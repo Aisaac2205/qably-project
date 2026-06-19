@@ -1,0 +1,16 @@
+node_modules
+.turbo
+dist
+.next
+.env
+.env.local
+*.log
+.superpowers/
+.claude/
+.agents/
+.atl/
+
+# Local analysis — not for version control
+docs/superpowers/
+REQUERIMIENTOS.md
+PRODUCT.md
