@@ -1,0 +1,13 @@
+{
+    "name": "@qably/types",
+    "version": "0.0.1",
+    "private": true,
+    "main": "./src/index.ts",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "devDependencies": {
+        "@qably/config": "workspace:*",
+        "typescript": "^5.4.0"
+    }
+}
