@@ -1,130 +1,103 @@
 @import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
-}
+/* ─── Qably Design Tokens ──────────────────────────────────────── */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Backgrounds */
+  --bg:                oklch(0.96 0.005 280);
+  --bg-surface:        oklch(1.000 0.000 0);
+  --bg-sidebar:        oklch(0.19 0.09 280);
+  --bg-sidebar-hover:  oklch(0.23 0.08 280);
+  --bg-sidebar-active: oklch(0.22 0.12 354 / 0.28);
+
+  /* Foregrounds */
+  --fg:                oklch(0.13 0.02 280);
+  --fg-muted:          oklch(0.46 0.004 280);
+  --fg-sidebar:        oklch(0.92 0.01 280);
+  --fg-sidebar-muted:  oklch(0.55 0.04 280);
+
+  /* Borders */
+  --border:            oklch(0.91 0.005 280);
+  --border-sidebar:    oklch(1 0 0 / 0.07);
+
+  /* Brand */
+  --primary:           oklch(0.55 0.18 354);
+  --primary-hover:     oklch(0.50 0.18 354);
+  --primary-fg:        oklch(0.98 0.005 354);
+
+  /* AI accent — only for AI-generated content markers */
+  --accent-ai:         oklch(0.50 0.19 295);
+  --accent-ai-bg:      oklch(0.95 0.06 295);
+
+  /* Status — semantic only, never for brand use */
+  --status-pass:       oklch(0.45 0.15 145);
+  --status-pass-bg:    oklch(0.95 0.05 145);
+  --status-fail:       oklch(0.45 0.20 25);
+  --status-fail-bg:    oklch(0.96 0.05 25);
+  --status-blocked:    oklch(0.55 0.18 50);
+  --status-blocked-bg: oklch(0.97 0.04 50);
+  --status-skip:       oklch(0.55 0.00 0);
+  --status-skip-bg:    oklch(0.94 0.00 0);
+  --status-running:    oklch(0.50 0.18 240);
+  --status-running-bg: oklch(0.95 0.05 240);
+  --status-warn:       oklch(0.55 0.15 80);
+  --status-warn-bg:    oklch(0.97 0.05 80);
+
+  /* shadcn/ui bridge — maps shadcn variable names to our tokens */
+  --background: var(--bg);
+  --foreground: var(--fg);
+  --card: var(--bg-surface);
+  --card-foreground: var(--fg);
+  --border-default: var(--border);
+  --ring: var(--primary);
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* ─── Tailwind v4 theme mapping ─────────────────────────────────── */
+/* Maps CSS variables → Tailwind utility classes */
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* bg-canvas, text-canvas, border-canvas */
+  --color-canvas:             var(--bg);
+  --color-surface:            var(--bg-surface);
+  --color-sidebar:            var(--bg-sidebar);
+  --color-sidebar-hover:      var(--bg-sidebar-hover);
+  --color-sidebar-active:     var(--bg-sidebar-active);
+
+  --color-default:            var(--fg);
+  --color-muted:              var(--fg-muted);
+  --color-sidebar-fg:         var(--fg-sidebar);
+  --color-sidebar-fg-muted:   var(--fg-sidebar-muted);
+
+  --color-border:             var(--border);
+  --color-border-sidebar:     var(--border-sidebar);
+
+  --color-primary:            var(--primary);
+  --color-primary-hover:      var(--primary-hover);
+  --color-primary-fg:         var(--primary-fg);
+
+  --color-ai:                 var(--accent-ai);
+  --color-ai-bg:              var(--accent-ai-bg);
+
+  --color-pass:               var(--status-pass);
+  --color-pass-bg:            var(--status-pass-bg);
+  --color-fail:               var(--status-fail);
+  --color-fail-bg:            var(--status-fail-bg);
+  --color-blocked:            var(--status-blocked);
+  --color-blocked-bg:         var(--status-blocked-bg);
+  --color-skip:               var(--status-skip);
+  --color-skip-bg:            var(--status-skip-bg);
+  --color-running:            var(--status-running);
+  --color-running-bg:         var(--status-running-bg);
+  --color-warn:               var(--status-warn);
+  --color-warn-bg:            var(--status-warn-bg);
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  html {
-    @apply font-sans;
-  }
+/* ─── Base styles ───────────────────────────────────────────────── */
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
 }
