@@ -25,6 +25,17 @@ import type {
   GithubIntegration,
 } from '@qably/types'
 
+// Module-level frozen empty arrays — stable identity across SSR calls.
+// React 19's useSyncExternalStore requires getServerSnapshot to return
+// the SAME reference on every call to prevent infinite loop detection.
+const EMPTY_PROJECTS = Object.freeze([]) as unknown as Project[]
+const EMPTY_SUITES = Object.freeze([]) as unknown as Suite[]
+const EMPTY_RUNS = Object.freeze([]) as unknown as Run[]
+const EMPTY_AI_CASES = Object.freeze([]) as unknown as AiCase[]
+const EMPTY_PIPELINES = Object.freeze([]) as unknown as PipelineRun[]
+const EMPTY_MEMBERS = Object.freeze([]) as unknown as OrgMember[]
+const EMPTY_API_KEYS = Object.freeze([]) as unknown as ApiKey[]
+
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
   const cacheRef = useRef<{ key: number; value: T[] }>({ key: -1, value: [] })
   return useSyncExternalStore(
@@ -50,7 +61,7 @@ function sameContents<T>(a: T[], b: T[]): boolean {
 }
 
 export function useProjects(): Project[] {
-  return useStableArray(() => getSnapshot().projects, () => [])
+  return useStableArray(() => getSnapshot().projects, () => EMPTY_PROJECTS)
 }
 
 export function useProject(id: string): Project | undefined {
@@ -74,7 +85,7 @@ export function useSuites(projectId?: string): Suite[] {
       const all = getSnapshot().suites
       return projectId ? all.filter((s) => s.projectId === projectId) : all
     },
-    () => [],
+    () => EMPTY_SUITES,
   )
 }
 
@@ -99,7 +110,7 @@ export function useRuns(projectId?: string): Run[] {
       const all = getSnapshot().runs
       return projectId ? all.filter((r) => r.projectId === projectId) : all
     },
-    () => [],
+    () => EMPTY_RUNS,
   )
 }
 
@@ -124,7 +135,7 @@ export function useAiCases(projectId?: string): AiCase[] {
       const all = getSnapshot().aiCases
       return projectId ? all.filter((c) => c.projectId === projectId) : all
     },
-    () => [],
+    () => EMPTY_AI_CASES,
   )
 }
 
@@ -134,7 +145,7 @@ export function usePipelines(projectId?: string): PipelineRun[] {
       const all = getSnapshot().pipelines
       return projectId ? all.filter((p) => p.projectId === projectId) : all
     },
-    () => [],
+    () => EMPTY_PIPELINES,
   )
 }
 
@@ -143,11 +154,11 @@ export function useOrg(): Organization {
 }
 
 export function useMembers(): OrgMember[] {
-  return useStableArray(() => getSnapshot().members, () => [])
+  return useStableArray(() => getSnapshot().members, () => EMPTY_MEMBERS)
 }
 
 export function useApiKeys(): ApiKey[] {
-  return useStableArray(() => getSnapshot().apiKeys, () => [])
+  return useStableArray(() => getSnapshot().apiKeys, () => EMPTY_API_KEYS)
 }
 
 export function useIntegration(): GithubIntegration {

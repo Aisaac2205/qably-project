@@ -73,6 +73,20 @@ describe('mock-store', () => {
     expect(a.projects).toEqual([])
   })
 
+  it('getServerSnapshot inner arrays are stable references across calls', () => {
+    const a = getServerSnapshot()
+    const b = getServerSnapshot()
+    // Each inner array must be the SAME reference — React 19 useSyncExternalStore
+    // requires getServerSnapshot to return identical references for identical state.
+    expect(a.projects).toBe(b.projects)
+    expect(a.suites).toBe(b.suites)
+    expect(a.runs).toBe(b.runs)
+    expect(a.aiCases).toBe(b.aiCases)
+    expect(a.pipelines).toBe(b.pipelines)
+    expect(a.members).toBe(b.members)
+    expect(a.apiKeys).toBe(b.apiKeys)
+  })
+
   // ── Projects ────────────────────────────────────────────────────
 
   it('getProjects returns all seeded projects', () => {
