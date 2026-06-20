@@ -3,10 +3,11 @@
  * via useSyncExternalStore.
  *
  * Each hook provides a stable server snapshot for SSR safety.
+ * Uses cached selectors to prevent infinite loops with React 19's strict getSnapshot identity checks.
  */
 'use client'
 
-import { useSyncExternalStore } from 'react'
+import { useSyncExternalStore, useRef } from 'react'
 import {
   subscribe,
   getSnapshot,
@@ -24,21 +25,51 @@ import type {
   GithubIntegration,
 } from '@qably/types'
 
+function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
+  const cacheRef = useRef<{ key: number; value: T[] }>({ key: -1, value: [] })
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      const arr = selector()
+      const key = arr.length
+      if (key !== cacheRef.current.key || !sameContents(cacheRef.current.value, arr)) {
+        cacheRef.current = { key: arr.length, value: arr }
+      }
+      return cacheRef.current.value
+    },
+    fallback,
+  )
+}
+
+function sameContents<T>(a: T[], b: T[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
 export function useProjects(): Project[] {
-  return useSyncExternalStore(subscribe, () => getSnapshot().projects, () => getServerSnapshot().projects)
+  return useStableArray(() => getSnapshot().projects, () => [])
 }
 
 export function useProject(id: string): Project | undefined {
+  const cacheRef = useRef<{ id: string; value: Project | undefined }>({ id: '', value: undefined })
   return useSyncExternalStore(
     subscribe,
-    () => getSnapshot().projects.find((p) => p.id === id),
-    () => getServerSnapshot().projects.find((p) => p.id === id),
+    () => {
+      const p = getSnapshot().projects.find((p) => p.id === id)
+      if (p !== cacheRef.current.value || id !== cacheRef.current.id) {
+        cacheRef.current = { id, value: p }
+      }
+      return cacheRef.current.value
+    },
+    () => undefined,
   )
 }
 
 export function useSuites(projectId?: string): Suite[] {
-  return useSyncExternalStore(
-    subscribe,
+  return useStableArray(
     () => {
       const all = getSnapshot().suites
       return projectId ? all.filter((s) => s.projectId === projectId) : all
@@ -48,16 +79,22 @@ export function useSuites(projectId?: string): Suite[] {
 }
 
 export function useSuite(suiteId: string): Suite | undefined {
+  const cacheRef = useRef<{ id: string; value: Suite | undefined }>({ id: '', value: undefined })
   return useSyncExternalStore(
     subscribe,
-    () => getSnapshot().suites.find((s) => s.id === suiteId),
+    () => {
+      const s = getSnapshot().suites.find((s) => s.id === suiteId)
+      if (s !== cacheRef.current.value || suiteId !== cacheRef.current.id) {
+        cacheRef.current = { id: suiteId, value: s }
+      }
+      return cacheRef.current.value
+    },
     () => undefined,
   )
 }
 
 export function useRuns(projectId?: string): Run[] {
-  return useSyncExternalStore(
-    subscribe,
+  return useStableArray(
     () => {
       const all = getSnapshot().runs
       return projectId ? all.filter((r) => r.projectId === projectId) : all
@@ -67,16 +104,22 @@ export function useRuns(projectId?: string): Run[] {
 }
 
 export function useRun(runId: string): Run | undefined {
+  const cacheRef = useRef<{ id: string; value: Run | undefined }>({ id: '', value: undefined })
   return useSyncExternalStore(
     subscribe,
-    () => getSnapshot().runs.find((r) => r.id === runId),
+    () => {
+      const r = getSnapshot().runs.find((r) => r.id === runId)
+      if (r !== cacheRef.current.value || runId !== cacheRef.current.id) {
+        cacheRef.current = { id: runId, value: r }
+      }
+      return cacheRef.current.value
+    },
     () => undefined,
   )
 }
 
 export function useAiCases(projectId?: string): AiCase[] {
-  return useSyncExternalStore(
-    subscribe,
+  return useStableArray(
     () => {
       const all = getSnapshot().aiCases
       return projectId ? all.filter((c) => c.projectId === projectId) : all
@@ -86,8 +129,7 @@ export function useAiCases(projectId?: string): AiCase[] {
 }
 
 export function usePipelines(projectId?: string): PipelineRun[] {
-  return useSyncExternalStore(
-    subscribe,
+  return useStableArray(
     () => {
       const all = getSnapshot().pipelines
       return projectId ? all.filter((p) => p.projectId === projectId) : all
@@ -101,11 +143,11 @@ export function useOrg(): Organization {
 }
 
 export function useMembers(): OrgMember[] {
-  return useSyncExternalStore(subscribe, () => getSnapshot().members, () => getServerSnapshot().members)
+  return useStableArray(() => getSnapshot().members, () => [])
 }
 
 export function useApiKeys(): ApiKey[] {
-  return useSyncExternalStore(subscribe, () => getSnapshot().apiKeys, () => getServerSnapshot().apiKeys)
+  return useStableArray(() => getSnapshot().apiKeys, () => [])
 }
 
 export function useIntegration(): GithubIntegration {
