@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useProjectContext } from '@/features/projects/context/project-context'
 import { useRuns, useAiCases } from '@/lib/use-mock-store'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
 const PassRateChart = dynamic(
   () => import('./pass-rate-chart').then((mod) => mod.PassRateChart),
@@ -30,10 +31,12 @@ const AiCasesChart = dynamic(
 
 function ChartSkeleton() {
   return (
-    <div className="h-64 rounded-md border border-border p-4 bg-surface animate-pulse">
-      <div className="h-4 w-1/3 bg-muted/30 rounded mb-4" />
-      <div className="h-40 bg-muted/20 rounded" />
-    </div>
+    <Card className="animate-pulse">
+      <CardContent className="p-4">
+        <div className="h-4 w-1/3 bg-muted/30 rounded mb-4" />
+        <div className="h-40 bg-muted/20 rounded" />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -44,28 +47,40 @@ export function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <h1 className="text-lg font-semibold text-default" id="reports-heading">
+      <h1 className="text-2xl font-semibold tracking-tight text-default" id="reports-heading">
         Reports
       </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Pass Rate Chart */}
-        <div className="rounded-md border border-border p-4 bg-surface">
-          <h2 className="text-sm font-medium text-default mb-3">Pass Rate Over Time</h2>
-          <PassRateChart runs={runs} />
-        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Pass Rate Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PassRateChart runs={runs} />
+          </CardContent>
+        </Card>
 
         {/* Distribution Chart */}
-        <div className="rounded-md border border-border p-4 bg-surface">
-          <h2 className="text-sm font-medium text-default mb-3">Pass / Fail Distribution</h2>
-          <DistributionChart runs={runs} />
-        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Pass / Fail Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DistributionChart runs={runs} />
+          </CardContent>
+        </Card>
 
         {/* AI Cases Chart */}
-        <div className="rounded-md border border-border p-4 bg-surface lg:col-span-2">
-          <h2 className="text-sm font-medium text-default mb-3">AI Case Review Status</h2>
-          <AiCasesChart aiCases={aiCases} />
-        </div>
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">AI Case Review Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AiCasesChart aiCases={aiCases} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

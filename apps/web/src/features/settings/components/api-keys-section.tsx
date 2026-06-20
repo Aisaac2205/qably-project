@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useApiKeys } from '@/lib/use-mock-store'
 import { useCreateApiKey } from '../hooks/use-create-api-key'
 import { useRevokeApiKey } from '../hooks/use-revoke-api-key'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
@@ -34,25 +35,27 @@ export function ApiKeysSection() {
   return (
     <div className="space-y-6">
       {/* Create form */}
-      <div className="flex items-end gap-3 p-3 rounded-md border border-border bg-canvas">
-        <div className="flex-1 space-y-1.5">
-          <label className="text-xs font-medium text-default" htmlFor="key-name">
-            Key Name
-          </label>
-          <Input
-            id="key-name"
-            type="text"
-            placeholder="Key name e.g. CI/CD"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="h-7 text-xs"
-          />
-        </div>
-        <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
-          <Plus size={14} />
-          Create
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="flex items-end gap-3 p-3">
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-medium text-default" htmlFor="key-name">
+              Key Name
+            </label>
+            <Input
+              id="key-name"
+              type="text"
+              placeholder="Key name e.g. CI/CD"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="h-7 text-xs"
+            />
+          </div>
+          <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
+            <Plus size={14} />
+            Create
+          </Button>
+        </CardContent>
+      </Card>
 
       <Separator />
 

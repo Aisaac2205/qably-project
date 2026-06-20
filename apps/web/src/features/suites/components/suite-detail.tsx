@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useSuite, useProject } from '@/lib/use-mock-store'
+import { Card, CardContent } from '@/components/ui/card'
 import { CaseCard } from './case-card'
 import { Play } from '@phosphor-icons/react'
 
@@ -22,7 +23,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     <div className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-default">{suite.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-default">{suite.name}</h1>
           <p className="text-[11px] text-muted mt-0.5">
             {suite.cases.length} test cases
           </p>
@@ -37,15 +38,17 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         </button>
       </div>
 
-      <div className="bg-surface rounded border border-border divide-y divide-border">
-        {suite.cases.length === 0 ? (
-          <div className="py-8 text-center text-muted text-sm">No test cases in this suite</div>
-        ) : (
-          suite.cases.map((tc) => (
-            <CaseCard key={tc.id} testCase={tc} />
-          ))
-        )}
-      </div>
+      <Card>
+        <CardContent className="p-0 divide-y divide-border">
+          {suite.cases.length === 0 ? (
+            <div className="py-8 text-center text-muted text-sm">No test cases in this suite</div>
+          ) : (
+            suite.cases.map((tc) => (
+              <CaseCard key={tc.id} testCase={tc} />
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

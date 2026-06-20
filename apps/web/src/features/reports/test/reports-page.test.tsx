@@ -63,12 +63,12 @@ describe('ReportsPage', () => {
     expect(screen.getByText('AI Case Review Status')).toBeInTheDocument()
   })
 
-  it('renders chart containers with border and background', async () => {
+  it('renders chart containers as Card components', async () => {
     await act(async () => {
       render(<ReportsPage />)
     })
-    // Should have at least 3 chart card wrappers (rounded-md border)
-    const cards = document.querySelectorAll('.rounded-md.border.border-border')
+    // Should have at least 3 chart cards (Card components with data-slot="card")
+    const cards = document.querySelectorAll('[data-slot="card"]')
     expect(cards.length).toBeGreaterThanOrEqual(3)
   })
 })

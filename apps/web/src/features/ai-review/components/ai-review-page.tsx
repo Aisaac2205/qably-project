@@ -18,7 +18,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
   return (
     <div className="h-full flex flex-col">
       <div className="px-4 py-3 border-b border-border">
-        <h1 className="text-lg font-semibold text-default">AI Review</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-default mb-6">AI Review</h1>
         <p className="text-[11px] text-muted">
           {cases.length} case{cases.length !== 1 ? 's' : ''} pending review
         </p>

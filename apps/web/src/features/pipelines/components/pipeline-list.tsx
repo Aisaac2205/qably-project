@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import type { PipelineStatus } from '@qably/types'
 import { usePipelines } from '@/lib/use-mock-store'
+import { Card, CardContent } from '@/components/ui/card'
 import { PipelineFilter } from './pipeline-filter'
 import { PipelineRow } from './pipeline-row'
 
@@ -35,11 +36,13 @@ export function PipelineList({ projectId }: { projectId: string }) {
           No pipelines match the selected filters
         </div>
       ) : (
-        <div className="divide-y divide-border bg-surface rounded border border-border">
-          {filtered.map((p) => (
-            <PipelineRow key={p.id} p={p} projectId={projectId} />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0 divide-y divide-border">
+            {filtered.map((p) => (
+              <PipelineRow key={p.id} p={p} projectId={projectId} />
+            ))}
+          </CardContent>
+        </Card>
       )}
     </div>
   )

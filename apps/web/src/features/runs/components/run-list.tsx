@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { Run } from '@qably/types'
 import { useRuns } from '@/lib/use-mock-store'
+import { Card, CardContent } from '@/components/ui/card'
 import { StatusChip } from './status-chip'
 
 function formatDate(iso: string): string {
@@ -71,10 +72,12 @@ export function RunList({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="divide-y divide-border bg-surface rounded border border-border">
-      {sorted.map((r) => (
-        <RunRow key={r.id} run={r} projectId={projectId} />
-      ))}
-    </div>
+    <Card>
+      <CardContent className="p-0 divide-y divide-border">
+        {sorted.map((r) => (
+          <RunRow key={r.id} run={r} projectId={projectId} />
+        ))}
+      </CardContent>
+    </Card>
   )
 }

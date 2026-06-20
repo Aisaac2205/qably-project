@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useMembers } from '@/lib/use-mock-store'
 import { useInviteMember } from '../hooks/use-invite-member'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,39 +33,41 @@ export function MembersSection() {
   return (
     <div className="space-y-6">
       {/* Invite form */}
-      <div className="flex items-end gap-3 p-3 rounded-md border border-border bg-canvas">
-        <div className="flex-1 space-y-1.5">
-          <label className="text-xs font-medium text-default" htmlFor="invite-email">
-            Email
-          </label>
-          <Input
-            id="invite-email"
-            type="email"
-            placeholder="email@acme.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="h-7 text-xs"
-          />
-        </div>
-        <div className="w-28 space-y-1.5">
-          <label className="text-xs font-medium text-default" htmlFor="invite-role">
-            Role
-          </label>
-          <Select value={role} onValueChange={(v) => setRole(v as OrgMember['role'])}>
-            <SelectTrigger id="invite-role" className="h-7 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="member">Member</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button size="sm" onClick={handleInvite} disabled={isLoading || !email.trim()}>
-          <Plus size={14} />
-          Invite
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="flex items-end gap-3 p-3">
+          <div className="flex-1 space-y-1.5">
+            <label className="text-xs font-medium text-default" htmlFor="invite-email">
+              Email
+            </label>
+            <Input
+              id="invite-email"
+              type="email"
+              placeholder="email@acme.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-7 text-xs"
+            />
+          </div>
+          <div className="w-28 space-y-1.5">
+            <label className="text-xs font-medium text-default" htmlFor="invite-role">
+              Role
+            </label>
+            <Select value={role} onValueChange={(v) => setRole(v as OrgMember['role'])}>
+              <SelectTrigger id="invite-role" className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="member">Member</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button size="sm" onClick={handleInvite} disabled={isLoading || !email.trim()}>
+            <Plus size={14} />
+            Invite
+          </Button>
+        </CardContent>
+      </Card>
 
       <Separator />
 

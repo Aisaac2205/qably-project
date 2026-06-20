@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useSuites } from '@/lib/use-mock-store'
+import { Card, CardContent } from '@/components/ui/card'
 import { SuiteRow } from './suite-row'
 
 export function SuiteList({ projectId }: { projectId: string }) {
@@ -20,16 +21,18 @@ export function SuiteList({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="divide-y divide-border">
-      {sorted.map((suite) => (
-        <Link
-          key={suite.id}
-          href={`/projects/${projectId}/suites/${suite.id}`}
-          className="block focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <SuiteRow suite={suite} />
-        </Link>
-      ))}
-    </div>
+    <Card>
+      <CardContent className="p-0 divide-y divide-border">
+        {sorted.map((suite) => (
+          <Link
+            key={suite.id}
+            href={`/projects/${projectId}/suites/${suite.id}`}
+            className="block focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <SuiteRow suite={suite} />
+          </Link>
+        ))}
+      </CardContent>
+    </Card>
   )
 }

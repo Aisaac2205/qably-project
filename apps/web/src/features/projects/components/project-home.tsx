@@ -2,6 +2,7 @@
 
 import type { Project } from '@qably/types'
 import { useRuns, useAiCases, usePipelines } from '@/lib/use-mock-store'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { ProjectHeader } from './project-header'
 import { StatusChip } from './status-chip'
 
@@ -101,24 +102,24 @@ export function ProjectHome({ project }: { project: Project }) {
       <ProjectHeader project={project} />
 
       <section>
-        <h2 className="text-sm font-semibold text-default mb-2">Recent runs</h2>
-        <div className="bg-surface rounded border border-border">
+        <h2 className="text-lg font-medium mb-3">Recent runs</h2>
+        <Card>
           <RecentRuns projectId={project.id} />
-        </div>
+        </Card>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-default mb-2">Pending AI cases</h2>
-        <div className="bg-surface rounded border border-border">
+        <h2 className="text-lg font-medium mb-3">Pending AI cases</h2>
+        <Card>
           <RecentAiCases projectId={project.id} />
-        </div>
+        </Card>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-default mb-2">Recent pipelines</h2>
-        <div className="bg-surface rounded border border-border">
+        <h2 className="text-lg font-medium mb-3">Recent pipelines</h2>
+        <Card>
           <RecentPipelines projectId={project.id} />
-        </div>
+        </Card>
       </section>
     </div>
   )

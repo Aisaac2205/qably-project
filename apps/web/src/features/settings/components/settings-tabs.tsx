@@ -21,7 +21,7 @@ export function SettingsTabs() {
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-3xl">
-      <h1 className="text-lg font-semibold text-default">Settings</h1>
+      <h1 className="text-2xl font-semibold tracking-tight text-default">Settings</h1>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
         <TabsList className="w-fit">
