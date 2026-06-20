@@ -12,6 +12,7 @@ import {
   Sparkle,
   Gear,
 } from '@phosphor-icons/react'
+import { useProject } from '@/lib/use-mock-store'
 
 interface NavItem {
   label: string
@@ -32,6 +33,12 @@ const PROJECT_NAV: NavItem[] = [
   { label: 'Reports', href: 'reports', icon: ChartBar },
   { label: 'AI Review', href: 'ai-review', icon: Sparkle },
 ]
+
+function healthColor(score: number): string {
+  if (score >= 80) return 'bg-pass'
+  if (score >= 50) return 'bg-warn'
+  return 'bg-fail'
+}
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -76,6 +83,8 @@ function GlobalNav({ pathname }: { pathname: string }) {
 }
 
 function ProjectNav({ projectId, pathname }: { projectId: string; pathname: string }) {
+  const project = useProject(projectId)
+
   return (
     <>
       <Link
@@ -86,8 +95,24 @@ function ProjectNav({ projectId, pathname }: { projectId: string; pathname: stri
       </Link>
 
       <div className="mx-2 mb-1 rounded bg-white/5 px-2 py-1.5">
-        <div className="text-sidebar-fg text-[11px] font-semibold truncate">{projectId}</div>
-        <div className="text-sidebar-fg-muted text-[9px] mt-0.5">Loading…</div>
+        <div className="flex items-center gap-1.5">
+          {project ? (
+            <>
+              <div
+                className={`w-2 h-2 rounded-full shrink-0 ${healthColor(project.healthScore)}`}
+                aria-hidden="true"
+              />
+              <div className="text-sidebar-fg text-[11px] font-semibold truncate">
+                {project.name}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-sidebar-fg text-[11px] font-semibold truncate">{projectId}</div>
+              <div className="text-sidebar-fg-muted text-[9px]">Loading…</div>
+            </>
+          )}
+        </div>
       </div>
 
       <nav className="flex flex-col py-1">
