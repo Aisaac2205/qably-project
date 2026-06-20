@@ -1,7 +1,10 @@
-export default function RunDetailPlaceholder() {
-  return (
-    <div className="flex items-center justify-center h-full text-muted text-sm">
-      Runs (moved, will be reimplemented in T08)
-    </div>
-  )
+import { RunDetailPageClient } from './client'
+
+type Props = {
+  params: Promise<{ id: string; runId: string }>
+}
+
+export default async function RunDetailPage({ params }: Props) {
+  const { id, runId } = await params
+  return <RunDetailPageClient projectId={id} runId={runId} />
 }

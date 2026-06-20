@@ -1,0 +1,111 @@
+'use client'
+
+import { useState, useCallback } from 'react'
+import { useSuites } from '@/lib/use-mock-store'
+import { useCreateRun } from '@/features/runs/hooks/use-create-run'
+import {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+
+export function NewRunForm({
+  projectId,
+  initialSuiteId,
+}: {
+  projectId: string
+  initialSuiteId?: string
+}) {
+  const suites = useSuites(projectId)
+  const createRun = useCreateRun(projectId)
+  const [suiteId, setSuiteId] = useState(initialSuiteId ?? '')
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const handleSuiteChange = useCallback((value: unknown) => {
+    const v = String(value ?? '')
+    setSuiteId(v)
+    if (v) setError('')
+  }, [])
+
+  const handleSubmit = useCallback(async () => {
+    if (!suiteId) {
+      setError('Please select a suite')
+      return
+    }
+    setSubmitting(true)
+    try {
+      createRun(suiteId, name || undefined)
+    } finally {
+      setSubmitting(false)
+    }
+  }, [suiteId, name, createRun])
+
+  if (suites.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-sm text-muted">
+        No suites available. Create a suite first.
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-md mx-auto p-4 space-y-4">
+      <h1 className="text-lg font-semibold text-default">New run</h1>
+
+      <div className="space-y-1.5">
+        <label htmlFor="suite-select" className="text-xs font-medium text-default">
+          Suite
+        </label>
+        <Select value={suiteId} onValueChange={handleSuiteChange}>
+          <SelectTrigger id="suite-select">
+            <SelectValue placeholder="Select a suite" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {suites.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        {error && (
+          <span className="text-[11px] text-fail" role="alert">
+            {error}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="run-name" className="text-xs font-medium text-default">
+          Run name{' '}
+          <span className="text-muted font-normal">(optional)</span>
+        </label>
+        <input
+          id="run-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Smoke Test"
+          className="w-full h-8 px-2.5 text-xs rounded border border-border bg-surface text-default
+            placeholder:text-muted focus-visible:outline-2 focus-visible:outline-primary"
+        />
+      </div>
+
+      <Button
+        onClick={handleSubmit}
+        disabled={submitting}
+        className="w-full"
+      >
+        {submitting ? 'Starting...' : 'Start run'}
+      </Button>
+    </div>
+  )
+}
