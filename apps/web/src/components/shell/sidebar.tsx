@@ -46,10 +46,10 @@ export function Sidebar() {
   const projectId = projectMatch?.[1] ?? null
 
   return (
-    <aside className="w-40 h-full bg-sidebar flex flex-col shrink-0">
+    <aside className="w-60 h-full bg-sidebar flex flex-col shrink-0">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border-sidebar">
-        <div className="w-4 h-4 rounded bg-primary shrink-0" aria-hidden="true" />
-        <span className="text-sidebar-fg text-xs font-semibold">Qably</span>
+        <div className="w-5 h-5 rounded bg-primary shrink-0" aria-hidden="true" />
+        <span className="text-sidebar-fg text-base font-semibold">Qably</span>
       </div>
 
       {projectId ? (
@@ -59,10 +59,10 @@ export function Sidebar() {
       )}
 
       <div className="flex items-center gap-2 px-3 py-2 border-t border-border-sidebar mt-auto">
-        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-fg text-[9px] font-bold shrink-0">
+        <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-fg text-xs font-bold shrink-0">
           IF
         </div>
-        <span className="text-sidebar-fg-muted text-[11px] truncate">Isaac F.</span>
+        <span className="text-sidebar-fg-muted text-sm truncate">Isaac F.</span>
       </div>
     </aside>
   )
@@ -89,7 +89,7 @@ function ProjectNav({ projectId, pathname }: { projectId: string; pathname: stri
     <>
       <Link
         href="/projects"
-        className="px-3 pt-2.5 pb-1 text-[11px] text-sidebar-fg-muted hover:text-sidebar-fg transition-colors"
+        className="px-3 pt-2.5 pb-1 text-sm text-sidebar-fg-muted hover:text-sidebar-fg transition-colors"
       >
         ← Projects
       </Link>
@@ -102,14 +102,14 @@ function ProjectNav({ projectId, pathname }: { projectId: string; pathname: stri
                 className={`w-2 h-2 rounded-full shrink-0 ${healthColor(project.healthScore)}`}
                 aria-hidden="true"
               />
-              <div className="text-sidebar-fg text-[11px] font-semibold truncate">
+              <div className="text-sidebar-fg text-sm font-semibold truncate">
                 {project.name}
               </div>
             </>
           ) : (
             <>
-              <div className="text-sidebar-fg text-[11px] font-semibold truncate">{projectId}</div>
-              <div className="text-sidebar-fg-muted text-[9px]">Loading…</div>
+              <div className="text-sidebar-fg text-sm font-semibold truncate">{projectId}</div>
+              <div className="text-sidebar-fg-muted text-xs">Loading…</div>
             </>
           )}
         </div>
@@ -137,13 +137,13 @@ function SidebarItem({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       className={[
-        'flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors',
+        'flex items-center gap-2 px-3 py-2 text-sm transition-colors',
         active
           ? 'bg-sidebar-active text-sidebar-fg border-l-2 border-primary'
           : 'text-sidebar-fg-muted hover:text-sidebar-fg hover:bg-sidebar-hover',
       ].join(' ')}
     >
-      <Icon size={13} weight={active ? 'bold' : 'regular'} aria-hidden="true" />
+      <Icon size={16} weight={active ? 'bold' : 'regular'} aria-hidden="true" />
       {item.label}
     </Link>
   )
