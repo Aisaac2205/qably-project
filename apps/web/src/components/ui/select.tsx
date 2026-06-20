@@ -4,15 +4,20 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { CaretDown, Check } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 
-function Select({ ...props }: SelectPrimitive.Root.Props) {
+type SelectRootProps = React.ComponentProps<typeof SelectPrimitive.Root>
+type SelectGroupProps = React.ComponentProps<typeof SelectPrimitive.Group>
+type SelectValueProps = React.ComponentProps<typeof SelectPrimitive.Value>
+type SelectTriggerProps = React.ComponentProps<typeof SelectPrimitive.Trigger>
+
+function Select({ ...props }: SelectRootProps) {
   return <SelectPrimitive.Root data-slot="select" {...props} />
 }
 
-function SelectGroup({ ...props }: SelectPrimitive.Group.Props) {
+function SelectGroup({ ...props }: SelectGroupProps) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+function SelectValue({ className, ...props }: SelectValueProps) {
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
@@ -22,7 +27,7 @@ function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
   )
 }
 
-function SelectTrigger({ className, children, ...props }: SelectPrimitive.Trigger.Props) {
+function SelectTrigger({ className, children, ...props }: SelectTriggerProps) {
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
