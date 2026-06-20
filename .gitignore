@@ -1,3 +1,4 @@
+PLAN.md
 node_modules
 .turbo
 dist
@@ -9,6 +10,7 @@ dist
 .claude/
 .agents/
 .atl/
+openspec/
 
 # Local analysis — not for version control
 docs/superpowers/

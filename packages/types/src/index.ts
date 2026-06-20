@@ -1,72 +1,143 @@
-export enum TestStatus {
-    PASS = 'pass',
-    FAIL = 'fail',
-    SKIPPED = 'skipped',
-    BLOCKED = 'blocked',
+// ─── Status types ────────────────────────────────────────────────────────────
+
+export type CaseStatus = 'pass' | 'fail' | 'skip' | 'blocked' | 'running' | 'pending'
+export type RunStatus = 'pass' | 'fail' | 'running' | 'pending'
+export type ReviewStatus = 'pending' | 'confirmed' | 'rejected'
+export type CasePriority = 'critical' | 'high' | 'medium' | 'low'
+export type CaseState = 'active' | 'draft' | 'deprecated'
+export type OrgRole = 'owner' | 'admin' | 'member'
+export type Plan = 'free' | 'pro' | 'agency'
+export type PipelineStatus = 'pass' | 'fail' | 'running' | 'pending' | 'cancelled'
+export type RunSource = 'manual' | 'api' | 'github_actions'
+
+// ─── Organization ─────────────────────────────────────────────────────────────
+
+export interface Organization {
+  id: string
+  name: string
+  slug: string
+  plan: Plan
+  planLimits: {
+    maxProjects: number
+    maxUsers: number
+    maxCases: number
+  }
 }
 
-export enum TestPriority {
-    LOW = 'low',
-    MEDIUM = 'medium',
-    HIGH = 'high',
-    CRITICAL = 'critical',
+export interface OrgMember {
+  id: string
+  userId: string
+  name: string
+  email: string
+  role: OrgRole
+  joinedAt: string
+  avatarUrl?: string
 }
 
-export enum RunSource {
-    MANUAL = 'manual',
-    API = 'api',
-    GITHUB_ACTIONS = 'github_actions',
+export interface ApiKey {
+  id: string
+  name: string
+  prefix: string
+  lastFour: string
+  createdAt: string
+  lastUsedAt?: string
 }
 
-export enum UserRole {
-    OWNER = 'owner',
-    ADMIN = 'admin',
-    MEMBER = 'member',
+// ─── Projects ─────────────────────────────────────────────────────────────────
+
+export interface Project {
+  id: string
+  name: string
+  description?: string
+  githubRepo?: string
+  organizationId: string
+  healthScore: number
+  lastRunStatus: RunStatus
+  lastRunAt: string
+  suiteCount: number
+  activeRunCount: number
+  aiPendingCount: number
+  createdAt: string
 }
 
-export interface BaseEntity {
-    id: string
-    createdAt: Date
-    updatedAt: Date
+// ─── Suites & Cases ───────────────────────────────────────────────────────────
+
+export interface TestCase {
+  id: string
+  suiteId: string
+  name: string
+  steps: string[]
+  expectedResult: string
+  priority: CasePriority
+  state: CaseState
 }
 
-export interface Organization extends BaseEntity {
-    name: string
-    slug: string
-    plan: 'free' | 'pro' | 'agency'
+export interface Suite {
+  id: string
+  projectId: string
+  organizationId: string
+  name: string
+  cases: TestCase[]
+  createdAt: string
 }
 
-export interface Project extends BaseEntity {
-    name: string
-    description?: string
-    organizationId: string
+// ─── Runs ─────────────────────────────────────────────────────────────────────
+
+export interface RunCase {
+  id: string
+  name: string
+  suite: string
+  steps: string[]
+  expectedResult: string
+  status: CaseStatus
 }
 
-export interface TestSuite extends BaseEntity {
-    name: string
-    projectId: string
+export interface Run {
+  id: string
+  projectId: string
+  name: string
+  suiteId: string
+  suiteName: string
+  cases: RunCase[]
+  status: RunStatus
+  passRate: number
+  source: RunSource
+  startedAt: string
+  finishedAt?: string
 }
 
-export interface TestCase extends BaseEntity {
-    title: string
-    steps: string
-    expectedResult: string
-    priority: TestPriority
-    suiteId: string
+// ─── AI Cases ─────────────────────────────────────────────────────────────────
+
+export interface AiCase {
+  id: string
+  name: string
+  steps: string[]
+  expectedResult: string
+  sourceFile: string
+  sourceSnippet: string
+  reviewStatus: ReviewStatus
+  projectId: string
 }
 
-export interface TestRun extends BaseEntity {
-    name: string
-    source: RunSource
-    branch?: string
-    commitSha?: string
-    projectId: string
+// ─── Pipelines ────────────────────────────────────────────────────────────────
+
+export interface PipelineRun {
+  id: string
+  projectId: string
+  branch: string
+  commitSha: string
+  commitMessage: string
+  status: PipelineStatus
+  runId?: string
+  triggeredAt: string
+  finishedAt?: string
 }
 
-export interface TestResult extends BaseEntity {
-    status: TestStatus
-    comment?: string
-    duration?: number
-    runId: string
-    caseId: string
+// ─── Integrations ─────────────────────────────────────────────────────────────
+
+export interface GithubIntegration {
+  webhookUrl: string
+  webhookSecret?: string
+  connected: boolean
+  repoUrl?: string
 }
