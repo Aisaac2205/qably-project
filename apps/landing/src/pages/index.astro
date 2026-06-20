@@ -1,0 +1,43 @@
+---
+import Landing from "../layouts/Landing.astro";
+import Navbar from "../components/Navbar.astro";
+import Hero from "../components/Hero.astro";
+import Problem from "../components/Problem.astro";
+import Solution from "../components/Solution.astro";
+import Features from "../components/Features.astro";
+import Pricing from "../components/Pricing.astro";
+import CtaFinal from "../components/CtaFinal.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<Landing title="Qably — QA Management for Engineers, Automated by AI">
+  <!-- Sticky Navigation Header -->
+  <Navbar />
+
+  <!-- Main Content Areas -->
+  <main class="flex-grow">
+    <!-- Hero Section with RetroGrid and AI queue preview -->
+    <Hero />
+
+    <!-- Scroll revealable sections -->
+    <div class="reveal-stagger">
+      <!-- Problem statement: the 20-min manual documentation tax -->
+      <Problem />
+
+      <!-- Solution representation: 4-step flow from code to Qably -->
+      <Solution />
+
+      <!-- Feature highlight: Bento Grid layout detailing components -->
+      <Features />
+
+      <!-- Pricing options: Pro, Agency, Custom -->
+      <Pricing />
+
+      <!-- Final Call to Action -->
+      <CtaFinal />
+    </div>
+  </main>
+
+  <!-- Navigation Footer -->
+  <Footer />
+</Landing>

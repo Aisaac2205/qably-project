@@ -1,0 +1,43 @@
+---
+interface Props {
+  angle?: number;
+  cellSize?: number;
+  opacity?: number;
+  lineColor?: string;
+  className?: string;
+}
+
+const {
+  angle = 65,
+  cellSize = 60,
+  opacity = 0.4,
+  lineColor = "rgba(255, 255, 255, 0.05)",
+  className = "",
+} = Astro.props;
+---
+
+<div
+  class={`pointer-events-none absolute inset-0 overflow-hidden opacity-[var(--grid-opacity)] [perspective:350px] ${className}`}
+  style={{
+    "--grid-angle": `${angle}deg`,
+    "--cell-size": `${cellSize}px`,
+    "--grid-opacity": opacity,
+    "--grid-line": lineColor,
+  }}
+>
+  <!-- Grid wrapper with perspective transformation -->
+  <div class="absolute inset-0 origin-top [transform:rotateX(var(--grid-angle))]">
+    <!-- Scrolling grid background -->
+    <div
+      class="animate-grid absolute -inset-y-[150%] -inset-x-[50%] w-[200%] h-[300vh] [background-repeat:repeat] [background-size:var(--cell-size)_var(--cell-size)]"
+      style={{
+        backgroundImage: `linear-gradient(to right, var(--grid-line) 1px, transparent 1px), linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px)`
+      }}
+    >
+    </div>
+  </div>
+
+  <!-- Radial gradient to fade the grid out gracefully towards the edges and bottom -->
+  <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,var(--landing-bg)_80%)]"></div>
+  <div class="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent"></div>
+</div>

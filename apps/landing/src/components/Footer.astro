@@ -1,0 +1,71 @@
+---
+const currentYear = new Date().getFullYear();
+const webUrl = import.meta.env.PUBLIC_WEB_URL || "http://localhost:3000";
+---
+
+<footer class="border-t border-border/40 bg-bg-subtle/50 py-12 md:py-16">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="grid gap-8 md:grid-cols-4 lg:gap-12">
+      
+      <!-- Brand column -->
+      <div class="flex flex-col gap-4">
+        <a href="#" class="flex items-center space-x-2">
+          <span class="font-sans font-bold text-lg tracking-tight text-fg flex items-center gap-1.5">
+            <svg class="h-4.5 w-4.5 text-primary" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Qably
+          </span>
+        </a>
+        <p class="text-xs text-fg-muted max-w-xs leading-relaxed">
+          El primer gestor del ciclo de vida de QA diseñado específicamente para desarrolladores, con documentación automatizada por Inteligencia Artificial.
+        </p>
+      </div>
+
+      <!-- Column 2: Product -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-fg mb-4">Producto</h4>
+        <ul class="space-y-2.5 text-xs">
+          <li><a href="#problem" class="text-fg-muted hover:text-fg transition-colors">El Problema</a></li>
+          <li><a href="#solution" class="text-fg-muted hover:text-fg transition-colors">Cómo Funciona</a></li>
+          <li><a href="#features" class="text-fg-muted hover:text-fg transition-colors">Características</a></li>
+          <li><a href="#pricing" class="text-fg-muted hover:text-fg transition-colors">Planes & Precios</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 3: Resources -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-fg mb-4">Recursos</h4>
+        <ul class="space-y-2.5 text-xs">
+          <li><a href={`${webUrl}/docs`} class="text-fg-muted hover:text-fg transition-colors">Documentación</a></li>
+          <li><a href={`${webUrl}/blog`} class="text-fg-muted hover:text-fg transition-colors">Blog de Ingeniería</a></li>
+          <li><a href={`${webUrl}/status`} class="text-fg-muted hover:text-fg transition-colors">Estado de Servicios</a></li>
+          <li><a href={`${webUrl}/contact`} class="text-fg-muted hover:text-fg transition-colors">Centro de Ayuda</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 4: Legal -->
+      <div>
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-fg mb-4">Legal</h4>
+        <ul class="space-y-2.5 text-xs">
+          <li><a href={`${webUrl}/privacy`} class="text-fg-muted hover:text-fg transition-colors">Privacidad</a></li>
+          <li><a href={`${webUrl}/terms`} class="text-fg-muted hover:text-fg transition-colors">Términos del Servicio</a></li>
+          <li><a href={`${webUrl}/security`} class="text-fg-muted hover:text-fg transition-colors">Seguridad (SOC2)</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- Bottom metadata -->
+    <div class="mt-12 border-t border-border/40 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-fg-subtle font-mono">
+      <div>
+        &copy; {currentYear} Qably Inc. Todos los derechos reservados.
+      </div>
+      <div class="flex gap-4">
+        <span>Hecho para ingenieros por ingenieros.</span>
+      </div>
+    </div>
+  </div>
+</footer>

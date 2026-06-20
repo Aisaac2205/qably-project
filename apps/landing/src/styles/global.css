@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+/* ─── Qably Landing — Design Tokens ────────────────────────────── */
+/* Derived from apps/web/globals.css for brand consistency.         */
+/* The landing uses the sidebar palette (dark) as its base,         */
+/* ensuring visual continuity when users transition to the app.     */
+
+:root {
+  /* ── Backgrounds ─────────────────────────────────────────────── */
+  --landing-bg:            oklch(0.13 0.04 280);
+  --landing-bg-elevated:   oklch(0.17 0.05 280);
+  --landing-bg-hover:      oklch(0.20 0.06 280);
+  --landing-bg-subtle:     oklch(0.10 0.03 280);
+
+  /* ── Foregrounds ─────────────────────────────────────────────── */
+  --landing-fg:            oklch(0.92 0.01 280);
+  --landing-fg-muted:      oklch(0.55 0.04 280);
+  --landing-fg-subtle:     oklch(0.40 0.03 280);
+
+  /* ── Brand (exact copies from apps/web) ──────────────────────── */
+  --primary:               oklch(0.55 0.18 354);
+  --primary-hover:         oklch(0.50 0.18 354);
+  --primary-fg:            oklch(0.98 0.005 354);
+
+  /* ── AI accent (exact copy from apps/web) ────────────────────── */
+  --accent-ai:             oklch(0.50 0.19 295);
+  --accent-ai-bg:          oklch(0.20 0.08 295);
+
+  /* ── Borders ─────────────────────────────────────────────────── */
+  --landing-border:        oklch(1 0 0 / 0.08);
+  --landing-border-strong: oklch(1 0 0 / 0.15);
+
+  /* ── Radii ───────────────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* ── Spacing scale ───────────────────────────────────────────── */
+  --space-section: clamp(4rem, 8vw, 8rem);
+}
+
+/* ─── Tailwind v4 theme ────────────────────────────────────────── */
+
+@theme inline {
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-bg:          var(--landing-bg);
+  --color-bg-elevated: var(--landing-bg-elevated);
+  --color-bg-hover:    var(--landing-bg-hover);
+  --color-bg-subtle:   var(--landing-bg-subtle);
+
+  --color-fg:          var(--landing-fg);
+  --color-fg-muted:    var(--landing-fg-muted);
+  --color-fg-subtle:   var(--landing-fg-subtle);
+
+  --color-primary:       var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg:    var(--primary-fg);
+
+  --color-ai:          var(--accent-ai);
+  --color-ai-bg:       var(--accent-ai-bg);
+
+  --color-border:        var(--landing-border);
+  --color-border-strong: var(--landing-border-strong);
+}
+
+/* ─── Base styles ──────────────────────────────────────────────── */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--landing-bg);
+  color: var(--landing-fg);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+/* ─── Animations ───────────────────────────────────────────────── */
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grid-scroll {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(calc(var(--cell-size, 60px) * 1));
+  }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-grid {
+  animation: grid-scroll 15s linear infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 3s linear infinite;
+}
+
+/* ─── Scroll-triggered animations ──────────────────────────────── */
+
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children */
+.reveal-stagger > .reveal:nth-child(1) { transition-delay: 0ms; }
+.reveal-stagger > .reveal:nth-child(2) { transition-delay: 100ms; }
+.reveal-stagger > .reveal:nth-child(3) { transition-delay: 200ms; }
+.reveal-stagger > .reveal:nth-child(4) { transition-delay: 300ms; }
+.reveal-stagger > .reveal:nth-child(5) { transition-delay: 400ms; }
+.reveal-stagger > .reveal:nth-child(6) { transition-delay: 500ms; }
+
+/* ─── Reduced motion ──────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-grid,
+  .animate-spin-slow,
+  .reveal {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

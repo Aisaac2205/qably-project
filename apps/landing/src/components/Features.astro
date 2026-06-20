@@ -1,0 +1,133 @@
+---
+---
+
+<section id="features" class="relative py-20 border-b border-border/40 overflow-hidden bg-bg-subtle/30">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    
+    <!-- Section Header -->
+    <div class="mx-auto max-w-3xl text-center mb-16">
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-primary">Características de Nivel Profesional</h2>
+      <p class="mt-3 font-sans text-3xl font-bold tracking-tight text-fg sm:text-4xl">
+        Un Gestor de QA que Respeta tu Tiempo
+      </p>
+      <p class="mt-4 text-base text-fg-muted">
+        Diseñado para equipos que valoran la velocidad y odian el desorden visual. Menos clics, más claridad.
+      </p>
+    </div>
+
+    <!-- Bento Grid -->
+    <div class="grid gap-6 md:grid-cols-3">
+      
+      <!-- Feature 1: AI Spec Parser (Large card, span-2, row-span-2) -->
+      <div class="md:col-span-2 md:row-span-2 rounded-xl border border-ai/20 bg-ai/5 p-6 flex flex-col justify-between transition-all hover:border-ai/40 hover:shadow-lg hover:shadow-ai/5 group reveal">
+        <div>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-ai text-xl">🤖</span>
+            <span class="text-xs font-semibold uppercase tracking-widest text-ai">Diferenciador Exclusivo</span>
+          </div>
+          <h3 class="text-xl font-bold text-fg group-hover:text-ai transition-colors sm:text-2xl">
+            Generador de QA impulsado por IA
+          </h3>
+          <p class="mt-3 text-sm text-fg-muted max-w-lg">
+            Qably lee tus archivos <code class="text-ai font-mono">.spec.ts</code> o <code class="text-ai font-mono">.test.js</code> directamente de tu repositorio y, mediante el modelo Claude 3.5, deduce de forma inteligente los pasos en lenguaje natural, pre-condiciones, prioridades y resultados esperados.
+          </p>
+          <ul class="mt-6 space-y-2 text-xs text-fg-muted">
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Soporte nativo para Playwright, Jest, Vitest, Cypress y Testing Library.
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Historial de cambios para no duplicar casos modificados.
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Interfaz interactiva de aprobación individual o masiva en un clic.
+            </li>
+          </ul>
+        </div>
+        
+        <!-- Mockup Visual inside Bento -->
+        <div class="mt-8 rounded-lg border border-border bg-bg p-4 font-mono text-[10px] text-fg-muted">
+          <div class="text-ai">// Entrada de código analizada por Qably:</div>
+          <div>test("should delete task", async () => &#123; ... &#125;);</div>
+          <div class="mt-2 border-t border-border/40 pt-2 text-fg">
+            <span class="text-primary">Sugerencia AI:</span> <strong>Caso:</strong> Eliminar tarea creada <br />
+            <strong>Pasos:</strong> 1. Crear tarea de prueba | 2. Clic en botón borrar | 3. Confirmar modal <br />
+            <strong>Resultado:</strong> La tarea desaparece del listado principal.
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2: Keyboard-Driven Runs (Standard Card, col-span-1) -->
+      <div class="rounded-xl border border-border bg-bg-elevated/40 p-6 flex flex-col justify-between transition-all hover:border-border-strong group reveal">
+        <div>
+          <div class="text-lg mb-3">⌨</div>
+          <h3 class="text-base font-bold text-fg group-hover:text-primary transition-colors">Ejecución Manual por Teclado</h3>
+          <p class="mt-2 text-xs text-fg-muted leading-relaxed">
+            Ejecuta ciclos manuales rápidamente. Usa atajos de teclado rápidos (<kbd class="bg-bg border border-border/60 px-1 py-0.5 rounded text-[10px] text-fg font-mono">P</kbd> Pass, <kbd class="bg-bg border border-border/60 px-1 py-0.5 rounded text-[10px] text-fg font-mono">F</kbd> Fail, <kbd class="bg-bg border border-border/60 px-1 py-0.5 rounded text-[10px] text-fg font-mono">S</kbd> Skip) para marcar estados sin tocar el ratón.
+          </p>
+        </div>
+        <div class="mt-6 flex items-center justify-between text-[10px] font-mono text-fg-subtle">
+          <span>Split-screen Layout</span>
+          <span class="text-primary">Optimized for speed</span>
+        </div>
+      </div>
+
+      <!-- Feature 3: CI/CD Pipeline API (Standard Card, col-span-1) -->
+      <div class="rounded-xl border border-border bg-bg-elevated/40 p-6 flex flex-col justify-between transition-all hover:border-border-strong group reveal">
+        <div>
+          <div class="text-lg mb-3">🔌</div>
+          <h3 class="text-base font-bold text-fg group-hover:text-primary transition-colors">Integración CI/CD y API Pública</h3>
+          <p class="mt-2 text-xs text-fg-muted leading-relaxed">
+            Envía resultados de tus pipelines directamente a Qably mediante un endpoint REST seguro. Generación automática de plantillas YAML para GitHub Actions, GitLab y CircleCI en segundos.
+          </p>
+        </div>
+        <div class="mt-6 flex items-center justify-between text-[10px] font-mono text-fg-subtle">
+          <span>POST /public/v1/runs</span>
+          <span class="text-emerald-500">API Key Secured</span>
+        </div>
+      </div>
+
+      <!-- Feature 4: Automatic Quality Reports (Standard Card, col-span-1) -->
+      <div class="rounded-xl border border-border bg-bg-elevated/40 p-6 flex flex-col justify-between transition-all hover:border-border-strong group reveal">
+        <div>
+          <div class="text-lg mb-3">📊</div>
+          <h3 class="text-base font-bold text-fg group-hover:text-primary transition-colors">Reportes de Calidad al Instante</h3>
+          <p class="mt-2 text-xs text-fg-muted leading-relaxed">
+            Métricas de cobertura de automatización, tasa de defectos por módulo, tendencias de estabilidad e historial de runs sin necesidad de configurar dashboards complejos.
+          </p>
+        </div>
+        <div class="mt-6 flex items-center justify-between text-[10px] font-mono text-fg-subtle">
+          <span>Regression Charts</span>
+          <span class="text-primary">Zero Config</span>
+        </div>
+      </div>
+
+      <!-- Feature 5: Inline Suites & Case Editor (Standard Card, col-span-2) -->
+      <div class="md:col-span-2 rounded-xl border border-border bg-bg-elevated/40 p-6 flex flex-col justify-between transition-all hover:border-border-strong group reveal">
+        <div class="grid gap-6 md:grid-cols-[1fr_200px]">
+          <div>
+            <div class="text-lg mb-3">📝</div>
+            <h3 class="text-base font-bold text-fg group-hover:text-primary transition-colors">Edición Inline sin Modales</h3>
+            <p class="mt-2 text-xs text-fg-muted leading-relaxed">
+              Modifica títulos, pasos y prioridades directamente sobre la lista de suites. Olvídate de abrir y cerrar diálogos lentos que interrumpen tu flujo de trabajo. Qably guarda todo al instante.
+            </p>
+          </div>
+          
+          <!-- Abstract representation of inline edit -->
+          <div class="rounded-lg border border-border bg-bg p-3 flex flex-col gap-2 font-mono text-[9px] text-fg-subtle justify-center">
+            <div class="flex items-center gap-1.5 bg-bg-hover/60 p-1 rounded border border-primary/20">
+              <span class="text-emerald-500">●</span>
+              <span class="text-fg font-semibold">Verify card upgrade</span>
+              <span class="ml-auto text-[8px] bg-primary/20 text-primary px-1 rounded">Editando...</span>
+            </div>
+            <div class="flex items-center gap-1.5 p-1 rounded">
+              <span class="text-yellow-500">●</span>
+              <span>Reset password flow</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>

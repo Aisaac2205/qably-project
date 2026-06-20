@@ -1,0 +1,46 @@
+---
+const webUrl = import.meta.env.PUBLIC_WEB_URL || "http://localhost:3000";
+const registerUrl = `${webUrl}/register`;
+---
+
+<section class="relative py-24 overflow-hidden border-b border-border/40">
+  <!-- Glowing abstract background -->
+  <div class="absolute inset-0 bg-[radial-gradient(circle_at_bottom,rgba(139,92,246,0.06),transparent_60%)] -z-10"></div>
+  
+  <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center reveal">
+    <div class="rounded-2xl border border-primary/20 bg-gradient-to-br from-bg-elevated/80 to-bg-subtle/80 p-12 md:p-20 relative overflow-hidden backdrop-blur-sm">
+      
+      <!-- Top subtle line glow -->
+      <div class="absolute top-0 inset-x-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
+      
+      <!-- Content -->
+      <h2 class="font-sans text-3xl font-bold tracking-tight text-fg sm:text-4xl md:text-5xl max-w-2xl mx-auto leading-tight">
+        Deja de Documentar Manualmente.<br />
+        <span class="text-primary font-extrabold bg-gradient-to-r from-primary to-ai bg-clip-text text-transparent">Empieza a Automatizar con Qably.</span>
+      </h2>
+      <p class="mx-auto mt-6 max-w-xl text-sm sm:text-base text-fg-muted">
+        Únete a los equipos de desarrollo e ingeniería de QA que han recuperado hasta un 20% de su jornada laboral automatizando la documentación de pruebas.
+      </p>
+
+      <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a
+          href={registerUrl}
+          class="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-lg bg-primary px-8 text-sm font-semibold text-primary-fg shadow-lg shadow-primary/25 hover:bg-primary-hover hover:scale-[1.02] transition-all"
+        >
+          Crear mi cuenta gratis →
+        </a>
+        <a
+          href="#pricing"
+          class="inline-flex h-12 w-full sm:w-auto items-center justify-center rounded-lg border border-border bg-bg/50 px-8 text-sm font-semibold text-fg hover:bg-bg-hover hover:border-border-strong transition-all"
+        >
+          Ver planes de precios
+        </a>
+      </div>
+
+      <div class="mt-8 text-[10px] text-fg-subtle font-mono">
+        Configuración en 3 minutos · Sin tarjeta de crédito requerida
+      </div>
+      
+    </div>
+  </div>
+</section>

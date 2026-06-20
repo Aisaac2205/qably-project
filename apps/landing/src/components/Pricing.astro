@@ -1,0 +1,154 @@
+---
+const webUrl = import.meta.env.PUBLIC_WEB_URL || "http://localhost:3000";
+const registerUrl = `${webUrl}/register`;
+---
+
+<section id="pricing" class="relative py-20 border-b border-border/40 overflow-hidden">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    
+    <!-- Section Header -->
+    <div class="mx-auto max-w-3xl text-center mb-16">
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-primary">Precios Transparentes</h2>
+      <p class="mt-3 font-sans text-3xl font-bold tracking-tight text-fg sm:text-4xl">
+        Planes Adaptados a tu Equipo
+      </p>
+      <p class="mt-4 text-base text-fg-muted">
+        Comienza a ahorrar tiempo hoy. Cambia o cancela tu plan en cualquier momento.
+      </p>
+    </div>
+
+    <!-- Pricing Cards Grid -->
+    <div class="mx-auto grid max-w-5xl gap-8 lg:grid-cols-3 items-stretch">
+      
+      <!-- Plan 1: Pro ($10/mo) -->
+      <div class="rounded-xl border border-border bg-bg-elevated/40 p-8 flex flex-col justify-between transition-all hover:border-border-strong group reveal">
+        <div>
+          <div class="mb-4">
+            <h3 class="text-lg font-bold text-fg">Pro</h3>
+            <p class="text-xs text-fg-muted mt-1">Perfecto para desarrolladores independientes y squads pequeños.</p>
+          </div>
+          <div class="mt-6 flex items-baseline gap-1">
+            <span class="text-4xl font-extrabold text-fg">$10</span>
+            <span class="text-xs text-fg-subtle">/mes</span>
+          </div>
+          <p class="text-[10px] text-fg-subtle mt-1 font-mono">Facturado mensualmente</p>
+          
+          <ul class="mt-8 space-y-3.5 text-xs text-fg-muted">
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Hasta 10 Proyectos
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> 5 Integrantes de Equipo
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Generación AI: 1,000 archivos/mes
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Integración CI/CD y API Pública
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Soporte vía Email y Discord
+            </li>
+          </ul>
+        </div>
+        <div class="mt-8">
+          <a
+            href={registerUrl}
+            class="inline-flex h-10 w-full items-center justify-center rounded-lg border border-border bg-bg hover:bg-bg-hover hover:border-border-strong text-sm font-semibold text-fg transition-all"
+          >
+            Empezar Pro
+          </a>
+        </div>
+      </div>
+
+      <!-- Plan 2: Agency ($25/mo) - Highlighted/Popular -->
+      <div class="rounded-xl border-2 border-primary bg-bg-elevated/60 p-8 flex flex-col justify-between transition-all hover:shadow-xl hover:shadow-primary/5 relative group reveal">
+        <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-[10px] font-bold text-primary-fg uppercase tracking-widest">
+          Recomendado
+        </div>
+        <div>
+          <div class="mb-4">
+            <h3 class="text-lg font-bold text-fg">Agency</h3>
+            <p class="text-xs text-fg-muted mt-1">Ideal para agencias de software y equipos en crecimiento.</p>
+          </div>
+          <div class="mt-6 flex items-baseline gap-1">
+            <span class="text-4xl font-extrabold text-fg">$25</span>
+            <span class="text-xs text-fg-subtle">/mes</span>
+          </div>
+          <p class="text-[10px] text-fg-subtle mt-1 font-mono">Facturado mensualmente</p>
+          
+          <ul class="mt-8 space-y-3.5 text-xs text-fg-muted">
+            <li class="flex items-center gap-2 font-medium text-fg">
+              <span class="text-primary">✔</span> Proyectos ilimitados
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-primary">✔</span> Miembros ilimitados
+            </li>
+            <li class="flex items-center gap-2 font-medium text-fg">
+              <span class="text-primary">✔</span> Generación AI: 5,000 archivos/mes
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-primary">✔</span> Prioridad en Cola de Análisis AI
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-primary">✔</span> SLA de soporte: &lt; 12 horas
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-primary">✔</span> Acceso anticipado a features
+            </li>
+          </ul>
+        </div>
+        <div class="mt-8">
+          <a
+            href={registerUrl}
+            class="inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary hover:bg-primary-hover text-sm font-semibold text-primary-fg shadow-lg shadow-primary/10 transition-all hover:scale-[1.02]"
+          >
+            Empezar Agency
+          </a>
+        </div>
+      </div>
+
+      <!-- Plan 3: Custom -->
+      <div class="rounded-xl border border-border bg-bg-elevated/40 p-8 flex flex-col justify-between transition-all hover:border-border-strong group reveal">
+        <div>
+          <div class="mb-4">
+            <h3 class="text-lg font-bold text-fg">Custom</h3>
+            <p class="text-xs text-fg-muted mt-1">Para corporativos con estrictas políticas de seguridad.</p>
+          </div>
+          <div class="mt-6 flex items-baseline gap-1">
+            <span class="text-4xl font-extrabold text-fg">Personal</span>
+          </div>
+          <p class="text-[10px] text-fg-subtle mt-1 font-mono">Diseñado a medida</p>
+          
+          <ul class="mt-8 space-y-3.5 text-xs text-fg-muted">
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Infraestructura dedicada (Self-hosted/Cloud)
+            </li>
+            <li class="flex items-center gap-2 font-medium text-fg">
+              <span class="text-emerald-500">✔</span> Integración con tu propia API Key de Claude
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Seguridad Avanzada (SSO & SAML)
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="text-emerald-500">✔</span> Auditorías de seguridad y SOC2 compliance
+            </li>
+            <li class="flex items-center gap-2 font-medium text-fg">
+              <span class="text-emerald-500">✔</span> Account Manager dedicado & Training
+            </li>
+          </ul>
+        </div>
+        <div class="mt-8">
+          <a
+            href={`${webUrl}/contact`}
+            class="inline-flex h-10 w-full items-center justify-center rounded-lg border border-border bg-bg hover:bg-bg-hover hover:border-border-strong text-sm font-semibold text-fg transition-all"
+          >
+            Contactar Soporte
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</section>

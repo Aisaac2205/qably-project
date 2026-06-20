@@ -1,0 +1,105 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Qably — QA Management for Engineers, Automated by AI",
+  description = "Eliminate manual test documentation. Qably watches your code, generates structured test cases automatically, and integrates with your CI/CD pipelines.",
+} = Astro.props;
+
+// Read PUBLIC_WEB_URL from environment or fallback to localhost
+const webUrl = import.meta.env.PUBLIC_WEB_URL || "http://localhost:3000";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- SEO Meta Tags -->
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={Astro.url} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content={Astro.url} />
+    <meta property="twitter:title" content={title} />
+    <meta property="twitter:description" content={description} />
+    <meta property="twitter:image" content="/og-image.png" />
+
+    <!-- Google Fonts - Geist & Geist Mono & IBM Plex Serif for contrast -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=IBM+Plex+Serif:ital,wght@0,300;0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json" is:inline define:vars={{ title, description, webUrl }}>
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Qably",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "All",
+        "offers": {
+          "@type": "Offer",
+          "price": "10.00",
+          "priceCurrency": "USD"
+        },
+        "description": "QA Management Platform for Engineers with AI-powered test case generation from code."
+      }
+    </script>
+  </head>
+  <body class="bg-bg text-fg min-h-screen selection:bg-primary selection:text-primary-fg font-sans antialiased overflow-x-hidden">
+    <div class="relative min-h-screen flex flex-col justify-between">
+      <!-- Glow effects -->
+      <div class="pointer-events-none absolute top-0 left-1/2 -z-10 h-[600px] w-full max-w-[1200px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_top,rgba(139,92,246,0.03),transparent_50%)]"></div>
+      <div class="pointer-events-none absolute top-[20%] left-1/4 -z-10 h-[400px] w-[400px] rounded-full bg-ai/3 blur-[120px]"></div>
+      <div class="pointer-events-none absolute top-[60%] right-1/4 -z-10 h-[500px] w-[500px] rounded-full bg-primary/3 blur-[150px]"></div>
+
+      <slot />
+    </div>
+
+    <!-- Scroll Reveal script -->
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const observerOptions = {
+          root: null,
+          rootMargin: "0px",
+          threshold: 0.1,
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible");
+              // Once it is visible, we can stop observing it
+              observer.unobserve(entry.target);
+            }
+          });
+        }, observerOptions);
+
+        const revealElements = document.querySelectorAll(".reveal");
+        revealElements.forEach((el) => observer.observe(el));
+      });
+    </script>
+  </body>
+</html>

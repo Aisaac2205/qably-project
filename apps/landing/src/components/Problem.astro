@@ -1,0 +1,110 @@
+---
+---
+
+<section id="problem" class="relative py-20 border-b border-border/40 overflow-hidden bg-bg-subtle/50">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    
+    <!-- Section Header -->
+    <div class="mx-auto max-w-3xl text-center mb-16">
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-primary">El Impuesto del Trabajo Manual</h2>
+      <p class="mt-3 font-sans text-3xl font-bold tracking-tight text-fg sm:text-4xl md:text-5xl">
+        Escribes código en segundos.<br />
+        <span class="text-fg-muted font-light">Documentas a mano en 20 minutos.</span>
+      </p>
+      <p class="mt-4 text-base text-fg-muted">
+        Los ingenieros de QA aman programar automation pero odian rellenar formularios en herramientas legacy.
+        Qably elimina la fricción entre el código de tus tests y el gestor de pruebas.
+      </p>
+    </div>
+
+    <!-- Interactive Pain Comparison -->
+    <div class="grid gap-8 lg:grid-cols-2 items-stretch">
+      
+      <!-- Left side: The clean code (Joy of writing tests) -->
+      <div class="rounded-xl border border-border bg-bg-elevated/40 p-6 flex flex-col justify-between transition-all hover:border-border-strong relative">
+        <div class="absolute top-4 right-4 text-[10px] font-mono text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">
+          RÁPIDO · 10 SEGUNDOS
+        </div>
+        <div>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-emerald-500">⚡</span>
+            <span class="text-sm font-bold text-fg">El código que escribes</span>
+          </div>
+          <p class="text-xs text-fg-muted mb-4">
+            Un test de Playwright simple, legible y auto-explicativo.
+          </p>
+          <div class="rounded-lg bg-bg border border-border/60 p-4 font-mono text-xs text-fg-muted leading-relaxed overflow-x-auto">
+            <span class="text-primary">test</span>(<span class="text-amber-400">'user can upgrade to pro plan'</span>, <span class="text-blue-400">async</span> ({ page }) => &#123;<br />
+            &nbsp;&nbsp;<span class="text-blue-400">await</span> page.<span class="text-emerald-400">goto</span>(<span class="text-amber-400">'/settings/billing'</span>);<br />
+            &nbsp;&nbsp;<span class="text-blue-400">await</span> page.<span class="text-emerald-400">click</span>(<span class="text-amber-400">'button#upgrade-pro'</span>);<br />
+            &nbsp;&nbsp;<span class="text-blue-400">await</span> page.<span class="text-emerald-400">fill</span>(<span class="text-amber-400">'input#card'</span>, <span class="text-amber-400">'4242...'</span>);<br />
+            &nbsp;&nbsp;<span class="text-blue-400">await</span> <span class="text-primary">expect</span>(page).<span class="text-emerald-400">toHaveURL</span>(<span class="text-amber-400">'/success'</span>);<br />
+            &#125;);
+          </div>
+        </div>
+        <div class="mt-6 border-t border-border/40 pt-4 flex items-center justify-between text-xs text-fg-subtle">
+          <span>Total: 5 líneas de código</span>
+          <span class="text-emerald-500 font-semibold">Done & Pushed</span>
+        </div>
+      </div>
+
+      <!-- Right side: The legacy form hell (Manual tax) -->
+      <div class="rounded-xl border border-red-500/20 bg-red-950/5 p-6 flex flex-col justify-between transition-all hover:border-red-500/30 relative">
+        <div class="absolute top-4 right-4 text-[10px] font-mono text-red-500 bg-red-500/10 px-2 py-0.5 rounded">
+          LENTO · 20 MINUTOS
+        </div>
+        <div>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-red-500">❌</span>
+            <span class="text-sm font-bold text-fg">Lo que te obliga a documentar la herramienta legacy</span>
+          </div>
+          <p class="text-xs text-fg-muted mb-4">
+            Rellenar interminables campos manuales en un gestor de pruebas (ej: TestRail).
+          </p>
+
+          <!-- Mock Legacy Cluttered Form -->
+          <div class="rounded-lg bg-bg border border-border/60 p-4 flex flex-col gap-3 text-[10px] font-sans opacity-75">
+            <div class="grid grid-cols-[80px_1fr] items-center gap-2">
+              <label class="text-fg-subtle font-medium text-right">Título:</label>
+              <input type="text" value="RF-304 - Pro Plan Upgradability Flow validation" disabled class="bg-bg-elevated border border-border/60 rounded px-2 py-1 text-fg" />
+            </div>
+            
+            <div class="grid grid-cols-[80px_1fr] items-center gap-2">
+              <label class="text-fg-subtle font-medium text-right">Suite Padre:</label>
+              <select disabled class="bg-bg-elevated border border-border/60 rounded px-2 py-1 text-fg">
+                <option>Billing -> Core Flows -> Upgrade Operations</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-[80px_1fr] items-start gap-2">
+              <label class="text-fg-subtle font-medium text-right mt-1">Pasos:</label>
+              <textarea rows="3" disabled class="bg-bg-elevated border border-border/60 rounded px-2 py-1 text-fg resize-none font-mono">1. User routes to checkout page
+2. Clicks on 'Upgrade to Pro'
+3. Enters card credentials
+4. Clicks confirm</textarea>
+            </div>
+
+            <div class="grid grid-cols-[80px_1fr] items-center gap-2">
+              <label class="text-fg-subtle font-medium text-right">Esperado:</label>
+              <input type="text" value="User is redirected to /success with upgraded status" disabled class="bg-bg-elevated border border-border/60 rounded px-2 py-1 text-fg" />
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 border-t border-border/40 pt-4 flex items-center justify-between text-xs text-fg-subtle">
+          <span>Campos restantes: 12 (Prioridad, Estimación, Tipo...)</span>
+          <span class="text-red-500 font-semibold">Repetir para cada test case...</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Outro Banner -->
+    <div class="mt-12 rounded-xl border border-border bg-bg-elevated/20 p-6 text-center max-w-3xl mx-auto backdrop-blur-sm">
+      <p class="text-sm text-fg-muted font-medium">
+        💡 <strong class="text-fg">¿Por qué duplicar esfuerzo?</strong> Tu código ya contiene la verdad. Qably utiliza Inteligencia Artificial entrenada en desarrollo para interpretar el código y documentarlo por ti, manteniendo la trazabilidad al 100%.
+      </p>
+    </div>
+
+  </div>
+</section>

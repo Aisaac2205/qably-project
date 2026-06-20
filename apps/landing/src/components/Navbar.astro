@@ -1,0 +1,42 @@
+---
+const webUrl = import.meta.env.PUBLIC_WEB_URL || "http://localhost:3000";
+---
+
+<header class="sticky top-0 z-50 w-full border-b border-border/40 bg-bg/85 backdrop-blur-md transition-all duration-300">
+  <div class="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center gap-6 md:gap-10">
+      <a href="#" class="flex items-center space-x-2">
+        <!-- Logotipo tipográfico "Qably" con Geist bold -->
+        <span class="font-sans font-bold text-xl tracking-tight text-fg flex items-center gap-1.5">
+          <svg class="h-5 w-5 text-primary" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Qably
+        </span>
+      </a>
+      <nav class="hidden md:flex gap-6">
+        <a href="#problem" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">El Problema</a>
+        <a href="#solution" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Cómo Funciona</a>
+        <a href="#features" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Características</a>
+        <a href="#pricing" class="text-sm font-medium text-fg-muted hover:text-fg transition-colors">Precios</a>
+      </nav>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <a
+        href={`${webUrl}/login`}
+        class="text-sm font-medium text-fg-muted hover:text-fg transition-colors px-3 py-1.5 rounded-md hover:bg-bg-elevated"
+      >
+        Iniciar sesión
+      </a>
+      <a
+        href={`${webUrl}/register`}
+        class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-fg shadow transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        Registrarse →
+      </a>
+    </div>
+  </div>
+</header>
