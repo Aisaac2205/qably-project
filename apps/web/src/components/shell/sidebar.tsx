@@ -10,6 +10,7 @@ import {
   GitBranch,
   ChartBar,
   Sparkle,
+  Gear,
 } from '@phosphor-icons/react'
 
 interface NavItem {
@@ -21,6 +22,7 @@ interface NavItem {
 const GLOBAL_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Gauge },
   { label: 'Projects', href: '/projects', icon: FolderOpen },
+  { label: 'Settings', href: '/settings', icon: Gear },
 ]
 
 const PROJECT_NAV: NavItem[] = [

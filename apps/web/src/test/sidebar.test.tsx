@@ -13,11 +13,12 @@ vi.mock('next/link', () => ({
 }))
 
 describe('Sidebar — global state', () => {
-  it('shows Dashboard and Projects links', async () => {
+  it('shows Dashboard, Projects, and Settings links', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<Sidebar />) })
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Projects')).toBeInTheDocument()
+    expect(screen.getByText('Settings')).toBeInTheDocument()
   })
 
   it('does not show ← Projects in global state', async () => {
