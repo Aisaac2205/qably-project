@@ -171,6 +171,10 @@ export const mockSuites: Suite[] = [
     organizationId: 'org-1',
     name: 'Authentication',
     createdAt: '2026-01-25T00:00:00Z',
+    description: 'Login, registration, and password reset flows.',
+    tags: ['auth', 'security', 'smoke'],
+    isDefault: true,
+    updatedAt: '2026-06-14T10:00:00Z',
     cases: [
       {
         id: 'tc-1',
@@ -207,6 +211,10 @@ export const mockSuites: Suite[] = [
     organizationId: 'org-1',
     name: 'Checkout',
     createdAt: '2026-01-28T00:00:00Z',
+    description: 'Cart, payment, and order confirmation tests.',
+    tags: ['checkout', 'e2e', 'regression'],
+    isDefault: false,
+    updatedAt: '2026-06-10T14:30:00Z',
     cases: [
       {
         id: 'tc-4',
@@ -243,6 +251,10 @@ export const mockSuites: Suite[] = [
     organizationId: 'org-1',
     name: 'User Account',
     createdAt: '2026-02-02T00:00:00Z',
+    description: 'Profile and account management flows.',
+    tags: ['account', 'profile'],
+    isDefault: false,
+    updatedAt: '2026-06-08T09:15:00Z',
     cases: [
       {
         id: 'tc-7',
