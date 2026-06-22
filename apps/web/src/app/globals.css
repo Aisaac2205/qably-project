@@ -93,6 +93,16 @@
   --color-running-bg:         var(--status-running-bg);
   --color-warn:               var(--status-warn);
   --color-warn-bg:            var(--status-warn-bg);
+
+  /* shadcn-style aliases — so primitives like Dialog/Button/Input/Card
+     that use `bg-background`, `text-foreground`, `text-muted-foreground`,
+     `bg-card`, `text-card-foreground`, `ring` work with our OKLCH tokens. */
+  --color-background:         var(--background);
+  --color-foreground:         var(--foreground);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-muted-foreground:   var(--fg-muted);
+  --color-ring:               var(--ring);
 }
 
 /* ─── Base styles ───────────────────────────────────────────────── */
