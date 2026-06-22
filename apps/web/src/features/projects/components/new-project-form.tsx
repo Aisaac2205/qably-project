@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { useCreateProject } from '../hooks/use-create-project'
+import { TechSelector } from './tech-selector'
 
 const GITHUB_REPO_RE = /^[\w-]+\/[\w-]+$/
 
@@ -10,6 +11,7 @@ export function NewProjectForm() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [githubRepo, setGithubRepo] = useState('')
+  const [technologies, setTechnologies] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -29,12 +31,12 @@ export function NewProjectForm() {
     if (Object.keys(errs).length > 0) return
 
     setIsSubmitting(true)
-    // Small delay so loading state is visible
     await new Promise((r) => setTimeout(r, 200))
     createProject({
       name: name.trim(),
       description: description.trim() || undefined,
       githubRepo: githubRepo.trim() || undefined,
+      technologies,
     })
   }
 
@@ -99,6 +101,13 @@ export function NewProjectForm() {
             {errors.githubRepo}
           </p>
         )}
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold text-default">
+          Tech stack <span className="text-muted font-normal">(optional)</span>
+        </p>
+        <TechSelector selected={technologies} onChange={setTechnologies} />
       </div>
 
       <button

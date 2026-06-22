@@ -8,7 +8,7 @@ export function useCreateProject() {
   const router = useRouter()
 
   const create = useCallback(
-    (input: { name: string; description?: string; githubRepo?: string }) => {
+    (input: { name: string; description?: string; githubRepo?: string; technologies?: string[] }) => {
       const project = createProject(input)
       router.push(`/projects/${project.id}`)
     },

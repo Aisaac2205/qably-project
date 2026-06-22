@@ -113,12 +113,12 @@ export const mockProjects: Project[] = [
     activeRunCount: 0,
     aiPendingCount: 3,
     createdAt: '2026-01-20T00:00:00Z',
-    technologies: ['react', 'typescript', 'javascript'],
+    technologies: ['react', 'typescript', 'vite'],
   },
   {
     id: 'proj-2',
     name: 'Mobile App',
-    description: 'React Native iOS and Android client.',
+    description: 'Flutter iOS and Android client.',
     githubRepo: 'acme/mobile-app',
     organizationId: 'org-1',
     healthScore: 45,
@@ -128,7 +128,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 1,
     aiPendingCount: 0,
     createdAt: '2026-02-05T00:00:00Z',
-    technologies: ['react', 'typescript'],
+    technologies: ['flutter', 'javascript', 'typescript'],
   },
   {
     id: 'proj-3',
@@ -143,7 +143,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 1,
     aiPendingCount: 0,
     createdAt: '2026-02-20T00:00:00Z',
-    technologies: ['nestjs', 'typescript'],
+    technologies: ['java', 'springboot', 'postgresql'],
   },
   {
     id: 'proj-4',
@@ -158,7 +158,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 0,
     aiPendingCount: 4,
     createdAt: '2026-03-10T00:00:00Z',
-    technologies: ['angular', 'typescript'],
+    technologies: ['angular', 'typescript', 'express'],
   },
 ]
 

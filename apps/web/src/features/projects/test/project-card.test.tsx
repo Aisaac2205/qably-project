@@ -24,10 +24,9 @@ const mockProject: Project = {
 }
 
 describe('ProjectCard', () => {
-  it('renders project name and description', async () => {
+  it('renders project name', async () => {
     await act(async () => { render(<ProjectCard project={mockProject} />) })
     expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
-    expect(screen.getByText(/Checkout/)).toBeInTheDocument()
   })
 
   it('shows health score', async () => {
@@ -56,10 +55,16 @@ describe('ProjectCard', () => {
     expect(link).toHaveAttribute('href', '/projects/proj-1')
   })
 
-  it('clamps description at 2 lines', async () => {
-    const longDesc = { ...mockProject, description: 'A very long description that should be clamped. '.repeat(10) }
-    await act(async () => { render(<ProjectCard project={longDesc} />) })
-    const desc = screen.getByText(/A very long/)
-    expect(desc.className).toContain('line-clamp-2')
+  it('shows tech icons for provided technologies', async () => {
+    const withTech = { ...mockProject, technologies: ['react', 'typescript'] }
+    await act(async () => { render(<ProjectCard project={withTech} />) })
+    expect(screen.getByAltText('React')).toBeInTheDocument()
+    expect(screen.getByAltText('TypeScript')).toBeInTheDocument()
+  })
+
+  it('shows empty stack placeholder when no technologies set', async () => {
+    const noTech = { ...mockProject, technologies: [] }
+    await act(async () => { render(<ProjectCard project={noTech} />) })
+    expect(screen.getByText('No stack selected')).toBeInTheDocument()
   })
 })

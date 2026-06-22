@@ -66,6 +66,6 @@ describe('NewProjectForm', () => {
     await user.type(screen.getByLabelText(/Project name/), 'Payment Gateway')
     await user.click(screen.getByRole('button', { name: /Create project/ }))
     // Button text changes during loading
-    expect(screen.getByRole('button')).toHaveTextContent('Creating…')
+    expect(screen.getByRole('button', { name: /Creating/ })).toBeInTheDocument()
   })
 })
