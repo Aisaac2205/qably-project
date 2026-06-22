@@ -34,6 +34,9 @@ export type {
   GithubIntegration,
 } from '@qably/types'
 
+/** Fixed reference "now" for deterministic mock data calculations. */
+export const MOCK_NOW = '2026-06-16T11:00:00Z'
+
 // ─── Organization ─────────────────────────────────────────────────────────────
 
 export const mockOrg: Organization = {

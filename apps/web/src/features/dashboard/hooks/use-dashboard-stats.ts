@@ -8,6 +8,7 @@ import {
   usePipelines,
   useOrg,
 } from '@/lib/use-mock-store'
+import { MOCK_NOW } from '@/lib/mock-data'
 import type {
   Project,
   Run,
@@ -44,7 +45,7 @@ export function useDashboardStats(): DashboardStats {
   const org = useOrg()
 
   return useMemo(() => {
-    const now = Date.now()
+    const now = new Date(MOCK_NOW).getTime()
     const sevenDaysAgo = now - MS_7D
     const fourteenDaysAgo = now - 2 * MS_7D
 
