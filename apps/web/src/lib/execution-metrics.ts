@@ -106,8 +106,6 @@ export function getSparklineData(
   suiteId: string,
   now: number = Date.now(),
 ): Array<{ date: string; passRate: number; runCount: number }> {
-  const today = new Date(now)
-  const todayKey = toLocalDateString(today)
   const dayKeys: string[] = []
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now - i * DAY_MS)
