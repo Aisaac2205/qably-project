@@ -9,6 +9,9 @@ export type OrgRole = 'owner' | 'admin' | 'member'
 export type Plan = 'free' | 'pro' | 'agency'
 export type RunSource = 'manual' | 'api' | 'github_actions'
 
+/** Suite-level execution status, derived from run history (not stored on Suite). */
+export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
+
 // ─── Organization ─────────────────────────────────────────────────────────────
 
 export interface Organization {
@@ -79,6 +82,14 @@ export interface Suite {
   name: string
   cases: TestCase[]
   createdAt: string
+  /** Human-readable description of the suite's scope. Required; may be empty string. */
+  description: string
+  /** Lowercase short tags for filtering/labeling. Max 8 entries, 32 chars each, hyphens allowed, no spaces. */
+  tags: string[]
+  /** Whether this suite is the project's default (exactly one per project at most). */
+  isDefault: boolean
+  /** ISO timestamp of the last mutation to this suite. */
+  updatedAt: string
 }
 
 // ─── Runs ─────────────────────────────────────────────────────────────────────
