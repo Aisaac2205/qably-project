@@ -1,7 +1,7 @@
 'use client'
 
 import type { Project } from '@qably/types'
-import { useRuns, useAiCases, usePipelines } from '@/lib/use-mock-store'
+import { useRuns, useAiCases } from '@/lib/use-mock-store'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { ProjectHeader } from './project-header'
 import { StatusChip } from './status-chip'
@@ -63,11 +63,11 @@ function RecentAiCases({ projectId }: { projectId: string }) {
   )
 }
 
-function RecentPipelines({ projectId }: { projectId: string }) {
-  const pipelines = usePipelines(projectId)
-  const recent = pipelines.slice(0, 3)
+function RecentCiRuns({ projectId }: { projectId: string }) {
+  const runs = useRuns(projectId)
+  const ciRuns = runs.filter((r) => r.source === 'github_actions').slice(0, 3)
 
-  if (recent.length === 0) {
+  if (ciRuns.length === 0) {
     return (
       <div className="text-[11px] text-muted py-3">
         No pipelines yet
@@ -77,19 +77,19 @@ function RecentPipelines({ projectId }: { projectId: string }) {
 
   return (
     <div className="space-y-1">
-      {recent.map((p) => (
+      {ciRuns.map((r) => (
         <div
-          key={p.id}
+          key={r.id}
           className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-canvas transition-colors"
         >
           <div className="min-w-0">
-            <div className="text-xs font-medium text-default truncate">{p.commitMessage}</div>
+            <div className="text-xs font-medium text-default truncate">{r.commitMessage ?? r.name}</div>
             <div className="flex items-center gap-2 text-[10px] text-muted">
-              <span className="font-mono">{p.commitSha}</span>
-              <span>{p.branch}</span>
+              {r.commitSha && <span className="font-mono">{r.commitSha}</span>}
+              {r.branch && <span>{r.branch}</span>}
             </div>
           </div>
-          <StatusChip status={p.status} />
+          <StatusChip status={r.status} />
         </div>
       ))}
     </div>
@@ -118,7 +118,7 @@ export function ProjectHome({ project }: { project: Project }) {
       <section>
         <h2 className="text-lg font-medium mb-3">Recent pipelines</h2>
         <Card>
-          <RecentPipelines projectId={project.id} />
+          <RecentCiRuns projectId={project.id} />
         </Card>
       </section>
     </div>

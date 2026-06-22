@@ -51,4 +51,11 @@ describe('ProjectHome', () => {
     await act(async () => { render(<ProjectHome project={mockProject} />) })
     expect(screen.getByText('Recent pipelines')).toBeInTheDocument()
   })
+
+  it('shows CI run commit info in pipelines section', async () => {
+    await act(async () => { render(<ProjectHome project={mockProject} />) })
+    // After unification, RecentCiRuns uses useRuns filtered by github_actions
+    // run-10 has CI metadata with commitMessage
+    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
+  })
 })
