@@ -14,7 +14,7 @@ import {
   CaretDown,
   Buildings,
 } from '@phosphor-icons/react'
-import { useProjects, useProject, useOrg } from '@/lib/use-mock-store'
+import { useProject, useOrg } from '@/lib/use-mock-store'
 
 interface NavItem {
   label: string
@@ -33,7 +33,6 @@ export function Sidebar() {
   const pathname = usePathname()
   const projectMatch = pathname.match(/^\/projects\/([^/]+)/)
   const projectId = projectMatch?.[1] ?? null
-  const projects = useProjects()
   const org = useOrg()
 
   // If a project dynamic path is active, show the project-specific nav layout
@@ -41,38 +40,12 @@ export function Sidebar() {
     return <ProjectSidebar projectId={projectId} pathname={pathname} org={org} />
   }
 
-  // Otherwise, show the global organization-wide navigation (mockup layout)
-  const activeProjectId = projects.length > 0 ? projects[0].id : null
-
+  // Otherwise, show the global organization-wide navigation.
+  // Project-internal items (Suites, Runs, Pipelines, Reports, AI Review)
+  // belong ONLY in ProjectSidebar, never here.
   const navItems: NavItem[] = [
     { label: 'Dashboard', href: '/dashboard', icon: Gauge },
     { label: 'Projects', href: '/projects', icon: FolderOpen },
-    {
-      label: 'Test Suites',
-      href: activeProjectId ? `/projects/${activeProjectId}/suites` : '/projects',
-      icon: TestTube,
-    },
-    {
-      label: 'Runs',
-      href: activeProjectId ? `/projects/${activeProjectId}/runs` : '/projects',
-      icon: Play,
-    },
-    {
-      label: 'AI Cases',
-      href: activeProjectId ? `/projects/${activeProjectId}/ai-review` : '/projects',
-      icon: Sparkle,
-      badge: 'New',
-    },
-    {
-      label: 'Pipelines',
-      href: activeProjectId ? `/projects/${activeProjectId}/pipelines` : '/projects',
-      icon: Code,
-    },
-    {
-      label: 'Reports',
-      href: activeProjectId ? `/projects/${activeProjectId}/reports` : '/projects',
-      icon: ChartBar,
-    },
     { label: 'Settings', href: '/settings', icon: Gear },
   ]
 

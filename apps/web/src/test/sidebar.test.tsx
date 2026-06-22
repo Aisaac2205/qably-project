@@ -53,6 +53,19 @@ describe('Sidebar — global state', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument()
   })
 
+  it('does not show project-internal items in global state', async () => {
+    mockPathname.mockReturnValue('/dashboard')
+    await act(async () => { render(<Sidebar />) })
+    // Project-internal routes belong only in ProjectSidebar
+    expect(screen.queryByText('Suites')).not.toBeInTheDocument()
+    expect(screen.queryByText('Test Suites')).not.toBeInTheDocument()
+    expect(screen.queryByText('Runs')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pipelines')).not.toBeInTheDocument()
+    expect(screen.queryByText('Reports')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI Review')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI Cases')).not.toBeInTheDocument()
+  })
+
   it('does not show ← Projects in global state', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<Sidebar />) })
