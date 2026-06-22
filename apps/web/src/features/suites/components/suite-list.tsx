@@ -14,17 +14,14 @@ import { TestTube } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
-import { useSuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useSuiteMetrics, type SuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
 
 interface SuiteListProps {
   projectId: string
 }
 
-function applySort(
-  items: Array<{ suite: { id: string; name: string; cases: unknown[]; createdAt: string }; passRate7d: number }>,
-  sort: SortKey,
-) {
+function applySort(items: SuiteMetrics[], sort: SortKey): SuiteMetrics[] {
   const arr = [...items]
   switch (sort) {
     case 'name':
@@ -48,7 +45,7 @@ function applySort(
 }
 
 function applyFilters(
-  items: ReturnType<typeof useSuiteMetrics>['perSuite'],
+  items: SuiteMetrics[],
   filters: {
     search: string
     status: SuiteRunStatus | 'all'
@@ -144,7 +141,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
                 href={`/projects/${projectId}/suites/${m.suite.id}`}
                 className="block focus-visible:outline-2 focus-visible:outline-primary"
               >
-                <SuiteRow suite={m.suite} metrics={m} projectId={projectId} />
+                <SuiteRow suite={m.suite} metrics={m} />
               </Link>
             ))}
           </CardContent>

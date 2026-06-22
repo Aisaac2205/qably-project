@@ -44,10 +44,9 @@ const STATUS_TONE: Record<string, 'text-pass' | 'text-fail' | 'text-warn' | 'tex
 interface SuiteRowProps {
   suite: Suite
   metrics: SuiteMetrics
-  projectId: string
 }
 
-function SuiteRowImpl({ suite, metrics, projectId }: SuiteRowProps) {
+function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
   const { lastRun, passRate7d, sparkline, status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
 

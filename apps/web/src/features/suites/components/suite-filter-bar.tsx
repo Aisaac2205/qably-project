@@ -99,7 +99,7 @@ export function SuiteFilterBar({
           ))}
         </SelectContent>
       </Select>
-      <Select value={tag} onValueChange={(v) => onTagChange(v)}>
+      <Select value={tag} onValueChange={(v) => onTagChange(String(v))}>
         <SelectTrigger className="h-8 text-xs w-full md:w-36" aria-label="Tag filter">
           <SelectValue />
         </SelectTrigger>

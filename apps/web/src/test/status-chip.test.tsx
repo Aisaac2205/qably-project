@@ -48,9 +48,9 @@ describe('StatusChip (global)', () => {
   })
 
   it('falls back to pending for unknown status', async () => {
-    // @ts-expect-error testing runtime fallback
     await act(async () => {
-      render(<StatusChip status="bogus" />)
+      // Cast to bypass the union type — we want to test the runtime fallback.
+      render(<StatusChip status={'bogus' as unknown as 'pass'} />)
     })
     expect(screen.getByText('Pending')).toBeInTheDocument()
   })
