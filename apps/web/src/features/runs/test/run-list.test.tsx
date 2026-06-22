@@ -69,4 +69,49 @@ describe('RunList', () => {
     })
     expect(screen.getByText('No runs yet')).toBeInTheDocument()
   })
+
+  it('filters runs by source when source prop provided', async () => {
+    await act(async () => {
+      render(<RunList projectId="proj-1" source="github_actions" />)
+    })
+    // Only run-10 has source=github_actions
+    expect(screen.getByText('Run #10')).toBeInTheDocument()
+    // run-11, run-9 have different sources — should NOT appear
+    expect(screen.queryByText('Run #12')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run #11')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
+  })
+
+  it('shows all runs when source prop omitted', async () => {
+    await act(async () => {
+      render(<RunList projectId="proj-1" />)
+    })
+    // No source filter — all 4 runs visible
+    expect(screen.getByText('Run #12')).toBeInTheDocument()
+    expect(screen.getByText('Run #11')).toBeInTheDocument()
+    expect(screen.getByText('Run #10')).toBeInTheDocument()
+    expect(screen.getByText('Run #9')).toBeInTheDocument()
+  })
+
+  it('shows empty state when source filter matches no runs', async () => {
+    await act(async () => {
+      render(<RunList projectId="proj-1" source="api" />)
+    })
+    // proj-1 has run-9 with source=api — so should show that
+    expect(screen.getByText('Run #9')).toBeInTheDocument()
+    // non-api runs should not appear
+    expect(screen.queryByText('Run #10')).not.toBeInTheDocument()
+  })
+
+  it('filters correctly for manual source', async () => {
+    await act(async () => {
+      render(<RunList projectId="proj-1" source="manual" />)
+    })
+    // run-12 and run-11 are manual
+    expect(screen.getByText('Run #12')).toBeInTheDocument()
+    expect(screen.getByText('Run #11')).toBeInTheDocument()
+    // github_actions and api runs should not appear
+    expect(screen.queryByText('Run #10')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
+  })
 })

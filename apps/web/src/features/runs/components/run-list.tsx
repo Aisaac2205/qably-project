@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { Run } from '@qably/types'
+import type { Run, RunSource } from '@qably/types'
 import { useRuns } from '@/lib/use-mock-store'
 import { Card, CardContent } from '@/components/ui/card'
 import { StatusChip } from './status-chip'
@@ -51,8 +51,9 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
   )
 }
 
-export function RunList({ projectId }: { projectId: string }) {
-  const runs = useRuns(projectId)
+export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
+  const allRuns = useRuns(projectId)
+  const runs = source ? allRuns.filter((r) => r.source === source) : allRuns
   const sorted = [...runs].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   )
