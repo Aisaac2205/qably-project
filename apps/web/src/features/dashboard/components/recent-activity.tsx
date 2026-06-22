@@ -20,7 +20,7 @@ export function RecentActivity() {
   // Slice feeds to match mockup density
   const runs = stats.recentRuns.slice(0, 4)
   const aiCases = stats.recentAiCases.slice(0, 3)
-  const pipelines = stats.recentPipelines.slice(0, 3)
+  const ciRuns = stats.recentCiRuns.slice(0, 3)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -115,7 +115,7 @@ export function RecentActivity() {
         </CardContent>
       </Card>
 
-      {/* Recent pipelines */}
+      {/* Recent pipelines (CI runs) */}
       <Card className="border border-border/80 flex flex-col justify-between">
         <CardHeader className="flex flex-row items-center justify-between pb-3 p-5">
           <CardTitle className="text-sm font-semibold text-default">Recent pipelines</CardTitle>
@@ -128,13 +128,13 @@ export function RecentActivity() {
         </CardHeader>
         
         <CardContent className="p-0 flex-1">
-          {pipelines.length === 0 ? (
+          {ciRuns.length === 0 ? (
             <p className="text-xs text-muted-foreground p-5">No pipelines yet</p>
           ) : (
             <div className="divide-y divide-border/60">
-              {pipelines.map((pipe) => (
+              {ciRuns.map((run) => (
                 <div
-                  key={pipe.id}
+                  key={run.id}
                   className="flex items-center justify-between gap-3 py-3.5 px-5 hover:bg-canvas/20 transition-colors duration-150 cursor-pointer group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -143,20 +143,20 @@ export function RecentActivity() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-default truncate">
-                        {pipe.commitMessage}
+                        {run.commitMessage ?? run.name}
                       </p>
                       <p className="text-[10px] text-muted-foreground truncate">
-                        <span className="font-mono">{pipe.commitSha}</span>
-                        {' · '}
-                        <span className="font-medium text-default/80">{pipe.branch}</span>
+                        {run.commitSha && <span className="font-mono">{run.commitSha}</span>}
+                        {(run.commitSha && run.branch) && ' · '}
+                        {run.branch && <span className="font-medium text-default/80">{run.branch}</span>}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
                     <span className="text-[10px] text-muted-foreground tabular-nums font-mono">
-                      {formatRelativeTime(pipe.triggeredAt)}
+                      {formatRelativeTime(run.startedAt)}
                     </span>
-                    <StatusChip status={pipe.status} />
+                    <StatusChip status={run.status} />
                   </div>
                 </div>
               ))}

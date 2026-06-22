@@ -22,7 +22,7 @@ describe('useDashboardStats — pure derivation', () => {
       'projectsByHealth',
       'recentRuns',
       'recentAiCases',
-      'recentPipelines',
+      'recentCiRuns',
     ]
     expect(expectedKeys.length).toBe(11)
   })

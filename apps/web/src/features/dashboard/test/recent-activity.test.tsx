@@ -40,11 +40,12 @@ describe('RecentActivity', () => {
     expect(screen.getByText('Discount code reduces total')).toBeInTheDocument()
   })
 
-  it('shows empty pipelines when no seed data', async () => {
+  it('shows recent CI runs in pipelines section', async () => {
     await act(async () => {
       render(<RecentActivity />)
     })
-    // Pipelines section shows empty state after mockPipelineRuns removal
-    expect(screen.getByText('No pipelines yet')).toBeInTheDocument()
+    // After unification, pipelines section shows CI runs (github_actions source)
+    // run-10 has commitMessage from enriched CI metadata
+    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
   })
 })

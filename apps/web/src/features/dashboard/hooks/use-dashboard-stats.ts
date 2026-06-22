@@ -5,7 +5,6 @@ import {
   useProjects,
   useRuns,
   useAiCases,
-  usePipelines,
   useOrg,
 } from '@/lib/use-mock-store'
 import { MOCK_NOW } from '@/lib/mock-data'
@@ -13,7 +12,6 @@ import type {
   Project,
   Run,
   AiCase,
-  PipelineRun,
   RunStatus,
 } from '@qably/types'
 
@@ -32,7 +30,7 @@ export interface DashboardStats {
   }>
   recentRuns: Run[]
   recentAiCases: AiCase[]
-  recentPipelines: PipelineRun[]
+  recentCiRuns: Run[]
 }
 
 const MS_7D = 7 * 24 * 60 * 60 * 1000
@@ -41,7 +39,6 @@ export function useDashboardStats(): DashboardStats {
   const projects = useProjects()
   const runs = useRuns()
   const aiCases = useAiCases()
-  const pipelines = usePipelines()
   const org = useOrg()
 
   return useMemo(() => {
@@ -109,12 +106,12 @@ export function useDashboardStats(): DashboardStats {
       .sort((a, b) => a.sourceFile.localeCompare(b.sourceFile))
       .slice(0, 5)
 
-    // Recent pipelines: top 5 by triggeredAt desc
-    const recentPipelines = [...pipelines]
+    // Recent CI runs: top 5 github_actions runs by startedAt desc
+    const recentCiRuns = [...runs]
+      .filter((r) => r.source === 'github_actions')
       .sort(
         (a, b) =>
-          new Date(b.triggeredAt).getTime() -
-          new Date(a.triggeredAt).getTime(),
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
       )
       .slice(0, 5)
 
@@ -129,7 +126,7 @@ export function useDashboardStats(): DashboardStats {
       projectsByHealth,
       recentRuns,
       recentAiCases,
-      recentPipelines,
+      recentCiRuns,
     }
-  }, [projects, runs, aiCases, pipelines, org])
+  }, [projects, runs, aiCases, org])
 }
