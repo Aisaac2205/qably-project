@@ -21,7 +21,7 @@ function SelectValue({ className, ...props }: SelectValueProps) {
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
-      className={cn("text-sm text-foreground", className)}
+      className={cn("text-sm text-default", className)}
       {...props}
     />
   )
@@ -32,7 +32,7 @@ function SelectTrigger({ className, children, ...props }: SelectTriggerProps) {
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-1 text-sm outline-none transition-colors",
+        "flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-2.5 py-1 text-sm outline-none transition-colors",
         "placeholder:text-muted-foreground",
         "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30",
         "disabled:cursor-not-allowed disabled:opacity-50",
@@ -58,19 +58,19 @@ function SelectContent({ className, children, ...props }: SelectPrimitive.Popup.
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "relative z-50 max-h-60 min-w-[8rem] origin-(--transform-origin) overflow-hidden rounded-md border border-border bg-background text-foreground shadow-md duration-200",
+            "relative z-50 max-h-60 min-w-[8rem] origin-(--transform-origin) overflow-hidden rounded-md border border-border bg-surface text-default shadow-md duration-200",
             "data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[starting-style]:opacity-0 data-[starting-style]:scale-95",
             className,
           )}
           {...props}
         >
-          <SelectPrimitive.ScrollUpArrow className="flex h-6 items-center justify-center bg-background">
+          <SelectPrimitive.ScrollUpArrow className="flex h-6 items-center justify-center bg-surface">
             <CaretDown className="size-4 rotate-180" />
           </SelectPrimitive.ScrollUpArrow>
           <SelectPrimitive.List className="p-1">
             {children}
           </SelectPrimitive.List>
-          <SelectPrimitive.ScrollDownArrow className="flex h-6 items-center justify-center bg-background">
+          <SelectPrimitive.ScrollDownArrow className="flex h-6 items-center justify-center bg-surface">
             <CaretDown className="size-4" />
           </SelectPrimitive.ScrollDownArrow>
         </SelectPrimitive.Popup>
@@ -85,7 +85,7 @@ function SelectItem({ className, children, ...props }: SelectPrimitive.Item.Prop
       data-slot="select-item"
       className={cn(
         "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none",
-        "data-[highlighted]:bg-muted data-[highlighted]:text-foreground",
+        "data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className,
       )}
