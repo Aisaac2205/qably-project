@@ -14,6 +14,7 @@ import {
   mockApiKeys,
   mockGithubIntegration,
 } from '@/lib/mock-data'
+import { validateTags } from '@/lib/tag-validation'
 import type {
   Project,
   Suite,
@@ -140,10 +141,97 @@ export function getIntegration(): GithubIntegration {
 
 // ── Mutators ──────────────────────────────────────────────────────
 
-export function updateSuite(id: string, patch: Partial<Pick<Suite, 'name'>>): Suite | undefined {
-  suites = suites.map((s) => (s.id === id ? { ...s, ...patch } : s))
+function nowIso(): string {
+  return new Date().toISOString()
+}
+
+export function createSuite(input: {
+  projectId: string
+  organizationId?: string
+  name: string
+  description: string
+  tags?: string[]
+}): Suite {
+  const id = `suite-${suites.length + 1}`
+  const tags = validateTags(input.tags ?? [])
+  // First suite for a project auto-defaults to isDefault: true.
+  const projectSuiteCount = suites.filter((s) => s.projectId === input.projectId).length
+  const isDefault = projectSuiteCount === 0
+  const createdAt = nowIso()
+  const newSuite: Suite = {
+    id,
+    projectId: input.projectId,
+    organizationId: input.organizationId ?? 'org-1',
+    name: input.name,
+    cases: [],
+    createdAt,
+    description: input.description,
+    tags,
+    isDefault,
+    updatedAt: createdAt,
+  }
+  suites = [...suites, newSuite]
+  notify()
+  return newSuite
+}
+
+export function updateSuite(
+  id: string,
+  patch: Partial<Pick<Suite, 'name' | 'description' | 'tags' | 'isDefault'>>,
+): Suite | undefined {
+  const target = suites.find((s) => s.id === id)
+  if (!target) return undefined
+  const normalizedPatch: Partial<Pick<Suite, 'name' | 'description' | 'tags' | 'isDefault'>> = {
+    ...patch,
+    ...(patch.tags !== undefined ? { tags: validateTags(patch.tags) } : {}),
+  }
+  const ts = nowIso()
+  // If switching default, unset the previous default in the same project.
+  if (normalizedPatch.isDefault === true && !target.isDefault) {
+    suites = suites.map((s) =>
+      s.projectId === target.projectId && s.id !== id && s.isDefault
+        ? { ...s, isDefault: false, updatedAt: ts }
+        : s,
+    )
+  }
+  suites = suites.map((s) => (s.id === id ? { ...s, ...normalizedPatch, updatedAt: ts } : s))
   notify()
   return suites.find((s) => s.id === id)
+}
+
+export function deleteSuite(id: string): boolean {
+  const target = suites.find((s) => s.id === id)
+  if (!target) return false
+  suites = suites.filter((s) => s.id !== id)
+  // If the deleted suite was the default, promote the next-most-recent in the same project.
+  if (target.isDefault) {
+    const remaining = suites
+      .filter((s) => s.projectId === target.projectId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    if (remaining.length > 0) {
+      const ts = nowIso()
+      const promotedId = remaining[0].id
+      suites = suites.map((s) =>
+        s.id === promotedId ? { ...s, isDefault: true, updatedAt: ts } : s,
+      )
+    }
+  }
+  notify()
+  return true
+}
+
+export function setDefaultSuite(suiteId: string): Suite | undefined {
+  const target = suites.find((s) => s.id === suiteId)
+  if (!target) return undefined
+  const ts = nowIso()
+  suites = suites.map((s) => {
+    if (s.projectId !== target.projectId) return s
+    const isNewDefault = s.id === suiteId
+    if (s.isDefault === isNewDefault) return s
+    return { ...s, isDefault: isNewDefault, updatedAt: ts }
+  })
+  notify()
+  return suites.find((s) => s.id === suiteId)
 }
 
 export function updateRunCaseStatus(runId: string, caseId: string, status: CaseStatus): Run | undefined {
