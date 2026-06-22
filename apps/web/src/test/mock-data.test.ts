@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mockProjects, mockRun, mockAiCases, mockRuns } from '@/lib/mock-data'
+import { mockProjects, mockSuites, mockRun, mockAiCases, mockRuns } from '@/lib/mock-data'
 
 describe('mock data', () => {
   it('provides at least 2 projects', () => {
@@ -52,5 +52,50 @@ describe('mock data', () => {
     expect(run9!.commitSha).toBeUndefined()
     expect(run9!.commitMessage).toBeUndefined()
     expect(run9!.branch).toBeUndefined()
+  })
+
+  // ── Suite enrichment assertions ──────────────────────────────────
+
+  it('every mock suite has a description string', () => {
+    mockSuites.forEach((s) => {
+      expect(typeof s.description).toBe('string')
+      expect(s.description.length).toBeGreaterThan(0)
+    })
+  })
+
+  it('every mock suite has a tags array', () => {
+    mockSuites.forEach((s) => {
+      expect(Array.isArray(s.tags)).toBe(true)
+      s.tags.forEach((t) => {
+        expect(typeof t).toBe('string')
+        expect(t).toBe(t.toLowerCase())
+        expect(t).not.toMatch(/\s/)
+      })
+    })
+  })
+
+  it('every mock suite has isDefault boolean', () => {
+    mockSuites.forEach((s) => {
+      expect(typeof s.isDefault).toBe('boolean')
+    })
+  })
+
+  it('every mock suite has updatedAt ISO timestamp', () => {
+    mockSuites.forEach((s) => {
+      expect(typeof s.updatedAt).toBe('string')
+      expect(Number.isFinite(new Date(s.updatedAt).getTime())).toBe(true)
+    })
+  })
+
+  it('exactly one suite per project is the default', () => {
+    const byProject = new Map<string, number>()
+    mockSuites.forEach((s) => {
+      if (s.isDefault) {
+        byProject.set(s.projectId, (byProject.get(s.projectId) ?? 0) + 1)
+      }
+    })
+    byProject.forEach((count) => {
+      expect(count).toBe(1)
+    })
   })
 })

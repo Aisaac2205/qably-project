@@ -12,6 +12,9 @@ import {
   getApiKeys,
   getIntegration,
   updateSuite,
+  createSuite,
+  deleteSuite,
+  setDefaultSuite,
   updateRunCaseStatus,
   createRun,
   confirmAiCase,
@@ -153,6 +156,153 @@ describe('mock-store', () => {
     expect(updated!.name).toBe('Auth Suite Renamed')
     // Verify it persists
     expect(getSuite('suite-1')!.name).toBe('Auth Suite Renamed')
+  })
+
+  it('updateSuite widens patch to accept description and tags', () => {
+    const updated = updateSuite('suite-1', {
+      description: 'New description',
+      tags: ['smoke', 'e2e'],
+    })
+    expect(updated).toBeDefined()
+    expect(updated!.description).toBe('New description')
+    expect(updated!.tags).toEqual(['smoke', 'e2e'])
+  })
+
+  it('updateSuite refreshes updatedAt on every mutation', async () => {
+    const before = getSuite('suite-1')!.updatedAt
+    await new Promise((r) => setTimeout(r, 5))
+    const updated = updateSuite('suite-1', { name: 'Renamed Again' })
+    expect(updated).toBeDefined()
+    expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(new Date(before).getTime())
+  })
+
+  it('createSuite adds a suite, validates tags, and sets updatedAt', () => {
+    let notified = false
+    subscribe(() => { notified = true })
+
+    const suite = createSuite({
+      projectId: 'proj-1',
+      name: 'New Test Suite',
+      description: 'Tests for new feature',
+      tags: ['SMOKE', '  api  ', 'smoke'], // normalize + dedupe
+    })
+
+    expect(notified).toBe(true)
+    expect(suite.id).toMatch(/^suite-/)
+    expect(suite.name).toBe('New Test Suite')
+    expect(suite.description).toBe('Tests for new feature')
+    expect(suite.tags).toEqual(['smoke', 'api'])
+    expect(suite.isDefault).toBe(false) // not the first suite for proj-1
+    expect(suite.updatedAt).toBeDefined()
+    expect(getSuite(suite.id)).toEqual(suite)
+  })
+
+  it('createSuite auto-defaults the first suite for a new project', () => {
+    const suite = createSuite({
+      projectId: 'proj-empty',
+      name: 'Brand New Project First Suite',
+      description: 'First suite',
+    })
+    expect(suite.isDefault).toBe(true)
+  })
+
+  it('createSuite does NOT default subsequent suites in the same project', () => {
+    createSuite({
+      projectId: 'proj-empty-2',
+      name: 'First',
+      description: 'First',
+    })
+    const second = createSuite({
+      projectId: 'proj-empty-2',
+      name: 'Second',
+      description: 'Second',
+    })
+    expect(second.isDefault).toBe(false)
+  })
+
+  it('updateSuite with isDefault: true unsets the previous default in same project', () => {
+    // suite-1 is the default for proj-1 in mock data
+    expect(getSuite('suite-1')!.isDefault).toBe(true)
+
+    const switched = updateSuite('suite-2', { isDefault: true })
+    expect(switched).toBeDefined()
+    expect(switched!.isDefault).toBe(true)
+    expect(getSuite('suite-1')!.isDefault).toBe(false)
+    expect(getSuite('suite-2')!.isDefault).toBe(true)
+  })
+
+  it('updateSuite with isDefault does not affect other projects', () => {
+    // Add a default suite in proj-3
+    const proj3 = createSuite({
+      projectId: 'proj-3',
+      name: 'Proj 3 Default',
+      description: 'Default for proj-3',
+    })
+    expect(proj3.isDefault).toBe(true)
+
+    // Now switch default in proj-1 — proj-3 default should remain untouched
+    updateSuite('suite-2', { isDefault: true })
+    expect(getSuite(proj3.id)!.isDefault).toBe(true)
+  })
+
+  it('setDefaultSuite switches the default and updates updatedAt', () => {
+    expect(getSuite('suite-1')!.isDefault).toBe(true)
+
+    const result = setDefaultSuite('suite-2')
+    expect(result).toBeDefined()
+    expect(result!.isDefault).toBe(true)
+    expect(getSuite('suite-1')!.isDefault).toBe(false)
+    expect(getSuite('suite-2')!.isDefault).toBe(true)
+  })
+
+  it('setDefaultSuite returns undefined for unknown id', () => {
+    expect(setDefaultSuite('nonexistent')).toBeUndefined()
+  })
+
+  it('setDefaultSuite is a no-op when target is already the default', () => {
+    expect(getSuite('suite-1')!.isDefault).toBe(true)
+    const result = setDefaultSuite('suite-1')
+    expect(result).toBeDefined()
+    expect(result!.isDefault).toBe(true)
+    expect(getSuite('suite-1')!.isDefault).toBe(true)
+  })
+
+  it('deleteSuite removes a suite and returns true', () => {
+    const before = getSuites('proj-1').length
+    const result = deleteSuite('suite-3')
+    expect(result).toBe(true)
+    expect(getSuite('suite-3')).toBeUndefined()
+    expect(getSuites('proj-1').length).toBe(before - 1)
+  })
+
+  it('deleteSuite returns false for unknown id', () => {
+    expect(deleteSuite('nonexistent')).toBe(false)
+  })
+
+  it('deleteSuite promotes next-most-recent when default is deleted', () => {
+    // suite-1 is the default for proj-1
+    expect(getSuite('suite-1')!.isDefault).toBe(true)
+    deleteSuite('suite-1')
+    // One of the remaining proj-1 suites should now be the default
+    const remaining = getSuites('proj-1')
+    const defaultCount = remaining.filter((s) => s.isDefault).length
+    expect(defaultCount).toBe(1)
+  })
+
+  it('deleteSuite does not affect other projects when their default survives', () => {
+    // Create a project with multiple suites
+    const a = createSuite({ projectId: 'proj-isolated', name: 'A', description: 'A' })
+    const b = createSuite({ projectId: 'proj-isolated', name: 'B', description: 'B' })
+    // a is auto-default, b is not
+    expect(a.isDefault).toBe(true)
+    expect(b.isDefault).toBe(false)
+    // Switch default to b explicitly via setDefaultSuite
+    setDefaultSuite(b.id)
+    expect(getSuite(a.id)!.isDefault).toBe(false)
+    expect(getSuite(b.id)!.isDefault).toBe(true)
+    // Now delete a (the previous default) — b should remain the default
+    deleteSuite(a.id)
+    expect(getSuite(b.id)!.isDefault).toBe(true)
   })
 
   // ── Runs ────────────────────────────────────────────────────────
