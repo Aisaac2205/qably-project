@@ -104,6 +104,14 @@ export interface Run {
   source: RunSource
   startedAt: string
   finishedAt?: string
+  /** Who executed this run (manual/API). Typically undefined for CI runs. */
+  executedBy?: { id: string; name: string }
+  /** CI metadata — only populated when source === 'github_actions'. */
+  commitSha?: string
+  commitMessage?: string
+  commitAuthor?: { name: string; email: string }
+  branch?: string
+  workflowName?: string
 }
 
 // ─── AI Cases ─────────────────────────────────────────────────────────────────
