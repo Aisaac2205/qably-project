@@ -11,6 +11,7 @@ dist
 .agents/
 .atl/
 openspec/
+.playwright-mcp/
 
 # Local analysis — not for version control
 docs/superpowers/

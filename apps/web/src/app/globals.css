@@ -6,7 +6,7 @@
   /* Backgrounds */
   --bg:                oklch(0.96 0.005 280);
   --bg-surface:        oklch(1.000 0.000 0);
-  --bg-sidebar:        oklch(0.19 0.09 280);
+  --bg-sidebar:        oklch(13.902% 0.05928 282.076);
   --bg-sidebar-hover:  oklch(0.23 0.08 280);
   --bg-sidebar-active: oklch(0.22 0.12 354 / 0.28);
 
@@ -22,7 +22,7 @@
 
   /* Brand */
   --primary:           oklch(0.55 0.18 354);
-  --primary-hover:     oklch(0.50 0.18 354);
+  --primary-hover:     oklch(40.178% 0.14532 353.571);
   --primary-fg:        oklch(0.98 0.005 354);
 
   /* AI accent — only for AI-generated content markers */
@@ -100,4 +100,15 @@
 body {
   background-color: var(--bg);
   color: var(--fg);
+}
+
+@keyframes scan {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translateY(45px);
+    opacity: 0.8;
+  }
 }
