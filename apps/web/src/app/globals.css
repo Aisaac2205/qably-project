@@ -122,3 +122,7 @@ body {
     opacity: 0.8;
   }
 }
+
+@keyframes sparkline-draw {
+  to { stroke-dashoffset: 0; }
+}
