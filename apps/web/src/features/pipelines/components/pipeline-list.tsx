@@ -37,6 +37,13 @@ export function PipelineList({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <Card>
+          <div className="flex items-center gap-3 px-3 py-2 border-b border-border">
+            <span className="w-24 shrink-0 text-[10px] font-semibold text-muted uppercase tracking-wide">Status</span>
+            <span className="flex-1 min-w-0 text-[10px] font-semibold text-muted uppercase tracking-wide">Workflow / Branch</span>
+            <span className="w-32 shrink-0 text-[10px] font-semibold text-muted uppercase tracking-wide hidden lg:block">Triggered by</span>
+            <span className="w-36 shrink-0 text-[10px] font-semibold text-muted uppercase tracking-wide">Started</span>
+            <span className="w-20 shrink-0 text-[10px] font-semibold text-muted uppercase tracking-wide text-right">Duration</span>
+          </div>
           <CardContent className="p-0 divide-y divide-border">
             {filtered.map((p) => (
               <PipelineRow key={p.id} p={p} projectId={projectId} />

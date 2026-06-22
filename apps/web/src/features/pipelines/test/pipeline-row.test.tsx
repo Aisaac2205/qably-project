@@ -68,12 +68,11 @@ describe('PipelineRow', () => {
     expect(screen.getByText('—')).toBeInTheDocument()
   })
 
-  it('renders dates', async () => {
+  it('renders relative started time', async () => {
     await act(async () => {
       render(<PipelineRow p={mockPipeline} projectId="proj-1" />)
     })
-    // Should show formatted date. jsdom may use UTC, so check for common patterns
     const texts = document.body.textContent ?? ''
-    expect(texts).toMatch(/Jun|13/)
+    expect(texts).toMatch(/\d+[mhd] ago/)
   })
 })

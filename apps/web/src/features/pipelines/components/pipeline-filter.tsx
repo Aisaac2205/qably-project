@@ -2,15 +2,18 @@
 
 import type { PipelineStatus } from '@qably/types'
 
-const ALL_STATUSES: Array<{ value: PipelineStatus; label: string }> = [
-  { value: 'pass', label: 'Pass' },
-  { value: 'fail', label: 'Fail' },
-  { value: 'running', label: 'Running' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'cancelled', label: 'Cancelled' },
+const ALL_STATUSES: Array<{ value: PipelineStatus; label: string; activeClass: string }> = [
+  { value: 'running', label: 'Running', activeClass: 'bg-running-bg text-running border-running/30' },
+  { value: 'pass',    label: 'Pass',    activeClass: 'bg-pass-bg text-pass border-pass/30' },
+  { value: 'fail',    label: 'Fail',    activeClass: 'bg-fail-bg text-fail border-fail/30' },
+  { value: 'pending', label: 'Pending', activeClass: 'bg-skip-bg text-muted border-border' },
+  { value: 'cancelled', label: 'Cancelled', activeClass: 'bg-skip-bg text-muted border-border' },
 ]
 
 const ALL_VALUES = ALL_STATUSES.map((s) => s.value)
+
+const INACTIVE_CLASS = 'border-border text-muted bg-transparent hover:bg-canvas hover:text-default'
+const ALL_ACTIVE_CLASS = 'bg-primary/10 text-primary border-primary/30'
 
 export function PipelineFilter({
   selected,
@@ -32,41 +35,38 @@ export function PipelineFilter({
   }
 
   function toggleAll() {
-    if (allSelected) {
-      onChange(new Set())
-    } else {
-      onChange(new Set(ALL_VALUES))
-    }
+    onChange(allSelected ? new Set() : new Set(ALL_VALUES))
   }
 
   return (
-    <div className="space-y-2" aria-label="Filter by status">
-      <label className="text-[11px] font-semibold text-default">Status</label>
-      <div className="flex flex-wrap items-center gap-1.5">
-        <label className="inline-flex items-center gap-1.5 text-[11px] text-muted cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={toggleAll}
-            className="size-3 accent-primary cursor-pointer"
-          />
-          All
-        </label>
-        {ALL_STATUSES.map((s) => (
-          <label
+    <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Filter by status">
+      <button
+        onClick={toggleAll}
+        aria-label="All"
+        aria-pressed={allSelected}
+        className={`inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-medium border transition-colors ${
+          allSelected ? ALL_ACTIVE_CLASS : INACTIVE_CLASS
+        }`}
+      >
+        All
+      </button>
+
+      {ALL_STATUSES.map((s) => {
+        const active = selected.has(s.value)
+        return (
+          <button
             key={s.value}
-            className="inline-flex items-center gap-1.5 text-[11px] text-muted cursor-pointer select-none"
+            onClick={() => toggle(s.value)}
+            aria-label={s.label}
+            aria-pressed={active}
+            className={`inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-medium border transition-colors ${
+              active ? s.activeClass : INACTIVE_CLASS
+            }`}
           >
-            <input
-              type="checkbox"
-              checked={selected.has(s.value)}
-              onChange={() => toggle(s.value)}
-              className="size-3 accent-primary cursor-pointer"
-            />
             {s.label}
-          </label>
-        ))}
-      </div>
+          </button>
+        )
+      })}
     </div>
   )
 }
