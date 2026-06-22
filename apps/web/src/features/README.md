@@ -10,7 +10,6 @@ Each folder under `features/` is a vertical slice. A slice owns its own
 - `suites/` — suite list with inline edit, suite detail with case cards
 - `runs/` — run list, new run, run detail with keyboard shortcuts
 - `ai-review/` — two-pane confirm/reject/skip for AI-generated cases
-- `pipelines/` — pipeline list with status filter
 - `reports/` — charts (Recharts, lazy-loaded)
 - `settings/` — org, members, API keys, integrations
 
