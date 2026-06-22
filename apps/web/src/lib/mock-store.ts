@@ -9,7 +9,6 @@ import {
   mockSuites,
   mockRuns,
   mockAiCases,
-  mockPipelineRuns,
   mockOrg,
   mockMembers,
   mockApiKeys,
@@ -50,7 +49,7 @@ let projects: Project[] = structuredClone(mockProjects)
 let suites: Suite[] = structuredClone(mockSuites)
 let runs: Run[] = structuredClone(mockRuns)
 let aiCases: AiCase[] = structuredClone(mockAiCases)
-let pipelines: PipelineRun[] = structuredClone(mockPipelineRuns)
+let pipelines: PipelineRun[] = []
 let org: Organization = { ...mockOrg }
 let members: OrgMember[] = structuredClone(mockMembers)
 let apiKeys: ApiKey[] = structuredClone(mockApiKeys)
@@ -307,7 +306,7 @@ export function __resetStore(): void {
   suites = structuredClone(mockSuites)
   runs = structuredClone(mockRuns)
   aiCases = structuredClone(mockAiCases)
-  pipelines = structuredClone(mockPipelineRuns)
+  pipelines = []
   org = { ...mockOrg }
   members = structuredClone(mockMembers)
   apiKeys = structuredClone(mockApiKeys)

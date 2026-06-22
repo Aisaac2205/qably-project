@@ -231,9 +231,9 @@ describe('mock-store', () => {
 
   // ── Pipelines ───────────────────────────────────────────────────
 
-  it('getPipelines returns pipelines for a project', () => {
+  it('getPipelines returns empty when no seed pipelines remain', () => {
     const pipes = getPipelines('proj-1')
-    expect(pipes.length).toBeGreaterThanOrEqual(2)
+    expect(pipes).toEqual([])
   })
 
   it('createPipeline creates a new pipeline and notifies', () => {

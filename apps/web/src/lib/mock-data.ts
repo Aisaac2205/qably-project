@@ -7,7 +7,6 @@ import type {
   AiCase,
   OrgMember,
   ApiKey,
-  PipelineRun,
   Organization,
   GithubIntegration,
 } from '@qably/types'
@@ -29,7 +28,6 @@ export type {
   AiCase,
   OrgMember,
   ApiKey,
-  PipelineRun,
   Organization,
   GithubIntegration,
 } from '@qably/types'
@@ -334,6 +332,11 @@ export const mockRuns: Run[] = [
     source: 'github_actions',
     startedAt: '2026-06-14T09:00:00Z',
     finishedAt: '2026-06-14T09:12:00Z',
+    commitSha: 'b1e4d90',
+    commitMessage: 'fix: checkout button not disabling on empty cart',
+    commitAuthor: { name: 'CI Bot', email: 'ci@qably.io' },
+    branch: 'feature/checkout-fix',
+    workflowName: 'CI',
     cases: [],
   },
   {
@@ -393,42 +396,6 @@ export const mockAiCases: AiCase[] = [
     sourceSnippet: `it('should show error on invalid login', async () => {\n  await loginPage.fillCredentials('wrong@email.com', 'badpass')\n  await expect(errorMsg).toHaveText(/Invalid/)\n})`,
     reviewStatus: 'pending',
     projectId: 'proj-1',
-  },
-]
-
-// ─── Pipelines ────────────────────────────────────────────────────────────────
-
-export const mockPipelineRuns: PipelineRun[] = [
-  {
-    id: 'pipe-1',
-    projectId: 'proj-1',
-    branch: 'main',
-    commitSha: 'a3f8c21',
-    commitMessage: 'feat: add discount code validation',
-    status: 'pass',
-    runId: 'run-9',
-    triggeredAt: '2026-06-13T11:00:00Z',
-    finishedAt: '2026-06-13T11:08:00Z',
-  },
-  {
-    id: 'pipe-2',
-    projectId: 'proj-1',
-    branch: 'feature/checkout-fix',
-    commitSha: 'b1e4d90',
-    commitMessage: 'fix: checkout button not disabling on empty cart',
-    status: 'fail',
-    runId: 'run-10',
-    triggeredAt: '2026-06-14T09:00:00Z',
-    finishedAt: '2026-06-14T09:12:00Z',
-  },
-  {
-    id: 'pipe-3',
-    projectId: 'proj-1',
-    branch: 'main',
-    commitSha: 'c7a2b35',
-    commitMessage: 'chore: update dependencies',
-    status: 'running',
-    triggeredAt: '2026-06-16T10:00:00Z',
   },
 ]
 

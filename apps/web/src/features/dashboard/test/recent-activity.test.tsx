@@ -40,11 +40,11 @@ describe('RecentActivity', () => {
     expect(screen.getByText('Discount code reduces total')).toBeInTheDocument()
   })
 
-  it('shows recent pipelines from mock data', async () => {
+  it('shows empty pipelines when no seed data', async () => {
     await act(async () => {
       render(<RecentActivity />)
     })
-    // Should show pipeline commit messages
-    expect(screen.getByText('feat: add discount code validation')).toBeInTheDocument()
+    // Pipelines section shows empty state after mockPipelineRuns removal
+    expect(screen.getByText('No pipelines yet')).toBeInTheDocument()
   })
 })
