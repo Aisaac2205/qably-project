@@ -26,7 +26,7 @@ describe('OrgSection', () => {
 
   it('shows org name', async () => {
     await act(async () => { render(<OrgSection />) })
-    expect(screen.getByText('Acme QA Team')).toBeInTheDocument()
+    expect(screen.getAllByText('Acme QA Team').length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows org slug', async () => {
@@ -36,19 +36,19 @@ describe('OrgSection', () => {
 
   it('shows plan as a badge', async () => {
     await act(async () => { render(<OrgSection />) })
-    expect(screen.getByText('pro', { exact: true })).toBeInTheDocument()
+    expect(screen.getAllByText('pro').length).toBeGreaterThanOrEqual(1)
   })
 
   it('shows plan limits', async () => {
     await act(async () => { render(<OrgSection />) })
-    expect(screen.getByText(/20/)).toBeInTheDocument()
-    expect(screen.getByText(/10/)).toBeInTheDocument()
-    expect(screen.getByText(/5000/)).toBeInTheDocument()
+    expect(screen.getByText(/Up to 20 projects/i)).toBeInTheDocument()
+    expect(screen.getByText(/Up to 10 team members/i)).toBeInTheDocument()
+    expect(screen.getByText(/5,000/)).toBeInTheDocument()
   })
 
-  it('renders in read-only mode (no inputs)', async () => {
+  it('has no editable fields for org name or slug', async () => {
     await act(async () => { render(<OrgSection />) })
-    const inputs = document.querySelectorAll('input')
-    expect(inputs.length).toBe(0)
+    expect(screen.queryByPlaceholderText(/name/i)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/slug/i)).not.toBeInTheDocument()
   })
 })

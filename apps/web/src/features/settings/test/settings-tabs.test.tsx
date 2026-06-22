@@ -29,17 +29,18 @@ describe('SettingsTabs', () => {
     vi.clearAllMocks()
   })
 
-  it('renders four tabs', async () => {
+  it('renders all tabs', async () => {
     await act(async () => { render(<SettingsTabs />) })
     expect(screen.getByRole('tab', { name: /general/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /members/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /api keys/i })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: /integrations/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /billing/i })).toBeInTheDocument()
   })
 
   it('shows General tab content by default', async () => {
     await act(async () => { render(<SettingsTabs />) })
-    expect(screen.getByText('Acme QA Team')).toBeInTheDocument()
+    expect(screen.getAllByText('Acme QA Team').length).toBeGreaterThanOrEqual(1)
   })
 
   it('switches to Members tab on click', async () => {

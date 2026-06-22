@@ -38,7 +38,7 @@ export function ApiKeysSection() {
       <Card>
         <CardContent className="flex items-end gap-3 p-3">
           <div className="flex-1 space-y-1.5">
-            <label className="text-xs font-medium text-default" htmlFor="key-name">
+            <label className="text-sm font-medium text-default" htmlFor="key-name">
               Key Name
             </label>
             <Input
@@ -47,7 +47,7 @@ export function ApiKeysSection() {
               placeholder="Key name e.g. CI/CD"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-7 text-xs"
+              className="h-8 text-xs"
             />
           </div>
           <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
@@ -73,12 +73,12 @@ export function ApiKeysSection() {
                 <Key size={12} weight="bold" className="text-ai" aria-hidden="true" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-default truncate">{key.name}</div>
-                <div className="text-[10px] text-muted font-mono">
+                <div className="text-sm font-medium text-default truncate">{key.name}</div>
+                <div className="text-xs text-muted font-mono">
                   {key.prefix}••••{key.lastFour}
                 </div>
               </div>
-              <span className="text-[10px] text-muted w-20 text-right shrink-0">
+              <span className="text-xs text-muted w-20 text-right shrink-0">
                 {new Date(key.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </span>
               <Button

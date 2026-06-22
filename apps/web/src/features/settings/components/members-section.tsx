@@ -12,10 +12,10 @@ import { Separator } from '@/components/ui/separator'
 import { User, Plus } from '@phosphor-icons/react'
 import type { OrgMember } from '@qably/types'
 
-const ROLE_COLORS: Record<string, string> = {
-  owner: 'bg-primary text-primary-fg',
-  admin: 'bg-warn-bg text-warn',
-  member: 'bg-skip-bg text-skip',
+const ROLE_VARIANT: Record<string, 'default' | 'warn' | 'skip'> = {
+  owner: 'default',
+  admin: 'warn',
+  member: 'skip',
 }
 
 export function MembersSection() {
@@ -36,7 +36,7 @@ export function MembersSection() {
       <Card>
         <CardContent className="flex items-end gap-3 p-3">
           <div className="flex-1 space-y-1.5">
-            <label className="text-xs font-medium text-default" htmlFor="invite-email">
+            <label className="text-sm font-medium text-default" htmlFor="invite-email">
               Email
             </label>
             <Input
@@ -45,15 +45,15 @@ export function MembersSection() {
               placeholder="email@acme.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-7 text-xs"
+              className="h-8 text-xs"
             />
           </div>
           <div className="w-28 space-y-1.5">
-            <label className="text-xs font-medium text-default" htmlFor="invite-role">
+            <label className="text-sm font-medium text-default" htmlFor="invite-role">
               Role
             </label>
             <Select value={role} onValueChange={(v) => setRole(v as OrgMember['role'])}>
-              <SelectTrigger id="invite-role" className="h-7 text-xs">
+              <SelectTrigger id="invite-role" className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -72,13 +72,23 @@ export function MembersSection() {
       <Separator />
 
       {/* Members list */}
-      <div className="space-y-1">
+      <div>
         {members.length === 0 ? (
           <p className="text-sm text-muted text-center py-6">No members yet</p>
         ) : (
-          members.map((member) => (
-            <MemberRow key={member.id} member={member} />
-          ))
+          <>
+            <div className="flex items-center gap-3 px-3 pb-2 border-b border-border">
+              <div className="w-6 shrink-0" aria-hidden="true" />
+              <span className="flex-1 text-xs font-semibold text-muted uppercase tracking-wide">Name</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wide w-16 text-center shrink-0">Role</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wide w-20 text-right shrink-0">Joined</span>
+            </div>
+            <div className="space-y-0.5 mt-1">
+              {members.map((member) => (
+                <MemberRow key={member.id} member={member} />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -92,13 +102,13 @@ function MemberRow({ member }: { member: OrgMember }) {
         <User size={12} weight="bold" className="text-primary" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-xs font-medium text-default truncate">{member.name}</div>
-        <div className="text-[10px] text-muted truncate">{member.email}</div>
+        <div className="text-sm font-medium text-default truncate">{member.name}</div>
+        <div className="text-xs text-muted truncate">{member.email}</div>
       </div>
-      <Badge className={`text-[10px] capitalize ${ROLE_COLORS[member.role] ?? 'bg-skip-bg text-skip'}`}>
+      <Badge variant={ROLE_VARIANT[member.role] ?? 'skip'} className="capitalize">
         {member.role}
       </Badge>
-      <span className="text-[10px] text-muted w-20 text-right shrink-0">
+      <span className="text-xs text-muted w-20 text-right shrink-0">
         {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
       </span>
     </div>

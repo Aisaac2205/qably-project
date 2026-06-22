@@ -30,7 +30,7 @@ export function IntegrationsSection() {
           <div className="flex-1">
             <div className="text-sm font-medium text-default flex items-center gap-2">
               GitHub Integration
-              <Badge className={integration.connected ? 'bg-pass-bg text-pass' : 'bg-skip-bg text-skip'}>
+              <Badge variant={integration.connected ? 'pass' : 'skip'}>
                 {integration.connected ? 'Connected' : 'Not connected'}
               </Badge>
             </div>
@@ -52,7 +52,7 @@ export function IntegrationsSection() {
 
         {/* Webhook URL */}
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-default">Webhook URL</label>
+          <label className="text-sm font-medium text-default">Webhook URL</label>
           <div className="flex items-center gap-2 p-2 rounded-md bg-canvas border border-border">
             <Link size={14} className="text-muted shrink-0" aria-hidden="true" />
             <code className="text-xs font-mono text-default truncate flex-1">
