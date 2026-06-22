@@ -19,7 +19,6 @@ export type {
   CaseState,
   OrgRole,
   Plan,
-  PipelineStatus,
   Project,
   Suite,
   TestCase,
@@ -114,6 +113,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 0,
     aiPendingCount: 3,
     createdAt: '2026-01-20T00:00:00Z',
+    technologies: ['react', 'typescript', 'javascript'],
   },
   {
     id: 'proj-2',
@@ -128,6 +128,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 1,
     aiPendingCount: 0,
     createdAt: '2026-02-05T00:00:00Z',
+    technologies: ['react', 'typescript'],
   },
   {
     id: 'proj-3',
@@ -142,6 +143,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 1,
     aiPendingCount: 0,
     createdAt: '2026-02-20T00:00:00Z',
+    technologies: ['nestjs', 'typescript'],
   },
   {
     id: 'proj-4',
@@ -156,6 +158,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 0,
     aiPendingCount: 4,
     createdAt: '2026-03-10T00:00:00Z',
+    technologies: ['angular', 'typescript'],
   },
 ]
 

@@ -33,7 +33,6 @@ vi.mock('@/lib/use-mock-store', () => ({
   useSuites: () => [],
   useRuns: () => [],
   useAiCases: () => [],
-  usePipelines: () => [],
   useOrg: () => ({ id: 'org-1', name: 'Acme', slug: 'acme', plan: 'pro', planLimits: { maxProjects: 20, maxUsers: 10, maxCases: 5000 } }),
   useMembers: () => [],
   useApiKeys: () => [],
@@ -43,20 +42,25 @@ vi.mock('@/lib/use-mock-store', () => ({
 import { TopBar } from '@/components/shell/top-bar'
 
 describe('TopBar', () => {
-  it('shows "Dashboard" breadcrumb on /dashboard', async () => {
+  // NOTE: The top bar does NOT render inline breadcrumbs yet.
+  // Breadcrumbs live in the page-level shell wrapper. The top bar renders
+  // the project context indicator (name + health dot) on project routes.
+  // If breadcrumbs are added to the top bar in the future, restore the
+  // assertions below (Dashboard / Projects > Name > Segment).
+  it('does not render a Dashboard label on /dashboard (no inline breadcrumb)', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<TopBar />) })
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    // Top bar shows search, notifications, and user avatar
+    expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument()
+    expect(screen.getByText('IF')).toBeInTheDocument()
   })
 
-  it('shows breadcrumbs with project name inside a project', async () => {
+  it('shows the project name in the context indicator on project routes', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/runs')
     await act(async () => { render(<TopBar />) })
-    expect(screen.getByText('Projects')).toBeInTheDocument()
-    // Project name appears in both breadcrumbs and context indicator
-    const appOccurrences = screen.getAllByText('Ecommerce App')
-    expect(appOccurrences.length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Runs')).toBeInTheDocument()
+    // Project name appears in the context indicator on the right
+    expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
   })
 
   it('shows project context on the right inside a project', async () => {

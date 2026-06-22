@@ -18,7 +18,6 @@ import type {
   Suite,
   Run,
   AiCase,
-  PipelineRun,
   Organization,
   OrgMember,
   ApiKey,
@@ -32,7 +31,6 @@ const EMPTY_PROJECTS = Object.freeze([]) as unknown as Project[]
 const EMPTY_SUITES = Object.freeze([]) as unknown as Suite[]
 const EMPTY_RUNS = Object.freeze([]) as unknown as Run[]
 const EMPTY_AI_CASES = Object.freeze([]) as unknown as AiCase[]
-const EMPTY_PIPELINES = Object.freeze([]) as unknown as PipelineRun[]
 const EMPTY_MEMBERS = Object.freeze([]) as unknown as OrgMember[]
 const EMPTY_API_KEYS = Object.freeze([]) as unknown as ApiKey[]
 
@@ -136,16 +134,6 @@ export function useAiCases(projectId?: string): AiCase[] {
       return projectId ? all.filter((c) => c.projectId === projectId) : all
     },
     () => EMPTY_AI_CASES,
-  )
-}
-
-export function usePipelines(projectId?: string): PipelineRun[] {
-  return useStableArray(
-    () => {
-      const all = getSnapshot().pipelines
-      return projectId ? all.filter((p) => p.projectId === projectId) : all
-    },
-    () => EMPTY_PIPELINES,
   )
 }
 

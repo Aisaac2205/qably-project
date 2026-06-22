@@ -7,7 +7,6 @@ import {
   getRuns,
   getRun,
   getAiCases,
-  getPipelines,
   getOrg,
   getMembers,
   getApiKeys,
@@ -21,7 +20,6 @@ import {
   createApiKey,
   revokeApiKey,
   createProject,
-  createPipeline,
   updateIntegration,
   inviteMember,
   subscribe,
@@ -29,7 +27,7 @@ import {
   getServerSnapshot,
   __resetStore,
 } from '@/lib/mock-store'
-import type { Project, Suite, Run, AiCase, ApiKey, OrgMember, PipelineRun } from '@qably/types'
+import type { Project, Suite, Run, AiCase, ApiKey, OrgMember } from '@qably/types'
 
 describe('mock-store', () => {
   beforeEach(() => {
@@ -82,7 +80,6 @@ describe('mock-store', () => {
     expect(a.suites).toBe(b.suites)
     expect(a.runs).toBe(b.runs)
     expect(a.aiCases).toBe(b.aiCases)
-    expect(a.pipelines).toBe(b.pipelines)
     expect(a.members).toBe(b.members)
     expect(a.apiKeys).toBe(b.apiKeys)
   })
@@ -227,31 +224,6 @@ describe('mock-store', () => {
     const result = skipAiCase('ai-2')
     expect(result).toBeDefined()
     expect(result!.reviewStatus).toBe('pending')
-  })
-
-  // ── Pipelines ───────────────────────────────────────────────────
-
-  it('getPipelines returns empty when no seed pipelines remain', () => {
-    const pipes = getPipelines('proj-1')
-    expect(pipes).toEqual([])
-  })
-
-  it('createPipeline creates a new pipeline and notifies', () => {
-    let notified = false
-    subscribe(() => { notified = true })
-
-    const pipe = createPipeline({
-      projectId: 'proj-1',
-      branch: 'feature/x',
-      commitSha: 'abc1234',
-      commitMessage: 'test: add pipeline',
-    })
-
-    expect(notified).toBe(true)
-    expect(pipe.id).toMatch(/^pipe-/)
-    expect(pipe.branch).toBe('feature/x')
-    expect(pipe.status).toBe('running')
-    expect(getPipelines('proj-1').find(p => p.id === pipe.id)).toEqual(pipe)
   })
 
   // ── Org / Members / API Keys / Integration ─────────────────────

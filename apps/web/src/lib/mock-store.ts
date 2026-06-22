@@ -19,7 +19,6 @@ import type {
   Suite,
   Run,
   AiCase,
-  PipelineRun,
   Organization,
   OrgMember,
   ApiKey,
@@ -36,7 +35,6 @@ export interface StoreSnapshot {
   suites: Suite[]
   runs: Run[]
   aiCases: AiCase[]
-  pipelines: PipelineRun[]
   org: Organization
   members: OrgMember[]
   apiKeys: ApiKey[]
@@ -49,7 +47,6 @@ let projects: Project[] = structuredClone(mockProjects)
 let suites: Suite[] = structuredClone(mockSuites)
 let runs: Run[] = structuredClone(mockRuns)
 let aiCases: AiCase[] = structuredClone(mockAiCases)
-let pipelines: PipelineRun[] = []
 let org: Organization = { ...mockOrg }
 let members: OrgMember[] = structuredClone(mockMembers)
 let apiKeys: ApiKey[] = structuredClone(mockApiKeys)
@@ -69,7 +66,7 @@ export function subscribe(listener: Listener): () => void {
 }
 
 function currentSnapshot(): StoreSnapshot {
-  return { projects, suites, runs, aiCases, pipelines, org, members, apiKeys, integration }
+  return { projects, suites, runs, aiCases, org, members, apiKeys, integration }
 }
 
 // Stable server snapshot — cached as a frozen constant
@@ -78,7 +75,6 @@ const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
   suites: [],
   runs: [],
   aiCases: [],
-  pipelines: [],
   org: { id: '', name: '', slug: '', plan: 'free' as const, planLimits: { maxProjects: 0, maxUsers: 0, maxCases: 0 } },
   members: [],
   apiKeys: [],
@@ -124,11 +120,6 @@ export function getRun(runId: string): Run | undefined {
 export function getAiCases(projectId?: string): AiCase[] {
   if (!projectId) return aiCases
   return aiCases.filter((c) => c.projectId === projectId)
-}
-
-export function getPipelines(projectId?: string): PipelineRun[] {
-  if (!projectId) return pipelines
-  return pipelines.filter((p) => p.projectId === projectId)
 }
 
 export function getOrg(): Organization {
@@ -232,10 +223,20 @@ export function revokeApiKey(id: string): boolean {
   return false
 }
 
+export function updateProject(
+  id: string,
+  patch: Partial<Pick<Project, 'name' | 'description' | 'githubRepo' | 'technologies'>>,
+): Project | undefined {
+  projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p))
+  notify()
+  return projects.find((p) => p.id === id)
+}
+
 export function createProject(input: {
   name: string
   description?: string
   githubRepo?: string
+  technologies?: string[]
 }): Project {
   const id = `proj-${projects.length + 1}`
   const newProject: Project = {
@@ -251,31 +252,11 @@ export function createProject(input: {
     activeRunCount: 0,
     aiPendingCount: 0,
     createdAt: new Date().toISOString(),
+    technologies: input.technologies ?? [],
   }
   projects = [...projects, newProject]
   notify()
   return newProject
-}
-
-export function createPipeline(input: {
-  projectId: string
-  branch: string
-  commitSha: string
-  commitMessage: string
-}): PipelineRun {
-  const id = `pipe-${pipelines.length + 1}`
-  const newPipe: PipelineRun = {
-    id,
-    projectId: input.projectId,
-    branch: input.branch,
-    commitSha: input.commitSha,
-    commitMessage: input.commitMessage,
-    status: 'running',
-    triggeredAt: new Date().toISOString(),
-  }
-  pipelines = [...pipelines, newPipe]
-  notify()
-  return newPipe
 }
 
 export function updateIntegration(patch: Partial<GithubIntegration>): GithubIntegration {
@@ -306,7 +287,6 @@ export function __resetStore(): void {
   suites = structuredClone(mockSuites)
   runs = structuredClone(mockRuns)
   aiCases = structuredClone(mockAiCases)
-  pipelines = []
   org = { ...mockOrg }
   members = structuredClone(mockMembers)
   apiKeys = structuredClone(mockApiKeys)

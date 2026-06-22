@@ -7,7 +7,6 @@ export type CasePriority = 'critical' | 'high' | 'medium' | 'low'
 export type CaseState = 'active' | 'draft' | 'deprecated'
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type Plan = 'free' | 'pro' | 'agency'
-export type PipelineStatus = 'pass' | 'fail' | 'running' | 'pending' | 'cancelled'
 export type RunSource = 'manual' | 'api' | 'github_actions'
 
 // ─── Organization ─────────────────────────────────────────────────────────────
@@ -58,6 +57,7 @@ export interface Project {
   activeRunCount: number
   aiPendingCount: number
   createdAt: string
+  technologies?: string[]
 }
 
 // ─── Suites & Cases ───────────────────────────────────────────────────────────
@@ -125,20 +125,6 @@ export interface AiCase {
   sourceSnippet: string
   reviewStatus: ReviewStatus
   projectId: string
-}
-
-// ─── Pipelines ────────────────────────────────────────────────────────────────
-
-export interface PipelineRun {
-  id: string
-  projectId: string
-  branch: string
-  commitSha: string
-  commitMessage: string
-  status: PipelineStatus
-  runId?: string
-  triggeredAt: string
-  finishedAt?: string
 }
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
