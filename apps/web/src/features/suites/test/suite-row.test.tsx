@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { SuiteRow } from '@/features/suites/components/suite-row'
 import { __resetStore, updateSuite, getSuite } from '@/lib/mock-store'
-import type { Suite } from '@qably/types'
+import { createMockSuite } from '@/lib/test-utils'
+import type { TestCase } from '@qably/types'
 
 // We need to mock the store's update function to verify it's called
 vi.mock(import('@/lib/mock-store'), async (importOriginal) => {
@@ -11,24 +12,21 @@ vi.mock(import('@/lib/mock-store'), async (importOriginal) => {
   return { ...actual }
 })
 
-const mockSuite: Suite = {
-  id: 'suite-1',
-  projectId: 'proj-1',
-  organizationId: 'org-1',
-  name: 'Authentication',
-  cases: [
-    {
-      id: 'tc-1',
-      suiteId: 'suite-1',
-      name: 'Valid login',
-      steps: ['Step 1'],
-      expectedResult: 'Success',
-      priority: 'critical',
-      state: 'active',
-    },
-  ],
-  createdAt: '2026-01-25T00:00:00Z',
+const mockCase: TestCase = {
+  id: 'tc-1',
+  suiteId: 'suite-1',
+  name: 'Valid login',
+  steps: ['Step 1'],
+  expectedResult: 'Success',
+  priority: 'critical',
+  state: 'active',
 }
+
+const mockSuite = createMockSuite({
+  id: 'suite-1',
+  name: 'Authentication',
+  cases: [mockCase],
+})
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
