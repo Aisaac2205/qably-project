@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Play, Sparkle, Code } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { StatusChip } from '@/features/projects/components/status-chip'
+import { StatusChip } from '@/components/ui/status-chip'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
 

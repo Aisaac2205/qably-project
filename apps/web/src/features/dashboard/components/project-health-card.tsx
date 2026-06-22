@@ -9,7 +9,7 @@ import {
   CardContent,
   CardFooter,
 } from '@/components/ui/card'
-import { StatusChip } from '@/features/projects/components/status-chip'
+import { StatusChip } from '@/components/ui/status-chip'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
 
 interface ProjectHealthCardProps {
