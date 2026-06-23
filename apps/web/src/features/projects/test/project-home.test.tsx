@@ -1,7 +1,6 @@
-import { render, screen, act, within } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, act } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ProjectHome } from '@/features/projects/components/project-home'
-import { ProjectKpiRow } from '@/features/projects/components/project-kpi-row'
 import { __resetStore } from '@/lib/mock-store'
 import type { Project } from '@qably/types'
 
@@ -25,90 +24,50 @@ const mockProject: Project = {
   createdAt: '2026-01-20T00:00:00Z',
 }
 
-describe('ProjectHome', () => {
+describe('ProjectHome (thin shell)', () => {
   beforeEach(() => {
     __resetStore()
   })
 
-  it('renders project name and description', async () => {
+  it('renders the project name as h1', async () => {
     await act(async () => { render(<ProjectHome project={mockProject} />) })
     expect(screen.getByRole('heading', { level: 1, name: 'Ecommerce App' })).toBeInTheDocument()
+  })
+
+  it('renders the project description', async () => {
+    await act(async () => { render(<ProjectHome project={mockProject} />) })
     expect(screen.getByText(/Checkout, catalog/)).toBeInTheDocument()
   })
 
-  it('renders health + last-run chip in header', async () => {
+  it('omits the description when project has none', async () => {
+    const noDesc = { ...mockProject, description: undefined }
+    await act(async () => { render(<ProjectHome project={noDesc} />) })
+    expect(screen.queryByText(/Checkout, catalog/)).not.toBeInTheDocument()
+  })
+
+  it('renders the SuiteList with the seeded suites', async () => {
     await act(async () => { render(<ProjectHome project={mockProject} />) })
-    expect(screen.getByText(/Health 90%/)).toBeInTheDocument()
-    // "Pass" appears in the header status chip + multiple suite status chips
-    expect(screen.getAllByText('Pass').length).toBeGreaterThan(0)
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
+    expect(screen.getByText('Checkout')).toBeInTheDocument()
+    expect(screen.getByText('User Account')).toBeInTheDocument()
   })
 
-  it('renders 4 KPIs in ProjectKpiRow', async () => {
+  it('renders the filter bar from SuiteList', async () => {
     await act(async () => { render(<ProjectHome project={mockProject} />) })
-    const kpiGroup = screen.getByRole('group', { name: /Project health/i })
-    expect(within(kpiGroup).getByText('Suites')).toBeInTheDocument()
-    expect(within(kpiGroup).getByText('Test Cases')).toBeInTheDocument()
-    expect(within(kpiGroup).getByText(/Pass Rate \(7d\)/)).toBeInTheDocument()
-    expect(within(kpiGroup).getByText('Last Run')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Search by name/i)).toBeInTheDocument()
   })
 
-  it('renders 3 "Recent" sections', async () => {
+  it('does NOT render a KPI strip or activity feed (those live in /dashboard, /runs, /ai-review)', async () => {
     await act(async () => { render(<ProjectHome project={mockProject} />) })
-    expect(screen.getByText('Recent suites')).toBeInTheDocument()
-    expect(screen.getByText('Recent runs')).toBeInTheDocument()
-    expect(screen.getByText('Pending AI cases')).toBeInTheDocument()
+    expect(screen.queryByText('Recent runs')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recent suites')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pending AI cases')).not.toBeInTheDocument()
+    // No KPI group either
+    expect(screen.queryByRole('group', { name: /Project health/i })).not.toBeInTheDocument()
   })
 
-  it('shows "View all" links for each section', async () => {
+  it('does NOT render the health dot or last-run chip in the home (moved out of project header)', async () => {
     await act(async () => { render(<ProjectHome project={mockProject} />) })
-    const links = screen.getAllByText(/View all/i)
-    expect(links.length).toBe(3)
-  })
-
-  it('renders recent runs with suite + status', async () => {
-    await act(async () => { render(<ProjectHome project={mockProject} />) })
-    // run-12 is in mock data, name "Run #12"
-    const runs = screen.getAllByText(/Run #/)
-    expect(runs.length).toBeGreaterThan(0)
-  })
-
-  it('renders pending AI cases', async () => {
-    await act(async () => { render(<ProjectHome project={mockProject} />) })
-    // mockAiCases has 'ai-2' with 'pending' status
-    expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
-  })
-
-  it('renders recent suites with their status chips', async () => {
-    await act(async () => { render(<ProjectHome project={mockProject} />) })
-    // proj-1 has 3 suites, all have runs
-    const auth = screen.getAllByText('Authentication')
-    expect(auth.length).toBeGreaterThan(0)
-  })
-})
-
-describe('ProjectKpiRow', () => {
-  beforeEach(() => {
-    __resetStore()
-  })
-
-  it('renders 4 KPI cards', async () => {
-    await act(async () => { render(<ProjectKpiRow projectId="proj-1" />) })
-    const group = screen.getByRole('group', { name: /Project health/i })
-    expect(within(group).getByText('Suites')).toBeInTheDocument()
-    expect(within(group).getByText('Test Cases')).toBeInTheDocument()
-    expect(within(group).getByText(/Pass Rate \(7d\)/)).toBeInTheDocument()
-    expect(within(group).getByText('Last Run')).toBeInTheDocument()
-  })
-
-  it('shows project-wide totals', async () => {
-    await act(async () => { render(<ProjectKpiRow projectId="proj-1" />) })
-    // proj-1 has 3 suites with 3+3+1 = 7 cases
-    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
-    expect(screen.getByText('7')).toBeInTheDocument()
-  })
-
-  it('shows "—" for Last Run when project has no runs', async () => {
-    await act(async () => { render(<ProjectKpiRow projectId="proj-empty" />) })
-    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.queryByText(/Health \d+%/)).not.toBeInTheDocument()
   })
 })

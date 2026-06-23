@@ -7,7 +7,6 @@ import {
   FolderOpen,
   TestTube,
   Play,
-  Code,
   ChartBar,
   Sparkle,
   Gear,
@@ -108,9 +107,8 @@ function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathn
   const project = useProject(projectId)
 
   const projectNavItems = [
-    { label: 'Suites', href: 'suites', icon: TestTube },
+    { label: 'Suites', href: '', icon: TestTube },
     { label: 'Runs', href: 'runs', icon: Play },
-    { label: 'Pipelines', href: 'pipelines', icon: Code },
     { label: 'Reports', href: 'reports', icon: ChartBar },
     { label: 'AI Review', href: 'ai-review', icon: Sparkle },
   ]
@@ -150,11 +148,13 @@ function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathn
       {/* Project Navigation */}
       <nav className="flex flex-col gap-0.5 py-4 px-2 overflow-y-auto flex-1">
         {projectNavItems.map(item => {
-          const href = `/projects/${projectId}/${item.href}`
-          const isActive = pathname.startsWith(href)
+          // Empty href means "project home" — the suites list is the project home.
+          const href = item.href ? `/projects/${projectId}/${item.href}` : `/projects/${projectId}`
+          const isActive: boolean =
+            pathname === href || (item.href !== '' && pathname.startsWith(href))
           return (
             <SidebarItem
-              key={item.href}
+              key={item.label}
               item={{ ...item, href }}
               active={isActive}
             />
