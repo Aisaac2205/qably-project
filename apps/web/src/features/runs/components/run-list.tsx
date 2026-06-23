@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Run, RunSource } from '@qably/types'
 import { useRuns } from '@/lib/use-mock-store'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { StatusChip } from './status-chip'
 
 function formatDate(iso: string): string {
@@ -37,13 +38,13 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
         <span className="text-sm font-semibold tabular-nums font-mono text-default w-10 text-right">
           {run.passRate}%
         </span>
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sidebar-hover text-sidebar-fg-muted uppercase hidden sm:inline">
+        <Badge variant="outline" className="uppercase hidden sm:inline-flex">
           {run.source}
-        </span>
+        </Badge>
         <div className="text-right hidden sm:block">
-          <div className="text-[11px] text-muted">{formatDate(run.startedAt)}</div>
+          <div className="text-xs text-muted">{formatDate(run.startedAt)}</div>
           {run.finishedAt && (
-            <div className="text-[11px] text-muted">{formatDate(run.finishedAt)}</div>
+            <div className="text-xs text-muted">{formatDate(run.finishedAt)}</div>
           )}
         </div>
       </div>
@@ -64,7 +65,7 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
         <p className="text-sm text-muted">No runs yet</p>
         <Link
           href={`/projects/${projectId}/runs/new`}
-          className="text-xs font-medium text-primary hover:text-primary-hover transition-colors"
+          className="text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
         >
           Start a run
         </Link>

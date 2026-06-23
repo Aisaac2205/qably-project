@@ -126,7 +126,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
                 setStatus('all')
                 setTag('all')
               }}
-              className="text-xs text-primary hover:underline"
+              className="text-sm text-default font-medium hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
             >
               Clear filters
             </button>
