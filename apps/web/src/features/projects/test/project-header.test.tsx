@@ -19,27 +19,24 @@ const mockProject: Project = {
 }
 
 describe('ProjectHeader', () => {
-  it('renders project name', async () => {
+  it('renders project name as h1', async () => {
     await act(async () => { render(<ProjectHeader project={mockProject} />) })
-    expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Ecommerce App' })).toBeInTheDocument()
   })
 
-  it('shows health score with dot indicator', async () => {
+  it('renders project description when present', async () => {
     await act(async () => { render(<ProjectHeader project={mockProject} />) })
-    expect(screen.getByText('90%')).toBeInTheDocument()
+    expect(screen.getByText('Checkout flows')).toBeInTheDocument()
+  })
+
+  it('shows health score with label', async () => {
+    await act(async () => { render(<ProjectHeader project={mockProject} />) })
+    expect(screen.getByText(/Health 90%/)).toBeInTheDocument()
   })
 
   it('shows last run status chip', async () => {
     await act(async () => { render(<ProjectHeader project={mockProject} />) })
     expect(screen.getByText('Pass')).toBeInTheDocument()
-  })
-
-  it('shows counts with correct text', async () => {
-    await act(async () => { render(<ProjectHeader project={mockProject} />) })
-    expect(screen.getByText(/12/)).toBeInTheDocument()
-    expect(screen.getByText(/suites/)).toBeInTheDocument()
-    expect(screen.getByText(/active runs/)).toBeInTheDocument()
-    expect(screen.getByText(/AI pending/)).toBeInTheDocument()
   })
 
   it('shows red dot for health score < 50', async () => {
@@ -54,5 +51,12 @@ describe('ProjectHeader', () => {
     await act(async () => { render(<ProjectHeader project={warn} />) })
     const dot = document.querySelector('.bg-warn')
     expect(dot).toBeTruthy()
+  })
+
+  it('does NOT render the suite/active-run/AI-pending counts (moved to KPI)', async () => {
+    await act(async () => { render(<ProjectHeader project={mockProject} />) })
+    // Counts live in ProjectKpiRow, not here
+    expect(screen.queryByText(/active runs/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/AI pending/)).not.toBeInTheDocument()
   })
 })
