@@ -1,7 +1,12 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import type { Run, CaseStatus } from '@qably/types'
+import { useRun, useProject } from '@/lib/use-mock-store'
+import { Breadcrumbs } from '@/components/shell/breadcrumbs'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft } from '@phosphor-icons/react'
+import Link from 'next/link'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
 import { RunProgressHeader } from './run-progress-header'
@@ -26,22 +31,21 @@ export function RunDetail({
 }) {
   const updateStatus = useUpdateRunCase(run.id)
 
-  const sortedCases = useMemo(() => {
-    // Keep original order; run.cases already has cases
-    return run.cases
-  }, [run.id, run.cases])
+  const sortedCases = useMemo(() => run.cases, [run.id, run.cases])
 
   const [selectedId, setSelectedId] = useState<string>(sortedCases[0]?.id ?? '')
   const [announcement, setAnnouncement] = useState('')
 
+  // If the selected case no longer exists (e.g. after a refetch), fall back to the first.
+  useEffect(() => {
+    if (selectedId && !sortedCases.find((c) => c.id === selectedId)) {
+      setSelectedId(sortedCases[0]?.id ?? '')
+    }
+  }, [sortedCases, selectedId])
+
   const selectedIndex = sortedCases.findIndex((c) => c.id === selectedId)
 
-  const selectCase = useCallback(
-    (id: string) => {
-      setSelectedId(id)
-    },
-    [],
-  )
+  const selectCase = useCallback((id: string) => setSelectedId(id), [])
 
   const goNext = useCallback(() => {
     if (selectedIndex < sortedCases.length - 1) {
@@ -73,7 +77,6 @@ export function RunDetail({
   )
 
   const runNext = useCallback(() => {
-    // Find the next pending case, starting from current index + 1
     for (let i = selectedIndex + 1; i < sortedCases.length; i++) {
       if (sortedCases[i].status === 'pending') {
         setSelectedId(sortedCases[i].id)
@@ -82,7 +85,6 @@ export function RunDetail({
         return
       }
     }
-    // Wrap around
     for (let i = 0; i < selectedIndex; i++) {
       if (sortedCases[i].status === 'pending') {
         setSelectedId(sortedCases[i].id)
@@ -109,17 +111,20 @@ export function RunDetail({
     <div className="h-full flex flex-col">
       <RunProgressHeader run={run} />
 
-      {/* Keyboard shortcut hints */}
+      {/* Keyboard shortcut hints — using surface tokens (not sidebar), readable text-xs */}
       <div
-        className="flex items-center gap-2 px-4 py-1.5 border-b border-border bg-canvas/50"
+        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 border-b border-border bg-canvas"
         aria-label="Keyboard shortcuts"
       >
+        <span className="text-[11px] uppercase tracking-wide text-muted font-semibold">
+          Shortcuts
+        </span>
         {SHORTCUT_LABELS.map((s) => (
-          <span key={s.key} className="inline-flex items-center gap-1">
-            <kbd className="text-[10px] font-mono px-1 py-0.5 rounded bg-sidebar-hover text-sidebar-fg-muted border border-border-sidebar">
+          <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-default">
+            <kbd className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded border border-border bg-surface text-default shadow-sm min-w-[20px] text-center">
               {s.key}
             </kbd>
-            <span className="text-[10px] text-muted">{s.label}</span>
+            <span className="text-muted">{s.label}</span>
           </span>
         ))}
       </div>
@@ -136,7 +141,7 @@ export function RunDetail({
 
       {/* Two-pane: case list + detail */}
       <div className="flex-1 flex min-h-0">
-        <div className="w-64 shrink-0 border-r border-border overflow-y-auto">
+        <div className="w-72 shrink-0 border-r border-border overflow-y-auto">
           <CaseList
             cases={sortedCases}
             selectedId={selectedId}
@@ -147,8 +152,9 @@ export function RunDetail({
           {selectedCase ? (
             <CaseDetail c={selectedCase} />
           ) : (
-            <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
-              Select a case to view details
+            <div className="flex flex-col items-center justify-center h-full text-sm text-muted p-8 gap-2 text-center">
+              <p className="text-sm font-medium text-default">No case selected</p>
+              <p>Pick a case from the list to view its details.</p>
             </div>
           )}
         </div>

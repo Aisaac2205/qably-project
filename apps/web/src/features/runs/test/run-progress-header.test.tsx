@@ -48,11 +48,12 @@ describe('RunProgressHeader', () => {
     expect(screen.getByText('Running')).toBeInTheDocument()
   })
 
-  it('renders source badge', async () => {
+  it('renders source label', async () => {
     await act(async () => {
       render(<RunProgressHeader run={mockRun} />)
     })
-    expect(screen.getByText('manual')).toBeInTheDocument()
+    // Source is rendered as a human-readable label: manual → Manual
+    expect(screen.getByText('Manual')).toBeInTheDocument()
   })
 
   it('renders dates', async () => {
