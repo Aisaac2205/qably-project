@@ -19,6 +19,7 @@ import {
   mockCoverageGaps,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
+import { wantsCaseGeneration, buildAssistantReply } from '@/features/ai-review/lib/generate-mock-reply'
 import type {
   Project,
   Suite,
@@ -440,13 +441,6 @@ export function disconnectAiProvider(provider: AiProvider): AiProviderConnection
   return aiProviders.find((p) => p.provider === provider)!
 }
 
-const GENERATE_CASE_KEYWORDS = ['genera', 'crea un caso', 'create a case', 'test case for', 'generate a case']
-
-function wantsCaseGeneration(text: string): boolean {
-  const lower = text.toLowerCase()
-  return GENERATE_CASE_KEYWORDS.some((kw) => lower.includes(kw))
-}
-
 export function sendChatMessage(
   projectId: string,
   content: string,
@@ -464,7 +458,7 @@ export function sendChatMessage(
   chatMessages = [...chatMessages, userMessage]
 
   let generatedCaseIds: string[] | undefined
-  let replyText: string
+  let generatedCaseName: string | undefined
 
   if (wantsCaseGeneration(content)) {
     const newCase: AiCase = {
@@ -480,12 +474,17 @@ export function sendChatMessage(
     }
     aiCases = [...aiCases, newCase]
     generatedCaseIds = [newCase.id]
-    replyText = `I drafted a new case "${newCase.name}" and added it to the review queue as pending.`
-  } else {
-    const projectCases = aiCases.filter((c) => c.projectId === projectId)
-    const pendingCount = projectCases.filter((c) => c.reviewStatus === 'pending').length
-    replyText = `This project has ${projectCases.length} AI-generated case(s), ${pendingCount} pending review.`
+    generatedCaseName = newCase.name
   }
+
+  const projectCases = aiCases.filter((c) => c.projectId === projectId)
+  const pendingCount = projectCases.filter((c) => c.reviewStatus === 'pending').length
+  const replyText = buildAssistantReply({
+    projectCaseCount: projectCases.length,
+    pendingCount,
+    requestText: content,
+    generatedCaseName,
+  })
 
   const assistantMessage: ChatMessage = {
     id: `msg-${chatMessages.length + 1}`,
