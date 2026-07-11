@@ -49,7 +49,7 @@ export function Sidebar() {
   ]
 
   return (
-    <aside className="w-60 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
+    <aside className="w-52 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
       {/* Header / Logo */}
       <div className="flex items-center gap-2 px-4 py-4 border-b border-border-sidebar">
         <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-fg text-xs font-bold shrink-0 shadow-sm" aria-hidden="true">
@@ -114,7 +114,7 @@ function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathn
   ]
 
   return (
-    <aside className="w-60 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
+    <aside className="w-52 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
       {/* Header / Back Link */}
       <div className="flex flex-col gap-2 p-4 border-b border-border-sidebar">
         <Link

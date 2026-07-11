@@ -1,18 +1,23 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { Organization, OrgMember, ApiKey, GithubIntegration } from '@qably/types'
+import type { Organization, OrgMember, ApiKey, GithubIntegration, AiProviderConnection } from '@qably/types'
 
 const mockOrg: Organization = { id: 'org-1', name: 'Acme QA Team', slug: 'acme-qa', plan: 'pro', planLimits: { maxProjects: 20, maxUsers: 10, maxCases: 5000 } }
 const mockMembers: OrgMember[] = []
 const mockKeys: ApiKey[] = []
 const mockIntegration: GithubIntegration = { webhookUrl: '', connected: false }
+const mockAiProviders: AiProviderConnection[] = [
+  { provider: 'claude', label: 'Claude', connected: false, model: 'claude-sonnet-4-20250514' },
+  { provider: 'gemini', label: 'Gemini', connected: false, model: 'gemini-2.5-flash' },
+]
 
 vi.mock('@/lib/use-mock-store', () => ({
   useOrg: () => mockOrg,
   useMembers: () => mockMembers,
   useApiKeys: () => mockKeys,
   useIntegration: () => mockIntegration,
+  useAiProviders: () => mockAiProviders,
 }))
 
 vi.mock('@/lib/mock-store', () => ({
@@ -20,6 +25,8 @@ vi.mock('@/lib/mock-store', () => ({
   createApiKey: vi.fn(),
   revokeApiKey: vi.fn(),
   updateIntegration: vi.fn(),
+  connectAiProvider: vi.fn(),
+  disconnectAiProvider: vi.fn(),
 }))
 
 import { SettingsTabs } from '../components/settings-tabs'
@@ -65,6 +72,6 @@ describe('SettingsTabs', () => {
     await act(async () => { render(<SettingsTabs />) })
     const intTab = screen.getByRole('tab', { name: /integrations/i })
     await user.click(intTab)
-    expect(screen.getByText(/not connected/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/not connected/i).length).toBeGreaterThan(0)
   })
 })

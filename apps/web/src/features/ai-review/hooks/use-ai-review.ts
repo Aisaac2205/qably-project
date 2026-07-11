@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useAiCases } from '@/lib/use-mock-store'
-import { confirmAiCase, rejectAiCase, skipAiCase } from '@/lib/mock-store'
+import { confirmAiCase, rejectAiCase, skipAiCase, confirmAllPending } from '@/lib/mock-store'
 
 export function useAiReview(projectId: string) {
   const allCases = useAiCases(projectId)
@@ -54,6 +54,11 @@ export function useAiReview(projectId: string) {
     }
   }, [selectedId, pending])
 
+  const confirmAll = useCallback(() => {
+    confirmAllPending(projectId)
+    setSelectedId('')
+  }, [projectId])
+
   return {
     cases: pending,
     selectedCase,
@@ -61,5 +66,6 @@ export function useAiReview(projectId: string) {
     confirmSelected,
     rejectSelected,
     skipSelected,
+    confirmAll,
   }
 }

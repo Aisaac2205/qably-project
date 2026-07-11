@@ -4,6 +4,7 @@ import {
   CheckCircle,
   XCircle,
   ArrowRight,
+  Checks,
 } from '@phosphor-icons/react'
 
 export function ReviewToolbar({
@@ -11,11 +12,15 @@ export function ReviewToolbar({
   onConfirm,
   onReject,
   onSkip,
+  onConfirmAll,
+  pendingCount,
 }: {
   disabled: boolean
   onConfirm: () => void
   onReject: () => void
   onSkip: () => void
+  onConfirmAll: () => void
+  pendingCount: number
 }) {
   return (
     <div className="flex items-center gap-2 px-4 py-3 border-t border-border bg-surface">
@@ -59,6 +64,20 @@ export function ReviewToolbar({
       >
         <ArrowRight size={14} weight="bold" aria-hidden="true" />
         Skip
+      </button>
+
+      <button
+        onClick={onConfirmAll}
+        disabled={pendingCount === 0}
+        aria-label={`Confirm all ${pendingCount} pending cases`}
+        className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded
+          border border-border text-default hover:bg-canvas
+          disabled:opacity-40 disabled:cursor-not-allowed
+          focus-visible:outline-2 focus-visible:outline-primary
+          transition-colors"
+      >
+        <Checks size={14} weight="bold" aria-hidden="true" />
+        Confirm all
       </button>
     </div>
   )
