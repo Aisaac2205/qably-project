@@ -9,6 +9,10 @@ import type {
   ApiKey,
   Organization,
   GithubIntegration,
+  AiProviderConnection,
+  ChatThread,
+  ChatMessage,
+  CoverageGap,
 } from '@qably/types'
 
 export type {
@@ -381,6 +385,7 @@ export const mockAiCases: AiCase[] = [
     sourceSnippet: `it('should complete checkout successfully', async () => {\n  await cart.addItem(product)\n  await checkout.fillAddress(address)\n  await expect(confirmationPage).toBeVisible()\n})`,
     reviewStatus: 'confirmed',
     projectId: 'proj-1',
+    source: 'webhook',
   },
   {
     id: 'ai-2',
@@ -391,6 +396,7 @@ export const mockAiCases: AiCase[] = [
     sourceSnippet: `it('should block checkout when cart is empty', async () => {\n  await page.goto('/checkout')\n  await expect(proceedBtn).toBeDisabled()\n})`,
     reviewStatus: 'pending',
     projectId: 'proj-1',
+    source: 'webhook',
   },
   {
     id: 'ai-3',
@@ -401,6 +407,9 @@ export const mockAiCases: AiCase[] = [
     sourceSnippet: `it('should apply discount code', async () => {\n  await checkout.applyCode('SAVE20')\n  await expect(discountLine).toBeVisible()\n})`,
     reviewStatus: 'pending',
     projectId: 'proj-1',
+    source: 'webhook',
+    duplicateOfCaseId: 'case-checkout-discount',
+    similarityScore: 0.86,
   },
   {
     id: 'ai-4',
@@ -411,6 +420,7 @@ export const mockAiCases: AiCase[] = [
     sourceSnippet: `it('should show error on invalid login', async () => {\n  await loginPage.fillCredentials('wrong@email.com', 'badpass')\n  await expect(errorMsg).toHaveText(/Invalid/)\n})`,
     reviewStatus: 'pending',
     projectId: 'proj-1',
+    source: 'webhook',
   },
 ]
 
@@ -421,3 +431,71 @@ export const mockGithubIntegration: GithubIntegration = {
   connected: true,
   repoUrl: 'https://github.com/acme/ecommerce-app',
 }
+
+// ─── AI Providers ─────────────────────────────────────────────────────────────
+
+export const mockAiProviders: AiProviderConnection[] = [
+  {
+    provider: 'claude',
+    label: 'Claude',
+    connected: true,
+    maskedKey: 'sk-ant-...8f2a',
+    model: 'claude-sonnet-4-20250514',
+    connectedAt: '2026-05-02T09:00:00Z',
+  },
+  {
+    provider: 'gemini',
+    label: 'Gemini',
+    connected: false,
+    model: 'gemini-2.5-flash',
+  },
+]
+
+// ─── Project Chat ─────────────────────────────────────────────────────────────
+
+export const mockChatThreads: ChatThread[] = [
+  {
+    id: 'thread-proj-1',
+    projectId: 'proj-1',
+    createdAt: '2026-06-20T10:00:00Z',
+    updatedAt: '2026-06-20T10:02:00Z',
+  },
+]
+
+export const mockChatMessages: ChatMessage[] = [
+  {
+    id: 'msg-1',
+    threadId: 'thread-proj-1',
+    role: 'user',
+    content: 'What suites have the most pending AI cases?',
+    createdAt: '2026-06-20T10:00:00Z',
+  },
+  {
+    id: 'msg-2',
+    threadId: 'thread-proj-1',
+    role: 'assistant',
+    content: 'The Checkout suite has 2 pending cases awaiting review. Auth has 1.',
+    createdAt: '2026-06-20T10:02:00Z',
+  },
+]
+
+// ─── Coverage Gaps ─────────────────────────────────────────────────────────────
+
+export const mockCoverageGaps: CoverageGap[] = [
+  {
+    id: 'gap-1',
+    projectId: 'proj-1',
+    area: 'Payment refunds',
+    description: 'No test cases cover partial or full refund flows.',
+    severity: 'high',
+    suggestedCaseCount: 3,
+  },
+  {
+    id: 'gap-2',
+    projectId: 'proj-1',
+    area: 'Password reset',
+    description: 'Only the happy path is covered; expired-token and rate-limit cases are missing.',
+    severity: 'medium',
+    suggestedCaseCount: 2,
+  },
+]
