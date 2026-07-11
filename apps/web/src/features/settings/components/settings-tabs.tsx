@@ -6,6 +6,7 @@ import { OrgSection } from './org-section'
 import { MembersSection } from './members-section'
 import { ApiKeysSection } from './api-keys-section'
 import { IntegrationsSection } from './integrations-section'
+import { AiProvidersSection } from './ai-providers-section'
 import { BillingSection } from './billing-section'
 
 const TABS = [
@@ -44,8 +45,9 @@ export function SettingsTabs() {
           <ApiKeysSection />
         </TabsPanel>
 
-        <TabsPanel value="integrations" className="mt-6">
+        <TabsPanel value="integrations" className="mt-6 space-y-6">
           <IntegrationsSection />
+          <AiProvidersSection />
         </TabsPanel>
 
         <TabsPanel value="billing" className="mt-6">
