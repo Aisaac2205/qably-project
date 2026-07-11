@@ -9,7 +9,7 @@ import { ReviewCaseDetail } from './review-case-detail'
 import { ReviewToolbar } from './review-toolbar'
 import { CoverageGapsPanel } from './coverage-gaps-panel'
 import { ProjectChatPanel } from './project-chat-panel'
-import { Tabs, TabsList, TabsTab, TabsPanel } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
 

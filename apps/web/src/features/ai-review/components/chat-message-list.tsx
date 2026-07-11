@@ -17,7 +17,7 @@ export function ChatMessageList({
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted gap-2 p-4">
         <ChatCircleDots size={28} weight="light" aria-hidden="true" />
-        <p className="text-xs">Ask anything about this project's suites, cases, or coverage.</p>
+        <p className="text-xs">Ask anything about this project&apos;s suites, cases, or coverage.</p>
       </div>
     )
   }

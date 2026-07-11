@@ -29,7 +29,7 @@ export function DuplicateComparison({
         <div>
           <p className="text-xs font-medium text-default">{existingCase.name}</p>
           <p className="text-[11px] text-muted mt-0.5">
-            This looks similar to an existing case in this project's suites.
+            This looks similar to an existing case in this project&apos;s suites.
           </p>
         </div>
       ) : (

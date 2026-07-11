@@ -22,14 +22,17 @@ export function ChatComposer({
   initialValue?: string
 }) {
   const [value, setValue] = useState(initialValue)
+  const [prevInitialValue, setPrevInitialValue] = useState(initialValue)
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({ minHeight: 44, maxHeight: 200 })
 
+  if (initialValue !== prevInitialValue) {
+    setPrevInitialValue(initialValue)
+    setValue(initialValue)
+  }
+
   useEffect(() => {
-    if (initialValue) {
-      setValue(initialValue)
-      adjustHeight()
-    }
-  }, [initialValue, adjustHeight])
+    adjustHeight()
+  }, [value, adjustHeight])
 
   const handleSend = () => {
     if (!value.trim()) return
