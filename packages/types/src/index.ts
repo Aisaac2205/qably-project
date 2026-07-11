@@ -136,6 +136,54 @@ export interface AiCase {
   sourceSnippet: string
   reviewStatus: ReviewStatus
   projectId: string
+  /** Where this case originated. Defaults to 'webhook' for pre-existing mock data. */
+  source: 'webhook' | 'chat'
+  /** Set when the AI detects this case is similar to an existing TestCase. */
+  duplicateOfCaseId?: string
+  /** 0-1 similarity score, only present when duplicateOfCaseId is set. */
+  similarityScore?: number
+}
+
+// ─── AI Providers ─────────────────────────────────────────────────────────────
+
+export type AiProvider = 'claude' | 'gemini'
+
+export interface AiProviderConnection {
+  provider: AiProvider
+  label: string
+  connected: boolean
+  maskedKey?: string
+  model: string
+  connectedAt?: string
+}
+
+// ─── Project Chat ─────────────────────────────────────────────────────────────
+
+export interface ChatThread {
+  id: string
+  projectId: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessage {
+  id: string
+  threadId: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
+  generatedCaseIds?: string[]
+}
+
+// ─── Coverage Gaps ─────────────────────────────────────────────────────────────
+
+export interface CoverageGap {
+  id: string
+  projectId: string
+  area: string
+  description: string
+  severity: 'high' | 'medium' | 'low'
+  suggestedCaseCount: number
 }
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
