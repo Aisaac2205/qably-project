@@ -12,6 +12,7 @@ import {
   subscribe,
   getSnapshot,
   getServerSnapshot,
+  getChatThread,
 } from '@/lib/mock-store'
 import type {
   Project,
@@ -22,6 +23,9 @@ import type {
   OrgMember,
   ApiKey,
   GithubIntegration,
+  AiProviderConnection,
+  ChatMessage,
+  CoverageGap,
 } from '@qably/types'
 
 // Module-level frozen empty arrays — stable identity across SSR calls.
@@ -33,6 +37,9 @@ const EMPTY_RUNS = Object.freeze([]) as unknown as Run[]
 const EMPTY_AI_CASES = Object.freeze([]) as unknown as AiCase[]
 const EMPTY_MEMBERS = Object.freeze([]) as unknown as OrgMember[]
 const EMPTY_API_KEYS = Object.freeze([]) as unknown as ApiKey[]
+const EMPTY_AI_PROVIDERS = Object.freeze([]) as unknown as AiProviderConnection[]
+const EMPTY_CHAT_MESSAGES = Object.freeze([]) as unknown as ChatMessage[]
+const EMPTY_COVERAGE_GAPS = Object.freeze([]) as unknown as CoverageGap[]
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
   const cacheRef = useRef<{ key: number; value: T[] }>({ key: -1, value: [] })
@@ -151,4 +158,26 @@ export function useApiKeys(): ApiKey[] {
 
 export function useIntegration(): GithubIntegration {
   return useSyncExternalStore(subscribe, () => getSnapshot().integration, () => getServerSnapshot().integration)
+}
+
+export function useAiProviders(): AiProviderConnection[] {
+  return useStableArray(() => getSnapshot().aiProviders, () => EMPTY_AI_PROVIDERS)
+}
+
+export function useChatMessages(projectId: string): ChatMessage[] {
+  const threadId = getChatThread(projectId).id
+  return useStableArray(
+    () => getSnapshot().chatMessages.filter((m) => m.threadId === threadId),
+    () => EMPTY_CHAT_MESSAGES,
+  )
+}
+
+export function useCoverageGaps(projectId?: string): CoverageGap[] {
+  return useStableArray(
+    () => {
+      const all = getSnapshot().coverageGaps
+      return projectId ? all.filter((g) => g.projectId === projectId) : all
+    },
+    () => EMPTY_COVERAGE_GAPS,
+  )
 }
