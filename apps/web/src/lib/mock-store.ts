@@ -13,6 +13,10 @@ import {
   mockMembers,
   mockApiKeys,
   mockGithubIntegration,
+  mockAiProviders,
+  mockChatThreads,
+  mockChatMessages,
+  mockCoverageGaps,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
 import type {
@@ -25,6 +29,11 @@ import type {
   ApiKey,
   GithubIntegration,
   CaseStatus,
+  AiProvider,
+  AiProviderConnection,
+  ChatThread,
+  ChatMessage,
+  CoverageGap,
 } from '@qably/types'
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -40,6 +49,10 @@ export interface StoreSnapshot {
   members: OrgMember[]
   apiKeys: ApiKey[]
   integration: GithubIntegration
+  aiProviders: AiProviderConnection[]
+  chatThreads: ChatThread[]
+  chatMessages: ChatMessage[]
+  coverageGaps: CoverageGap[]
 }
 
 // ── State ─────────────────────────────────────────────────────────
@@ -52,6 +65,10 @@ let org: Organization = { ...mockOrg }
 let members: OrgMember[] = structuredClone(mockMembers)
 let apiKeys: ApiKey[] = structuredClone(mockApiKeys)
 let integration: GithubIntegration = { ...mockGithubIntegration }
+let aiProviders: AiProviderConnection[] = structuredClone(mockAiProviders)
+let chatThreads: ChatThread[] = structuredClone(mockChatThreads)
+let chatMessages: ChatMessage[] = structuredClone(mockChatMessages)
+let coverageGaps: CoverageGap[] = structuredClone(mockCoverageGaps)
 
 // ── Pub-sub ───────────────────────────────────────────────────────
 
@@ -67,7 +84,10 @@ export function subscribe(listener: Listener): () => void {
 }
 
 function currentSnapshot(): StoreSnapshot {
-  return { projects, suites, runs, aiCases, org, members, apiKeys, integration }
+  return {
+    projects, suites, runs, aiCases, org, members, apiKeys, integration,
+    aiProviders, chatThreads, chatMessages, coverageGaps,
+  }
 }
 
 // Stable server snapshot — cached as a frozen constant
@@ -80,6 +100,10 @@ const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
   members: [],
   apiKeys: [],
   integration: { webhookUrl: '', connected: false },
+  aiProviders: [],
+  chatThreads: [],
+  chatMessages: [],
+  coverageGaps: [],
 })
 
 export function getSnapshot(): StoreSnapshot {
@@ -137,6 +161,29 @@ export function getApiKeys(): ApiKey[] {
 
 export function getIntegration(): GithubIntegration {
   return integration
+}
+
+export function getAiProviders(): AiProviderConnection[] {
+  return aiProviders
+}
+
+export function getChatThread(projectId: string): ChatThread {
+  const existing = chatThreads.find((t) => t.projectId === projectId)
+  if (existing) return existing
+  const ts = nowIso()
+  const newThread: ChatThread = { id: `thread-${projectId}`, projectId, createdAt: ts, updatedAt: ts }
+  chatThreads = [...chatThreads, newThread]
+  notify()
+  return newThread
+}
+
+export function getChatMessages(threadId: string): ChatMessage[] {
+  return chatMessages.filter((m) => m.threadId === threadId)
+}
+
+export function getCoverageGaps(projectId?: string): CoverageGap[] {
+  if (!projectId) return coverageGaps
+  return coverageGaps.filter((g) => g.projectId === projectId)
 }
 
 // ── Mutators ──────────────────────────────────────────────────────
@@ -368,6 +415,102 @@ export function inviteMember(input: { email: string; role: OrgMember['role'] }):
   return newMember
 }
 
+function maskKey(apiKey: string): string {
+  if (apiKey.length <= 10) return `${apiKey.slice(0, 2)}...${apiKey.slice(-2)}`
+  return `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`
+}
+
+export function connectAiProvider(provider: AiProvider, apiKey: string): AiProviderConnection {
+  aiProviders = aiProviders.map((p) =>
+    p.provider === provider
+      ? { ...p, connected: true, maskedKey: maskKey(apiKey), connectedAt: nowIso() }
+      : p,
+  )
+  notify()
+  return aiProviders.find((p) => p.provider === provider)!
+}
+
+export function disconnectAiProvider(provider: AiProvider): AiProviderConnection {
+  aiProviders = aiProviders.map((p) =>
+    p.provider === provider
+      ? { ...p, connected: false, maskedKey: undefined, connectedAt: undefined }
+      : p,
+  )
+  notify()
+  return aiProviders.find((p) => p.provider === provider)!
+}
+
+const GENERATE_CASE_KEYWORDS = ['genera', 'crea un caso', 'create a case', 'test case for', 'generate a case']
+
+function wantsCaseGeneration(text: string): boolean {
+  const lower = text.toLowerCase()
+  return GENERATE_CASE_KEYWORDS.some((kw) => lower.includes(kw))
+}
+
+export function sendChatMessage(
+  projectId: string,
+  content: string,
+): { userMessage: ChatMessage; assistantMessage: ChatMessage } {
+  const thread = getChatThread(projectId)
+  const ts = nowIso()
+
+  const userMessage: ChatMessage = {
+    id: `msg-${chatMessages.length + 1}`,
+    threadId: thread.id,
+    role: 'user',
+    content,
+    createdAt: ts,
+  }
+  chatMessages = [...chatMessages, userMessage]
+
+  let generatedCaseIds: string[] | undefined
+  let replyText: string
+
+  if (wantsCaseGeneration(content)) {
+    const newCase: AiCase = {
+      id: `ai-${aiCases.length + 1}`,
+      name: `Case drafted from chat: ${content.slice(0, 60)}`,
+      steps: ['Reproduce the scenario described in the chat request', 'Verify the expected behavior'],
+      expectedResult: 'Behavior matches the scenario requested in chat',
+      sourceFile: 'chat-generated',
+      sourceSnippet: content,
+      reviewStatus: 'pending',
+      projectId,
+      source: 'chat',
+    }
+    aiCases = [...aiCases, newCase]
+    generatedCaseIds = [newCase.id]
+    replyText = `I drafted a new case "${newCase.name}" and added it to the review queue as pending.`
+  } else {
+    const projectCases = aiCases.filter((c) => c.projectId === projectId)
+    const pendingCount = projectCases.filter((c) => c.reviewStatus === 'pending').length
+    replyText = `This project has ${projectCases.length} AI-generated case(s), ${pendingCount} pending review.`
+  }
+
+  const assistantMessage: ChatMessage = {
+    id: `msg-${chatMessages.length + 1}`,
+    threadId: thread.id,
+    role: 'assistant',
+    content: replyText,
+    createdAt: nowIso(),
+    generatedCaseIds,
+  }
+  chatMessages = [...chatMessages, assistantMessage]
+  chatThreads = chatThreads.map((t) => (t.id === thread.id ? { ...t, updatedAt: assistantMessage.createdAt } : t))
+
+  notify()
+  return { userMessage, assistantMessage }
+}
+
+export function confirmAllPending(projectId: string): void {
+  aiCases = aiCases.map((c) =>
+    c.projectId === projectId && c.reviewStatus === 'pending'
+      ? { ...c, reviewStatus: 'confirmed' as const }
+      : c,
+  )
+  notify()
+}
+
 // ── Test-only reset ───────────────────────────────────────────────
 
 export function __resetStore(): void {
@@ -379,5 +522,9 @@ export function __resetStore(): void {
   members = structuredClone(mockMembers)
   apiKeys = structuredClone(mockApiKeys)
   integration = { ...mockGithubIntegration }
+  aiProviders = structuredClone(mockAiProviders)
+  chatThreads = structuredClone(mockChatThreads)
+  chatMessages = structuredClone(mockChatMessages)
+  coverageGaps = structuredClone(mockCoverageGaps)
   notify()
 }
