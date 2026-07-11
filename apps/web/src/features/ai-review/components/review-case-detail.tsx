@@ -3,12 +3,21 @@
 import type { AiCase } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { CodeSnippet } from './code-snippet'
+import { DuplicateComparison } from './duplicate-comparison'
 
 export function ReviewCaseDetail({ c }: { c: AiCase }) {
   return (
     <Card className="rounded-none border-0 h-full">
       <CardContent className="space-y-4 p-4">
         <h3 className="text-base font-medium text-default">{c.name}</h3>
+
+        {c.duplicateOfCaseId && c.similarityScore !== undefined && (
+          <DuplicateComparison
+            duplicateOfCaseId={c.duplicateOfCaseId}
+            similarityScore={c.similarityScore}
+            projectId={c.projectId}
+          />
+        )}
 
         <div>
           <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">

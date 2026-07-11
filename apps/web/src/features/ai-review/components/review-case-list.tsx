@@ -3,20 +3,25 @@
 import type { AiCase } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { AiStatusChip } from './ai-status-chip'
+import { CopySimple, ChatCircleText, GitBranch } from '@phosphor-icons/react'
 
 export function ReviewCaseList({
   cases,
   selectedId,
   onSelect,
+  filter = 'all',
 }: {
   cases: AiCase[]
   selectedId?: string
   onSelect: (id: string) => void
+  filter?: 'all' | 'duplicates'
 }) {
-  if (cases.length === 0) {
+  const visibleCases = filter === 'duplicates' ? cases.filter((c) => c.duplicateOfCaseId) : cases
+
+  if (visibleCases.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
-        No AI cases pending review
+        {filter === 'duplicates' ? 'No possible duplicates' : 'No AI cases pending review'}
       </div>
     )
   }
@@ -25,7 +30,7 @@ export function ReviewCaseList({
     <Card className="rounded-none border-0 h-full">
       <CardContent className="p-0">
         <ul className="divide-y divide-border" role="listbox" aria-label="AI review cases">
-          {cases.map((c) => {
+          {visibleCases.map((c) => {
             const isSelected = c.id === selectedId
             return (
               <li key={c.id}>
@@ -40,12 +45,20 @@ export function ReviewCaseList({
                   }`}
                 >
                   <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs font-medium text-default truncate">
+                    <span className="text-xs font-medium text-default truncate flex items-center gap-1.5">
+                      {c.source === 'chat' ? (
+                        <ChatCircleText size={12} className="text-ai shrink-0" aria-label="Generated from chat" />
+                      ) : (
+                        <GitBranch size={12} className="text-muted shrink-0" aria-label="Generated from webhook" />
+                      )}
                       {c.name}
                     </span>
                     <AiStatusChip status={c.reviewStatus} />
                   </div>
-                  <div className="text-[10px] text-muted font-mono truncate">
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono truncate">
+                    {c.duplicateOfCaseId && (
+                      <CopySimple size={11} className="text-warn shrink-0" weight="bold" aria-label="Possible duplicate" />
+                    )}
                     {c.sourceFile}
                   </div>
                 </button>

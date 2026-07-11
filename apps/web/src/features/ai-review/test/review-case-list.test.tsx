@@ -8,14 +8,17 @@ const mockCases: AiCase[] = [
   {
     id: 'ai-1', name: 'Checkout blocked', steps: [], expectedResult: '',
     sourceFile: 'checkout.spec.ts', sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
+    source: 'webhook',
   },
   {
     id: 'ai-2', name: 'Discount code', steps: [], expectedResult: '',
     sourceFile: 'checkout.spec.ts', sourceSnippet: '', reviewStatus: 'confirmed', projectId: 'proj-1',
+    source: 'webhook',
   },
   {
     id: 'ai-3', name: 'Login error', steps: [], expectedResult: '',
     sourceFile: 'auth.spec.ts', sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
+    source: 'webhook',
   },
 ]
 
@@ -65,5 +68,39 @@ describe('ReviewCaseList', () => {
       render(<ReviewCaseList cases={[]} onSelect={onSelect} />)
     })
     expect(screen.getByText('No AI cases pending review')).toBeInTheDocument()
+  })
+
+  it('shows a duplicate badge for cases with duplicateOfCaseId', async () => {
+    const cases: AiCase[] = [
+      {
+        id: 'ai-x', name: 'Dup case', steps: [], expectedResult: '', sourceFile: 'a.spec.ts',
+        sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
+        source: 'webhook', duplicateOfCaseId: 'case-1', similarityScore: 0.9,
+      },
+    ]
+    await act(async () => {
+      render(<ReviewCaseList cases={cases} onSelect={vi.fn()} />)
+    })
+    expect(screen.getByLabelText('Possible duplicate')).toBeInTheDocument()
+  })
+
+  it('filters to only duplicates when filter="duplicates"', async () => {
+    const cases: AiCase[] = [
+      {
+        id: 'ai-x', name: 'Dup case', steps: [], expectedResult: '', sourceFile: 'a.spec.ts',
+        sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
+        source: 'webhook', duplicateOfCaseId: 'case-1', similarityScore: 0.9,
+      },
+      {
+        id: 'ai-y', name: 'Unique case', steps: [], expectedResult: '', sourceFile: 'b.spec.ts',
+        sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
+        source: 'webhook',
+      },
+    ]
+    await act(async () => {
+      render(<ReviewCaseList cases={cases} onSelect={vi.fn()} filter="duplicates" />)
+    })
+    expect(screen.getByText('Dup case')).toBeInTheDocument()
+    expect(screen.queryByText('Unique case')).not.toBeInTheDocument()
   })
 })
