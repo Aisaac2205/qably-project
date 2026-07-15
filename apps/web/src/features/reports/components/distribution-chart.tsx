@@ -1,17 +1,23 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Run } from '@qably/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface DistributionChartProps {
   runs: Run[]
 }
 
 export function DistributionChart({ runs }: DistributionChartProps) {
+  const { t } = useTranslation()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  
   if (runs.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-muted text-sm">
-        No data yet
+        {t('common.noData')}
       </div>
     )
   }
@@ -32,20 +38,21 @@ export function DistributionChart({ runs }: DistributionChartProps) {
   if (total === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-muted text-sm">
-        No data yet
+        {t('common.noData')}
       </div>
     )
   }
 
   const data = [
-    { name: 'Pass', value: totalPass, color: 'var(--status-pass)' },
-    { name: 'Fail', value: totalFail, color: 'var(--status-fail)' },
-    { name: 'Other', value: totalOther, color: 'var(--fg-muted)' },
+    { name: t('common.pass'), value: totalPass, color: 'var(--status-pass)' },
+    { name: t('common.fail'), value: totalFail, color: 'var(--status-fail)' },
+    { name: t('reports.other'), value: totalOther, color: 'var(--fg-muted)' },
   ].filter((d) => d.value > 0)
 
   return (
-    <div className="h-64" aria-label="Donut chart showing pass/fail distribution">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-64" aria-label={t('reports.ariaDistributionChart')}>
+      {mounted ? (
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <Pie
             data={data}
@@ -75,6 +82,9 @@ export function DistributionChart({ runs }: DistributionChartProps) {
           />
         </PieChart>
       </ResponsiveContainer>
+      ) : (
+        <div style={{ width: '100%', height: '100%' }} />
+      )}
     </div>
   )
 }

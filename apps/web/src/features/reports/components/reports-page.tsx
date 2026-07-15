@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useProjectContext } from '@/features/projects/context/project-context'
 import { useRuns, useAiCases } from '@/lib/use-mock-store'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { useTranslation } from '@/lib/i18n'
 
 const PassRateChart = dynamic(
   () => import('./pass-rate-chart').then((mod) => mod.PassRateChart),
@@ -44,18 +45,19 @@ export function ReportsPage() {
   const { projectId } = useProjectContext()
   const runs = useRuns(projectId)
   const aiCases = useAiCases(projectId)
+  const { t } = useTranslation()
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <h1 className="text-2xl font-semibold tracking-tight text-default" id="reports-heading">
-        Reports
+        {t('reports.title')}
       </h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Pass Rate Chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Pass Rate Over Time</CardTitle>
+            <CardTitle className="text-base">{t('reports.passRateOverTime')}</CardTitle>
           </CardHeader>
           <CardContent>
             <PassRateChart runs={runs} />
@@ -65,7 +67,7 @@ export function ReportsPage() {
         {/* Distribution Chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Pass / Fail Distribution</CardTitle>
+            <CardTitle className="text-base">{t('reports.passFailDistribution')}</CardTitle>
           </CardHeader>
           <CardContent>
             <DistributionChart runs={runs} />
@@ -75,7 +77,7 @@ export function ReportsPage() {
         {/* AI Cases Chart */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">AI Case Review Status</CardTitle>
+            <CardTitle className="text-base">{t('reports.aiCaseReviewStatus')}</CardTitle>
           </CardHeader>
           <CardContent>
             <AiCasesChart aiCases={aiCases} />

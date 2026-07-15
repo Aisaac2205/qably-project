@@ -1,17 +1,23 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import type { Run } from '@qably/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface PassRateChartProps {
   runs: Run[]
 }
 
 export function PassRateChart({ runs }: PassRateChartProps) {
+  const { t } = useTranslation()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  
   if (runs.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-muted text-sm">
-        No data yet
+        {t('common.noData')}
       </div>
     )
   }
@@ -26,8 +32,9 @@ export function PassRateChart({ runs }: PassRateChartProps) {
   }))
 
   return (
-    <div className="h-64" aria-label="Line chart showing pass rate over time">
-      <ResponsiveContainer width="100%" height="100%">
+    <div className="h-64" aria-label={t('reports.ariaPassRateChart')}>
+      {mounted ? (
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
           <XAxis
@@ -53,7 +60,7 @@ export function PassRateChart({ runs }: PassRateChartProps) {
               fontSize: '0.75rem',
               fontFamily: 'var(--font-geist-sans)',
             }}
-            formatter={(value: unknown) => [`${value}%`, 'Pass Rate']}
+            formatter={(value: unknown) => [`${value}%`, t('reports.passRateLabel')]}
           />
           <Line
             type="monotone"
@@ -65,6 +72,9 @@ export function PassRateChart({ runs }: PassRateChartProps) {
           />
         </LineChart>
       </ResponsiveContainer>
+      ) : (
+        <div style={{ width: '100%', height: '100%' }} />
+      )}
     </div>
   )
 }
