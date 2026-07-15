@@ -14,6 +14,7 @@ import {
   Buildings,
 } from '@phosphor-icons/react'
 import { useProject, useOrg } from '@/lib/use-mock-store'
+import { useTranslation } from '@/lib/i18n'
 
 interface NavItem {
   label: string
@@ -33,32 +34,27 @@ export function Sidebar() {
   const projectMatch = pathname.match(/^\/projects\/([^/]+)/)
   const projectId = projectMatch?.[1] ?? null
   const org = useOrg()
+  const { t } = useTranslation()
 
-  // If a project dynamic path is active, show the project-specific nav layout
   if (projectId && projectId !== 'new') {
     return <ProjectSidebar projectId={projectId} pathname={pathname} org={org} />
   }
 
-  // Otherwise, show the global organization-wide navigation.
-  // Project-internal items (Suites, Runs, Pipelines, Reports, AI Review)
-  // belong ONLY in ProjectSidebar, never here.
   const navItems: NavItem[] = [
-    { label: 'Dashboard', href: '/dashboard', icon: Gauge },
-    { label: 'Projects', href: '/projects', icon: FolderOpen },
-    { label: 'Settings', href: '/settings', icon: Gear },
+    { label: t('sidebar.dashboard'), href: '/dashboard', icon: Gauge },
+    { label: t('sidebar.projects'), href: '/projects', icon: FolderOpen },
+    { label: t('sidebar.settings'), href: '/settings', icon: Gear },
   ]
 
   return (
     <aside className="w-52 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
-      {/* Header / Logo */}
       <div className="flex items-center gap-2 px-4 py-4 border-b border-border-sidebar">
         <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-fg text-xs font-bold shrink-0 shadow-sm" aria-hidden="true">
           Q
         </div>
-        <span className="text-sidebar-fg text-lg font-bold tracking-tight">Qably</span>
+        <span className="text-sidebar-fg text-lg font-bold tracking-tight">{t('sidebar.brand')}</span>
       </div>
 
-      {/* Navigation */}
       <nav className="flex flex-col gap-0.5 py-4 px-2 overflow-y-auto flex-1">
         {navItems.map(item => {
           const isActive = pathname === item.href || (item.href !== '/dashboard' && item.href !== '/settings' && item.href !== '/projects' && pathname.startsWith(item.href))
@@ -72,30 +68,27 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom section */}
       <div className="flex flex-col gap-2 p-3 border-t border-border-sidebar mt-auto bg-black/10">
-        {/* Organization dropdown card */}
         <button
           className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-border-sidebar hover:bg-sidebar-hover transition-colors text-left cursor-pointer"
           aria-label="Select organization"
         >
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-5 h-5 rounded bg-zinc-800 flex items-center justify-center text-[10px] text-sidebar-fg-muted shrink-0">
+            <div className="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-[10px] text-sidebar-fg-muted shrink-0">
               <Buildings size={12} />
             </div>
-            <span className="text-xs font-medium text-sidebar-fg truncate">{org.name || 'Organization'}</span>
+            <span className="text-xs font-medium text-sidebar-fg truncate">{org.name || t('sidebar.organization')}</span>
           </div>
           <CaretDown size={12} className="text-sidebar-fg-muted shrink-0" />
         </button>
 
-        {/* User profile card */}
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <div className="w-7 h-7 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-xs font-bold shrink-0">
             IF
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-sidebar-fg truncate">Isaac F.</div>
-            <div className="text-[10px] text-sidebar-fg-muted truncate">Admin</div>
+            <div className="text-[10px] text-sidebar-fg-muted truncate">{t('sidebar.admin')}</div>
           </div>
         </div>
       </div>
@@ -105,26 +98,25 @@ export function Sidebar() {
 
 function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathname: string; org: any }) {
   const project = useProject(projectId)
+  const { t } = useTranslation()
 
   const projectNavItems = [
-    { label: 'Suites', href: '', icon: TestTube },
-    { label: 'Runs', href: 'runs', icon: Play },
-    { label: 'Reports', href: 'reports', icon: ChartBar },
-    { label: 'AI Review', href: 'ai-review', icon: Sparkle },
+    { label: t('sidebar.suites'), href: '', icon: TestTube },
+    { label: t('sidebar.runs'), href: 'runs', icon: Play },
+    { label: t('sidebar.reports'), href: 'reports', icon: ChartBar },
+    { label: t('sidebar.aiReview'), href: 'ai-review', icon: Sparkle },
   ]
 
   return (
     <aside className="w-52 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
-      {/* Header / Back Link */}
       <div className="flex flex-col gap-2 p-4 border-b border-border-sidebar">
         <Link
           href="/projects"
           className="text-xs font-semibold text-sidebar-fg-muted hover:text-sidebar-fg transition-colors inline-flex items-center gap-1"
         >
-          ← Projects
+          ← {t('sidebar.projects')}
         </Link>
         
-        {/* Project Name Card */}
         <div className="mt-1 rounded-lg bg-white/5 border border-border-sidebar/40 px-3 py-2 flex items-center gap-2">
           {project ? (
             <>
@@ -139,16 +131,14 @@ function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathn
           ) : (
             <>
               <div className="text-sidebar-fg text-xs font-semibold truncate">{projectId}</div>
-              <div className="text-sidebar-fg-muted text-[10px]">Loading…</div>
+              <div className="text-sidebar-fg-muted text-[10px]">{t('common.loading')}</div>
             </>
           )}
         </div>
       </div>
 
-      {/* Project Navigation */}
       <nav className="flex flex-col gap-0.5 py-4 px-2 overflow-y-auto flex-1">
         {projectNavItems.map(item => {
-          // Empty href means "project home" — the suites list is the project home.
           const href = item.href ? `/projects/${projectId}/${item.href}` : `/projects/${projectId}`
           const isActive: boolean =
             pathname === href || (item.href !== '' && pathname.startsWith(href))
@@ -162,7 +152,6 @@ function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathn
         })}
       </nav>
 
-      {/* Bottom section */}
       <div className="flex flex-col gap-2 p-3 border-t border-border-sidebar mt-auto bg-black/10">
         <div className="flex items-center gap-2 px-2.5 py-1.5">
           <div className="w-7 h-7 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-xs font-bold shrink-0">
@@ -170,7 +159,7 @@ function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathn
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-sidebar-fg truncate">Isaac F.</div>
-            <div className="text-[10px] text-sidebar-fg-muted truncate">Admin</div>
+            <div className="text-[10px] text-sidebar-fg-muted truncate">{t('sidebar.admin')}</div>
           </div>
         </div>
       </div>
