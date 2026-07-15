@@ -3,6 +3,7 @@
 import type { RunCase } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { StatusChip } from './status-chip'
+import { useTranslation } from '@/lib/i18n'
 
 export function CaseList({
   cases,
@@ -13,17 +14,19 @@ export function CaseList({
   selectedId?: string
   onSelect: (id: string) => void
 }) {
+  const { t } = useTranslation()
+  
   if (cases.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
-        No cases in this run
+        {t('runs.noCases')}
       </div>
     )
   }
 
   return (
     <Card className="h-full rounded-none border-0">
-      <CardContent className="p-0 divide-y divide-border" role="listbox" aria-label="Run cases">
+      <CardContent className="p-0 divide-y divide-border" role="listbox" aria-label={t('runs.ariaRunCases')}>
         {cases.map((c) => {
           const isSelected = c.id === selectedId
           return (

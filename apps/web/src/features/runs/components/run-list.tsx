@@ -6,6 +6,7 @@ import { useRuns } from '@/lib/use-mock-store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from './status-chip'
+import { useTranslation } from '@/lib/i18n'
 
 function formatDate(iso: string): string {
   try {
@@ -54,6 +55,7 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
 
 export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
   const allRuns = useRuns(projectId)
+  const { t } = useTranslation()
   const runs = source ? allRuns.filter((r) => r.source === source) : allRuns
   const sorted = [...runs].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
@@ -62,12 +64,12 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
   if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-sm text-muted">No runs yet</p>
+        <p className="text-sm text-muted">{t('runs.noRuns')}</p>
         <Link
           href={`/projects/${projectId}/runs/new`}
           className="text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
         >
-          Start a run
+          {t('runs.startARun')}
         </Link>
       </div>
     )

@@ -4,6 +4,7 @@ import type { Run } from '@qably/types'
 import { GitCommit } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { StatusChip } from './status-chip'
+import { useTranslation } from '@/lib/i18n'
 
 function formatDate(iso: string): string {
   try {
@@ -19,14 +20,16 @@ function formatDate(iso: string): string {
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  manual: 'Manual',
-  api: 'API',
-  github_actions: 'CI',
+  manual: 'runs.sourceManual',
+  api: 'runs.sourceApi',
+  github_actions: 'runs.sourceCi',
 }
 
 export function RunProgressHeader({ run }: { run: Run }) {
+  const { t } = useTranslation()
   const passRateDisplay = `${run.passRate}%`
-  const sourceLabel = SOURCE_LABELS[run.source] ?? run.source
+  const sourceLabelKey = SOURCE_LABELS[run.source]
+  const sourceLabel = sourceLabelKey ? t(sourceLabelKey) : run.source
 
   return (
     <Card className="rounded-none border-x-0 border-t-0">
@@ -45,22 +48,22 @@ export function RunProgressHeader({ run }: { run: Run }) {
 
         <div className="flex items-center gap-5 shrink-0">
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-wide text-muted">Pass rate</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted">{t('runs.passRate')}</div>
             <div className="text-base font-mono font-semibold tabular-nums text-default">
               {passRateDisplay}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-wide text-muted">Source</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted">{t('runs.source')}</div>
             <div className="text-sm font-semibold text-default">{sourceLabel}</div>
           </div>
           <div className="hidden sm:block text-right">
-            <div className="text-[11px] uppercase tracking-wide text-muted">Started</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted">{t('runs.started')}</div>
             <div className="text-sm text-default">{formatDate(run.startedAt)}</div>
           </div>
           {run.finishedAt && (
             <div className="hidden sm:block text-right">
-              <div className="text-[11px] uppercase tracking-wide text-muted">Finished</div>
+              <div className="text-[11px] uppercase tracking-wide text-muted">{t('runs.finished')}</div>
               <div className="text-sm text-default">{formatDate(run.finishedAt)}</div>
             </div>
           )}
@@ -88,13 +91,13 @@ export function RunProgressHeader({ run }: { run: Run }) {
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                 <span className="font-mono">{run.commitSha.slice(0, 7)}</span>
-                {run.branch && <span>on <span className="font-mono">{run.branch}</span></span>}
+                {run.branch && <span>{t('runs.onBranch')}<span className="font-mono">{run.branch}</span></span>}
                 {run.commitAuthor && (
                   <span>
-                    by <span className="text-default">{run.commitAuthor.name}</span>
+                    {t('runs.byAuthor')}<span className="text-default">{run.commitAuthor.name}</span>
                   </span>
                 )}
-                {run.workflowName && <span>via {run.workflowName}</span>}
+                {run.workflowName && <span>{t('runs.viaWorkflow')}{run.workflowName}</span>}
               </div>
             </div>
           </div>

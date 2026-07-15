@@ -12,15 +12,7 @@ import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
 import { RunProgressHeader } from './run-progress-header'
 import { CaseList } from './case-list'
 import { CaseDetail } from './case-detail'
-
-const SHORTCUT_LABELS: Array<{ key: string; label: string }> = [
-  { key: 'P', label: 'Pass' },
-  { key: 'F', label: 'Fail' },
-  { key: 'S', label: 'Skip' },
-  { key: 'B', label: 'Blocked' },
-  { key: 'R', label: 'Run next' },
-  { key: '←→', label: 'Navigate' },
-]
+import { useTranslation } from '@/lib/i18n'
 
 export function RunDetail({
   projectId,
@@ -29,6 +21,7 @@ export function RunDetail({
   projectId: string
   run: Run
 }) {
+  const { t } = useTranslation()
   const updateStatus = useUpdateRunCase(run.id)
 
   const sortedCases = useMemo(() => run.cases, [run.id, run.cases])
@@ -64,16 +57,16 @@ export function RunDetail({
       if (!selectedId) return
       updateStatus(selectedId, status)
       const config: Record<string, string> = {
-        pass: 'Pass',
-        fail: 'Fail',
-        skip: 'Skip',
-        blocked: 'Blocked',
-        running: 'Running',
-        pending: 'Pending',
+        pass: t('runs.statusPass'),
+        fail: t('runs.statusFail'),
+        skip: t('runs.statusSkip'),
+        blocked: t('runs.statusBlocked'),
+        running: t('runs.statusRunning'),
+        pending: t('runs.statusPending'),
       }
-      setAnnouncement(`Status: ${config[status] ?? status}`)
+      setAnnouncement(t('runs.statusAnnouncement', { status: config[status] ?? status }))
     },
-    [selectedId, updateStatus],
+    [selectedId, updateStatus, t],
   )
 
   const runNext = useCallback(() => {
@@ -81,7 +74,7 @@ export function RunDetail({
       if (sortedCases[i].status === 'pending') {
         setSelectedId(sortedCases[i].id)
         updateStatus(sortedCases[i].id, 'running')
-        setAnnouncement('Status: Running')
+        setAnnouncement(t('runs.statusAnnouncement', { status: t('runs.statusRunning') }))
         return
       }
     }
@@ -89,11 +82,11 @@ export function RunDetail({
       if (sortedCases[i].status === 'pending') {
         setSelectedId(sortedCases[i].id)
         updateStatus(sortedCases[i].id, 'running')
-        setAnnouncement('Status: Running')
+        setAnnouncement(t('runs.statusAnnouncement', { status: t('runs.statusRunning') }))
         return
       }
     }
-  }, [selectedIndex, sortedCases, updateStatus])
+  }, [selectedIndex, sortedCases, updateStatus, t])
 
   useKeyboardShortcuts({
     p: () => setStatus('pass'),
@@ -107,6 +100,15 @@ export function RunDetail({
 
   const selectedCase = sortedCases.find((c) => c.id === selectedId)
 
+  const SHORTCUT_LABELS: Array<{ key: string; label: string }> = [
+    { key: 'P', label: t('runs.shortcutPass') },
+    { key: 'F', label: t('runs.shortcutFail') },
+    { key: 'S', label: t('runs.shortcutSkip') },
+    { key: 'B', label: t('runs.shortcutBlocked') },
+    { key: 'R', label: t('runs.shortcutRunNext') },
+    { key: '←→', label: t('runs.shortcutNavigate') },
+  ]
+
   return (
     <div className="h-full flex flex-col">
       <RunProgressHeader run={run} />
@@ -114,10 +116,10 @@ export function RunDetail({
       {/* Keyboard shortcut hints — using surface tokens (not sidebar), readable text-xs */}
       <div
         className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 border-b border-border bg-canvas"
-        aria-label="Keyboard shortcuts"
+        aria-label={t('runs.keyboardShortcuts')}
       >
         <span className="text-[11px] uppercase tracking-wide text-muted font-semibold">
-          Shortcuts
+          {t('runs.shortcuts')}
         </span>
         {SHORTCUT_LABELS.map((s) => (
           <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-default">
@@ -153,8 +155,8 @@ export function RunDetail({
             <CaseDetail c={selectedCase} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-sm text-muted p-8 gap-2 text-center">
-              <p className="text-sm font-medium text-default">No case selected</p>
-              <p>Pick a case from the list to view its details.</p>
+              <p className="text-sm font-medium text-default">{t('runs.noCaseSelected')}</p>
+              <p>{t('runs.pickCaseHint')}</p>
             </div>
           )}
         </div>

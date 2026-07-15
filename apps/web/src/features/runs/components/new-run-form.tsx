@@ -12,6 +12,7 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
+import { useTranslation } from '@/lib/i18n'
 
 export function NewRunForm({
   projectId,
@@ -22,6 +23,7 @@ export function NewRunForm({
 }) {
   const suites = useSuites(projectId)
   const createRun = useCreateRun(projectId)
+  const { t } = useTranslation()
   const [suiteId, setSuiteId] = useState(initialSuiteId ?? '')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
@@ -35,7 +37,7 @@ export function NewRunForm({
 
   const handleSubmit = useCallback(async () => {
     if (!suiteId) {
-      setError('Please select a suite')
+      setError(t('runs.pleaseSelectSuite'))
       return
     }
     setSubmitting(true)
@@ -44,27 +46,27 @@ export function NewRunForm({
     } finally {
       setSubmitting(false)
     }
-  }, [suiteId, name, createRun])
+  }, [suiteId, name, createRun, t])
 
   if (suites.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted">
-        No suites available. Create a suite first.
+        {t('runs.noSuitesAvailable')}
       </div>
     )
   }
 
   return (
     <div className="max-w-md mx-auto p-4 space-y-4">
-      <h1 className="text-lg font-semibold text-default">New run</h1>
+      <h1 className="text-lg font-semibold text-default">{t('runs.newRun')}</h1>
 
       <div className="space-y-1.5">
         <label htmlFor="suite-select" className="text-xs font-medium text-default">
-          Suite
+          {t('runs.suiteLabel')}
         </label>
         <Select value={suiteId} onValueChange={handleSuiteChange}>
           <SelectTrigger id="suite-select">
-            <SelectValue placeholder="Select a suite" />
+            <SelectValue placeholder={t('runs.selectSuite')} />
           </SelectTrigger>
           <SelectContent>
             <SelectGroup>
@@ -85,15 +87,15 @@ export function NewRunForm({
 
       <div className="space-y-1.5">
         <label htmlFor="run-name" className="text-xs font-medium text-default">
-          Run name{' '}
-          <span className="text-muted font-normal">(optional)</span>
+          {t('runs.runNameLabel')}{' '}
+          <span className="text-muted font-normal">({t('common.optional')})</span>
         </label>
         <input
           id="run-name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Smoke Test"
+          placeholder={t('runs.runNamePlaceholder')}
           className="w-full h-8 px-2.5 text-xs rounded border border-border bg-surface text-default
             placeholder:text-muted focus-visible:outline-2 focus-visible:outline-primary"
         />
@@ -104,7 +106,7 @@ export function NewRunForm({
         disabled={submitting}
         className="w-full"
       >
-        {submitting ? 'Starting...' : 'Start run'}
+        {submitting ? t('runs.starting') : t('runs.startRun')}
       </Button>
     </div>
   )
