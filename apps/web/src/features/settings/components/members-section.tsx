@@ -11,6 +11,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Separator } from '@/components/ui/separator'
 import { User, Plus } from '@phosphor-icons/react'
 import type { OrgMember } from '@qably/types'
+import { useTranslation } from '@/lib/i18n'
 
 const ROLE_VARIANT: Record<string, 'default' | 'warn' | 'skip'> = {
   owner: 'default',
@@ -21,6 +22,7 @@ const ROLE_VARIANT: Record<string, 'default' | 'warn' | 'skip'> = {
 export function MembersSection() {
   const members = useMembers()
   const { invite, isLoading } = useInviteMember()
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<OrgMember['role']>('member')
 
@@ -37,12 +39,12 @@ export function MembersSection() {
         <CardContent className="flex items-end gap-3 p-3">
           <div className="flex-1 space-y-1.5">
             <label className="text-sm font-medium text-default" htmlFor="invite-email">
-              Email
+              {t('settings.members.email')}
             </label>
             <Input
               id="invite-email"
               type="email"
-              placeholder="email@acme.com"
+              placeholder={t('settings.members.emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="h-8 text-xs"
@@ -50,21 +52,21 @@ export function MembersSection() {
           </div>
           <div className="w-28 space-y-1.5">
             <label className="text-sm font-medium text-default" htmlFor="invite-role">
-              Role
+              {t('settings.members.role')}
             </label>
             <Select value={role} onValueChange={(v) => setRole(v as OrgMember['role'])}>
               <SelectTrigger id="invite-role" className="h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="member">Member</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="member">{t('settings.members.roleMember')}</SelectItem>
+                <SelectItem value="admin">{t('settings.members.roleAdmin')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <Button size="sm" onClick={handleInvite} disabled={isLoading || !email.trim()}>
             <Plus size={14} />
-            Invite
+            {t('settings.members.invite')}
           </Button>
         </CardContent>
       </Card>
@@ -74,14 +76,14 @@ export function MembersSection() {
       {/* Members list */}
       <div>
         {members.length === 0 ? (
-          <p className="text-sm text-muted text-center py-6">No members yet</p>
+          <p className="text-sm text-muted text-center py-6">{t('settings.members.noMembers')}</p>
         ) : (
           <>
             <div className="flex items-center gap-3 px-3 pb-2 border-b border-border">
               <div className="w-6 shrink-0" aria-hidden="true" />
-              <span className="flex-1 text-xs font-semibold text-muted uppercase tracking-wide">Name</span>
-              <span className="text-xs font-semibold text-muted uppercase tracking-wide w-16 text-center shrink-0">Role</span>
-              <span className="text-xs font-semibold text-muted uppercase tracking-wide w-20 text-right shrink-0">Joined</span>
+              <span className="flex-1 text-xs font-semibold text-muted uppercase tracking-wide">{t('settings.members.name')}</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wide w-16 text-center shrink-0">{t('settings.members.role')}</span>
+              <span className="text-xs font-semibold text-muted uppercase tracking-wide w-20 text-right shrink-0">{t('settings.members.joined')}</span>
             </div>
             <div className="space-y-0.5 mt-1">
               {members.map((member) => (

@@ -6,26 +6,28 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Lightning, CheckCircle } from '@phosphor-icons/react'
-
-const STARTER_FEATURES = [
-  'Up to 5 projects',
-  'Up to 10 team members',
-  'Up to 1,000 AI-generated cases',
-  'GitHub integration',
-  'Basic reporting',
-]
-
-const PRO_FEATURES = [
-  'Unlimited projects',
-  'Unlimited team members',
-  'Unlimited AI cases',
-  'Priority support',
-  'Advanced analytics',
-  'SSO / SAML',
-]
+import { useTranslation } from '@/lib/i18n'
 
 export function BillingSection() {
   const org = useOrg()
+  const { t } = useTranslation()
+
+  const STARTER_FEATURES = [
+    t('settings.billing.starterProjects'),
+    t('settings.billing.starterMembers'),
+    t('settings.billing.starterCases'),
+    t('settings.billing.starterGithub'),
+    t('settings.billing.starterReporting'),
+  ]
+
+  const PRO_FEATURES = [
+    t('settings.billing.proProjects'),
+    t('settings.billing.proMembers'),
+    t('settings.billing.proCases'),
+    t('settings.billing.proSupport'),
+    t('settings.billing.proAnalytics'),
+    t('settings.billing.proSso'),
+  ]
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -34,17 +36,17 @@ export function BillingSection() {
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-default">Current plan</h3>
-              <p className="text-xs text-muted mt-0.5">Billed monthly · Renews Dec 12, 2026</p>
+              <h3 className="text-sm font-semibold text-default">{t('settings.billing.currentPlan')}</h3>
+              <p className="text-xs text-muted mt-0.5">{t('settings.billing.billedMonthly')} · Renews Dec 12, 2026</p>
             </div>
             <Badge className="capitalize">{org.plan}</Badge>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <UsageStat label="Projects" used={2} max={org.planLimits.maxProjects} />
-            <UsageStat label="Members" used={4} max={org.planLimits.maxUsers} />
-            <UsageStat label="Cases" used={312} max={org.planLimits.maxCases} />
+            <UsageStat label={t('settings.billing.projectsUsage')} used={2} max={org.planLimits.maxProjects} />
+            <UsageStat label={t('settings.billing.membersUsage')} used={4} max={org.planLimits.maxUsers} />
+            <UsageStat label={t('settings.billing.casesUsage')} used={312} max={org.planLimits.maxCases} />
           </div>
           <Separator className="mb-4" />
           <div className="space-y-1.5">
@@ -66,9 +68,9 @@ export function BillingSection() {
               <Lightning size={18} weight="duotone" className="text-primary" aria-hidden="true" />
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="text-sm font-semibold text-default">Upgrade to Pro</h4>
+              <h4 className="text-sm font-semibold text-default">{t('settings.billing.upgradeToPro')}</h4>
               <p className="text-xs text-muted mt-0.5 mb-3">
-                Remove limits and unlock advanced features for your entire team.
+                {t('settings.billing.upgradeDesc')}
               </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mb-4">
                 {PRO_FEATURES.map((f) => (
@@ -80,7 +82,7 @@ export function BillingSection() {
               </div>
               <Button size="sm" className="gap-1.5">
                 <Lightning size={14} weight="fill" aria-hidden="true" />
-                Upgrade to Pro
+                {t('settings.billing.upgradeToPro')}
               </Button>
             </div>
           </div>

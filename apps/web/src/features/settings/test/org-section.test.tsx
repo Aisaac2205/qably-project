@@ -43,7 +43,7 @@ describe('OrgSection', () => {
     await act(async () => { render(<OrgSection />) })
     expect(screen.getByText(/Up to 20 projects/i)).toBeInTheDocument()
     expect(screen.getByText(/Up to 10 team members/i)).toBeInTheDocument()
-    expect(screen.getByText(/5,000/)).toBeInTheDocument()
+    expect(screen.getByText(/Up to 5000 AI-generated cases/i)).toBeInTheDocument()
   })
 
   it('has no editable fields for org name or slug', async () => {

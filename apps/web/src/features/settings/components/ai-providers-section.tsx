@@ -9,10 +9,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Robot } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 export function AiProvidersSection() {
   const providers = useAiProviders()
   const { connect, disconnect, isLoading } = useConnectAiProvider()
+  const { t } = useTranslation()
   const [keyDrafts, setKeyDrafts] = useState<Record<string, string>>({})
 
   return (
@@ -32,13 +34,13 @@ export function AiProvidersSection() {
                 <div className="text-sm font-medium text-default flex items-center gap-2">
                   {provider.label}
                   <Badge variant={provider.connected ? 'pass' : 'skip'}>
-                    {provider.connected ? 'Connected' : 'Not connected'}
+                    {provider.connected ? t('settings.aiProviders.connected') : t('settings.aiProviders.notConnected')}
                   </Badge>
                 </div>
                 {provider.connected ? (
                   <p className="text-xs text-muted mt-0.5 font-mono">{provider.maskedKey}</p>
                 ) : (
-                  <p className="text-xs text-muted mt-0.5">Model: {provider.model}</p>
+                  <p className="text-xs text-muted mt-0.5">{t('settings.aiProviders.modelPrefix')}{provider.model}</p>
                 )}
               </div>
               {provider.connected ? (
@@ -48,7 +50,7 @@ export function AiProvidersSection() {
                   disabled={isLoading}
                   onClick={() => disconnect(provider.provider)}
                 >
-                  Disconnect {provider.label}
+                  {t('settings.aiProviders.disconnect', { name: provider.label })}
                 </Button>
               ) : null}
             </div>
@@ -57,8 +59,8 @@ export function AiProvidersSection() {
               <div className="mt-3 flex items-center gap-2">
                 <Input
                   type="password"
-                  aria-label={`${provider.label} API key`}
-                  placeholder="Paste API key"
+                  aria-label={t('settings.aiProviders.apiKeyLabel', { name: provider.label })}
+                  placeholder={t('settings.aiProviders.pasteApiKey')}
                   value={keyDrafts[provider.provider] ?? ''}
                   onChange={(e) =>
                     setKeyDrafts((prev) => ({ ...prev, [provider.provider]: e.target.value }))
@@ -70,7 +72,7 @@ export function AiProvidersSection() {
                   disabled={isLoading || !(keyDrafts[provider.provider] ?? '').trim()}
                   onClick={() => connect(provider.provider, keyDrafts[provider.provider] ?? '')}
                 >
-                  Connect {provider.label}
+                  {t('settings.aiProviders.connect', { name: provider.label })}
                 </Button>
               </div>
             )}

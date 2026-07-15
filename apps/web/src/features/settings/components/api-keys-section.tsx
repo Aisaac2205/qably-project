@@ -17,11 +17,13 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Key, Plus, Trash } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 export function ApiKeysSection() {
   const keys = useApiKeys()
   const { create, isLoading: creating } = useCreateApiKey()
   const { confirmingId, requestRevoke, cancelRevoke, confirmRevoke, isLoading: revoking } = useRevokeApiKey()
+  const { t } = useTranslation()
   const [name, setName] = useState('')
 
   const handleCreate = async () => {
@@ -39,12 +41,12 @@ export function ApiKeysSection() {
         <CardContent className="flex items-end gap-3 p-3">
           <div className="flex-1 space-y-1.5">
             <label className="text-sm font-medium text-default" htmlFor="key-name">
-              Key Name
+              {t('settings.apiKeys.keyName')}
             </label>
             <Input
               id="key-name"
               type="text"
-              placeholder="Key name e.g. CI/CD"
+              placeholder={t('settings.apiKeys.keyNamePlaceholder')}
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="h-8 text-xs"
@@ -52,7 +54,7 @@ export function ApiKeysSection() {
           </div>
           <Button size="sm" onClick={handleCreate} disabled={creating || !name.trim()}>
             <Plus size={14} />
-            Create
+            {t('common.create')}
           </Button>
         </CardContent>
       </Card>
@@ -62,7 +64,7 @@ export function ApiKeysSection() {
       {/* Keys list */}
       <div className="space-y-1">
         {keys.length === 0 ? (
-          <p className="text-sm text-muted text-center py-6">No API keys yet</p>
+          <p className="text-sm text-muted text-center py-6">{t('settings.apiKeys.noKeys')}</p>
         ) : (
           keys.map((key) => (
             <div
@@ -85,11 +87,11 @@ export function ApiKeysSection() {
                 size="xs"
                 variant="ghost"
                 onClick={() => requestRevoke(key.id)}
-                aria-label={`Revoke ${key.name}`}
+                aria-label={t('settings.apiKeys.revokeKey', { name: key.name })}
                 disabled={revoking}
               >
                 <Trash size={12} />
-                Revoke
+                {t('common.revoke')}
               </Button>
             </div>
           ))
@@ -100,21 +102,21 @@ export function ApiKeysSection() {
       <Dialog open={confirmingId !== null} onOpenChange={() => cancelRevoke()}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Revoke API Key</DialogTitle>
+            <DialogTitle>{t('settings.apiKeys.revokeTitle')}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to revoke "{keyToRevoke?.name}"? This action cannot be undone.
+              {t('settings.apiKeys.revokeConfirm', { name: keyToRevoke?.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={cancelRevoke}>
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={() => confirmingId && confirmRevoke(confirmingId)}
               disabled={revoking}
             >
-              Revoke
+              {t('common.revoke')}
             </Button>
           </DialogFooter>
         </DialogContent>

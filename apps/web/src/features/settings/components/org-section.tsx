@@ -17,49 +17,50 @@ import {
   CheckCircle,
 } from '@phosphor-icons/react'
 import type { ElementType } from 'react'
+import { useTranslation } from '@/lib/i18n'
 type TabValue = 'general' | 'members' | 'api-keys' | 'integrations' | 'billing'
 
 interface OrgSectionProps {
   onNavigate?: (tab: TabValue) => void
 }
 
-const QUICK_ACTIONS: Array<{
-  icon: ElementType
-  label: string
-  description: string
-  tab: TabValue
-}> = [
-  {
-    icon: UserPlus,
-    label: 'Invite members',
-    description: 'Invite and manage team permissions',
-    tab: 'members',
-  },
-  {
-    icon: Key,
-    label: 'Generate API key',
-    description: 'Create access tokens for integrations',
-    tab: 'api-keys',
-  },
-  {
-    icon: CurrencyDollar,
-    label: 'Data billing',
-    description: 'Review usage and update billing',
-    tab: 'billing',
-  },
-  {
-    icon: Plug,
-    label: 'Configure integrations',
-    description: 'Connect your services and tools',
-    tab: 'integrations',
-  },
-]
-
-
 const TEST_FRAMEWORKS = ['Playwright', 'Cypress', 'Vitest', 'Jest']
 
 export function OrgSection({ onNavigate = () => {} }: OrgSectionProps) {
   const org = useOrg()
+  const { t } = useTranslation()
+
+  const QUICK_ACTIONS: Array<{
+    icon: ElementType
+    labelKey: string
+    descriptionKey: string
+    tab: TabValue
+  }> = [
+    {
+      icon: UserPlus,
+      labelKey: 'settings.org.inviteMembers',
+      descriptionKey: 'settings.org.inviteMembersDesc',
+      tab: 'members',
+    },
+    {
+      icon: Key,
+      labelKey: 'settings.org.generateApiKey',
+      descriptionKey: 'settings.org.generateApiKeyDesc',
+      tab: 'api-keys',
+    },
+    {
+      icon: CurrencyDollar,
+      labelKey: 'settings.org.dataBilling',
+      descriptionKey: 'settings.org.dataBillingDesc',
+      tab: 'billing',
+    },
+    {
+      icon: Plug,
+      labelKey: 'settings.org.configureIntegrations',
+      descriptionKey: 'settings.org.configureIntegrationsDesc',
+      tab: 'integrations',
+    },
+  ]
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
@@ -77,14 +78,14 @@ export function OrgSection({ onNavigate = () => {} }: OrgSectionProps) {
                   <Badge className="capitalize">{org.plan}</Badge>
                 </div>
                 <p className="text-xs text-muted mt-0.5">{org.slug}</p>
-                <p className="text-xs text-muted mt-2">Manage your organization, settings and tools</p>
+                <p className="text-xs text-muted mt-2">{t('settings.org.orgDescription')}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <div>
-          <h4 className="text-sm font-semibold text-default mb-3">Quick actions</h4>
+          <h4 className="text-sm font-semibold text-default mb-3">{t('settings.org.quickActions')}</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {QUICK_ACTIONS.map((action) => (
               <button
@@ -96,8 +97,8 @@ export function OrgSection({ onNavigate = () => {} }: OrgSectionProps) {
                   <action.icon size={15} weight="duotone" className="text-primary" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-medium text-default">{action.label}</div>
-                  <div className="text-xs text-muted mt-0.5 leading-snug">{action.description}</div>
+                  <div className="text-sm font-medium text-default">{t(action.labelKey)}</div>
+                  <div className="text-xs text-muted mt-0.5 leading-snug">{t(action.descriptionKey)}</div>
                 </div>
                 <CaretRight
                   size={13}
@@ -113,32 +114,32 @@ export function OrgSection({ onNavigate = () => {} }: OrgSectionProps) {
       {/* Right panel — limits, details, preferences */}
       <div className="xl:col-span-2 space-y-6">
         <div>
-          <h4 className="text-sm font-semibold text-default mb-3">Plan limits</h4>
+          <h4 className="text-sm font-semibold text-default mb-3">{t('settings.org.planLimits')}</h4>
           <div className="space-y-1.5">
-            <LimitItem label={`Up to ${org.planLimits.maxProjects} projects`} />
-            <LimitItem label={`Up to ${org.planLimits.maxUsers} team members`} />
-            <LimitItem label={`Up to ${org.planLimits.maxCases.toLocaleString()} AI-generated cases`} />
+            <LimitItem label={t('settings.org.upToProjects', { count: org.planLimits.maxProjects })} />
+            <LimitItem label={t('settings.org.upToMembers', { count: org.planLimits.maxUsers })} />
+            <LimitItem label={t('settings.org.upToCases', { count: org.planLimits.maxCases })} />
           </div>
         </div>
 
         <Separator />
 
         <div>
-          <h4 className="text-sm font-semibold text-default mb-3">Organization details</h4>
+          <h4 className="text-sm font-semibold text-default mb-3">{t('settings.org.orgDetails')}</h4>
           <div className="space-y-0.5">
-            <DetailRow label="Team" value={org.name}>
-              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-muted hover:text-default">Edit</Button>
+            <DetailRow label={t('settings.org.team')} value={org.name}>
+              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-muted hover:text-default">{t('common.edit')}</Button>
             </DetailRow>
             <DetailRow
-              label="Plan"
+              label={t('settings.org.plan')}
               value={<Badge className="capitalize">{org.plan}</Badge>}
             >
               <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-primary hover:text-primary-hover">
-                Upgrade
+                {t('settings.org.upgrade')}
               </Button>
             </DetailRow>
-            <DetailRow label="Created" value="Jan 8, 2026">
-              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-muted hover:text-default">Edit</Button>
+            <DetailRow label={t('settings.org.created')} value="Jan 8, 2026">
+              <Button variant="ghost" size="sm" className="h-7 text-xs px-2 text-muted hover:text-default">{t('common.edit')}</Button>
             </DetailRow>
           </div>
         </div>
@@ -146,12 +147,12 @@ export function OrgSection({ onNavigate = () => {} }: OrgSectionProps) {
         <Separator />
 
         <div>
-          <h4 className="text-sm font-semibold text-default mb-3">Preferences</h4>
+          <h4 className="text-sm font-semibold text-default mb-3">{t('settings.org.preferences')}</h4>
           <div className="space-y-3">
-            <PreferenceRow label="Default AI model" description="Used for AI case generation">
+            <PreferenceRow label={t('settings.org.defaultAiModel')} description={t('settings.org.defaultAiModelDesc')}>
               <span className="text-sm text-default font-medium">Gemini 3.1 Flash Lite</span>
             </PreferenceRow>
-            <PreferenceRow label="Default test framework" description="Applied when generating new test cases">
+            <PreferenceRow label={t('settings.org.defaultTestFramework')} description={t('settings.org.defaultTestFrameworkDesc')}>
               <Select defaultValue="playwright">
                 <SelectTrigger className="h-8 text-xs w-44">
                   <SelectValue />
