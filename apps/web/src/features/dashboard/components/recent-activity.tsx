@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { StatusChip } from '@/components/ui/status-chip'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
+import { useTranslation } from '@/lib/i18n'
 
 function getCasePriority(name: string): { label: string; className: string } {
   if (name.toLowerCase().includes('login') || name.toLowerCase().includes('critical')) {
@@ -16,29 +17,28 @@ function getCasePriority(name: string): { label: string; className: string } {
 
 export function RecentActivity() {
   const stats = useDashboardStats()
+  const { t } = useTranslation()
 
-  // Slice feeds to match mockup density
   const runs = stats.recentRuns.slice(0, 4)
   const aiCases = stats.recentAiCases.slice(0, 3)
   const ciRuns = stats.recentCiRuns.slice(0, 3)
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {/* Recent runs */}
+    <>
       <Card className="border border-border/80 flex flex-col justify-between">
         <CardHeader className="flex flex-row items-center justify-between pb-3 p-5">
-          <CardTitle className="text-sm font-semibold text-default">Recent runs</CardTitle>
+          <CardTitle className="text-sm font-semibold text-default">{t('dashboard.recentRuns')}</CardTitle>
           <Link
             href="/projects"
             className="text-xs font-semibold text-primary hover:text-primary-hover hover:underline transition-all duration-150 cursor-pointer"
           >
-            View all
+            {t('common.viewAll')}
           </Link>
         </CardHeader>
         
         <CardContent className="p-0 flex-1">
           {runs.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-5">No runs yet</p>
+            <p className="text-xs text-muted-foreground p-5">{t('dashboard.noRuns')}</p>
           ) : (
             <div className="divide-y divide-border/60">
               {runs.map((run) => (
@@ -68,21 +68,20 @@ export function RecentActivity() {
         </CardContent>
       </Card>
 
-      {/* Pending AI cases */}
       <Card className="border border-border/80 flex flex-col justify-between">
         <CardHeader className="flex flex-row items-center justify-between pb-3 p-5">
-          <CardTitle className="text-sm font-semibold text-default">Pending AI cases</CardTitle>
+          <CardTitle className="text-sm font-semibold text-default">{t('dashboard.pendingAiCases')}</CardTitle>
           <Link
             href="/projects"
             className="text-xs font-semibold text-primary hover:text-primary-hover hover:underline transition-all duration-150 cursor-pointer"
           >
-            View all
+            {t('common.viewAll')}
           </Link>
         </CardHeader>
         
         <CardContent className="p-0 flex-1">
           {aiCases.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-5">No pending AI cases</p>
+            <p className="text-xs text-muted-foreground p-5">{t('dashboard.noPendingAi')}</p>
           ) : (
             <div className="divide-y divide-border/60">
               {aiCases.map((c) => {
@@ -115,21 +114,20 @@ export function RecentActivity() {
         </CardContent>
       </Card>
 
-      {/* Recent pipelines (CI runs) */}
       <Card className="border border-border/80 flex flex-col justify-between">
         <CardHeader className="flex flex-row items-center justify-between pb-3 p-5">
-          <CardTitle className="text-sm font-semibold text-default">Recent pipelines</CardTitle>
+          <CardTitle className="text-sm font-semibold text-default">{t('dashboard.recentPipelines')}</CardTitle>
           <Link
             href="/projects"
             className="text-xs font-semibold text-primary hover:text-primary-hover hover:underline transition-all duration-150 cursor-pointer"
           >
-            View all
+            {t('common.viewAll')}
           </Link>
         </CardHeader>
         
         <CardContent className="p-0 flex-1">
           {ciRuns.length === 0 ? (
-            <p className="text-xs text-muted-foreground p-5">No pipelines yet</p>
+            <p className="text-xs text-muted-foreground p-5">{t('dashboard.noPipelines')}</p>
           ) : (
             <div className="divide-y divide-border/60">
               {ciRuns.map((run) => (
@@ -164,6 +162,6 @@ export function RecentActivity() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </>
   )
 }
