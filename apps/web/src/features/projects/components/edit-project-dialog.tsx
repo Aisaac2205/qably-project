@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { TechSelector } from './tech-selector'
 import { useUpdateProject } from '../hooks/use-update-project'
+import { useTranslation } from '@/lib/i18n'
 
 interface EditProjectDialogProps {
   project: Project
@@ -20,6 +21,7 @@ interface EditProjectDialogProps {
 
 export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDialogProps) {
   const updateProject = useUpdateProject()
+  const { t } = useTranslation()
   const [technologies, setTechnologies] = useState<string[]>(project.technologies ?? [])
 
   useEffect(() => {
@@ -35,7 +37,7 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit tech stack</DialogTitle>
+          <DialogTitle>{t('projects.editTechStackTitle')}</DialogTitle>
         </DialogHeader>
 
         <p className="text-xs text-muted-foreground">{project.name}</p>
@@ -48,14 +50,14 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
             onClick={() => onOpenChange(false)}
             className="px-3 py-1.5 rounded border border-border text-sm text-default hover:bg-surface transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             onClick={handleSave}
             className="px-3 py-1.5 rounded bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover transition-colors"
           >
-            Save
+            {t('common.save')}
           </button>
         </DialogFooter>
       </DialogContent>

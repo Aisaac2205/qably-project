@@ -3,11 +3,13 @@
 import { useState, type FormEvent } from 'react'
 import { useCreateProject } from '../hooks/use-create-project'
 import { TechSelector } from './tech-selector'
+import { useTranslation } from '@/lib/i18n'
 
 const GITHUB_REPO_RE = /^[\w-]+\/[\w-]+$/
 
 export function NewProjectForm() {
   const createProject = useCreateProject()
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [githubRepo, setGithubRepo] = useState('')
@@ -17,9 +19,9 @@ export function NewProjectForm() {
 
   function validate(): Record<string, string> {
     const errs: Record<string, string> = {}
-    if (!name.trim()) errs.name = 'Project name is required'
+    if (!name.trim()) errs.name = t('projects.nameRequired')
     if (githubRepo.trim() && !GITHUB_REPO_RE.test(githubRepo.trim())) {
-      errs.githubRepo = 'Format must be org/repo'
+      errs.githubRepo = t('projects.formatOrgRepo')
     }
     return errs
   }
@@ -42,11 +44,11 @@ export function NewProjectForm() {
 
   return (
     <form onSubmit={handleSubmit} className="max-w-lg mx-auto space-y-4">
-      <h1 className="text-lg font-semibold text-default">New Project</h1>
+      <h1 className="text-lg font-semibold text-default">{t('projects.newProject')}</h1>
 
       <div className="space-y-1.5">
         <label htmlFor="name" className="block text-xs font-semibold text-default">
-          Project name <span aria-hidden="true">*</span>
+          {t('projects.projectNameLabel')} <span aria-hidden="true">*</span>
         </label>
         <input
           id="name"
@@ -69,7 +71,7 @@ export function NewProjectForm() {
 
       <div className="space-y-1.5">
         <label htmlFor="description" className="block text-xs font-semibold text-default">
-          Description <span className="text-muted font-normal">(optional)</span>
+          {t('projects.descriptionLabel')} <span className="text-muted font-normal">({t('common.optional')})</span>
         </label>
         <textarea
           id="description"
@@ -83,7 +85,7 @@ export function NewProjectForm() {
 
       <div className="space-y-1.5">
         <label htmlFor="githubRepo" className="block text-xs font-semibold text-default">
-          GitHub repo <span className="text-muted font-normal">(optional, org/repo)</span>
+          {t('projects.githubRepoLabel')} <span className="text-muted font-normal">({t('projects.githubRepoHint')})</span>
         </label>
         <input
           id="githubRepo"
@@ -91,7 +93,7 @@ export function NewProjectForm() {
           type="text"
           value={githubRepo}
           onChange={(e) => { setGithubRepo(e.target.value); setErrors((prev) => { const next = { ...prev }; delete next.githubRepo; return next }) }}
-          placeholder="org/repo"
+          placeholder={t('projects.githubRepoPlaceholder')}
           className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors"
           aria-invalid={!!errors.githubRepo}
           aria-describedby={errors.githubRepo ? 'repo-error' : undefined}
@@ -105,7 +107,7 @@ export function NewProjectForm() {
 
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-default">
-          Tech stack <span className="text-muted font-normal">(optional)</span>
+          {t('projects.techStackLabel')} <span className="text-muted font-normal">({t('common.optional')})</span>
         </p>
         <TechSelector selected={technologies} onChange={setTechnologies} />
       </div>
@@ -115,7 +117,7 @@ export function NewProjectForm() {
         disabled={isSubmitting}
         className="w-full px-4 py-2 rounded bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-primary"
       >
-        {isSubmitting ? 'Creating…' : 'Create project'}
+        {isSubmitting ? t('projects.creating') : t('projects.createProject')}
       </button>
     </form>
   )

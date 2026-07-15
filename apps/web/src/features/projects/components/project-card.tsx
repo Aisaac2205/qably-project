@@ -8,11 +8,13 @@ import { StatusChip } from './status-chip'
 import { TechBadge } from './tech-badge'
 import { EditProjectDialog } from './edit-project-dialog'
 import { TECH_ICONS, type TechKey } from '../lib/tech-icons'
+import { useTranslation } from '@/lib/i18n'
 
 const MAX_ICONS = 4
 
 export function ProjectCard({ project }: { project: Project }) {
   const [editOpen, setEditOpen] = useState(false)
+  const { t } = useTranslation()
 
   const passedCount = project.lastRunStatus === 'fail'
     ? Math.max(0, project.suiteCount - 1)
@@ -49,7 +51,7 @@ export function ProjectCard({ project }: { project: Project }) {
             </span>
             <button
               type="button"
-              aria-label={`Edit tech stack for ${project.name}`}
+              aria-label={t('projects.editTechStack', { name: project.name })}
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -74,7 +76,7 @@ export function ProjectCard({ project }: { project: Project }) {
               )}
             </>
           ) : (
-            <span className="text-xs text-muted-foreground/40 select-none">No stack selected</span>
+            <span className="text-xs text-muted-foreground/40 select-none">{t('projects.noStackSelected')}</span>
           )}
         </div>
 
@@ -82,16 +84,16 @@ export function ProjectCard({ project }: { project: Project }) {
         <div className="flex items-center gap-2 border-t border-border/40 pt-3">
           <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
           <span className="text-[11px] text-muted-foreground">
-            Production · {passedCount}/{project.suiteCount} {project.suiteCount === 1 ? 'service' : 'services'} online
+            {t('projects.production')} · {passedCount}/{project.suiteCount} {project.suiteCount === 1 ? t('projects.service_one') : t('projects.service_other')} {t('projects.online')}
           </span>
         </div>
 
         {/* Hidden elements for Vitest assertions */}
         <div className="sr-only">
           <StatusChip status={project.lastRunStatus} />
-          <span><span>{project.suiteCount}</span> suites</span>
-          <span><span>{project.activeRunCount}</span> active</span>
-          <span><span>{project.aiPendingCount}</span> AI pending</span>
+          <span><span>{project.suiteCount}</span>{t('projects.suitesSuffix')}</span>
+          <span><span>{project.activeRunCount}</span>{t('projects.activeSuffix')}</span>
+          <span><span>{project.aiPendingCount}</span>{t('projects.aiPendingSuffix')}</span>
         </div>
       </Link>
 

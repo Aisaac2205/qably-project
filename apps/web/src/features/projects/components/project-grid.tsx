@@ -3,9 +3,11 @@
 import { useProjects } from '@/lib/use-mock-store'
 import { ProjectCard } from './project-card'
 import Link from 'next/link'
+import { useTranslation } from '@/lib/i18n'
 
 export function ProjectGrid() {
   const projects = useProjects()
+  const { t } = useTranslation()
   const sorted = [...projects].sort(
     (a, b) => new Date(b.lastRunAt).getTime() - new Date(a.lastRunAt).getTime(),
   )
@@ -13,12 +15,12 @@ export function ProjectGrid() {
   if (sorted.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
-        <p className="text-muted text-sm">No projects yet</p>
+        <p className="text-muted text-sm">{t('projects.noProjects')}</p>
         <Link
           href="/projects/new"
           className="text-primary text-sm font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-primary"
         >
-          Create your first project
+          {t('projects.createFirst')}
         </Link>
       </div>
     )
