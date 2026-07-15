@@ -16,6 +16,7 @@ import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface SuiteListProps {
   projectId: string
@@ -66,6 +67,7 @@ function applyFilters(
 
 export function SuiteList({ projectId }: SuiteListProps) {
   const { perSuite } = useSuiteMetrics(projectId)
+  const { t } = useTranslation()
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<SuiteRunStatus | 'all'>('all')
@@ -75,7 +77,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
   const availableTags = useMemo(() => {
     const set = new Set<string>()
     for (const m of perSuite) {
-      for (const t of m.suite.tags) set.add(t)
+      for (const tagItem of m.suite.tags) set.add(tagItem)
     }
     return Array.from(set).sort()
   }, [perSuite])
@@ -92,8 +94,8 @@ export function SuiteList({ projectId }: SuiteListProps) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
         <TestTube size={32} weight="duotone" className="text-muted" aria-hidden="true" />
-        <p className="text-sm text-default font-medium">No suites yet</p>
-        <p className="text-xs text-muted">Create one from a project run.</p>
+        <p className="text-sm text-default font-medium">{t('suites.noSuitesHeading')}</p>
+        <p className="text-xs text-muted">{t('suites.createSuiteHint')}</p>
       </div>
     )
   }
@@ -117,7 +119,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
       {sorted.length === 0 ? (
         // Empty state 2: filter excludes everything
         <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
-          <p className="text-sm text-default font-medium">No suites match your filters</p>
+          <p className="text-sm text-default font-medium">{t('suites.noSuitesMatch')}</p>
           {hasActiveFilter && (
             <button
               type="button"
@@ -128,7 +130,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
               }}
               className="text-sm text-default font-medium hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
             >
-              Clear filters
+              {t('suites.clearFilters')}
             </button>
           )}
         </div>

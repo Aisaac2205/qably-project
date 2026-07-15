@@ -7,12 +7,13 @@ import {
   Minus,
   ArrowDown,
 } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
-const PRIORITY_CONFIG: Record<CasePriority, { label: string; className: string }> = {
-  critical: { label: 'Critical', className: 'bg-fail-bg text-fail' },
-  high: { label: 'High', className: 'bg-warn-bg text-warn' },
-  medium: { label: 'Medium', className: 'bg-skip-bg text-muted' },
-  low: { label: 'Low', className: 'bg-surface text-muted border border-border' },
+const PRIORITY_CONFIG: Record<CasePriority, { labelKey: string; className: string }> = {
+  critical: { labelKey: 'suites.priorityCritical', className: 'bg-fail-bg text-fail' },
+  high: { labelKey: 'suites.priorityHigh', className: 'bg-warn-bg text-warn' },
+  medium: { labelKey: 'suites.priorityMedium', className: 'bg-skip-bg text-muted' },
+  low: { labelKey: 'suites.priorityLow', className: 'bg-surface text-muted border border-border' },
 }
 
 function PriorityIcon({ priority }: { priority: CasePriority }) {
@@ -30,11 +31,12 @@ function PriorityIcon({ priority }: { priority: CasePriority }) {
 }
 
 export function PriorityBadge({ priority }: { priority: CasePriority }) {
+  const { t } = useTranslation()
   const config = PRIORITY_CONFIG[priority]
   return (
     <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${config.className}`}>
       <PriorityIcon priority={priority} />
-      {config.label}
+      {t(config.labelKey)}
     </span>
   )
 }

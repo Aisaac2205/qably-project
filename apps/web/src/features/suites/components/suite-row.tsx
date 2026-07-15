@@ -16,6 +16,7 @@ import { Sparkline } from './sparkline'
 import { InlineEditableText } from './inline-editable-text'
 import { updateSuite } from '@/lib/mock-store'
 import type { SuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useTranslation } from '@/lib/i18n'
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
@@ -49,6 +50,7 @@ interface SuiteRowProps {
 function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
   const { lastRun, passRate7d, sparkline, status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
+  const { t } = useTranslation()
 
   function handleSave(newName: string) {
     updateSuite(suite.id, { name: newName })
@@ -73,15 +75,15 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
           <InlineEditableText
             value={suite.name}
             onSave={handleSave}
-            ariaLabel={`Edit suite name: ${suite.name}`}
+            ariaLabel={t('suites.editSuiteName', { name: suite.name })}
           />
           {suite.isDefault && (
             <span
               className="inline-flex items-center text-warn shrink-0"
-              title="Default suite"
+              title={t('suites.defaultSuite')}
             >
               <Star size={12} weight="fill" aria-hidden="true" />
-              <span className="sr-only">Default suite</span>
+              <span className="sr-only">{t('suites.defaultSuite')}</span>
             </span>
           )}
         </div>
@@ -90,9 +92,9 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         )}
         {suite.tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
-            {suite.tags.map((t) => (
-              <Badge key={t} variant="outline">
-                {t}
+            {suite.tags.map((tagItem) => (
+              <Badge key={tagItem} variant="outline">
+                {tagItem}
               </Badge>
             ))}
           </div>
@@ -104,7 +106,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         <span className="text-sm font-mono font-semibold text-default tabular-nums">
           {suite.cases.length}
         </span>
-        <span className="text-[10px] text-muted">{suite.cases.length === 1 ? 'case' : 'cases'}</span>
+        <span className="text-[10px] text-muted">{suite.cases.length === 1 ? t('suites.caseSuffix_one') : t('suites.caseSuffix_other')}</span>
       </div>
 
       {/* Col 4: last run reference (hidden on mobile) */}
@@ -113,7 +115,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
           {formatRelative(lastRun?.startedAt)}
         </span>
         <span className="text-[10px] text-muted">
-          {lastRun?.source === 'github_actions' ? 'CI' : lastRun ? 'Manual' : ''}
+          {lastRun?.source === 'github_actions' ? t('suites.sourceCi') : lastRun ? t('suites.sourceManual') : ''}
         </span>
       </div>
 

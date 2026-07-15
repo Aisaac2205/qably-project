@@ -12,6 +12,7 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { Sparkline } from './sparkline'
 import { CaseCard } from './case-card'
 import { useSuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useTranslation } from '@/lib/i18n'
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 
@@ -31,6 +32,7 @@ function formatRelative(iso: string | undefined): string {
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
+  const { t } = useTranslation()
   const suite = useSuite(suiteId)
   const project = useProject(projectId)
   const runs = useRuns(projectId)
@@ -42,19 +44,19 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
         <Breadcrumbs
           items={[
-            { label: 'Projects', href: '/projects' },
+            { label: t('suites.breadcrumbProjects'), href: '/projects' },
             ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
-            { label: 'Not found' },
+            { label: t('common.notFound') },
           ]}
         />
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <p className="text-sm text-muted">Suite not found</p>
+          <p className="text-sm text-muted">{t('suites.suiteNotFound')}</p>
           <Link
             href={`/projects/${projectId}`}
             className="text-sm text-primary font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-primary inline-flex items-center gap-1"
           >
             <ArrowLeft size={14} weight="bold" aria-hidden="true" />
-            Back to project
+            {t('suites.backToProject')}
           </Link>
         </div>
       </div>
@@ -65,9 +67,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
       <Breadcrumbs
         items={[
-          { label: 'Projects', href: '/projects' },
+          { label: t('suites.breadcrumbProjects'), href: '/projects' },
           ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
-          { label: 'Suites', href: `/projects/${projectId}` },
+          { label: t('suites.breadcrumbSuites'), href: `/projects/${projectId}` },
           { label: suite.name },
         ]}
       />
@@ -83,10 +85,10 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               {suite.isDefault && (
                 <span
                   className="inline-flex items-center gap-1 text-xs font-semibold text-warn bg-warn-bg border border-warn/20 rounded px-2 py-0.5"
-                  title="Default suite for this project"
+                  title={t('suites.defaultSuiteTooltip')}
                 >
                   <Star size={12} weight="fill" aria-hidden="true" />
-                  Default
+                  {t('suites.defaultBadge')}
                 </span>
               )}
             </div>
@@ -97,9 +99,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             )}
             {suite.tags.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                {suite.tags.map((t) => (
-                  <Badge key={t} variant="outline" className="text-xs">
-                    {t}
+                {suite.tags.map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-xs">
+                    {tag}
                   </Badge>
                 ))}
               </div>
@@ -113,7 +115,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               size="default"
             >
               <Play size={14} weight="bold" aria-hidden="true" />
-              Run this suite
+              {t('suites.runThisSuite')}
             </Button>
           </div>
         </div>
@@ -123,14 +125,14 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           <div
             className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted border-t border-border pt-3"
             role="group"
-            aria-label="Suite health"
+            aria-label={t('suites.ariaSuiteHealth')}
           >
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">Status</span>
+              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.statusLabel')}</span>
               <StatusChip status={metrics.status} />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">Pass rate (7d)</span>
+              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.passRate7d')}</span>
               <span
                 className={`text-base font-mono font-semibold tabular-nums ${
                   metrics.passRate7d >= 70
@@ -144,11 +146,11 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">Last run</span>
+              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.lastRun')}</span>
               <span className="text-sm text-default">{formatRelative(metrics.lastRun?.startedAt)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">Cases</span>
+              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.casesLabel')}</span>
               <span className="text-sm font-mono font-semibold text-default tabular-nums">
                 {suite.cases.length}
               </span>
@@ -168,16 +170,16 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       {/* Case list */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-default">Test cases</h2>
+          <h2 className="text-base font-semibold text-default">{t('suites.testCases')}</h2>
           <span className="text-xs text-muted">
-            {suite.cases.length} {suite.cases.length === 1 ? 'case' : 'cases'}
+            {suite.cases.length} {suite.cases.length === 1 ? t('suites.case_one') : t('suites.case_other')}
           </span>
         </div>
         <Card>
           <CardContent className="p-0 divide-y divide-border">
             {suite.cases.length === 0 ? (
               <div className="py-12 text-center text-sm text-muted">
-                No test cases in this suite yet.
+                {t('suites.noTestCases')}
               </div>
             ) : (
               suite.cases.map((tc) => <CaseCard key={tc.id} testCase={tc} />)

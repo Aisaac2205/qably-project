@@ -10,6 +10,7 @@
  * - The 7 data points are mapped: x = index * (W / 6), y = H - (passRate / 100) * H.
  */
 import { useId, useMemo } from 'react'
+import { useTranslation } from '@/lib/i18n'
 
 interface SparklineProps {
   data: Array<{ date: string; passRate: number }>
@@ -35,12 +36,13 @@ export function Sparkline({
   ariaLabel,
   className,
 }: SparklineProps) {
+  const { t } = useTranslation()
   const id = useId()
   const toneClass = TONE_CLASSES[tone]
 
   const { points, polylinePoints, label } = useMemo(() => {
     if (data.length === 0) {
-      return { points: [], polylinePoints: '', label: 'No data' }
+      return { points: [], polylinePoints: '', label: t('suites.noData') }
     }
     const n = data.length
     const xs = data.map((_, i) => (n === 1 ? width / 2 : (i * width) / (n - 1)))
@@ -48,8 +50,8 @@ export function Sparkline({
     const pts = xs.map((x, i) => ({ x, y: ys[i] }))
     const polyline = pts.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')
     const avg = Math.round(data.reduce((acc, d) => acc + d.passRate, 0) / n)
-    return { points: pts, polylinePoints: polyline, label: `Pass rate trend: ${avg}% average over last ${n} days` }
-  }, [data, width, height])
+    return { points: pts, polylinePoints: polyline, label: t('suites.passRateTrend', { avg, days: n }) }
+  }, [data, width, height, t])
 
   return (
     <svg

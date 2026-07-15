@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Check } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 interface InlineEditableTextProps {
   value: string
@@ -9,7 +10,8 @@ interface InlineEditableTextProps {
   ariaLabel?: string
 }
 
-export function InlineEditableText({ value, onSave, ariaLabel = 'Edit text' }: InlineEditableTextProps) {
+export function InlineEditableText({ value, onSave, ariaLabel }: InlineEditableTextProps) {
+  const { t } = useTranslation()
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(value)
   const [saved, setSaved] = useState(false)
@@ -45,7 +47,7 @@ export function InlineEditableText({ value, onSave, ariaLabel = 'Edit text' }: I
       <button
         onClick={() => { setDraft(value); setIsEditing(true) }}
         className="text-left hover:bg-canvas rounded px-1 -mx-1 transition-colors text-default cursor-text"
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ?? t('suites.editText')}
         type="button"
       >
         {value}
@@ -62,11 +64,11 @@ export function InlineEditableText({ value, onSave, ariaLabel = 'Edit text' }: I
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel() }}
         onBlur={commit}
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ?? t('suites.editText')}
         className="bg-surface border-b border-primary outline-none px-1 -mx-1 text-sm text-default font-inherit w-auto min-w-[100px] max-w-[300px] focus:outline-none"
       />
       <span className="sr-only" aria-live="polite" role="status">
-        {saved ? 'Saved' : ''}
+        {saved ? t('suites.saved') : ''}
       </span>
     </span>
   )
