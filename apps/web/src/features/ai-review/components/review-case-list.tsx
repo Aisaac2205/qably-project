@@ -4,6 +4,7 @@ import type { AiCase } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { AiStatusChip } from './ai-status-chip'
 import { CopySimple, ChatCircleText, GitBranch } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 export function ReviewCaseList({
   cases,
@@ -16,12 +17,13 @@ export function ReviewCaseList({
   onSelect: (id: string) => void
   filter?: 'all' | 'duplicates'
 }) {
+  const { t } = useTranslation()
   const visibleCases = filter === 'duplicates' ? cases.filter((c) => c.duplicateOfCaseId) : cases
 
   if (visibleCases.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
-        {filter === 'duplicates' ? 'No possible duplicates' : 'No AI cases pending review'}
+        {filter === 'duplicates' ? t('aiReview.noDuplicates') : t('aiReview.noCasesPending')}
       </div>
     )
   }
@@ -29,7 +31,7 @@ export function ReviewCaseList({
   return (
     <Card className="rounded-none border-0 h-full">
       <CardContent className="p-0">
-        <ul className="divide-y divide-border" role="listbox" aria-label="AI review cases">
+        <ul className="divide-y divide-border" role="listbox" aria-label={t('aiReview.ariaReviewCases')}>
           {visibleCases.map((c) => {
             const isSelected = c.id === selectedId
             return (
@@ -47,9 +49,9 @@ export function ReviewCaseList({
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-xs font-medium text-default truncate flex items-center gap-1.5">
                       {c.source === 'chat' ? (
-                        <ChatCircleText size={12} className="text-ai shrink-0" aria-label="Generated from chat" />
+                        <ChatCircleText size={12} className="text-ai shrink-0" aria-label={t('aiReview.ariaGeneratedChat')} />
                       ) : (
-                        <GitBranch size={12} className="text-muted shrink-0" aria-label="Generated from webhook" />
+                        <GitBranch size={12} className="text-muted shrink-0" aria-label={t('aiReview.ariaGeneratedWebhook')} />
                       )}
                       {c.name}
                     </span>
@@ -57,7 +59,7 @@ export function ReviewCaseList({
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono truncate">
                     {c.duplicateOfCaseId && (
-                      <CopySimple size={11} className="text-warn shrink-0" weight="bold" aria-label="Possible duplicate" />
+                      <CopySimple size={11} className="text-warn shrink-0" weight="bold" aria-label={t('aiReview.ariaPossibleDuplicate')} />
                     )}
                     {c.sourceFile}
                   </div>

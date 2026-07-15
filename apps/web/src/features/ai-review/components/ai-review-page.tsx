@@ -12,6 +12,7 @@ import { ProjectChatPanel } from './project-chat-panel'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 export function AiReviewPage({ projectId }: { projectId: string }) {
   const {
@@ -24,12 +25,13 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
     confirmAll,
   } = useAiReview(projectId)
   const { connectedProviders, hasConnected } = useAiProviders()
+  const { t } = useTranslation()
   const [tab, setTab] = useState<'review' | 'chat'>('review')
   const [listFilter, setListFilter] = useState<'all' | 'duplicates'>('all')
   const [prefillPrompt, setPrefillPrompt] = useState<string | undefined>(undefined)
 
   const handleDraftWithAi = (area: string) => {
-    setPrefillPrompt(`Sugiéreme casos de prueba para: ${area}`)
+    setPrefillPrompt(t('aiReview.suggestCases', { area }))
     setTab('chat')
   }
 
@@ -43,29 +45,29 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
     <div className="h-full flex flex-col">
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-default">AI Review</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-default">{t('aiReview.title')}</h1>
           {hasConnected ? (
             <Badge variant="pass">
               <CheckCircle size={11} weight="fill" aria-hidden="true" />
-              {connectedProviders[0].label} connected
+              {connectedProviders[0].label}{t('aiReview.connected')}
             </Badge>
           ) : (
             <Link href="/settings">
               <Badge variant="warn">
                 <WarningCircle size={11} weight="fill" aria-hidden="true" />
-                No AI provider connected
+                {t('aiReview.noProvider')}
               </Badge>
             </Link>
           )}
         </div>
         <p className="text-[11px] text-muted mb-4">
-          {cases.length} case{cases.length !== 1 ? 's' : ''} pending review
+          {cases.length === 1 ? t('aiReview.casePendingReview', { count: cases.length }) : t('aiReview.casesPendingReview', { count: cases.length })}
         </p>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as 'review' | 'chat')}>
           <TabsList>
-            <TabsTab value="review">Review Queue</TabsTab>
-            <TabsTab value="chat">Project Chat</TabsTab>
+            <TabsTab value="review">{t('aiReview.reviewQueue')}</TabsTab>
+            <TabsTab value="chat">{t('aiReview.projectChat')}</TabsTab>
           </TabsList>
         </Tabs>
       </div>
@@ -81,7 +83,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                     listFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
                   }`}
                 >
-                  All
+                  {t('aiReview.filterAll')}
                 </button>
                 <button
                   onClick={() => setListFilter('duplicates')}
@@ -89,7 +91,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                     listFilter === 'duplicates' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
                   }`}
                 >
-                  Possible duplicates
+                  {t('aiReview.filterDuplicates')}
                 </button>
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -107,7 +109,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                   <ReviewCaseDetail c={selectedCase} />
                 ) : (
                   <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
-                    Select a case to review
+                    {t('aiReview.selectCaseToReview')}
                   </div>
                 )}
               </div>

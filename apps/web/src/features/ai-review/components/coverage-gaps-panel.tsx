@@ -5,6 +5,7 @@ import { useCoverageGaps } from '@/lib/use-mock-store'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { CaretDown, Target } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 const SEVERITY_VARIANT = {
   high: 'fail',
@@ -20,6 +21,7 @@ export function CoverageGapsPanel({
   onDraftWithAi: (area: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation()
   const gaps = useCoverageGaps(projectId)
 
   if (gaps.length === 0) return null
@@ -32,7 +34,7 @@ export function CoverageGapsPanel({
         className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold text-default hover:bg-canvas transition-colors"
       >
         <Target size={14} className="text-ai" aria-hidden="true" />
-        Coverage gaps
+        {t('aiReview.coverageGaps')}
         <Badge variant="outline">{gaps.length}</Badge>
         <CaretDown
           size={12}
@@ -53,7 +55,7 @@ export function CoverageGapsPanel({
                 <p className="text-[11px] text-muted mt-0.5">{gap.description}</p>
               </div>
               <Button size="sm" variant="outline" onClick={() => onDraftWithAi(gap.area)}>
-                Draft with AI
+                {t('aiReview.draftWithAi')}
               </Button>
             </li>
           ))}

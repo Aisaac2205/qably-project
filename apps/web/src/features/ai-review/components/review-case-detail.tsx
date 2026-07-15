@@ -4,8 +4,11 @@ import type { AiCase } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { CodeSnippet } from './code-snippet'
 import { DuplicateComparison } from './duplicate-comparison'
+import { useTranslation } from '@/lib/i18n'
 
 export function ReviewCaseDetail({ c }: { c: AiCase }) {
+  const { t } = useTranslation()
+  
   return (
     <Card className="rounded-none border-0 h-full">
       <CardContent className="space-y-4 p-4">
@@ -21,7 +24,7 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
 
         <div>
           <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
-            Steps
+            {t('aiReview.steps')}
           </h4>
           <ol className="space-y-1 list-decimal list-inside">
             {c.steps.map((step, i) => (
@@ -34,7 +37,7 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
 
         <div>
           <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
-            Expected result
+            {t('aiReview.expectedResult')}
           </h4>
           <p className="text-xs text-default bg-surface border border-border rounded p-2 leading-relaxed">
             {c.expectedResult}
@@ -43,7 +46,7 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
 
         <div>
           <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
-            Source snippet
+            {t('aiReview.sourceSnippet')}
           </h4>
           <CodeSnippet code={c.sourceSnippet} language="TypeScript" />
         </div>

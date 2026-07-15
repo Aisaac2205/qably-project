@@ -7,6 +7,7 @@ import { ProviderPicker } from './provider-picker'
 import { useAutoResizeTextarea } from '../hooks/use-auto-resize-textarea'
 import { cn } from '@/lib/utils'
 import type { AiProvider, AiProviderConnection } from '@qably/types'
+import { useTranslation } from '@/lib/i18n'
 
 export function ChatComposer({
   providers,
@@ -21,6 +22,7 @@ export function ChatComposer({
   onSend: (text: string) => void
   initialValue?: string
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const [prevInitialValue, setPrevInitialValue] = useState(initialValue)
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({ minHeight: 44, maxHeight: 200 })
@@ -53,7 +55,7 @@ export function ChatComposer({
       <Textarea
         ref={textareaRef}
         value={value}
-        placeholder="Ask about this project or request a new test case…"
+        placeholder={t('aiReview.chatPlaceholder')}
         className="border-0 bg-transparent focus-visible:ring-0 min-h-[44px]"
         onKeyDown={handleKeyDown}
         onChange={(e) => {
@@ -67,7 +69,7 @@ export function ChatComposer({
           type="button"
           onClick={handleSend}
           disabled={!value.trim()}
-          aria-label="Send message"
+          aria-label={t('aiReview.sendMessage')}
           className={cn(
             'inline-flex items-center justify-center size-7 rounded-md transition-colors',
             'text-primary-fg bg-primary hover:bg-primary-hover',

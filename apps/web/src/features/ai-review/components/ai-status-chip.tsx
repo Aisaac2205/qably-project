@@ -2,16 +2,17 @@
 
 import { Clock, CheckCircle, XCircle } from '@phosphor-icons/react'
 import type { ReviewStatus } from '@qably/types'
+import { useTranslation } from '@/lib/i18n'
 
 interface AiStatusConfig {
-  label: string
+  labelKey: string
   className: string
 }
 
 const CONFIG: Record<ReviewStatus, AiStatusConfig> = {
-  pending: { label: 'Pending', className: 'bg-skip-bg text-muted' },
-  confirmed: { label: 'Confirmed', className: 'bg-pass-bg text-pass' },
-  rejected: { label: 'Rejected', className: 'bg-fail-bg text-fail' },
+  pending: { labelKey: 'aiReview.statusPending', className: 'bg-skip-bg text-muted' },
+  confirmed: { labelKey: 'aiReview.statusConfirmed', className: 'bg-pass-bg text-pass' },
+  rejected: { labelKey: 'aiReview.statusRejected', className: 'bg-fail-bg text-fail' },
 }
 
 function AiStatusIcon({ status }: { status: ReviewStatus }) {
@@ -27,13 +28,14 @@ function AiStatusIcon({ status }: { status: ReviewStatus }) {
 }
 
 export function AiStatusChip({ status }: { status: ReviewStatus }) {
+  const { t } = useTranslation()
   const config = CONFIG[status]
   return (
     <span
       className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${config.className}`}
     >
       <AiStatusIcon status={status} />
-      {config.label}
+      {t(config.labelKey)}
     </span>
   )
 }

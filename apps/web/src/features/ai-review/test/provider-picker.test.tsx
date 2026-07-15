@@ -1,8 +1,27 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { AiProviderConnection } from '@qably/types'
+
+vi.mock('@/lib/i18n', () => ({
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, string | number>) => {
+      if (key === 'aiReview.selectedProvider') {
+        return `Selected AI provider: ${params?.name || 'none'}`
+      }
+      if (key === 'aiReview.noProviderLabel') {
+        return 'No provider'
+      }
+      if (key === 'common.none') {
+        return 'None'
+      }
+      return key
+    },
+    locale: 'en',
+  }),
+}))
+
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi } from 'vitest'
 import { ProviderPicker } from '@/features/ai-review/components/provider-picker'
-import type { AiProviderConnection } from '@qably/types'
 
 const providers: AiProviderConnection[] = [
   { provider: 'claude', label: 'Claude', connected: true, model: 'claude-sonnet-4-20250514', maskedKey: 'sk-...abcd' },
@@ -10,6 +29,14 @@ const providers: AiProviderConnection[] = [
 ]
 
 describe('ProviderPicker', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('only lists connected providers', async () => {
     const user = userEvent.setup()
     await act(async () => {
