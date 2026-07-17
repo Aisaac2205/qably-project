@@ -1,8 +1,9 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
+import { MagnifyingGlass, Bell, SidebarSimple } from '@phosphor-icons/react'
 import { useProject } from '@/lib/use-mock-store'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 
 function healthColor(score: number): string {
   if (score >= 80) return 'bg-pass'
@@ -19,7 +20,8 @@ export function TopBar() {
 
   return (
     <div className="h-16 flex items-center justify-between px-6 bg-surface border-b border-border shadow-sm">
-      <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <SidebarTrigger className="-ml-1" />
         {isProjectRoute && project && (
           <div className="flex items-center gap-1.5 text-xs text-muted">
             <div
@@ -41,7 +43,7 @@ export function TopBar() {
             <MagnifyingGlass size={16} className="text-muted-foreground" />
             <span>Search...</span>
           </div>
-          <span className="text-[10px] font-mono bg-surface border border-border px-1.5 py-0.5 rounded text-muted shadow-sm">⌘K</span>
+          <span className="text-xs font-mono bg-surface border border-border px-1.5 py-0.5 rounded text-muted shadow-sm">⌘K</span>
         </button>
 
         {/* Notifications Icon */}

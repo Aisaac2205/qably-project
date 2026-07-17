@@ -2,190 +2,117 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  Gauge,
-  FolderOpen,
-  TestTube,
-  Play,
-  ChartBar,
-  Sparkle,
-  Gear,
-  CaretDown,
-  Buildings,
-} from '@phosphor-icons/react'
-import { useProject, useOrg } from '@/lib/use-mock-store'
+import { Buildings, CaretDown, Gauge, FolderOpen, Gear } from '@phosphor-icons/react'
+import { useOrg } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
+import {
+  Sidebar as ShadcnSidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from '@/components/ui/sidebar'
 
 interface NavItem {
   label: string
   href: string
   icon: React.ElementType
-  badge?: string
-}
-
-function healthColor(score: number): string {
-  if (score >= 80) return 'bg-pass'
-  if (score >= 50) return 'bg-warn'
-  return 'bg-fail'
 }
 
 export function Sidebar() {
   const pathname = usePathname()
-  const projectMatch = pathname.match(/^\/projects\/([^/]+)/)
-  const projectId = projectMatch?.[1] ?? null
   const org = useOrg()
   const { t } = useTranslation()
-
-  if (projectId && projectId !== 'new') {
-    return <ProjectSidebar projectId={projectId} pathname={pathname} org={org} />
-  }
+  const { state } = useSidebar()
+  const isCollapsed = state === 'collapsed'
 
   const navItems: NavItem[] = [
     { label: t('sidebar.dashboard'), href: '/dashboard', icon: Gauge },
     { label: t('sidebar.projects'), href: '/projects', icon: FolderOpen },
-    { label: t('sidebar.settings'), href: '/settings', icon: Gear },
   ]
 
   return (
-    <aside className="w-52 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
-      <div className="flex items-center gap-2 px-4 py-4 border-b border-border-sidebar">
-        <div className="w-6 h-6 rounded bg-primary flex items-center justify-center text-primary-fg text-xs font-bold shrink-0 shadow-sm" aria-hidden="true">
-          Q
-        </div>
-        <span className="text-sidebar-fg text-lg font-bold tracking-tight">{t('sidebar.brand')}</span>
-      </div>
-
-      <nav className="flex flex-col gap-0.5 py-4 px-2 overflow-y-auto flex-1">
-        {navItems.map(item => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && item.href !== '/settings' && item.href !== '/projects' && pathname.startsWith(item.href))
-          return (
-            <SidebarItem
-              key={item.label}
-              item={item}
-              active={isActive}
-            />
-          )
-        })}
-      </nav>
-
-      <div className="flex flex-col gap-2 p-3 border-t border-border-sidebar mt-auto bg-black/10">
-        <button
-          className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border border-border-sidebar hover:bg-sidebar-hover transition-colors text-left cursor-pointer"
-          aria-label="Select organization"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-[10px] text-sidebar-fg-muted shrink-0">
-              <Buildings size={12} />
-            </div>
-            <span className="text-xs font-medium text-sidebar-fg truncate">{org.name || t('sidebar.organization')}</span>
-          </div>
-          <CaretDown size={12} className="text-sidebar-fg-muted shrink-0" />
-        </button>
-
-        <div className="flex items-center gap-2 px-2.5 py-1.5">
-          <div className="w-7 h-7 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-xs font-bold shrink-0">
-            IF
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold text-sidebar-fg truncate">Isaac F.</div>
-            <div className="text-[10px] text-sidebar-fg-muted truncate">{t('sidebar.admin')}</div>
-          </div>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-function ProjectSidebar({ projectId, pathname, org }: { projectId: string; pathname: string; org: any }) {
-  const project = useProject(projectId)
-  const { t } = useTranslation()
-
-  const projectNavItems = [
-    { label: t('sidebar.suites'), href: '', icon: TestTube },
-    { label: t('sidebar.runs'), href: 'runs', icon: Play },
-    { label: t('sidebar.reports'), href: 'reports', icon: ChartBar },
-    { label: t('sidebar.aiReview'), href: 'ai-review', icon: Sparkle },
-  ]
-
-  return (
-    <aside className="w-52 h-full bg-sidebar flex flex-col shrink-0 text-sidebar-fg">
-      <div className="flex flex-col gap-2 p-4 border-b border-border-sidebar">
-        <Link
-          href="/projects"
-          className="text-xs font-semibold text-sidebar-fg-muted hover:text-sidebar-fg transition-colors inline-flex items-center gap-1"
-        >
-          ← {t('sidebar.projects')}
-        </Link>
-        
-        <div className="mt-1 rounded-lg bg-white/5 border border-border-sidebar/40 px-3 py-2 flex items-center gap-2">
-          {project ? (
-            <>
-              <div
-                className={`w-2 h-2 rounded-full shrink-0 ${healthColor(project.healthScore)}`}
-                aria-hidden="true"
-              />
-              <div className="text-sidebar-fg text-xs font-semibold truncate">
-                {project.name}
+    <ShadcnSidebar collapsible="icon" className="bg-sidebar">
+      <SidebarHeader className="p-3 border-b border-border-sidebar">
+        {!isCollapsed && (
+          <button
+            className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border border-border-sidebar hover:bg-sidebar-hover transition-colors text-left cursor-pointer"
+            aria-label="Select organization"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-sidebar-fg-muted shrink-0">
+                <Buildings size={14} />
               </div>
-            </>
-          ) : (
-            <>
-              <div className="text-sidebar-fg text-xs font-semibold truncate">{projectId}</div>
-              <div className="text-sidebar-fg-muted text-[10px]">{t('common.loading')}</div>
-            </>
-          )}
-        </div>
-      </div>
+              <span className="text-sm font-medium text-sidebar-foreground truncate">{org.name || t('sidebar.organization')}</span>
+            </div>
+            <CaretDown size={14} className="text-sidebar-fg-muted shrink-0" />
+          </button>
+        )}
+      </SidebarHeader>
 
-      <nav className="flex flex-col gap-0.5 py-4 px-2 overflow-y-auto flex-1">
-        {projectNavItems.map(item => {
-          const href = item.href ? `/projects/${projectId}/${item.href}` : `/projects/${projectId}`
-          const isActive: boolean =
-            pathname === href || (item.href !== '' && pathname.startsWith(href))
-          return (
-            <SidebarItem
-              key={item.label}
-              item={{ ...item, href }}
-              active={isActive}
-            />
-          )
-        })}
-      </nav>
+      <SidebarContent>
+        <SidebarGroup className="px-2">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map(item => {
+                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+                return (
+                  <SidebarMenuItem key={item.label}>
+                    <SidebarMenuButton
+                      render={<Link href={item.href} />}
+                      isActive={isActive}
+                      tooltip={item.label}
+                      className="h-10 text-base"
+                    >
+                      <item.icon size={22} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
 
-      <div className="flex flex-col gap-2 p-3 border-t border-border-sidebar mt-auto bg-black/10">
-        <div className="flex items-center gap-2 px-2.5 py-1.5">
-          <div className="w-7 h-7 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-xs font-bold shrink-0">
-            IF
+      <SidebarFooter className="p-3 border-t border-border-sidebar bg-black/10">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              render={<Link href="/settings" />}
+              isActive={pathname === '/settings'}
+              tooltip={t('sidebar.settings')}
+              className="h-10 text-base"
+            >
+              <Gear size={22} weight={pathname === '/settings' ? 'bold' : 'regular'} aria-hidden="true" />
+              <span>{t('sidebar.settings')}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+
+        {isCollapsed ? (
+          <div className="flex items-center justify-center py-2">
+            <div className="w-8 h-8 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-sm font-bold shrink-0">
+              IF
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold text-sidebar-fg truncate">Isaac F.</div>
-            <div className="text-[10px] text-sidebar-fg-muted truncate">{t('sidebar.admin')}</div>
+        ) : (
+          <div className="flex items-center gap-2 px-2.5 py-2 mt-2">
+            <div className="w-8 h-8 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-sm font-bold shrink-0">
+              IF
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-sidebar-foreground truncate">Isaac F.</div>
+              <div className="text-sm text-sidebar-fg-muted truncate">{t('sidebar.admin')}</div>
+            </div>
           </div>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-function SidebarItem({ item, active }: { item: NavItem; active: boolean }) {
-  const Icon = item.icon
-  return (
-    <Link
-      href={item.href}
-      className={[
-        'flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
-        active
-          ? 'bg-sidebar-active text-sidebar-fg'
-          : 'text-sidebar-fg-muted hover:text-sidebar-fg hover:bg-sidebar-hover',
-      ].join(' ')}
-    >
-      <Icon size={18} weight={active ? 'bold' : 'regular'} className="shrink-0" aria-hidden="true" />
-      <span className="truncate">{item.label}</span>
-      {item.badge && (
-        <span className="ml-auto text-[9px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-primary/20 text-primary-fg animate-pulse">
-          {item.badge}
-        </span>
-      )}
-    </Link>
+        )}
+      </SidebarFooter>
+    </ShadcnSidebar>
   )
 }
