@@ -104,7 +104,7 @@ export function ApiKeysSection() {
           <DialogHeader>
             <DialogTitle>{t('settings.apiKeys.revokeTitle')}</DialogTitle>
             <DialogDescription>
-              {t('settings.apiKeys.revokeConfirm', { name: keyToRevoke?.name })}
+              {t('settings.apiKeys.revokeConfirm', { name: keyToRevoke?.name ?? '' })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
