@@ -60,7 +60,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             </Link>
           )}
         </div>
-        <p className="text-[11px] text-muted mb-4">
+        <p className="text-xs text-muted mb-4">
           {cases.length === 1 ? t('aiReview.casePendingReview', { count: cases.length }) : t('aiReview.casesPendingReview', { count: cases.length })}
         </p>
 
@@ -79,7 +79,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
               <div className="flex items-center gap-1 px-3 py-2 border-b border-border">
                 <button
                   onClick={() => setListFilter('all')}
-                  className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${
+                  className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${
                     listFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
                   }`}
                 >
@@ -87,7 +87,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                 </button>
                 <button
                   onClick={() => setListFilter('duplicates')}
-                  className={`text-[10px] font-semibold px-2 py-1 rounded transition-colors ${
+                  className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${
                     listFilter === 'duplicates' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
                   }`}
                 >
@@ -108,7 +108,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                 {selectedCase ? (
                   <ReviewCaseDetail c={selectedCase} />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
+                  <div className="flex items-center justify-center h-full text-xs text-muted p-4">
                     {t('aiReview.selectCaseToReview')}
                   </div>
                 )}

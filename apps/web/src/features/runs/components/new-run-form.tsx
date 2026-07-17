@@ -79,7 +79,7 @@ export function NewRunForm({
           </SelectContent>
         </Select>
         {error && (
-          <span className="text-[11px] text-fail" role="alert">
+          <span className="text-xs text-fail" role="alert">
             {error}
           </span>
         )}

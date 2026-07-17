@@ -31,7 +31,7 @@ export function ReviewToolbar({
         onClick={onConfirm}
         disabled={disabled}
         aria-label={t('aiReview.ariaConfirmCase')}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded
           bg-primary text-primary-fg hover:bg-primary-hover
           disabled:opacity-40 disabled:cursor-not-allowed
           focus-visible:outline-2 focus-visible:outline-primary
@@ -45,7 +45,7 @@ export function ReviewToolbar({
         onClick={onReject}
         disabled={disabled}
         aria-label={t('aiReview.ariaRejectCase')}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded
           bg-fail-bg text-fail hover:bg-fail-bg/80
           disabled:opacity-40 disabled:cursor-not-allowed
           focus-visible:outline-2 focus-visible:outline-fail
@@ -59,7 +59,7 @@ export function ReviewToolbar({
         onClick={onSkip}
         disabled={disabled}
         aria-label={t('aiReview.ariaSkipCase')}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded
           bg-skip-bg text-skip hover:bg-skip-bg/80
           disabled:opacity-40 disabled:cursor-not-allowed
           focus-visible:outline-2 focus-visible:outline-skip
@@ -73,7 +73,7 @@ export function ReviewToolbar({
         onClick={onConfirmAll}
         disabled={pendingCount === 0}
         aria-label={t('aiReview.ariaConfirmAll', { count: pendingCount })}
-        className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold rounded
+        className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded
           border border-border text-default hover:bg-canvas
           disabled:opacity-40 disabled:cursor-not-allowed
           focus-visible:outline-2 focus-visible:outline-primary

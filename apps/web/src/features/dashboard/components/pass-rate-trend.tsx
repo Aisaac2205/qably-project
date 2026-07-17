@@ -96,7 +96,7 @@ export function PassRateTrend() {
                 content={({ active, payload }) => {
                   if (active && payload && payload.length) {
                     return (
-                      <div className="bg-surface border border-border p-2 rounded-lg shadow-md text-[11px]">
+                      <div className="bg-surface border border-border p-2 rounded-lg shadow-md text-xs">
                         <p className="font-semibold text-default">{payload[0].payload.day}</p>
                         <p className="font-mono text-primary font-bold mt-0.5">
                           {t('dashboard.passRateKpi')}: {payload[0].value}%

@@ -40,7 +40,7 @@ export function ProjectCard({ project }: { project: Project }) {
             {project.name}
           </h3>
           <div className="flex items-center gap-1.5 shrink-0">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
               project.healthScore >= 80
                 ? 'bg-pass-bg text-pass border-pass/20'
                 : project.healthScore >= 50
@@ -83,7 +83,7 @@ export function ProjectCard({ project }: { project: Project }) {
         {/* Footer */}
         <div className="flex items-center gap-2 border-t border-border/40 pt-3">
           <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {t('projects.production')} · {passedCount}/{project.suiteCount} {project.suiteCount === 1 ? t('projects.service_one') : t('projects.service_other')} {t('projects.online')}
           </span>
         </div>

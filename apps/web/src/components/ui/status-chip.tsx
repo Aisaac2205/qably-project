@@ -70,7 +70,7 @@ export function StatusChip({ status }: { status: ChipStatus }) {
   const config = STATUS_MAP[status] ?? STATUS_MAP.pending
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${config.className}`}
+      className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${config.className}`}
     >
       <StatusIcon icon={config.icon} />
       {config.label}

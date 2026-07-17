@@ -20,7 +20,7 @@ export function DuplicateComparison({
 
   return (
     <div className="rounded border border-warn/30 bg-warn-bg p-2.5 space-y-1.5">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-warn">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-warn">
         <CopySimple size={14} weight="bold" aria-hidden="true" />
         {t('aiReview.possibleDuplicate')}
         <Badge variant="warn" className="ml-auto">
@@ -30,12 +30,12 @@ export function DuplicateComparison({
       {existingCase ? (
         <div>
           <p className="text-xs font-medium text-default">{existingCase.name}</p>
-          <p className="text-[11px] text-muted mt-0.5">
+          <p className="text-xs text-muted mt-0.5">
             {t('aiReview.duplicateDescription')}
           </p>
         </div>
       ) : (
-        <p className="text-[11px] text-muted">
+        <p className="text-xs text-muted">
           {t('aiReview.duplicateNotFound')}
         </p>
       )}

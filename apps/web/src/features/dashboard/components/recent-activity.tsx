@@ -52,11 +52,11 @@ export function RecentActivity() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-default truncate">{run.name}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{run.suiteName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{run.suiteName}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="text-[10px] text-muted-foreground tabular-nums font-mono">
+                    <span className="text-xs text-muted-foreground tabular-nums font-mono">
                       {formatRelativeTime(run.startedAt)}
                     </span>
                     <StatusChip status={run.status} />
@@ -97,13 +97,13 @@ export function RecentActivity() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-default truncate">{c.name}</p>
-                        <p className="text-[10px] text-muted-foreground font-mono truncate">
+                        <p className="text-xs text-muted-foreground font-mono truncate">
                           {c.sourceFile}
                         </p>
                       </div>
                     </div>
                     
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${prio.className}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${prio.className}`}>
                       {prio.label}
                     </span>
                   </div>
@@ -143,7 +143,7 @@ export function RecentActivity() {
                       <p className="text-xs font-semibold text-default truncate">
                         {run.commitMessage ?? run.name}
                       </p>
-                      <p className="text-[10px] text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground truncate">
                         {run.commitSha && <span className="font-mono">{run.commitSha}</span>}
                         {(run.commitSha && run.branch) && ' · '}
                         {run.branch && <span className="font-medium text-default/80">{run.branch}</span>}
@@ -151,7 +151,7 @@ export function RecentActivity() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="text-[10px] text-muted-foreground tabular-nums font-mono">
+                    <span className="text-xs text-muted-foreground tabular-nums font-mono">
                       {formatRelativeTime(run.startedAt)}
                     </span>
                     <StatusChip status={run.status} />

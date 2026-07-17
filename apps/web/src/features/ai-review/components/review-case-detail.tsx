@@ -23,7 +23,7 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
         )}
 
         <div>
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
             {t('aiReview.steps')}
           </h4>
           <ol className="space-y-1 list-decimal list-inside">
@@ -36,7 +36,7 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
         </div>
 
         <div>
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
             {t('aiReview.expectedResult')}
           </h4>
           <p className="text-xs text-default bg-surface border border-border rounded p-2 leading-relaxed">
@@ -45,7 +45,7 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
         </div>
 
         <div>
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
             {t('aiReview.sourceSnippet')}
           </h4>
           <CodeSnippet code={c.sourceSnippet} language="TypeScript" />

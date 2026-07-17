@@ -32,7 +32,7 @@ export function AiStatusChip({ status }: { status: ReviewStatus }) {
   const config = CONFIG[status]
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${config.className}`}
+      className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${config.className}`}
     >
       <AiStatusIcon status={status} />
       {t(config.labelKey)}

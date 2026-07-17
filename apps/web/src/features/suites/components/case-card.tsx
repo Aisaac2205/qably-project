@@ -25,7 +25,7 @@ export function CaseCard({ testCase }: { testCase: TestCase }) {
           {testCase.name}
         </span>
         <PriorityBadge priority={testCase.priority} />
-        <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${stateConfig.className}`}>
+        <span className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${stateConfig.className}`}>
           {t(stateConfig.labelKey)}
         </span>
       </div>
@@ -34,7 +34,7 @@ export function CaseCard({ testCase }: { testCase: TestCase }) {
       <div className="mt-1">
         <button
           onClick={() => setStepsOpen(!stepsOpen)}
-          className="flex items-center gap-1 text-[10px] text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex items-center gap-1 text-xs text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary"
           aria-expanded={stepsOpen}
           type="button"
         >
@@ -42,7 +42,7 @@ export function CaseCard({ testCase }: { testCase: TestCase }) {
           {t('suites.stepsCount', { count: testCase.steps.length })}
         </button>
         {stepsOpen && (
-          <ol className="mt-1 ml-3 text-[11px] text-muted space-y-0.5 list-decimal list-inside">
+          <ol className="mt-1 ml-3 text-xs text-muted space-y-0.5 list-decimal list-inside">
             {testCase.steps.map((step, i) => (
               <li key={i}>{step}</li>
             ))}
@@ -54,7 +54,7 @@ export function CaseCard({ testCase }: { testCase: TestCase }) {
       <div className="mt-1">
         <button
           onClick={() => setExpectedOpen(!expectedOpen)}
-          className="flex items-center gap-1 text-[10px] text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+          className="flex items-center gap-1 text-xs text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary"
           aria-expanded={expectedOpen}
           type="button"
         >
@@ -62,7 +62,7 @@ export function CaseCard({ testCase }: { testCase: TestCase }) {
           {t('suites.expectedResult')}
         </button>
         {expectedOpen && (
-          <p className="mt-1 ml-3 text-[11px] text-muted">
+          <p className="mt-1 ml-3 text-xs text-muted">
             {testCase.expectedResult}
           </p>
         )}

@@ -31,7 +31,7 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
         <StatusChip status={run.status} />
         <div className="min-w-0">
           <div className="text-xs font-medium text-default truncate">{run.name}</div>
-          <div className="text-[10px] text-muted truncate">{run.suiteName}</div>
+          <div className="text-xs text-muted truncate">{run.suiteName}</div>
         </div>
       </div>
 

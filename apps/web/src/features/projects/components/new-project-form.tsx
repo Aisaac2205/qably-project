@@ -63,7 +63,7 @@ export function NewProjectForm() {
           autoFocus
         />
         {errors.name && (
-          <p id="name-error" className="text-[11px] text-fail" role="alert">
+          <p id="name-error" className="text-xs text-fail" role="alert">
             {errors.name}
           </p>
         )}
@@ -99,7 +99,7 @@ export function NewProjectForm() {
           aria-describedby={errors.githubRepo ? 'repo-error' : undefined}
         />
         {errors.githubRepo && (
-          <p id="repo-error" className="text-[11px] text-fail" role="alert">
+          <p id="repo-error" className="text-xs text-fail" role="alert">
             {errors.githubRepo}
           </p>
         )}

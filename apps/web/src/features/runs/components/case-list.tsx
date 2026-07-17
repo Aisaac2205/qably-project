@@ -18,7 +18,7 @@ export function CaseList({
   
   if (cases.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
+      <div className="flex items-center justify-center h-full text-xs text-muted p-4">
         {t('runs.noCases')}
       </div>
     )

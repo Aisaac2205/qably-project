@@ -88,7 +88,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
           )}
         </div>
         {suite.description && (
-          <p className="text-[11px] text-muted truncate">{suite.description}</p>
+          <p className="text-xs text-muted truncate">{suite.description}</p>
         )}
         {suite.tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1">
@@ -106,7 +106,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         <span className="text-sm font-mono font-semibold text-default tabular-nums">
           {suite.cases.length}
         </span>
-        <span className="text-[10px] text-muted">{suite.cases.length === 1 ? t('suites.caseSuffix_one') : t('suites.caseSuffix_other')}</span>
+        <span className="text-xs text-muted">{suite.cases.length === 1 ? t('suites.caseSuffix_one') : t('suites.caseSuffix_other')}</span>
       </div>
 
       {/* Col 4: last run reference (hidden on mobile) */}
@@ -114,7 +114,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         <span className="text-xs text-default">
           {formatRelative(lastRun?.startedAt)}
         </span>
-        <span className="text-[10px] text-muted">
+        <span className="text-xs text-muted">
           {lastRun?.source === 'github_actions' ? t('suites.sourceCi') : lastRun ? t('suites.sourceManual') : ''}
         </span>
       </div>

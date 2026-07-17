@@ -31,7 +31,7 @@ export function CoverageGapsPanel({
       <button
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-[11px] font-semibold text-default hover:bg-canvas transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-default hover:bg-canvas transition-colors"
       >
         <Target size={14} className="text-ai" aria-hidden="true" />
         {t('aiReview.coverageGaps')}
@@ -52,7 +52,7 @@ export function CoverageGapsPanel({
                   <span className="text-xs font-medium text-default">{gap.area}</span>
                   <Badge variant={SEVERITY_VARIANT[gap.severity]}>{gap.severity}</Badge>
                 </div>
-                <p className="text-[11px] text-muted mt-0.5">{gap.description}</p>
+                <p className="text-xs text-muted mt-0.5">{gap.description}</p>
               </div>
               <Button size="sm" variant="outline" onClick={() => onDraftWithAi(gap.area)}>
                 {t('aiReview.draftWithAi')}

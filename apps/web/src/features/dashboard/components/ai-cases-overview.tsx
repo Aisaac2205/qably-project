@@ -53,7 +53,7 @@ export function AiCasesOverview() {
             <span className="text-xl font-bold tracking-tight text-default tabular-nums font-mono">
               {total}
             </span>
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
               {t('common.total')}
             </span>
           </div>

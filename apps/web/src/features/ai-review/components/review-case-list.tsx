@@ -22,7 +22,7 @@ export function ReviewCaseList({
 
   if (visibleCases.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-[11px] text-muted p-4">
+      <div className="flex items-center justify-center h-full text-xs text-muted p-4">
         {filter === 'duplicates' ? t('aiReview.noDuplicates') : t('aiReview.noCasesPending')}
       </div>
     )
@@ -57,7 +57,7 @@ export function ReviewCaseList({
                     </span>
                     <AiStatusChip status={c.reviewStatus} />
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono truncate">
+                  <div className="flex items-center gap-1.5 text-xs text-muted font-mono truncate">
                     {c.duplicateOfCaseId && (
                       <CopySimple size={11} className="text-warn shrink-0" weight="bold" aria-label={t('aiReview.ariaPossibleDuplicate')} />
                     )}

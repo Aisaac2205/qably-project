@@ -27,11 +27,11 @@ export function ProjectHealthTable() {
         <table className="w-full text-left border-collapse min-w-[400px]">
           <thead>
             <tr className="border-b border-border bg-canvas/30">
-              <th className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3">{t('dashboard.thProject')}</th>
-              <th className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3">{t('dashboard.thHealth')}</th>
-              <th className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3">{t('dashboard.thLastRun')}</th>
-              <th className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3 text-center">{t('dashboard.thSuites')}</th>
-              <th className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3 text-center">{t('dashboard.thAiPending')}</th>
+              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3">{t('dashboard.thProject')}</th>
+              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3">{t('dashboard.thHealth')}</th>
+              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3">{t('dashboard.thLastRun')}</th>
+              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3 text-center">{t('dashboard.thSuites')}</th>
+              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3 text-center">{t('dashboard.thAiPending')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">

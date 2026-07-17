@@ -17,7 +17,7 @@ export function CaseDetail({ c }: { c: RunCase }) {
         </div>
 
         <div>
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
             {t('runs.steps')}
           </h4>
           <ol className="space-y-1 list-decimal list-inside">
@@ -30,7 +30,7 @@ export function CaseDetail({ c }: { c: RunCase }) {
         </div>
 
         <div>
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
             {t('runs.expectedResult')}
           </h4>
           <p className="text-xs text-default bg-surface border border-border rounded p-2 leading-relaxed">

@@ -34,7 +34,7 @@ export function PriorityBadge({ priority }: { priority: CasePriority }) {
   const { t } = useTranslation()
   const config = PRIORITY_CONFIG[priority]
   return (
-    <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${config.className}`}>
+    <span className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${config.className}`}>
       <PriorityIcon priority={priority} />
       {t(config.labelKey)}
     </span>
