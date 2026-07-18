@@ -1,7 +1,7 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect } from 'vitest'
-import { CaseCard } from '@/features/suites/components/case-card'
+import { CaseCard } from '@/features/projects/suites/components/case-card'
 import type { TestCase } from '@qably/types'
 
 const mockCase: TestCase = {

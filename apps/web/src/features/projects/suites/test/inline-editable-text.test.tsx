@@ -1,7 +1,7 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
-import { InlineEditableText } from '@/features/suites/components/inline-editable-text'
+import { InlineEditableText } from '@/features/projects/suites/components/inline-editable-text'
 
 describe('InlineEditableText', () => {
   it('renders text by default', async () => {

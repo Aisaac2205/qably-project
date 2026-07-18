@@ -1,7 +1,7 @@
 'use client'
 
 import { use } from 'react'
-import { SuiteDetail } from '@/features/suites/components/suite-detail'
+import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 
 type Params = Promise<{ id: string; suiteId: string }>
 

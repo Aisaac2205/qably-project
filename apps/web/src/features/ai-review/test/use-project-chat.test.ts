@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useProjectChat } from '@/features/ai-review/hooks/use-project-chat'
+import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
 import { __resetStore } from '@/lib/mock-store'
 
 describe('useProjectChat', () => {

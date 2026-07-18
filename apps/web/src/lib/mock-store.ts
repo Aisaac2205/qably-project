@@ -19,7 +19,7 @@ import {
   mockCoverageGaps,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
-import { wantsCaseGeneration, buildAssistantReply } from '@/features/ai-review/lib/generate-mock-reply'
+import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
 import type {
   Project,
   Suite,
@@ -146,6 +146,10 @@ export function getRun(runId: string): Run | undefined {
 export function getAiCases(projectId?: string): AiCase[] {
   if (!projectId) return aiCases
   return aiCases.filter((c) => c.projectId === projectId)
+}
+
+export function getAiCase(id: string): AiCase | undefined {
+  return aiCases.find((c) => c.id === id)
 }
 
 export function getOrg(): Organization {
@@ -366,6 +370,14 @@ export function updateProject(
   projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p))
   notify()
   return projects.find((p) => p.id === id)
+}
+
+export function deleteProject(id: string): boolean {
+  const before = projects.length
+  projects = projects.filter((p) => p.id !== id)
+  if (projects.length === before) return false
+  notify()
+  return true
 }
 
 export function createProject(input: {

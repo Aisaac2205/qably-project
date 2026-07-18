@@ -8,7 +8,7 @@
  */
 import { TestTube, ListChecks, ChartBar, Clock } from '@phosphor-icons/react'
 import { KpiCard } from '@/components/ui/kpi-card'
-import { useSuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })

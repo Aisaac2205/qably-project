@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { StatusChip } from '@/components/ui/status-chip'
 import { Sparkline } from './sparkline'
 import { CaseCard } from './case-card'
-import { useSuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })

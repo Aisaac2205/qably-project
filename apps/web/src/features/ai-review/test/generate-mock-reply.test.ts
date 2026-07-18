@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wantsCaseGeneration, buildAssistantReply } from '@/features/ai-review/lib/generate-mock-reply'
+import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
 
 describe('wantsCaseGeneration', () => {
   it('detects Spanish generation intent', () => {

@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { PriorityBadge } from '@/features/suites/components/priority-badge'
+import { PriorityBadge } from '@/features/projects/suites/components/priority-badge'
 
 describe('PriorityBadge', () => {
   it('renders critical priority', async () => {

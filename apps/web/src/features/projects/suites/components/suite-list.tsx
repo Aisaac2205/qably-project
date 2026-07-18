@@ -14,7 +14,7 @@ import { TestTube } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
-import { useSuiteMetrics, type SuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 

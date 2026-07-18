@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useAiReview } from '@/features/ai-review/hooks/use-ai-review'
+import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
 import { __resetStore } from '@/lib/mock-store'
 
 describe('useAiReview confirmAll', () => {

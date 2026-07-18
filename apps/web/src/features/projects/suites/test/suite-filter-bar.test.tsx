@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
-import { SuiteFilterBar, type SortKey } from '@/features/suites/components/suite-filter-bar'
+import { SuiteFilterBar, type SortKey } from '@/features/projects/suites/components/suite-filter-bar'
 import type { SuiteRunStatus } from '@qably/types'
 
 const baseProps = {

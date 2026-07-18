@@ -15,7 +15,7 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { Sparkline } from './sparkline'
 import { InlineEditableText } from './inline-editable-text'
 import { updateSuite } from '@/lib/mock-store'
-import type { SuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
 
 const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })

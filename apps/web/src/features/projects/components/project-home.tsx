@@ -8,7 +8,7 @@
  * the central `/dashboard` and in the dedicated `/runs` and
  * `/ai-review` pages, not here.
  */
-import { SuiteList } from '@/features/suites/components/suite-list'
+import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import type { Project } from '@qably/types'
 
 export function ProjectHome({ project }: { project: Project }) {

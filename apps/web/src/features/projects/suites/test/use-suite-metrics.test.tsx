@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useSuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { createMockSuite } from '@/lib/test-utils'
 import { __resetStore, createRun } from '@/lib/mock-store'
 

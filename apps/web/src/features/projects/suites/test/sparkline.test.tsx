@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { Sparkline } from '@/features/suites/components/sparkline'
+import { Sparkline } from '@/features/projects/suites/components/sparkline'
 
 const sampleData = [
   { date: '2026-06-10', passRate: 60 },

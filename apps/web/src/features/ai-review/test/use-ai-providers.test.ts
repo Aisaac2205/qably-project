@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useAiProviders } from '@/features/ai-review/hooks/use-ai-providers'
+import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { __resetStore } from '@/lib/mock-store'
 
 describe('useAiProviders', () => {

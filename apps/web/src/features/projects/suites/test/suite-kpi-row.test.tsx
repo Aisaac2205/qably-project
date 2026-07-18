@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { SuiteKpiRow } from '@/features/suites/components/suite-kpi-row'
+import { SuiteKpiRow } from '@/features/projects/suites/components/suite-kpi-row'
 import { __resetStore } from '@/lib/mock-store'
 
 describe('SuiteKpiRow', () => {

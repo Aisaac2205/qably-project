@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useProjectChat } from '../hooks/use-project-chat'
-import { useAiProviders } from '../hooks/use-ai-providers'
+import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
+import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { ChatMessageList } from './chat-message-list'
 import { ChatComposer } from './chat-composer'
 import { buttonVariants } from '@/components/ui/button'

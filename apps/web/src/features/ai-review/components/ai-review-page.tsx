@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useAiReview } from '@/features/ai-review/hooks/use-ai-review'
-import { useAiProviders } from '@/features/ai-review/hooks/use-ai-providers'
+import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
+import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { ReviewCaseList } from './review-case-list'
 import { ReviewCaseDetail } from './review-case-detail'
 import { ReviewToolbar } from './review-toolbar'

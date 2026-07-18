@@ -1,12 +1,12 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { SuiteRow } from '@/features/suites/components/suite-row'
+import { SuiteRow } from '@/features/projects/suites/components/suite-row'
 import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite } from '@/lib/test-utils'
-import { useSuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { TestCase, Run } from '@qably/types'
-import type { SuiteMetrics } from '@/features/suites/hooks/use-suite-metrics'
+import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>

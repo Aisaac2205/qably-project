@@ -1,7 +1,7 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { SuiteList } from '@/features/suites/components/suite-list'
+import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import { __resetStore } from '@/lib/mock-store'
 
 vi.mock('next/link', () => ({

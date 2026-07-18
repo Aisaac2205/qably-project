@@ -1,7 +1,7 @@
 import { render, screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { SuiteDetail } from '@/features/suites/components/suite-detail'
+import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 import { __resetStore } from '@/lib/mock-store'
 
 const mockPush = vi.fn()
