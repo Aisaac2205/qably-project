@@ -13,6 +13,7 @@ import type {
   ChatThread,
   ChatMessage,
   CoverageGap,
+  Connection,
 } from '@qably/types'
 
 export type {
@@ -431,6 +432,35 @@ export const mockGithubIntegration: GithubIntegration = {
   connected: true,
   repoUrl: 'https://github.com/acme/ecommerce-app',
 }
+
+// ─── Connections (integration aggregate) ─────────────────────────────────────
+
+export const mockConnections: Connection[] = [
+  {
+    id: 'conn-1',
+    type: 'github',
+    name: 'acme/ecommerce-app',
+    status: 'pending',
+    config: { repoUrl: 'https://github.com/acme/ecommerce-app' },
+    createdAt: '2026-06-10T09:00:00Z',
+  },
+  {
+    id: 'conn-2',
+    type: 'slack',
+    name: '#qa-alerts',
+    status: 'connected',
+    config: { channelId: 'C0123' },
+    createdAt: '2026-05-20T10:00:00Z',
+    lastSyncAt: '2026-06-15T08:00:00Z',
+  },
+  {
+    id: 'conn-3',
+    type: 'email',
+    name: 'qa-team@acme.com',
+    status: 'disconnected',
+    createdAt: '2026-04-15T10:00:00Z',
+  },
+]
 
 // ─── AI Providers ─────────────────────────────────────────────────────────────
 

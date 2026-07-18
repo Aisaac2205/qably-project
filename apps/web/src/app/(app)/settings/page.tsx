@@ -1,6 +1,11 @@
+/**
+ * /settings — trimmed down to language only after Commit 2 absorbed
+ * integrations / api-keys / members / org / billing / ai-providers
+ * into their respective transactional modules.
+ */
 'use client'
 
-import { SettingsTabs } from '@/features/settings/components/settings-tabs'
+import { LanguageSection } from '@/features/settings/components/language-section'
 import { useTranslation } from '@/lib/i18n'
 
 export default function SettingsPage() {
@@ -12,7 +17,9 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold tracking-tight text-default">{t('settings.title')}</h1>
         <p className="text-sm text-muted mt-0.5">{t('settings.subtitle')}</p>
       </div>
-      <SettingsTabs />
+      <div className="px-6 pt-5 pb-6">
+        <LanguageSection />
+      </div>
     </div>
   )
 }

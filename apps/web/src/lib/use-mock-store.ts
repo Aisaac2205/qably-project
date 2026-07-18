@@ -26,6 +26,7 @@ import type {
   AiProviderConnection,
   ChatMessage,
   CoverageGap,
+  Connection,
 } from '@qably/types'
 
 // Module-level frozen empty arrays — stable identity across SSR calls.
@@ -40,6 +41,7 @@ const EMPTY_API_KEYS = Object.freeze([]) as unknown as ApiKey[]
 const EMPTY_AI_PROVIDERS = Object.freeze([]) as unknown as AiProviderConnection[]
 const EMPTY_CHAT_MESSAGES = Object.freeze([]) as unknown as ChatMessage[]
 const EMPTY_COVERAGE_GAPS = Object.freeze([]) as unknown as CoverageGap[]
+const EMPTY_CONNECTIONS = Object.freeze([]) as unknown as Connection[]
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
   const cacheRef = useRef<{ key: number; value: T[] }>({ key: -1, value: [] })
@@ -179,5 +181,24 @@ export function useCoverageGaps(projectId?: string): CoverageGap[] {
       return projectId ? all.filter((g) => g.projectId === projectId) : all
     },
     () => EMPTY_COVERAGE_GAPS,
+  )
+}
+
+export function useConnections(): Connection[] {
+  return useStableArray(() => getSnapshot().connections, () => EMPTY_CONNECTIONS)
+}
+
+export function useConnection(id: string): Connection | undefined {
+  const cacheRef = useRef<{ id: string; value: Connection | undefined }>({ id: '', value: undefined })
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      const c = getSnapshot().connections.find((c) => c.id === id)
+      if (c !== cacheRef.current.value || id !== cacheRef.current.id) {
+        cacheRef.current = { id, value: c }
+      }
+      return cacheRef.current.value
+    },
+    () => undefined,
   )
 }

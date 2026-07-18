@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Buildings, CaretDown, Gauge, FolderOpen, Gear } from '@phosphor-icons/react'
+import { Buildings, CaretDown, Gauge, FolderOpen, Gear, Plug } from '@phosphor-icons/react'
 import { useOrg } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
 import {
@@ -34,6 +34,7 @@ export function Sidebar() {
   const navItems: NavItem[] = [
     { label: t('sidebar.dashboard'), href: '/dashboard', icon: Gauge },
     { label: t('sidebar.projects'), href: '/projects', icon: FolderOpen },
+    { label: t('sidebar.integrations'), href: '/integrations', icon: Plug },
   ]
 
   return (

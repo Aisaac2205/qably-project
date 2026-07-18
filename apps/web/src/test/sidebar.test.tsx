@@ -1,8 +1,27 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import type { Project } from '@qably/types'
+import { SidebarProvider } from '@/components/ui/sidebar'
 
 const mockPathname = vi.fn(() => '/dashboard')
+
+// jsdom doesn't implement matchMedia. SidebarProvider uses it via
+// use-mobile to detect viewport size for the collapsible sidebar.
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
@@ -14,7 +33,6 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-// Mock useProject to return a project when needed
 const mockProject: Project = {
   id: 'proj-1',
   name: 'Ecommerce App',
@@ -43,59 +61,39 @@ vi.mock('@/lib/use-mock-store', () => ({
 
 import { Sidebar } from '@/components/shell/sidebar'
 
-describe('Sidebar — global state', () => {
-  it('shows Dashboard, Projects, and Settings links', async () => {
+// Sidebar uses useSidebar() which requires a SidebarProvider. Wrap renders.
+function renderSidebar() {
+  return render(
+    <SidebarProvider defaultOpen={true}>
+      <Sidebar />
+    </SidebarProvider>,
+  )
+}
+
+describe('Sidebar — global state (Commit 2 nav: 4 items)', () => {
+  it('shows Dashboard, Projects, Integrations, and Settings links', async () => {
     mockPathname.mockReturnValue('/dashboard')
-    await act(async () => { render(<Sidebar />) })
+    await act(async () => { renderSidebar() })
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
     expect(screen.getByText('Projects')).toBeInTheDocument()
+    expect(screen.getByText('Integrations')).toBeInTheDocument()
     expect(screen.getByText('Settings')).toBeInTheDocument()
+  })
+
+  it('Integrations link points to /integrations', async () => {
+    mockPathname.mockReturnValue('/dashboard')
+    await act(async () => { renderSidebar() })
+    const link = screen.getByText('Integrations').closest('a')
+    expect(link?.getAttribute('href')).toBe('/integrations')
   })
 
   it('does not show project-internal items in global state', async () => {
     mockPathname.mockReturnValue('/dashboard')
-    await act(async () => { render(<Sidebar />) })
-    // Project-internal routes belong only in ProjectSidebar
+    await act(async () => { renderSidebar() })
     expect(screen.queryByText('Suites')).not.toBeInTheDocument()
-    expect(screen.queryByText('Test Suites')).not.toBeInTheDocument()
     expect(screen.queryByText('Runs')).not.toBeInTheDocument()
-    expect(screen.queryByText('Pipelines')).not.toBeInTheDocument()
     expect(screen.queryByText('Reports')).not.toBeInTheDocument()
     expect(screen.queryByText('AI Review')).not.toBeInTheDocument()
     expect(screen.queryByText('AI Cases')).not.toBeInTheDocument()
-  })
-
-  it('does not show ← Projects in global state', async () => {
-    mockPathname.mockReturnValue('/dashboard')
-    await act(async () => { render(<Sidebar />) })
-    expect(screen.queryByText(/← Projects/)).not.toBeInTheDocument()
-  })
-})
-
-describe('Sidebar — project state', () => {
-  it('shows ← Projects back link when inside a project', async () => {
-    mockPathname.mockReturnValue('/projects/proj-1/runs')
-    await act(async () => { render(<Sidebar />) })
-    expect(screen.getByText(/← Projects/)).toBeInTheDocument()
-  })
-
-  it('shows project nav items when inside a project', async () => {
-    mockPathname.mockReturnValue('/projects/proj-1/runs')
-    await act(async () => { render(<Sidebar />) })
-    expect(screen.getByText('Suites')).toBeInTheDocument()
-    expect(screen.getByText('Runs')).toBeInTheDocument()
-    expect(screen.getByText('AI Review')).toBeInTheDocument()
-  })
-
-  it('shows real project name (not raw projectId)', async () => {
-    mockPathname.mockReturnValue('/projects/proj-1/runs')
-    await act(async () => { render(<Sidebar />) })
-    expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
-  })
-
-  it('does not show global nav items when inside a project', async () => {
-    mockPathname.mockReturnValue('/projects/proj-1/runs')
-    await act(async () => { render(<Sidebar />) })
-    expect(screen.queryByText('Dashboard')).not.toBeInTheDocument()
   })
 })

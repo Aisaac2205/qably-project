@@ -194,3 +194,28 @@ export interface GithubIntegration {
   connected: boolean
   repoUrl?: string
 }
+
+// Connection aggregate root — one row per third-party integration
+// (CI provider, notification channel). The state machine is:
+//   pending → connected → disconnected
+// and is driven by `useConnections().transition()`.
+export type ConnectionType =
+  | 'github'
+  | 'bitbucket'
+  | 'gitlab'
+  | 'slack'
+  | 'discord'
+  | 'email'
+
+export type ConnectionStatus = 'pending' | 'connected' | 'disconnected' | 'error'
+
+export interface Connection {
+  id: string
+  type: ConnectionType
+  name: string
+  status: ConnectionStatus
+  /** Provider-specific configuration (repo URL, channel ID, email, etc.). */
+  config?: Record<string, string>
+  createdAt: string
+  lastSyncAt?: string
+}

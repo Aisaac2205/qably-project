@@ -17,6 +17,7 @@ import {
   mockChatThreads,
   mockChatMessages,
   mockCoverageGaps,
+  mockConnections,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
 import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
@@ -35,6 +36,9 @@ import type {
   ChatThread,
   ChatMessage,
   CoverageGap,
+  Connection,
+  ConnectionStatus,
+  ConnectionType,
 } from '@qably/types'
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -54,6 +58,7 @@ export interface StoreSnapshot {
   chatThreads: ChatThread[]
   chatMessages: ChatMessage[]
   coverageGaps: CoverageGap[]
+  connections: Connection[]
 }
 
 // ── State ─────────────────────────────────────────────────────────
@@ -70,6 +75,7 @@ let aiProviders: AiProviderConnection[] = structuredClone(mockAiProviders)
 let chatThreads: ChatThread[] = structuredClone(mockChatThreads)
 let chatMessages: ChatMessage[] = structuredClone(mockChatMessages)
 let coverageGaps: CoverageGap[] = structuredClone(mockCoverageGaps)
+let connections: Connection[] = structuredClone(mockConnections)
 
 // ── Pub-sub ───────────────────────────────────────────────────────
 
@@ -87,7 +93,7 @@ export function subscribe(listener: Listener): () => void {
 function currentSnapshot(): StoreSnapshot {
   return {
     projects, suites, runs, aiCases, org, members, apiKeys, integration,
-    aiProviders, chatThreads, chatMessages, coverageGaps,
+    aiProviders, chatThreads, chatMessages, coverageGaps, connections,
   }
 }
 
@@ -105,6 +111,7 @@ const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
   chatThreads: [],
   chatMessages: [],
   coverageGaps: [],
+  connections: [],
 })
 
 export function getSnapshot(): StoreSnapshot {
@@ -189,6 +196,102 @@ export function getChatMessages(threadId: string): ChatMessage[] {
 export function getCoverageGaps(projectId?: string): CoverageGap[] {
   if (!projectId) return coverageGaps
   return coverageGaps.filter((g) => g.projectId === projectId)
+}
+
+// ── Connection aggregate (Commit 2) ────────────────────────────────────────
+
+// In-memory log of CI webhook events received. The runs/ module (Commit 3)
+// subscribes to this via the bus; for now we just keep a ring buffer so
+// the integrations UI can show "last received event" per connection.
+const ciEventLog: import('@/lib/types/ci-events').NormalizedCIEvent[] = []
+const CI_LOG_MAX = 50
+
+export function recordCiEvent(event: import('@/lib/types/ci-events').NormalizedCIEvent): void {
+  ciEventLog.push(event)
+  if (ciEventLog.length > CI_LOG_MAX) ciEventLog.shift()
+  notify()
+}
+
+export function getCiEventLog(): import('@/lib/types/ci-events').NormalizedCIEvent[] {
+  return ciEventLog
+}
+
+export function getConnections(): Connection[] {
+  return connections
+}
+
+export function getConnection(id: string): Connection | undefined {
+  return connections.find((c) => c.id === id)
+}
+
+export function createConnection(input: {
+  type: ConnectionType
+  name: string
+  config?: Record<string, string>
+}): Connection {
+  const id = `conn-${connections.length + 1}`
+  const newConnection: Connection = {
+    id,
+    type: input.type,
+    name: input.name,
+    status: 'pending',
+    config: input.config,
+    createdAt: nowIso(),
+  }
+  connections = [...connections, newConnection]
+  notify()
+  return newConnection
+}
+
+export function updateConnection(
+  id: string,
+  patch: Partial<Pick<Connection, 'name' | 'config' | 'lastSyncAt'>>,
+): Connection | undefined {
+  const target = connections.find((c) => c.id === id)
+  if (!target) return undefined
+  connections = connections.map((c) => (c.id === id ? { ...c, ...patch } : c))
+  notify()
+  return connections.find((c) => c.id === id)
+}
+
+export function deleteConnection(id: string): boolean {
+  const before = connections.length
+  connections = connections.filter((c) => c.id !== id)
+  if (connections.length === before) return false
+  notify()
+  return true
+}
+
+/**
+ * Connection state machine. Returns the updated connection or undefined if
+ * the id is missing or the transition is invalid from the current status.
+ *   pending      → connect → connected
+ *   disconnected → connect → connected
+ *   connected    → disconnect → disconnected
+ *   pending      → disconnect → disconnected
+ * Anything else is a no-op (returns undefined; no event emitted).
+ */
+export function transitionConnection(
+  id: string,
+  action: 'connect' | 'disconnect',
+): Connection | undefined {
+  const target = connections.find((c) => c.id === id)
+  if (!target) return undefined
+  const next: ConnectionStatus | null = (() => {
+    if (action === 'connect') {
+      if (target.status === 'pending' || target.status === 'disconnected') return 'connected'
+      return null
+    }
+    if (action === 'disconnect') {
+      if (target.status === 'connected' || target.status === 'pending') return 'disconnected'
+      return null
+    }
+    return null
+  })()
+  if (next === null) return undefined
+  connections = connections.map((c) => (c.id === id ? { ...c, status: next } : c))
+  notify()
+  return connections.find((c) => c.id === id)
 }
 
 // ── Mutators ──────────────────────────────────────────────────────
@@ -537,5 +640,7 @@ export function __resetStore(): void {
   chatThreads = structuredClone(mockChatThreads)
   chatMessages = structuredClone(mockChatMessages)
   coverageGaps = structuredClone(mockCoverageGaps)
+  connections = structuredClone(mockConnections)
+  ciEventLog.length = 0
   notify()
 }

@@ -38,6 +38,7 @@
     "dashboard": "Dashboard",
     "projects": "Proyectos",
     "settings": "Configuraci\u00f3n",
+    "integrations": "Integraciones",
     "suites": "Suites",
     "runs": "Ejecuciones",
     "reports": "Reportes",
@@ -385,6 +386,17 @@
       "pasteApiKey": "Pegar clave API",
       "connect": "Conectar {{name}}",
       "apiKeyLabel": "Clave API de {{name}}"
+    }
+  },
+
+  "modules": {
+    "integrations": {
+      "title": "Integraciones",
+      "subtitle": "Conecta Qably con tu proveedor de CI, canales de notificación y herramientas externas.",
+      "kpiTotal": "Conexiones totales",
+      "kpiConnected": "Conectadas",
+      "kpiPending": "Pendientes",
+      "empty": "Sin conexiones a\u00fan"
     }
   }
 }
