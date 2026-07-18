@@ -203,16 +203,16 @@ export function getCoverageGaps(projectId?: string): CoverageGap[] {
 // In-memory log of CI webhook events received. The runs/ module (Commit 3)
 // subscribes to this via the bus; for now we just keep a ring buffer so
 // the integrations UI can show "last received event" per connection.
-const ciEventLog: import('@/lib/types/ci-events').NormalizedCIEvent[] = []
+const ciEventLog: import('@/features/integrations/ci-providers/types').NormalizedCIEvent[] = []
 const CI_LOG_MAX = 50
 
-export function recordCiEvent(event: import('@/lib/types/ci-events').NormalizedCIEvent): void {
+export function recordCiEvent(event: import('@/features/integrations/ci-providers/types').NormalizedCIEvent): void {
   ciEventLog.push(event)
   if (ciEventLog.length > CI_LOG_MAX) ciEventLog.shift()
   notify()
 }
 
-export function getCiEventLog(): import('@/lib/types/ci-events').NormalizedCIEvent[] {
+export function getCiEventLog(): import('@/features/integrations/ci-providers/types').NormalizedCIEvent[] {
   return ciEventLog
 }
 
@@ -397,6 +397,52 @@ export function updateRunCaseStatus(runId: string, caseId: string, status: CaseS
   })
   notify()
   return runs.find((r) => r.id === runId)
+}
+
+export function updateRun(
+  id: string,
+  patch: Partial<Pick<Run, 'name' | 'status' | 'passRate' | 'finishedAt'>>,
+): Run | undefined {
+  const target = runs.find((r) => r.id === id)
+  if (!target) return undefined
+  runs = runs.map((r) => (r.id === id ? { ...r, ...patch } : r))
+  notify()
+  return runs.find((r) => r.id === id)
+}
+
+export function deleteRun(id: string): boolean {
+  const before = runs.length
+  runs = runs.filter((r) => r.id !== id)
+  if (runs.length === before) return false
+  notify()
+  return true
+}
+
+/**
+ * Run state machine. Returns the updated run or undefined if the id is
+ * missing or the transition is invalid from the current status.
+ *   running    → 'complete' → 'pass'
+ *   running    → 'fail'     → 'fail'
+ *   pending    → 'start'    → 'running'
+ * Anything else is a no-op (returns undefined).
+ */
+export function transitionRun(
+  id: string,
+  action: 'start' | 'complete' | 'fail',
+): Run | undefined {
+  const target = runs.find((r) => r.id === id)
+  if (!target) return undefined
+  const next: Run['status'] | null = (() => {
+    if (action === 'start' && target.status === 'pending') return 'running'
+    if (action === 'complete' && target.status === 'running') return 'pass'
+    if (action === 'fail' && target.status === 'running') return 'fail'
+    return null
+  })()
+  if (next === null) return undefined
+  const finishedAt = next === 'pass' || next === 'fail' ? nowIso() : target.finishedAt
+  runs = runs.map((r) => (r.id === id ? { ...r, status: next, finishedAt } : r))
+  notify()
+  return runs.find((r) => r.id === id)
 }
 
 export function createRun(input: {

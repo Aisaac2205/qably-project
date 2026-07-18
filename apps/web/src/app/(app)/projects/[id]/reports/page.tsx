@@ -1,4 +1,4 @@
-import { ReportsPage } from '@/features/reports/components/reports-page'
+import { ReportsPage } from '@/features/runs/reports/components/reports-page'
 
 type PageProps = { params: Promise<{ id: string }> }
 

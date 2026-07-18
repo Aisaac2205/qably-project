@@ -10,6 +10,7 @@
 
 import { useState } from 'react'
 import { useConnections } from '@/features/integrations'
+import { useRunAggregate } from '@/features/runs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,7 +51,15 @@ function StatusChip({ status }: { status: Connection['status'] }) {
   )
 }
 
-function SimulateCiButton({ connection, onSimulated }: { connection: Connection; onSimulated: () => void }) {
+function SimulateCiButton({
+  connection,
+  runId,
+  onSimulated,
+}: {
+  connection: Connection
+  runId: string | null
+  onSimulated: () => void
+}) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -60,20 +69,24 @@ function SimulateCiButton({ connection, onSimulated }: { connection: Connection;
     try {
       // Simulates a GitHub `check_run` webhook. In dev, this bypasses HMAC
       // (env-gated per demo recommendation #1000) and writes to the mock-store.
+      // external_id carries the runId so the runs/ subscriber can correlate
+      // and transition the run.
+      const ts = Date.now()
+      const targetRunId = runId ?? connection.id
       const payload = {
         action: 'completed',
         check_run: {
-          id: Date.now(),
-          head_sha: 'sim-sha-' + Date.now(),
+          id: ts,
+          head_sha: 'sim-sha-' + ts,
           name: 'CI',
           status: 'completed',
           conclusion: 'success',
-          details_url: 'https://github.com/sim/run/' + Date.now(),
-          external_id: connection.id,
+          details_url: 'https://github.com/sim/run/' + ts,
+          external_id: targetRunId,
         },
         check_suite: {
-          id: Date.now(),
-          head_sha: 'sim-sha-' + Date.now(),
+          id: ts,
+          head_sha: 'sim-sha-' + ts,
           head_branch: 'main',
           repository: { full_name: connection.config?.repoUrl ?? 'acme/repo' },
         },
@@ -104,6 +117,7 @@ function SimulateCiButton({ connection, onSimulated }: { connection: Connection;
         <ArrowsClockwise size={14} className="mr-1.5" />
         Simulate CI webhook
       </Button>
+      {runId && <span className="text-xs text-muted font-mono">→ {runId}</span>}
       {error && <span className="text-xs text-fail">{error}</span>}
     </div>
   )
@@ -111,10 +125,16 @@ function SimulateCiButton({ connection, onSimulated }: { connection: Connection;
 
 export default function IntegrationsPage() {
   const { connections, transition } = useConnections()
+  const { runs } = useRunAggregate()
   const { t } = useTranslation()
 
   const connected = connections.filter((c) => c.status === 'connected').length
   const pending = connections.filter((c) => c.status === 'pending').length
+
+  // First running run — used as the target of "Simulate CI webhook" so the
+  // end-to-end flow (CI event → bus → run subscriber → run transition)
+  // works in the demo without manual setup.
+  const firstRunningRun = runs.find((r) => r.status === 'running')
 
   return (
     <div className="flex flex-col">
@@ -157,7 +177,11 @@ export default function IntegrationsPage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <SimulateCiButton connection={c} onSimulated={() => undefined} />
+                  <SimulateCiButton
+                    connection={c}
+                    runId={firstRunningRun?.id ?? null}
+                    onSimulated={() => undefined}
+                  />
                   {c.status === 'connected' ? (
                     <Button size="sm" variant="ghost" onClick={() => transition(c.id, 'disconnect')}>
                       Disconnect

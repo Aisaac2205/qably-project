@@ -23,6 +23,7 @@
  * day one — extensions in C2-C4 only add behaviour, not new payload fields.
  */
 import type { RunSource, RunStatus } from '@qably/types'
+import type { NormalizedCIEvent } from '@/features/integrations/ci-providers/types'
 
 export interface AppEventMap {
   'project.created': { projectId: string }
@@ -39,6 +40,8 @@ export interface AppEventMap {
     status: RunStatus
     url: string
   }
+
+  'ci.event.received': { event: NormalizedCIEvent }
 
   'connection.added': { connectionId: string; provider: 'github' | 'bitbucket' | 'gitlab' }
   'connection.removed': { connectionId: string }

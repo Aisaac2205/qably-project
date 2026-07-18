@@ -21,6 +21,7 @@ import { NextResponse } from 'next/server'
 import { dispatch, isKnownProvider } from '@/features/integrations/ci-providers'
 import { verifyHmac as verifyGithubHmac } from '@/features/integrations/ci-providers/github'
 import { recordCiEvent } from '@/lib/mock-store'
+import { eventBus } from '@/lib/event-bus'
 
 interface RouteContext {
   params: Promise<{ provider: string }>
@@ -76,6 +77,9 @@ export async function POST(
   }
 
   recordCiEvent(event)
+  // Cross-module handoff: emit on the bus so the runs/ subscriber
+  // (registered in app-shell.tsx) can transition the run.
+  eventBus.emit('ci.event.received', { event })
   return NextResponse.json({ ok: true, eventId: event.eventId, runId: event.runId })
 }
 

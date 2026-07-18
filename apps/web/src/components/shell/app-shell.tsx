@@ -1,14 +1,22 @@
 'use client'
 
+import { useEffect } from 'react'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { Sidebar } from './sidebar'
 import { TopBar } from './top-bar'
+import { registerRunSubscriber } from '@/features/runs'
 
 interface AppShellProps {
   children: React.ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
+  // Cross-module glue (per design, Commit 3): the run subscriber listens
+  // to CI events on the bus and transitions runs. HMR-safe via cleanup.
+  useEffect(() => {
+    return registerRunSubscriber()
+  }, [])
+
   return (
     <SidebarProvider defaultOpen={true} className="h-screen w-screen overflow-hidden bg-canvas">
       <Sidebar />
