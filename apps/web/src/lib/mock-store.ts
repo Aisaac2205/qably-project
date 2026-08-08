@@ -31,6 +31,9 @@ import type {
   ApiKey,
   GithubIntegration,
   CaseStatus,
+  CasePriority,
+  CaseState,
+  TestCase,
   AiProvider,
   AiProviderConnection,
   ChatThread,
@@ -371,6 +374,84 @@ export function deleteSuite(id: string): boolean {
       )
     }
   }
+  notify()
+  return true
+}
+
+// ── Case mutators (cases live embedded in Suite.cases) ────────────
+
+function nextCaseId(): string {
+  let max = 0
+  for (const s of suites) {
+    for (const c of s.cases) {
+      const match = /^tc-(\d+)$/.exec(c.id)
+      if (match) max = Math.max(max, Number(match[1]))
+    }
+  }
+  return `tc-${max + 1}`
+}
+
+export function createCase(
+  suiteId: string,
+  input: {
+    name: string
+    steps?: string[]
+    expectedResult?: string
+    priority?: CasePriority
+    state?: CaseState
+  },
+): TestCase | undefined {
+  const target = suites.find((s) => s.id === suiteId)
+  if (!target) return undefined
+  const newCase: TestCase = {
+    id: nextCaseId(),
+    suiteId,
+    name: input.name,
+    steps: input.steps ?? [],
+    expectedResult: input.expectedResult ?? '',
+    priority: input.priority ?? 'medium',
+    state: input.state ?? 'active',
+  }
+  const ts = nowIso()
+  suites = suites.map((s) =>
+    s.id === suiteId ? { ...s, cases: [...s.cases, newCase], updatedAt: ts } : s,
+  )
+  notify()
+  return newCase
+}
+
+export function updateCase(
+  suiteId: string,
+  caseId: string,
+  patch: Partial<Pick<TestCase, 'name' | 'steps' | 'expectedResult' | 'priority' | 'state'>>,
+): TestCase | undefined {
+  const target = suites.find((s) => s.id === suiteId)
+  if (!target) return undefined
+  if (!target.cases.some((c) => c.id === caseId)) return undefined
+  const ts = nowIso()
+  suites = suites.map((s) =>
+    s.id === suiteId
+      ? {
+          ...s,
+          cases: s.cases.map((c) => (c.id === caseId ? { ...c, ...patch } : c)),
+          updatedAt: ts,
+        }
+      : s,
+  )
+  notify()
+  return suites.find((s) => s.id === suiteId)?.cases.find((c) => c.id === caseId)
+}
+
+export function deleteCase(suiteId: string, caseId: string): boolean {
+  const target = suites.find((s) => s.id === suiteId)
+  if (!target) return false
+  if (!target.cases.some((c) => c.id === caseId)) return false
+  const ts = nowIso()
+  suites = suites.map((s) =>
+    s.id === suiteId
+      ? { ...s, cases: s.cases.filter((c) => c.id !== caseId), updatedAt: ts }
+      : s,
+  )
   notify()
   return true
 }

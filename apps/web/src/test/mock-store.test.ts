@@ -15,6 +15,9 @@ import {
   createSuite,
   deleteSuite,
   setDefaultSuite,
+  createCase,
+  updateCase,
+  deleteCase,
   updateRunCaseStatus,
   createRun,
   confirmAiCase,
@@ -303,6 +306,91 @@ describe('mock-store', () => {
     // Now delete a (the previous default) — b should remain the default
     deleteSuite(a.id)
     expect(getSuite(b.id)!.isDefault).toBe(true)
+  })
+
+  // ── Cases ───────────────────────────────────────────────────────
+
+  it('createCase appends a case to the suite and bumps updatedAt', async () => {
+    let notified = false
+    subscribe(() => { notified = true })
+    const before = getSuite('suite-1')!
+    const beforeCount = before.cases.length
+    await new Promise((r) => setTimeout(r, 5))
+
+    const created = createCase('suite-1', {
+      name: 'Session expires after inactivity',
+      steps: ['Log in', 'Wait 30 minutes', 'Refresh'],
+      expectedResult: 'Redirected to /login',
+      priority: 'high',
+      state: 'draft',
+    })
+
+    expect(notified).toBe(true)
+    expect(created).toBeDefined()
+    expect(created!.id).toMatch(/^tc-\d+$/)
+    expect(created!.suiteId).toBe('suite-1')
+    expect(created!.priority).toBe('high')
+    expect(created!.state).toBe('draft')
+    const after = getSuite('suite-1')!
+    expect(after.cases.length).toBe(beforeCount + 1)
+    expect(after.cases[after.cases.length - 1].id).toBe(created!.id)
+    expect(new Date(after.updatedAt).getTime()).toBeGreaterThan(new Date(before.updatedAt).getTime())
+  })
+
+  it('createCase generates globally unique ids across suites', () => {
+    const a = createCase('suite-1', { name: 'Case A' })
+    const b = createCase('suite-2', { name: 'Case B' })
+    expect(a!.id).not.toBe(b!.id)
+    // No collision with seeded mock ids either
+    const allIds = getSuites().flatMap((s) => s.cases.map((c) => c.id))
+    expect(new Set(allIds).size).toBe(allIds.length)
+  })
+
+  it('createCase applies defaults and returns undefined for unknown suite', () => {
+    const created = createCase('suite-1', { name: 'Minimal case' })
+    expect(created!.steps).toEqual([])
+    expect(created!.expectedResult).toBe('')
+    expect(created!.priority).toBe('medium')
+    expect(created!.state).toBe('active')
+    expect(createCase('suite-999', { name: 'Nope' })).toBeUndefined()
+  })
+
+  it('updateCase merges patch and notifies', () => {
+    let notified = false
+    subscribe(() => { notified = true })
+    const target = getSuite('suite-1')!.cases[0]
+
+    const updated = updateCase('suite-1', target.id, {
+      name: 'Renamed case',
+      priority: 'critical',
+    })
+
+    expect(notified).toBe(true)
+    expect(updated).toBeDefined()
+    expect(updated!.name).toBe('Renamed case')
+    expect(updated!.priority).toBe('critical')
+    expect(getSuite('suite-1')!.cases[0].name).toBe('Renamed case')
+  })
+
+  it('updateCase returns undefined for unknown suite or case', () => {
+    expect(updateCase('suite-999', 'tc-1', { name: 'X' })).toBeUndefined()
+    expect(updateCase('suite-1', 'tc-999', { name: 'X' })).toBeUndefined()
+  })
+
+  it('deleteCase removes the case and returns true', () => {
+    const before = getSuite('suite-1')!.cases.length
+    const target = getSuite('suite-1')!.cases[0]
+
+    const result = deleteCase('suite-1', target.id)
+
+    expect(result).toBe(true)
+    expect(getSuite('suite-1')!.cases.length).toBe(before - 1)
+    expect(getSuite('suite-1')!.cases.some((c) => c.id === target.id)).toBe(false)
+  })
+
+  it('deleteCase returns false for unknown suite or case', () => {
+    expect(deleteCase('suite-999', 'tc-1')).toBe(false)
+    expect(deleteCase('suite-1', 'tc-999')).toBe(false)
   })
 
   // ── Runs ────────────────────────────────────────────────────────
