@@ -91,6 +91,7 @@
   --color-primary:            var(--primary);
   --color-primary-hover:      var(--primary-hover);
   --color-primary-fg:         var(--primary-fg);
+  --color-primary-foreground: var(--primary-foreground);
 
   --color-ai:                 var(--accent-ai);
   --color-ai-bg:              var(--accent-ai-bg);
