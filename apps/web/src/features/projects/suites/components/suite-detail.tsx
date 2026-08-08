@@ -1,16 +1,23 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Play, Star, ArrowLeft } from '@phosphor-icons/react'
+import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
+import type { TestCase } from '@qably/types'
 import { useSuite, useProject, useRuns } from '@/lib/use-mock-store'
+import { deleteSuite, deleteCase } from '@/lib/mock-store'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { StatusChip } from '@/components/ui/status-chip'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { Sparkline } from './sparkline'
 import { CaseCard } from './case-card'
+import { SuiteFormDialog } from './suite-form-dialog'
+import { CaseFormDialog } from './case-form-dialog'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
 
@@ -38,6 +45,22 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const runs = useRuns(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [caseDialogOpen, setCaseDialogOpen] = useState(false)
+  const [editingCase, setEditingCase] = useState<TestCase | undefined>(undefined)
+  const [deletingCase, setDeletingCase] = useState<TestCase | undefined>(undefined)
+
+  function handleEditCase(tc: TestCase) {
+    setEditingCase(tc)
+    setCaseDialogOpen(true)
+  }
+
+  function handleAddCase() {
+    setEditingCase(undefined)
+    setCaseDialogOpen(true)
+  }
 
   if (!suite) {
     return (
@@ -117,6 +140,33 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               <Play size={14} weight="bold" aria-hidden="true" />
               {t('suites.runThisSuite')}
             </Button>
+
+            {/* Suite actions */}
+            <Menu>
+              <MenuTrigger
+                aria-label={t('suites.suiteActions')}
+                className="size-8 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <DotsThreeVertical size={16} weight="bold" aria-hidden="true" />
+              </MenuTrigger>
+              <MenuPortal>
+                <MenuPositioner align="end">
+                  <MenuContent>
+                    <MenuItem onClick={() => setEditOpen(true)}>
+                      <PencilSimple size={14} aria-hidden="true" />
+                      {t('suites.editSuite')}
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => setDeleteOpen(true)}
+                      className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
+                    >
+                      <Trash size={14} aria-hidden="true" />
+                      {t('suites.deleteSuite')}
+                    </MenuItem>
+                  </MenuContent>
+                </MenuPositioner>
+              </MenuPortal>
+            </Menu>
           </div>
         </div>
 
@@ -170,23 +220,76 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       {/* Case list */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-default">{t('suites.testCases')}</h2>
-          <span className="text-xs text-muted">
-            {suite.cases.length} {suite.cases.length === 1 ? t('suites.case_one') : t('suites.case_other')}
-          </span>
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-semibold text-default">{t('suites.testCases')}</h2>
+            <span className="text-xs text-muted">
+              {suite.cases.length} {suite.cases.length === 1 ? t('suites.case_one') : t('suites.case_other')}
+            </span>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={handleAddCase}>
+            <Plus size={14} weight="bold" aria-hidden="true" />
+            {t('suites.addCase')}
+          </Button>
         </div>
         <Card>
           <CardContent className="p-0 divide-y divide-border">
             {suite.cases.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted">
-                {t('suites.noTestCases')}
+              <div className="py-12 flex flex-col items-center gap-2 text-center">
+                <p className="text-sm text-muted">{t('suites.noTestCases')}</p>
+                <button
+                  type="button"
+                  onClick={handleAddCase}
+                  className="text-sm font-medium text-default hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  {t('suites.noCasesCta')}
+                </button>
               </div>
             ) : (
-              suite.cases.map((tc) => <CaseCard key={tc.id} testCase={tc} />)
+              suite.cases.map((tc) => (
+                <CaseCard key={tc.id} testCase={tc} onEdit={handleEditCase} onDelete={setDeletingCase} />
+              ))
             )}
           </CardContent>
         </Card>
       </section>
+
+      {/* Suite dialogs */}
+      <SuiteFormDialog
+        projectId={projectId}
+        suite={suite}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+      />
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t('suites.deleteSuiteTitle')}
+        description={t('suites.deleteSuiteDescription', {
+          name: suite.name,
+          count: suite.cases.length,
+        })}
+        onConfirm={() => {
+          deleteSuite(suite.id)
+          router.push(`/projects/${projectId}`)
+        }}
+      />
+
+      {/* Case dialogs */}
+      <CaseFormDialog
+        suiteId={suite.id}
+        testCase={editingCase}
+        open={caseDialogOpen}
+        onOpenChange={setCaseDialogOpen}
+      />
+      <ConfirmDialog
+        open={deletingCase !== undefined}
+        onOpenChange={(open) => { if (!open) setDeletingCase(undefined) }}
+        title={t('suites.deleteCaseTitle')}
+        description={t('suites.deleteCaseDescription', { name: deletingCase?.name ?? '' })}
+        onConfirm={() => {
+          if (deletingCase) deleteCase(suite.id, deletingCase.id)
+        }}
+      />
     </div>
   )
 }

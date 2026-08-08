@@ -10,10 +10,12 @@
  */
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { TestTube } from '@phosphor-icons/react'
+import { TestTube, Plus } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
+import { SuiteFormDialog } from './suite-form-dialog'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
@@ -73,6 +75,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
   const [status, setStatus] = useState<SuiteRunStatus | 'all'>('all')
   const [tag, setTag] = useState<string>('all')
   const [sort, setSort] = useState<SortKey>('recent')
+  const [createOpen, setCreateOpen] = useState(false)
 
   const availableTags = useMemo(() => {
     const set = new Set<string>()
@@ -92,10 +95,15 @@ export function SuiteList({ projectId }: SuiteListProps) {
   // Empty state 1: project has no suites at all
   if (perSuite.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-2 text-center">
+      <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
         <TestTube size={32} weight="duotone" className="text-muted" aria-hidden="true" />
         <p className="text-sm text-default font-medium">{t('suites.noSuitesHeading')}</p>
-        <p className="text-xs text-muted">{t('suites.createSuiteHint')}</p>
+        <p className="text-xs text-muted max-w-[40ch]">{t('suites.createSuiteHint')}</p>
+        <Button type="button" size="sm" className="mt-1" onClick={() => setCreateOpen(true)}>
+          <Plus size={14} weight="bold" aria-hidden="true" />
+          {t('suites.newSuite')}
+        </Button>
+        <SuiteFormDialog projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
       </div>
     )
   }
@@ -104,17 +112,25 @@ export function SuiteList({ projectId }: SuiteListProps) {
 
   return (
     <div className="space-y-3">
-      <SuiteFilterBar
-        search={search}
-        onSearchChange={setSearch}
-        status={status}
-        onStatusChange={setStatus}
-        tag={tag}
-        onTagChange={setTag}
-        sort={sort}
-        onSortChange={setSort}
-        availableTags={availableTags}
-      />
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <SuiteFilterBar
+            search={search}
+            onSearchChange={setSearch}
+            status={status}
+            onStatusChange={setStatus}
+            tag={tag}
+            onTagChange={setTag}
+            sort={sort}
+            onSortChange={setSort}
+            availableTags={availableTags}
+          />
+        </div>
+        <Button type="button" size="sm" onClick={() => setCreateOpen(true)} className="shrink-0">
+          <Plus size={14} weight="bold" aria-hidden="true" />
+          {t('suites.newSuite')}
+        </Button>
+      </div>
 
       {sorted.length === 0 ? (
         // Empty state 2: filter excludes everything
@@ -149,6 +165,8 @@ export function SuiteList({ projectId }: SuiteListProps) {
           </CardContent>
         </Card>
       )}
+
+      <SuiteFormDialog projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }

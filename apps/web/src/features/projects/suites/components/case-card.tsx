@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
+import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
 
 const STATE_CONFIG: Record<string, { labelKey: string; className: string }> = {
@@ -12,7 +13,13 @@ const STATE_CONFIG: Record<string, { labelKey: string; className: string }> = {
   deprecated: { labelKey: 'suites.stateDeprecated', className: 'bg-skip-bg text-muted' },
 }
 
-export function CaseCard({ testCase }: { testCase: TestCase }) {
+interface CaseCardProps {
+  testCase: TestCase
+  onEdit: (testCase: TestCase) => void
+  onDelete: (testCase: TestCase) => void
+}
+
+export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
@@ -28,6 +35,33 @@ export function CaseCard({ testCase }: { testCase: TestCase }) {
         <span className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${stateConfig.className}`}>
           {t(stateConfig.labelKey)}
         </span>
+
+        {/* Row actions — revealed on hover/focus so the list stays quiet */}
+        <Menu>
+          <MenuTrigger
+            aria-label={t('suites.caseActions')}
+            className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100 focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <DotsThree size={16} weight="bold" aria-hidden="true" />
+          </MenuTrigger>
+          <MenuPortal>
+            <MenuPositioner align="end">
+              <MenuContent>
+                <MenuItem onClick={() => onEdit(testCase)}>
+                  <PencilSimple size={14} aria-hidden="true" />
+                  {t('suites.editCase')}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => onDelete(testCase)}
+                  className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
+                >
+                  <Trash size={14} aria-hidden="true" />
+                  {t('suites.deleteCase')}
+                </MenuItem>
+              </MenuContent>
+            </MenuPositioner>
+          </MenuPortal>
+        </Menu>
       </div>
 
       {/* Steps */}
