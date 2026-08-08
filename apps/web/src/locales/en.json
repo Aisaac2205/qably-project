@@ -125,7 +125,13 @@
     "formatOrgRepo": "Format must be org/repo",
     "editTechStackTitle": "Edit tech stack",
     "nameRequiredError": "Project name is required",
-    "formatOrgRepoError": "Format must be org/repo"
+    "formatOrgRepoError": "Format must be org/repo",
+    "editProjectTitle": "Edit project",
+    "editProject": "Edit project",
+    "deleteProject": "Delete project",
+    "deleteProjectTitle": "Delete project?",
+    "deleteProjectDescription": "This permanently deletes {{name}} with all its suites and test cases. This action cannot be undone.",
+    "projectActions": "Project actions"
   },
 
   "aiReview": {
@@ -216,7 +222,11 @@
     "finished": "Finished",
     "onBranch": "on ",
     "byAuthor": "by ",
-    "viaWorkflow": "via "
+    "viaWorkflow": "via ",
+    "deleteRun": "Delete run",
+    "deleteRunTitle": "Delete run?",
+    "deleteRunDescription": "This permanently deletes {{name}} and its recorded case results. This action cannot be undone.",
+    "runActions": "Run actions"
   },
 
   "suites": {
@@ -275,7 +285,7 @@
     "lastRunLabel": "Last Run",
     "noRunsSubtext": "No runs yet",
     "noSuitesHeading": "No suites yet",
-    "createSuiteHint": "Create one from a project run.",
+    "createSuiteHint": "Create your first suite to start organizing test cases.",
     "noSuitesMatch": "No suites match your filters",
     "clearFilters": "Clear filters",
     "editSuiteName": "Edit suite name: {{name}}",
@@ -283,7 +293,40 @@
     "caseSuffix_one": "case",
     "caseSuffix_other": "cases",
     "sourceCi": "CI",
-    "sourceManual": "Manual"
+    "sourceManual": "Manual",
+    "newSuite": "New suite",
+    "createSuite": "Create suite",
+    "editSuite": "Edit suite",
+    "deleteSuite": "Delete suite",
+    "suiteActions": "Suite actions",
+    "deleteSuiteTitle": "Delete suite?",
+    "deleteSuiteDescription": "This permanently deletes {{name}} and its {{count}} test cases. This action cannot be undone.",
+    "suiteNameLabel": "Name",
+    "suiteNamePlaceholder": "e.g. Checkout smoke tests",
+    "suiteDescriptionLabel": "Description",
+    "suiteDescriptionPlaceholder": "What does this suite cover?",
+    "tagsLabel": "Tags",
+    "tagsPlaceholder": "smoke, checkout, api",
+    "tagsHint": "Comma-separated. Lowercase, hyphens allowed.",
+    "suiteNameRequired": "A suite name is required",
+    "addCase": "Add case",
+    "createCase": "Create case",
+    "editCase": "Edit case",
+    "deleteCase": "Delete case",
+    "caseActions": "Case actions",
+    "deleteCaseTitle": "Delete test case?",
+    "deleteCaseDescription": "This permanently deletes \u201C{{name}}\u201D. This action cannot be undone.",
+    "caseNameLabel": "Title",
+    "caseNamePlaceholder": "e.g. Valid login redirects to dashboard",
+    "priorityLabel": "Priority",
+    "stateLabel": "State",
+    "stepsLabel": "Steps",
+    "stepsPlaceholder": "One step per line",
+    "stepsHint": "Each line becomes one step, executed in order.",
+    "expectedResultLabel": "Expected result",
+    "expectedResultPlaceholder": "What should happen when the steps succeed?",
+    "caseNameRequired": "A case title is required",
+    "noCasesCta": "Add the first test case to start documenting this suite."
   },
 
   "settings": {

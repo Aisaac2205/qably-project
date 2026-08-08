@@ -125,7 +125,13 @@
     "formatOrgRepo": "El formato debe ser org/repo",
     "editTechStackTitle": "Editar stack tecnológico",
     "nameRequiredError": "El nombre del proyecto es requerido",
-    "formatOrgRepoError": "El formato debe ser org/repo"
+    "formatOrgRepoError": "El formato debe ser org/repo",
+    "editProjectTitle": "Editar proyecto",
+    "editProject": "Editar proyecto",
+    "deleteProject": "Eliminar proyecto",
+    "deleteProjectTitle": "¿Eliminar proyecto?",
+    "deleteProjectDescription": "Esto elimina permanentemente {{name}} con todas sus suites y casos de prueba. Esta acción no se puede deshacer.",
+    "projectActions": "Acciones del proyecto"
   },
 
   "aiReview": {
@@ -216,7 +222,11 @@
     "finished": "Finalizado",
     "onBranch": "en ",
     "byAuthor": "por ",
-    "viaWorkflow": "v\u00eda "
+    "viaWorkflow": "v\u00eda ",
+    "deleteRun": "Eliminar ejecución",
+    "deleteRunTitle": "¿Eliminar ejecución?",
+    "deleteRunDescription": "Esto elimina permanentemente {{name}} y los resultados registrados de sus casos. Esta acción no se puede deshacer.",
+    "runActions": "Acciones de la ejecución"
   },
 
   "suites": {
@@ -275,7 +285,7 @@
     "lastRunLabel": "\u00daltima Ejecuci\u00f3n",
     "noRunsSubtext": "Sin ejecuciones a\u00fan",
     "noSuitesHeading": "Sin suites a\u00fan",
-    "createSuiteHint": "Crea una desde una ejecuci\u00f3n de proyecto.",
+    "createSuiteHint": "Creá tu primera suite para empezar a organizar casos de prueba.",
     "noSuitesMatch": "Ninguna suite coincide con tus filtros",
     "clearFilters": "Limpiar filtros",
     "editSuiteName": "Editar nombre de suite: {{name}}",
@@ -283,7 +293,40 @@
     "caseSuffix_one": "caso",
     "caseSuffix_other": "casos",
     "sourceCi": "CI",
-    "sourceManual": "Manual"
+    "sourceManual": "Manual",
+    "newSuite": "Nueva suite",
+    "createSuite": "Crear suite",
+    "editSuite": "Editar suite",
+    "deleteSuite": "Eliminar suite",
+    "suiteActions": "Acciones de la suite",
+    "deleteSuiteTitle": "¿Eliminar suite?",
+    "deleteSuiteDescription": "Esto elimina permanentemente {{name}} y sus {{count}} casos de prueba. Esta acción no se puede deshacer.",
+    "suiteNameLabel": "Nombre",
+    "suiteNamePlaceholder": "ej. Smoke tests de checkout",
+    "suiteDescriptionLabel": "Descripción",
+    "suiteDescriptionPlaceholder": "¿Qué cubre esta suite?",
+    "tagsLabel": "Etiquetas",
+    "tagsPlaceholder": "smoke, checkout, api",
+    "tagsHint": "Separadas por comas. Minúsculas, guiones permitidos.",
+    "suiteNameRequired": "El nombre de la suite es requerido",
+    "addCase": "Agregar caso",
+    "createCase": "Crear caso",
+    "editCase": "Editar caso",
+    "deleteCase": "Eliminar caso",
+    "caseActions": "Acciones del caso",
+    "deleteCaseTitle": "¿Eliminar caso de prueba?",
+    "deleteCaseDescription": "Esto elimina permanentemente \u201C{{name}}\u201D. Esta acción no se puede deshacer.",
+    "caseNameLabel": "Título",
+    "caseNamePlaceholder": "ej. Login válido redirige al dashboard",
+    "priorityLabel": "Prioridad",
+    "stateLabel": "Estado",
+    "stepsLabel": "Pasos",
+    "stepsPlaceholder": "Un paso por línea",
+    "stepsHint": "Cada línea se convierte en un paso, ejecutado en orden.",
+    "expectedResultLabel": "Resultado esperado",
+    "expectedResultPlaceholder": "¿Qué debería pasar cuando los pasos tienen éxito?",
+    "caseNameRequired": "El título del caso es requerido",
+    "noCasesCta": "Agregá el primer caso de prueba para empezar a documentar esta suite."
   },
 
   "settings": {
