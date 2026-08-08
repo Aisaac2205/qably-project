@@ -37,7 +37,7 @@ function MenuContent({ className, children, ...props }: MenuPrimitive.Popup.Prop
     <MenuPrimitive.Popup
       data-slot="menu-content"
       className={cn(
-        "relative z-50 min-w-[10rem] origin-(--transform-origin) overflow-hidden rounded-md border border-border bg-surface p-1 text-default shadow-md duration-200",
+        "relative z-50 min-w-[10rem] origin-(--transform-origin) overflow-hidden rounded-md border border-border bg-surface p-1 text-default shadow-pop duration-200",
         "data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[starting-style]:opacity-0 data-[starting-style]:scale-95",
         className,
       )}

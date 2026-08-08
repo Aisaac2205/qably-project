@@ -58,7 +58,7 @@ function SelectContent({ className, children, ...props }: SelectPrimitive.Popup.
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "relative z-50 max-h-60 min-w-[8rem] origin-(--transform-origin) overflow-hidden rounded-md border border-border bg-surface text-default shadow-md duration-200",
+            "relative z-50 max-h-60 min-w-[8rem] origin-(--transform-origin) overflow-hidden rounded-md border border-border bg-surface text-default shadow-pop duration-200",
             "data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[starting-style]:opacity-0 data-[starting-style]:scale-95",
             className,
           )}
@@ -105,7 +105,7 @@ function SelectSeparator({ className, ...props }: SelectPrimitive.Separator.Prop
   return (
     <SelectPrimitive.Separator
       data-slot="select-separator"
-      className={cn("-mx-1 my-1 h-px bg-muted", className)}
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
       {...props}
     />
   )
