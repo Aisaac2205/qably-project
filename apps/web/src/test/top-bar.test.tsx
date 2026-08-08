@@ -39,6 +39,10 @@ vi.mock('@/lib/use-mock-store', () => ({
   useIntegration: () => ({ webhookUrl: '', connected: false }),
 }))
 
+vi.mock('@/components/ui/sidebar', () => ({
+  SidebarTrigger: () => <button type="button" aria-label="Toggle sidebar" />,
+}))
+
 import { TopBar } from '@/components/shell/top-bar'
 
 describe('TopBar', () => {

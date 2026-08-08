@@ -18,6 +18,7 @@ import {
   mockChatMessages,
   mockCoverageGaps,
   mockConnections,
+  mockNotifications,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
 import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
@@ -42,6 +43,7 @@ import type {
   Connection,
   ConnectionStatus,
   ConnectionType,
+  Notification,
 } from '@qably/types'
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -62,6 +64,7 @@ export interface StoreSnapshot {
   chatMessages: ChatMessage[]
   coverageGaps: CoverageGap[]
   connections: Connection[]
+  notifications: Notification[]
 }
 
 // ── State ─────────────────────────────────────────────────────────
@@ -79,6 +82,7 @@ let chatThreads: ChatThread[] = structuredClone(mockChatThreads)
 let chatMessages: ChatMessage[] = structuredClone(mockChatMessages)
 let coverageGaps: CoverageGap[] = structuredClone(mockCoverageGaps)
 let connections: Connection[] = structuredClone(mockConnections)
+let notifications: Notification[] = structuredClone(mockNotifications)
 
 // ── Pub-sub ───────────────────────────────────────────────────────
 
@@ -96,7 +100,7 @@ export function subscribe(listener: Listener): () => void {
 function currentSnapshot(): StoreSnapshot {
   return {
     projects, suites, runs, aiCases, org, members, apiKeys, integration,
-    aiProviders, chatThreads, chatMessages, coverageGaps, connections,
+    aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
   }
 }
 
@@ -115,6 +119,7 @@ const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
   chatMessages: [],
   coverageGaps: [],
   connections: [],
+  notifications: [],
 })
 
 export function getSnapshot(): StoreSnapshot {
@@ -199,6 +204,14 @@ export function getChatMessages(threadId: string): ChatMessage[] {
 export function getCoverageGaps(projectId?: string): CoverageGap[] {
   if (!projectId) return coverageGaps
   return coverageGaps.filter((g) => g.projectId === projectId)
+}
+
+export function getNotifications(): Notification[] {
+  return notifications
+}
+
+export function getServerNotifications(): Notification[] {
+  return FROZEN_EMPTY.notifications
 }
 
 // ── Connection aggregate (Commit 2) ────────────────────────────────────────
@@ -557,6 +570,15 @@ export function confirmAiCase(id: string): AiCase | undefined {
   return aiCases.find((c) => c.id === id)
 }
 
+export function markNotificationAsRead(id: string): Notification | undefined {
+  const notification = notifications.find((item) => item.id === id)
+  if (!notification || notification.readAt) return notification
+  const readAt = nowIso()
+  notifications = notifications.map((item) => (item.id === id ? { ...item, readAt } : item))
+  notify()
+  return notifications.find((item) => item.id === id)
+}
+
 export function rejectAiCase(id: string): AiCase | undefined {
   aiCases = aiCases.map((c) => (c.id === id ? { ...c, reviewStatus: 'rejected' as const } : c))
   notify()
@@ -768,6 +790,7 @@ export function __resetStore(): void {
   chatMessages = structuredClone(mockChatMessages)
   coverageGaps = structuredClone(mockCoverageGaps)
   connections = structuredClone(mockConnections)
+  notifications = structuredClone(mockNotifications)
   ciEventLog.length = 0
   notify()
 }

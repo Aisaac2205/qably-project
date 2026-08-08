@@ -8,6 +8,8 @@ export type CaseState = 'active' | 'draft' | 'deprecated'
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type Plan = 'free' | 'pro' | 'agency'
 export type RunSource = 'manual' | 'api' | 'github_actions'
+export type NotificationSeverity = 'critical' | 'high' | 'medium' | 'low'
+export type NotificationChannel = 'in_app' | 'slack' | 'email'
 
 /** Suite-level execution status, derived from run history (not stored on Suite). */
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
@@ -123,6 +125,20 @@ export interface Run {
   commitAuthor?: { name: string; email: string }
   branch?: string
   workflowName?: string
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export interface Notification {
+  id: string
+  projectId: string
+  runId: string
+  testCaseId: string
+  severity: NotificationSeverity
+  message: string
+  channel: NotificationChannel
+  createdAt: string
+  readAt?: string
 }
 
 // ─── AI Cases ─────────────────────────────────────────────────────────────────

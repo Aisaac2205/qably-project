@@ -14,6 +14,7 @@ import type {
   ChatMessage,
   CoverageGap,
   Connection,
+  Notification,
 } from '@qably/types'
 
 export type {
@@ -371,6 +372,42 @@ export const mockRuns: Run[] = [
     startedAt: '2026-06-13T11:00:00Z',
     finishedAt: '2026-06-13T11:08:00Z',
     cases: [],
+  },
+]
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export const mockNotifications: Notification[] = [
+  {
+    id: 'notification-1',
+    projectId: 'proj-1',
+    runId: 'run-12',
+    testCaseId: 'tc-3',
+    severity: 'critical',
+    message: 'Password reset flow failed in Run #12.',
+    channel: 'in_app',
+    createdAt: '2026-06-16T10:42:00Z',
+  },
+  {
+    id: 'notification-2',
+    projectId: 'proj-1',
+    runId: 'run-10',
+    testCaseId: 'tc-4',
+    severity: 'critical',
+    message: 'Checkout guard failed in CI on feature/checkout-fix.',
+    channel: 'slack',
+    createdAt: '2026-06-14T09:12:00Z',
+  },
+  {
+    id: 'notification-3',
+    projectId: 'proj-1',
+    runId: 'run-10',
+    testCaseId: 'tc-5',
+    severity: 'high',
+    message: 'Discount calculation regression needs review.',
+    channel: 'email',
+    createdAt: '2026-06-14T09:12:00Z',
+    readAt: '2026-06-14T10:00:00Z',
   },
 ]
 

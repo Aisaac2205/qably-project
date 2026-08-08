@@ -1,9 +1,10 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
+import { MagnifyingGlass } from '@phosphor-icons/react'
 import { useProject } from '@/lib/use-mock-store'
 import { SidebarTrigger } from '@/components/ui/sidebar'
+import { NotificationsMenu } from '@/features/notifications'
 
 function healthColor(score: number): string {
   if (score >= 80) return 'bg-pass'
@@ -49,18 +50,7 @@ export function TopBar() {
           </kbd>
         </button>
 
-        {/* Notifications */}
-        <button
-          type="button"
-          aria-label="Notifications, 1 unread"
-          className="relative size-8 flex items-center justify-center rounded-lg text-default hover:bg-surface-hover transition-colors duration-150 cursor-pointer"
-        >
-          <Bell size={18} aria-hidden="true" />
-          <span
-            className="absolute top-1.5 right-1.5 size-1.5 bg-running rounded-full ring-1 ring-surface"
-            aria-hidden="true"
-          />
-        </button>
+        <NotificationsMenu />
 
         {/* User menu */}
         <button
