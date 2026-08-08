@@ -22,7 +22,7 @@ export function ReviewCaseList({
 
   if (visibleCases.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-xs text-muted p-4">
+      <div className="flex items-center justify-center h-full text-sm text-muted p-6">
         {filter === 'duplicates' ? t('aiReview.noDuplicates') : t('aiReview.noCasesPending')}
       </div>
     )
@@ -40,26 +40,26 @@ export function ReviewCaseList({
                   role="option"
                   aria-selected={isSelected}
                   onClick={() => onSelect(c.id)}
-                  className={`w-full text-left px-3 py-2.5 transition-colors hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary ${
+                  className={`w-full text-left px-4 py-3 transition-colors hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary ${
                     isSelected
                       ? 'bg-primary/10 border-l-2 border-primary'
                       : 'border-l-2 border-transparent'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-xs font-medium text-default truncate flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-sm font-medium text-default truncate flex items-center gap-2">
                       {c.source === 'chat' ? (
-                        <ChatCircleText size={12} className="text-ai shrink-0" aria-label={t('aiReview.ariaGeneratedChat')} />
+                        <ChatCircleText size={14} className="text-ai shrink-0" aria-label={t('aiReview.ariaGeneratedChat')} />
                       ) : (
-                        <GitBranch size={12} className="text-muted shrink-0" aria-label={t('aiReview.ariaGeneratedWebhook')} />
+                        <GitBranch size={14} className="text-muted shrink-0" aria-label={t('aiReview.ariaGeneratedWebhook')} />
                       )}
                       {c.name}
                     </span>
                     <AiStatusChip status={c.reviewStatus} />
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-muted font-mono truncate">
+                  <div className="flex items-center gap-1.5 pl-6 text-xs text-muted font-mono truncate">
                     {c.duplicateOfCaseId && (
-                      <CopySimple size={11} className="text-warn shrink-0" weight="bold" aria-label={t('aiReview.ariaPossibleDuplicate')} />
+                      <CopySimple size={12} className="text-warn shrink-0" weight="bold" aria-label={t('aiReview.ariaPossibleDuplicate')} />
                     )}
                     {c.sourceFile}
                   </div>

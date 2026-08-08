@@ -19,9 +19,9 @@ export function DuplicateComparison({
   const existingCase = suites.flatMap((s) => s.cases).find((c) => c.id === duplicateOfCaseId)
 
   return (
-    <div className="rounded border border-warn/30 bg-warn-bg p-2.5 space-y-1.5">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-warn">
-        <CopySimple size={14} weight="bold" aria-hidden="true" />
+    <div className="rounded border border-warn/30 bg-warn-bg p-3.5 space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-warn">
+        <CopySimple size={16} weight="bold" aria-hidden="true" />
         {t('aiReview.possibleDuplicate')}
         <Badge variant="warn" className="ml-auto">
           {Math.round(similarityScore * 100)}%
@@ -29,13 +29,13 @@ export function DuplicateComparison({
       </div>
       {existingCase ? (
         <div>
-          <p className="text-xs font-medium text-default">{existingCase.name}</p>
-          <p className="text-xs text-muted mt-0.5">
+          <p className="text-sm font-medium text-default">{existingCase.name}</p>
+          <p className="text-sm text-muted mt-1 leading-relaxed">
             {t('aiReview.duplicateDescription')}
           </p>
         </div>
       ) : (
-        <p className="text-xs text-muted">
+        <p className="text-sm text-muted leading-relaxed">
           {t('aiReview.duplicateNotFound')}
         </p>
       )}

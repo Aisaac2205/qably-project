@@ -11,8 +11,8 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
   
   return (
     <Card className="rounded-none border-0 h-full">
-      <CardContent className="space-y-4 p-4">
-        <h3 className="text-base font-medium text-default">{c.name}</h3>
+      <CardContent className="space-y-5 p-5">
+        <h3 className="text-lg font-semibold text-default leading-snug">{c.name}</h3>
 
         {c.duplicateOfCaseId && c.similarityScore !== undefined && (
           <DuplicateComparison
@@ -23,12 +23,12 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
         )}
 
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-sm font-medium text-default mb-2">
             {t('aiReview.steps')}
           </h4>
-          <ol className="space-y-1 list-decimal list-inside">
+          <ol className="space-y-2 list-decimal list-inside marker:text-muted marker:font-mono">
             {c.steps.map((step, i) => (
-              <li key={i} className="text-xs text-default leading-relaxed">
+              <li key={i} className="text-sm text-default leading-relaxed pl-1">
                 {step}
               </li>
             ))}
@@ -36,16 +36,16 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
         </div>
 
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-sm font-medium text-default mb-2">
             {t('aiReview.expectedResult')}
           </h4>
-          <p className="text-xs text-default bg-surface border border-border rounded p-2 leading-relaxed">
+          <p className="text-sm text-default bg-surface border border-border rounded p-3 leading-relaxed">
             {c.expectedResult}
           </p>
         </div>
 
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted mb-1.5">
+          <h4 className="text-sm font-medium text-default mb-2">
             {t('aiReview.sourceSnippet')}
           </h4>
           <CodeSnippet code={c.sourceSnippet} language="TypeScript" />

@@ -31,13 +31,13 @@ export function CoverageGapsPanel({
       <button
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-default hover:bg-canvas transition-colors"
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-default hover:bg-canvas transition-colors"
       >
-        <Target size={14} className="text-ai" aria-hidden="true" />
+        <Target size={16} className="text-ai" aria-hidden="true" />
         {t('aiReview.coverageGaps')}
         <Badge variant="outline">{gaps.length}</Badge>
         <CaretDown
-          size={12}
+          size={14}
           className={`ml-auto transition-transform ${expanded ? 'rotate-180' : ''}`}
           aria-hidden="true"
         />
@@ -46,15 +46,15 @@ export function CoverageGapsPanel({
       {expanded && (
         <ul className="divide-y divide-border">
           {gaps.map((gap) => (
-            <li key={gap.id} className="flex items-start gap-3 px-4 py-2.5">
+            <li key={gap.id} className="flex items-start gap-3.5 px-4 py-3.5">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-medium text-default">{gap.area}</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-default">{gap.area}</span>
                   <Badge variant={SEVERITY_VARIANT[gap.severity]}>{gap.severity}</Badge>
                 </div>
-                <p className="text-xs text-muted mt-0.5">{gap.description}</p>
+                <p className="text-sm text-muted mt-1 leading-relaxed">{gap.description}</p>
               </div>
-              <Button size="sm" variant="outline" onClick={() => onDraftWithAi(gap.area)}>
+              <Button variant="outline" onClick={() => onDraftWithAi(gap.area)}>
                 {t('aiReview.draftWithAi')}
               </Button>
             </li>

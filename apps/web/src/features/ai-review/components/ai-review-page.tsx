@@ -10,6 +10,7 @@ import { ReviewToolbar } from './review-toolbar'
 import { CoverageGapsPanel } from './coverage-gaps-panel'
 import { ProjectChatPanel } from './project-chat-panel'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
+import { ResizableSplit } from '@/components/ui/resizable-split'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
@@ -74,55 +75,63 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
 
       {tab === 'review' ? (
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 flex min-h-0">
-            <div className="w-72 shrink-0 border-r border-border flex flex-col min-h-0">
-              <div className="flex items-center gap-1 px-3 py-2 border-b border-border">
-                <button
-                  onClick={() => setListFilter('all')}
-                  className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${
-                    listFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
-                  }`}
-                >
-                  {t('aiReview.filterAll')}
-                </button>
-                <button
-                  onClick={() => setListFilter('duplicates')}
-                  className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${
-                    listFilter === 'duplicates' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
-                  }`}
-                >
-                  {t('aiReview.filterDuplicates')}
-                </button>
+          <ResizableSplit
+            storageKey="ai-review-sidebar"
+            defaultWidth={288}
+            minWidth={240}
+            maxRatio={0.5}
+            first={
+              <div className="flex flex-col min-h-0 h-full">
+                <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border">
+                  <button
+                    onClick={() => setListFilter('all')}
+                    className={`text-sm font-medium px-3 py-1.5 rounded transition-colors ${
+                      listFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
+                    }`}
+                  >
+                    {t('aiReview.filterAll')}
+                  </button>
+                  <button
+                    onClick={() => setListFilter('duplicates')}
+                    className={`text-sm font-medium px-3 py-1.5 rounded transition-colors ${
+                      listFilter === 'duplicates' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
+                    }`}
+                  >
+                    {t('aiReview.filterDuplicates')}
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <ReviewCaseList
+                    cases={cases}
+                    selectedId={selectedCase?.id}
+                    onSelect={selectCase}
+                    filter={listFilter}
+                  />
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto">
-                <ReviewCaseList
-                  cases={cases}
-                  selectedId={selectedCase?.id}
-                  onSelect={selectCase}
-                  filter={listFilter}
+            }
+            second={
+              <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-y-auto">
+                <div className="flex-1">
+                  {selectedCase ? (
+                    <ReviewCaseDetail c={selectedCase} />
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-sm text-muted p-6 text-center">
+                      {t('aiReview.selectCaseToReview')}
+                    </div>
+                  )}
+                </div>
+                <ReviewToolbar
+                  disabled={!selectedCase}
+                  onConfirm={confirmSelected}
+                  onReject={rejectSelected}
+                  onSkip={skipSelected}
+                  onConfirmAll={confirmAll}
+                  pendingCount={cases.length}
                 />
               </div>
-            </div>
-            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
-              <div className="flex-1">
-                {selectedCase ? (
-                  <ReviewCaseDetail c={selectedCase} />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-xs text-muted p-4">
-                    {t('aiReview.selectCaseToReview')}
-                  </div>
-                )}
-              </div>
-              <ReviewToolbar
-                disabled={!selectedCase}
-                onConfirm={confirmSelected}
-                onReject={rejectSelected}
-                onSkip={skipSelected}
-                onConfirmAll={confirmAll}
-                pendingCount={cases.length}
-              />
-            </div>
-          </div>
+            }
+          />
           <CoverageGapsPanel projectId={projectId} onDraftWithAi={handleDraftWithAi} />
         </div>
       ) : (
