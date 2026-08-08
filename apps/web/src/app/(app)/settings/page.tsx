@@ -6,6 +6,7 @@
 'use client'
 
 import { LanguageSection } from '@/features/settings/components/language-section'
+import { AccountPlanSection } from '@/features/settings/components/account-plan-section'
 import { useTranslation } from '@/lib/i18n'
 
 export default function SettingsPage() {
@@ -17,8 +18,9 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold tracking-tight text-default">{t('settings.title')}</h1>
         <p className="text-sm text-muted mt-0.5">{t('settings.subtitle')}</p>
       </div>
-      <div className="px-6 pt-5 pb-6">
-        <LanguageSection />
+        <div className="space-y-5 px-6 pt-5 pb-6">
+          <AccountPlanSection />
+          <LanguageSection />
       </div>
     </div>
   )

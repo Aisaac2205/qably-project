@@ -346,6 +346,17 @@
       "english": "English",
       "spanish": "Spanish"
     },
+    "accountPlan": {
+      "title": "Account plan",
+      "description": "Your current service level and included limits.",
+      "gratuito": "Free",
+      "equipo": "Team",
+      "empresa": "Enterprise",
+      "projects": "Projects",
+      "members": "Members",
+      "aiCases": "AI cases",
+      "limit": "Up to {{count}}"
+    },
     "org": {
       "inviteMembers": "Invite members",
       "inviteMembersDesc": "Invite and manage team permissions",

@@ -346,6 +346,17 @@
       "english": "Ingl\u00e9s",
       "spanish": "Espa\u00f1ol"
     },
+    "accountPlan": {
+      "title": "Plan de cuenta",
+      "description": "Tu nivel de servicio actual y los l\u00edmites incluidos.",
+      "gratuito": "Gratuito",
+      "equipo": "Equipo",
+      "empresa": "Empresa",
+      "projects": "Proyectos",
+      "members": "Miembros",
+      "aiCases": "Casos de IA",
+      "limit": "Hasta {{count}}"
+    },
     "org": {
       "inviteMembers": "Invitar miembros",
       "inviteMembersDesc": "Invita y gestiona permisos del equipo",

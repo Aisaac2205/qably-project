@@ -46,7 +46,7 @@ export const mockOrg: Organization = {
   id: 'org-1',
   name: 'Acme QA Team',
   slug: 'acme-qa',
-  plan: 'pro',
+  plan: 'equipo',
   planLimits: {
     maxProjects: 20,
     maxUsers: 10,

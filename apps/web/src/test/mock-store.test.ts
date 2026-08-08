@@ -470,7 +470,7 @@ describe('mock-store', () => {
     const org = getOrg()
     expect(org.name).toBe('Acme QA Team')
     expect(org.slug).toBe('acme-qa')
-    expect(org.plan).toBe('pro')
+    expect(org.plan).toBe('equipo')
   })
 
   it('getMembers returns all members', () => {

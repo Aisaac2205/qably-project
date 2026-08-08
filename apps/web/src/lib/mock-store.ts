@@ -110,7 +110,7 @@ const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
   suites: [],
   runs: [],
   aiCases: [],
-  org: { id: '', name: '', slug: '', plan: 'free' as const, planLimits: { maxProjects: 0, maxUsers: 0, maxCases: 0 } },
+  org: { id: '', name: '', slug: '', plan: 'gratuito' as const, planLimits: { maxProjects: 0, maxUsers: 0, maxCases: 0 } },
   members: [],
   apiKeys: [],
   integration: { webhookUrl: '', connected: false },
