@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import type { Run, CaseStatus } from '@qably/types'
 import { useRun, useProject } from '@/lib/use-mock-store'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
@@ -9,9 +10,11 @@ import { ArrowLeft } from '@phosphor-icons/react'
 import Link from 'next/link'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
+import { useRunAggregate } from '@/features/runs/lib/aggregate'
 import { RunProgressHeader } from './run-progress-header'
 import { CaseList } from './case-list'
 import { CaseDetail } from './case-detail'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
 
 export function RunDetail({
@@ -22,12 +25,20 @@ export function RunDetail({
   run: Run
 }) {
   const { t } = useTranslation()
+  const router = useRouter()
   const updateStatus = useUpdateRunCase(run.id)
+  const { delete: deleteRun } = useRunAggregate()
 
   const sortedCases = useMemo(() => run.cases, [run.id, run.cases])
 
   const [selectedId, setSelectedId] = useState<string>(sortedCases[0]?.id ?? '')
   const [announcement, setAnnouncement] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+
+  const handleDelete = useCallback(() => {
+    deleteRun(run.id)
+    router.push(`/projects/${projectId}/runs`)
+  }, [deleteRun, run.id, projectId, router])
 
   // If the selected case no longer exists (e.g. after a refetch), fall back to the first.
   useEffect(() => {
@@ -88,15 +99,19 @@ export function RunDetail({
     }
   }, [selectedIndex, sortedCases, updateStatus, t])
 
-  useKeyboardShortcuts({
-    p: () => setStatus('pass'),
-    f: () => setStatus('fail'),
-    s: () => setStatus('skip'),
-    b: () => setStatus('blocked'),
-    ArrowRight: () => goNext(),
-    ArrowLeft: () => goPrev(),
-    r: () => runNext(),
-  })
+  useKeyboardShortcuts(
+    {
+      p: () => setStatus('pass'),
+      f: () => setStatus('fail'),
+      s: () => setStatus('skip'),
+      b: () => setStatus('blocked'),
+      ArrowRight: () => goNext(),
+      ArrowLeft: () => goPrev(),
+      r: () => runNext(),
+    },
+    // Shortcuts pause while the delete confirmation owns keyboard focus.
+    { enabled: !deleteOpen },
+  )
 
   const selectedCase = sortedCases.find((c) => c.id === selectedId)
 
@@ -111,7 +126,7 @@ export function RunDetail({
 
   return (
     <div className="h-full flex flex-col">
-      <RunProgressHeader run={run} />
+      <RunProgressHeader run={run} onDelete={() => setDeleteOpen(true)} />
 
       {/* Keyboard shortcut hints — using surface tokens (not sidebar), readable text-xs */}
       <div
@@ -161,6 +176,14 @@ export function RunDetail({
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t('runs.deleteRunTitle')}
+        description={t('runs.deleteRunDescription', { name: run.name })}
+        onConfirm={handleDelete}
+      />
     </div>
   )
 }

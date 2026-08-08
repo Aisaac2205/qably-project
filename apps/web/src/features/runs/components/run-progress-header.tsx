@@ -1,8 +1,9 @@
 'use client'
 
 import type { Run } from '@qably/types'
-import { GitCommit } from '@phosphor-icons/react'
+import { GitCommit, DotsThreeVertical, Trash } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
 
@@ -25,7 +26,7 @@ const SOURCE_LABELS: Record<string, string> = {
   github_actions: 'runs.sourceCi',
 }
 
-export function RunProgressHeader({ run }: { run: Run }) {
+export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () => void }) {
   const { t } = useTranslation()
   const passRateDisplay = `${run.passRate}%`
   const sourceLabelKey = SOURCE_LABELS[run.source]
@@ -66,6 +67,29 @@ export function RunProgressHeader({ run }: { run: Run }) {
               <div className="text-xs uppercase tracking-wide text-muted">{t('runs.finished')}</div>
               <div className="text-sm text-default">{formatDate(run.finishedAt)}</div>
             </div>
+          )}
+          {onDelete && (
+            <Menu>
+              <MenuTrigger
+                aria-label={t('runs.runActions')}
+                className="size-7 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+              >
+                <DotsThreeVertical size={15} weight="bold" aria-hidden="true" />
+              </MenuTrigger>
+              <MenuPortal>
+                <MenuPositioner align="end">
+                  <MenuContent>
+                    <MenuItem
+                      onClick={onDelete}
+                      className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
+                    >
+                      <Trash size={14} aria-hidden="true" />
+                      {t('runs.deleteRun')}
+                    </MenuItem>
+                  </MenuContent>
+                </MenuPositioner>
+              </MenuPortal>
+            </Menu>
           )}
         </div>
       </CardHeader>
