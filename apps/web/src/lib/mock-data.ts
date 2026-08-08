@@ -435,6 +435,8 @@ export const mockAiCases: AiCase[] = [
     reviewStatus: 'pending',
     projectId: 'proj-1',
     source: 'webhook',
+    possibleDuplicateOf: 'tc-4',
+    similarityScore: 0.91,
   },
   {
     id: 'ai-3',
@@ -446,7 +448,7 @@ export const mockAiCases: AiCase[] = [
     reviewStatus: 'pending',
     projectId: 'proj-1',
     source: 'webhook',
-    duplicateOfCaseId: 'case-checkout-discount',
+    possibleDuplicateOf: 'tc-5',
     similarityScore: 0.86,
   },
   {
@@ -459,6 +461,30 @@ export const mockAiCases: AiCase[] = [
     reviewStatus: 'pending',
     projectId: 'proj-1',
     source: 'webhook',
+  },
+  {
+    id: 'ai-5',
+    name: 'Partial refund restores the original payment method',
+    steps: ['Complete an order paid by card', 'Issue a partial refund', 'Check the payment activity'],
+    expectedResult: 'The partial amount is returned to the original card and the order history records the refund.',
+    sourceFile: 'payments/refunds.spec.ts',
+    sourceSnippet: `it('returns a partial refund to the original payment method', async () => {\n  await refunds.issuePartial(order.id, 25)\n  await expect(paymentActivity).toContainText('$25.00 refunded')\n})`,
+    reviewStatus: 'pending',
+    projectId: 'proj-1',
+    source: 'chat',
+    coverageGapId: 'gap-1',
+  },
+  {
+    id: 'ai-6',
+    name: 'Expired password reset token is rejected',
+    steps: ['Request a password reset', 'Open an expired reset link', 'Submit a new password'],
+    expectedResult: 'The reset is rejected and the user is prompted to request a new link.',
+    sourceFile: 'auth/password-reset.spec.ts',
+    sourceSnippet: `it('rejects an expired password reset token', async () => {\n  await resetPage.open(expiredToken)\n  await resetPage.submitNewPassword('new-password')\n  await expect(resetPage.error).toContainText('expired')\n})`,
+    reviewStatus: 'pending',
+    projectId: 'proj-1',
+    source: 'chat',
+    coverageGapId: 'gap-2',
   },
 ]
 
@@ -556,6 +582,7 @@ export const mockCoverageGaps: CoverageGap[] = [
     description: 'No test cases cover partial or full refund flows.',
     severity: 'high',
     suggestedCaseCount: 3,
+    suggestedCaseId: 'ai-5',
   },
   {
     id: 'gap-2',
@@ -564,5 +591,6 @@ export const mockCoverageGaps: CoverageGap[] = [
     description: 'Only the happy path is covered; expired-token and rate-limit cases are missing.',
     severity: 'medium',
     suggestedCaseCount: 2,
+    suggestedCaseId: 'ai-6',
   },
 ]

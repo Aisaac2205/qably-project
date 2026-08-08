@@ -49,11 +49,11 @@ describe('ReviewCaseDetail', () => {
     expect(code?.textContent).toContain('should block')
   })
 
-  it('renders the duplicate comparison card when duplicateOfCaseId is set', async () => {
+  it('renders the duplicate comparison card when possibleDuplicateOf is set', async () => {
     const c: AiCase = {
       id: 'ai-x', name: 'Dup case', steps: ['step'], expectedResult: 'result', sourceFile: 'a.spec.ts',
       sourceSnippet: 'code', reviewStatus: 'pending', projectId: 'proj-1',
-      source: 'webhook', duplicateOfCaseId: 'case-1', similarityScore: 0.9,
+      source: 'webhook', possibleDuplicateOf: 'case-1', similarityScore: 0.9,
     }
     await act(async () => {
       render(<ReviewCaseDetail c={c} />)

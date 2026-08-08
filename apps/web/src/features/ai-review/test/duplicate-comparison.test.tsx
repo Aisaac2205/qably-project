@@ -10,7 +10,7 @@ describe('DuplicateComparison', () => {
     await act(async () => {
       render(
         <DuplicateComparison
-          duplicateOfCaseId="does-not-exist"
+          possibleDuplicateOf="does-not-exist"
           similarityScore={0.8}
           projectId="proj-1"
         />,
@@ -23,7 +23,7 @@ describe('DuplicateComparison', () => {
     await act(async () => {
       render(
         <DuplicateComparison
-          duplicateOfCaseId="does-not-exist"
+          possibleDuplicateOf="does-not-exist"
           similarityScore={0.86}
           projectId="proj-1"
         />,

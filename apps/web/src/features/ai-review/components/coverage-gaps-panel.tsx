@@ -51,6 +51,7 @@ export function CoverageGapsPanel({
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-default">{gap.area}</span>
                   <Badge variant={SEVERITY_VARIANT[gap.severity]}>{gap.severity}</Badge>
+                  <Badge variant="default">{t('aiReview.coverageGapSuggestion')}</Badge>
                 </div>
                 <p className="text-sm text-muted mt-1 leading-relaxed">{gap.description}</p>
               </div>

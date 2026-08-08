@@ -177,7 +177,8 @@
     "ariaSkipCase": "Omitir caso",
     "ariaConfirmAll": "Confirmar todos los {{count}} casos pendientes",
     "confirmAll": "Confirmar todos",
-    "suggestCases": "Sugi\u00e9reme casos de prueba para: {{area}}"
+    "suggestCases": "Sugi\u00e9reme casos de prueba para: {{area}}",
+    "coverageGapSuggestion": "Sugerido por vac\u00edo de cobertura"
   },
 
   "runs": {

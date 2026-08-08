@@ -8,15 +8,16 @@ import { useTranslation } from '@/lib/i18n'
 
 export function ReviewCaseDetail({ c }: { c: AiCase }) {
   const { t } = useTranslation()
+  const possibleDuplicateOf = c.possibleDuplicateOf ?? c.duplicateOfCaseId
   
   return (
     <Card className="rounded-none border-0 h-full">
       <CardContent className="space-y-5 p-5">
         <h3 className="text-lg font-semibold text-default leading-snug">{c.name}</h3>
 
-        {c.duplicateOfCaseId && c.similarityScore !== undefined && (
+        {possibleDuplicateOf && c.similarityScore !== undefined && (
           <DuplicateComparison
-            duplicateOfCaseId={c.duplicateOfCaseId}
+            possibleDuplicateOf={possibleDuplicateOf}
             similarityScore={c.similarityScore}
             projectId={c.projectId}
           />

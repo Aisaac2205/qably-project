@@ -3,7 +3,8 @@
 import type { AiCase } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { AiStatusChip } from './ai-status-chip'
-import { CopySimple, ChatCircleText, GitBranch } from '@phosphor-icons/react'
+import { CopySimple, ChatCircleText, GitBranch, Target } from '@phosphor-icons/react'
+import { Badge } from '@/components/ui/badge'
 import { useTranslation } from '@/lib/i18n'
 
 export function ReviewCaseList({
@@ -18,7 +19,9 @@ export function ReviewCaseList({
   filter?: 'all' | 'duplicates'
 }) {
   const { t } = useTranslation()
-  const visibleCases = filter === 'duplicates' ? cases.filter((c) => c.duplicateOfCaseId) : cases
+  const visibleCases = filter === 'duplicates'
+    ? cases.filter((c) => c.possibleDuplicateOf ?? c.duplicateOfCaseId)
+    : cases
 
   if (visibleCases.length === 0) {
     return (
@@ -34,6 +37,7 @@ export function ReviewCaseList({
         <ul className="divide-y divide-border" role="listbox" aria-label={t('aiReview.ariaReviewCases')}>
           {visibleCases.map((c) => {
             const isSelected = c.id === selectedId
+            const possibleDuplicateOf = c.possibleDuplicateOf ?? c.duplicateOfCaseId
             return (
               <li key={c.id}>
                 <button
@@ -57,12 +61,21 @@ export function ReviewCaseList({
                     </span>
                     <AiStatusChip status={c.reviewStatus} />
                   </div>
-                  <div className="flex items-center gap-1.5 pl-6 text-xs text-muted font-mono truncate">
-                    {c.duplicateOfCaseId && (
-                      <CopySimple size={12} className="text-warn shrink-0" weight="bold" aria-label={t('aiReview.ariaPossibleDuplicate')} />
-                    )}
-                    {c.sourceFile}
-                  </div>
+                   <div className="flex flex-wrap items-center gap-1.5 pl-6 text-xs text-muted">
+                     {possibleDuplicateOf && (
+                       <Badge variant="warn">
+                         <CopySimple size={12} weight="bold" aria-hidden="true" />
+                         {t('aiReview.possibleDuplicate')}
+                       </Badge>
+                     )}
+                     {c.coverageGapId && (
+                       <Badge variant="default">
+                         <Target size={12} weight="bold" aria-hidden="true" />
+                         {t('aiReview.coverageGapSuggestion')}
+                       </Badge>
+                     )}
+                     <span className="font-mono truncate">{c.sourceFile}</span>
+                   </div>
                 </button>
               </li>
             )

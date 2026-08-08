@@ -6,17 +6,17 @@ import { CopySimple } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 
 export function DuplicateComparison({
-  duplicateOfCaseId,
+  possibleDuplicateOf,
   similarityScore,
   projectId,
 }: {
-  duplicateOfCaseId: string
+  possibleDuplicateOf: string
   similarityScore: number
   projectId: string
 }) {
   const suites = useSuites(projectId)
   const { t } = useTranslation()
-  const existingCase = suites.flatMap((s) => s.cases).find((c) => c.id === duplicateOfCaseId)
+  const existingCase = suites.flatMap((s) => s.cases).find((c) => c.id === possibleDuplicateOf)
 
   return (
     <div className="rounded border border-warn/30 bg-warn-bg p-3.5 space-y-2">

@@ -70,18 +70,18 @@ describe('ReviewCaseList', () => {
     expect(screen.getByText('No AI cases pending review')).toBeInTheDocument()
   })
 
-  it('shows a duplicate badge for cases with duplicateOfCaseId', async () => {
+  it('shows a duplicate badge for cases with possibleDuplicateOf', async () => {
     const cases: AiCase[] = [
       {
         id: 'ai-x', name: 'Dup case', steps: [], expectedResult: '', sourceFile: 'a.spec.ts',
         sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-        source: 'webhook', duplicateOfCaseId: 'case-1', similarityScore: 0.9,
+        source: 'webhook', possibleDuplicateOf: 'case-1', similarityScore: 0.9,
       },
     ]
     await act(async () => {
       render(<ReviewCaseList cases={cases} onSelect={vi.fn()} />)
     })
-    expect(screen.getByLabelText('Possible duplicate')).toBeInTheDocument()
+    expect(screen.getByText('Possible duplicate')).toBeInTheDocument()
   })
 
   it('filters to only duplicates when filter="duplicates"', async () => {
@@ -89,7 +89,7 @@ describe('ReviewCaseList', () => {
       {
         id: 'ai-x', name: 'Dup case', steps: [], expectedResult: '', sourceFile: 'a.spec.ts',
         sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-        source: 'webhook', duplicateOfCaseId: 'case-1', similarityScore: 0.9,
+        source: 'webhook', possibleDuplicateOf: 'case-1', similarityScore: 0.9,
       },
       {
         id: 'ai-y', name: 'Unique case', steps: [], expectedResult: '', sourceFile: 'b.spec.ts',
@@ -102,5 +102,16 @@ describe('ReviewCaseList', () => {
     })
     expect(screen.getByText('Dup case')).toBeInTheDocument()
     expect(screen.queryByText('Unique case')).not.toBeInTheDocument()
+  })
+
+  it('labels cases suggested from a coverage gap', async () => {
+    const cases: AiCase[] = [{
+      id: 'ai-gap', name: 'Refund flow', steps: [], expectedResult: '', sourceFile: 'refunds.spec.ts',
+      sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1', source: 'chat', coverageGapId: 'gap-1',
+    }]
+    await act(async () => {
+      render(<ReviewCaseList cases={cases} onSelect={vi.fn()} />)
+    })
+    expect(screen.getByText('Suggested from coverage gap')).toBeInTheDocument()
   })
 })

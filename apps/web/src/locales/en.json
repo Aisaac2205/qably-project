@@ -177,7 +177,8 @@
     "ariaSkipCase": "Skip case",
     "ariaConfirmAll": "Confirm all {{count}} pending cases",
     "confirmAll": "Confirm all",
-    "suggestCases": "Suggest test cases for: {{area}}"
+    "suggestCases": "Suggest test cases for: {{area}}",
+    "coverageGapSuggestion": "Suggested from coverage gap"
   },
 
   "runs": {

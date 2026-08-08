@@ -154,10 +154,14 @@ export interface AiCase {
   projectId: string
   /** Where this case originated. Defaults to 'webhook' for pre-existing mock data. */
   source: 'webhook' | 'chat'
-  /** Set when the AI detects this case is similar to an existing TestCase. */
+  /** Reference to an existing TestCase when the AI detects a possible duplicate. */
+  possibleDuplicateOf?: string
+  /** @deprecated Use possibleDuplicateOf. Retained for existing consumers. */
   duplicateOfCaseId?: string
-  /** 0-1 similarity score, only present when duplicateOfCaseId is set. */
+  /** 0-1 similarity score, only present when a duplicate reference is set. */
   similarityScore?: number
+  /** Coverage gap that prompted this suggestion, when applicable. */
+  coverageGapId?: string
 }
 
 // ─── AI Providers ─────────────────────────────────────────────────────────────
@@ -200,6 +204,7 @@ export interface CoverageGap {
   description: string
   severity: 'high' | 'medium' | 'low'
   suggestedCaseCount: number
+  suggestedCaseId: string
 }
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
