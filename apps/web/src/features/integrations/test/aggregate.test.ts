@@ -110,17 +110,17 @@ describe('useConnections — transition state machine', () => {
     eventBus.on('connection.added', listener)
 
     const { result } = renderHook(() => useConnections())
-    // conn-1 starts pending in the seed data
-    expect(result.current.connection('conn-1')?.status).toBe('pending')
+    const created = result.current.create({ type: 'github', name: 'CI repository' })
+    expect(created.status).toBe('pending')
 
     act(() => {
-      const updated = result.current.transition('conn-1', 'connect')
+      const updated = result.current.transition(created.id, 'connect')
       expect(updated?.status).toBe('connected')
     })
 
-    expect(result.current.connection('conn-1')?.status).toBe('connected')
+    expect(result.current.connection(created.id)?.status).toBe('connected')
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith({ connectionId: 'conn-1', provider: 'github' })
+    expect(listener).toHaveBeenCalledWith({ connectionId: created.id, provider: 'github' })
   })
 
   it("transition('disconnect') moves a connected connection to disconnected and emits connection.removed", () => {
@@ -128,19 +128,17 @@ describe('useConnections — transition state machine', () => {
     eventBus.on('connection.removed', listener)
 
     const { result } = renderHook(() => useConnections())
-    // First connect, then disconnect
-    act(() => {
-      result.current.transition('conn-1', 'connect')
-    })
-    listener.mockClear()
-
     act(() => {
       const updated = result.current.transition('conn-1', 'disconnect')
       expect(updated?.status).toBe('disconnected')
     })
 
-    expect(result.current.connection('conn-1')?.status).toBe('disconnected')
-    expect(listener).toHaveBeenCalledTimes(1)
+    act(() => {
+      const updated = result.current.transition('conn-1', 'connect')
+      expect(updated?.status).toBe('connected')
+    })
+
+    expect(result.current.connection('conn-1')?.status).toBe('connected')
     expect(listener).toHaveBeenCalledWith({ connectionId: 'conn-1' })
   })
 

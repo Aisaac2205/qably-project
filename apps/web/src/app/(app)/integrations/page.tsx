@@ -1,212 +1,221 @@
-/**
- * /integrations — list of connections (GitHub repo, Slack channel, email)
- * with a "Simulate CI webhook" button per github connection to demo the
- * end-to-end flow without real GitHub.
- *
- * Composition follows the project standard:
- *   header (h1 + subtitle) → KPI row → list
- */
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
+import {
+  ArrowsClockwise,
+  CheckCircle,
+  Circle,
+  CircleNotch,
+  Plus,
+} from '@phosphor-icons/react'
+import type { Connection } from '@qably/types'
 import { useConnections } from '@/features/integrations'
 import { useRunAggregate } from '@/features/runs'
-import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Plug, Plugs, ArrowsClockwise, CheckCircle, XCircle, CircleNotch } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
-import type { Connection } from '@qably/types'
 
-function StatusChip({ status }: { status: Connection['status'] }) {
+const logos: Record<Connection['name'], string> = {
+  Slack: '/logos/slack.svg',
+  'GitHub Actions': '/logos/githubactions.svg',
+  GitHub: '/logos/github.svg',
+  Bitbucket: '/logos/bitbucket.svg',
+  Gmail: '/logos/google-gmail-svgrepo-com.svg',
+}
+
+const activity = [
+  { id: 'activity-1', connection: 'Slack', title: 'Alert #1245 delivered', detail: 'Slack · #qa-alerts', time: '2 min ago' },
+  { id: 'activity-2', connection: 'GitHub Actions', title: 'Workflow "E2E Tests" completed', detail: 'GitHub Actions', time: '5 min ago' },
+  { id: 'activity-3', connection: 'Slack', title: 'Alert #1244 delivered', detail: 'Slack · #qa-alerts', time: '18 min ago' },
+  { id: 'activity-4', connection: 'GitHub Actions', title: 'Workflow "Smoke Tests" started', detail: 'GitHub Actions', time: '27 min ago' },
+]
+
+function connectionResource(connection: Connection): string {
+  if (connection.config?.repoUrl) return connection.config.repoUrl
+  if (connection.type === 'slack') return connection.name
+  if (connection.config?.description) return connection.config.description
+  return 'Not connected'
+}
+
+function ConnectionStatus({ status }: { status: Connection['status'] }) {
   if (status === 'connected') {
     return (
-      <Badge variant="pass" className="gap-1">
-        <CheckCircle size={12} weight="fill" />
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-pass">
+        <CheckCircle size={14} weight="fill" aria-hidden="true" />
         Connected
-      </Badge>
+      </span>
     )
   }
-  if (status === 'disconnected') {
+
+  if (status === 'pending') {
     return (
-      <Badge variant="skip" className="gap-1">
-        <XCircle size={12} weight="fill" />
-        Disconnected
-      </Badge>
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-warn">
+        <CircleNotch size={14} aria-hidden="true" />
+        Pending
+      </span>
     )
   }
-  if (status === 'error') {
-    return (
-      <Badge variant="fail" className="gap-1">
-        <XCircle size={12} weight="fill" />
-        Error
-      </Badge>
-    )
-  }
+
   return (
-    <Badge variant="warn" className="gap-1">
-      <CircleNotch size={12} />
-      Pending
-    </Badge>
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+      <Circle size={14} weight="fill" aria-hidden="true" />
+      Available
+    </span>
   )
 }
 
-function SimulateCiButton({
-  connection,
-  runId,
-  onSimulated,
-}: {
-  connection: Connection
-  runId: string | null
-  onSimulated: () => void
-}) {
+function ConnectionLogo({ name }: { name: Connection['name'] }) {
+  const src = logos[name]
+
+  return (
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface p-2">
+      {src ? <Image src={src} alt="" width={24} height={24} className="size-full object-contain" /> : <Circle size={18} className="text-muted" aria-hidden="true" />}
+    </div>
+  )
+}
+
+function SimulateCiButton({ connection, runId }: { connection: Connection; runId: string | null }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  if (connection.config?.category !== 'ci') return null
 
   const simulate = async () => {
     setLoading(true)
     setError(null)
     try {
-      // Simulates a GitHub `check_run` webhook. In dev, this bypasses HMAC
-      // (env-gated per demo recommendation #1000) and writes to the mock-store.
-      // external_id carries the runId so the runs/ subscriber can correlate
-      // and transition the run.
-      const ts = Date.now()
-      const targetRunId = runId ?? connection.id
+      const timestamp = Date.now()
+      const run = runId ?? connection.id
       const payload = {
         action: 'completed',
         check_run: {
-          id: ts,
-          head_sha: 'sim-sha-' + ts,
+          id: timestamp,
+          head_sha: `sim-sha-${timestamp}`,
           name: 'CI',
           status: 'completed',
           conclusion: 'success',
-          details_url: 'https://github.com/sim/run/' + ts,
-          external_id: targetRunId,
+          details_url: `https://github.com/sim/run/${timestamp}`,
+          external_id: run,
         },
         check_suite: {
-          id: ts,
-          head_sha: 'sim-sha-' + ts,
+          id: timestamp,
+          head_sha: `sim-sha-${timestamp}`,
           head_branch: 'main',
           repository: { full_name: connection.config?.repoUrl ?? 'acme/repo' },
         },
         repository: { full_name: connection.config?.repoUrl ?? 'acme/repo' },
       }
-      const res = await fetch('/api/webhooks/ci/github', {
+      const response = await fetch('/api/webhooks/ci/github', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) {
-        setError(`HTTP ${res.status}`)
-      } else {
-        onSimulated()
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error')
+      if (!response.ok) setError(`HTTP ${response.status}`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Network error')
     } finally {
       setLoading(false)
     }
   }
 
-  if (connection.type !== 'github') return null
-
   return (
     <div className="flex flex-col items-end gap-1">
       <Button size="sm" variant="outline" onClick={simulate} disabled={loading}>
-        <ArrowsClockwise size={14} className="mr-1.5" />
-        Simulate CI webhook
+        <ArrowsClockwise size={14} aria-hidden="true" />
+        Simulate CI
       </Button>
-      {runId && <span className="text-xs text-muted font-mono">→ {runId}</span>}
       {error && <span className="text-xs text-fail">{error}</span>}
     </div>
   )
 }
 
 export default function IntegrationsPage() {
-  const { connections, transition } = useConnections()
+  const { connections, create, transition } = useConnections()
   const { runs } = useRunAggregate()
   const { t } = useTranslation()
+  const firstRunningRun = runs.find((run) => run.status === 'running')
 
-  const connected = connections.filter((c) => c.status === 'connected').length
-  const pending = connections.filter((c) => c.status === 'pending').length
-
-  // First running run — used as the target of "Simulate CI webhook" so the
-  // end-to-end flow (CI event → bus → run subscriber → run transition)
-  // works in the demo without manual setup.
-  const firstRunningRun = runs.find((r) => r.status === 'running')
+  const addIntegration = () => {
+    create({ type: 'email', name: 'New integration', config: { description: 'Configure a notification channel' } })
+  }
 
   return (
     <div className="flex flex-col">
-      <div className="px-6 pt-6 pb-4 shrink-0">
-        <h1 className="text-3xl font-bold tracking-tight text-default">{t('modules.integrations.title')}</h1>
-        <p className="text-sm text-muted mt-0.5">{t('modules.integrations.subtitle')}</p>
-      </div>
-
-      <div className="px-6 pb-4">
-        <div className="grid grid-cols-3 gap-3 max-w-2xl">
-          <Kpi label={t('modules.integrations.kpiTotal')} value={connections.length} />
-          <Kpi label={t('modules.integrations.kpiConnected')} value={connected} accent="pass" />
-          <Kpi label={t('modules.integrations.kpiPending')} value={pending} accent="warn" />
+      <div className="flex flex-col gap-4 px-6 pb-6 pt-6 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-default">{t('modules.integrations.title')}</h1>
+          <p className="mt-0.5 text-sm text-muted">{t('modules.integrations.subtitle')}</p>
         </div>
+        <Button onClick={addIntegration}>
+          <Plus size={16} weight="bold" aria-hidden="true" />
+          Add integration
+        </Button>
       </div>
 
-      <div className="px-6 pb-6 space-y-2">
-        {connections.length === 0 ? (
-          <p className="text-sm text-muted text-center py-8">{t('modules.integrations.empty')}</p>
-        ) : (
-          connections.map((c) => (
-            <Card key={c.id}>
-              <CardContent className="flex items-center gap-3 p-3">
-                <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                  {c.status === 'connected' ? (
-                    <Plug size={18} weight="duotone" className="text-pass" />
-                  ) : (
-                    <Plugs size={18} weight="duotone" className="text-muted" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-default truncate">{c.name}</span>
-                    <StatusChip status={c.status} />
-                    <span className="text-xs text-muted">·</span>
-                    <span className="text-xs text-muted uppercase tracking-wide">{c.type}</span>
-                  </div>
-                  {c.config?.repoUrl && (
-                    <p className="text-xs text-muted font-mono mt-0.5 truncate">{c.config.repoUrl}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <SimulateCiButton
-                    connection={c}
-                    runId={firstRunningRun?.id ?? null}
-                    onSimulated={() => undefined}
-                  />
-                  {c.status === 'connected' ? (
-                    <Button size="sm" variant="ghost" onClick={() => transition(c.id, 'disconnect')}>
-                      Disconnect
-                    </Button>
-                  ) : (
-                    <Button size="sm" onClick={() => transition(c.id, 'connect')}>
-                      Connect
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-    </div>
-  )
-}
+      <div className="grid gap-5 px-6 pb-6 lg:grid-cols-3">
+        <section className="overflow-hidden rounded-xl border border-border bg-surface lg:col-span-2" aria-labelledby="connections-heading">
+          <div className="border-b border-border px-5 py-4">
+            <h2 id="connections-heading" className="text-sm font-semibold text-default">Integrations</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[720px] w-full text-left">
+              <thead className="border-b border-border text-xs text-muted">
+                <tr>
+                  <th scope="col" className="px-5 py-3 font-medium">Service</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Connected resource</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Last activity</th>
+                  <th scope="col" className="px-5 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {connections.map((connection) => (
+                  <tr key={connection.id}>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <ConnectionLogo name={connection.name} />
+                        <span className="text-sm font-semibold text-default">{connection.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-muted">{connectionResource(connection)}</td>
+                    <td className="px-4 py-4"><ConnectionStatus status={connection.status} /></td>
+                    <td className="px-4 py-4 text-sm text-muted">
+                      {connection.lastSyncAt ? 'Activity recorded' : '—'}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex justify-end gap-2">
+                        <SimulateCiButton connection={connection} runId={firstRunningRun?.id ?? null} />
+                        {connection.status === 'connected' ? (
+                          <Button size="sm" variant="outline" onClick={() => transition(connection.id, 'disconnect')}>Disconnect</Button>
+                        ) : (
+                          <Button size="sm" onClick={() => transition(connection.id, 'connect')}>Connect</Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-function Kpi({ label, value, accent }: { label: string; value: number; accent?: 'pass' | 'warn' }) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-3">
-      <div className="text-xs text-muted">{label}</div>
-      <div className={`text-2xl font-semibold mt-0.5 ${accent === 'pass' ? 'text-pass' : accent === 'warn' ? 'text-warn' : 'text-default'}`}>
-        {value}
+        <aside className="overflow-hidden rounded-xl border border-border bg-surface" aria-labelledby="activity-heading">
+          <div className="border-b border-border px-5 py-4">
+            <h2 id="activity-heading" className="text-sm font-semibold text-default">Recent activity</h2>
+          </div>
+          <ul className="divide-y divide-border">
+            {activity.map((item) => (
+              <li key={item.id} className="flex gap-3 px-5 py-4">
+                <ConnectionLogo name={item.connection} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-default">{item.title}</p>
+                  <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                </div>
+                <time className="shrink-0 text-xs text-muted">{item.time}</time>
+              </li>
+            ))}
+          </ul>
+        </aside>
       </div>
     </div>
   )

@@ -502,10 +502,11 @@ export const mockConnections: Connection[] = [
   {
     id: 'conn-1',
     type: 'github',
-    name: 'acme/ecommerce-app',
-    status: 'pending',
-    config: { repoUrl: 'https://github.com/acme/ecommerce-app' },
+    name: 'GitHub Actions',
+    status: 'connected',
+    config: { repoUrl: 'acme/ecommerce-app', category: 'ci' },
     createdAt: '2026-06-10T09:00:00Z',
+    lastSyncAt: '2026-06-16T10:55:00Z',
   },
   {
     id: 'conn-2',
@@ -518,9 +519,24 @@ export const mockConnections: Connection[] = [
   },
   {
     id: 'conn-3',
-    type: 'email',
-    name: 'qa-team@acme.com',
+    type: 'github',
+    name: 'GitHub',
     status: 'disconnected',
+    createdAt: '2026-04-15T10:00:00Z',
+  },
+  {
+    id: 'conn-4',
+    type: 'bitbucket',
+    name: 'Bitbucket',
+    status: 'disconnected',
+    createdAt: '2026-04-15T10:00:00Z',
+  },
+  {
+    id: 'conn-5',
+    type: 'email',
+    name: 'Gmail',
+    status: 'disconnected',
+    config: { description: 'Notifications and reports' },
     createdAt: '2026-04-15T10:00:00Z',
   },
 ]

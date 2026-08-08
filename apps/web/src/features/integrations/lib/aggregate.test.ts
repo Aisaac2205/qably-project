@@ -45,7 +45,7 @@ describe('useConnections — shape', () => {
 
   it('connection(id) returns the connection or undefined', () => {
     const { result } = renderHook(() => useConnections())
-    expect(result.current.connection('conn-1')?.name).toBe('acme/ecommerce-app')
+    expect(result.current.connection('conn-1')?.name).toBe('GitHub Actions')
     expect(result.current.connection('missing')).toBeUndefined()
   })
 })
@@ -114,12 +114,14 @@ describe('useConnections — transition state machine', () => {
     eventBus.on('connection.added', listener)
 
     const { result } = renderHook(() => useConnections())
+    const created = result.current.create({ type: 'github', name: 'CI repository' })
+    expect(created.status).toBe('pending')
     act(() => {
-      const updated = result.current.transition('conn-1', 'connect')
+      const updated = result.current.transition(created.id, 'connect')
       expect(updated?.status).toBe('connected')
     })
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith({ connectionId: 'conn-1', provider: 'github' })
+    expect(listener).toHaveBeenCalledWith({ connectionId: created.id, provider: 'github' })
   })
 
   it('connect: disconnected → connected, emits connection.added', () => {
@@ -128,7 +130,7 @@ describe('useConnections — transition state machine', () => {
 
     const { result } = renderHook(() => useConnections())
     act(() => {
-      const updated = result.current.transition('conn-3', 'connect') // conn-3 is email, disconnected
+      const updated = result.current.transition('conn-3', 'connect') // conn-3 is GitHub, disconnected
       expect(updated?.status).toBe('connected')
     })
     expect(listener).toHaveBeenCalledTimes(1)
@@ -140,11 +142,11 @@ describe('useConnections — transition state machine', () => {
 
     const { result } = renderHook(() => useConnections())
     act(() => {
-      const updated = result.current.transition('conn-2', 'disconnect') // conn-2 is slack, connected
+      const updated = result.current.transition('conn-1', 'disconnect') // conn-1 is GitHub Actions, connected
       expect(updated?.status).toBe('disconnected')
     })
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(listener).toHaveBeenCalledWith({ connectionId: 'conn-2' })
+    expect(listener).toHaveBeenCalledWith({ connectionId: 'conn-1' })
   })
 
   it('invalid transition (connect on connected) returns undefined, emits nothing', () => {
@@ -153,7 +155,7 @@ describe('useConnections — transition state machine', () => {
 
     const { result } = renderHook(() => useConnections())
     act(() => {
-      expect(result.current.transition('conn-2', 'connect')).toBeUndefined() // conn-2 already connected
+      expect(result.current.transition('conn-1', 'connect')).toBeUndefined() // conn-1 already connected
     })
     expect(listener).not.toHaveBeenCalled()
   })
