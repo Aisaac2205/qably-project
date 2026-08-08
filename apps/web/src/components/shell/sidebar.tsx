@@ -2,8 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Buildings, CaretDown, Gauge, FolderOpen, Gear, Plug } from '@phosphor-icons/react'
-import { useOrg } from '@/lib/use-mock-store'
+import {
+  Buildings,
+  CaretDown,
+  Gauge,
+  FolderOpen,
+  Gear,
+  Plug,
+  Stack,
+  Play,
+  Robot,
+  ChartLine,
+  ArrowLeft,
+} from '@phosphor-icons/react'
+import { useOrg, useProject } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
 import {
   Sidebar as ShadcnSidebar,
@@ -31,11 +43,28 @@ export function Sidebar() {
   const { state } = useSidebar()
   const isCollapsed = state === 'collapsed'
 
+  // Project context: when inside a project page (/projects/[id]/...),
+  // render the project's sub-routes in addition to the global nav.
+  const segments = pathname.split('/').filter(Boolean)
+  const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
+  const project = useProject(projectId ?? '')
+
   const navItems: NavItem[] = [
     { label: t('sidebar.dashboard'), href: '/dashboard', icon: Gauge },
     { label: t('sidebar.projects'), href: '/projects', icon: FolderOpen },
     { label: t('sidebar.integrations'), href: '/integrations', icon: Plug },
   ]
+
+  // Project-internal sub-routes. Each links to a project-scoped page.
+  // "Suites" → /projects/[id] (Phase 1.7: project home collapsed into suites list)
+  const projectSubItems: NavItem[] = projectId
+    ? [
+        { label: t('sidebar.suites'), href: `/projects/${projectId}`, icon: Stack },
+        { label: t('sidebar.runs'), href: `/projects/${projectId}/runs`, icon: Play },
+        { label: t('sidebar.aiReview'), href: `/projects/${projectId}/ai-review`, icon: Robot },
+        { label: t('sidebar.reports'), href: `/projects/${projectId}/reports`, icon: ChartLine },
+      ]
+    : []
 
   return (
     <ShadcnSidebar collapsible="icon" className="bg-sidebar">
@@ -57,11 +86,46 @@ export function Sidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Project context (only when inside a project) — Linear-style:
+            single muted row with chevron + project name as the back link. */}
+        {projectId && project && !isCollapsed && (
+          <SidebarGroup className="px-2 pt-2">
+            <Link
+              href="/projects"
+              className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-sidebar-fg-muted hover:text-sidebar-foreground transition-colors"
+            >
+              <ArrowLeft size={12} aria-hidden="true" />
+              <span className="truncate font-medium">{project.name}</span>
+            </Link>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {projectSubItems.map(item => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  return (
+                    <SidebarMenuItem key={item.label}>
+                      <SidebarMenuButton
+                        render={<Link href={item.href} />}
+                        isActive={isActive}
+                        tooltip={item.label}
+                        className="h-8 text-sm"
+                      >
+                        <item.icon size={16} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* Global nav */}
         <SidebarGroup className="px-2">
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map(item => {
-                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
+                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
                 return (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton

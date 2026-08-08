@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { MagnifyingGlass, Bell, SidebarSimple } from '@phosphor-icons/react'
+import { MagnifyingGlass, Bell } from '@phosphor-icons/react'
 import { useProject } from '@/lib/use-mock-store'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 
@@ -19,7 +19,7 @@ export function TopBar() {
   const project = useProject(projectId ?? '')
 
   return (
-    <div className="h-16 flex items-center justify-between px-6 bg-surface border-b border-border shadow-sm">
+    <div className="h-14 flex items-center justify-between px-4 md:px-6 bg-surface border-b border-border">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <SidebarTrigger className="-ml-1" />
         {isProjectRoute && project && (
@@ -33,32 +33,40 @@ export function TopBar() {
         )}
       </div>
 
-      <div className="flex items-center gap-4 shrink-0">
-        {/* Mock Search Bar */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Search trigger (visual placeholder — command palette lands in Phase 2) */}
         <button
+          type="button"
           aria-label="Search"
-          className="w-64 h-9 flex items-center justify-between px-3 text-xs text-muted-foreground bg-canvas border border-border rounded-lg shadow-sm hover:border-border-default/60 hover:text-default transition-all duration-150 cursor-pointer"
+          className="hidden sm:flex w-56 h-8 items-center justify-between px-2.5 text-xs text-muted-foreground bg-canvas border border-border rounded-lg hover:bg-surface-hover hover:text-default transition-colors duration-150 cursor-pointer"
         >
-          <div className="flex items-center gap-2">
-            <MagnifyingGlass size={16} className="text-muted-foreground" />
+          <span className="flex items-center gap-2">
+            <MagnifyingGlass size={14} aria-hidden="true" />
             <span>Search...</span>
-          </div>
-          <span className="text-xs font-mono bg-surface border border-border px-1.5 py-0.5 rounded text-muted shadow-sm">⌘K</span>
+          </span>
+          <kbd className="text-[10px] font-mono bg-surface border border-border px-1.5 py-0.5 rounded text-muted">
+            ⌘K
+          </kbd>
         </button>
 
-        {/* Notifications Icon */}
+        {/* Notifications */}
         <button
-          aria-label="Notifications"
-          className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-canvas text-default hover:text-primary transition-all duration-150 cursor-pointer"
+          type="button"
+          aria-label="Notifications, 1 unread"
+          className="relative size-8 flex items-center justify-center rounded-lg text-default hover:bg-surface-hover transition-colors duration-150 cursor-pointer"
         >
-          <Bell size={20} />
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-pink-500 rounded-full border border-surface" />
+          <Bell size={18} aria-hidden="true" />
+          <span
+            className="absolute top-1.5 right-1.5 size-1.5 bg-running rounded-full ring-1 ring-surface"
+            aria-hidden="true"
+          />
         </button>
 
-        {/* User profile dropdown button */}
+        {/* User menu */}
         <button
+          type="button"
           aria-label="User menu"
-          className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-fg text-xs font-bold select-none shrink-0 shadow-sm cursor-pointer hover:opacity-90 active:scale-95 transition-all duration-150"
+          className="size-7 rounded-full bg-primary flex items-center justify-center text-primary-fg text-xs font-bold select-none shrink-0 cursor-pointer hover:bg-primary-hover transition-colors duration-150"
         >
           IF
         </button>
