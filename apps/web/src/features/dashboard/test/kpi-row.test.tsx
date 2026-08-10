@@ -45,7 +45,7 @@ describe('KpiRow', () => {
     await act(async () => {
       render(<KpiRow />)
     })
-    // 3 pending AI cases
-    expect(screen.getByText('3')).toBeInTheDocument()
+    // Five of the six seeded AI cases are pending review.
+    expect(screen.getByText('5')).toBeInTheDocument()
   })
 })

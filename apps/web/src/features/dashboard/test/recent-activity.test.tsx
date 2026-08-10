@@ -35,9 +35,16 @@ describe('RecentActivity', () => {
     await act(async () => {
       render(<RecentActivity />)
     })
-    // Should show pending AI case names
-    expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
-    expect(screen.getByText('Discount code reduces total')).toBeInTheDocument()
+    // Five seeded cases are pending; source-file ordering leaves only these three after the UI cap.
+    const visibleCases = [
+      'Checkout with empty cart blocked',
+      'Expired password reset token is rejected',
+      'Invalid login shows error message',
+    ]
+
+    expect(visibleCases.map((name) => screen.getByText(name))).toHaveLength(3)
+    expect(screen.queryByText('Discount code reduces total')).not.toBeInTheDocument()
+    expect(screen.queryByText('Partial refund restores the original payment method')).not.toBeInTheDocument()
   })
 
   it('shows recent CI runs in pipelines section', async () => {

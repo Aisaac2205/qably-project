@@ -43,7 +43,7 @@ describe('ProviderPicker', () => {
       render(<ProviderPicker providers={providers} selected="claude" onSelect={vi.fn()} />)
     })
     await user.click(screen.getByRole('button', { name: /claude/i }))
-    expect(await screen.findByText('Claude')).toBeInTheDocument()
+    expect(await screen.findByRole('menuitem', { name: 'Claude' })).toBeInTheDocument()
     expect(screen.queryByText('Gemini')).not.toBeInTheDocument()
   })
 

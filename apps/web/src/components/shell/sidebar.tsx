@@ -68,6 +68,7 @@ export function Sidebar() {
 
   return (
     <ShadcnSidebar collapsible="icon" className="bg-sidebar">
+      <nav aria-label="Sidebar" className="flex h-full flex-col">
       <SidebarHeader className="p-3 border-b border-border-sidebar">
         {!isCollapsed && (
           <button
@@ -178,6 +179,7 @@ export function Sidebar() {
           </div>
         )}
       </SidebarFooter>
+      </nav>
     </ShadcnSidebar>
   )
 }

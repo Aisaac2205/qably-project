@@ -31,7 +31,7 @@ describe('useDashboardStats — pure derivation', () => {
     const snap = getSnapshot()
     expect(snap.projects.length).toBe(4)
     expect(snap.runs.length).toBe(4)
-    expect(snap.aiCases.length).toBe(4)
+    expect(snap.aiCases.length).toBe(6)
     expect(snap.org.name).toBe('Acme QA Team')
   })
 })

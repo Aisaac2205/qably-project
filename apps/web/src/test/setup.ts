@@ -1,6 +1,24 @@
 import '@testing-library/jest-dom'
-import { afterEach, beforeEach } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 import { useI18nStore } from '@/lib/i18n'
+
+vi.mock('next/navigation', () => {
+  const router = {
+    back: () => {},
+    forward: () => {},
+    prefetch: () => Promise.resolve(),
+    push: () => {},
+    refresh: () => {},
+    replace: () => {},
+  }
+
+  return {
+    useParams: () => ({}),
+    usePathname: () => '/dashboard',
+    useRouter: () => router,
+    useSearchParams: () => new URLSearchParams(),
+  }
+})
 
 beforeEach(() => {
   localStorage.clear()
