@@ -19,6 +19,7 @@ import {
   mockCoverageGaps,
   mockConnections,
   mockNotifications,
+  MOCK_NOW,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
 import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
@@ -44,6 +45,19 @@ import type {
   ConnectionStatus,
   ConnectionType,
   Notification,
+  IngestionBatch,
+  CodeChange,
+  ExtractedProposal,
+  ReviewDecision,
+  OfficialTestCase,
+  TestCaseVersion,
+  TraceabilityLink,
+  Execution,
+  ExecutionResult,
+  Evidence,
+  QualityRisk,
+  ReviewScenario,
+  ProposalMutationResult,
 } from '@qably/types'
 
 // ── Types ─────────────────────────────────────────────────────────
@@ -65,6 +79,17 @@ export interface StoreSnapshot {
   coverageGaps: CoverageGap[]
   connections: Connection[]
   notifications: Notification[]
+  ingestionBatches: IngestionBatch[]
+  codeChanges: CodeChange[]
+  proposals: ExtractedProposal[]
+  reviewDecisions: ReviewDecision[]
+  officialTestCases: OfficialTestCase[]
+  testCaseVersions: TestCaseVersion[]
+  traceabilityLinks: TraceabilityLink[]
+  executions: Execution[]
+  executionResults: ExecutionResult[]
+  evidence: Evidence[]
+  qualityRisks: QualityRisk[]
 }
 
 // ── State ─────────────────────────────────────────────────────────
@@ -84,6 +109,77 @@ let coverageGaps: CoverageGap[] = structuredClone(mockCoverageGaps)
 let connections: Connection[] = structuredClone(mockConnections)
 let notifications: Notification[] = structuredClone(mockNotifications)
 
+function createReviewDomain() {
+  const evidence = mockAiCases.map<Evidence>((aiCase) => ({
+    id: `evidence-${aiCase.id}`,
+    projectId: aiCase.projectId,
+    kind: 'source_excerpt',
+    title: aiCase.sourceFile,
+    uri: `mock://${aiCase.sourceFile}`,
+    excerpt: aiCase.sourceSnippet,
+    createdAt: MOCK_NOW,
+  }))
+  const proposals = mockAiCases.map<ExtractedProposal>((aiCase) => ({
+    id: `proposal-${aiCase.id}`,
+    projectId: aiCase.projectId,
+    status: aiCase.reviewStatus === 'rejected' ? 'rejected' : aiCase.reviewStatus === 'confirmed' ? 'approved' : 'in_review',
+    title: aiCase.name,
+    objective: aiCase.name,
+    preconditions: [],
+    steps: aiCase.steps,
+    expectedResult: aiCase.expectedResult,
+    priority: 'medium',
+    evidenceId: `evidence-${aiCase.id}`,
+    targetOfficialTestCaseId: aiCase.possibleDuplicateOf ? `case-${aiCase.possibleDuplicateOf}` : undefined,
+  }))
+  const existingCases = mockSuites.flatMap((suite) => suite.cases.map<OfficialTestCase>((testCase) => ({
+    id: `case-${testCase.id}`,
+    projectId: suite.projectId,
+    suiteId: suite.id,
+    lifecycle: testCase.state === 'deprecated' ? 'deprecated' : 'active',
+    currentVersionId: `version-${testCase.id}-1`,
+    createdAt: suite.createdAt,
+  })))
+  const versions = mockSuites.flatMap((suite) => suite.cases.map<TestCaseVersion>((testCase) => ({
+    id: `version-${testCase.id}-1`,
+    testCaseId: `case-${testCase.id}`,
+    version: 1,
+    title: testCase.name,
+    objective: testCase.name,
+    preconditions: [],
+    steps: testCase.steps,
+    expectedResult: testCase.expectedResult,
+    priority: testCase.priority,
+    publishedAt: suite.updatedAt,
+  })))
+  return {
+    evidence,
+    proposals,
+    officialTestCases: existingCases,
+    testCaseVersions: versions,
+    traceabilityLinks: proposals.map<TraceabilityLink>((proposal) => ({
+      id: `link-${proposal.id}-evidence`,
+      from: { type: 'proposal', id: proposal.id },
+      to: { type: 'evidence', id: proposal.evidenceId },
+      relation: 'evidence_for',
+    })),
+  }
+}
+
+let reviewDomain = createReviewDomain()
+let { evidence, proposals, officialTestCases, testCaseVersions, traceabilityLinks } = reviewDomain
+let ingestionBatches: IngestionBatch[] = []
+let codeChanges: CodeChange[] = []
+let reviewDecisions: ReviewDecision[] = []
+let executions: Execution[] = []
+let executionResults: ExecutionResult[] = []
+let qualityRisks: QualityRisk[] = []
+const reviewScenarios: ReviewScenario[] = [
+  { id: 'approval-new', proposalId: 'proposal-ai-4' },
+  { id: 'approval-version', proposalId: 'proposal-ai-2' },
+  { id: 'rejection-evidence', proposalId: 'proposal-ai-3' },
+]
+
 // ── Pub-sub ───────────────────────────────────────────────────────
 
 const listeners = new Set<Listener>()
@@ -101,6 +197,8 @@ function currentSnapshot(): StoreSnapshot {
   return {
     projects, suites, runs, aiCases, org, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
+    ingestionBatches, codeChanges, proposals, reviewDecisions, officialTestCases,
+    testCaseVersions, traceabilityLinks, executions, executionResults, evidence, qualityRisks,
   }
 }
 
@@ -120,6 +218,8 @@ const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
   coverageGaps: [],
   connections: [],
   notifications: [],
+  ingestionBatches: [], codeChanges: [], proposals: [], reviewDecisions: [], officialTestCases: [],
+  testCaseVersions: [], traceabilityLinks: [], executions: [], executionResults: [], evidence: [], qualityRisks: [],
 })
 
 export function getSnapshot(): StoreSnapshot {
@@ -208,6 +308,117 @@ export function getCoverageGaps(projectId?: string): CoverageGap[] {
 
 export function getNotifications(): Notification[] {
   return notifications
+}
+
+export function getProposal(id: string): ExtractedProposal | undefined {
+  return proposals.find((proposal) => proposal.id === id)
+}
+
+export function getOfficialTestCase(id: string): OfficialTestCase | undefined {
+  return officialTestCases.find((testCase) => testCase.id === id)
+}
+
+export function getTestCaseVersions(testCaseId: string): TestCaseVersion[] {
+  return testCaseVersions.filter((version) => version.testCaseId === testCaseId)
+}
+
+export function getTraceabilityLinks({ entityId }: { entityId: string }): TraceabilityLink[] {
+  return traceabilityLinks.filter((link) => link.from.id === entityId || link.to.id === entityId)
+}
+
+export function getReviewScenario(id: ReviewScenario['id']): ReviewScenario {
+  return reviewScenarios.find((scenario) => scenario.id === id)!
+}
+
+type ApprovalResult =
+  | ({ ok: true; createdNewCase: boolean; officialTestCase: OfficialTestCase; version: TestCaseVersion; decision: ReviewDecision })
+  | Extract<ProposalMutationResult, { ok: false }>
+
+export function approveProposal(
+  proposalId: string,
+  input: { actorId: string; comment?: string },
+): ApprovalResult {
+  const proposal = getProposal(proposalId)
+  if (!proposal) return { ok: false, reason: 'not_found' }
+  if (proposal.status !== 'in_review') return { ok: false, reason: 'invalid_transition' }
+  if (!evidence.some((item) => item.id === proposal.evidenceId)) return { ok: false, reason: 'missing_evidence' }
+
+  const timestamp = nowIso()
+  const existingCase = proposal.targetOfficialTestCaseId
+    ? getOfficialTestCase(proposal.targetOfficialTestCaseId)
+    : undefined
+  const suiteId = existingCase?.suiteId ?? getSuites(proposal.projectId)[0]?.id
+  if (!suiteId) return { ok: false, reason: 'missing_evidence' }
+
+  const createdNewCase = !existingCase
+  const testCase: OfficialTestCase = existingCase ?? {
+    id: `case-${officialTestCases.length + 1}`,
+    projectId: proposal.projectId,
+    suiteId,
+    lifecycle: 'active',
+    currentVersionId: '',
+    createdAt: timestamp,
+  }
+  const nextVersion: TestCaseVersion = {
+    id: `version-${testCase.id}-${getTestCaseVersions(testCase.id).length + 1}`,
+    testCaseId: testCase.id,
+    version: getTestCaseVersions(testCase.id).length + 1,
+    title: proposal.title,
+    objective: proposal.objective,
+    preconditions: proposal.preconditions,
+    steps: proposal.steps,
+    expectedResult: proposal.expectedResult,
+    priority: proposal.priority,
+    publishedAt: timestamp,
+  }
+  const decision: ReviewDecision = {
+    id: `decision-${reviewDecisions.length + 1}`,
+    proposalId,
+    actorId: input.actorId,
+    action: 'approved',
+    comment: input.comment,
+    decidedAt: timestamp,
+  }
+
+  // Build every affected collection first; only then expose the approved graph.
+  const nextProposal = { ...proposal, status: 'approved' as const }
+  const nextCases = createdNewCase
+    ? [...officialTestCases, { ...testCase, currentVersionId: nextVersion.id }]
+    : officialTestCases.map((item) => item.id === testCase.id ? { ...item, currentVersionId: nextVersion.id } : item)
+  const nextLinks = [
+    ...traceabilityLinks,
+    { id: `link-${proposalId}-${testCase.id}`, from: { type: 'proposal' as const, id: proposalId }, to: { type: 'test_case' as const, id: testCase.id }, relation: 'produced' as const },
+    { id: `link-${nextVersion.id}-${testCase.id}`, from: { type: 'test_case_version' as const, id: nextVersion.id }, to: { type: 'test_case' as const, id: testCase.id }, relation: 'version_of' as const },
+  ]
+
+  proposals = proposals.map((item) => item.id === proposalId ? nextProposal : item)
+  officialTestCases = nextCases
+  testCaseVersions = [...testCaseVersions, nextVersion]
+  traceabilityLinks = nextLinks
+  reviewDecisions = [...reviewDecisions, decision]
+  notify()
+  return { ok: true, createdNewCase, officialTestCase: nextCases.find((item) => item.id === testCase.id)!, version: nextVersion, decision }
+}
+
+export function rejectProposal(
+  proposalId: string,
+  input: { actorId: string; comment?: string },
+): ProposalMutationResult {
+  const proposal = getProposal(proposalId)
+  if (!proposal) return { ok: false, reason: 'not_found' }
+  if (proposal.status !== 'in_review') return { ok: false, reason: 'invalid_transition' }
+  const decision: ReviewDecision = {
+    id: `decision-${reviewDecisions.length + 1}`,
+    proposalId,
+    actorId: input.actorId,
+    action: 'rejected',
+    comment: input.comment,
+    decidedAt: nowIso(),
+  }
+  proposals = proposals.map((item) => item.id === proposalId ? { ...item, status: 'rejected' } : item)
+  reviewDecisions = [...reviewDecisions, decision]
+  notify()
+  return { ok: true, decision }
 }
 
 export function getServerNotifications(): Notification[] {
@@ -791,6 +1002,18 @@ export function __resetStore(): void {
   coverageGaps = structuredClone(mockCoverageGaps)
   connections = structuredClone(mockConnections)
   notifications = structuredClone(mockNotifications)
+  reviewDomain = createReviewDomain()
+  evidence = reviewDomain.evidence
+  proposals = reviewDomain.proposals
+  officialTestCases = reviewDomain.officialTestCases
+  testCaseVersions = reviewDomain.testCaseVersions
+  traceabilityLinks = reviewDomain.traceabilityLinks
+  ingestionBatches = []
+  codeChanges = []
+  reviewDecisions = []
+  executions = []
+  executionResults = []
+  qualityRisks = []
   ciEventLog.length = 0
   notify()
 }

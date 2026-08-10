@@ -10,6 +10,14 @@ import {
   getCoverageGaps,
   getAiCases,
   confirmAllPending,
+  approveProposal,
+  getOfficialTestCase,
+  getProposal,
+  getReviewScenario,
+  getTestCaseVersions,
+  getTraceabilityLinks,
+  rejectProposal,
+  getSnapshot,
 } from '@/lib/mock-store'
 
 describe('mock-store AI providers', () => {
@@ -91,5 +99,65 @@ describe('mock-store confirmAllPending', () => {
     const cases = getAiCases('proj-1')
     expect(cases.every((c) => c.reviewStatus !== 'pending')).toBe(true)
     expect(cases.find((c) => c.id === 'ai-1')?.reviewStatus).toBe('confirmed')
+  })
+})
+
+describe('mock-store governed proposal scenarios', () => {
+  beforeEach(() => __resetStore())
+
+  it('approves a new proposal atomically with decision, case, version, and links', () => {
+    const scenario = getReviewScenario('approval-new')
+    const proposal = getProposal(scenario.proposalId)!
+
+    const result = approveProposal(proposal.id, { actorId: 'member-1', comment: 'Reviewed against the source.' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(getProposal(proposal.id)?.status).toBe('approved')
+    expect(getOfficialTestCase(result.officialTestCase.id)).toEqual(result.officialTestCase)
+    expect(getTestCaseVersions(result.officialTestCase.id)).toContainEqual(result.version)
+    expect(getTraceabilityLinks({ entityId: proposal.id })).toHaveLength(2)
+    expect(result.decision.action).toBe('approved')
+
+    const snapshot = getSnapshot()
+    expect(approveProposal(proposal.id, { actorId: 'member-1' })).toEqual({ ok: false, reason: 'invalid_transition' })
+    expect(getSnapshot().officialTestCases).toEqual(snapshot.officialTestCases)
+    expect(getSnapshot().reviewDecisions).toEqual(snapshot.reviewDecisions)
+  })
+
+  it('approves a duplicate proposal as an immutable next version', () => {
+    const scenario = getReviewScenario('approval-version')
+    const result = approveProposal(scenario.proposalId, { actorId: 'member-1' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.createdNewCase).toBe(false)
+    expect(result.version.version).toBe(2)
+  })
+
+  it('rejects only an in-review proposal and keeps its source evidence link', () => {
+    const scenario = getReviewScenario('rejection-evidence')
+    const result = rejectProposal(scenario.proposalId, { actorId: 'member-1', comment: 'Evidence does not cover this risk.' })
+
+    expect(result.ok).toBe(true)
+    expect(getProposal(scenario.proposalId)?.status).toBe('rejected')
+    expect(getTraceabilityLinks({ entityId: scenario.proposalId })).toHaveLength(1)
+    expect(rejectProposal(scenario.proposalId, { actorId: 'member-1' })).toEqual({ ok: false, reason: 'invalid_transition' })
+  })
+
+  it('resets the three deterministic review scenarios to identical seeded proposals', () => {
+    const before = ['approval-new', 'approval-version', 'rejection-evidence'].map((id) => {
+      const scenario = getReviewScenario(id as 'approval-new' | 'approval-version' | 'rejection-evidence')
+      return { scenario, proposal: getProposal(scenario.proposalId) }
+    })
+
+    approveProposal('proposal-ai-4', { actorId: 'member-1' })
+    rejectProposal('proposal-ai-3', { actorId: 'member-1' })
+    __resetStore()
+
+    expect(['approval-new', 'approval-version', 'rejection-evidence'].map((id) => {
+      const scenario = getReviewScenario(id as 'approval-new' | 'approval-version' | 'rejection-evidence')
+      return { scenario, proposal: getProposal(scenario.proposalId) }
+    })).toEqual(before)
   })
 })

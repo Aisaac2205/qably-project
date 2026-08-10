@@ -141,6 +141,115 @@ export interface Notification {
   readAt?: string
 }
 
+// ─── Thesis-aligned QA flow ───────────────────────────────────────────────────
+
+export type ProposalStatus = 'in_review' | 'approved' | 'rejected' | 'changes_requested'
+export type ReviewDecisionAction = 'approved' | 'rejected' | 'changes_requested'
+export type TraceabilityEntityType = 'code_change' | 'evidence' | 'proposal' | 'test_case' | 'test_case_version' | 'execution' | 'execution_result' | 'quality_risk'
+
+export interface Evidence {
+  id: string
+  projectId: string
+  kind: 'source_excerpt' | 'artifact' | 'url'
+  title: string
+  uri: string
+  excerpt?: string
+  createdAt: string
+}
+export interface CodeChange {
+  id: string
+  projectId: string
+  pullRequestNumber?: number
+  commitSha: string
+  filePath: string
+  diff: string
+  detectedPattern?: string
+  evidenceId: string
+}
+export interface IngestionBatch {
+  id: string
+  projectId: string
+  source: 'repository' | 'webhook'
+  status: 'pending' | 'completed' | 'failed'
+  codeChangeIds: string[]
+  createdAt: string
+}
+export interface ExtractedProposal {
+  id: string
+  projectId: string
+  status: ProposalStatus
+  title: string
+  objective: string
+  preconditions: string[]
+  steps: string[]
+  expectedResult: string
+  priority: CasePriority
+  evidenceId: string
+  targetOfficialTestCaseId?: string
+}
+export interface ReviewDecision {
+  id: string
+  proposalId: string
+  actorId: string
+  action: ReviewDecisionAction
+  comment?: string
+  decidedAt: string
+}
+export interface OfficialTestCase {
+  id: string
+  projectId: string
+  suiteId: string
+  lifecycle: 'active' | 'deprecated'
+  currentVersionId: string
+  createdAt: string
+}
+export interface TestCaseVersion {
+  id: string
+  testCaseId: string
+  version: number
+  title: string
+  objective: string
+  preconditions: string[]
+  steps: string[]
+  expectedResult: string
+  priority: CasePriority
+  publishedAt: string
+}
+export interface TraceabilityLink {
+  id: string
+  from: { type: TraceabilityEntityType; id: string }
+  to: { type: TraceabilityEntityType; id: string }
+  relation: 'evidence_for' | 'produced' | 'version_of' | 'executed_as' | 'signals'
+}
+export interface Execution {
+  id: string
+  projectId: string
+  environment: string
+  testCaseVersionIds: string[]
+  status: 'pending' | 'running' | 'completed'
+}
+export interface ExecutionResult {
+  id: string
+  executionId: string
+  testCaseVersionId: string
+  verdict: CaseStatus
+  evidenceIds: string[]
+}
+export interface QualityRisk {
+  id: string
+  projectId: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  criteria: string[]
+  evidenceIds: string[]
+}
+export interface ReviewScenario {
+  id: 'approval-new' | 'approval-version' | 'rejection-evidence'
+  proposalId: string
+}
+export type ProposalMutationResult =
+  | { ok: true; decision: ReviewDecision }
+  | { ok: false; reason: 'not_found' | 'invalid_transition' | 'missing_evidence' }
+
 // ─── AI Cases ─────────────────────────────────────────────────────────────────
 
 export interface AiCase {
