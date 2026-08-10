@@ -7,7 +7,7 @@
  * (createCase / updateCase) take the suiteId and bump the suite's
  * updatedAt. Steps are edited as plain text, one step per line.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CasePriority, CaseState, TestCase } from '@qably/types'
 import {
   Dialog,
@@ -54,25 +54,34 @@ interface CaseFormDialogProps {
 }
 
 export function CaseFormDialog({ suiteId, testCase, open, onOpenChange }: CaseFormDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && (
+        <CaseFormDialogContent
+          key={testCase?.id ?? 'new'}
+          suiteId={suiteId}
+          testCase={testCase}
+          onOpenChange={onOpenChange}
+        />
+      )}
+    </Dialog>
+  )
+}
+
+function CaseFormDialogContent({
+  suiteId,
+  testCase,
+  onOpenChange,
+}: Omit<CaseFormDialogProps, 'open'>) {
   const { t } = useTranslation()
   const isEdit = testCase !== undefined
 
-  const [name, setName] = useState('')
-  const [priority, setPriority] = useState<CasePriority>('medium')
-  const [state, setState] = useState<CaseState>('active')
-  const [steps, setSteps] = useState('')
-  const [expectedResult, setExpectedResult] = useState('')
+  const [name, setName] = useState(testCase?.name ?? '')
+  const [priority, setPriority] = useState<CasePriority>(testCase?.priority ?? 'medium')
+  const [state, setState] = useState<CaseState>(testCase?.state ?? 'active')
+  const [steps, setSteps] = useState(testCase?.steps.join('\n') ?? '')
+  const [expectedResult, setExpectedResult] = useState(testCase?.expectedResult ?? '')
   const [nameError, setNameError] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setName(testCase?.name ?? '')
-    setPriority(testCase?.priority ?? 'medium')
-    setState(testCase?.state ?? 'active')
-    setSteps(testCase?.steps.join('\n') ?? '')
-    setExpectedResult(testCase?.expectedResult ?? '')
-    setNameError(false)
-  }, [open, testCase])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -107,8 +116,7 @@ export function CaseFormDialog({ suiteId, testCase, open, onOpenChange }: CaseFo
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? t('suites.editCase') : t('suites.addCase')}</DialogTitle>
         </DialogHeader>
@@ -206,7 +214,6 @@ export function CaseFormDialog({ suiteId, testCase, open, onOpenChange }: CaseFo
             <Button type="submit">{isEdit ? t('common.save') : t('suites.createCase')}</Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   )
 }

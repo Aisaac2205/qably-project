@@ -1,14 +1,13 @@
 'use client'
 
-import { useState, useLayoutEffect } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { useTranslation } from '@/lib/i18n'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 export function AiCasesOverview() {
   const { t } = useTranslation()
-  const [mounted, setMounted] = useState(false)
-  useLayoutEffect(() => { setMounted(true) }, [])
+  const hydrated = useHydrated()
 
   const data = [
     { nameKey: 'dashboard.aiReady', value: 24, color: 'var(--color-pass)' },
@@ -27,7 +26,7 @@ export function AiCasesOverview() {
       
       <CardContent className="p-5 pt-0 flex-1 flex items-center justify-between gap-4">
         <div className="relative w-28 h-28 shrink-0">
-          {mounted ? (
+          {hydrated ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <PieChart>
               <Pie

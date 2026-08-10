@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useHydrated } from '@/hooks/use-hydrated'
 import { cn } from '@/lib/utils'
 
 interface ResizableSplitProps {
@@ -22,6 +23,34 @@ const KEYBOARD_STEP_SHIFT = 32
 
 export function ResizableSplit({
   storageKey,
+  defaultWidth,
+  minWidth,
+  maxRatio,
+  side,
+  className,
+  first,
+  second,
+}: ResizableSplitProps) {
+  const hydrated = useHydrated()
+
+  return (
+    <ResizableSplitContent
+      key={`${hydrated}:${storageKey}`}
+      storageKey={storageKey}
+      defaultWidth={defaultWidth}
+      minWidth={minWidth}
+      maxRatio={maxRatio}
+      side={side}
+      className={className}
+      first={first}
+      second={second}
+      hydrated={hydrated}
+    />
+  )
+}
+
+function ResizableSplitContent({
+  storageKey,
   defaultWidth = 288,
   minWidth = 240,
   maxRatio = 0.5,
@@ -29,28 +58,27 @@ export function ResizableSplit({
   className,
   first,
   second,
-}: ResizableSplitProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState<number>(defaultWidth)
-  const [containerWidth, setContainerWidth] = useState<number>(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const dragOrigin = useRef<{ x: number; w: number } | null>(null)
-
+  hydrated,
+}: ResizableSplitProps & { hydrated: boolean }) {
   const fullKey = `${STORAGE_PREFIX}${storageKey}`
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(() => {
+    if (!hydrated) return defaultWidth
 
-  // Restore saved width on mount
-  useEffect(() => {
     try {
       const saved = localStorage.getItem(fullKey)
-      if (!saved) return
-      const parsed = parseInt(saved, 10)
+      const parsed = saved ? parseInt(saved, 10) : defaultWidth
       if (Number.isFinite(parsed) && parsed >= minWidth) {
-        setWidth(parsed)
+        return parsed
       }
     } catch {
       /* localStorage unavailable */
     }
-  }, [fullKey, minWidth])
+    return defaultWidth
+  })
+  const [containerWidth, setContainerWidth] = useState<number>(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragOrigin = useRef<{ x: number; w: number } | null>(null)
 
   // Measure container so the max constraint reacts to viewport changes
   useEffect(() => {
@@ -65,13 +93,11 @@ export function ResizableSplit({
 
   const maxWidth =
     containerWidth > 0 ? Math.max(minWidth, Math.floor(containerWidth * maxRatio)) : Infinity
-
-  // If the viewport shrinks past the saved/default width, pull the pane
-  // back inside the new constraint instead of overflowing the container.
-  useEffect(() => {
-    if (containerWidth === 0) return
-    setWidth((w) => Math.min(maxWidth, Math.max(minWidth, w)))
-  }, [containerWidth, maxWidth, minWidth])
+  const clamp = useCallback(
+    (n: number) => Math.max(minWidth, Number.isFinite(maxWidth) ? Math.min(maxWidth, n) : n),
+    [maxWidth, minWidth],
+  )
+  const displayedWidth = clamp(width)
 
   // Lock body cursor + selection while dragging so the user can sweep
   // past the handle without losing the col-resize feedback.
@@ -90,10 +116,10 @@ export function ResizableSplit({
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
       e.preventDefault()
-      dragOrigin.current = { x: e.clientX, w: width }
+      dragOrigin.current = { x: e.clientX, w: displayedWidth }
       setIsDragging(true)
     },
-    [width],
+    [displayedWidth],
   )
 
   useEffect(() => {
@@ -120,32 +146,23 @@ export function ResizableSplit({
   // Persist width whenever it changes (and we're not mid-drag, to avoid
   // hammering localStorage on every pointermove tick).
   useEffect(() => {
-    if (isDragging) return
+    if (!hydrated || isDragging) return
     try {
       localStorage.setItem(fullKey, String(width))
     } catch {
       /* localStorage unavailable */
     }
-  }, [width, isDragging, fullKey])
-
-  const clamp = useCallback(
-    (n: number) =>
-      Math.max(
-        minWidth,
-        Number.isFinite(maxWidth) ? Math.min(maxWidth, n) : n,
-      ),
-    [maxWidth, minWidth],
-  )
+  }, [width, hydrated, isDragging, fullKey])
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const step = e.shiftKey ? KEYBOARD_STEP_SHIFT : KEYBOARD_STEP
       const sign = side === 'left' ? 1 : -1
-      let next = width
+      let next = displayedWidth
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault()
         const dir = e.key === 'ArrowLeft' ? -1 : 1
-        next = width + sign * dir * step
+        next = displayedWidth + sign * dir * step
       } else if (e.key === 'Home') {
         e.preventDefault()
         next = minWidth
@@ -160,7 +177,7 @@ export function ResizableSplit({
       }
       setWidth(clamp(next))
     },
-    [width, side, minWidth, maxWidth, defaultWidth, clamp],
+    [displayedWidth, side, minWidth, maxWidth, defaultWidth, clamp],
   )
 
   const onDoubleClick = useCallback(() => {
@@ -175,14 +192,14 @@ export function ResizableSplit({
     >
       <div
         className="flex flex-col min-h-0 shrink-0"
-        style={{ width: `${width}px` }}
+        style={{ width: `${displayedWidth}px` }}
       >
         {first}
       </div>
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-valuenow={width}
+        aria-valuenow={displayedWidth}
         aria-valuemin={minWidth}
         aria-valuemax={maxWidth}
         tabIndex={0}

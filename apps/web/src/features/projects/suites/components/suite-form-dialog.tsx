@@ -9,7 +9,7 @@
  * Tags are entered comma-separated and normalized by the store's
  * validateTags (lowercase, deduped, hyphen-safe).
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Suite } from '@qably/types'
 import {
   Dialog,
@@ -33,21 +33,32 @@ interface SuiteFormDialogProps {
 }
 
 export function SuiteFormDialog({ projectId, suite, open, onOpenChange }: SuiteFormDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && (
+        <SuiteFormDialogContent
+          key={suite?.id ?? 'new'}
+          projectId={projectId}
+          suite={suite}
+          onOpenChange={onOpenChange}
+        />
+      )}
+    </Dialog>
+  )
+}
+
+function SuiteFormDialogContent({
+  projectId,
+  suite,
+  onOpenChange,
+}: Omit<SuiteFormDialogProps, 'open'>) {
   const { t } = useTranslation()
   const isEdit = suite !== undefined
 
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [tags, setTags] = useState('')
+  const [name, setName] = useState(suite?.name ?? '')
+  const [description, setDescription] = useState(suite?.description ?? '')
+  const [tags, setTags] = useState(suite?.tags.join(', ') ?? '')
   const [nameError, setNameError] = useState(false)
-
-  useEffect(() => {
-    if (!open) return
-    setName(suite?.name ?? '')
-    setDescription(suite?.description ?? '')
-    setTags(suite?.tags.join(', ') ?? '')
-    setNameError(false)
-  }, [open, suite])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,8 +81,7 @@ export function SuiteFormDialog({ projectId, suite, open, onOpenChange }: SuiteF
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? t('suites.editSuite') : t('suites.newSuite')}</DialogTitle>
         </DialogHeader>
@@ -129,7 +139,6 @@ export function SuiteFormDialog({ projectId, suite, open, onOpenChange }: SuiteF
             <Button type="submit">{isEdit ? t('common.save') : t('suites.createSuite')}</Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </DialogContent>
   )
 }

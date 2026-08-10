@@ -8,7 +8,7 @@
  * org/repo). Delete lives on the card's kebab menu, not here —
  * destructive actions get their own confirmation dialog.
  */
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Project } from '@qably/types'
 import {
   Dialog,
@@ -34,6 +34,17 @@ interface EditProjectDialogProps {
 }
 
 export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {open && <EditProjectDialogContent key={project.id} project={project} onOpenChange={onOpenChange} />}
+    </Dialog>
+  )
+}
+
+function EditProjectDialogContent({
+  project,
+  onOpenChange,
+}: Omit<EditProjectDialogProps, 'open'>) {
   const updateProject = useUpdateProject()
   const { t } = useTranslation()
 
@@ -42,15 +53,6 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
   const [githubRepo, setGithubRepo] = useState(project.githubRepo ?? '')
   const [technologies, setTechnologies] = useState<string[]>(project.technologies ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
-
-  useEffect(() => {
-    if (!open) return
-    setName(project.name)
-    setDescription(project.description ?? '')
-    setGithubRepo(project.githubRepo ?? '')
-    setTechnologies(project.technologies ?? [])
-    setErrors({})
-  }, [open, project])
 
   function clearError(field: string) {
     setErrors((prev) => {
@@ -80,79 +82,77 @@ export function EditProjectDialog({ project, open, onOpenChange }: EditProjectDi
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('projects.editProjectTitle')}</DialogTitle>
-        </DialogHeader>
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>{t('projects.editProjectTitle')}</DialogTitle>
+      </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
-          <div className="grid gap-2">
-            <Label htmlFor="edit-project-name">
-              {t('projects.projectNameLabel')} <span aria-hidden="true">*</span>
-            </Label>
-            <Input
-              id="edit-project-name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value)
-                clearError('name')
-              }}
-              aria-required="true"
-              aria-invalid={!!errors.name}
-              autoFocus
-            />
-            {errors.name && (
-              <p role="alert" className="text-xs text-fail">
-                {errors.name}
-              </p>
-            )}
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="edit-project-description">{t('projects.descriptionLabel')}</Label>
-            <Textarea
-              id="edit-project-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="edit-project-repo">{t('projects.githubRepoLabel')}</Label>
-            <Input
-              id="edit-project-repo"
-              value={githubRepo}
-              onChange={(e) => {
-                setGithubRepo(e.target.value)
-                clearError('githubRepo')
-              }}
-              placeholder={t('projects.githubRepoPlaceholder')}
-              aria-invalid={!!errors.githubRepo}
-            />
-            {errors.githubRepo && (
-              <p role="alert" className="text-xs text-fail">
-                {errors.githubRepo}
-              </p>
-            )}
-          </div>
-
-          <div className="grid gap-2">
-            <p className="text-sm font-medium leading-none text-foreground">
-              {t('projects.techStackLabel')}
+      <form onSubmit={handleSubmit} className="grid gap-4" noValidate>
+        <div className="grid gap-2">
+          <Label htmlFor="edit-project-name">
+            {t('projects.projectNameLabel')} <span aria-hidden="true">*</span>
+          </Label>
+          <Input
+            id="edit-project-name"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              clearError('name')
+            }}
+            aria-required="true"
+            aria-invalid={!!errors.name}
+            autoFocus
+          />
+          {errors.name && (
+            <p role="alert" className="text-xs text-fail">
+              {errors.name}
             </p>
-            <TechSelector selected={technologies} onChange={setTechnologies} />
-          </div>
+          )}
+        </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit">{t('common.save')}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <div className="grid gap-2">
+          <Label htmlFor="edit-project-description">{t('projects.descriptionLabel')}</Label>
+          <Textarea
+            id="edit-project-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="edit-project-repo">{t('projects.githubRepoLabel')}</Label>
+          <Input
+            id="edit-project-repo"
+            value={githubRepo}
+            onChange={(e) => {
+              setGithubRepo(e.target.value)
+              clearError('githubRepo')
+            }}
+            placeholder={t('projects.githubRepoPlaceholder')}
+            aria-invalid={!!errors.githubRepo}
+          />
+          {errors.githubRepo && (
+            <p role="alert" className="text-xs text-fail">
+              {errors.githubRepo}
+            </p>
+          )}
+        </div>
+
+        <div className="grid gap-2">
+          <p className="text-sm font-medium leading-none text-foreground">
+            {t('projects.techStackLabel')}
+          </p>
+          <TechSelector selected={technologies} onChange={setTechnologies} />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit">{t('common.save')}</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
   )
 }

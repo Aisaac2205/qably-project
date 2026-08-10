@@ -1,5 +1,6 @@
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 
@@ -45,17 +46,23 @@ describe('ResizableSplit', () => {
     expect(localStorage.getItem('qably:split:persist-default')).toBe('320')
   })
 
-  it('restores the saved width on mount', () => {
+  it('uses the default width during SSR and restores the saved width after hydration', async () => {
     localStorage.setItem('qably:split:restore', '350')
+    const props = {
+      storageKey: 'restore',
+      defaultWidth: 288,
+      first: <div>L</div>,
+      second: <div>R</div>,
+    }
+
+    expect(renderToString(<ResizableSplit {...props} />)).toContain('width:288px')
+
     render(
-      <ResizableSplit
-        storageKey="restore"
-        defaultWidth={288}
-        first={<div>L</div>}
-        second={<div>R</div>}
-      />,
+      <ResizableSplit {...props} />,
     )
-    expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '350')
+    await waitFor(() => {
+      expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '350')
+    })
   })
 
   it('ignores an invalid saved width and falls back to default', () => {

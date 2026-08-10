@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import type { Run } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 interface PassRateChartProps {
   runs: Run[]
@@ -11,8 +11,7 @@ interface PassRateChartProps {
 
 export function PassRateChart({ runs }: PassRateChartProps) {
   const { t } = useTranslation()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  const hydrated = useHydrated()
   
   if (runs.length === 0) {
     return (
@@ -33,7 +32,7 @@ export function PassRateChart({ runs }: PassRateChartProps) {
 
   return (
     <div className="h-64" aria-label={t('reports.ariaPassRateChart')}>
-      {mounted ? (
+      {hydrated ? (
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <LineChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />

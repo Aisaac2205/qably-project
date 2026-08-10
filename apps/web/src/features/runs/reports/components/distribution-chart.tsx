@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Run } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 interface DistributionChartProps {
   runs: Run[]
@@ -11,8 +11,7 @@ interface DistributionChartProps {
 
 export function DistributionChart({ runs }: DistributionChartProps) {
   const { t } = useTranslation()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  const hydrated = useHydrated()
   
   if (runs.length === 0) {
     return (
@@ -51,7 +50,7 @@ export function DistributionChart({ runs }: DistributionChartProps) {
 
   return (
     <div className="h-64" aria-label={t('reports.ariaDistributionChart')}>
-      {mounted ? (
+      {hydrated ? (
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <PieChart margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <Pie

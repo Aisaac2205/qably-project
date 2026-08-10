@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Check } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 
 interface InlineEditableTextProps {
@@ -20,10 +19,6 @@ export function InlineEditableText({ value, onSave, ariaLabel }: InlineEditableT
   useEffect(() => {
     if (isEditing) inputRef.current?.focus()
   }, [isEditing])
-
-  useEffect(() => {
-    setDraft(value)
-  }, [value])
 
   const commit = useCallback(() => {
     const trimmed = draft.trim()

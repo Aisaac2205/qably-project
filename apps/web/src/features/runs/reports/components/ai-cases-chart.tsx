@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import type { AiCase } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
+import { useHydrated } from '@/hooks/use-hydrated'
 
 interface AiCasesChartProps {
   aiCases: AiCase[]
@@ -17,8 +17,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export function AiCasesChart({ aiCases }: AiCasesChartProps) {
   const { t } = useTranslation()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
+  const hydrated = useHydrated()
   
   if (aiCases.length === 0) {
     return (
@@ -40,7 +39,7 @@ export function AiCasesChart({ aiCases }: AiCasesChartProps) {
 
   return (
     <div className="h-64" aria-label={t('reports.ariaAiCasesChart')}>
-      {mounted ? (
+      {hydrated ? (
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
           <XAxis

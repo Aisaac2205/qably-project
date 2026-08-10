@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 
 type KeyHandler = (e: KeyboardEvent) => void
 
@@ -9,11 +9,7 @@ export function useKeyboardShortcuts(
   options?: { enabled?: boolean },
 ) {
   const enabled = options?.enabled ?? true
-  const handlersRef = useRef(handlers)
-  handlersRef.current = handlers
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
       if (!enabled) return
 
       const target = e.target as HTMLElement
@@ -26,18 +22,16 @@ export function useKeyboardShortcuts(
         return
       }
 
-      const handler = handlersRef.current[e.key]
+      const handler = handlers[e.key]
       if (handler) {
         e.preventDefault()
         handler(e)
       }
-    },
-    [enabled],
-  )
+  })
 
   useEffect(() => {
     if (!enabled) return
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [enabled, handleKeyDown])
+  }, [enabled])
 }

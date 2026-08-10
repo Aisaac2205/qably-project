@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Run, CaseStatus } from '@qably/types'
 import { useRun, useProject } from '@/lib/use-mock-store'
@@ -40,14 +40,9 @@ export function RunDetail({
     router.push(`/projects/${projectId}/runs`)
   }, [deleteRun, run.id, projectId, router])
 
-  // If the selected case no longer exists (e.g. after a refetch), fall back to the first.
-  useEffect(() => {
-    if (selectedId && !sortedCases.find((c) => c.id === selectedId)) {
-      setSelectedId(sortedCases[0]?.id ?? '')
-    }
-  }, [sortedCases, selectedId])
-
-  const selectedIndex = sortedCases.findIndex((c) => c.id === selectedId)
+  const selectedCase = sortedCases.find((c) => c.id === selectedId) ?? sortedCases[0]
+  const activeCaseId = selectedCase?.id ?? ''
+  const selectedIndex = sortedCases.findIndex((c) => c.id === activeCaseId)
 
   const selectCase = useCallback((id: string) => setSelectedId(id), [])
 
@@ -65,8 +60,8 @@ export function RunDetail({
 
   const setStatus = useCallback(
     (status: CaseStatus) => {
-      if (!selectedId) return
-      updateStatus(selectedId, status)
+      if (!activeCaseId) return
+      updateStatus(activeCaseId, status)
       const config: Record<string, string> = {
         pass: t('runs.statusPass'),
         fail: t('runs.statusFail'),
@@ -77,7 +72,7 @@ export function RunDetail({
       }
       setAnnouncement(t('runs.statusAnnouncement', { status: config[status] ?? status }))
     },
-    [selectedId, updateStatus, t],
+    [activeCaseId, updateStatus, t],
   )
 
   const runNext = useCallback(() => {
@@ -112,8 +107,6 @@ export function RunDetail({
     // Shortcuts pause while the delete confirmation owns keyboard focus.
     { enabled: !deleteOpen },
   )
-
-  const selectedCase = sortedCases.find((c) => c.id === selectedId)
 
   const SHORTCUT_LABELS: Array<{ key: string; label: string }> = [
     { key: 'P', label: t('runs.shortcutPass') },
@@ -161,7 +154,7 @@ export function RunDetail({
         <div className="w-72 shrink-0 border-r border-border overflow-y-auto">
           <CaseList
             cases={sortedCases}
-            selectedId={selectedId}
+            selectedId={activeCaseId}
             onSelect={selectCase}
           />
         </div>

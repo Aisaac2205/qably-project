@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useLayoutEffect } from 'react'
 import { CaretDown, ArrowUp } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { useTranslation } from '@/lib/i18n'
+import { useHydrated } from '@/hooks/use-hydrated'
 import {
   AreaChart,
   Area,
@@ -28,9 +28,8 @@ const CHART_DATA = [
 export function PassRateTrend() {
   const stats = useDashboardStats()
   const { t } = useTranslation()
-  const [period, setPeriod] = useState('7 days')
-  const [mounted, setMounted] = useState(false)
-  useLayoutEffect(() => { setMounted(true) }, [])
+  const period = '7 days'
+  const hydrated = useHydrated()
 
   return (
     <Card className="col-span-1 border border-border/80 flex flex-col justify-between">
@@ -58,7 +57,7 @@ export function PassRateTrend() {
         </div>
 
         <div className="w-full h-36 mt-1">
-          {mounted ? (
+          {hydrated ? (
           <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <AreaChart
               data={CHART_DATA}
