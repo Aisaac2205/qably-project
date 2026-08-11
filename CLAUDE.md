@@ -36,3 +36,9 @@ Never hardcode font families, weights, or sizes in components — use Tailwind s
 - shadcn/ui as base, always adapted to project tokens — never in default state
 - Icons: `@phosphor-icons/react` — no lucide, no hand-rolled SVG paths
 - Tokens first → Tailwind utilities second → arbitrary values never
+
+## Commit Discipline
+
+- Every complete, validated change must end with its own conventional commit before starting another change.
+- Keep each commit atomic and reviewable: include only the files belonging to that change and never absorb unrelated worktree changes.
+- Do not accumulate completed changes in the working tree. If a change cannot be committed, document the blocker before continuing.
