@@ -109,7 +109,7 @@ describe('mock-store ingestion fixtures', () => {
     const [batch] = snapshot.ingestionBatches
     const initialRawChanges = snapshot.codeChanges
 
-    expect(snapshot.ingestionBatches).toHaveLength(1)
+    expect(snapshot.ingestionBatches.filter((b) => b.projectId === 'proj-1')).toHaveLength(1)
     expect(batch).toMatchObject({
       projectId: 'proj-1',
       status: 'completed',

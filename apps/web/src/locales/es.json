@@ -92,10 +92,13 @@
     "detectedTestsHeading": "Pruebas detectadas",
     "detectedTestsDescription": "Coincide patrones configurados con rutas ya incluidas en este lote de ingesta simulado.",
     "detectedPattern": "Patrón",
+    "filterAll": "Todo",
     "linkedProposal": "Propuesta vinculada",
     "simulatedDescription": "Estos datos de fuente son simulados, no una conexi\u00f3n activa con un proveedor.",
     "noSourceTitle": "Sin fuente SCM",
-    "noSourceDescription": "Este proyecto no tiene una fuente SCM configurada."
+    "noSourceDescription": "Este proyecto no tiene una fuente SCM configurada.",
+    "ingestionErrorTitle": "La extracción falló",
+    "ingestionErrorDescription": "Este lote de ingesta no pudo procesarse, por lo que no se extrajeron cambios de prueba."
   },
 
   "status": {

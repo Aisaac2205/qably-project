@@ -92,10 +92,13 @@
     "detectedTestsHeading": "Detected tests",
     "detectedTestsDescription": "Matches configured patterns against paths already in this simulated ingestion batch.",
     "detectedPattern": "Pattern",
+    "filterAll": "All",
     "linkedProposal": "Linked proposal",
     "simulatedDescription": "This is simulated source data, not a live provider connection.",
     "noSourceTitle": "No SCM source",
-    "noSourceDescription": "This project does not have an SCM source configured."
+    "noSourceDescription": "This project does not have an SCM source configured.",
+    "ingestionErrorTitle": "Extraction failed",
+    "ingestionErrorDescription": "This ingestion batch could not be processed, so no test changes were extracted."
   },
 
   "status": {

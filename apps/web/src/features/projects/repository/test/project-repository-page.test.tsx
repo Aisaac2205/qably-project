@@ -1,4 +1,5 @@
 import { act, render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useI18nStore } from '@/lib/i18n'
 import { __resetStore } from '@/lib/mock-store'
@@ -37,7 +38,7 @@ describe('ProjectRepositoryPage', () => {
     expect(screen.getByText('8f3c2a1')).toBeInTheDocument()
     expect(screen.getAllByText('tests/checkout/empty-cart.spec.ts')).toHaveLength(2)
     expect(screen.getByText(/checkoutButton\)\.toBeDisabled/)).toBeInTheDocument()
-    expect(screen.getByText('mock://acme/ecommerce-app/pull/184/files/tests/checkout/empty-cart.spec.ts')).toBeInTheDocument()
+    expect(screen.getAllByText('mock://acme/ecommerce-app/pull/184/files/tests/checkout/empty-cart.spec.ts')).toHaveLength(2)
     expect(screen.getByText('This is simulated source data, not a live provider connection.')).toBeInTheDocument()
   })
 
@@ -72,6 +73,49 @@ describe('ProjectRepositoryPage', () => {
     const cartTotalItem = within(detectedTests).getByText('tests/checkout/cart-total.test.ts').closest('li')
     expect(cartTotalItem).not.toBeNull()
     expect(within(cartTotalItem!).queryByText('Linked proposal')).not.toBeInTheDocument()
+  })
+
+  it('filters detected tests by pattern', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      render(<ProjectRepositoryPage projectId="proj-1" />)
+    })
+
+    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
+    await user.click(within(detectedTests).getByRole('button', { name: '*.test.ts' }))
+
+    expect(detectedTests).toHaveTextContent('tests/checkout/cart-total.test.ts')
+    expect(detectedTests).not.toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+
+    await user.click(within(detectedTests).getByRole('button', { name: '*.spec.ts' }))
+    expect(detectedTests).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+    expect(detectedTests).not.toHaveTextContent('tests/checkout/cart-total.test.ts')
+
+    await user.click(within(detectedTests).getByRole('button', { name: 'All' }))
+    expect(detectedTests).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+    expect(detectedTests).toHaveTextContent('tests/checkout/cart-total.test.ts')
+  })
+
+  it("shows each detected file's own origin evidence, not only the batch's first file", async () => {
+    await act(async () => {
+      render(<ProjectRepositoryPage projectId="proj-1" />)
+    })
+
+    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
+    const cartTotalItem = within(detectedTests).getByText('tests/checkout/cart-total.test.ts').closest('li')
+    expect(cartTotalItem).not.toBeNull()
+    expect(within(cartTotalItem!).getByText('mock://acme/ecommerce-app/pull/184/files/tests/checkout/cart-total.test.ts')).toBeInTheDocument()
+  })
+
+  it('shows an accessible error state when the ingestion batch failed, without a fabricated detection result', async () => {
+    await act(async () => {
+      render(<ProjectRepositoryPage projectId="proj-3" />)
+    })
+
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveTextContent('Extraction failed')
+    expect(screen.queryByRole('region', { name: 'Detected tests' })).not.toBeInTheDocument()
   })
 
   it('translates ingestion labels in Spanish', async () => {

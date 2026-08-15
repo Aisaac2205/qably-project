@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { GithubLogo } from '@phosphor-icons/react'
 import type { CodeChange } from '@qably/types'
@@ -24,6 +25,7 @@ function DetectedTestItem({
     (link) => link.relation === 'produced' && link.from.id === detectedChange.id && link.to.type === 'proposal',
   )
   const proposal = useProposal(proposalLink?.to.id ?? '')
+  const originEvidence = useEvidence(detectedChange.evidenceId)
 
   return (
     <li className="min-w-0 rounded-md border border-border px-3 py-2 sm:flex sm:items-start sm:justify-between sm:gap-4">
@@ -31,6 +33,12 @@ function DetectedTestItem({
       <p className="mt-2 shrink-0 text-sm text-muted sm:mt-0">
         {t('repository.detectedPattern')}: <code className="break-all font-mono text-default">{detectedChange.detectedPattern}</code>
       </p>
+      {originEvidence ? (
+        <p className="mt-2 w-full min-w-0 text-sm sm:mt-1">
+          <span className="text-xs font-medium text-muted">{t('repository.origin')}: </span>
+          <span className="min-w-0 break-all text-default">{originEvidence.uri}</span>
+        </p>
+      ) : null}
       {proposal ? (
         <div className="mt-2 w-full sm:mt-1">
           <p className="text-xs font-medium text-muted">{t('repository.linkedProposal')}</p>
@@ -63,6 +71,10 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   const evidence = useEvidence(change?.evidenceId)
   const batchChanges = batch ? changes.filter((item) => batch.codeChangeIds.includes(item.id)) : []
   const detectedTests = source ? selectDetectedTestChanges(batchChanges, source.testFilePatterns) : []
+  const [patternFilter, setPatternFilter] = useState<string>('all')
+  const visibleDetectedTests = patternFilter === 'all'
+    ? detectedTests
+    : detectedTests.filter((item) => item.detectedPattern === patternFilter)
 
   return (
     <div className="px-4 py-6 sm:px-6">
@@ -94,7 +106,7 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      {batch && change && evidence ? (
+      {batch ? (
         <section className="mt-6 max-w-3xl" aria-labelledby="repository-ingestion-heading">
           <h2 id="repository-ingestion-heading" className="text-sm font-semibold text-default">
             {t('repository.ingestionHeading')}
@@ -113,31 +125,69 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
               <dd className="mt-1 font-medium text-default">{formatTimestamp(batch.createdAt, locale)}</dd>
             </div>
           </dl>
-          <InspectorPanel title={t('repository.inspectorHeading')} className="mt-4">
-            <dl className="grid gap-3 p-5 text-sm sm:grid-cols-[auto_1fr]">
-              <dt className="text-muted">{t('repository.pullRequest')}</dt>
-              <dd className="font-medium text-default">PR #{change.pullRequestNumber}</dd>
-              <dt className="text-muted">{t('repository.commit')}</dt>
-              <dd className="font-mono text-default">{change.commitSha.slice(0, 7)}</dd>
-              <dt className="text-muted">{t('repository.file')}</dt>
-              <dd className="min-w-0 break-all text-default">{change.filePath}</dd>
-              <dt className="text-muted">{t('repository.diff')}</dt>
-              <dd className="min-w-0 overflow-x-auto rounded border border-border bg-canvas p-3 font-mono text-xs text-default"><pre>{change.diff}</pre></dd>
-              <dt className="text-muted">{t('repository.origin')}</dt>
-              <dd className="min-w-0 break-all text-default">{evidence.uri}</dd>
-            </dl>
-          </InspectorPanel>
-          <section className="mt-4 rounded-lg border border-border bg-surface p-4" aria-labelledby="repository-detected-tests-heading">
-            <h3 id="repository-detected-tests-heading" className="text-sm font-semibold text-default">
-              {t('repository.detectedTestsHeading')}
-            </h3>
-            <p className="mt-1 text-sm text-muted">{t('repository.detectedTestsDescription')}</p>
-            <ul className="mt-4 space-y-3" aria-label={t('repository.detectedTestsHeading')}>
-              {detectedTests.map((detectedChange) => (
-                <DetectedTestItem key={detectedChange.id} detectedChange={detectedChange} projectId={projectId} />
-              ))}
-            </ul>
-          </section>
+
+          {batch.status === 'failed' ? (
+            <div className="mt-4">
+              <StateView
+                kind="error"
+                title={t('repository.ingestionErrorTitle')}
+                description={t('repository.ingestionErrorDescription')}
+              />
+            </div>
+          ) : change && evidence ? (
+            <>
+              <InspectorPanel title={t('repository.inspectorHeading')} className="mt-4">
+                <dl className="grid gap-3 p-5 text-sm sm:grid-cols-[auto_1fr]">
+                  <dt className="text-muted">{t('repository.pullRequest')}</dt>
+                  <dd className="font-medium text-default">PR #{change.pullRequestNumber}</dd>
+                  <dt className="text-muted">{t('repository.commit')}</dt>
+                  <dd className="font-mono text-default">{change.commitSha.slice(0, 7)}</dd>
+                  <dt className="text-muted">{t('repository.file')}</dt>
+                  <dd className="min-w-0 break-all text-default">{change.filePath}</dd>
+                  <dt className="text-muted">{t('repository.diff')}</dt>
+                  <dd className="min-w-0 overflow-x-auto rounded border border-border bg-canvas p-3 font-mono text-xs text-default"><pre>{change.diff}</pre></dd>
+                  <dt className="text-muted">{t('repository.origin')}</dt>
+                  <dd className="min-w-0 break-all text-default">{evidence.uri}</dd>
+                </dl>
+              </InspectorPanel>
+              <section className="mt-4 rounded-lg border border-border bg-surface p-4" aria-labelledby="repository-detected-tests-heading">
+                <h3 id="repository-detected-tests-heading" className="text-sm font-semibold text-default">
+                  {t('repository.detectedTestsHeading')}
+                </h3>
+                <p className="mt-1 text-sm text-muted">{t('repository.detectedTestsDescription')}</p>
+                <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('repository.detectedPattern')}>
+                  <button
+                    type="button"
+                    aria-pressed={patternFilter === 'all'}
+                    onClick={() => setPatternFilter('all')}
+                    className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
+                      patternFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
+                    }`}
+                  >
+                    {t('repository.filterAll')}
+                  </button>
+                  {source?.testFilePatterns.map((pattern) => (
+                    <button
+                      key={pattern}
+                      type="button"
+                      aria-pressed={patternFilter === pattern}
+                      onClick={() => setPatternFilter(pattern)}
+                      className={`rounded px-3 py-1.5 font-mono text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
+                        patternFilter === pattern ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
+                      }`}
+                    >
+                      {pattern}
+                    </button>
+                  ))}
+                </div>
+                <ul className="mt-4 space-y-3" aria-label={t('repository.detectedTestsHeading')}>
+                  {visibleDetectedTests.map((detectedChange) => (
+                    <DetectedTestItem key={detectedChange.id} detectedChange={detectedChange} projectId={projectId} />
+                  ))}
+                </ul>
+              </section>
+            </>
+          ) : null}
         </section>
       ) : null}
     </div>

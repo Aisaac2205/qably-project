@@ -511,17 +511,28 @@ export const mockRepositorySources: Record<string, RepositorySourceFixture> = {
     repository: 'acme/ecommerce-app',
     testFilePatterns: ['*.spec.ts', '*.test.ts'],
   },
+  'proj-3': {
+    provider: 'GitHub',
+    repository: 'acme/api-backend',
+    testFilePatterns: ['*.spec.ts', '*.test.ts'],
+  },
 }
 
-export const mockIngestionBatches: IngestionBatch[] = [{
-  id: 'batch-repository-1', projectId: 'proj-1', source: 'repository', status: 'completed',
-  codeChangeIds: [
-    'change-empty-cart-1',
-    'change-cart-total-1',
-    'change-cart-service-1',
-    'change-checkout-docs-1',
-  ], createdAt: '2026-06-16T10:45:00Z',
-}]
+export const mockIngestionBatches: IngestionBatch[] = [
+  {
+    id: 'batch-repository-1', projectId: 'proj-1', source: 'repository', status: 'completed',
+    codeChangeIds: [
+      'change-empty-cart-1',
+      'change-cart-total-1',
+      'change-cart-service-1',
+      'change-checkout-docs-1',
+    ], createdAt: '2026-06-16T10:45:00Z',
+  },
+  {
+    id: 'batch-repository-failed-1', projectId: 'proj-3', source: 'repository', status: 'failed',
+    codeChangeIds: [], createdAt: '2026-06-15T09:20:00Z',
+  },
+]
 
 export const mockCodeChanges: CodeChange[] = [
   {
