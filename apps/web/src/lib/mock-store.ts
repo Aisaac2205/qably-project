@@ -166,12 +166,24 @@ function createReviewDomain() {
     proposalIdByAiCaseId,
     officialTestCases: existingCases,
     testCaseVersions: versions,
-    traceabilityLinks: proposals.map<TraceabilityLink>((proposal) => ({
-      id: `link-${proposal.id}-evidence`,
-      from: { type: 'proposal', id: proposal.id },
-      to: { type: 'evidence', id: proposal.evidenceId },
-      relation: 'evidence_for',
-    })),
+    traceabilityLinks: [
+      ...proposals.map<TraceabilityLink>((proposal) => ({
+        id: `link-${proposal.id}-evidence`,
+        from: { type: 'proposal', id: proposal.id },
+        to: { type: 'evidence', id: proposal.evidenceId },
+        relation: 'evidence_for',
+      })),
+      // Repository detection (Phase 2) and AI Review extraction (Phase 3
+      // proposals) are still separate mock domains. This is the one curated
+      // bridge showing a code change that already led to an extraction
+      // proposal, without simulating a publication that hasn't happened.
+      {
+        id: 'link-change-empty-cart-1-produced-review-proposal-checkout',
+        from: { type: 'code_change', id: 'change-empty-cart-1' },
+        to: { type: 'proposal', id: 'review-proposal-checkout' },
+        relation: 'produced',
+      } satisfies TraceabilityLink,
+    ],
   }
 }
 

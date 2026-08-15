@@ -1,13 +1,51 @@
 'use client'
 
+import Link from 'next/link'
 import { GithubLogo } from '@phosphor-icons/react'
+import type { CodeChange } from '@qably/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { InspectorPanel } from '@/components/ui/inspector-panel'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 import { mockRepositorySources } from '@/lib/mock-data'
-import { useCodeChanges, useEvidence, useIngestionBatches } from '@/lib/use-mock-store'
+import { useCodeChanges, useEvidence, useIngestionBatches, useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
 import { selectDetectedTestChanges } from '../lib/test-file-patterns'
+
+function DetectedTestItem({
+  detectedChange,
+  projectId,
+}: {
+  detectedChange: CodeChange & { detectedPattern: string }
+  projectId: string
+}) {
+  const { t } = useTranslation()
+  const links = useTraceabilityLinks(detectedChange.id)
+  const proposalLink = links.find(
+    (link) => link.relation === 'produced' && link.from.id === detectedChange.id && link.to.type === 'proposal',
+  )
+  const proposal = useProposal(proposalLink?.to.id ?? '')
+
+  return (
+    <li className="min-w-0 rounded-md border border-border px-3 py-2 sm:flex sm:items-start sm:justify-between sm:gap-4">
+      <p className="min-w-0 break-all text-sm text-default">{detectedChange.filePath}</p>
+      <p className="mt-2 shrink-0 text-sm text-muted sm:mt-0">
+        {t('repository.detectedPattern')}: <code className="break-all font-mono text-default">{detectedChange.detectedPattern}</code>
+      </p>
+      {proposal ? (
+        <div className="mt-2 w-full sm:mt-1">
+          <p className="text-xs font-medium text-muted">{t('repository.linkedProposal')}</p>
+          <p className="text-sm text-default">{proposal.title}</p>
+          <Link
+            href={`/projects/${projectId}/ai-review`}
+            className="text-sm font-medium text-default underline underline-offset-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            {t('sidebar.aiReview')}
+          </Link>
+        </div>
+      ) : null}
+    </li>
+  )
+}
 
 function formatTimestamp(timestamp: string, locale: 'en' | 'es') {
   return new Intl.DateTimeFormat(locale === 'es' ? 'es-ES' : 'en-US', {
@@ -96,12 +134,7 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
             <p className="mt-1 text-sm text-muted">{t('repository.detectedTestsDescription')}</p>
             <ul className="mt-4 space-y-3" aria-label={t('repository.detectedTestsHeading')}>
               {detectedTests.map((detectedChange) => (
-                <li key={detectedChange.id} className="min-w-0 rounded-md border border-border px-3 py-2 sm:flex sm:items-start sm:justify-between sm:gap-4">
-                  <p className="min-w-0 break-all text-sm text-default">{detectedChange.filePath}</p>
-                  <p className="mt-2 shrink-0 text-sm text-muted sm:mt-0">
-                    {t('repository.detectedPattern')}: <code className="break-all font-mono text-default">{detectedChange.detectedPattern}</code>
-                  </p>
-                </li>
+                <DetectedTestItem key={detectedChange.id} detectedChange={detectedChange} projectId={projectId} />
               ))}
             </ul>
           </section>

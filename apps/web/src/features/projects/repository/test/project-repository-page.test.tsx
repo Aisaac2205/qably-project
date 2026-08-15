@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useI18nStore } from '@/lib/i18n'
 import { __resetStore } from '@/lib/mock-store'
@@ -53,6 +53,25 @@ describe('ProjectRepositoryPage', () => {
     expect(detectedTests).toHaveTextContent('*.test.ts')
     expect(detectedTests).not.toHaveTextContent('src/checkout/cart-service.ts')
     expect(detectedTests).not.toHaveTextContent('docs/checkout.md')
+  })
+
+  it('links a detected test to its future extraction proposal without simulating publication', async () => {
+    await act(async () => {
+      render(<ProjectRepositoryPage projectId="proj-1" />)
+    })
+
+    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
+    const emptyCartItem = within(detectedTests).getByText('tests/checkout/empty-cart.spec.ts').closest('li')
+    expect(emptyCartItem).not.toBeNull()
+    expect(within(emptyCartItem!).getByText('Linked proposal')).toBeInTheDocument()
+    expect(within(emptyCartItem!).getByText('Checkout with empty cart blocked')).toBeInTheDocument()
+    const reviewLink = within(emptyCartItem!).getByRole('link', { name: 'AI Review' })
+    expect(reviewLink).toHaveAttribute('href', '/projects/proj-1/ai-review')
+    expect(emptyCartItem).not.toHaveTextContent(/approved|published|created/i)
+
+    const cartTotalItem = within(detectedTests).getByText('tests/checkout/cart-total.test.ts').closest('li')
+    expect(cartTotalItem).not.toBeNull()
+    expect(within(cartTotalItem!).queryByText('Linked proposal')).not.toBeInTheDocument()
   })
 
   it('translates ingestion labels in Spanish', async () => {
