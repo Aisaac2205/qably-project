@@ -100,6 +100,22 @@ describe('mock-store governance surface', () => {
   })
 })
 
+describe('mock-store ingestion fixtures', () => {
+  beforeEach(() => __resetStore())
+
+  it('resets one project batch with its change and resolvable evidence', () => {
+    const snapshot = getSnapshot()
+    const [batch] = snapshot.ingestionBatches
+    const [change] = snapshot.codeChanges
+
+    expect(snapshot.ingestionBatches).toHaveLength(1)
+    expect(snapshot.codeChanges).toHaveLength(1)
+    expect(batch).toMatchObject({ projectId: 'proj-1', status: 'completed', codeChangeIds: [change.id] })
+    expect(change.projectId).toBe('proj-1')
+    expect(snapshot.evidence.find((item) => item.id === change.evidenceId)).toBeDefined()
+  })
+})
+
 describe('mock-store governed proposal scenarios', () => {
   beforeEach(() => __resetStore())
 

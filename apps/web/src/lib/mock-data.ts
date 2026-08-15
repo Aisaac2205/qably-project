@@ -15,6 +15,9 @@ import type {
   CoverageGap,
   Connection,
   Notification,
+  IngestionBatch,
+  CodeChange,
+  Evidence,
 } from '@qably/types'
 
 export type {
@@ -499,6 +502,25 @@ export const mockGithubIntegration: GithubIntegration = {
 export const mockRepositorySources: Record<string, { provider: 'GitHub'; repository: string }> = {
   'proj-1': { provider: 'GitHub', repository: 'acme/ecommerce-app' },
 }
+
+export const mockIngestionBatches: IngestionBatch[] = [{
+  id: 'batch-repository-1', projectId: 'proj-1', source: 'repository', status: 'completed',
+  codeChangeIds: ['change-empty-cart-1'], createdAt: '2026-06-16T10:45:00Z',
+}]
+
+export const mockCodeChanges: CodeChange[] = [{
+  id: 'change-empty-cart-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+  filePath: 'tests/checkout/empty-cart.spec.ts',
+  diff: '+  await expect(checkoutButton).toBeDisabled()',
+  evidenceId: 'evidence-change-empty-cart-1',
+}]
+
+export const mockIngestionEvidence: Evidence[] = [{
+  id: 'evidence-change-empty-cart-1', projectId: 'proj-1', kind: 'source_excerpt',
+  title: 'tests/checkout/empty-cart.spec.ts',
+  uri: 'mock://acme/ecommerce-app/pull/184/files/tests/checkout/empty-cart.spec.ts',
+  excerpt: '+  await expect(checkoutButton).toBeDisabled()', createdAt: '2026-06-16T10:45:00Z',
+}]
 
 // ─── Connections (integration aggregate) ─────────────────────────────────────
 

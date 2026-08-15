@@ -15,7 +15,7 @@ function keyPaths(value: Record<string, unknown>, prefix = ''): string[] {
 }
 
 describe('Phase 1 i18n', () => {
-  it('keeps navigation and temporary-state translation keys in parity', () => {
+  it('keeps navigation, repository, and temporary-state translation keys in parity', () => {
     const phaseOneEnglish = {
       sidebar: en.sidebar,
       reviewInbox: en.reviewInbox,
@@ -34,6 +34,7 @@ describe('Phase 1 i18n', () => {
     }
 
     expect(keyPaths(phaseOneSpanish)).toEqual(keyPaths(phaseOneEnglish))
+    expect(keyPaths(es.repository)).toEqual(keyPaths(en.repository))
   })
 
   it('renders a temporary page in Spanish', () => {

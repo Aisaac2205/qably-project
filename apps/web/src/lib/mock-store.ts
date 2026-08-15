@@ -19,6 +19,9 @@ import {
   mockCoverageGaps,
   mockConnections,
   mockNotifications,
+  mockIngestionBatches,
+  mockCodeChanges,
+  mockIngestionEvidence,
   MOCK_NOW,
 } from '@/lib/mock-data'
 import { validateTags } from '@/lib/tag-validation'
@@ -111,7 +114,7 @@ let connections: Connection[] = structuredClone(mockConnections)
 let notifications: Notification[] = structuredClone(mockNotifications)
 
 function createReviewDomain() {
-  const evidence = mockAiCases.map<Evidence>((aiCase) => ({
+  const evidence = [...mockAiCases.map<Evidence>((aiCase) => ({
     id: `evidence-${aiCase.id}`,
     projectId: aiCase.projectId,
     kind: 'source_excerpt',
@@ -119,7 +122,7 @@ function createReviewDomain() {
     uri: `mock://${aiCase.sourceFile}`,
     excerpt: aiCase.sourceSnippet,
     createdAt: MOCK_NOW,
-  }))
+  })), ...structuredClone(mockIngestionEvidence)]
   const proposalIdByAiCaseId = Object.fromEntries(mockAiCases.map((aiCase) => [
     aiCase.id,
     aiCase.id === 'ai-2' ? 'review-proposal-checkout' : `proposal-${aiCase.id}`,
@@ -174,8 +177,8 @@ function createReviewDomain() {
 
 let reviewDomain = createReviewDomain()
 let { evidence, proposals, proposalIdByAiCaseId, officialTestCases, testCaseVersions, traceabilityLinks } = reviewDomain
-let ingestionBatches: IngestionBatch[] = []
-let codeChanges: CodeChange[] = []
+let ingestionBatches: IngestionBatch[] = structuredClone(mockIngestionBatches)
+let codeChanges: CodeChange[] = structuredClone(mockCodeChanges)
 let reviewDecisions: ReviewDecision[] = []
 let executions: Execution[] = []
 let executionResults: ExecutionResult[] = []
@@ -300,6 +303,14 @@ export function getCoverageGaps(projectId?: string): CoverageGap[] {
 
 export function getNotifications(): Notification[] {
   return notifications
+}
+
+export function getIngestionBatches(projectId?: string): IngestionBatch[] {
+  return projectId ? ingestionBatches.filter((batch) => batch.projectId === projectId) : ingestionBatches
+}
+
+export function getCodeChanges(projectId?: string): CodeChange[] {
+  return projectId ? codeChanges.filter((change) => change.projectId === projectId) : codeChanges
 }
 
 export function getProposal(id: string): ExtractedProposal | undefined {
@@ -1004,8 +1015,8 @@ export function __resetStore(): void {
   officialTestCases = reviewDomain.officialTestCases
   testCaseVersions = reviewDomain.testCaseVersions
   traceabilityLinks = reviewDomain.traceabilityLinks
-  ingestionBatches = []
-  codeChanges = []
+  ingestionBatches = structuredClone(mockIngestionBatches)
+  codeChanges = structuredClone(mockCodeChanges)
   reviewDecisions = []
   executions = []
   executionResults = []

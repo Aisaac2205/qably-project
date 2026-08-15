@@ -29,6 +29,8 @@ import type {
   ExtractedProposal,
   Evidence,
   TraceabilityLink,
+  IngestionBatch,
+  CodeChange,
 } from '@qably/types'
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
@@ -188,6 +190,20 @@ export function useCoverageGaps(projectId?: string): CoverageGap[] {
 
 export function useConnections(): Connection[] {
   return useStableArray(() => getSnapshot().connections, () => getServerSnapshot().connections)
+}
+
+export function useIngestionBatches(projectId?: string): IngestionBatch[] {
+  return useStableArray(
+    () => getSnapshot().ingestionBatches.filter((batch) => !projectId || batch.projectId === projectId),
+    () => getServerSnapshot().ingestionBatches.filter((batch) => !projectId || batch.projectId === projectId),
+  )
+}
+
+export function useCodeChanges(projectId?: string): CodeChange[] {
+  return useStableArray(
+    () => getSnapshot().codeChanges.filter((change) => !projectId || change.projectId === projectId),
+    () => getServerSnapshot().codeChanges.filter((change) => !projectId || change.projectId === projectId),
+  )
 }
 
 export function useProposal(id: string): ExtractedProposal | undefined {
