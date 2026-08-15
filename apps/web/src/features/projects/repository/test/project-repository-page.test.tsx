@@ -35,10 +35,24 @@ describe('ProjectRepositoryPage', () => {
     expect(screen.getByText('Jun 16, 2026, 10:45 AM')).toBeInTheDocument()
     expect(screen.getByText('PR #184')).toBeInTheDocument()
     expect(screen.getByText('8f3c2a1')).toBeInTheDocument()
-    expect(screen.getByText('tests/checkout/empty-cart.spec.ts')).toBeInTheDocument()
+    expect(screen.getAllByText('tests/checkout/empty-cart.spec.ts')).toHaveLength(2)
     expect(screen.getByText(/checkoutButton\)\.toBeDisabled/)).toBeInTheDocument()
     expect(screen.getByText('mock://acme/ecommerce-app/pull/184/files/tests/checkout/empty-cart.spec.ts')).toBeInTheDocument()
     expect(screen.getByText('This is simulated source data, not a live provider connection.')).toBeInTheDocument()
+  })
+
+  it('presents only pattern-matched tests from the already-ingested batch', async () => {
+    await act(async () => {
+      render(<ProjectRepositoryPage projectId="proj-1" />)
+    })
+
+    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
+    expect(detectedTests).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+    expect(detectedTests).toHaveTextContent('tests/checkout/cart-total.test.ts')
+    expect(detectedTests).toHaveTextContent('*.spec.ts')
+    expect(detectedTests).toHaveTextContent('*.test.ts')
+    expect(detectedTests).not.toHaveTextContent('src/checkout/cart-service.ts')
+    expect(detectedTests).not.toHaveTextContent('docs/checkout.md')
   })
 
   it('translates ingestion labels in Spanish', async () => {
@@ -57,6 +71,7 @@ describe('ProjectRepositoryPage', () => {
     expect(screen.getByText('Archivo')).toBeInTheDocument()
     expect(screen.getByText('Diferencia')).toBeInTheDocument()
     expect(screen.getByText('Origen')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Pruebas detectadas' })).toHaveTextContent('Patrón')
   })
 
   it('renders a localized no-source state without a fabricated connect action', async () => {

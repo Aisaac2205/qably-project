@@ -20,6 +20,7 @@ import {
   rejectProposal,
   getSnapshot,
 } from '@/lib/mock-store'
+import { selectDetectedTestChanges } from '@/features/projects/repository/lib/test-file-patterns'
 
 describe('mock-store AI providers', () => {
   beforeEach(() => __resetStore())
@@ -103,16 +104,49 @@ describe('mock-store governance surface', () => {
 describe('mock-store ingestion fixtures', () => {
   beforeEach(() => __resetStore())
 
-  it('resets one project batch with its change and resolvable evidence', () => {
+  it('resets the raw batch and its deterministic detected test projections', () => {
     const snapshot = getSnapshot()
     const [batch] = snapshot.ingestionBatches
-    const [change] = snapshot.codeChanges
+    const initialRawChanges = snapshot.codeChanges
 
     expect(snapshot.ingestionBatches).toHaveLength(1)
-    expect(snapshot.codeChanges).toHaveLength(1)
-    expect(batch).toMatchObject({ projectId: 'proj-1', status: 'completed', codeChangeIds: [change.id] })
-    expect(change.projectId).toBe('proj-1')
-    expect(snapshot.evidence.find((item) => item.id === change.evidenceId)).toBeDefined()
+    expect(batch).toMatchObject({
+      projectId: 'proj-1',
+      status: 'completed',
+      codeChangeIds: [
+        'change-empty-cart-1',
+        'change-cart-total-1',
+        'change-cart-service-1',
+        'change-checkout-docs-1',
+      ],
+    })
+    expect(initialRawChanges.map((change) => change.id)).toEqual(batch.codeChangeIds)
+    expect(selectDetectedTestChanges(initialRawChanges, ['*.spec.ts', '*.test.ts'])).toMatchObject([
+      { id: 'change-empty-cart-1', detectedPattern: '*.spec.ts' },
+      { id: 'change-cart-total-1', detectedPattern: '*.test.ts' },
+    ])
+
+    __resetStore()
+
+    const resetSnapshot = getSnapshot()
+    expect(resetSnapshot.codeChanges).toEqual(initialRawChanges)
+    expect(selectDetectedTestChanges(resetSnapshot.codeChanges, ['*.spec.ts', '*.test.ts'])).toEqual(
+      selectDetectedTestChanges(initialRawChanges, ['*.spec.ts', '*.test.ts']),
+    )
+
+    const batchChanges = resetSnapshot.codeChanges.filter((change) => batch.codeChangeIds.includes(change.id))
+    const evidenceById = new Map(resetSnapshot.evidence.map((evidence) => [evidence.id, evidence]))
+
+    expect(batchChanges).toHaveLength(batch.codeChangeIds.length)
+    expect(batchChanges.flatMap((change) => evidenceById.has(change.evidenceId) ? [] : [change.evidenceId])).toEqual([])
+    for (const change of batchChanges) {
+      expect(evidenceById.get(change.evidenceId)).toMatchObject({
+        projectId: change.projectId,
+        title: change.filePath,
+        uri: `mock://acme/ecommerce-app/pull/${change.pullRequestNumber}/files/${change.filePath}`,
+        excerpt: change.diff,
+      })
+    }
   })
 })
 

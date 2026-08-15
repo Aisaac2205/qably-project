@@ -89,6 +89,9 @@
     "file": "Archivo",
     "diff": "Diferencia",
     "origin": "Origen",
+    "detectedTestsHeading": "Pruebas detectadas",
+    "detectedTestsDescription": "Coincide patrones configurados con rutas ya incluidas en este lote de ingesta simulado.",
+    "detectedPattern": "Patrón",
     "simulatedDescription": "Estos datos de fuente son simulados, no una conexi\u00f3n activa con un proveedor.",
     "noSourceTitle": "Sin fuente SCM",
     "noSourceDescription": "Este proyecto no tiene una fuente SCM configurada."

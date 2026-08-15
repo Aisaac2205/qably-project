@@ -89,6 +89,9 @@
     "file": "File",
     "diff": "Diff",
     "origin": "Origin",
+    "detectedTestsHeading": "Detected tests",
+    "detectedTestsDescription": "Matches configured patterns against paths already in this simulated ingestion batch.",
+    "detectedPattern": "Pattern",
     "simulatedDescription": "This is simulated source data, not a live provider connection.",
     "noSourceTitle": "No SCM source",
     "noSourceDescription": "This project does not have an SCM source configured."

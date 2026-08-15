@@ -499,28 +499,80 @@ export const mockGithubIntegration: GithubIntegration = {
   repoUrl: 'https://github.com/acme/ecommerce-app',
 }
 
-export const mockRepositorySources: Record<string, { provider: 'GitHub'; repository: string }> = {
-  'proj-1': { provider: 'GitHub', repository: 'acme/ecommerce-app' },
+type RepositorySourceFixture = {
+  provider: 'GitHub'
+  repository: string
+  testFilePatterns: ['*.spec.ts', '*.test.ts']
+}
+
+export const mockRepositorySources: Record<string, RepositorySourceFixture> = {
+  'proj-1': {
+    provider: 'GitHub',
+    repository: 'acme/ecommerce-app',
+    testFilePatterns: ['*.spec.ts', '*.test.ts'],
+  },
 }
 
 export const mockIngestionBatches: IngestionBatch[] = [{
   id: 'batch-repository-1', projectId: 'proj-1', source: 'repository', status: 'completed',
-  codeChangeIds: ['change-empty-cart-1'], createdAt: '2026-06-16T10:45:00Z',
+  codeChangeIds: [
+    'change-empty-cart-1',
+    'change-cart-total-1',
+    'change-cart-service-1',
+    'change-checkout-docs-1',
+  ], createdAt: '2026-06-16T10:45:00Z',
 }]
 
-export const mockCodeChanges: CodeChange[] = [{
-  id: 'change-empty-cart-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-  filePath: 'tests/checkout/empty-cart.spec.ts',
-  diff: '+  await expect(checkoutButton).toBeDisabled()',
-  evidenceId: 'evidence-change-empty-cart-1',
-}]
+export const mockCodeChanges: CodeChange[] = [
+  {
+    id: 'change-empty-cart-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+    filePath: 'tests/checkout/empty-cart.spec.ts',
+    diff: '+  await expect(checkoutButton).toBeDisabled()',
+    evidenceId: 'evidence-change-empty-cart-1',
+  },
+  {
+    id: 'change-cart-total-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+    filePath: 'tests/checkout/cart-total.test.ts',
+    diff: '+  expect(total).toBe(42)', evidenceId: 'evidence-change-cart-total-1',
+  },
+  {
+    id: 'change-cart-service-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+    filePath: 'src/checkout/cart-service.ts',
+    diff: '+  return total', evidenceId: 'evidence-change-cart-service-1',
+  },
+  {
+    id: 'change-checkout-docs-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+    filePath: 'docs/checkout.md',
+    diff: '+ Updated checkout guidance', evidenceId: 'evidence-change-checkout-docs-1',
+  },
+]
 
-export const mockIngestionEvidence: Evidence[] = [{
-  id: 'evidence-change-empty-cart-1', projectId: 'proj-1', kind: 'source_excerpt',
-  title: 'tests/checkout/empty-cart.spec.ts',
-  uri: 'mock://acme/ecommerce-app/pull/184/files/tests/checkout/empty-cart.spec.ts',
-  excerpt: '+  await expect(checkoutButton).toBeDisabled()', createdAt: '2026-06-16T10:45:00Z',
-}]
+export const mockIngestionEvidence: Evidence[] = [
+  {
+    id: 'evidence-change-empty-cart-1', projectId: 'proj-1', kind: 'source_excerpt',
+    title: 'tests/checkout/empty-cart.spec.ts',
+    uri: 'mock://acme/ecommerce-app/pull/184/files/tests/checkout/empty-cart.spec.ts',
+    excerpt: '+  await expect(checkoutButton).toBeDisabled()', createdAt: '2026-06-16T10:45:00Z',
+  },
+  {
+    id: 'evidence-change-cart-total-1', projectId: 'proj-1', kind: 'source_excerpt',
+    title: 'tests/checkout/cart-total.test.ts',
+    uri: 'mock://acme/ecommerce-app/pull/184/files/tests/checkout/cart-total.test.ts',
+    excerpt: '+  expect(total).toBe(42)', createdAt: '2026-06-16T10:45:00Z',
+  },
+  {
+    id: 'evidence-change-cart-service-1', projectId: 'proj-1', kind: 'source_excerpt',
+    title: 'src/checkout/cart-service.ts',
+    uri: 'mock://acme/ecommerce-app/pull/184/files/src/checkout/cart-service.ts',
+    excerpt: '+  return total', createdAt: '2026-06-16T10:45:00Z',
+  },
+  {
+    id: 'evidence-change-checkout-docs-1', projectId: 'proj-1', kind: 'source_excerpt',
+    title: 'docs/checkout.md',
+    uri: 'mock://acme/ecommerce-app/pull/184/files/docs/checkout.md',
+    excerpt: '+ Updated checkout guidance', createdAt: '2026-06-16T10:45:00Z',
+  },
+]
 
 // ─── Connections (integration aggregate) ─────────────────────────────────────
 
