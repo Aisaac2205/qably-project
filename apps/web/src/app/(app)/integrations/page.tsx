@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Image from 'next/image'
 import {
   ArrowsClockwise,
@@ -8,11 +8,16 @@ import {
   Circle,
   CircleNotch,
   Plus,
+  WarningCircle,
 } from '@phosphor-icons/react'
 import type { Connection } from '@qably/types'
 import { useConnections } from '@/features/integrations'
 import { useRunAggregate } from '@/features/runs'
 import { Button } from '@/components/ui/button'
+import { DataTable } from '@/components/ui/data-table'
+import { InspectorPanel } from '@/components/ui/inspector-panel'
+import { PageHeader } from '@/components/ui/page-header'
+import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 
 const logos: Record<Connection['name'], string> = {
@@ -24,25 +29,27 @@ const logos: Record<Connection['name'], string> = {
 }
 
 const activity = [
-  { id: 'activity-1', connection: 'Slack', title: 'Alert #1245 delivered', detail: 'Slack · #qa-alerts', time: '2 min ago' },
-  { id: 'activity-2', connection: 'GitHub Actions', title: 'Workflow "E2E Tests" completed', detail: 'GitHub Actions', time: '5 min ago' },
-  { id: 'activity-3', connection: 'Slack', title: 'Alert #1244 delivered', detail: 'Slack · #qa-alerts', time: '18 min ago' },
-  { id: 'activity-4', connection: 'GitHub Actions', title: 'Workflow "Smoke Tests" started', detail: 'GitHub Actions', time: '27 min ago' },
+  { id: 'activity-1', connection: 'Slack', title: 'activityAlert1245', detail: 'activitySlackQa', time: 'time2Minutes' },
+  { id: 'activity-2', connection: 'GitHub Actions', title: 'activityWorkflowCompleted', detail: 'activityGithubActions', time: 'time5Minutes' },
+  { id: 'activity-3', connection: 'Slack', title: 'activityAlert1244', detail: 'activitySlackQa', time: 'time18Minutes' },
+  { id: 'activity-4', connection: 'GitHub Actions', title: 'activityWorkflowStarted', detail: 'activityGithubActions', time: 'time27Minutes' },
 ]
 
-function connectionResource(connection: Connection): string {
+function connectionResource(connection: Connection, notConnected: string): string {
   if (connection.config?.repoUrl) return connection.config.repoUrl
   if (connection.type === 'slack') return connection.name
   if (connection.config?.description) return connection.config.description
-  return 'Not connected'
+  return notConnected
 }
 
 function ConnectionStatus({ status }: { status: Connection['status'] }) {
+  const { t } = useTranslation()
+
   if (status === 'connected') {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-pass">
         <CheckCircle size={14} weight="fill" aria-hidden="true" />
-        Connected
+        {t('modules.integrations.connected')}
       </span>
     )
   }
@@ -51,7 +58,16 @@ function ConnectionStatus({ status }: { status: Connection['status'] }) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-warn">
         <CircleNotch size={14} aria-hidden="true" />
-        Pending
+        {t('modules.integrations.pending')}
+      </span>
+    )
+  }
+
+  if (status === 'error') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-fail">
+        <WarningCircle size={14} weight="fill" aria-hidden="true" />
+        {t('modules.integrations.error')}
       </span>
     )
   }
@@ -59,7 +75,7 @@ function ConnectionStatus({ status }: { status: Connection['status'] }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
       <Circle size={14} weight="fill" aria-hidden="true" />
-      Available
+      {t('modules.integrations.available')}
     </span>
   )
 }
@@ -76,11 +92,16 @@ function ConnectionLogo({ name }: { name: Connection['name'] }) {
 
 function SimulateCiButton({ connection, runId }: { connection: Connection; runId: string | null }) {
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<'server' | 'network' | null>(null)
+  const inFlight = useRef(false)
+  const { t } = useTranslation()
 
   if (connection.config?.category !== 'ci') return null
 
   const simulate = async () => {
+    if (inFlight.current) return
+
+    inFlight.current = true
     setLoading(true)
     setError(null)
     try {
@@ -110,21 +131,61 @@ function SimulateCiButton({ connection, runId }: { connection: Connection; runId
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!response.ok) setError(`HTTP ${response.status}`)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Network error')
+      if (!response.ok) setError('server')
+    } catch {
+      setError('network')
     } finally {
+      inFlight.current = false
       setLoading(false)
     }
   }
 
+  const actionLabel = t(error ? 'modules.integrations.simulateCiRetry' : 'modules.integrations.simulateCi')
+  const errorDescription = error === 'server'
+    ? t('modules.integrations.simulateCiServerErrorDescription')
+    : t('modules.integrations.simulateCiNetworkErrorDescription')
+
   return (
-    <div className="flex flex-col items-end gap-1">
-      <Button size="sm" variant="outline" onClick={simulate} disabled={loading}>
+    <div className="flex w-full min-w-0 flex-col items-end gap-1 sm:w-auto">
+      <Button size="sm" variant="outline" onClick={simulate} disabled={loading} aria-label={actionLabel}>
         <ArrowsClockwise size={14} aria-hidden="true" />
-        Simulate CI
+        {actionLabel}
       </Button>
-      {error && <span className="text-xs text-fail">{error}</span>}
+      {error ? (
+        <StateView
+          kind="error"
+          title={t('modules.integrations.simulateCiErrorTitle')}
+          description={errorDescription}
+          className="min-h-0 w-full gap-2 px-2 py-2 sm:w-56"
+        />
+      ) : null}
+    </div>
+  )
+}
+
+function ConnectionActions({
+  connection,
+  runId,
+  onTransition,
+}: {
+  connection: Connection
+  runId: string | null
+  onTransition: (id: string, event: 'connect' | 'disconnect') => void
+}) {
+  const { t } = useTranslation()
+
+  return (
+    <div className="flex w-full flex-wrap justify-end gap-2">
+      <SimulateCiButton connection={connection} runId={runId} />
+      {connection.status === 'connected' ? (
+        <Button size="sm" variant="outline" onClick={() => onTransition(connection.id, 'disconnect')}>
+          {t('modules.integrations.disconnect')}
+        </Button>
+      ) : (
+        <Button size="sm" onClick={() => onTransition(connection.id, 'connect')}>
+          {t('modules.integrations.connect')}
+        </Button>
+      )}
     </div>
   )
 }
@@ -136,86 +197,111 @@ export default function IntegrationsPage() {
   const firstRunningRun = runs.find((run) => run.status === 'running')
 
   const addIntegration = () => {
-    create({ type: 'email', name: 'New integration', config: { description: 'Configure a notification channel' } })
+    create({
+      type: 'email',
+      name: t('modules.integrations.newName'),
+      config: { description: t('modules.integrations.newDescription') },
+    })
   }
+
+  const notConnected = t('modules.integrations.notConnected')
+  const lastActivity = (connection: Connection) => connection.lastSyncAt
+    ? t('modules.integrations.activityRecorded')
+    : t('modules.integrations.noActivity')
 
   return (
     <div className="flex flex-col">
-      <div className="flex flex-col gap-4 px-6 pb-6 pt-6 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-default">{t('modules.integrations.title')}</h1>
-          <p className="mt-0.5 text-sm text-muted">{t('modules.integrations.subtitle')}</p>
-        </div>
-        <Button onClick={addIntegration}>
-          <Plus size={16} weight="bold" aria-hidden="true" />
-          Add integration
-        </Button>
+      <div className="px-4 pb-6 pt-6 sm:px-6">
+        <PageHeader
+          title={t('modules.integrations.title')}
+          description={t('modules.integrations.subtitle')}
+          actions={(
+            <Button onClick={addIntegration}>
+              <Plus size={16} weight="bold" aria-hidden="true" />
+              {t('modules.integrations.add')}
+            </Button>
+          )}
+        />
       </div>
 
-      <div className="grid gap-5 px-6 pb-6 lg:grid-cols-3">
+      <div className="grid gap-5 px-4 pb-6 sm:px-6 lg:grid-cols-3">
         <section className="overflow-hidden rounded-xl border border-border bg-surface lg:col-span-2" aria-labelledby="connections-heading">
           <div className="border-b border-border px-5 py-4">
-            <h2 id="connections-heading" className="text-sm font-semibold text-default">Integrations</h2>
+            <h2 id="connections-heading" className="text-sm font-semibold text-default">
+              {t('modules.integrations.listHeading')}
+            </h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-[720px] w-full text-left">
+          <ul aria-label={t('modules.integrations.listCaption')} className="divide-y divide-border md:hidden">
+            {connections.map((connection) => (
+              <li key={connection.id} className="min-w-0 space-y-4 px-4 py-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <ConnectionLogo name={connection.name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold text-default">{connection.name}</p>
+                    <ConnectionStatus status={connection.status} />
+                  </div>
+                </div>
+                <dl className="grid min-w-0 gap-2 text-sm">
+                  <div className="min-w-0">
+                    <dt className="text-xs font-medium text-muted">{t('modules.integrations.resource')}</dt>
+                    <dd className="break-words text-default">{connectionResource(connection, notConnected)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-muted">{t('modules.integrations.lastActivity')}</dt>
+                    <dd className="text-default">{lastActivity(connection)}</dd>
+                  </div>
+                </dl>
+                <ConnectionActions connection={connection} runId={firstRunningRun?.id ?? null} onTransition={transition} />
+              </li>
+            ))}
+          </ul>
+          <DataTable caption={t('modules.integrations.listCaption')} wrapperClassName="hidden md:block">
               <thead className="border-b border-border text-xs text-muted">
                 <tr>
-                  <th scope="col" className="px-5 py-3 font-medium">Service</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Connected resource</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Status</th>
-                  <th scope="col" className="px-4 py-3 font-medium">Last activity</th>
-                  <th scope="col" className="px-5 py-3 text-right font-medium">Actions</th>
+                  <th scope="col" className="px-5 py-3 font-medium">{t('modules.integrations.service')}</th>
+                  <th scope="col" className="px-4 py-3 font-medium">{t('modules.integrations.resource')}</th>
+                  <th scope="col" className="px-4 py-3 font-medium">{t('modules.integrations.status')}</th>
+                  <th scope="col" className="px-4 py-3 font-medium">{t('modules.integrations.lastActivity')}</th>
+                  <th scope="col" className="px-5 py-3 text-right font-medium">{t('modules.integrations.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {connections.map((connection) => (
                   <tr key={connection.id}>
-                    <td className="px-5 py-4">
+                    <td className="px-3 py-4 sm:px-5">
                       <div className="flex items-center gap-3">
-                        <ConnectionLogo name={connection.name} />
-                        <span className="text-sm font-semibold text-default">{connection.name}</span>
+                        <div className="hidden sm:block"><ConnectionLogo name={connection.name} /></div>
+                        <span className="break-words text-sm font-semibold text-default">{connection.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-muted">{connectionResource(connection)}</td>
+                    <td className="px-4 py-4 text-sm text-muted">{connectionResource(connection, notConnected)}</td>
                     <td className="px-4 py-4"><ConnectionStatus status={connection.status} /></td>
                     <td className="px-4 py-4 text-sm text-muted">
-                      {connection.lastSyncAt ? 'Activity recorded' : '—'}
+                      {lastActivity(connection)}
                     </td>
-                    <td className="px-5 py-4">
-                      <div className="flex justify-end gap-2">
-                        <SimulateCiButton connection={connection} runId={firstRunningRun?.id ?? null} />
-                        {connection.status === 'connected' ? (
-                          <Button size="sm" variant="outline" onClick={() => transition(connection.id, 'disconnect')}>Disconnect</Button>
-                        ) : (
-                          <Button size="sm" onClick={() => transition(connection.id, 'connect')}>Connect</Button>
-                        )}
-                      </div>
+                    <td className="px-3 py-4 sm:px-5">
+                      <ConnectionActions connection={connection} runId={firstRunningRun?.id ?? null} onTransition={transition} />
                     </td>
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </DataTable>
         </section>
 
-        <aside className="overflow-hidden rounded-xl border border-border bg-surface" aria-labelledby="activity-heading">
-          <div className="border-b border-border px-5 py-4">
-            <h2 id="activity-heading" className="text-sm font-semibold text-default">Recent activity</h2>
-          </div>
+        <InspectorPanel title={t('modules.integrations.recentActivity')}>
           <ul className="divide-y divide-border">
             {activity.map((item) => (
               <li key={item.id} className="flex gap-3 px-5 py-4">
                 <ConnectionLogo name={item.connection} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-default">{item.title}</p>
-                  <p className="mt-0.5 text-xs text-muted">{item.detail}</p>
+                  <p className="text-sm font-medium text-default">{t(`modules.integrations.${item.title}`)}</p>
+                  <p className="mt-0.5 text-xs text-muted">{t(`modules.integrations.${item.detail}`)}</p>
                 </div>
-                <time className="shrink-0 text-xs text-muted">{item.time}</time>
+                <time className="shrink-0 text-xs text-muted">{t(`modules.integrations.${item.time}`)}</time>
               </li>
             ))}
           </ul>
-        </aside>
+        </InspectorPanel>
       </div>
     </div>
   )
