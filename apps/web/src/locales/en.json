@@ -333,7 +333,13 @@
     "deleteRun": "Delete run",
     "deleteRunTitle": "Delete run?",
     "deleteRunDescription": "This permanently deletes {{name}} and its recorded case results. This action cannot be undone.",
-    "runActions": "Run actions"
+    "runActions": "Run actions",
+    "ciAdapterHeading": "CI adapter",
+    "simulateCi": "Simulate CI",
+    "simulateCiRetry": "Retry simulation",
+    "simulateCiErrorTitle": "CI simulation failed",
+    "simulateCiServerErrorDescription": "The CI simulation could not be completed. Try again.",
+    "simulateCiNetworkErrorDescription": "We could not reach the CI simulator. Check your connection and try again."
   },
 
   "suites": {
@@ -587,12 +593,7 @@
       "time2Minutes": "2 min ago",
       "time5Minutes": "5 min ago",
       "time18Minutes": "18 min ago",
-      "time27Minutes": "27 min ago",
-      "simulateCi": "Simulate CI",
-      "simulateCiRetry": "Retry simulation",
-      "simulateCiErrorTitle": "CI simulation failed",
-      "simulateCiServerErrorDescription": "The CI simulation could not be completed. Try again.",
-      "simulateCiNetworkErrorDescription": "We could not reach the CI simulator. Check your connection and try again."
+      "time27Minutes": "27 min ago"
     }
   }
 }

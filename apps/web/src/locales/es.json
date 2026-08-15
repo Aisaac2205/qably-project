@@ -333,7 +333,13 @@
     "deleteRun": "Eliminar ejecución",
     "deleteRunTitle": "¿Eliminar ejecución?",
     "deleteRunDescription": "Esto elimina permanentemente {{name}} y los resultados registrados de sus casos. Esta acción no se puede deshacer.",
-    "runActions": "Acciones de la ejecución"
+    "runActions": "Acciones de la ejecución",
+    "ciAdapterHeading": "Adaptador de CI",
+    "simulateCi": "Simular CI",
+    "simulateCiRetry": "Reintentar simulación",
+    "simulateCiErrorTitle": "La simulación de CI falló",
+    "simulateCiServerErrorDescription": "No se pudo completar la simulación de CI. Intentá de nuevo.",
+    "simulateCiNetworkErrorDescription": "No pudimos conectarnos al simulador de CI. Revisá tu conexión e intentá de nuevo."
   },
 
   "suites": {
@@ -587,12 +593,7 @@
       "time2Minutes": "hace 2 min",
       "time5Minutes": "hace 5 min",
       "time18Minutes": "hace 18 min",
-      "time27Minutes": "hace 27 min",
-      "simulateCi": "Simular CI",
-      "simulateCiRetry": "Reintentar simulaci\u00f3n",
-      "simulateCiErrorTitle": "La simulaci\u00f3n de CI fall\u00f3",
-      "simulateCiServerErrorDescription": "No se pudo completar la simulaci\u00f3n de CI. Intent\u00e1 de nuevo.",
-      "simulateCiNetworkErrorDescription": "No pudimos conectarnos al simulador de CI. Revis\u00e1 tu conexi\u00f3n e intent\u00e1 de nuevo."
+      "time27Minutes": "hace 27 min"
     }
   }
 }

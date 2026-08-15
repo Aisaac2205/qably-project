@@ -1,9 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
 import Image from 'next/image'
 import {
-  ArrowsClockwise,
   CheckCircle,
   Circle,
   CircleNotch,
@@ -12,12 +10,10 @@ import {
 } from '@phosphor-icons/react'
 import type { Connection } from '@qably/types'
 import { useConnections } from '@/features/integrations'
-import { useRunAggregate } from '@/features/runs'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 import { InspectorPanel } from '@/components/ui/inspector-panel'
 import { PageHeader } from '@/components/ui/page-header'
-import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 
 const logos: Record<Connection['name'], string> = {
@@ -90,93 +86,17 @@ function ConnectionLogo({ name }: { name: Connection['name'] }) {
   )
 }
 
-function SimulateCiButton({ connection, runId }: { connection: Connection; runId: string | null }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<'server' | 'network' | null>(null)
-  const inFlight = useRef(false)
-  const { t } = useTranslation()
-
-  if (connection.config?.category !== 'ci') return null
-
-  const simulate = async () => {
-    if (inFlight.current) return
-
-    inFlight.current = true
-    setLoading(true)
-    setError(null)
-    try {
-      const timestamp = Date.now()
-      const run = runId ?? connection.id
-      const payload = {
-        action: 'completed',
-        check_run: {
-          id: timestamp,
-          head_sha: `sim-sha-${timestamp}`,
-          name: 'CI',
-          status: 'completed',
-          conclusion: 'success',
-          details_url: `https://github.com/sim/run/${timestamp}`,
-          external_id: run,
-        },
-        check_suite: {
-          id: timestamp,
-          head_sha: `sim-sha-${timestamp}`,
-          head_branch: 'main',
-          repository: { full_name: connection.config?.repoUrl ?? 'acme/repo' },
-        },
-        repository: { full_name: connection.config?.repoUrl ?? 'acme/repo' },
-      }
-      const response = await fetch('/api/webhooks/ci/github', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) setError('server')
-    } catch {
-      setError('network')
-    } finally {
-      inFlight.current = false
-      setLoading(false)
-    }
-  }
-
-  const actionLabel = t(error ? 'modules.integrations.simulateCiRetry' : 'modules.integrations.simulateCi')
-  const errorDescription = error === 'server'
-    ? t('modules.integrations.simulateCiServerErrorDescription')
-    : t('modules.integrations.simulateCiNetworkErrorDescription')
-
-  return (
-    <div className="flex w-full min-w-0 flex-col items-end gap-1 sm:w-auto">
-      <Button size="sm" variant="outline" onClick={simulate} disabled={loading} aria-label={actionLabel}>
-        <ArrowsClockwise size={14} aria-hidden="true" />
-        {actionLabel}
-      </Button>
-      {error ? (
-        <StateView
-          kind="error"
-          title={t('modules.integrations.simulateCiErrorTitle')}
-          description={errorDescription}
-          className="min-h-0 w-full gap-2 px-2 py-2 sm:w-56"
-        />
-      ) : null}
-    </div>
-  )
-}
-
 function ConnectionActions({
   connection,
-  runId,
   onTransition,
 }: {
   connection: Connection
-  runId: string | null
   onTransition: (id: string, event: 'connect' | 'disconnect') => void
 }) {
   const { t } = useTranslation()
 
   return (
     <div className="flex w-full flex-wrap justify-end gap-2">
-      <SimulateCiButton connection={connection} runId={runId} />
       {connection.status === 'connected' ? (
         <Button size="sm" variant="outline" onClick={() => onTransition(connection.id, 'disconnect')}>
           {t('modules.integrations.disconnect')}
@@ -192,10 +112,10 @@ function ConnectionActions({
 
 export default function IntegrationsPage() {
   const { connections, create, transition } = useConnections()
-  const { runs } = useRunAggregate()
   const { t } = useTranslation()
-  const firstRunningRun = runs.find((run) => run.status === 'running')
-  const visibleConnections = connections.filter((connection) => connection.config?.category !== 'scm')
+  const visibleConnections = connections.filter(
+    (connection) => connection.config?.category !== 'scm' && connection.config?.category !== 'ci',
+  )
 
   const addIntegration = () => {
     create({
@@ -252,7 +172,7 @@ export default function IntegrationsPage() {
                     <dd className="text-default">{lastActivity(connection)}</dd>
                   </div>
                 </dl>
-                <ConnectionActions connection={connection} runId={firstRunningRun?.id ?? null} onTransition={transition} />
+                <ConnectionActions connection={connection} onTransition={transition} />
               </li>
             ))}
           </ul>
@@ -281,7 +201,7 @@ export default function IntegrationsPage() {
                       {lastActivity(connection)}
                     </td>
                     <td className="px-3 py-4 sm:px-5">
-                      <ConnectionActions connection={connection} runId={firstRunningRun?.id ?? null} onTransition={transition} />
+                      <ConnectionActions connection={connection} onTransition={transition} />
                     </td>
                   </tr>
                 ))}
