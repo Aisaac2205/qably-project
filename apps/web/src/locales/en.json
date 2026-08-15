@@ -30,21 +30,78 @@
     "cases": "Cases",
     "suites": "Suites",
     "runs": "Runs",
-    "projects": "Projects"
+    "projects": "Projects",
+    "skipToMain": "Skip to main content"
   },
 
   "sidebar": {
     "brand": "Qably",
     "dashboard": "Dashboard",
+    "portfolio": "Portfolio",
     "projects": "Projects",
+    "reviewInbox": "Review Inbox",
+    "notifications": "Notifications",
     "settings": "Settings",
     "integrations": "Integrations",
+    "overview": "Overview",
+    "repository": "Repository",
+    "review": "Review",
+    "testLibrary": "Test Library",
+    "quality": "Quality",
     "suites": "Suites",
     "runs": "Runs",
     "reports": "Reports",
     "aiReview": "AI Review",
     "organization": "Organization",
     "admin": "Admin"
+  },
+
+  "reviewInbox": {
+    "title": "Review Inbox",
+    "subtitle": "A dedicated inbox for review work.",
+    "temporaryTitle": "This area is not available yet",
+    "temporaryDescription": "Review items will appear here when the review workflow is introduced."
+  },
+
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "A dedicated place for product notifications.",
+    "temporaryTitle": "This area is not available yet",
+    "temporaryDescription": "Notifications will appear here when notification delivery is introduced."
+  },
+
+  "repository": {
+    "title": "Repository",
+    "subtitle": "Repository connections will be introduced for this project in Phase 2.",
+    "temporaryTitle": "Repository setup is not available yet",
+    "temporaryDescription": "This temporary page preserves project context without implying that a repository is connected.",
+    "openIntegrations": "Open integrations"
+  },
+
+  "status": {
+    "execution": {
+      "pass": "Pass",
+      "fail": "Fail",
+      "skip": "Skip",
+      "blocked": "Blocked",
+      "running": "Running",
+      "pending": "Pending",
+      "needsAttention": "Needs attention",
+      "neverRun": "Never run"
+    },
+    "review": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "rejected": "Rejected"
+    },
+    "lifecycle": {
+      "active": "Active",
+      "draft": "Draft",
+      "deprecated": "Deprecated"
+    },
+    "legacy": {
+      "cancelled": "Cancelled"
+    }
   },
 
   "dashboard": {
@@ -158,9 +215,9 @@
     "possibleDuplicate": "Possible duplicate",
     "duplicateDescription": "This looks similar to an existing case in this project\u2019s suites.",
     "duplicateNotFound": "The original matching case could not be located (it may have been removed).",
-    "connectProviderTitle": "Connect an AI provider to start chatting",
-    "connectProviderDesc": "Link Claude or Gemini in Settings to ask questions about this project and draft new test cases.",
-    "goToSettings": "Go to Settings",
+    "connectProviderTitle": "AI chat is unavailable",
+    "connectProviderDesc": "No AI provider is connected. You can continue reviewing the existing queue.",
+    "returnToReview": "Return to Review Queue",
     "noProviderLabel": "No provider",
     "selectedProvider": "Selected AI provider: {{name}}",
     "steps": "Steps",
@@ -179,6 +236,36 @@
     "confirmAll": "Confirm all",
     "suggestCases": "Suggest test cases for: {{area}}",
     "coverageGapSuggestion": "Suggested from coverage gap"
+  },
+
+  "reviewFlow": {
+    "provenance": "Provenance",
+    "source": "Source",
+    "excerpt": "Excerpt",
+    "evidence": "Evidence",
+    "traceability": "Traceability",
+    "evidenceKind": {
+      "source_excerpt": "Source excerpt",
+      "artifact": "Artifact",
+      "url": "URL"
+    },
+    "relation": {
+      "evidence_for": "Evidence for",
+      "produced": "Produced",
+      "version_of": "Version of",
+      "executed_as": "Executed as",
+      "signals": "Signals"
+    },
+    "entity": {
+      "code_change": "Code change",
+      "evidence": "Evidence",
+      "proposal": "Proposal",
+      "test_case": "Test case",
+      "test_case_version": "Test case version",
+      "execution": "Execution",
+      "execution_result": "Execution result",
+      "quality_risk": "Quality risk"
+    }
   },
 
   "runs": {
@@ -451,7 +538,42 @@
       "kpiTotal": "Total connections",
       "kpiConnected": "Connected",
       "kpiPending": "Pending",
-      "empty": "No connections yet"
+      "empty": "No connections yet",
+      "add": "Add integration",
+      "newName": "New integration",
+      "newDescription": "Configure a notification channel",
+      "listHeading": "Integrations",
+      "listCaption": "Integrations",
+      "service": "Service",
+      "resource": "Connected resource",
+      "status": "Status",
+      "lastActivity": "Last activity",
+      "actions": "Actions",
+      "connected": "Connected",
+      "pending": "Pending",
+      "error": "Error",
+      "available": "Available",
+      "notConnected": "Not connected",
+      "activityRecorded": "Activity recorded",
+      "noActivity": "No activity",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "recentActivity": "Recent activity",
+      "activityAlert1245": "Alert #1245 delivered",
+      "activityWorkflowCompleted": "Workflow E2E Tests completed",
+      "activityAlert1244": "Alert #1244 delivered",
+      "activityWorkflowStarted": "Workflow Smoke Tests started",
+      "activitySlackQa": "Slack, qa-alerts channel",
+      "activityGithubActions": "GitHub Actions",
+      "time2Minutes": "2 min ago",
+      "time5Minutes": "5 min ago",
+      "time18Minutes": "18 min ago",
+      "time27Minutes": "27 min ago",
+      "simulateCi": "Simulate CI",
+      "simulateCiRetry": "Retry simulation",
+      "simulateCiErrorTitle": "CI simulation failed",
+      "simulateCiServerErrorDescription": "The CI simulation could not be completed. Try again.",
+      "simulateCiNetworkErrorDescription": "We could not reach the CI simulator. Check your connection and try again."
     }
   }
 }

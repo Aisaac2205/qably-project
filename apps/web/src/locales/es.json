@@ -30,21 +30,78 @@
     "cases": "Casos",
     "suites": "Suites",
     "runs": "Ejecuciones",
-    "projects": "Proyectos"
+    "projects": "Proyectos",
+    "skipToMain": "Saltar al contenido principal"
   },
 
   "sidebar": {
     "brand": "Qably",
     "dashboard": "Dashboard",
+    "portfolio": "Portafolio",
     "projects": "Proyectos",
+    "reviewInbox": "Bandeja de revisi\u00f3n",
+    "notifications": "Notificaciones",
     "settings": "Configuraci\u00f3n",
     "integrations": "Integraciones",
+    "overview": "Resumen",
+    "repository": "Repositorio",
+    "review": "Revisi\u00f3n",
+    "testLibrary": "Biblioteca de pruebas",
+    "quality": "Calidad",
     "suites": "Suites",
     "runs": "Ejecuciones",
     "reports": "Reportes",
     "aiReview": "Revisi\u00f3n IA",
     "organization": "Organizaci\u00f3n",
     "admin": "Administrador"
+  },
+
+  "reviewInbox": {
+    "title": "Bandeja de revisi\u00f3n",
+    "subtitle": "Una bandeja dedicada al trabajo de revisi\u00f3n.",
+    "temporaryTitle": "Esta \u00e1rea todav\u00eda no est\u00e1 disponible",
+    "temporaryDescription": "Los elementos de revisi\u00f3n aparecer\u00e1n aqu\u00ed cuando se incorpore el flujo de revisi\u00f3n."
+  },
+
+  "notifications": {
+    "title": "Notificaciones",
+    "subtitle": "Un espacio dedicado a las notificaciones del producto.",
+    "temporaryTitle": "Esta \u00e1rea todav\u00eda no est\u00e1 disponible",
+    "temporaryDescription": "Las notificaciones aparecer\u00e1n aqu\u00ed cuando se incorpore su entrega."
+  },
+
+  "repository": {
+    "title": "Repositorio",
+    "subtitle": "Las conexiones de repositorio para este proyecto se incorporar\u00e1n en la Fase 2.",
+    "temporaryTitle": "La configuraci\u00f3n del repositorio todav\u00eda no est\u00e1 disponible",
+    "temporaryDescription": "Esta p\u00e1gina temporal conserva el contexto del proyecto sin indicar que haya un repositorio conectado.",
+    "openIntegrations": "Abrir integraciones"
+  },
+
+  "status": {
+    "execution": {
+      "pass": "Aprobado",
+      "fail": "Fallido",
+      "skip": "Omitido",
+      "blocked": "Bloqueado",
+      "running": "En ejecución",
+      "pending": "Pendiente",
+      "needsAttention": "Requiere atención",
+      "neverRun": "Nunca ejecutado"
+    },
+    "review": {
+      "pending": "Pendiente",
+      "confirmed": "Confirmado",
+      "rejected": "Rechazado"
+    },
+    "lifecycle": {
+      "active": "Activo",
+      "draft": "Borrador",
+      "deprecated": "Obsoleto"
+    },
+    "legacy": {
+      "cancelled": "Cancelado"
+    }
   },
 
   "dashboard": {
@@ -158,9 +215,9 @@
     "possibleDuplicate": "Posible duplicado",
     "duplicateDescription": "Esto se parece a un caso existente en las suites de este proyecto.",
     "duplicateNotFound": "El caso original coincidente no pudo ser localizado (puede haber sido eliminado).",
-    "connectProviderTitle": "Conecta un proveedor de IA para comenzar a chatear",
-    "connectProviderDesc": "Vincula Claude o Gemini en Configuraci\u00f3n para hacer preguntas sobre este proyecto y crear nuevos casos de prueba.",
-    "goToSettings": "Ir a Configuraci\u00f3n",
+    "connectProviderTitle": "El chat con IA no est\u00e1 disponible",
+    "connectProviderDesc": "No hay un proveedor de IA conectado. Pod\u00e9s continuar revisando la cola existente.",
+    "returnToReview": "Volver a la Cola de Revisi\u00f3n",
     "noProviderLabel": "Sin proveedor",
     "selectedProvider": "Proveedor de IA seleccionado: {{name}}",
     "steps": "Pasos",
@@ -179,6 +236,36 @@
     "confirmAll": "Confirmar todos",
     "suggestCases": "Sugi\u00e9reme casos de prueba para: {{area}}",
     "coverageGapSuggestion": "Sugerido por vac\u00edo de cobertura"
+  },
+
+  "reviewFlow": {
+    "provenance": "Procedencia",
+    "source": "Fuente",
+    "excerpt": "Fragmento",
+    "evidence": "Evidencia",
+    "traceability": "Trazabilidad",
+    "evidenceKind": {
+      "source_excerpt": "Fragmento de fuente",
+      "artifact": "Artefacto",
+      "url": "URL"
+    },
+    "relation": {
+      "evidence_for": "Evidencia de",
+      "produced": "Produjo",
+      "version_of": "Versi\u00f3n de",
+      "executed_as": "Ejecutado como",
+      "signals": "Se\u00f1ala"
+    },
+    "entity": {
+      "code_change": "Cambio de c\u00f3digo",
+      "evidence": "Evidencia",
+      "proposal": "Propuesta",
+      "test_case": "Caso de prueba",
+      "test_case_version": "Versi\u00f3n de caso de prueba",
+      "execution": "Ejecuci\u00f3n",
+      "execution_result": "Resultado de ejecuci\u00f3n",
+      "quality_risk": "Riesgo de calidad"
+    }
   },
 
   "runs": {
@@ -451,7 +538,42 @@
       "kpiTotal": "Conexiones totales",
       "kpiConnected": "Conectadas",
       "kpiPending": "Pendientes",
-      "empty": "Sin conexiones a\u00fan"
+      "empty": "Sin conexiones a\u00fan",
+      "add": "Agregar integraci\u00f3n",
+      "newName": "Nueva integraci\u00f3n",
+      "newDescription": "Configura un canal de notificaciones",
+      "listHeading": "Integraciones",
+      "listCaption": "Integraciones",
+      "service": "Servicio",
+      "resource": "Recurso conectado",
+      "status": "Estado",
+      "lastActivity": "\u00daltima actividad",
+      "actions": "Acciones",
+      "connected": "Conectado",
+      "pending": "Pendiente",
+      "error": "Error",
+      "available": "Disponible",
+      "notConnected": "No conectado",
+      "activityRecorded": "Actividad registrada",
+      "noActivity": "Sin actividad",
+      "connect": "Conectar",
+      "disconnect": "Desconectar",
+      "recentActivity": "Actividad reciente",
+      "activityAlert1245": "Alerta #1245 entregada",
+      "activityWorkflowCompleted": "Flujo E2E Tests completado",
+      "activityAlert1244": "Alerta #1244 entregada",
+      "activityWorkflowStarted": "Flujo Smoke Tests iniciado",
+      "activitySlackQa": "Slack, canal qa-alerts",
+      "activityGithubActions": "GitHub Actions",
+      "time2Minutes": "hace 2 min",
+      "time5Minutes": "hace 5 min",
+      "time18Minutes": "hace 18 min",
+      "time27Minutes": "hace 27 min",
+      "simulateCi": "Simular CI",
+      "simulateCiRetry": "Reintentar simulaci\u00f3n",
+      "simulateCiErrorTitle": "La simulaci\u00f3n de CI fall\u00f3",
+      "simulateCiServerErrorDescription": "No se pudo completar la simulaci\u00f3n de CI. Intent\u00e1 de nuevo.",
+      "simulateCiNetworkErrorDescription": "No pudimos conectarnos al simulador de CI. Revis\u00e1 tu conexi\u00f3n e intent\u00e1 de nuevo."
     }
   }
 }
