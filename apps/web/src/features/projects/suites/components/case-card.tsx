@@ -6,12 +6,7 @@ import { PriorityBadge } from './priority-badge'
 import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
-
-const STATE_CONFIG: Record<string, { labelKey: string; className: string }> = {
-  active: { labelKey: 'suites.stateActive', className: 'bg-pass-bg text-pass' },
-  draft: { labelKey: 'suites.stateDraft', className: 'bg-warn-bg text-warn' },
-  deprecated: { labelKey: 'suites.stateDeprecated', className: 'bg-skip-bg text-muted' },
-}
+import { StatusChip } from '@/components/ui/status-chip'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -23,7 +18,6 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
-  const stateConfig = STATE_CONFIG[testCase.state] ?? STATE_CONFIG.active
 
   return (
     <div className="py-2 px-3 hover:bg-canvas transition-colors rounded group">
@@ -32,9 +26,7 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
           {testCase.name}
         </span>
         <PriorityBadge priority={testCase.priority} />
-        <span className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${stateConfig.className}`}>
-          {t(stateConfig.labelKey)}
-        </span>
+        <StatusChip status={testCase.state} scope="lifecycle" />
 
         {/* Row actions — revealed on hover/focus so the list stays quiet */}
         <Menu>

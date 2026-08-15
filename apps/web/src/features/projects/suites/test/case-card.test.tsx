@@ -30,6 +30,9 @@ describe('CaseCard', () => {
   it('shows state badge', async () => {
     await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
     expect(screen.getByText('Active')).toBeInTheDocument()
+    const chip = screen.getByText('Active').closest('span')
+    expect(chip).toHaveAttribute('data-status', 'active')
+    expect(chip?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 
   it('shows steps count and can toggle expand', async () => {

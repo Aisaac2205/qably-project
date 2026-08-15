@@ -10,20 +10,12 @@
  */
 import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import type { Project } from '@qably/types'
+import { PageHeader } from '@/components/ui/page-header'
 
 export function ProjectHome({ project }: { project: Project }) {
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-default text-wrap-balance">
-          {project.name}
-        </h1>
-        {project.description && (
-          <p className="text-sm text-muted mt-1 max-w-[65ch] text-wrap-pretty">
-            {project.description}
-          </p>
-        )}
-      </header>
+      <PageHeader title={project.name} description={project.description} />
       <SuiteList projectId={project.id} />
     </div>
   )

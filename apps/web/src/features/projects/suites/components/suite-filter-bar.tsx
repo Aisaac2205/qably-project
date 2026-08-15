@@ -10,6 +10,7 @@
  */
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
+import { FilterBar } from '@/components/ui/filter-bar'
 import {
   Select,
   SelectContent,
@@ -62,11 +63,7 @@ export function SuiteFilterBar({
   ]
 
   return (
-    <div
-      className="grid grid-cols-2 md:flex md:items-center gap-2"
-      role="search"
-      aria-label={t('suites.ariaFilterSuites')}
-    >
+    <FilterBar label={t('suites.ariaFilterSuites')}>
       <div className="relative col-span-2 md:flex-1">
         <MagnifyingGlass
           size={14}
@@ -125,6 +122,6 @@ export function SuiteFilterBar({
           ))}
         </SelectContent>
       </Select>
-    </div>
+    </FilterBar>
   )
 }

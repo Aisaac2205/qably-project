@@ -10,9 +10,11 @@
  */
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { TestTube, Plus } from '@phosphor-icons/react'
+import { Plus } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { EntityList } from '@/components/ui/entity-list'
+import { StateView } from '@/components/ui/state-view'
 import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
 import { SuiteFormDialog } from './suite-form-dialog'
@@ -95,16 +97,18 @@ export function SuiteList({ projectId }: SuiteListProps) {
   // Empty state 1: project has no suites at all
   if (perSuite.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-        <TestTube size={32} weight="duotone" className="text-muted" aria-hidden="true" />
-        <p className="text-sm text-default font-medium">{t('suites.noSuitesHeading')}</p>
-        <p className="text-xs text-muted max-w-[40ch]">{t('suites.createSuiteHint')}</p>
-        <Button type="button" size="sm" className="mt-1" onClick={() => setCreateOpen(true)}>
-          <Plus size={14} weight="bold" aria-hidden="true" />
-          {t('suites.newSuite')}
-        </Button>
+      <>
+        <StateView
+          kind="empty"
+          title={t('suites.noSuitesHeading')}
+          description={t('suites.createSuiteHint')}
+          action={<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus size={14} weight="bold" aria-hidden="true" />
+            {t('suites.newSuite')}
+          </Button>}
+        />
         <SuiteFormDialog projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
-      </div>
+      </>
     )
   }
 
@@ -134,9 +138,10 @@ export function SuiteList({ projectId }: SuiteListProps) {
 
       {sorted.length === 0 ? (
         // Empty state 2: filter excludes everything
-        <div className="flex flex-col items-center justify-center py-16 gap-2 text-center">
-          <p className="text-sm text-default font-medium">{t('suites.noSuitesMatch')}</p>
-          {hasActiveFilter && (
+        <StateView
+          kind="empty"
+          title={t('suites.noSuitesMatch')}
+          action={hasActiveFilter ? (
             <button
               type="button"
               onClick={() => {
@@ -148,20 +153,23 @@ export function SuiteList({ projectId }: SuiteListProps) {
             >
               {t('suites.clearFilters')}
             </button>
-          )}
-        </div>
+          ) : undefined}
+        />
       ) : (
         <Card>
-          <CardContent className="p-0 divide-y divide-border">
+          <CardContent className="p-0">
+            <EntityList aria-label={t('suites.ariaFilterSuites')}>
             {sorted.map((m) => (
-              <Link
-                key={m.suite.id}
-                href={`/projects/${projectId}/suites/${m.suite.id}`}
-                className="block focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                <SuiteRow suite={m.suite} metrics={m} />
-              </Link>
+              <li key={m.suite.id}>
+                <Link
+                  href={`/projects/${projectId}/suites/${m.suite.id}`}
+                  className="block focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <SuiteRow suite={m.suite} metrics={m} />
+                </Link>
+              </li>
             ))}
+            </EntityList>
           </CardContent>
         </Card>
       )}

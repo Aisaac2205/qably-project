@@ -18,7 +18,8 @@ describe('ProjectHealthTable', () => {
     await act(async () => {
       render(<ProjectHealthTable />)
     })
-    expect(screen.getByText('Project health')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Project health' })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Project health' })).toBeInTheDocument()
   })
 
   it('renders the "View all" link', async () => {

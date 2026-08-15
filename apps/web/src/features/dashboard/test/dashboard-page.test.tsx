@@ -43,7 +43,7 @@ describe('DashboardPage', () => {
     await act(async () => {
       render(<DashboardPage />)
     })
-    expect(screen.getByText('Project health')).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: 'Project health' })).toBeInTheDocument()
     // Should show all 4 projects
     expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
     expect(screen.getByText('Mobile App')).toBeInTheDocument()

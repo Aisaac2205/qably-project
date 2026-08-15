@@ -6,6 +6,8 @@ import { useRuns } from '@/lib/use-mock-store'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from './status-chip'
+import { EntityList } from '@/components/ui/entity-list'
+import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 
 function formatDate(iso: string): string {
@@ -63,24 +65,27 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
 
   if (sorted.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <p className="text-sm text-muted">{t('runs.noRuns')}</p>
-        <Link
+      <StateView
+        kind="empty"
+        title={t('runs.noRuns')}
+        action={<Link
           href={`/projects/${projectId}/runs/new`}
           className="text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
         >
           {t('runs.startARun')}
-        </Link>
-      </div>
+        </Link>}
+      />
     )
   }
 
   return (
     <Card>
-      <CardContent className="p-0 divide-y divide-border">
+      <CardContent className="p-0">
+        <EntityList aria-label={t('runs.ariaRunCases')}>
         {sorted.map((r) => (
-          <RunRow key={r.id} run={r} projectId={projectId} />
+          <li key={r.id}><RunRow run={r} projectId={projectId} /></li>
         ))}
+        </EntityList>
       </CardContent>
     </Card>
   )

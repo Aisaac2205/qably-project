@@ -6,6 +6,7 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
 import { useTranslation } from '@/lib/i18n'
+import { DataTable } from '@/components/ui/data-table'
 
 export function ProjectHealthTable() {
   const stats = useDashboardStats()
@@ -23,8 +24,8 @@ export function ProjectHealthTable() {
         </Link>
       </CardHeader>
       
-      <CardContent className="p-0 overflow-x-auto flex-1">
-        <table className="w-full text-left border-collapse min-w-[400px]">
+      <CardContent className="p-0 flex-1">
+        <DataTable caption={t('dashboard.projectHealth')} className="min-w-[400px]">
           <thead>
             <tr className="border-b border-border bg-canvas/30">
               <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3">{t('dashboard.thProject')}</th>
@@ -74,7 +75,7 @@ export function ProjectHealthTable() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </DataTable>
       </CardContent>
     </Card>
   )
