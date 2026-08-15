@@ -8,6 +8,7 @@ function subscribe(onStoreChange: () => void) {
   if (typeof window.matchMedia !== 'function') return () => undefined
   const mediaQuery = window.matchMedia(query)
   mediaQuery.addEventListener('change', onStoreChange)
+  onStoreChange()
   return () => mediaQuery.removeEventListener('change', onStoreChange)
 }
 

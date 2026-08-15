@@ -54,8 +54,9 @@ describe('TopBar', () => {
   it('does not render a Dashboard label on /dashboard (no inline breadcrumb)', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<TopBar />) })
-    // Top bar shows search, notifications, and user avatar
-    expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
+    // Unimplemented controls stay out of the keyboard order.
+    expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /user menu/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument()
     expect(screen.getByText('IF')).toBeInTheDocument()
   })
@@ -76,10 +77,10 @@ describe('TopBar', () => {
     expect(occurrences.length).toBeGreaterThanOrEqual(1)
   })
 
-  it('has a search trigger button', async () => {
+  it('does not expose the deferred search command as a dead control', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<TopBar />) })
-    expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
   })
 
   it('shows user avatar', async () => {

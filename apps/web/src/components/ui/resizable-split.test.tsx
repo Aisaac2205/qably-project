@@ -55,7 +55,7 @@ describe('ResizableSplit', () => {
       second: <div>R</div>,
     }
 
-    expect(renderToString(<ResizableSplit {...props} />)).toContain('width:288px')
+    expect(renderToString(<ResizableSplit {...props} />)).toContain('--split-width:288px')
 
     render(
       <ResizableSplit {...props} />,
@@ -162,5 +162,28 @@ describe('ResizableSplit', () => {
       fireEvent.doubleClick(sep)
     })
     expect(sep.getAttribute('aria-valuenow')).toBe('288')
+  })
+
+  it('keeps both panes in document order and their controls keyboard reachable at 320px', async () => {
+    const user = userEvent.setup()
+    render(
+      <div style={{ width: 320 }}>
+        <ResizableSplit
+          storageKey="narrow"
+          first={<button type="button">Choose case</button>}
+          second={<button type="button">Confirm case</button>}
+        />
+      </div>,
+    )
+
+    const choose = screen.getByRole('button', { name: 'Choose case' })
+    const confirm = screen.getByRole('button', { name: 'Confirm case' })
+    expect(choose.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    await user.tab()
+    expect(choose).toHaveFocus()
+    await user.tab()
+    await user.tab()
+    expect(confirm).toHaveFocus()
   })
 })

@@ -1,9 +1,10 @@
-import { render, screen, act } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { render, screen, act, within } from '@testing-library/react'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import type { Project } from '@qably/types'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 const mockPathname = vi.fn(() => '/dashboard')
+let isMobileViewport = false
 
 // jsdom doesn't implement matchMedia. SidebarProvider uses it via
 // use-mobile to detect viewport size for the collapsible sidebar.
@@ -11,7 +12,7 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
     value: vi.fn().mockImplementation((query: string) => ({
-      matches: false,
+      get matches() { return isMobileViewport },
       media: query,
       onchange: null,
       addListener: vi.fn(),
@@ -62,29 +63,38 @@ vi.mock('@/lib/use-mock-store', () => ({
 import { Sidebar } from '@/components/shell/sidebar'
 
 // Sidebar uses useSidebar() which requires a SidebarProvider. Wrap renders.
-function renderSidebar() {
+function renderSidebar({ defaultOpen = true, includeTrigger = false } = {}) {
   return render(
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={defaultOpen}>
+      {includeTrigger ? <SidebarTrigger /> : null}
       <Sidebar />
     </SidebarProvider>,
   )
 }
 
+afterEach(() => {
+  isMobileViewport = false
+})
+
 describe('Sidebar — global state (no project route)', () => {
-  it('shows Dashboard, Projects, Integrations, and Settings links', async () => {
+  it('shows the aligned global destinations', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Portfolio')).toBeInTheDocument()
     expect(screen.getByText('Projects')).toBeInTheDocument()
-    expect(screen.getByText('Integrations')).toBeInTheDocument()
+    expect(screen.getByText('Review Inbox')).toBeInTheDocument()
+    expect(screen.getByText('Notifications')).toBeInTheDocument()
     expect(screen.getByText('Settings')).toBeInTheDocument()
   })
 
-  it('Integrations link points to /integrations', async () => {
+  it('maps every global destination to a safe route', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { renderSidebar() })
-    const link = screen.getByText('Integrations').closest('a')
-    expect(link?.getAttribute('href')).toBe('/integrations')
+    expect(screen.getByText('Portfolio').closest('a')).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByText('Projects').closest('a')).toHaveAttribute('href', '/projects')
+    expect(screen.getByText('Review Inbox').closest('a')).toHaveAttribute('href', '/review-inbox')
+    expect(screen.getByText('Notifications').closest('a')).toHaveAttribute('href', '/notifications')
+    expect(screen.getByText('Settings').closest('a')).toHaveAttribute('href', '/settings')
   })
 
   it('does not show project sub-routes in global state', async () => {
@@ -92,8 +102,8 @@ describe('Sidebar — global state (no project route)', () => {
     await act(async () => { renderSidebar() })
     // Project-internal items only show when on /projects/[id]/...
     expect(screen.queryByText('Runs')).not.toBeInTheDocument()
-    expect(screen.queryByText('AI Review')).not.toBeInTheDocument()
-    expect(screen.queryByText('Reports')).not.toBeInTheDocument()
+    expect(screen.queryByText('Review')).not.toBeInTheDocument()
+    expect(screen.queryByText('Quality')).not.toBeInTheDocument()
   })
 })
 
@@ -112,20 +122,26 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
     expect(link?.getAttribute('href')).toBe('/projects')
   })
 
-  it('shows project sub-routes: Suites, Runs, AI Review, Reports', async () => {
+  it('shows the aligned project destinations', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/suites')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Suites')).toBeInTheDocument()
+    expect(screen.getByText('Overview')).toBeInTheDocument()
+    expect(screen.getByText('Repository')).toBeInTheDocument()
+    expect(screen.getByText('Review')).toBeInTheDocument()
+    expect(screen.getByText('Test Library')).toBeInTheDocument()
     expect(screen.getByText('Runs')).toBeInTheDocument()
-    expect(screen.getByText('AI Review')).toBeInTheDocument()
-    expect(screen.getByText('Reports')).toBeInTheDocument()
+    expect(screen.getByText('Quality')).toBeInTheDocument()
   })
 
-  it('Suite sub-route link points to /projects/proj-1 (project home)', async () => {
+  it('maps every project destination to an existing route', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/suites')
     await act(async () => { renderSidebar() })
-    const link = screen.getByText('Suites').closest('a')
-    expect(link?.getAttribute('href')).toBe('/projects/proj-1')
+    expect(screen.getByText('Overview').closest('a')).toHaveAttribute('href', '/projects/proj-1')
+    expect(screen.getByText('Repository').closest('a')).toHaveAttribute('href', '/projects/proj-1/repository')
+    expect(screen.getByText('Review').closest('a')).toHaveAttribute('href', '/projects/proj-1/ai-review')
+    expect(screen.getByText('Test Library').closest('a')).toHaveAttribute('href', '/projects/proj-1/suites')
+    expect(screen.getByText('Runs').closest('a')).toHaveAttribute('href', '/projects/proj-1/runs')
+    expect(screen.getByText('Quality').closest('a')).toHaveAttribute('href', '/projects/proj-1/reports')
   })
 
   it('Runs sub-route link points to /projects/proj-1/runs', async () => {
@@ -135,19 +151,42 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
     expect(link?.getAttribute('href')).toBe('/projects/proj-1/runs')
   })
 
-  it('still shows global nav (Dashboard, Integrations, Settings) in project state', async () => {
+  it('replaces global navigation with the project hierarchy', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/suites')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Integrations')).toBeInTheDocument()
-    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.queryByText('Portfolio')).not.toBeInTheDocument()
+    expect(screen.queryByText('Review Inbox')).not.toBeInTheDocument()
+    expect(screen.queryByText('Notifications')).not.toBeInTheDocument()
+    expect(screen.queryByText('Settings')).not.toBeInTheDocument()
   })
 
-  it('highlights the active sub-route when on /projects/proj-1/runs', async () => {
-    mockPathname.mockReturnValue('/projects/proj-1/runs')
-    await act(async () => { renderSidebar() })
-    // The Runs link should have aria-current="page" or similar
-    // (we just check it renders without error — visual highlight is CSS)
-    expect(screen.getByText('Runs').closest('a')).toHaveAttribute('href', '/projects/proj-1/runs')
+})
+
+describe('Sidebar — current destinations', () => {
+  type RenderOptions = { defaultOpen?: boolean; mobile?: boolean }
+
+  const cases: ReadonlyArray<readonly [string, string, string, string, RenderOptions]> = [
+    ['global expanded', '/notifications', 'Notifications', '/notifications', {}],
+    ['global collapsed', '/projects/new', 'Projects', '/projects', { defaultOpen: false }],
+    ['global mobile', '/review-inbox', 'Review Inbox', '/review-inbox', { mobile: true }],
+    ['project Overview exact match', '/projects/proj-1', 'Overview', '/projects/proj-1', {}],
+    ['project Review nested destination', '/projects/proj-1/ai-review/case-1', 'Review', '/projects/proj-1/ai-review', {}],
+    ['project Quality nested destination', '/projects/proj-1/reports/run-1', 'Quality', '/projects/proj-1/reports', {}],
+    ['project collapsed', '/projects/proj-1/runs', 'Runs', '/projects/proj-1/runs', { defaultOpen: false }],
+    ['project mobile', '/projects/proj-1/repository', 'Repository', '/projects/proj-1/repository', { mobile: true }],
+  ]
+
+  it.each(cases)('%s exposes exactly one correct current link', async (_mode, pathname, name, href, options) => {
+    isMobileViewport = options.mobile ?? false
+    mockPathname.mockReturnValue(pathname)
+    await act(async () => { renderSidebar({ defaultOpen: options.defaultOpen, includeTrigger: options.mobile }) })
+
+    if (options.mobile) {
+      await act(async () => { screen.getByRole('button', { name: 'Toggle Sidebar' }).click() })
+    }
+    const links = options.mobile ? within(screen.getByRole('dialog', { name: 'Sidebar' })) : screen
+
+    expect(links.getAllByRole('link', { current: 'page' })).toHaveLength(1)
+    expect(links.getByRole('link', { name, current: 'page' })).toHaveAttribute('href', href)
   })
 })

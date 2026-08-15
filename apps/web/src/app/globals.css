@@ -6,19 +6,19 @@
   /* Backgrounds */
   --bg:                oklch(0.97 0.000 0);
   --bg-surface:        oklch(1.000 0.000 0);
-  --bg-sidebar:        oklch(0 0 0);
-  --bg-sidebar-hover:  oklch(0.15 0 0);
-  --bg-sidebar-active: oklch(1 0 0 / 0.12);
+  --bg-sidebar:        oklch(1.000 0.000 0);
+  --bg-sidebar-hover:  oklch(0.945 0.000 0);
+  --bg-sidebar-active: oklch(0.920 0.000 0);
 
   /* Foregrounds */
   --fg:                oklch(0.12 0.000 0);
   --fg-muted:          oklch(0.46 0.000 0);
-  --fg-sidebar:        oklch(0.95 0.000 0);
-  --fg-sidebar-muted:  oklch(0.55 0.000 0);
+  --fg-sidebar:        oklch(0.12 0.000 0);
+  --fg-sidebar-muted:  oklch(0.46 0.000 0);
 
   /* Borders */
   --border:            oklch(0.91 0.000 0);
-  --border-sidebar:    oklch(1 0 0 / 0.08);
+  --border-sidebar:    oklch(0.91 0.000 0);
 
   /* Brand */
   --primary:           oklch(0.15 0.000 0);
@@ -40,7 +40,7 @@
   --status-skip-bg:    oklch(0.94 0.00 0);
   --status-running:    oklch(0.50 0.18 240);
   --status-running-bg: oklch(0.95 0.05 240);
-  --status-warn:       oklch(0.55 0.15 80);
+  --status-warn:       oklch(0.53 0.15 80);
   --status-warn-bg:    oklch(0.97 0.05 80);
 
   /* Hover surface — for ghost/outline interactive states. Distinct from
@@ -62,7 +62,7 @@
   --sidebar-accent: var(--bg-sidebar-active);
   --sidebar-accent-foreground: var(--fg-sidebar);
   --sidebar-border: var(--border-sidebar);
-  --sidebar-ring: var(--primary);
+  --sidebar-ring: var(--fg-sidebar);
 }
 
 /* ─── Tailwind v4 theme mapping ─────────────────────────────────── */
@@ -140,6 +140,16 @@
 body {
   background-color: var(--bg);
   color: var(--fg);
+}
+
+.resizable-split-pane {
+  width: 100%;
+}
+
+@media (min-width: 48rem) {
+  .resizable-split-pane {
+    width: var(--split-width);
+  }
 }
 
 @keyframes scan {

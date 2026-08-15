@@ -187,12 +187,12 @@ function ResizableSplitContent({
   return (
     <div
       ref={containerRef}
-      className={cn('flex flex-1 min-h-0', isDragging && 'select-none', className)}
+      className={cn('flex w-full flex-none flex-col md:min-h-0 md:flex-1 md:flex-row', isDragging && 'select-none', className)}
       data-dragging={isDragging || undefined}
     >
       <div
-        className="flex flex-col min-h-0 shrink-0"
-        style={{ width: `${displayedWidth}px` }}
+        className="resizable-split-pane flex flex-none flex-col md:min-h-0 md:shrink-0"
+        style={{ '--split-width': `${displayedWidth}px` } as React.CSSProperties}
       >
         {first}
       </div>
@@ -208,14 +208,14 @@ function ResizableSplitContent({
         onDoubleClick={onDoubleClick}
         aria-label="Resize sidebar"
         className={cn(
-          'group relative shrink-0 self-stretch w-px bg-border',
+          'group relative hidden w-px shrink-0 self-stretch bg-border md:block',
           // Invisible 12px hit zone centered on the 1px line.
           'before:absolute before:inset-y-0 before:-left-1.5 before:w-3 before:cursor-col-resize',
           'hover:bg-primary/40 focus-visible:bg-primary/60 focus-visible:outline-none',
           isDragging && 'bg-primary/60',
         )}
       />
-      <div className="flex flex-1 min-w-0 min-h-0 flex-col">{second}</div>
+      <div className="flex min-w-0 flex-none flex-col md:min-h-0 md:flex-1">{second}</div>
     </div>
   )
 }

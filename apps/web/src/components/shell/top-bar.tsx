@@ -1,7 +1,6 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { MagnifyingGlass } from '@phosphor-icons/react'
 import { useProject } from '@/lib/use-mock-store'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { NotificationsMenu } from '@/features/notifications'
@@ -35,31 +34,14 @@ export function TopBar() {
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        {/* Search trigger (visual placeholder — command palette lands in Phase 2) */}
-        <button
-          type="button"
-          aria-label="Search"
-          className="hidden sm:flex w-56 h-8 items-center justify-between px-2.5 text-xs text-muted-foreground bg-canvas border border-border rounded-lg hover:bg-surface-hover hover:text-default transition-colors duration-150 cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <MagnifyingGlass size={14} aria-hidden="true" />
-            <span>Search...</span>
-          </span>
-          <kbd className="text-[10px] font-mono bg-surface border border-border px-1.5 py-0.5 rounded text-muted">
-            ⌘K
-          </kbd>
-        </button>
-
         <NotificationsMenu />
 
-        {/* User menu */}
-        <button
-          type="button"
-          aria-label="User menu"
-          className="size-7 rounded-full bg-primary flex items-center justify-center text-primary-fg text-xs font-bold select-none shrink-0 cursor-pointer hover:bg-primary-hover transition-colors duration-150"
+        <span
+          aria-label="Current user: Isaac F."
+          className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-fg"
         >
           IF
-        </button>
+        </span>
       </div>
     </div>
   )

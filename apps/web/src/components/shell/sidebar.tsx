@@ -3,16 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
+  Bell,
   Buildings,
-  CaretDown,
   Gauge,
   FolderOpen,
   Gear,
-  Plug,
   Stack,
   Play,
   Robot,
   ChartLine,
+  Tray,
   ArrowLeft,
 } from '@phosphor-icons/react'
 import { useOrg, useProject } from '@/lib/use-mock-store'
@@ -34,6 +34,7 @@ interface NavItem {
   label: string
   href: string
   icon: React.ElementType
+  exact?: boolean
 }
 
 export function Sidebar() {
@@ -43,74 +44,72 @@ export function Sidebar() {
   const { state } = useSidebar()
   const isCollapsed = state === 'collapsed'
 
-  // Project context: when inside a project page (/projects/[id]/...),
-  // render the project's sub-routes in addition to the global nav.
+  // Project routes replace, rather than append to, global navigation.
   const segments = pathname.split('/').filter(Boolean)
   const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
   const project = useProject(projectId ?? '')
+  const projectContext = project ? projectId : null
 
   const navItems: NavItem[] = [
-    { label: t('sidebar.dashboard'), href: '/dashboard', icon: Gauge },
+    { label: t('sidebar.portfolio'), href: '/dashboard', icon: Gauge },
     { label: t('sidebar.projects'), href: '/projects', icon: FolderOpen },
-    { label: t('sidebar.integrations'), href: '/integrations', icon: Plug },
+    { label: t('sidebar.reviewInbox'), href: '/review-inbox', icon: Tray },
+    { label: t('sidebar.notifications'), href: '/notifications', icon: Bell },
+    { label: t('sidebar.settings'), href: '/settings', icon: Gear },
   ]
 
-  // Project-internal sub-routes. Each links to a project-scoped page.
-  // "Suites" → /projects/[id] (Phase 1.7: project home collapsed into suites list)
-  const projectSubItems: NavItem[] = projectId
+  const projectSubItems: NavItem[] = projectContext
     ? [
-        { label: t('sidebar.suites'), href: `/projects/${projectId}`, icon: Stack },
-        { label: t('sidebar.runs'), href: `/projects/${projectId}/runs`, icon: Play },
-        { label: t('sidebar.aiReview'), href: `/projects/${projectId}/ai-review`, icon: Robot },
-        { label: t('sidebar.reports'), href: `/projects/${projectId}/reports`, icon: ChartLine },
+        { label: t('sidebar.overview'), href: `/projects/${projectContext}`, icon: Gauge, exact: true },
+        { label: t('sidebar.repository'), href: `/projects/${projectContext}/repository`, icon: FolderOpen },
+        { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Robot },
+        { label: t('sidebar.testLibrary'), href: `/projects/${projectContext}/suites`, icon: Stack },
+        { label: t('sidebar.runs'), href: `/projects/${projectContext}/runs`, icon: Play },
+        { label: t('sidebar.quality'), href: `/projects/${projectContext}/reports`, icon: ChartLine },
       ]
     : []
 
   return (
     <ShadcnSidebar collapsible="icon" className="bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
-      <SidebarHeader className="p-3 border-b border-border-sidebar">
+      <SidebarHeader className="h-14 justify-center p-2">
         {!isCollapsed && (
-          <button
-            className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg border border-border-sidebar hover:bg-sidebar-hover transition-colors text-left cursor-pointer"
-            aria-label="Select organization"
-          >
+          <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-border-sidebar px-2.5">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-6 h-6 rounded bg-white/10 flex items-center justify-center text-sidebar-fg-muted shrink-0">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-sidebar-active text-sidebar-fg-muted">
                 <Buildings size={14} />
               </div>
               <span className="text-sm font-medium text-sidebar-foreground truncate">{org.name || t('sidebar.organization')}</span>
             </div>
-            <CaretDown size={14} className="text-sidebar-fg-muted shrink-0" />
-          </button>
+          </div>
         )}
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Project context (only when inside a project) — Linear-style:
-            single muted row with chevron + project name as the back link. */}
-        {projectId && project && !isCollapsed && (
+        {/* The project identity also serves as the only route back to global projects. */}
+        {projectContext && project && (
           <SidebarGroup className="px-2 pt-2">
             <Link
               href="/projects"
-              className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-sidebar-fg-muted hover:text-sidebar-foreground transition-colors"
+              aria-label={`${t('sidebar.projects')}: ${project.name}`}
+              className="flex min-h-10 items-center gap-1.5 px-2 text-base font-normal text-sidebar-fg-muted transition-colors hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
-              <ArrowLeft size={12} aria-hidden="true" />
-              <span className="truncate font-medium">{project.name}</span>
+              <ArrowLeft size={18} weight="regular" aria-hidden="true" />
+              {!isCollapsed && <><span>{t('sidebar.projects')}</span><span aria-hidden="true">/</span><span className="truncate">{project.name}</span></>}
             </Link>
             <SidebarGroupContent>
               <SidebarMenu>
                 {projectSubItems.map(item => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  const isActive = pathname === item.href || (!item.exact && pathname.startsWith(item.href + '/'))
                   return (
                     <SidebarMenuItem key={item.label}>
                       <SidebarMenuButton
-                        render={<Link href={item.href} />}
+                        render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
                         isActive={isActive}
                         tooltip={item.label}
-                        className="h-8 text-sm"
+                        className="h-10 text-base font-normal"
                       >
-                        <item.icon size={16} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
+                        <item.icon size={20} weight="regular" aria-hidden="true" />
                         <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -121,21 +120,21 @@ export function Sidebar() {
           </SidebarGroup>
         )}
 
-        {/* Global nav */}
-        <SidebarGroup className="px-2">
+        {/* Global nav is only available outside a project context. */}
+        {!projectContext && <SidebarGroup className="px-2">
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map(item => {
-                const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
+                const isActive = !projectContext && (pathname === item.href || (!item.exact && pathname.startsWith(item.href + '/')))
                 return (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
-                      render={<Link href={item.href} />}
+                      render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
                       isActive={isActive}
                       tooltip={item.label}
                       className="h-10 text-base"
                     >
-                      <item.icon size={22} weight={isActive ? 'bold' : 'regular'} aria-hidden="true" />
+                      <item.icon size={20} weight="regular" aria-hidden="true" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -143,38 +142,24 @@ export function Sidebar() {
               })}
             </SidebarMenu>
           </SidebarGroupContent>
-        </SidebarGroup>
+        </SidebarGroup>}
       </SidebarContent>
 
-      <SidebarFooter className="p-3 border-t border-border-sidebar bg-black/10">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              render={<Link href="/settings" />}
-              isActive={pathname === '/settings'}
-              tooltip={t('sidebar.settings')}
-              className="h-10 text-base"
-            >
-              <Gear size={22} weight={pathname === '/settings' ? 'bold' : 'regular'} aria-hidden="true" />
-              <span>{t('sidebar.settings')}</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-
+       <SidebarFooter className="border-t border-border-sidebar p-3">
         {isCollapsed ? (
           <div className="flex items-center justify-center py-2">
-            <div className="w-8 h-8 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-sm font-bold shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-sidebar bg-primary text-sm font-normal text-primary-fg">
               IF
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-2 px-2.5 py-2 mt-2">
-            <div className="w-8 h-8 rounded-full bg-primary/25 border border-primary/35 flex items-center justify-center text-primary-fg text-sm font-bold shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-sidebar bg-primary text-sm font-normal text-primary-fg">
               IF
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-sidebar-foreground truncate">Isaac F.</div>
-              <div className="text-sm text-sidebar-fg-muted truncate">{t('sidebar.admin')}</div>
+              <div className="truncate text-sm font-normal text-sidebar-foreground">Isaac F.</div>
+              <div className="truncate text-sm text-sidebar-fg-muted">{t('sidebar.admin')}</div>
             </div>
           </div>
         )}
