@@ -1,79 +1,47 @@
 'use client'
 
+import { useTranslation } from '@/lib/i18n'
+import type { CaseState, ReviewStatus } from '@qably/types'
 import {
-  CheckCircle,
-  XCircle,
-  CircleNotch,
-  MinusCircle,
-  Prohibit,
-  ProhibitInset,
-  Question,
-  WarningCircle,
-  Circle,
-} from '@phosphor-icons/react'
-import type { RunStatus, SuiteRunStatus } from '@qably/types'
+  getCaseLifecyclePresentation,
+  getLegacyStatusPresentation,
+  getReviewStatusPresentation,
+  statusToneClassNames,
+  type LegacyStatus,
+  type StatusPresentation,
+} from './status-presentation'
 
-type ChipStatus =
-  | RunStatus
-  | SuiteRunStatus
-  | 'skip'
-  | 'blocked'
-  | 'cancelled'
-  | 'draft'
-  | 'deprecated'
+export type StatusChipProps =
+  | { status: LegacyStatus; scope?: undefined }
+  | { status: ReviewStatus; scope: 'review' }
+  | { status: CaseState; scope: 'lifecycle' }
 
-interface StatusConfig {
-  label: string
-  className: string
-  icon: 'check' | 'x' | 'spinner' | 'minus' | 'prohibit' | 'prohibitInset' | 'question' | 'warning' | 'circle'
+function getStatusPresentation(props: StatusChipProps): StatusPresentation {
+  if (props.scope === 'review') return getReviewStatusPresentation(props.status)
+  if (props.scope === 'lifecycle') return getCaseLifecyclePresentation(props.status)
+  return getLegacyStatusPresentation(props.status)
 }
 
-const STATUS_MAP: Record<string, StatusConfig> = {
-  pass: { label: 'Pass', className: 'bg-pass-bg text-pass', icon: 'check' },
-  fail: { label: 'Fail', className: 'bg-fail-bg text-fail', icon: 'x' },
-  skip: { label: 'Skip', className: 'bg-skip-bg text-skip', icon: 'minus' },
-  blocked: { label: 'Blocked', className: 'bg-blocked-bg text-blocked', icon: 'prohibit' },
-  running: { label: 'Running', className: 'bg-running-bg text-running', icon: 'spinner' },
-  pending: { label: 'Pending', className: 'bg-skip-bg text-muted', icon: 'minus' },
-  cancelled: { label: 'Cancelled', className: 'bg-skip-bg text-muted', icon: 'prohibitInset' },
-  draft: { label: 'Draft', className: 'bg-warn-bg text-warn', icon: 'warning' },
-  deprecated: { label: 'Deprecated', className: 'bg-skip-bg text-muted', icon: 'minus' },
-  'never-run': { label: 'Never run', className: 'bg-skip-bg text-muted', icon: 'circle' },
-  'needs-attention': { label: 'Needs attention', className: 'bg-warn-bg text-warn', icon: 'warning' },
-}
+export function StatusChip(props: StatusChipProps) {
+  const { t } = useTranslation()
+  const presentation = getStatusPresentation(props)
+  const label = t(presentation.labelKey)
+  const Icon = presentation.Icon
 
-function StatusIcon({ icon }: { icon: StatusConfig['icon'] }) {
-  const size = 12
-  switch (icon) {
-    case 'check':
-      return <CheckCircle size={size} weight="fill" aria-hidden="true" />
-    case 'x':
-      return <XCircle size={size} weight="fill" aria-hidden="true" />
-    case 'spinner':
-      return <CircleNotch size={size} weight="bold" className="animate-spin" aria-hidden="true" />
-    case 'minus':
-      return <MinusCircle size={size} weight="fill" aria-hidden="true" />
-    case 'prohibit':
-      return <Prohibit size={size} weight="fill" aria-hidden="true" />
-    case 'prohibitInset':
-      return <ProhibitInset size={size} weight="fill" aria-hidden="true" />
-    case 'warning':
-      return <WarningCircle size={size} weight="fill" aria-hidden="true" />
-    case 'circle':
-      return <Circle size={size} weight="fill" aria-hidden="true" />
-    default:
-      return <Question size={size} weight="fill" aria-hidden="true" />
-  }
-}
-
-export function StatusChip({ status }: { status: ChipStatus }) {
-  const config = STATUS_MAP[status] ?? STATUS_MAP.pending
   return (
     <span
-      className={`inline-flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${config.className}`}
+      aria-label={label}
+      data-status={presentation.status}
+      data-tone={presentation.tone}
+      className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${statusToneClassNames[presentation.tone]}`}
     >
-      <StatusIcon icon={config.icon} />
-      {config.label}
+      <Icon
+        size={12}
+        weight="fill"
+        className={presentation.animated ? 'animate-spin motion-reduce:animate-none' : undefined}
+        aria-hidden="true"
+      />
+      {label}
     </span>
   )
 }
