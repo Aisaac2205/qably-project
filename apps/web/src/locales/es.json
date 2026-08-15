@@ -469,6 +469,10 @@
       "aiCases": "Casos de IA",
       "limit": "Hasta {{count}}"
     },
+    "integrationsGovernance": {
+      "title": "Credenciales de integraciones",
+      "description": "Canales de notificación y otras credenciales de conexión de esta organización."
+    },
     "org": {
       "inviteMembers": "Invitar miembros",
       "inviteMembersDesc": "Invita y gestiona permisos del equipo",
@@ -559,41 +563,21 @@
   "modules": {
     "integrations": {
       "title": "Integraciones",
-      "subtitle": "Conecta Qably con tu proveedor de CI, canales de notificación y herramientas externas.",
-      "kpiTotal": "Conexiones totales",
-      "kpiConnected": "Conectadas",
-      "kpiPending": "Pendientes",
-      "empty": "Sin conexiones a\u00fan",
-      "add": "Agregar integraci\u00f3n",
-      "newName": "Nueva integraci\u00f3n",
+      "subtitle": "Esta página ya no concentra flujos operativos: cada responsabilidad se movió a su superficie propia.",
+      "movedHeading": "Adónde se movió cada cosa",
+      "movedCiText": "Los adaptadores de CI ahora viven en la página Runs de cada proyecto.",
+      "movedScmText": "Las fuentes SCM ahora viven en la página Repository de cada proyecto.",
+      "movedCredentialsText": "Las credenciales y canales de notificación ahora viven en Configuración.",
+      "add": "Agregar integración",
+      "newName": "Nueva integración",
       "newDescription": "Configura un canal de notificaciones",
-      "listHeading": "Integraciones",
-      "listCaption": "Integraciones",
-      "service": "Servicio",
-      "resource": "Recurso conectado",
-      "status": "Estado",
-      "lastActivity": "\u00daltima actividad",
-      "actions": "Acciones",
       "connected": "Conectado",
       "pending": "Pendiente",
       "error": "Error",
       "available": "Disponible",
       "notConnected": "No conectado",
-      "activityRecorded": "Actividad registrada",
-      "noActivity": "Sin actividad",
       "connect": "Conectar",
-      "disconnect": "Desconectar",
-      "recentActivity": "Actividad reciente",
-      "activityAlert1245": "Alerta #1245 entregada",
-      "activityWorkflowCompleted": "Flujo E2E Tests completado",
-      "activityAlert1244": "Alerta #1244 entregada",
-      "activityWorkflowStarted": "Flujo Smoke Tests iniciado",
-      "activitySlackQa": "Slack, canal qa-alerts",
-      "activityGithubActions": "GitHub Actions",
-      "time2Minutes": "hace 2 min",
-      "time5Minutes": "hace 5 min",
-      "time18Minutes": "hace 18 min",
-      "time27Minutes": "hace 27 min"
+      "disconnect": "Desconectar"
     }
   }
 }

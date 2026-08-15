@@ -7,6 +7,7 @@
 
 import { LanguageSection } from '@/features/settings/components/language-section'
 import { AccountPlanSection } from '@/features/settings/components/account-plan-section'
+import { IntegrationsGovernanceSection } from '@/features/settings/components/integrations-governance-section'
 import { useTranslation } from '@/lib/i18n'
 
 export default function SettingsPage() {
@@ -20,6 +21,7 @@ export default function SettingsPage() {
       </div>
         <div className="space-y-5 px-6 pt-5 pb-6">
           <AccountPlanSection />
+          <IntegrationsGovernanceSection />
           <LanguageSection />
       </div>
     </div>

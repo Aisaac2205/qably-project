@@ -12,3 +12,9 @@ export type {
   ConnectionPatch,
   ConnectionAction,
 } from './lib/aggregate'
+export {
+  ConnectionActions,
+  ConnectionLogo,
+  ConnectionStatus,
+  connectionResource,
+} from './components/connection-presentation'

@@ -469,6 +469,10 @@
       "aiCases": "AI cases",
       "limit": "Up to {{count}}"
     },
+    "integrationsGovernance": {
+      "title": "Integration credentials",
+      "description": "Notification channels and other connection credentials for this organization."
+    },
     "org": {
       "inviteMembers": "Invite members",
       "inviteMembersDesc": "Invite and manage team permissions",
@@ -559,41 +563,21 @@
   "modules": {
     "integrations": {
       "title": "Integrations",
-      "subtitle": "Connect Qably to your CI provider, notification channels, and external tools.",
-      "kpiTotal": "Total connections",
-      "kpiConnected": "Connected",
-      "kpiPending": "Pending",
-      "empty": "No connections yet",
+      "subtitle": "This page no longer hosts operational flows — each responsibility moved to its owning surface.",
+      "movedHeading": "Where things moved",
+      "movedCiText": "CI adapters now live in each project's Runs page.",
+      "movedScmText": "SCM sources now live in each project's Repository page.",
+      "movedCredentialsText": "Credentials and notification channels now live in Settings.",
       "add": "Add integration",
       "newName": "New integration",
       "newDescription": "Configure a notification channel",
-      "listHeading": "Integrations",
-      "listCaption": "Integrations",
-      "service": "Service",
-      "resource": "Connected resource",
-      "status": "Status",
-      "lastActivity": "Last activity",
-      "actions": "Actions",
       "connected": "Connected",
       "pending": "Pending",
       "error": "Error",
       "available": "Available",
       "notConnected": "Not connected",
-      "activityRecorded": "Activity recorded",
-      "noActivity": "No activity",
       "connect": "Connect",
-      "disconnect": "Disconnect",
-      "recentActivity": "Recent activity",
-      "activityAlert1245": "Alert #1245 delivered",
-      "activityWorkflowCompleted": "Workflow E2E Tests completed",
-      "activityAlert1244": "Alert #1244 delivered",
-      "activityWorkflowStarted": "Workflow Smoke Tests started",
-      "activitySlackQa": "Slack, qa-alerts channel",
-      "activityGithubActions": "GitHub Actions",
-      "time2Minutes": "2 min ago",
-      "time5Minutes": "5 min ago",
-      "time18Minutes": "18 min ago",
-      "time27Minutes": "27 min ago"
+      "disconnect": "Disconnect"
     }
   }
 }
