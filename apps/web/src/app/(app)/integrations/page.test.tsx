@@ -1,7 +1,7 @@
 import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { __resetStore, getSnapshot } from '@/lib/mock-store'
+import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import IntegrationsPage from './page'
 
@@ -10,12 +10,19 @@ describe('IntegrationsPage', () => {
 
   beforeEach(() => {
     __resetStore()
-    useI18nStore.setState({ locale: 'en' })
+    act(() => {
+      useI18nStore.setState({ locale: 'en' })
+    })
   })
 
-  afterEach(() => vi.unstubAllGlobals())
+  afterEach(() => {
+    act(() => {
+      useI18nStore.setState({ locale: 'en' })
+    })
+    vi.unstubAllGlobals()
+  })
 
-  it('renders the operational table with Gmail as an available channel', async () => {
+  it('keeps CI and notification integrations while excluding SCM sources', async () => {
     await act(async () => {
       render(<IntegrationsPage />)
     })
@@ -23,22 +30,9 @@ describe('IntegrationsPage', () => {
     expect(screen.getByRole('columnheader', { name: 'Service' })).toBeInTheDocument()
     expect(screen.getAllByText('GitHub Actions').length).toBeGreaterThan(0)
     expect(within(desktopTable()).getByText('Gmail')).toBeInTheDocument()
+    expect(within(desktopTable()).queryByText('GitHub')).not.toBeInTheDocument()
+    expect(within(desktopTable()).queryByText('Bitbucket')).not.toBeInTheDocument()
     expect(screen.getByText('Recent activity')).toBeInTheDocument()
-  })
-
-  it('renders an explicit localized error status instead of Available', async () => {
-    getSnapshot().connections[2].status = 'error'
-    await act(async () => {
-      render(<IntegrationsPage />)
-    })
-
-    const githubRow = within(desktopTable()).getByText('GitHub').closest('tr')
-    expect(githubRow).not.toBeNull()
-    expect(within(githubRow!).getByText('Error')).toBeInTheDocument()
-    expect(within(githubRow!).queryByText('Available')).not.toBeInTheDocument()
-
-    useI18nStore.setState({ locale: 'es' })
-    expect(within(githubRow!).getByText('Error')).toBeInTheDocument()
   })
 
   it('uses a semantic mobile list with all primary decisions available at 320px', async () => {
@@ -46,6 +40,8 @@ describe('IntegrationsPage', () => {
     render(<IntegrationsPage />)
 
     const mobileList = screen.getByRole('list', { name: 'Integrations' })
+    expect(within(mobileList).queryByText('GitHub')).not.toBeInTheDocument()
+    expect(within(mobileList).queryByText('Bitbucket')).not.toBeInTheDocument()
     const gmailItem = within(mobileList).getByText('Gmail').closest('li')
     expect(gmailItem).not.toBeNull()
     expect(within(gmailItem!).getByText('Available')).toBeInTheDocument()

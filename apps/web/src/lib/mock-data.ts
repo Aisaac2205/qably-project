@@ -496,6 +496,10 @@ export const mockGithubIntegration: GithubIntegration = {
   repoUrl: 'https://github.com/acme/ecommerce-app',
 }
 
+export const mockRepositorySources: Record<string, { provider: 'GitHub'; repository: string }> = {
+  'proj-1': { provider: 'GitHub', repository: 'acme/ecommerce-app' },
+}
+
 // ─── Connections (integration aggregate) ─────────────────────────────────────
 
 export const mockConnections: Connection[] = [
@@ -522,6 +526,7 @@ export const mockConnections: Connection[] = [
     type: 'github',
     name: 'GitHub',
     status: 'disconnected',
+    config: { category: 'scm' },
     createdAt: '2026-04-15T10:00:00Z',
   },
   {
@@ -529,6 +534,7 @@ export const mockConnections: Connection[] = [
     type: 'bitbucket',
     name: 'Bitbucket',
     status: 'disconnected',
+    config: { category: 'scm' },
     createdAt: '2026-04-15T10:00:00Z',
   },
   {

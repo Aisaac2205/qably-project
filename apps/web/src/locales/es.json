@@ -72,10 +72,11 @@
 
   "repository": {
     "title": "Repositorio",
-    "subtitle": "Las conexiones de repositorio para este proyecto se incorporar\u00e1n en la Fase 2.",
-    "temporaryTitle": "La configuraci\u00f3n del repositorio todav\u00eda no est\u00e1 disponible",
-    "temporaryDescription": "Esta p\u00e1gina temporal conserva el contexto del proyecto sin indicar que haya un repositorio conectado.",
-    "openIntegrations": "Abrir integraciones"
+    "subtitle": "Fuentes SCM de este proyecto.",
+    "sourceHeading": "Fuente",
+    "simulatedDescription": "Estos datos de fuente son simulados, no una conexi\u00f3n activa con un proveedor.",
+    "noSourceTitle": "Sin fuente SCM",
+    "noSourceDescription": "Este proyecto no tiene una fuente SCM configurada."
   },
 
   "status": {

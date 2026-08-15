@@ -195,6 +195,7 @@ export default function IntegrationsPage() {
   const { runs } = useRunAggregate()
   const { t } = useTranslation()
   const firstRunningRun = runs.find((run) => run.status === 'running')
+  const visibleConnections = connections.filter((connection) => connection.config?.category !== 'scm')
 
   const addIntegration = () => {
     create({
@@ -232,7 +233,7 @@ export default function IntegrationsPage() {
             </h2>
           </div>
           <ul aria-label={t('modules.integrations.listCaption')} className="divide-y divide-border md:hidden">
-            {connections.map((connection) => (
+            {visibleConnections.map((connection) => (
               <li key={connection.id} className="min-w-0 space-y-4 px-4 py-4">
                 <div className="flex min-w-0 items-center gap-3">
                   <ConnectionLogo name={connection.name} />
@@ -266,7 +267,7 @@ export default function IntegrationsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {connections.map((connection) => (
+                {visibleConnections.map((connection) => (
                   <tr key={connection.id}>
                     <td className="px-3 py-4 sm:px-5">
                       <div className="flex items-center gap-3">

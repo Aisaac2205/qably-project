@@ -1,28 +1,11 @@
-'use client'
+import { ProjectRepositoryPage } from '@/features/projects/repository/components/project-repository-page'
 
-import Link from 'next/link'
-import { FolderOpen } from '@phosphor-icons/react'
-import { useTranslation } from '@/lib/i18n'
+export default async function RepositoryPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
 
-export default function RepositoryPage() {
-  const { t } = useTranslation()
-
-  return (
-    <div className="flex flex-col px-4 py-6 sm:px-6">
-      <div className="max-w-2xl">
-        <div className="flex size-10 items-center justify-center rounded-lg border border-border bg-surface text-muted">
-          <FolderOpen size={20} aria-hidden="true" />
-        </div>
-        <h1 className="mt-5 text-3xl font-bold tracking-tight text-default">{t('repository.title')}</h1>
-        <p className="mt-1 text-sm text-muted">{t('repository.subtitle')}</p>
-        <section className="mt-6 rounded-xl border border-border bg-surface px-5 py-4" aria-labelledby="repository-temporary-heading">
-          <h2 id="repository-temporary-heading" className="text-sm font-semibold text-default">{t('repository.temporaryTitle')}</h2>
-          <p className="mt-1 text-sm text-muted">{t('repository.temporaryDescription')}</p>
-          <Link href="/integrations" className="mt-4 inline-flex text-sm font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary">
-            {t('repository.openIntegrations')}
-          </Link>
-        </section>
-      </div>
-    </div>
-  )
+  return <ProjectRepositoryPage projectId={id} />
 }

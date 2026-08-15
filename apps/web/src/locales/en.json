@@ -72,10 +72,11 @@
 
   "repository": {
     "title": "Repository",
-    "subtitle": "Repository connections will be introduced for this project in Phase 2.",
-    "temporaryTitle": "Repository setup is not available yet",
-    "temporaryDescription": "This temporary page preserves project context without implying that a repository is connected.",
-    "openIntegrations": "Open integrations"
+    "subtitle": "SCM sources for this project.",
+    "sourceHeading": "Source",
+    "simulatedDescription": "This is simulated source data, not a live provider connection.",
+    "noSourceTitle": "No SCM source",
+    "noSourceDescription": "This project does not have an SCM source configured."
   },
 
   "status": {
