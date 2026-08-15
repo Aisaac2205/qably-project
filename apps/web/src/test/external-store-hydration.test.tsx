@@ -3,8 +3,8 @@ import { hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { __resetStore } from '@/lib/mock-store'
-import { useAiCases, useConnections } from '@/lib/use-mock-store'
+import { __resetStore, getSnapshot, subscribe } from '@/lib/mock-store'
+import { useAiCases, useChatMessages, useConnections } from '@/lib/use-mock-store'
 
 function SeededCounts() {
   const cases = useAiCases('proj-1')
@@ -14,6 +14,10 @@ function SeededCounts() {
 
 function MobileState() {
   return <output>{useIsMobile() ? 'mobile' : 'desktop'}</output>
+}
+
+function UnseededChat() {
+  return <output>{useChatMessages('proj-2').length}</output>
 }
 
 function hydrate(element: React.ReactNode) {
@@ -51,6 +55,23 @@ describe('external-store hydration', () => {
     } finally {
       act(() => root.unmount())
       container.remove()
+    }
+  })
+
+  it('reads an unseeded chat during SSR without creating a thread or notifying', () => {
+    let notifications = 0
+    const unsubscribe = subscribe(() => { notifications += 1 })
+    notifications = 0
+    const threadsBefore = getSnapshot().chatThreads
+
+    try {
+      expect(renderToString(<UnseededChat />)).toContain('>0<')
+      expect(renderToString(<UnseededChat />)).toContain('>0<')
+      expect(getSnapshot().chatThreads).toBe(threadsBefore)
+      expect(getSnapshot().chatThreads.some((thread) => thread.projectId === 'proj-2')).toBe(false)
+      expect(notifications).toBe(0)
+    } finally {
+      unsubscribe()
     }
   })
 

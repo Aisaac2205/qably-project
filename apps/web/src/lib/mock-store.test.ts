@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import * as mockStore from '@/lib/mock-store'
 import {
   __resetStore,
   getAiProviders,
@@ -9,7 +10,6 @@ import {
   sendChatMessage,
   getCoverageGaps,
   getAiCases,
-  confirmAllPending,
   approveProposal,
   getOfficialTestCase,
   getProposal,
@@ -49,19 +49,21 @@ describe('mock-store project chat', () => {
   beforeEach(() => __resetStore())
 
   it('returns the seeded thread for proj-1', () => {
-    const thread = getChatThread('proj-1')
+    const thread = getChatThread('proj-1')!
     expect(thread.projectId).toBe('proj-1')
     expect(getChatMessages(thread.id).length).toBe(2)
   })
 
-  it('creates a thread lazily for a project with no chat history', () => {
-    const thread = getChatThread('proj-2')
-    expect(thread.projectId).toBe('proj-2')
-    expect(getChatMessages(thread.id)).toEqual([])
+  it('creates a thread from the explicit send event for a project with no chat history', () => {
+    expect(getChatThread('proj-2')).toBeUndefined()
+
+    const { userMessage } = sendChatMessage('proj-2', 'How many suites exist?')
+
+    expect(getChatThread('proj-2')?.id).toBe(userMessage.threadId)
   })
 
   it('appends a user message and a generic assistant reply', () => {
-    const before = getChatMessages(getChatThread('proj-1').id).length
+    const before = getChatMessages(getChatThread('proj-1')!.id).length
     const { userMessage, assistantMessage } = sendChatMessage('proj-1', 'How many suites exist?')
     expect(userMessage.role).toBe('user')
     expect(assistantMessage.role).toBe('assistant')
@@ -92,14 +94,9 @@ describe('mock-store coverage gaps', () => {
   })
 })
 
-describe('mock-store confirmAllPending', () => {
-  beforeEach(() => __resetStore())
-
-  it('confirms every pending AiCase for a project and leaves others untouched', () => {
-    confirmAllPending('proj-1')
-    const cases = getAiCases('proj-1')
-    expect(cases.every((c) => c.reviewStatus !== 'pending')).toBe(true)
-    expect(cases.find((c) => c.id === 'ai-1')?.reviewStatus).toBe('confirmed')
+describe('mock-store governance surface', () => {
+  it('does not export a mass-confirm mutation', () => {
+    expect(mockStore).not.toHaveProperty('confirmAllPending')
   })
 })
 

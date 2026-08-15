@@ -278,13 +278,14 @@ export function getAiProviders(): AiProviderConnection[] {
   return aiProviders
 }
 
-export function getChatThread(projectId: string): ChatThread {
-  const existing = chatThreads.find((t) => t.projectId === projectId)
-  if (existing) return existing
+export function getChatThread(projectId: string): ChatThread | undefined {
+  return chatThreads.find((t) => t.projectId === projectId)
+}
+
+function createChatThread(projectId: string): ChatThread {
   const ts = nowIso()
   const newThread: ChatThread = { id: `thread-${projectId}`, projectId, createdAt: ts, updatedAt: ts }
   chatThreads = [...chatThreads, newThread]
-  notify()
   return newThread
 }
 
@@ -923,7 +924,7 @@ export function sendChatMessage(
   projectId: string,
   content: string,
 ): { userMessage: ChatMessage; assistantMessage: ChatMessage } {
-  const thread = getChatThread(projectId)
+  const thread = getChatThread(projectId) ?? createChatThread(projectId)
   const ts = nowIso()
 
   const userMessage: ChatMessage = {
@@ -977,15 +978,6 @@ export function sendChatMessage(
 
   notify()
   return { userMessage, assistantMessage }
-}
-
-export function confirmAllPending(projectId: string): void {
-  aiCases = aiCases.map((c) =>
-    c.projectId === projectId && c.reviewStatus === 'pending'
-      ? { ...c, reviewStatus: 'confirmed' as const }
-      : c,
-  )
-  notify()
 }
 
 // ── Test-only reset ───────────────────────────────────────────────

@@ -12,7 +12,6 @@ import {
   subscribe,
   getSnapshot,
   getServerSnapshot,
-  getChatThread,
 } from '@/lib/mock-store'
 import type {
   Project,
@@ -163,10 +162,17 @@ export function useAiProviders(): AiProviderConnection[] {
 }
 
 export function useChatMessages(projectId: string): ChatMessage[] {
-  const threadId = getChatThread(projectId).id
   return useStableArray(
-    () => getSnapshot().chatMessages.filter((m) => m.threadId === threadId),
-    () => getServerSnapshot().chatMessages.filter((m) => m.threadId === threadId),
+    () => {
+      const snapshot = getSnapshot()
+      const threadId = snapshot.chatThreads.find((thread) => thread.projectId === projectId)?.id
+      return threadId ? snapshot.chatMessages.filter((message) => message.threadId === threadId) : []
+    },
+    () => {
+      const snapshot = getServerSnapshot()
+      const threadId = snapshot.chatThreads.find((thread) => thread.projectId === projectId)?.id
+      return threadId ? snapshot.chatMessages.filter((message) => message.threadId === threadId) : []
+    },
   )
 }
 

@@ -2,7 +2,13 @@ import { render, screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { AiReviewPage } from '@/features/ai-review/components/ai-review-page'
-import { __resetStore, confirmAllPending, disconnectAiProvider } from '@/lib/mock-store'
+import { __resetStore, confirmAiCase, disconnectAiProvider, getAiCases } from '@/lib/mock-store'
+
+function confirmPendingCases(projectId: string) {
+  for (const testCase of getAiCases(projectId)) {
+    if (testCase.reviewStatus === 'pending') confirmAiCase(testCase.id)
+  }
+}
 
 describe('AiReviewPage', () => {
   beforeEach(() => __resetStore())
@@ -32,7 +38,7 @@ describe('AiReviewPage', () => {
   })
 
   it('does not focus an initially empty review queue', async () => {
-    confirmAllPending('proj-1')
+    confirmPendingCases('proj-1')
     await act(async () => {
       render(<AiReviewPage projectId="proj-1" />)
     })
@@ -41,7 +47,7 @@ describe('AiReviewPage', () => {
   })
 
   it('does not steal focus when an empty review queue rerenders', async () => {
-    confirmAllPending('proj-1')
+    confirmPendingCases('proj-1')
     const { rerender } = render(<><button type="button">Keep focus</button><AiReviewPage projectId="proj-1" /></>)
     const trigger = screen.getByRole('button', { name: 'Keep focus' })
     trigger.focus()
