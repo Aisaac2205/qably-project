@@ -7,19 +7,24 @@ import { __resetStore, disconnectAiProvider } from '@/lib/mock-store'
 describe('ProjectChatPanel', () => {
   beforeEach(() => __resetStore())
 
-  it('shows an empty state with a settings link when no provider is connected', async () => {
+  it('blocks chat with an available return-to-review action when no provider is connected', async () => {
+    const onReturnToReview = vi.fn()
+    const user = userEvent.setup()
     disconnectAiProvider('claude')
     await act(async () => {
-      render(<ProjectChatPanel projectId="proj-1" onViewCase={vi.fn()} />)
+      render(<ProjectChatPanel projectId="proj-1" onViewCase={vi.fn()} onReturnToReview={onReturnToReview} />)
     })
-    expect(screen.getByText(/connect an ai provider/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /go to settings/i })).toHaveAttribute('href', '/settings')
+    const blockedState = screen.getByText('AI chat is unavailable').parentElement?.parentElement
+    expect(blockedState).toHaveAttribute('data-state-kind', 'blocked')
+    expect(screen.getByText('No AI provider is connected. You can continue reviewing the existing queue.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Return to Review Queue' }))
+    expect(onReturnToReview).toHaveBeenCalledOnce()
   })
 
   it('shows the chat and sends a message when a provider is connected', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<ProjectChatPanel projectId="proj-1" onViewCase={vi.fn()} />)
+      render(<ProjectChatPanel projectId="proj-1" onViewCase={vi.fn()} onReturnToReview={vi.fn()} />)
     })
     expect(screen.getByText('What suites have the most pending AI cases?')).toBeInTheDocument()
     const textarea = screen.getByPlaceholderText('Ask about this project or request a new test case…')

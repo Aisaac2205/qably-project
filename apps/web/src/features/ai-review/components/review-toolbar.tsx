@@ -4,7 +4,6 @@ import {
   CheckCircle,
   XCircle,
   ArrowRight,
-  Checks,
 } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 
@@ -13,15 +12,11 @@ export function ReviewToolbar({
   onConfirm,
   onReject,
   onSkip,
-  onConfirmAll,
-  pendingCount,
 }: {
   disabled: boolean
   onConfirm: () => void
   onReject: () => void
   onSkip: () => void
-  onConfirmAll: () => void
-  pendingCount: number
 }) {
   const { t } = useTranslation()
   
@@ -67,20 +62,6 @@ export function ReviewToolbar({
       >
         <ArrowRight size={16} weight="bold" aria-hidden="true" />
         {t('common.skip')}
-      </button>
-
-      <button
-        onClick={onConfirmAll}
-        disabled={pendingCount === 0}
-        aria-label={t('aiReview.ariaConfirmAll', { count: pendingCount })}
-        className="sm:ml-auto inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded
-          border border-border text-default hover:bg-canvas
-          disabled:opacity-40 disabled:cursor-not-allowed
-          focus-visible:outline-2 focus-visible:outline-primary
-          transition-colors"
-      >
-        <Checks size={16} weight="bold" aria-hidden="true" />
-        {t('aiReview.confirmAll')}
       </button>
     </div>
   )

@@ -6,6 +6,8 @@ import { AiStatusChip } from './ai-status-chip'
 import { CopySimple, ChatCircleText, GitBranch, Target } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { useTranslation } from '@/lib/i18n'
+import { EntityList } from '@/components/ui/entity-list'
+import { StateView } from '@/components/ui/state-view'
 
 export function ReviewCaseList({
   cases,
@@ -25,24 +27,21 @@ export function ReviewCaseList({
 
   if (visibleCases.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted p-6">
-        {filter === 'duplicates' ? t('aiReview.noDuplicates') : t('aiReview.noCasesPending')}
-      </div>
+      <StateView kind="empty" title={filter === 'duplicates' ? t('aiReview.noDuplicates') : t('aiReview.noCasesPending')} className="h-full" />
     )
   }
 
   return (
     <Card className="rounded-none border-0 h-full">
       <CardContent className="p-0">
-        <ul className="divide-y divide-border" role="listbox" aria-label={t('aiReview.ariaReviewCases')}>
+        <EntityList aria-label={t('aiReview.ariaReviewCases')}>
           {visibleCases.map((c) => {
             const isSelected = c.id === selectedId
             const possibleDuplicateOf = c.possibleDuplicateOf ?? c.duplicateOfCaseId
             return (
               <li key={c.id}>
                 <button
-                  role="option"
-                  aria-selected={isSelected}
+                  aria-current={isSelected ? 'true' : undefined}
                   onClick={() => onSelect(c.id)}
                   className={`w-full text-left px-4 py-3 transition-colors hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-primary ${
                     isSelected
@@ -80,7 +79,7 @@ export function ReviewCaseList({
               </li>
             )
           })}
-        </ul>
+        </EntityList>
       </CardContent>
     </Card>
   )

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useAiCases } from '@/lib/use-mock-store'
-import { confirmAiCase, rejectAiCase, skipAiCase, confirmAllPending } from '@/lib/mock-store'
+import { approveProposal, getMembers, getProposalForAiReviewCase, rejectProposal, skipAiCase } from '@/lib/mock-store'
 
 export function useAiReview(projectId: string) {
   const allCases = useAiCases(projectId)
@@ -14,7 +14,7 @@ export function useAiReview(projectId: string) {
   const [selectedId, setSelectedId] = useState<string>(pending[0]?.id ?? '')
 
   const selectedCase = useMemo(
-    () => pending.find((c) => c.id === selectedId) ?? null,
+    () => pending.find((c) => c.id === selectedId) ?? pending[0] ?? null,
     [pending, selectedId],
   )
 
@@ -23,41 +23,44 @@ export function useAiReview(projectId: string) {
   }, [])
 
   const confirmSelected = useCallback(() => {
-    if (!selectedId) return
-    confirmAiCase(selectedId)
+    if (!selectedCase) return
+    const proposal = getProposalForAiReviewCase(selectedCase.id)
+    const actor = getMembers()[0]
+    if (!proposal || !actor) return
+    const result = approveProposal(proposal.id, { actorId: actor.id })
+    if (!result.ok) return
     // Select next pending case
-    const idx = pending.findIndex((c) => c.id === selectedId)
+    const idx = pending.findIndex((c) => c.id === selectedCase.id)
     if (idx >= 0) {
-      const filtered = pending.filter((c) => c.id !== selectedId)
+      const filtered = pending.filter((c) => c.id !== selectedCase.id)
       // Next one after removal
       setSelectedId(filtered[Math.min(idx, filtered.length - 1)]?.id ?? '')
     }
-  }, [selectedId, pending])
+  }, [selectedCase, pending])
 
   const rejectSelected = useCallback(() => {
-    if (!selectedId) return
-    rejectAiCase(selectedId)
-    const idx = pending.findIndex((c) => c.id === selectedId)
+    if (!selectedCase) return
+    const proposal = getProposalForAiReviewCase(selectedCase.id)
+    const actor = getMembers()[0]
+    if (!proposal || !actor) return
+    const result = rejectProposal(proposal.id, { actorId: actor.id })
+    if (!result.ok) return
+    const idx = pending.findIndex((c) => c.id === selectedCase.id)
     if (idx >= 0) {
-      const filtered = pending.filter((c) => c.id !== selectedId)
+      const filtered = pending.filter((c) => c.id !== selectedCase.id)
       setSelectedId(filtered[Math.min(idx, filtered.length - 1)]?.id ?? '')
     }
-  }, [selectedId, pending])
+  }, [selectedCase, pending])
 
   const skipSelected = useCallback(() => {
-    if (!selectedId) return
-    skipAiCase(selectedId)
-    const idx = pending.findIndex((c) => c.id === selectedId)
+    if (!selectedCase) return
+    skipAiCase(selectedCase.id)
+    const idx = pending.findIndex((c) => c.id === selectedCase.id)
     if (idx >= 0) {
-      const filtered = pending.filter((c) => c.id !== selectedId)
+      const filtered = pending.filter((c) => c.id !== selectedCase.id)
       setSelectedId(filtered[Math.min(idx, filtered.length - 1)]?.id ?? '')
     }
-  }, [selectedId, pending])
-
-  const confirmAll = useCallback(() => {
-    confirmAllPending(projectId)
-    setSelectedId('')
-  }, [projectId])
+  }, [selectedCase, pending])
 
   return {
     cases: pending,
@@ -66,6 +69,5 @@ export function useAiReview(projectId: string) {
     confirmSelected,
     rejectSelected,
     skipSelected,
-    confirmAll,
   }
 }

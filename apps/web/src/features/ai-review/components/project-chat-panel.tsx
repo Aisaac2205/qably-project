@@ -1,23 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
 import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { ChatMessageList } from './chat-message-list'
 import { ChatComposer } from './chat-composer'
-import { buttonVariants } from '@/components/ui/button'
-import { Robot } from '@phosphor-icons/react'
+import { Button } from '@/components/ui/button'
+import { StateView } from '@/components/ui/state-view'
 import type { AiProvider } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 
 export function ProjectChatPanel({
   projectId,
   onViewCase,
+  onReturnToReview,
   prefillPrompt,
 }: {
   projectId: string
   onViewCase: (caseId: string) => void
+  onReturnToReview: () => void
   prefillPrompt?: string
 }) {
   const { messages, send } = useProjectChat(projectId)
@@ -29,16 +30,13 @@ export function ProjectChatPanel({
 
   if (!hasConnected) {
     return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
-        <Robot size={32} weight="light" className="text-muted" aria-hidden="true" />
-        <p className="text-sm text-default">{t('aiReview.connectProviderTitle')}</p>
-        <p className="text-xs text-muted max-w-xs">
-          {t('aiReview.connectProviderDesc')}
-        </p>
-        <Link href="/settings" className={buttonVariants({ size: 'sm' })}>
-          {t('aiReview.goToSettings')}
-        </Link>
-      </div>
+      <StateView
+        kind="blocked"
+        title={t('aiReview.connectProviderTitle')}
+        description={t('aiReview.connectProviderDesc')}
+        className="h-full"
+        action={<Button size="sm" onClick={onReturnToReview}>{t('aiReview.returnToReview')}</Button>}
+      />
     )
   }
 

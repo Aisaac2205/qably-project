@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
 import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { ReviewCaseList } from './review-case-list'
@@ -12,6 +11,7 @@ import { ProjectChatPanel } from './project-chat-panel'
 import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { Badge } from '@/components/ui/badge'
+import { StateView } from '@/components/ui/state-view'
 import { CheckCircle, WarningCircle } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 
@@ -23,7 +23,6 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
     confirmSelected,
     rejectSelected,
     skipSelected,
-    confirmAll,
   } = useAiReview(projectId)
   const { connectedProviders, hasConnected } = useAiProviders()
   const { t } = useTranslation()
@@ -53,12 +52,10 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
               {connectedProviders[0].label}{t('aiReview.connected')}
             </Badge>
           ) : (
-            <Link href="/settings">
-              <Badge variant="warn">
-                <WarningCircle size={11} weight="fill" aria-hidden="true" />
-                {t('aiReview.noProvider')}
-              </Badge>
-            </Link>
+            <Badge variant="warn">
+              <WarningCircle size={11} weight="fill" aria-hidden="true" />
+              {t('aiReview.noProvider')}
+            </Badge>
           )}
         </div>
         <p className="text-xs text-muted mb-4">
@@ -73,7 +70,13 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         </Tabs>
       </div>
 
-      {tab === 'review' ? (
+      {tab === 'review' ? cases.length === 0 ? (
+        <StateView
+          kind="empty"
+          title={t('aiReview.noCasesPending')}
+          className="flex-1"
+        />
+      ) : (
         <div className="flex-1 flex flex-col min-h-0">
           <ResizableSplit
             storageKey="ai-review-sidebar"
@@ -81,26 +84,30 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             minWidth={240}
             maxRatio={0.5}
             first={
-              <div className="flex flex-col min-h-0 h-full">
+              <div className="flex flex-col md:min-h-0 md:h-full">
                 <div className="flex items-center gap-1.5 px-3 py-2.5 border-b border-border">
                   <button
+                    type="button"
+                    aria-pressed={listFilter === 'all'}
                     onClick={() => setListFilter('all')}
-                    className={`text-sm font-medium px-3 py-1.5 rounded transition-colors ${
+                    className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
                       listFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
                     }`}
                   >
                     {t('aiReview.filterAll')}
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={listFilter === 'duplicates'}
                     onClick={() => setListFilter('duplicates')}
-                    className={`text-sm font-medium px-3 py-1.5 rounded transition-colors ${
+                    className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
                       listFilter === 'duplicates' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
                     }`}
                   >
                     {t('aiReview.filterDuplicates')}
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="md:flex-1 md:overflow-y-auto">
                   <ReviewCaseList
                     cases={cases}
                     selectedId={selectedCase?.id}
@@ -111,7 +118,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
               </div>
             }
             second={
-              <div className="flex flex-1 min-w-0 min-h-0 flex-col overflow-y-auto">
+              <div className="flex min-w-0 flex-col md:min-h-0 md:flex-1 md:overflow-y-auto">
                 <div className="flex-1">
                   {selectedCase ? (
                     <ReviewCaseDetail c={selectedCase} />
@@ -126,8 +133,6 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                   onConfirm={confirmSelected}
                   onReject={rejectSelected}
                   onSkip={skipSelected}
-                  onConfirmAll={confirmAll}
-                  pendingCount={cases.length}
                 />
               </div>
             }
@@ -136,7 +141,12 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <div className="flex-1 min-h-0">
-          <ProjectChatPanel projectId={projectId} onViewCase={handleViewCase} prefillPrompt={prefillPrompt} />
+          <ProjectChatPanel
+            projectId={projectId}
+            onViewCase={handleViewCase}
+            onReturnToReview={() => setTab('review')}
+            prefillPrompt={prefillPrompt}
+          />
         </div>
       )}
     </div>

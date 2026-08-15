@@ -42,21 +42,22 @@ describe('mock-store', () => {
 
   // ── Core ────────────────────────────────────────────────────────
 
-  it('subscribe returns an unsubscribe function that prevents future fires', () => {
+  it('subscribe synchronizes immediately and unsubscribe prevents future fires', () => {
     let calls = 0
     const unsub = subscribe(() => { calls++ })
-    expect(calls).toBe(0)
-    createProject({ name: 'Test Project' })
     expect(calls).toBe(1)
+    createProject({ name: 'Test Project' })
+    expect(calls).toBe(2)
     unsub()
     createProject({ name: 'Another Project' })
-    expect(calls).toBe(1)
+    expect(calls).toBe(2)
   })
 
   it('mutators broadcast to all subscribers', () => {
     const calls: number[] = []
     subscribe(() => calls.push(0))
     subscribe(() => calls.push(1))
+    calls.length = 0
     createProject({ name: 'Test' })
     expect(calls).toEqual([0, 1])
   })
@@ -66,15 +67,15 @@ describe('mock-store', () => {
     expect(projects).toEqual(getProjects())
   })
 
-  it('getServerSnapshot returns a frozen empty snapshot', () => {
+  it('getServerSnapshot returns a frozen seeded snapshot', () => {
     const server = getServerSnapshot()
     expect(server).toBeDefined()
     // Must return same identity each call (stable reference)
     const a = getServerSnapshot()
     const b = getServerSnapshot()
     expect(a).toBe(b)
-    // Should contain empty data
-    expect(a.projects).toEqual([])
+    // SSR markup must match the browser's seeded initial state.
+    expect(a.projects).toEqual(getProjects())
   })
 
   it('getServerSnapshot inner arrays are stable references across calls', () => {

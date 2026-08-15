@@ -48,7 +48,7 @@ describe('ReviewCaseList', () => {
     await act(async () => {
       render(<ReviewCaseList cases={mockCases} onSelect={onSelect} />)
     })
-    await user.click(screen.getByRole('option', { name: /Login error/i }))
+    await user.click(screen.getByRole('button', { name: /Login error/i }))
     expect(onSelect).toHaveBeenCalledWith('ai-3')
   })
 
@@ -57,8 +57,11 @@ describe('ReviewCaseList', () => {
     await act(async () => {
       render(<ReviewCaseList cases={mockCases} selectedId="ai-2" onSelect={onSelect} />)
     })
-    const selected = screen.getByRole('option', { name: /Discount code/i })
-    expect(selected).toHaveAttribute('aria-selected', 'true')
+    const selected = screen.getByRole('button', { name: /Discount code/i })
+    expect(screen.getByRole('list', { name: 'AI review cases' })).toBeInTheDocument()
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+    expect(selected).toHaveAttribute('aria-current', 'true')
     expect(selected.className).toContain('border-primary')
   })
 

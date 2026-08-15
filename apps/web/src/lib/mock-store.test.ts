@@ -13,6 +13,7 @@ import {
   approveProposal,
   getOfficialTestCase,
   getProposal,
+  getProposalForAiReviewCase,
   getReviewScenario,
   getTestCaseVersions,
   getTraceabilityLinks,
@@ -123,6 +124,13 @@ describe('mock-store governed proposal scenarios', () => {
     expect(approveProposal(proposal.id, { actorId: 'member-1' })).toEqual({ ok: false, reason: 'invalid_transition' })
     expect(getSnapshot().officialTestCases).toEqual(snapshot.officialTestCases)
     expect(getSnapshot().reviewDecisions).toEqual(snapshot.reviewDecisions)
+  })
+
+  it('finds a proposal through the explicit AI review case association', () => {
+    const proposal = getProposalForAiReviewCase('ai-2')
+
+    expect(proposal?.id).toBe('review-proposal-checkout')
+    expect(proposal?.id).not.toBe('proposal-ai-2')
   })
 
   it('approves a duplicate proposal as an immutable next version', () => {

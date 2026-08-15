@@ -82,6 +82,7 @@ export interface StoreSnapshot {
   ingestionBatches: IngestionBatch[]
   codeChanges: CodeChange[]
   proposals: ExtractedProposal[]
+  proposalIdByAiCaseId: Record<string, string>
   reviewDecisions: ReviewDecision[]
   officialTestCases: OfficialTestCase[]
   testCaseVersions: TestCaseVersion[]
@@ -119,8 +120,12 @@ function createReviewDomain() {
     excerpt: aiCase.sourceSnippet,
     createdAt: MOCK_NOW,
   }))
+  const proposalIdByAiCaseId = Object.fromEntries(mockAiCases.map((aiCase) => [
+    aiCase.id,
+    aiCase.id === 'ai-2' ? 'review-proposal-checkout' : `proposal-${aiCase.id}`,
+  ]))
   const proposals = mockAiCases.map<ExtractedProposal>((aiCase) => ({
-    id: `proposal-${aiCase.id}`,
+    id: proposalIdByAiCaseId[aiCase.id],
     projectId: aiCase.projectId,
     status: aiCase.reviewStatus === 'rejected' ? 'rejected' : aiCase.reviewStatus === 'confirmed' ? 'approved' : 'in_review',
     title: aiCase.name,
@@ -155,6 +160,7 @@ function createReviewDomain() {
   return {
     evidence,
     proposals,
+    proposalIdByAiCaseId,
     officialTestCases: existingCases,
     testCaseVersions: versions,
     traceabilityLinks: proposals.map<TraceabilityLink>((proposal) => ({
@@ -167,7 +173,7 @@ function createReviewDomain() {
 }
 
 let reviewDomain = createReviewDomain()
-let { evidence, proposals, officialTestCases, testCaseVersions, traceabilityLinks } = reviewDomain
+let { evidence, proposals, proposalIdByAiCaseId, officialTestCases, testCaseVersions, traceabilityLinks } = reviewDomain
 let ingestionBatches: IngestionBatch[] = []
 let codeChanges: CodeChange[] = []
 let reviewDecisions: ReviewDecision[] = []
@@ -176,7 +182,7 @@ let executionResults: ExecutionResult[] = []
 let qualityRisks: QualityRisk[] = []
 const reviewScenarios: ReviewScenario[] = [
   { id: 'approval-new', proposalId: 'proposal-ai-4' },
-  { id: 'approval-version', proposalId: 'proposal-ai-2' },
+  { id: 'approval-version', proposalId: 'review-proposal-checkout' },
   { id: 'rejection-evidence', proposalId: 'proposal-ai-3' },
 ]
 
@@ -190,6 +196,7 @@ function notify() {
 
 export function subscribe(listener: Listener): () => void {
   listeners.add(listener)
+  listener()
   return () => { listeners.delete(listener) }
 }
 
@@ -197,37 +204,21 @@ function currentSnapshot(): StoreSnapshot {
   return {
     projects, suites, runs, aiCases, org, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
-    ingestionBatches, codeChanges, proposals, reviewDecisions, officialTestCases,
+    ingestionBatches, codeChanges, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
     testCaseVersions, traceabilityLinks, executions, executionResults, evidence, qualityRisks,
   }
 }
 
-// Stable server snapshot — cached as a frozen constant
-const FROZEN_EMPTY: StoreSnapshot = Object.freeze({
-  projects: [],
-  suites: [],
-  runs: [],
-  aiCases: [],
-  org: { id: '', name: '', slug: '', plan: 'gratuito' as const, planLimits: { maxProjects: 0, maxUsers: 0, maxCases: 0 } },
-  members: [],
-  apiKeys: [],
-  integration: { webhookUrl: '', connected: false },
-  aiProviders: [],
-  chatThreads: [],
-  chatMessages: [],
-  coverageGaps: [],
-  connections: [],
-  notifications: [],
-  ingestionBatches: [], codeChanges: [], proposals: [], reviewDecisions: [], officialTestCases: [],
-  testCaseVersions: [], traceabilityLinks: [], executions: [], executionResults: [], evidence: [], qualityRisks: [],
-})
+// The client bundle starts from the same deterministic mock seed. Returning
+// this stable snapshot lets server HTML hydrate without replacing seeded UI.
+const FROZEN_SEEDED: StoreSnapshot = Object.freeze(currentSnapshot())
 
 export function getSnapshot(): StoreSnapshot {
   return currentSnapshot()
 }
 
 export function getServerSnapshot(): StoreSnapshot {
-  return FROZEN_EMPTY
+  return FROZEN_SEEDED
 }
 
 // ── Readers ───────────────────────────────────────────────────────
@@ -314,6 +305,11 @@ export function getProposal(id: string): ExtractedProposal | undefined {
   return proposals.find((proposal) => proposal.id === id)
 }
 
+export function getProposalForAiReviewCase(caseId: string): ExtractedProposal | undefined {
+  const proposalId = proposalIdByAiCaseId[caseId]
+  return proposalId ? getProposal(proposalId) : undefined
+}
+
 export function getOfficialTestCase(id: string): OfficialTestCase | undefined {
   return officialTestCases.find((testCase) => testCase.id === id)
 }
@@ -390,8 +386,13 @@ export function approveProposal(
     { id: `link-${proposalId}-${testCase.id}`, from: { type: 'proposal' as const, id: proposalId }, to: { type: 'test_case' as const, id: testCase.id }, relation: 'produced' as const },
     { id: `link-${nextVersion.id}-${testCase.id}`, from: { type: 'test_case_version' as const, id: nextVersion.id }, to: { type: 'test_case' as const, id: testCase.id }, relation: 'version_of' as const },
   ]
+  const aiCaseId = Object.keys(proposalIdByAiCaseId).find((caseId) => proposalIdByAiCaseId[caseId] === proposalId)
+  const nextAiCases = aiCases.map((item) => item.id === aiCaseId
+    ? { ...item, reviewStatus: 'confirmed' as const }
+    : item)
 
   proposals = proposals.map((item) => item.id === proposalId ? nextProposal : item)
+  aiCases = nextAiCases
   officialTestCases = nextCases
   testCaseVersions = [...testCaseVersions, nextVersion]
   traceabilityLinks = nextLinks
@@ -415,14 +416,16 @@ export function rejectProposal(
     comment: input.comment,
     decidedAt: nowIso(),
   }
+  const aiCaseId = Object.keys(proposalIdByAiCaseId).find((caseId) => proposalIdByAiCaseId[caseId] === proposalId)
   proposals = proposals.map((item) => item.id === proposalId ? { ...item, status: 'rejected' } : item)
+  aiCases = aiCases.map((item) => item.id === aiCaseId ? { ...item, reviewStatus: 'rejected' as const } : item)
   reviewDecisions = [...reviewDecisions, decision]
   notify()
   return { ok: true, decision }
 }
 
 export function getServerNotifications(): Notification[] {
-  return FROZEN_EMPTY.notifications
+  return FROZEN_SEEDED.notifications
 }
 
 // ── Connection aggregate (Commit 2) ────────────────────────────────────────
@@ -1005,6 +1008,7 @@ export function __resetStore(): void {
   reviewDomain = createReviewDomain()
   evidence = reviewDomain.evidence
   proposals = reviewDomain.proposals
+  proposalIdByAiCaseId = reviewDomain.proposalIdByAiCaseId
   officialTestCases = reviewDomain.officialTestCases
   testCaseVersions = reviewDomain.testCaseVersions
   traceabilityLinks = reviewDomain.traceabilityLinks

@@ -5,10 +5,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { CodeSnippet } from './code-snippet'
 import { DuplicateComparison } from './duplicate-comparison'
 import { useTranslation } from '@/lib/i18n'
+import { useEvidence, useProposalForAiReviewCase, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { ProvenanceSummary } from '@/components/ui/provenance-summary'
+import { EvidenceList } from '@/components/ui/evidence-list'
+import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 
 export function ReviewCaseDetail({ c }: { c: AiCase }) {
   const { t } = useTranslation()
   const possibleDuplicateOf = c.possibleDuplicateOf ?? c.duplicateOfCaseId
+  const proposal = useProposalForAiReviewCase(c.id)
+  const evidence = useEvidence(proposal?.evidenceId)
+  const links = useTraceabilityLinks(proposal?.id ?? '')
   
   return (
     <Card className="rounded-none border-0 h-full">
@@ -51,6 +58,14 @@ export function ReviewCaseDetail({ c }: { c: AiCase }) {
           </h4>
           <CodeSnippet code={c.sourceSnippet} language="TypeScript" />
         </div>
+
+        {evidence && (
+          <div className="space-y-5 border-t border-border pt-5">
+            <ProvenanceSummary evidence={evidence} />
+            <EvidenceList evidence={[evidence]} />
+            {links.length > 0 && <TraceabilityTrail links={links} />}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

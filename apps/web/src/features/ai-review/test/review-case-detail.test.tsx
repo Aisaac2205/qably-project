@@ -49,6 +49,23 @@ describe('ReviewCaseDetail', () => {
     expect(code?.textContent).toContain('should block')
   })
 
+  it('shows the matching Phase 0 provenance and traceability contracts', async () => {
+    await act(async () => {
+      render(<ReviewCaseDetail c={mockCase} />)
+    })
+
+    expect(screen.getByRole('region', { name: 'Provenance' })).toHaveTextContent('mock://checkout.spec.ts')
+    expect(screen.getByRole('region', { name: 'Traceability' })).toHaveTextContent('evidence-ai-2')
+  })
+
+  it('uses the explicit review case association when proposal IDs do not follow the legacy convention', async () => {
+    await act(async () => {
+      render(<ReviewCaseDetail c={mockCase} />)
+    })
+
+    expect(screen.getByRole('region', { name: 'Provenance' })).toHaveTextContent('mock://checkout.spec.ts')
+  })
+
   it('renders the duplicate comparison card when possibleDuplicateOf is set', async () => {
     const c: AiCase = {
       id: 'ai-x', name: 'Dup case', steps: ['step'], expectedResult: 'result', sourceFile: 'a.spec.ts',

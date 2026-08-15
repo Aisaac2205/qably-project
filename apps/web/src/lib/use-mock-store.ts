@@ -27,24 +27,14 @@ import type {
   ChatMessage,
   CoverageGap,
   Connection,
+  ExtractedProposal,
+  Evidence,
+  TraceabilityLink,
 } from '@qably/types'
-
-// Module-level frozen empty arrays — stable identity across SSR calls.
-// React 19's useSyncExternalStore requires getServerSnapshot to return
-// the SAME reference on every call to prevent infinite loop detection.
-const EMPTY_PROJECTS = Object.freeze([]) as unknown as Project[]
-const EMPTY_SUITES = Object.freeze([]) as unknown as Suite[]
-const EMPTY_RUNS = Object.freeze([]) as unknown as Run[]
-const EMPTY_AI_CASES = Object.freeze([]) as unknown as AiCase[]
-const EMPTY_MEMBERS = Object.freeze([]) as unknown as OrgMember[]
-const EMPTY_API_KEYS = Object.freeze([]) as unknown as ApiKey[]
-const EMPTY_AI_PROVIDERS = Object.freeze([]) as unknown as AiProviderConnection[]
-const EMPTY_CHAT_MESSAGES = Object.freeze([]) as unknown as ChatMessage[]
-const EMPTY_COVERAGE_GAPS = Object.freeze([]) as unknown as CoverageGap[]
-const EMPTY_CONNECTIONS = Object.freeze([]) as unknown as Connection[]
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
   const cacheRef = useRef<{ key: number; value: T[] }>({ key: -1, value: [] })
+  const serverCacheRef = useRef<T[] | null>(null)
   return useSyncExternalStore(
     subscribe,
     () => {
@@ -55,7 +45,13 @@ function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
       }
       return cacheRef.current.value
     },
-    fallback,
+    () => {
+      const arr = fallback()
+      if (serverCacheRef.current === null || !sameContents(serverCacheRef.current, arr)) {
+        serverCacheRef.current = arr
+      }
+      return serverCacheRef.current
+    },
   )
 }
 
@@ -68,7 +64,7 @@ function sameContents<T>(a: T[], b: T[]): boolean {
 }
 
 export function useProjects(): Project[] {
-  return useStableArray(() => getSnapshot().projects, () => EMPTY_PROJECTS)
+  return useStableArray(() => getSnapshot().projects, () => getServerSnapshot().projects)
 }
 
 export function useProject(id: string): Project | undefined {
@@ -82,7 +78,7 @@ export function useProject(id: string): Project | undefined {
       }
       return cacheRef.current.value
     },
-    () => undefined,
+    () => getServerSnapshot().projects.find((p) => p.id === id),
   )
 }
 
@@ -92,7 +88,7 @@ export function useSuites(projectId?: string): Suite[] {
       const all = getSnapshot().suites
       return projectId ? all.filter((s) => s.projectId === projectId) : all
     },
-    () => EMPTY_SUITES,
+    () => getServerSnapshot().suites.filter((s) => !projectId || s.projectId === projectId),
   )
 }
 
@@ -107,7 +103,7 @@ export function useSuite(suiteId: string): Suite | undefined {
       }
       return cacheRef.current.value
     },
-    () => undefined,
+    () => getServerSnapshot().suites.find((s) => s.id === suiteId),
   )
 }
 
@@ -117,7 +113,7 @@ export function useRuns(projectId?: string): Run[] {
       const all = getSnapshot().runs
       return projectId ? all.filter((r) => r.projectId === projectId) : all
     },
-    () => EMPTY_RUNS,
+    () => getServerSnapshot().runs.filter((r) => !projectId || r.projectId === projectId),
   )
 }
 
@@ -132,7 +128,7 @@ export function useRun(runId: string): Run | undefined {
       }
       return cacheRef.current.value
     },
-    () => undefined,
+    () => getServerSnapshot().runs.find((r) => r.id === runId),
   )
 }
 
@@ -142,7 +138,7 @@ export function useAiCases(projectId?: string): AiCase[] {
       const all = getSnapshot().aiCases
       return projectId ? all.filter((c) => c.projectId === projectId) : all
     },
-    () => EMPTY_AI_CASES,
+    () => getServerSnapshot().aiCases.filter((c) => !projectId || c.projectId === projectId),
   )
 }
 
@@ -151,11 +147,11 @@ export function useOrg(): Organization {
 }
 
 export function useMembers(): OrgMember[] {
-  return useStableArray(() => getSnapshot().members, () => EMPTY_MEMBERS)
+  return useStableArray(() => getSnapshot().members, () => getServerSnapshot().members)
 }
 
 export function useApiKeys(): ApiKey[] {
-  return useStableArray(() => getSnapshot().apiKeys, () => EMPTY_API_KEYS)
+  return useStableArray(() => getSnapshot().apiKeys, () => getServerSnapshot().apiKeys)
 }
 
 export function useIntegration(): GithubIntegration {
@@ -163,14 +159,14 @@ export function useIntegration(): GithubIntegration {
 }
 
 export function useAiProviders(): AiProviderConnection[] {
-  return useStableArray(() => getSnapshot().aiProviders, () => EMPTY_AI_PROVIDERS)
+  return useStableArray(() => getSnapshot().aiProviders, () => getServerSnapshot().aiProviders)
 }
 
 export function useChatMessages(projectId: string): ChatMessage[] {
   const threadId = getChatThread(projectId).id
   return useStableArray(
     () => getSnapshot().chatMessages.filter((m) => m.threadId === threadId),
-    () => EMPTY_CHAT_MESSAGES,
+    () => getServerSnapshot().chatMessages.filter((m) => m.threadId === threadId),
   )
 }
 
@@ -180,12 +176,50 @@ export function useCoverageGaps(projectId?: string): CoverageGap[] {
       const all = getSnapshot().coverageGaps
       return projectId ? all.filter((g) => g.projectId === projectId) : all
     },
-    () => EMPTY_COVERAGE_GAPS,
+    () => getServerSnapshot().coverageGaps.filter((g) => !projectId || g.projectId === projectId),
   )
 }
 
 export function useConnections(): Connection[] {
-  return useStableArray(() => getSnapshot().connections, () => EMPTY_CONNECTIONS)
+  return useStableArray(() => getSnapshot().connections, () => getServerSnapshot().connections)
+}
+
+export function useProposal(id: string): ExtractedProposal | undefined {
+  return useSyncExternalStore(
+    subscribe,
+    () => getSnapshot().proposals.find((proposal) => proposal.id === id),
+    () => getServerSnapshot().proposals.find((proposal) => proposal.id === id),
+  )
+}
+
+export function useProposalForAiReviewCase(caseId: string): ExtractedProposal | undefined {
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      const proposalId = getSnapshot().proposalIdByAiCaseId[caseId]
+      return proposalId ? getSnapshot().proposals.find((proposal) => proposal.id === proposalId) : undefined
+    },
+    () => {
+      const snapshot = getServerSnapshot()
+      const proposalId = snapshot.proposalIdByAiCaseId[caseId]
+      return proposalId ? snapshot.proposals.find((proposal) => proposal.id === proposalId) : undefined
+    },
+  )
+}
+
+export function useEvidence(id?: string): Evidence | undefined {
+  return useSyncExternalStore(
+    subscribe,
+    () => id ? getSnapshot().evidence.find((item) => item.id === id) : undefined,
+    () => id ? getServerSnapshot().evidence.find((item) => item.id === id) : undefined,
+  )
+}
+
+export function useTraceabilityLinks(entityId: string): TraceabilityLink[] {
+  return useStableArray(
+    () => getSnapshot().traceabilityLinks.filter((link) => link.from.id === entityId || link.to.id === entityId),
+    () => getServerSnapshot().traceabilityLinks.filter((link) => link.from.id === entityId || link.to.id === entityId),
+  )
 }
 
 export function useConnection(id: string): Connection | undefined {
@@ -199,6 +233,6 @@ export function useConnection(id: string): Connection | undefined {
       }
       return cacheRef.current.value
     },
-    () => undefined,
+    () => getServerSnapshot().connections.find((connection) => connection.id === id),
   )
 }
