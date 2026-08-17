@@ -30,11 +30,11 @@ export function AppShell({ children }: AppShellProps) {
         {t('common.skipToMain')}
       </a>
       <Sidebar />
-      <SidebarInset className="flex min-h-dvh min-w-0 flex-col">
+      <SidebarInset className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface ring-1 ring-border">
         <header role="banner" className="shrink-0">
           <TopBar />
         </header>
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-auto bg-surface">
           {children}
         </main>
       </SidebarInset>

@@ -41,6 +41,17 @@ describe('AppShell', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument()
   })
 
+  it('renders the product inside a quiet inset workspace frame', async () => {
+    const { container } = render(
+      <AppShell>
+        <div>Content</div>
+      </AppShell>,
+    )
+
+    expect(container.querySelector('[data-slot="sidebar"]')).toHaveAttribute('data-variant', 'inset')
+    expect(container.querySelector('[data-slot="sidebar-inset"]')).toHaveClass('bg-surface', 'overflow-hidden')
+  })
+
   it('starts keyboard order with a visible-on-focus skip link and one main landmark', async () => {
     const user = userEvent.setup()
     render(<AppShell><p>Content</p></AppShell>)

@@ -76,7 +76,7 @@ export function Sidebar() {
     : []
 
   return (
-    <ShadcnSidebar collapsible="icon" className="bg-sidebar">
+    <ShadcnSidebar variant="inset" collapsible="icon" className="bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
       <SidebarHeader className="h-14 justify-center p-2">
         {!isCollapsed && (
