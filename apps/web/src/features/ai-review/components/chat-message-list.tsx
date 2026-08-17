@@ -7,11 +7,9 @@ import { useTranslation } from '@/lib/i18n'
 
 export function ChatMessageList({
   messages,
-  projectId,
   onViewCase,
 }: {
   messages: ChatMessage[]
-  projectId: string
   onViewCase: (caseId: string) => void
 }) {
   const { t } = useTranslation()
@@ -28,7 +26,7 @@ export function ChatMessageList({
   return (
     <div className="flex flex-col gap-3 p-4">
       {messages.map((message) => (
-        <ChatMessageBubble key={message.id} message={message} projectId={projectId} onViewCase={onViewCase} />
+        <ChatMessageBubble key={message.id} message={message} onViewCase={onViewCase} />
       ))}
     </div>
   )

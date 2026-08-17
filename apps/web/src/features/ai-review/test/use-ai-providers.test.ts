@@ -6,9 +6,9 @@ import { __resetStore } from '@/lib/mock-store'
 describe('useAiProviders', () => {
   beforeEach(() => __resetStore())
 
-  it('reports Claude as the only connected provider by default', () => {
+  it('reports Gemini as the only connected provider by default', () => {
     const { result } = renderHook(() => useAiProviders())
     expect(result.current.hasConnected).toBe(true)
-    expect(result.current.connectedProviders.map((p) => p.provider)).toEqual(['claude'])
+    expect(result.current.connectedProviders.map((p) => p.provider)).toEqual(['gemini'])
   })
 })

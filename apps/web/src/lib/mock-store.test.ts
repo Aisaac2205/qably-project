@@ -27,20 +27,20 @@ describe('mock-store AI providers', () => {
 
   it('returns seeded providers', () => {
     const providers = getAiProviders()
-    expect(providers.find((p) => p.provider === 'claude')?.connected).toBe(true)
-    expect(providers.find((p) => p.provider === 'gemini')?.connected).toBe(false)
+    expect(providers.find((p) => p.provider === 'gemini')?.connected).toBe(true)
+    expect(providers.find((p) => p.provider === 'claude')?.connected).toBe(false)
   })
 
   it('connects a provider and masks the key', () => {
-    const connection = connectAiProvider('gemini', 'AIzaSySECRETKEY1234')
+    const connection = connectAiProvider('claude', 'sk-ant-SECRETKEY1234')
     expect(connection.connected).toBe(true)
-    expect(connection.maskedKey).toBe('AIzaSy...1234')
+    expect(connection.maskedKey).toBe('sk-ant...1234')
     expect(connection.maskedKey).not.toContain('SECRET')
   })
 
   it('disconnects a provider', () => {
-    disconnectAiProvider('claude')
-    const connection = getAiProviders().find((p) => p.provider === 'claude')
+    disconnectAiProvider('gemini')
+    const connection = getAiProviders().find((p) => p.provider === 'gemini')
     expect(connection?.connected).toBe(false)
     expect(connection?.maskedKey).toBeUndefined()
   })

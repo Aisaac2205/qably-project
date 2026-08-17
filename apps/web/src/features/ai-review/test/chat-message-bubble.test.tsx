@@ -12,7 +12,7 @@ describe('ChatMessageBubble', () => {
       id: 'm1', threadId: 't1', role: 'user', content: 'Hello there', createdAt: '2026-01-01T00:00:00Z',
     }
     await act(async () => {
-      render(<ChatMessageBubble message={message} projectId="proj-1" onViewCase={vi.fn()} />)
+      render(<ChatMessageBubble message={message} onViewCase={vi.fn()} />)
     })
     expect(screen.getByText('Hello there')).toBeInTheDocument()
   })
@@ -23,7 +23,7 @@ describe('ChatMessageBubble', () => {
       generatedCaseIds: ['ai-1'],
     }
     await act(async () => {
-      render(<ChatMessageBubble message={message} projectId="proj-1" onViewCase={vi.fn()} />)
+      render(<ChatMessageBubble message={message} onViewCase={vi.fn()} />)
     })
     expect(screen.getByText('Valid checkout completes order')).toBeInTheDocument()
   })

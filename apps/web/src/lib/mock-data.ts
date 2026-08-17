@@ -636,18 +636,18 @@ export const mockConnections: Connection[] = [
 
 export const mockAiProviders: AiProviderConnection[] = [
   {
-    provider: 'claude',
-    label: 'Claude',
+    provider: 'gemini',
+    label: 'Gemini 3.5 Flash-Lite',
     connected: true,
-    maskedKey: 'sk-ant-...8f2a',
-    model: 'claude-sonnet-4-20250514',
+    maskedKey: 'AIzaSy...8f2a',
+    model: 'gemini-3.5-flash-lite',
     connectedAt: '2026-05-02T09:00:00Z',
   },
   {
-    provider: 'gemini',
-    label: 'Gemini',
+    provider: 'claude',
+    label: 'Claude',
     connected: false,
-    model: 'gemini-2.5-flash',
+    model: 'claude-sonnet-4-20250514',
   },
 ]
 

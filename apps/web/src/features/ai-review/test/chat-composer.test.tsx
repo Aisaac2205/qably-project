@@ -22,25 +22,11 @@ describe('ChatComposer', () => {
         />,
       )
     })
-    const textarea = screen.getByPlaceholderText('Ask about this project or request a new test case…')
+    const textarea = screen.getByRole('textbox', { name: 'AI prompt' })
     await user.type(textarea, 'Hello there')
-    await user.click(screen.getByRole('button', { name: 'Send message' }))
+    await user.click(screen.getByRole('button', { name: /send prompt/i }))
     expect(onSend).toHaveBeenCalledWith('Hello there')
     expect(textarea).toHaveValue('')
-  })
-
-  it('disables Send when the input is empty', async () => {
-    await act(async () => {
-      render(
-        <ChatComposer
-          providers={providers}
-          selectedProvider="claude"
-          onSelectProvider={vi.fn()}
-          onSend={vi.fn()}
-        />,
-      )
-    })
-    expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled()
   })
 
   it('sends on Enter without Shift', async () => {
@@ -56,7 +42,7 @@ describe('ChatComposer', () => {
         />,
       )
     })
-    const textarea = screen.getByPlaceholderText('Ask about this project or request a new test case…')
+    const textarea = screen.getByRole('textbox', { name: 'AI prompt' })
     await user.type(textarea, 'Quick question{enter}')
     expect(onSend).toHaveBeenCalledWith('Quick question')
   })

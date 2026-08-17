@@ -58,7 +58,7 @@ describe('ProviderPicker', () => {
       render(<ProviderPicker providers={providersWithBothConnected} selected="claude" onSelect={onSelect} />)
     })
     await user.click(screen.getByRole('button', { name: /claude/i }))
-    await user.click(await screen.findByText('Gemini'))
+    await user.click(await screen.findByRole('menuitem', { name: /gemini/i }))
     expect(onSelect).toHaveBeenCalledWith('gemini')
   })
 })

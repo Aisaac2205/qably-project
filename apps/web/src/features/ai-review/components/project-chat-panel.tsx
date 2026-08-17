@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
 import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { ChatMessageList } from './chat-message-list'
@@ -27,6 +27,13 @@ export function ProjectChatPanel({
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>(
     connectedProviders[0]?.provider ?? 'claude',
   )
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  }, [messages])
 
   if (!hasConnected) {
     return (
@@ -42,8 +49,8 @@ export function ProjectChatPanel({
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <ChatMessageList messages={messages} projectId={projectId} onViewCase={onViewCase} />
+      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
+        <ChatMessageList messages={messages} onViewCase={onViewCase} />
       </div>
       <ChatComposer
         providers={providers}

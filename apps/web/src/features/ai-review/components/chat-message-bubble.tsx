@@ -5,11 +5,9 @@ import { ChatGeneratedCaseCard } from './chat-generated-case-card'
 
 export function ChatMessageBubble({
   message,
-  projectId,
   onViewCase,
 }: {
   message: ChatMessage
-  projectId: string
   onViewCase: (caseId: string) => void
 }) {
   const isUser = message.role === 'user'
@@ -25,7 +23,7 @@ export function ChatMessageBubble({
           {message.content}
         </div>
         {message.generatedCaseIds?.map((caseId) => (
-          <ChatGeneratedCaseCard key={caseId} caseId={caseId} projectId={projectId} onView={onViewCase} />
+          <ChatGeneratedCaseCard key={caseId} caseId={caseId} onView={onViewCase} />
         ))}
       </div>
     </div>

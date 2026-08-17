@@ -10,7 +10,7 @@ describe('ChatMessageList', () => {
       { id: 'm2', threadId: 't1', role: 'assistant', content: 'Second', createdAt: '2026-01-01T00:01:00Z' },
     ]
     await act(async () => {
-      render(<ChatMessageList messages={messages} projectId="proj-1" onViewCase={vi.fn()} />)
+      render(<ChatMessageList messages={messages} onViewCase={vi.fn()} />)
     })
     expect(screen.getByText('First')).toBeInTheDocument()
     expect(screen.getByText('Second')).toBeInTheDocument()
@@ -18,7 +18,7 @@ describe('ChatMessageList', () => {
 
   it('shows an empty state when there are no messages', async () => {
     await act(async () => {
-      render(<ChatMessageList messages={[]} projectId="proj-1" onViewCase={vi.fn()} />)
+      render(<ChatMessageList messages={[]} onViewCase={vi.fn()} />)
     })
     expect(screen.getByText(/ask anything/i)).toBeInTheDocument()
   })

@@ -10,7 +10,7 @@ describe('ProjectChatPanel', () => {
   it('blocks chat with an available return-to-review action when no provider is connected', async () => {
     const onReturnToReview = vi.fn()
     const user = userEvent.setup()
-    disconnectAiProvider('claude')
+    disconnectAiProvider('gemini')
     await act(async () => {
       render(<ProjectChatPanel projectId="proj-1" onViewCase={vi.fn()} onReturnToReview={onReturnToReview} />)
     })
@@ -27,7 +27,7 @@ describe('ProjectChatPanel', () => {
       render(<ProjectChatPanel projectId="proj-1" onViewCase={vi.fn()} onReturnToReview={vi.fn()} />)
     })
     expect(screen.getByText('What suites have the most pending AI cases?')).toBeInTheDocument()
-    const textarea = screen.getByPlaceholderText('Ask about this project or request a new test case…')
+    const textarea = screen.getByRole('textbox', { name: 'AI prompt' })
     await user.type(textarea, 'How many cases are pending?{enter}')
     expect(await screen.findAllByText('How many cases are pending?')).not.toHaveLength(0)
   })
