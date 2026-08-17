@@ -155,7 +155,7 @@ export function RunDetail({
         </div>
         <div className="flex flex-col overflow-y-auto">
           {selectedCase ? (
-            <CaseDetail c={selectedCase} />
+            <CaseDetail c={selectedCase} projectId={projectId} run={run} />
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-sm text-muted p-8 gap-2 text-center">
               <p className="text-sm font-medium text-default">{t('runs.noCaseSelected')}</p>

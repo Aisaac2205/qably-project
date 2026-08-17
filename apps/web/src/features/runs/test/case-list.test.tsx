@@ -40,15 +40,14 @@ describe('CaseList', () => {
     expect(screen.getByText('Pending')).toBeInTheDocument()
   })
 
-  it('highlights selected case with border and bg', async () => {
+  it('highlights selected case with bg', async () => {
     const onSelect = vi.fn()
     await act(async () => {
       render(<CaseList cases={mockCases} selectedId="tc-2" onSelect={onSelect} />)
     })
     const selectedBtn = screen.getByRole('option', { name: /Invalid credentials/i })
     expect(selectedBtn).toHaveAttribute('aria-selected', 'true')
-    expect(selectedBtn.className).toContain('border-l-2')
-    expect(selectedBtn.className).toContain('border-primary')
+    expect(selectedBtn.className).toContain('bg-surface-hover')
   })
 
   it('calls onSelect on click', async () => {

@@ -1,7 +1,6 @@
 'use client'
 
 import type { RunCase } from '@qably/types'
-import { Card, CardContent } from '@/components/ui/card'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
 
@@ -34,10 +33,10 @@ export function CaseList({
             role="option"
             aria-selected={isSelected}
             onClick={() => onSelect(c.id)}
-            className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:bg-surface-hover/70 focus-visible:outline-2 focus-visible:outline-primary ${
+            className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:bg-surface-hover/70 outline-none focus:outline-none focus-visible:outline-none ${
               isSelected
-                ? 'bg-surface-hover/80 font-medium border-l-2 border-primary'
-                : 'text-muted border-l-2 border-transparent'
+                ? 'bg-surface-hover text-default font-semibold'
+                : 'text-muted'
             }`}
           >
             <div className="shrink-0">

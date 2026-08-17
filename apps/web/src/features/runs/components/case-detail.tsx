@@ -1,20 +1,60 @@
 'use client'
 
-import type { RunCase } from '@qably/types'
-import { Card, CardContent } from '@/components/ui/card'
+import Link from 'next/link'
+import type { RunCase, Run } from '@qably/types'
+import { ArrowSquareOut, GitCommit } from '@phosphor-icons/react'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
+import { useOfficialTestCase, useTestCaseVersion, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 
-export function CaseDetail({ c }: { c: RunCase }) {
+export function CaseDetail({
+  c,
+  projectId,
+  run,
+}: {
+  c: RunCase
+  projectId?: string
+  run?: Run
+}) {
   const { t } = useTranslation()
-  
+  const officialCaseId = `case-${c.id}`
+  const officialCase = useOfficialTestCase(officialCaseId)
+  const currentVersionId = officialCase?.currentVersionId ?? `version-${c.id}-1`
+  const version = useTestCaseVersion(currentVersionId)
+  const links = useTraceabilityLinks(officialCaseId)
+
   return (
     <div className="space-y-5 p-5 sm:p-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h3 className="text-base font-semibold text-default">{c.name}</h3>
-        <StatusChip status={c.status} />
+      {/* Header with name, version snapshot, and status */}
+      <div className="space-y-2 pb-4 border-b border-border">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="rounded bg-canvas border border-border px-2 py-0.5 font-mono text-xs font-semibold text-muted">
+            {t('runs.versionSnapshot', { version: version?.version ?? 1 })}
+          </span>
+          {run && (
+            <span className="rounded bg-canvas border border-border px-2 py-0.5 text-xs font-medium text-muted">
+              {t('runs.environment')}: <span className="text-default font-medium">Staging</span>
+            </span>
+          )}
+          {projectId && officialCase && (
+            <Link
+              href={`/projects/${projectId}/suites/${officialCase.suiteId}`}
+              className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline ml-auto"
+            >
+              <span>{t('runs.viewInLibrary')}</span>
+              <ArrowSquareOut size={12} aria-hidden="true" />
+            </Link>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h3 className="text-base sm:text-lg font-semibold text-default">{c.name}</h3>
+          <StatusChip status={c.status} />
+        </div>
       </div>
 
+      {/* Steps */}
       <div className="space-y-2">
         <h4 className="text-xs font-semibold text-muted">
           {t('runs.steps')}
@@ -28,6 +68,7 @@ export function CaseDetail({ c }: { c: RunCase }) {
         </ol>
       </div>
 
+      {/* Expected Result */}
       <div className="space-y-2">
         <h4 className="text-xs font-semibold text-muted">
           {t('runs.expectedResult')}
@@ -36,6 +77,17 @@ export function CaseDetail({ c }: { c: RunCase }) {
           {c.expectedResult}
         </p>
       </div>
+
+      {/* Bidirectional Traceability Trail */}
+      {links.length > 0 && (
+        <div className="space-y-3 border-t border-border pt-5">
+          <h4 className="text-xs font-semibold text-muted flex items-center gap-1.5">
+            <GitCommit size={14} weight="bold" aria-hidden="true" />
+            {t('runs.traceability')}
+          </h4>
+          <TraceabilityTrail links={links} />
+        </div>
+      )}
     </div>
   )
 }
