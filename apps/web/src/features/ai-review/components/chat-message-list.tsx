@@ -1,8 +1,9 @@
 'use client'
 
+import Image from 'next/image'
 import type { ChatMessage } from '@qably/types'
 import { ChatMessageBubble } from './chat-message-bubble'
-import { Sparkle, ListChecks, Flask, ShieldCheck } from '@phosphor-icons/react'
+import { ListChecks, Flask, ShieldCheck } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 
 export function ChatMessageList({
@@ -35,9 +36,14 @@ export function ChatMessageList({
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[380px] text-center p-6 sm:p-8 gap-6 select-none max-w-2xl mx-auto">
         <div className="flex flex-col items-center gap-3">
-          <div className="size-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-xs">
-            <Sparkle size={26} weight="fill" aria-hidden="true" />
-          </div>
+          <Image
+            src="/icono-qably.png"
+            alt="Qably"
+            width={48}
+            height={48}
+            className="size-12 object-contain dark:invert"
+            priority
+          />
           <div className="space-y-1.5 max-w-md">
             <h2 className="text-lg sm:text-xl font-semibold text-default tracking-tight">
               {t('aiReview.chatGreeting')}
@@ -59,7 +65,7 @@ export function ChatMessageList({
                 className="group flex flex-col items-start text-left p-3.5 rounded-xl border border-border/80 bg-surface hover:bg-surface-hover/80 hover:border-border transition-all duration-150 active:scale-[0.98] shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
               >
                 <div className="size-7 rounded-lg bg-canvas text-muted group-hover:text-primary group-hover:bg-primary/10 flex items-center justify-center transition-colors mb-2">
-                  <Icon size={16} aria-hidden="true" />
+                  <Icon size={16} weight="regular" aria-hidden="true" />
                 </div>
                 <p className="text-xs font-medium text-default leading-snug line-clamp-3">
                   {starter.text}
@@ -73,9 +79,13 @@ export function ChatMessageList({
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 sm:p-6 max-w-3xl mx-auto w-full">
+    <div className="flex flex-col p-4 sm:p-6 space-y-4 max-w-3xl mx-auto w-full">
       {messages.map((message) => (
-        <ChatMessageBubble key={message.id} message={message} onViewCase={onViewCase} />
+        <ChatMessageBubble
+          key={message.id}
+          message={message}
+          onViewCase={onViewCase}
+        />
       ))}
     </div>
   )

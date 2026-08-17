@@ -171,7 +171,7 @@ export function Sidebar() {
         {isCollapsed ? (
           <div className="flex items-center justify-center py-1">
             <div
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-fg shadow-xs"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-fg shadow-xs"
               title="Isaac F. (Admin)"
               aria-label="Isaac F."
             >
@@ -185,7 +185,7 @@ export function Sidebar() {
           >
             <div
               aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-fg shadow-xs"
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-fg shadow-xs"
             >
               IF
             </div>
