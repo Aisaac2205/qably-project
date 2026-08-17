@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Bell,
-  Buildings,
   Gauge,
   FolderOpen,
   Gear,
@@ -15,7 +14,7 @@ import {
   Tray,
   CaretLeft,
 } from '@phosphor-icons/react'
-import { useOrg, useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
 import {
   Sidebar as ShadcnSidebar,
@@ -40,7 +39,6 @@ interface NavItem {
 
 export function Sidebar() {
   const pathname = usePathname()
-  const org = useOrg()
   const { t } = useTranslation()
   const { state } = useSidebar()
   const isCollapsed = state === 'collapsed'
@@ -79,16 +77,16 @@ export function Sidebar() {
     <ShadcnSidebar variant="inset" collapsible="icon" className="bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
       <SidebarHeader className="h-14 justify-center p-2">
-        {!isCollapsed && (
-          <div className="flex h-10 w-full items-center gap-2 rounded-lg border border-border-sidebar px-2.5">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-sidebar-active text-sidebar-fg-muted">
-                <Buildings size={14} />
-              </div>
-              <span className="text-sm font-medium text-sidebar-foreground truncate">{org.name || t('sidebar.organization')}</span>
-            </div>
-          </div>
-        )}
+        <Link
+          href="/dashboard"
+          aria-label="Qably"
+          className="flex h-10 w-full items-center gap-2.5 rounded-lg px-2 transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-fg">
+            Q
+          </span>
+          {!isCollapsed && <span className="truncate text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">Qably</span>}
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
@@ -98,7 +96,7 @@ export function Sidebar() {
             <Link
               href="/projects"
               aria-label={`${t('sidebar.projects')}: ${project.name}`}
-              className="flex min-h-10 items-center gap-1.5 px-2 text-base font-normal text-sidebar-fg-muted transition-colors hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              className="flex min-h-9 items-center gap-1.5 px-2 text-sm font-normal text-sidebar-fg-muted transition-colors hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               <CaretLeft size={18} weight="bold" aria-hidden="true" />
               {!isCollapsed && <><span>{t('sidebar.projects')}</span><span aria-hidden="true">/</span><span className="truncate">{project.name}</span></>}
@@ -116,9 +114,9 @@ export function Sidebar() {
                         render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
                         isActive={isActive}
                         tooltip={item.label}
-                        className="h-10 text-base font-normal"
+                        className="h-9 text-sm font-normal"
                       >
-                        <item.icon size={20} weight="regular" aria-hidden="true" />
+                        <item.icon size={18} weight="regular" aria-hidden="true" />
                         <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -141,9 +139,9 @@ export function Sidebar() {
                       render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
                       isActive={isActive}
                       tooltip={item.label}
-                      className="h-10 text-base"
+                      className="h-9 text-sm"
                     >
-                      <item.icon size={20} weight="regular" aria-hidden="true" />
+                      <item.icon size={18} weight="regular" aria-hidden="true" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

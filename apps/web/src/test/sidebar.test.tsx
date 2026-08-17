@@ -77,6 +77,14 @@ afterEach(() => {
 })
 
 describe('Sidebar — global state (no project route)', () => {
+  it('anchors navigation with the Qably product identity instead of workspace data', async () => {
+    mockPathname.mockReturnValue('/dashboard')
+    await act(async () => { renderSidebar() })
+
+    expect(screen.getByRole('link', { name: 'Qably' })).toHaveAttribute('href', '/dashboard')
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+  })
+
   it('shows the aligned global destinations', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { renderSidebar() })
