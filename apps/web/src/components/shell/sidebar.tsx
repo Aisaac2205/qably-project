@@ -13,7 +13,7 @@ import {
   Robot,
   ChartLine,
   Tray,
-  ArrowLeft,
+  CaretLeft,
 } from '@phosphor-icons/react'
 import { useOrg, useProject } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
@@ -35,6 +35,7 @@ interface NavItem {
   href: string
   icon: React.ElementType
   exact?: boolean
+  aliasHref?: string
 }
 
 export function Sidebar() {
@@ -60,10 +61,15 @@ export function Sidebar() {
 
   const projectSubItems: NavItem[] = projectContext
     ? [
-        { label: t('sidebar.overview'), href: `/projects/${projectContext}`, icon: Gauge, exact: true },
         { label: t('sidebar.repository'), href: `/projects/${projectContext}/repository`, icon: FolderOpen },
         { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Robot },
-        { label: t('sidebar.testLibrary'), href: `/projects/${projectContext}/suites`, icon: Stack },
+        {
+          label: t('sidebar.testLibrary'),
+          href: `/projects/${projectContext}/suites`,
+          icon: Stack,
+          // The project root renders the same suite list, so it counts as this item too.
+          aliasHref: `/projects/${projectContext}`,
+        },
         { label: t('sidebar.runs'), href: `/projects/${projectContext}/runs`, icon: Play },
         { label: t('sidebar.quality'), href: `/projects/${projectContext}/reports`, icon: ChartLine },
       ]
@@ -94,13 +100,16 @@ export function Sidebar() {
               aria-label={`${t('sidebar.projects')}: ${project.name}`}
               className="flex min-h-10 items-center gap-1.5 px-2 text-base font-normal text-sidebar-fg-muted transition-colors hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
-              <ArrowLeft size={18} weight="regular" aria-hidden="true" />
+              <CaretLeft size={18} weight="bold" aria-hidden="true" />
               {!isCollapsed && <><span>{t('sidebar.projects')}</span><span aria-hidden="true">/</span><span className="truncate">{project.name}</span></>}
             </Link>
             <SidebarGroupContent>
               <SidebarMenu>
                 {projectSubItems.map(item => {
-                  const isActive = pathname === item.href || (!item.exact && pathname.startsWith(item.href + '/'))
+                  const isActive =
+                    pathname === item.href ||
+                    pathname === item.aliasHref ||
+                    (!item.exact && pathname.startsWith(item.href + '/'))
                   return (
                     <SidebarMenuItem key={item.label}>
                       <SidebarMenuButton

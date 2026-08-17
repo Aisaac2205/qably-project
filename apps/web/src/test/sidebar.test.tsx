@@ -125,7 +125,6 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
   it('shows the aligned project destinations', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/suites')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Overview')).toBeInTheDocument()
     expect(screen.getByText('Repository')).toBeInTheDocument()
     expect(screen.getByText('Review')).toBeInTheDocument()
     expect(screen.getByText('Test Library')).toBeInTheDocument()
@@ -136,7 +135,6 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
   it('maps every project destination to an existing route', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/suites')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Overview').closest('a')).toHaveAttribute('href', '/projects/proj-1')
     expect(screen.getByText('Repository').closest('a')).toHaveAttribute('href', '/projects/proj-1/repository')
     expect(screen.getByText('Review').closest('a')).toHaveAttribute('href', '/projects/proj-1/ai-review')
     expect(screen.getByText('Test Library').closest('a')).toHaveAttribute('href', '/projects/proj-1/suites')
@@ -169,7 +167,7 @@ describe('Sidebar — current destinations', () => {
     ['global expanded', '/notifications', 'Notifications', '/notifications', {}],
     ['global collapsed', '/projects/new', 'Projects', '/projects', { defaultOpen: false }],
     ['global mobile', '/review-inbox', 'Review Inbox', '/review-inbox', { mobile: true }],
-    ['project Overview exact match', '/projects/proj-1', 'Overview', '/projects/proj-1', {}],
+    ['project root aliases to Test Library', '/projects/proj-1', 'Test Library', '/projects/proj-1/suites', {}],
     ['project Review nested destination', '/projects/proj-1/ai-review/case-1', 'Review', '/projects/proj-1/ai-review', {}],
     ['project Quality nested destination', '/projects/proj-1/reports/run-1', 'Quality', '/projects/proj-1/reports', {}],
     ['project collapsed', '/projects/proj-1/runs', 'Runs', '/projects/proj-1/runs', { defaultOpen: false }],
