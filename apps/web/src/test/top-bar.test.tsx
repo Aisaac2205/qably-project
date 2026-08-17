@@ -51,9 +51,10 @@ describe('TopBar', () => {
   // the project context indicator (name + health dot) on project routes.
   // If breadcrumbs are added to the top bar in the future, restore the
   // assertions below (Dashboard / Projects > Name > Segment).
-  it('does not render a Dashboard label on /dashboard (no inline breadcrumb)', async () => {
+  it('renders a Dashboard title heading on /dashboard', async () => {
     mockPathname.mockReturnValue('/dashboard')
     const { container } = render(<TopBar />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
     // Unimplemented controls stay out of the keyboard order.
     expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /user menu/i })).not.toBeInTheDocument()

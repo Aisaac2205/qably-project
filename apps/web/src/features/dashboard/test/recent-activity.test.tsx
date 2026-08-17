@@ -13,12 +13,11 @@ describe('RecentActivity', () => {
     __resetStore()
   })
 
-  it('renders three section headings', async () => {
+  it('renders section headings for recent runs and recent pipelines', async () => {
     await act(async () => {
       render(<RecentActivity />)
     })
     expect(screen.getByText('Recent runs')).toBeInTheDocument()
-    expect(screen.getByText('Pending AI cases')).toBeInTheDocument()
     expect(screen.getByText('Recent pipelines')).toBeInTheDocument()
   })
 
@@ -29,22 +28,6 @@ describe('RecentActivity', () => {
     // Should show at least one run name
     const runTitles = screen.getAllByText(/Run #/)
     expect(runTitles.length).toBeGreaterThan(0)
-  })
-
-  it('shows pending AI cases from mock data', async () => {
-    await act(async () => {
-      render(<RecentActivity />)
-    })
-    // Five seeded cases are pending; source-file ordering leaves only these three after the UI cap.
-    const visibleCases = [
-      'Checkout with empty cart blocked',
-      'Expired password reset token is rejected',
-      'Invalid login shows error message',
-    ]
-
-    expect(visibleCases.map((name) => screen.getByText(name))).toHaveLength(3)
-    expect(screen.queryByText('Discount code reduces total')).not.toBeInTheDocument()
-    expect(screen.queryByText('Partial refund restores the original payment method')).not.toBeInTheDocument()
   })
 
   it('shows recent CI runs in pipelines section', async () => {

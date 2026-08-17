@@ -27,12 +27,12 @@ export function ProjectHealthTable() {
       <CardContent className="p-0 flex-1">
         <DataTable caption={t('dashboard.projectHealth')} className="min-w-[400px]">
           <thead>
-            <tr className="border-b border-border bg-canvas/30">
-              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3">{t('dashboard.thProject')}</th>
-              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3">{t('dashboard.thHealth')}</th>
-              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3">{t('dashboard.thLastRun')}</th>
-              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-3 py-3 text-center">{t('dashboard.thSuites')}</th>
-              <th className="text-xs uppercase tracking-wider font-semibold text-muted-foreground px-5 py-3 text-center">{t('dashboard.thAiPending')}</th>
+            <tr className="border-b border-border bg-canvas/40">
+              <th className="text-xs font-medium text-muted px-5 py-3">{t('dashboard.thProject')}</th>
+              <th className="text-xs font-medium text-muted px-3 py-3">{t('dashboard.thHealth')}</th>
+              <th className="text-xs font-medium text-muted px-3 py-3">{t('dashboard.thLastRun')}</th>
+              <th className="text-xs font-medium text-muted px-3 py-3 text-center">{t('dashboard.thSuites')}</th>
+              <th className="text-xs font-medium text-muted px-5 py-3 text-center">{t('dashboard.thAiPending')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">

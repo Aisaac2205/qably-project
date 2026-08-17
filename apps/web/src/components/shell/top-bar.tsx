@@ -5,6 +5,7 @@ import { useProject } from '@/lib/use-mock-store'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { NotificationsMenu } from '@/features/notifications'
 
+
 function healthColor(score: number): string {
   if (score >= 80) return 'bg-pass'
   if (score >= 50) return 'bg-warn'
@@ -17,11 +18,17 @@ export function TopBar() {
   const isProjectRoute = segments[0] === 'projects' && segments.length >= 3
   const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
   const project = useProject(projectId ?? '')
+  const isDashboard = pathname === '/dashboard' || pathname === '/'
 
   return (
     <div className="flex h-14 items-center justify-between bg-sidebar px-4 md:px-6">
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <SidebarTrigger className="-ml-1" />
+        <SidebarTrigger className="md:hidden -ml-1" />
+        {isDashboard && (
+          <h1 id="dashboard-title" className="text-base md:text-lg font-semibold tracking-[-0.015em] text-default">
+            Dashboard
+          </h1>
+        )}
         {isProjectRoute && project && (
           <div className="flex items-center gap-1.5 text-xs text-muted">
             <div

@@ -263,8 +263,12 @@ function SidebarTrigger({
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
-      size="icon-sm"
-      className={cn(className)}
+      size="icon-lg"
+      aria-expanded={state === 'expanded'}
+      className={cn(
+        "size-9 rounded-lg text-sidebar-foreground hover:bg-surface-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary",
+        className
+      )}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()

@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Bell,
-  Gauge,
-  FolderOpen,
-  Gear,
+  BellSimple,
+  SquaresFour,
+  FolderSimple,
+  GearSix,
   Stack,
   Play,
   Robot,
@@ -26,6 +26,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 
@@ -50,16 +51,16 @@ export function Sidebar() {
   const projectContext = project ? projectId : null
 
   const navItems: NavItem[] = [
-    { label: t('sidebar.portfolio'), href: '/dashboard', icon: Gauge },
-    { label: t('sidebar.projects'), href: '/projects', icon: FolderOpen },
+    { label: t('sidebar.portfolio'), href: '/dashboard', icon: SquaresFour },
+    { label: t('sidebar.projects'), href: '/projects', icon: FolderSimple },
     { label: t('sidebar.reviewInbox'), href: '/review-inbox', icon: Tray },
-    { label: t('sidebar.notifications'), href: '/notifications', icon: Bell },
-    { label: t('sidebar.settings'), href: '/settings', icon: Gear },
+    { label: t('sidebar.notifications'), href: '/notifications', icon: BellSimple },
+    { label: t('sidebar.settings'), href: '/settings', icon: GearSix },
   ]
 
   const projectSubItems: NavItem[] = projectContext
     ? [
-        { label: t('sidebar.repository'), href: `/projects/${projectContext}/repository`, icon: FolderOpen },
+        { label: t('sidebar.repository'), href: `/projects/${projectContext}/repository`, icon: FolderSimple },
         { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Robot },
         {
           label: t('sidebar.testLibrary'),
@@ -77,16 +78,25 @@ export function Sidebar() {
     <ShadcnSidebar variant="sidebar" collapsible="icon" className="border-r-0! bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
       <SidebarHeader className="h-14 justify-center p-2">
-        <Link
-          href="/dashboard"
-          aria-label="Qably"
-          className="flex h-10 w-full items-center gap-2.5 rounded-lg px-2 transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-fg">
-            Q
-          </span>
-          {!isCollapsed && <span className="truncate text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">Qably</span>}
-        </Link>
+        {isCollapsed ? (
+          <div className="flex items-center justify-center">
+            <SidebarTrigger className="shrink-0" />
+          </div>
+        ) : (
+          <div className="flex h-10 w-full items-center justify-between gap-1.5 px-0.5">
+            <Link
+              href="/dashboard"
+              aria-label="Qably"
+              className="flex h-10 flex-1 items-center gap-2.5 rounded-lg px-2 transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary min-w-0"
+            >
+              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-fg shadow-xs">
+                Q
+              </span>
+              <span className="truncate text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">Qably</span>
+            </Link>
+            <SidebarTrigger className="shrink-0 text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-sidebar-hover" />
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent>
@@ -154,19 +164,29 @@ export function Sidebar() {
 
        <SidebarFooter className="p-2">
         {isCollapsed ? (
-          <div className="flex items-center justify-center py-2">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-medium text-primary-fg">
+          <div className="flex items-center justify-center py-1">
+            <div
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-fg shadow-xs"
+              title="Isaac F. (Admin)"
+              aria-label="Isaac F."
+            >
               IF
             </div>
           </div>
         ) : (
-          <div data-slot="sidebar-account" className="flex h-10 w-full items-center gap-2 rounded-lg border border-border-sidebar px-2.5">
-            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-[10px] font-medium text-primary-fg">
+          <div
+            data-slot="sidebar-account"
+            className="flex h-12 w-full items-center gap-2.5 rounded-xl border border-border-sidebar bg-sidebar/50 px-3 py-2 transition-colors hover:bg-sidebar-hover"
+          >
+            <div
+              aria-hidden="true"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-semibold text-primary-fg shadow-xs"
+            >
               IF
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-xs font-medium text-sidebar-foreground">Isaac F.</div>
-              <div className="truncate text-[10px] leading-3 text-sidebar-fg-muted">{t('sidebar.admin')}</div>
+              <div className="truncate text-sm font-medium leading-tight text-sidebar-foreground">Isaac F.</div>
+              <div className="truncate text-xs leading-normal text-sidebar-fg-muted">{t('sidebar.admin')}</div>
             </div>
           </div>
         )}

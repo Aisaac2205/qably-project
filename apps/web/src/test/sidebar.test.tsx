@@ -93,7 +93,7 @@ describe('Sidebar — global state (no project route)', () => {
     const footer = container.querySelector('[data-slot="sidebar-footer"]')
     const account = container.querySelector('[data-slot="sidebar-account"]')
     expect(footer).not.toHaveClass('border-t')
-    expect(account).toHaveClass('h-10', 'rounded-lg', 'border', 'border-border-sidebar')
+    expect(account).toHaveClass('h-12', 'rounded-xl', 'border', 'border-border-sidebar')
     expect(account).toHaveTextContent('Isaac F.')
     expect(account).toHaveTextContent('Admin')
   })
@@ -101,7 +101,7 @@ describe('Sidebar — global state (no project route)', () => {
   it('shows the aligned global destinations', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Portfolio')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument()
     expect(screen.getByText('Projects')).toBeInTheDocument()
     expect(screen.getByText('Review Inbox')).toBeInTheDocument()
     expect(screen.getByText('Notifications')).toBeInTheDocument()
@@ -111,7 +111,7 @@ describe('Sidebar — global state (no project route)', () => {
   it('maps every global destination to a safe route', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { renderSidebar() })
-    expect(screen.getByText('Portfolio').closest('a')).toHaveAttribute('href', '/dashboard')
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/dashboard')
     expect(screen.getByText('Projects').closest('a')).toHaveAttribute('href', '/projects')
     expect(screen.getByText('Review Inbox').closest('a')).toHaveAttribute('href', '/review-inbox')
     expect(screen.getByText('Notifications').closest('a')).toHaveAttribute('href', '/notifications')
@@ -173,12 +173,11 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
   it('replaces global navigation with the project hierarchy', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/suites')
     await act(async () => { renderSidebar() })
-    expect(screen.queryByText('Portfolio')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Dashboard' })).not.toBeInTheDocument()
     expect(screen.queryByText('Review Inbox')).not.toBeInTheDocument()
     expect(screen.queryByText('Notifications')).not.toBeInTheDocument()
     expect(screen.queryByText('Settings')).not.toBeInTheDocument()
   })
-
 })
 
 describe('Sidebar — current destinations', () => {
