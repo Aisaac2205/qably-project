@@ -5,7 +5,10 @@ import {
   getAiProviders,
   connectAiProvider,
   disconnectAiProvider,
+  getChatThreads,
   getChatThread,
+  createChatThread,
+  deleteChatThread,
   getChatMessages,
   sendChatMessage,
   getCoverageGaps,
@@ -49,26 +52,54 @@ describe('mock-store AI providers', () => {
 describe('mock-store project chat', () => {
   beforeEach(() => __resetStore())
 
-  it('returns the seeded thread for proj-1', () => {
-    const thread = getChatThread('proj-1')!
-    expect(thread.projectId).toBe('proj-1')
-    expect(getChatMessages(thread.id).length).toBe(2)
+  it('returns the seeded threads for proj-1 sorted by updatedAt', () => {
+    const threads = getChatThreads('proj-1')
+    expect(threads.length).toBeGreaterThan(0)
+    expect(threads[0].projectId).toBe('proj-1')
+    expect(getChatMessages(threads[0].id).length).toBe(2)
+  })
+
+  it('creates a unique thread on createChatThread', () => {
+    const t1 = createChatThread('proj-1')
+    const t2 = createChatThread('proj-1')
+    expect(t1.id).not.toBe(t2.id)
+    expect(getChatThreads('proj-1').map((t) => t.id)).toContain(t1.id)
+    expect(getChatThreads('proj-1').map((t) => t.id)).toContain(t2.id)
   })
 
   it('creates a thread from the explicit send event for a project with no chat history', () => {
-    expect(getChatThread('proj-2')).toBeUndefined()
+    expect(getChatThreads('proj-2').length).toBe(0)
 
-    const { userMessage } = sendChatMessage('proj-2', 'How many suites exist?')
+    const { userMessage, thread } = sendChatMessage('proj-2', 'How many suites exist?')
 
-    expect(getChatThread('proj-2')?.id).toBe(userMessage.threadId)
+    expect(thread.projectId).toBe('proj-2')
+    expect(thread.id).toBe(userMessage.threadId)
+    expect(getChatThreads('proj-2').length).toBe(1)
   })
 
-  it('appends a user message and a generic assistant reply', () => {
-    const before = getChatMessages(getChatThread('proj-1')!.id).length
-    const { userMessage, assistantMessage } = sendChatMessage('proj-1', 'How many suites exist?')
+  it('appends a user message and a generic assistant reply to an existing thread', () => {
+    const initialThread = getChatThreads('proj-1')[0]
+    const before = getChatMessages(initialThread.id).length
+    const { userMessage, assistantMessage, thread } = sendChatMessage(
+      'proj-1',
+      'How many suites exist?',
+      initialThread.id,
+    )
+    expect(thread.id).toBe(initialThread.id)
     expect(userMessage.role).toBe('user')
     expect(assistantMessage.role).toBe('assistant')
-    expect(getChatMessages(userMessage.threadId).length).toBe(before + 2)
+    expect(getChatMessages(initialThread.id).length).toBe(before + 2)
+  })
+
+  it('deletes a thread and all associated messages in cascade', () => {
+    const initialThread = getChatThreads('proj-1')[0]
+    expect(getChatMessages(initialThread.id).length).toBeGreaterThan(0)
+
+    const deleted = deleteChatThread(initialThread.id)
+    expect(deleted).toBe(true)
+    expect(getChatThread(initialThread.id)).toBeUndefined()
+    expect(getChatThreads('proj-1').find((t) => t.id === initialThread.id)).toBeUndefined()
+    expect(getChatMessages(initialThread.id).length).toBe(0)
   })
 
   it('creates a draft AiCase when the message asks to generate a case', () => {

@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import { __resetStore } from '@/lib/mock-store'
@@ -29,12 +29,13 @@ describe('DashboardPage', () => {
     await act(async () => {
       render(<DashboardPage />)
     })
-    expect(screen.getByRole('table', { name: 'Project health' })).toBeInTheDocument()
+    const table = screen.getByRole('table', { name: 'Project health' })
+    expect(table).toBeInTheDocument()
     // Should show all 4 projects
-    expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
-    expect(screen.getByText('Mobile App')).toBeInTheDocument()
-    expect(screen.getByText('API Backend')).toBeInTheDocument()
-    expect(screen.getByText('Admin Panel')).toBeInTheDocument()
+    expect(within(table).getByText('Ecommerce App')).toBeInTheDocument()
+    expect(within(table).getByText('Mobile App')).toBeInTheDocument()
+    expect(within(table).getByText('API Backend')).toBeInTheDocument()
+    expect(within(table).getByText('Admin Panel')).toBeInTheDocument()
   })
 
   it('renders recent activity sections', async () => {
@@ -75,11 +76,11 @@ describe('DashboardPage', () => {
     expect(screen.getByText('CI Executions')).toBeInTheDocument()
   })
 
-  it('renders an honest empty state for quality & freshness risks when no signals exist', async () => {
+  it('renders quality & freshness risks section with active signals', async () => {
     await act(async () => {
       render(<DashboardPage />)
     })
     expect(screen.getByRole('heading', { name: 'Quality & freshness risks' })).toBeInTheDocument()
-    expect(screen.getByText('No active risk signals yet')).toBeInTheDocument()
+    expect(screen.getByText(/coverage gap in payment refunds flow/i)).toBeInTheDocument()
   })
 })

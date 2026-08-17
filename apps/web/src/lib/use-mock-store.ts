@@ -23,6 +23,7 @@ import type {
   ApiKey,
   GithubIntegration,
   AiProviderConnection,
+  ChatThread,
   ChatMessage,
   CoverageGap,
   QualityRisk,
@@ -34,6 +35,9 @@ import type {
   CodeChange,
   OfficialTestCase,
   TestCaseVersion,
+  ReviewDecision,
+  Execution,
+  ExecutionResult,
 } from '@qably/types'
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
@@ -166,18 +170,36 @@ export function useAiProviders(): AiProviderConnection[] {
   return useStableArray(() => getSnapshot().aiProviders, () => getServerSnapshot().aiProviders)
 }
 
-export function useChatMessages(projectId: string): ChatMessage[] {
+export function useChatThreads(projectId: string): ChatThread[] {
+  return useStableArray(
+    () =>
+      getSnapshot()
+        .chatThreads.filter((thread) => thread.projectId === projectId)
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    () =>
+      getServerSnapshot()
+        .chatThreads.filter((thread) => thread.projectId === projectId)
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+  )
+}
+
+export function useChatMessages(threadId: string | null): ChatMessage[] {
   return useStableArray(
     () => {
-      const snapshot = getSnapshot()
-      const threadId = snapshot.chatThreads.find((thread) => thread.projectId === projectId)?.id
-      return threadId ? snapshot.chatMessages.filter((message) => message.threadId === threadId) : []
+      if (!threadId) return []
+      return getSnapshot().chatMessages.filter((message) => message.threadId === threadId)
     },
     () => {
-      const snapshot = getServerSnapshot()
-      const threadId = snapshot.chatThreads.find((thread) => thread.projectId === projectId)?.id
-      return threadId ? snapshot.chatMessages.filter((message) => message.threadId === threadId) : []
+      if (!threadId) return []
+      return getServerSnapshot().chatMessages.filter((message) => message.threadId === threadId)
     },
+  )
+}
+
+export function useAllChatMessages(): ChatMessage[] {
+  return useStableArray(
+    () => getSnapshot().chatMessages,
+    () => getServerSnapshot().chatMessages,
   )
 }
 
@@ -237,11 +259,75 @@ export function useOfficialTestCase(id?: string): OfficialTestCase | undefined {
   )
 }
 
+export function useOfficialTestCases(suiteId?: string, projectId?: string): OfficialTestCase[] {
+  return useStableArray(
+    () => {
+      let list = getSnapshot().officialTestCases
+      if (suiteId) list = list.filter((tc) => tc.suiteId === suiteId)
+      if (projectId) list = list.filter((tc) => tc.projectId === projectId)
+      return list
+    },
+    () => {
+      let list = getServerSnapshot().officialTestCases
+      if (suiteId) list = list.filter((tc) => tc.suiteId === suiteId)
+      if (projectId) list = list.filter((tc) => tc.projectId === projectId)
+      return list
+    },
+  )
+}
+
 export function useTestCaseVersion(id?: string): TestCaseVersion | undefined {
   return useSyncExternalStore(
     subscribe,
     () => id ? getSnapshot().testCaseVersions.find((item) => item.id === id) : undefined,
     () => id ? getServerSnapshot().testCaseVersions.find((item) => item.id === id) : undefined,
+  )
+}
+
+export function useTestCaseVersions(testCaseId?: string): TestCaseVersion[] {
+  return useStableArray(
+    () => {
+      const all = getSnapshot().testCaseVersions
+      return testCaseId ? all.filter((v) => v.testCaseId === testCaseId) : all
+    },
+    () => {
+      const all = getServerSnapshot().testCaseVersions
+      return testCaseId ? all.filter((v) => v.testCaseId === testCaseId) : all
+    },
+  )
+}
+
+export function useExecutions(projectId?: string): Execution[] {
+  return useStableArray(
+    () => {
+      const all = getSnapshot().executions
+      return projectId ? all.filter((e) => e.projectId === projectId) : all
+    },
+    () => {
+      const all = getServerSnapshot().executions
+      return projectId ? all.filter((e) => e.projectId === projectId) : all
+    },
+  )
+}
+
+export function useExecution(id?: string): Execution | undefined {
+  return useSyncExternalStore(
+    subscribe,
+    () => id ? getSnapshot().executions.find((item) => item.id === id) : undefined,
+    () => id ? getServerSnapshot().executions.find((item) => item.id === id) : undefined,
+  )
+}
+
+export function useExecutionResults(executionId?: string): ExecutionResult[] {
+  return useStableArray(
+    () => {
+      const all = getSnapshot().executionResults
+      return executionId ? all.filter((r) => r.executionId === executionId) : all
+    },
+    () => {
+      const all = getServerSnapshot().executionResults
+      return executionId ? all.filter((r) => r.executionId === executionId) : all
+    },
   )
 }
 
@@ -297,3 +383,11 @@ export function useConnection(id: string): Connection | undefined {
     () => getServerSnapshot().connections.find((connection) => connection.id === id),
   )
 }
+
+export function useReviewDecisions(): ReviewDecision[] {
+  return useStableArray(
+    () => getSnapshot().reviewDecisions,
+    () => getServerSnapshot().reviewDecisions,
+  )
+}
+

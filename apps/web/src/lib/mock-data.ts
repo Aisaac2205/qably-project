@@ -18,6 +18,7 @@ import type {
   IngestionBatch,
   CodeChange,
   Evidence,
+  QualityRisk,
 } from '@qably/types'
 
 export type {
@@ -699,5 +700,30 @@ export const mockCoverageGaps: CoverageGap[] = [
     severity: 'medium',
     suggestedCaseCount: 2,
     suggestedCaseId: 'ai-6',
+  },
+]
+
+// ─── Quality Risks ────────────────────────────────────────────────────────────
+
+export const mockQualityRisks: QualityRisk[] = [
+  {
+    id: 'risk-1',
+    projectId: 'proj-1',
+    severity: 'high',
+    criteria: [
+      'Coverage gap in payment refunds flow',
+      'No automated test coverage for partial or cancelled transactions',
+    ],
+    evidenceIds: ['evidence-change-empty-cart-1'],
+  },
+  {
+    id: 'risk-2',
+    projectId: 'proj-1',
+    severity: 'medium',
+    criteria: [
+      'Test drift detected on checkout guard verification',
+      'Flaky CI pass rate detected on branch feature/checkout-fix',
+    ],
+    evidenceIds: ['evidence-change-cart-total-1'],
   },
 ]

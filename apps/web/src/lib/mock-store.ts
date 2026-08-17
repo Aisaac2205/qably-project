@@ -19,6 +19,7 @@ import {
   mockCoverageGaps,
   mockConnections,
   mockNotifications,
+  mockQualityRisks,
   mockIngestionBatches,
   mockCodeChanges,
   mockIngestionEvidence,
@@ -194,7 +195,7 @@ let codeChanges: CodeChange[] = structuredClone(mockCodeChanges)
 let reviewDecisions: ReviewDecision[] = []
 let executions: Execution[] = []
 let executionResults: ExecutionResult[] = []
-let qualityRisks: QualityRisk[] = []
+let qualityRisks: QualityRisk[] = structuredClone(mockQualityRisks)
 const reviewScenarios: ReviewScenario[] = [
   { id: 'approval-new', proposalId: 'proposal-ai-4' },
   { id: 'approval-version', proposalId: 'review-proposal-checkout' },
@@ -293,15 +294,36 @@ export function getAiProviders(): AiProviderConnection[] {
   return aiProviders
 }
 
-export function getChatThread(projectId: string): ChatThread | undefined {
-  return chatThreads.find((t) => t.projectId === projectId)
+export function getChatThreads(projectId: string): ChatThread[] {
+  return chatThreads
+    .filter((t) => t.projectId === projectId)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 }
 
-function createChatThread(projectId: string): ChatThread {
+export function getChatThread(id: string): ChatThread | undefined {
+  return chatThreads.find((t) => t.id === id)
+}
+
+export function createChatThread(projectId: string): ChatThread {
   const ts = nowIso()
-  const newThread: ChatThread = { id: `thread-${projectId}`, projectId, createdAt: ts, updatedAt: ts }
-  chatThreads = [...chatThreads, newThread]
+  const newThread: ChatThread = {
+    id: `thread-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    projectId,
+    createdAt: ts,
+    updatedAt: ts,
+  }
+  chatThreads = [newThread, ...chatThreads]
+  notify()
   return newThread
+}
+
+export function deleteChatThread(threadId: string): boolean {
+  const before = chatThreads.length
+  chatThreads = chatThreads.filter((t) => t.id !== threadId)
+  if (chatThreads.length === before) return false
+  chatMessages = chatMessages.filter((m) => m.threadId !== threadId)
+  notify()
+  return true
 }
 
 export function getChatMessages(threadId: string): ChatMessage[] {
@@ -320,6 +342,31 @@ export function getQualityRisks(projectId?: string): QualityRisk[] {
 
 export function getNotifications(): Notification[] {
   return notifications
+}
+
+export function getServerNotifications(): Notification[] {
+  return FROZEN_SEEDED.notifications
+}
+
+export function markNotificationAsRead(id: string): void {
+  const ts = nowIso()
+  notifications = notifications.map((n) => (n.id === id ? { ...n, readAt: n.readAt ?? ts } : n))
+  notify()
+}
+
+export function toggleNotificationRead(id: string): void {
+  const ts = nowIso()
+  notifications = notifications.map((n) => (n.id === id ? { ...n, readAt: n.readAt ? undefined : ts } : n))
+  notify()
+}
+
+export function markAllNotificationsAsRead(projectId?: string): void {
+  const ts = nowIso()
+  notifications = notifications.map((n) => {
+    if (projectId && n.projectId !== projectId) return n
+    return { ...n, readAt: n.readAt ?? ts }
+  })
+  notify()
 }
 
 export function getIngestionBatches(projectId?: string): IngestionBatch[] {
@@ -343,12 +390,38 @@ export function getOfficialTestCase(id: string): OfficialTestCase | undefined {
   return officialTestCases.find((testCase) => testCase.id === id)
 }
 
-export function getTestCaseVersions(testCaseId: string): TestCaseVersion[] {
+export function getOfficialTestCases(suiteId?: string, projectId?: string): OfficialTestCase[] {
+  let list = officialTestCases
+  if (suiteId) {
+    list = list.filter((tc) => tc.suiteId === suiteId)
+  }
+  if (projectId) {
+    list = list.filter((tc) => tc.projectId === projectId)
+  }
+  return list
+}
+
+export function getTestCaseVersions(testCaseId?: string): TestCaseVersion[] {
+  if (!testCaseId) return testCaseVersions
   return testCaseVersions.filter((version) => version.testCaseId === testCaseId)
 }
 
 export function getTestCaseVersion(id: string): TestCaseVersion | undefined {
   return testCaseVersions.find((version) => version.id === id)
+}
+
+export function getExecutions(projectId?: string): Execution[] {
+  if (!projectId) return executions
+  return executions.filter((e) => e.projectId === projectId)
+}
+
+export function getExecution(id: string): Execution | undefined {
+  return executions.find((e) => e.id === id)
+}
+
+export function getExecutionResults(executionId?: string): ExecutionResult[] {
+  if (!executionId) return executionResults
+  return executionResults.filter((r) => r.executionId === executionId)
 }
 
 export function getTraceabilityLinks({ entityId }: { entityId: string }): TraceabilityLink[] {
@@ -457,9 +530,7 @@ export function rejectProposal(
   return { ok: true, decision }
 }
 
-export function getServerNotifications(): Notification[] {
-  return FROZEN_SEEDED.notifications
-}
+
 
 // ── Connection aggregate (Commit 2) ────────────────────────────────────────
 
@@ -817,14 +888,7 @@ export function confirmAiCase(id: string): AiCase | undefined {
   return aiCases.find((c) => c.id === id)
 }
 
-export function markNotificationAsRead(id: string): Notification | undefined {
-  const notification = notifications.find((item) => item.id === id)
-  if (!notification || notification.readAt) return notification
-  const readAt = nowIso()
-  notifications = notifications.map((item) => (item.id === id ? { ...item, readAt } : item))
-  notify()
-  return notifications.find((item) => item.id === id)
-}
+
 
 export function rejectAiCase(id: string): AiCase | undefined {
   aiCases = aiCases.map((c) => (c.id === id ? { ...c, reviewStatus: 'rejected' as const } : c))
@@ -955,8 +1019,12 @@ export function disconnectAiProvider(provider: AiProvider): AiProviderConnection
 export function sendChatMessage(
   projectId: string,
   content: string,
-): { userMessage: ChatMessage; assistantMessage: ChatMessage } {
-  const thread = getChatThread(projectId) ?? createChatThread(projectId)
+  threadId?: string,
+): { userMessage: ChatMessage; assistantMessage: ChatMessage; thread: ChatThread } {
+  let thread = threadId ? chatThreads.find((t) => t.id === threadId && t.projectId === projectId) : undefined
+  if (!thread) {
+    thread = createChatThread(projectId)
+  }
   const ts = nowIso()
 
   const userMessage: ChatMessage = {
@@ -1043,7 +1111,7 @@ export function sendChatMessage(
   chatThreads = chatThreads.map((t) => (t.id === thread.id ? { ...t, updatedAt: assistantMessage.createdAt } : t))
 
   notify()
-  return { userMessage, assistantMessage }
+  return { userMessage, assistantMessage, thread }
 }
 
 // ── Test-only reset ───────────────────────────────────────────────
@@ -1075,7 +1143,7 @@ export function __resetStore(): void {
   reviewDecisions = []
   executions = []
   executionResults = []
-  qualityRisks = []
+  qualityRisks = structuredClone(mockQualityRisks)
   ciEventLog.length = 0
   notify()
 }

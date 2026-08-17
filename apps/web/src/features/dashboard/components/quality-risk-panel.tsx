@@ -1,20 +1,46 @@
 'use client'
 
-import { WarningCircle } from '@phosphor-icons/react'
+import Link from 'next/link'
+import { WarningCircle, ArrowSquareOut, FileText } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
-import { useQualityRisks } from '@/lib/use-mock-store'
+import { useQualityRisks, useProjects } from '@/lib/use-mock-store'
 import { StateView } from '@/components/ui/state-view'
 
-const SEVERITY_LABEL: Record<string, string> = {
-  low: 'Low',
-  medium: 'Medium',
-  high: 'High',
-  critical: 'Critical',
+const SEVERITY_CONFIG: Record<
+  string,
+  {
+    label: string
+    colorClass: string
+    badgeClass: string
+  }
+> = {
+  critical: {
+    label: 'Critical',
+    colorClass: 'text-fail',
+    badgeClass: 'bg-fail-bg text-fail border-fail-border',
+  },
+  high: {
+    label: 'High',
+    colorClass: 'text-warn',
+    badgeClass: 'bg-warn-bg text-warn border-warn-border',
+  },
+  medium: {
+    label: 'Medium',
+    colorClass: 'text-running',
+    badgeClass: 'bg-running-bg text-running border-running-border',
+  },
+  low: {
+    label: 'Low',
+    colorClass: 'text-muted',
+    badgeClass: 'bg-canvas text-muted border-border',
+  },
 }
 
 export function QualityRiskPanel() {
   const { t } = useTranslation()
   const risks = useQualityRisks()
+  const projects = useProjects()
+  const projectsMap = new Map(projects.map((p) => [p.id, p]))
 
   return (
     <section
@@ -49,29 +75,57 @@ export function QualityRiskPanel() {
         />
       ) : (
         <div className="mt-4 divide-y divide-border/60">
-          {risks.map((risk) => (
-            <div
-              key={risk.id}
-              className="group flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
-            >
-              <div className="flex min-w-0 items-start gap-3">
-                <WarningCircle
-                  size={16}
-                  weight="regular"
-                  aria-hidden="true"
-                  className="mt-0.5 shrink-0 text-muted transition-colors group-hover:text-default"
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-default">
-                    {SEVERITY_LABEL[risk.severity] ?? risk.severity}
-                  </p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                    {risk.criteria.join(' · ')}
-                  </p>
+          {risks.map((risk) => {
+            const severity = SEVERITY_CONFIG[risk.severity] ?? SEVERITY_CONFIG.medium
+            const project = projectsMap.get(risk.projectId)
+
+            return (
+              <div
+                key={risk.id}
+                className="group flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
+              >
+                <div className="flex min-w-0 items-start gap-3 flex-1">
+                  <WarningCircle
+                    size={18}
+                    weight="fill"
+                    aria-hidden="true"
+                    className={`mt-0.5 shrink-0 ${severity.colorClass}`}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold border ${severity.badgeClass}`}>
+                        {severity.label}
+                      </span>
+                      {project && (
+                        <span className="inline-flex items-center rounded bg-canvas border border-border px-2 py-0.5 text-[11px] font-medium text-muted">
+                          {project.name}
+                        </span>
+                      )}
+                      {risk.evidenceIds.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+                          <FileText size={12} aria-hidden="true" />
+                          <span>{risk.evidenceIds.length} evidence</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs leading-relaxed text-default">
+                      {risk.criteria.join(' · ')}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="shrink-0 self-end sm:self-center">
+                  <Link
+                    href={`/projects/${risk.projectId}/repository`}
+                    className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline"
+                  >
+                    <span>View repository</span>
+                    <ArrowSquareOut size={12} aria-hidden="true" />
+                  </Link>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </section>

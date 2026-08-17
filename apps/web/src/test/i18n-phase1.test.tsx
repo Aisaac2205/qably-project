@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import NotificationsPage from '@/app/(app)/notifications/page'
 import ReviewInboxPage from '@/app/(app)/review-inbox/page'
 import { useI18nStore } from '@/lib/i18n'
 import en from '@/locales/en.json'
@@ -37,11 +38,20 @@ describe('Phase 1 i18n', () => {
     expect(keyPaths(es.repository)).toEqual(keyPaths(en.repository))
   })
 
-  it('renders a temporary page in Spanish', () => {
+  it('renders the Notifications page in Spanish', () => {
+    useI18nStore.setState({ locale: 'es' })
+    render(<NotificationsPage />)
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Notificaciones' })).toBeInTheDocument()
+    expect(screen.getByText('Alertas de ejecuciones críticas, propuestas de revisión y riesgos de calidad.')).toBeInTheDocument()
+  })
+
+  it('renders the Review Inbox page in Spanish', () => {
     useI18nStore.setState({ locale: 'es' })
     render(<ReviewInboxPage />)
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Bandeja de revisión' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Esta área todavía no está disponible' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: /Bandeja de revisión/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: /Autoridad humana requerida para la publicación/i })).toBeInTheDocument()
   })
 })
+
