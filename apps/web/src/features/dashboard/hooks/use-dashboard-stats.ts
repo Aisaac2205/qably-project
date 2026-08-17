@@ -6,6 +6,7 @@ import {
   useRuns,
   useAiCases,
   useOrg,
+  useCoverageGaps,
 } from '@/lib/use-mock-store'
 import { MOCK_NOW } from '@/lib/mock-data'
 import type {
@@ -19,9 +20,11 @@ export interface DashboardStats {
   totalProjects: number
   totalSuites: number
   totalRuns: number
+  runsLast7d: number
   pendingAiCases: number
   passRateLast7d: number
   passRateTrend: number
+  coverageGapsCount: number
   activeRuns: number
   projectsByHealth: Array<{
     project: Project
@@ -40,6 +43,7 @@ export function useDashboardStats(): DashboardStats {
   const runs = useRuns()
   const aiCases = useAiCases()
   const org = useOrg()
+  const coverageGaps = useCoverageGaps()
 
   return useMemo(() => {
     const now = new Date(MOCK_NOW).getTime()
@@ -48,6 +52,11 @@ export function useDashboardStats(): DashboardStats {
 
     // Total suites = sum of suiteCount across all projects
     const totalSuites = projects.reduce((sum, p) => sum + p.suiteCount, 0)
+
+    // Runs started in the last 7 days
+    const runsLast7d = runs.filter(
+      (r) => new Date(r.startedAt).getTime() >= sevenDaysAgo,
+    ).length
 
     // Active runs
     const activeRuns = runs.filter((r) => r.status === 'running').length
@@ -119,14 +128,16 @@ export function useDashboardStats(): DashboardStats {
       totalProjects: projects.length,
       totalSuites,
       totalRuns: runs.length,
+      runsLast7d,
       pendingAiCases,
       passRateLast7d,
       passRateTrend,
+      coverageGapsCount: coverageGaps.length,
       activeRuns,
       projectsByHealth,
       recentRuns,
       recentAiCases,
       recentCiRuns,
     }
-  }, [projects, runs, aiCases, org])
+  }, [projects, runs, aiCases, org, coverageGaps])
 }

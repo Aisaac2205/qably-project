@@ -1,35 +1,32 @@
 'use client'
 
 import Link from 'next/link'
-import { Code, Play, Sparkle } from '@phosphor-icons/react'
+import { Code, Play, CaretRight } from '@phosphor-icons/react'
 import { StatusChip } from '@/components/ui/status-chip'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
 import { useTranslation } from '@/lib/i18n'
 
-function getCasePriority(name: string): { label: string; className: string } {
-  if (name.toLowerCase().includes('login') || name.toLowerCase().includes('critical')) {
-    return { label: 'High', className: 'text-fail' }
-  }
-
-  return { label: 'Medium', className: 'text-warn' }
-}
-
 interface QueueSectionProps {
   title: string
+  href?: string
   children: React.ReactNode
 }
 
-function QueueSection({ title, children }: QueueSectionProps) {
+function QueueSection({ title, href = '/projects', children }: QueueSectionProps) {
   return (
-    <section className="min-w-0 px-5 py-5 first:pt-0 xl:border-r xl:border-border xl:last:border-r-0">
+    <section className="flex h-full min-w-0 flex-col p-5 md:p-6 md:border-r md:border-border md:last:border-r-0">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-default">{title}</h2>
-        <Link href="/projects" className="text-xs font-medium text-primary hover:text-primary-hover">
+        <h2 className="text-sm font-semibold tracking-[-0.01em] text-default">{title}</h2>
+        <Link
+          href={href}
+          className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary transition-colors"
+        >
           View all
+          <CaretRight size={11} weight="bold" aria-hidden="true" />
         </Link>
       </div>
-      <div className="divide-y divide-border">{children}</div>
+      <div className="flex flex-1 flex-col justify-between divide-y divide-border">{children}</div>
     </section>
   )
 }
@@ -39,12 +36,11 @@ export function RecentActivity() {
   const { t } = useTranslation()
 
   const runs = stats.recentRuns.slice(0, 4)
-  const aiCases = stats.recentAiCases.slice(0, 3)
-  const ciRuns = stats.recentCiRuns.slice(0, 3)
+  const ciRuns = stats.recentCiRuns.slice(0, 4)
 
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-surface" aria-label="Operational work queue">
-      <div className="grid grid-cols-1 divide-y divide-border xl:grid-cols-3 xl:divide-x xl:divide-y-0">
+    <section className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xs" aria-label="Operational work queue">
+      <div className="grid flex-1 grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
         <QueueSection title={t('dashboard.recentRuns')}>
           {runs.length === 0 ? (
             <p className="py-3 text-xs text-muted">{t('dashboard.noRuns')}</p>
@@ -55,8 +51,10 @@ export function RecentActivity() {
                 href="/projects"
                 className="group flex min-h-14 items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
               >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <Play size={15} className="shrink-0 text-muted group-hover:text-primary" aria-hidden="true" />
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-canvas text-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                    <Play size={15} weight="fill" className="shrink-0" aria-hidden="true" />
+                  </div>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-default group-hover:text-primary">{run.name}</p>
                     <p className="truncate text-xs text-muted">{run.suiteName}</p>
@@ -65,33 +63,6 @@ export function RecentActivity() {
                 <StatusChip status={run.status} />
               </Link>
             ))
-          )}
-        </QueueSection>
-
-        <QueueSection title={t('dashboard.pendingAiCases')}>
-          {aiCases.length === 0 ? (
-            <p className="py-3 text-xs text-muted">{t('dashboard.noPendingAi')}</p>
-          ) : (
-            aiCases.map((testCase) => {
-              const priority = getCasePriority(testCase.name)
-
-              return (
-                <Link
-                  key={testCase.id}
-                  href="/projects"
-                  className="group flex min-h-14 items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
-                >
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <Sparkle size={15} className="shrink-0 text-ai group-hover:text-primary" aria-hidden="true" />
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-medium text-default group-hover:text-primary">{testCase.name}</p>
-                      <p className="truncate text-xs font-mono text-muted">{testCase.sourceFile}</p>
-                    </div>
-                  </div>
-                  <span className={`shrink-0 text-xs font-medium ${priority.className}`}>{priority.label}</span>
-                </Link>
-              )
-            })
           )}
         </QueueSection>
 
@@ -105,14 +76,16 @@ export function RecentActivity() {
                 href="/projects"
                 className="group flex min-h-14 items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
               >
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <Code size={15} className="shrink-0 text-muted group-hover:text-primary" aria-hidden="true" />
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-canvas text-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                    <Code size={15} weight="bold" className="shrink-0" aria-hidden="true" />
+                  </div>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-default group-hover:text-primary">
                       {run.commitMessage ?? run.name}
                     </p>
                     <p className="truncate text-xs text-muted">
-                      {run.commitSha && <span className="font-mono">{run.commitSha}</span>}
+                      {run.commitSha && <span>{run.commitSha}</span>}
                       {run.commitSha && run.branch ? ' · ' : null}
                       {run.branch ? <span>{run.branch}</span> : null}
                     </p>

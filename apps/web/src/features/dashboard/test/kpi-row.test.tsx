@@ -13,32 +13,23 @@ describe('KpiRow', () => {
     __resetStore()
   })
 
-  it('renders all 5 KPI cards', async () => {
+  it('renders all 4 KPI cards', async () => {
     await act(async () => {
       render(<KpiRow />)
     })
-    expect(screen.getByText('Projects')).toBeInTheDocument()
-    expect(screen.getByText('Test Suites')).toBeInTheDocument()
-    expect(screen.getByText('Runs (7d)')).toBeInTheDocument()
-    expect(screen.getByText('Pass Rate (7d)')).toBeInTheDocument()
+    expect(screen.getByText('Runs · 7 days')).toBeInTheDocument()
+    expect(screen.getByText('Pass Rate · 7 days')).toBeInTheDocument()
     expect(screen.getByText('Pending AI')).toBeInTheDocument()
+    expect(screen.getByText('Coverage Gaps')).toBeInTheDocument()
   })
 
-  it('shows correct project count from mock data', async () => {
+  it('shows correct runs-last-7-days count from mock data', async () => {
     await act(async () => {
       render(<KpiRow />)
     })
-    // 4 projects in mock data (the Projects KPI card has value "4")
+    // All 4 seeded runs started within 7 days of MOCK_NOW.
     const values = screen.getAllByText('4')
     expect(values.length).toBeGreaterThanOrEqual(1)
-  })
-
-  it('shows correct suite count from mock data', async () => {
-    await act(async () => {
-      render(<KpiRow />)
-    })
-    // 12+8+6+5 = 31
-    expect(screen.getByText('31')).toBeInTheDocument()
   })
 
   it('shows correct pending AI count from mock data', async () => {
@@ -47,5 +38,14 @@ describe('KpiRow', () => {
     })
     // Five of the six seeded AI cases are pending review.
     expect(screen.getByText('5')).toBeInTheDocument()
+  })
+
+  it('shows correct coverage gaps count from mock data', async () => {
+    await act(async () => {
+      render(<KpiRow />)
+    })
+    // 2 seeded coverage gaps for proj-1.
+    const values = screen.getAllByText('2')
+    expect(values.length).toBeGreaterThanOrEqual(1)
   })
 })

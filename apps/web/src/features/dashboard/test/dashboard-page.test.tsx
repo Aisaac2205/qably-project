@@ -13,33 +13,16 @@ describe('DashboardPage', () => {
     __resetStore()
   })
 
-  it('renders the dashboard heading', async () => {
-    await act(async () => {
-      render(<DashboardPage />)
-    })
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-  })
-
-  it('renders a focused operational introduction without decorative emoji', async () => {
-    await act(async () => {
-      render(<DashboardPage />)
-    })
-    expect(screen.getByText(/Acme QA Team/)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
-    expect(screen.queryByText(/👋/)).not.toBeInTheDocument()
-  })
-
   it('groups the quality metrics in one labelled summary strip', async () => {
     await act(async () => {
       render(<DashboardPage />)
     })
     const summary = screen.getByLabelText('Quality overview')
     expect(summary).toBeInTheDocument()
-    expect(summary).toHaveTextContent('Projects')
-    expect(summary).toHaveTextContent('Test Suites')
-    expect(summary).toHaveTextContent('Runs (7d)')
-    expect(summary).toHaveTextContent('Pass Rate (7d)')
+    expect(summary).toHaveTextContent('Runs')
+    expect(summary).toHaveTextContent('Pass Rate')
     expect(summary).toHaveTextContent('Pending AI')
+    expect(summary).toHaveTextContent('Coverage Gaps')
   })
 
   it('renders project health section', async () => {
@@ -81,14 +64,22 @@ describe('DashboardPage', () => {
     expect(workspace).not.toHaveClass('max-w-[1440px]')
   })
 
-  it('heading has the correct typography class', async () => {
+  it('renders governance pipeline section with live stages', async () => {
     await act(async () => {
       render(<DashboardPage />)
     })
-    const heading = screen.getByRole('heading', { level: 1 })
-    expect(heading).toHaveTextContent('Dashboard')
-    expect(heading.className).toContain('text-2xl')
-    expect(heading.className).toContain('font-semibold')
-    expect(heading.className).toContain('tracking-[-0.025em]')
+    expect(screen.getByRole('heading', { name: 'Governance pipeline' })).toBeInTheDocument()
+    expect(screen.getByText('SCM Ingestion')).toBeInTheDocument()
+    expect(screen.getByText('AI Proposals')).toBeInTheDocument()
+    expect(screen.getByText('Official Cases')).toBeInTheDocument()
+    expect(screen.getByText('CI Executions')).toBeInTheDocument()
+  })
+
+  it('renders an honest empty state for quality & freshness risks when no signals exist', async () => {
+    await act(async () => {
+      render(<DashboardPage />)
+    })
+    expect(screen.getByRole('heading', { name: 'Quality & freshness risks' })).toBeInTheDocument()
+    expect(screen.getByText('No active risk signals yet')).toBeInTheDocument()
   })
 })
