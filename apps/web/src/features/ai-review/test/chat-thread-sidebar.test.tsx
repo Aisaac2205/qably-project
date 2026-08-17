@@ -118,4 +118,60 @@ describe('ChatThreadSidebar', () => {
 
     expect(screen.getByText(/no conversations|sin conversaciones/i)).toBeInTheDocument()
   })
+
+  it('triggers onToggleCollapse when clicking the sidebar trigger button in expanded state', async () => {
+    const onToggleCollapse = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ChatThreadSidebar
+          threads={threads}
+          activeThreadId="t1"
+          onSelectThread={vi.fn()}
+          onNewChat={vi.fn()}
+          onDeleteThread={vi.fn()}
+          messages={messages}
+          isCollapsed={false}
+          onToggleCollapse={onToggleCollapse}
+        />,
+      )
+    })
+
+    const triggerButton = screen.getByRole('button', { name: /collapse sidebar|ocultar barra lateral/i })
+    expect(triggerButton).toHaveAttribute('aria-expanded', 'true')
+    await user.click(triggerButton)
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders compact icons and triggers onToggleCollapse when collapsed', async () => {
+    const onToggleCollapse = vi.fn()
+    const onSelectThread = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ChatThreadSidebar
+          threads={threads}
+          activeThreadId="t1"
+          onSelectThread={onSelectThread}
+          onNewChat={vi.fn()}
+          onDeleteThread={vi.fn()}
+          messages={messages}
+          isCollapsed={true}
+          onToggleCollapse={onToggleCollapse}
+        />,
+      )
+    })
+
+    const expandButton = screen.getByRole('button', { name: /expand sidebar|mostrar barra lateral/i })
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false')
+    await user.click(expandButton)
+    expect(onToggleCollapse).toHaveBeenCalledTimes(1)
+
+    // Clicking a compact thread button selects the thread
+    const threadButtons = screen.getAllByRole('button', { name: /First thread message/i })
+    await user.click(threadButtons[0])
+    expect(onSelectThread).toHaveBeenCalledWith('t1')
+  })
 })

@@ -37,6 +37,7 @@ export function ProjectChatPanel({
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>(
     connectedProviders[0]?.provider ?? 'claude',
   )
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -66,6 +67,8 @@ export function ProjectChatPanel({
         onNewChat={startNewChat}
         onDeleteThread={removeThread}
         messages={allMessages}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
       <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
