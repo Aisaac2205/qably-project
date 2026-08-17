@@ -40,7 +40,7 @@ export function AppShell({ children }: AppShellProps) {
         <main
           id="main-content"
           tabIndex={-1}
-          className="min-h-0 flex-1 overflow-auto bg-surface md:m-3 md:mt-0 md:rounded-2xl md:ring-1 md:ring-border md:shadow-pop"
+          className="min-h-0 flex-1 overflow-auto bg-surface md:m-3 md:mt-0 md:rounded-2xl md:ring-1 md:ring-border md:shadow-pop flex flex-col"
         >
           {children}
         </main>

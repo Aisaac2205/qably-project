@@ -157,6 +157,14 @@ body {
   outline-offset: 2px;
 }
 
+[data-slot="ai-prompt-input"] textarea,
+[data-slot="ai-prompt-input"] textarea:focus,
+[data-slot="ai-prompt-input"] textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
 .resizable-split-pane {
   width: 100%;
 }

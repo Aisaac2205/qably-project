@@ -15,14 +15,11 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col">
-      <div className="px-6 pt-6 pb-0 shrink-0">
-        <h1 className="text-3xl font-bold tracking-tight text-default">{t('settings.title')}</h1>
-        <p className="text-sm text-muted mt-0.5">{t('settings.subtitle')}</p>
-      </div>
-        <div className="space-y-5 px-6 pt-5 pb-6">
-          <AccountPlanSection />
-          <IntegrationsGovernanceSection />
-          <LanguageSection />
+      <h1 className="sr-only">{t('settings.title')}</h1>
+      <div className="space-y-5 px-6 pt-5 pb-6">
+        <AccountPlanSection />
+        <IntegrationsGovernanceSection />
+        <LanguageSection />
       </div>
     </div>
   )

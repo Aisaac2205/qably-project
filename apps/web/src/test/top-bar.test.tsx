@@ -80,10 +80,37 @@ describe('TopBar', () => {
     expect(occurrences.length).toBeGreaterThanOrEqual(1)
   })
 
+
+
+
   it('does not expose the deferred search command as a dead control', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<TopBar />) })
     expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
+  })
+
+  it('renders a Review Inbox title heading on /review-inbox', async () => {
+    mockPathname.mockReturnValue('/review-inbox')
+    render(<TopBar />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Review Inbox' })).toBeInTheDocument()
+  })
+
+  it('renders a Projects title heading on /projects', async () => {
+    mockPathname.mockReturnValue('/projects')
+    render(<TopBar />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Projects' })).toBeInTheDocument()
+  })
+
+  it('renders a Notifications title heading on /notifications', async () => {
+    mockPathname.mockReturnValue('/notifications')
+    render(<TopBar />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Notifications' })).toBeInTheDocument()
+  })
+
+  it('renders a Settings title heading on /settings', async () => {
+    mockPathname.mockReturnValue('/settings')
+    render(<TopBar />)
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
   })
 
   it('shows user avatar', async () => {

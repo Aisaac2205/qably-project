@@ -14,7 +14,7 @@ export default function ProjectDetailPage({ params }: { params: Params }) {
 
   if (!project) {
     return (
-      <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
         <Breadcrumbs items={[{ label: 'Projects', href: '/projects' }, { label: 'Not found' }]} />
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <p className="text-muted text-sm">Project not found</p>
@@ -30,7 +30,7 @@ export default function ProjectDetailPage({ params }: { params: Params }) {
   }
 
   return (
-    <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
+    <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
       <Breadcrumbs
         items={[
           { label: 'Projects', href: '/projects' },

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   BellSimple,
@@ -9,7 +10,7 @@ import {
   GearSix,
   Stack,
   Play,
-  Robot,
+  Sparkle,
   ChartLine,
   Tray,
   CaretLeft,
@@ -61,7 +62,7 @@ export function Sidebar() {
   const projectSubItems: NavItem[] = projectContext
     ? [
         { label: t('sidebar.repository'), href: `/projects/${projectContext}/repository`, icon: FolderSimple },
-        { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Robot },
+        { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Sparkle },
         {
           label: t('sidebar.testLibrary'),
           href: `/projects/${projectContext}/suites`,
@@ -87,12 +88,16 @@ export function Sidebar() {
             <Link
               href="/dashboard"
               aria-label="Qably"
-              className="flex h-10 flex-1 items-center gap-2.5 rounded-lg px-2 transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary min-w-0"
+              className="flex h-10 flex-1 items-center rounded-lg px-2 transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary min-w-0"
             >
-              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-fg shadow-xs">
-                Q
-              </span>
-              <span className="truncate text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">Qably</span>
+              <Image
+                src="/qably-sidebar.svg"
+                alt="Qably"
+                width={416}
+                height={126}
+                className="h-7 w-auto object-contain"
+                priority
+              />
             </Link>
             <SidebarTrigger className="shrink-0 text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-sidebar-hover" />
           </div>
