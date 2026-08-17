@@ -25,6 +25,7 @@ import type {
   AiProviderConnection,
   ChatMessage,
   CoverageGap,
+  QualityRisk,
   Connection,
   ExtractedProposal,
   Evidence,
@@ -187,6 +188,16 @@ export function useCoverageGaps(projectId?: string): CoverageGap[] {
       return projectId ? all.filter((g) => g.projectId === projectId) : all
     },
     () => getServerSnapshot().coverageGaps.filter((g) => !projectId || g.projectId === projectId),
+  )
+}
+
+export function useQualityRisks(projectId?: string): QualityRisk[] {
+  return useStableArray(
+    () => {
+      const all = getSnapshot().qualityRisks
+      return projectId ? all.filter((r) => r.projectId === projectId) : all
+    },
+    () => getServerSnapshot().qualityRisks.filter((r) => !projectId || r.projectId === projectId),
   )
 }
 

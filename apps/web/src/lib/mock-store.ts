@@ -313,6 +313,11 @@ export function getCoverageGaps(projectId?: string): CoverageGap[] {
   return coverageGaps.filter((g) => g.projectId === projectId)
 }
 
+export function getQualityRisks(projectId?: string): QualityRisk[] {
+  if (!projectId) return qualityRisks
+  return qualityRisks.filter((r) => r.projectId === projectId)
+}
+
 export function getNotifications(): Notification[] {
   return notifications
 }
