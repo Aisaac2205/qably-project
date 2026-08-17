@@ -9,7 +9,6 @@ import { ReviewCaseDetail } from './review-case-detail'
 import { ReviewToolbar } from './review-toolbar'
 import { CoverageGapsPanel } from './coverage-gaps-panel'
 import { ProjectChatPanel } from './project-chat-panel'
-import { Tabs, TabsList, TabsTab } from '@/components/ui/tabs'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
@@ -59,12 +58,38 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             : t('aiReview.casesPendingReview', { count: cases.length })}
         </p>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'review' | 'chat')}>
-          <TabsList className="border-b border-border/80">
-            <TabsTab value="review" className="font-medium">{t('aiReview.reviewQueue')}</TabsTab>
-            <TabsTab value="chat" className="font-medium">{t('aiReview.projectChat')}</TabsTab>
-          </TabsList>
-        </Tabs>
+        <div
+          role="tablist"
+          aria-label={t('aiReview.title')}
+          className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-canvas/60 border border-border/60 shrink-0"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'review'}
+            onClick={() => setTab('review')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary cursor-pointer ${
+              tab === 'review'
+                ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs'
+                : 'text-muted hover:text-default hover:bg-surface-hover border border-transparent'
+            }`}
+          >
+            {t('aiReview.reviewQueue')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'chat'}
+            onClick={() => setTab('chat')}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary cursor-pointer ${
+              tab === 'chat'
+                ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs'
+                : 'text-muted hover:text-default hover:bg-surface-hover border border-transparent'
+            }`}
+          >
+            {t('aiReview.projectChat')}
+          </button>
+        </div>
       </div>
 
       {tab === 'review' ? (
