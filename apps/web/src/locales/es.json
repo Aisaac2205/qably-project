@@ -292,6 +292,8 @@
   },
 
   "runs": {
+    "title": "Ejecuciones",
+    "subtitle": "Historial de ejecuciones de pruebas, estados y simulación de CI de este proyecto.",
     "steps": "Pasos",
     "expectedResult": "Resultado esperado",
     "noCases": "Sin casos en esta ejecuci\u00f3n",

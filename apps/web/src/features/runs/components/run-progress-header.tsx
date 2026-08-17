@@ -33,8 +33,8 @@ export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () =
   const sourceLabel = sourceLabelKey ? t(sourceLabelKey) : run.source
 
   return (
-    <Card className="rounded-none border-x-0 border-t-0">
-      <CardHeader className="flex-row items-center justify-between gap-4 py-4">
+    <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+      <CardHeader className="flex-row items-center justify-between gap-4 py-4 sm:py-5 px-5 sm:px-6">
         <div className="min-w-0 flex items-center gap-3">
           <StatusChip status={run.status} />
           <div className="min-w-0 space-y-0.5">
@@ -49,22 +49,22 @@ export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () =
 
         <div className="flex items-center gap-5 shrink-0">
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-muted">{t('runs.passRate')}</div>
+            <div className="text-xs font-medium text-muted">{t('runs.passRate')}</div>
             <div className="text-base font-mono font-semibold tabular-nums text-default">
               {passRateDisplay}
             </div>
           </div>
           <div className="text-right">
-            <div className="text-xs uppercase tracking-wide text-muted">{t('runs.source')}</div>
+            <div className="text-xs font-medium text-muted">{t('runs.source')}</div>
             <div className="text-sm font-semibold text-default">{sourceLabel}</div>
           </div>
           <div className="hidden sm:block text-right">
-            <div className="text-xs uppercase tracking-wide text-muted">{t('runs.started')}</div>
+            <div className="text-xs font-medium text-muted">{t('runs.started')}</div>
             <div className="text-sm text-default">{formatDate(run.startedAt)}</div>
           </div>
           {run.finishedAt && (
             <div className="hidden sm:block text-right">
-              <div className="text-xs uppercase tracking-wide text-muted">{t('runs.finished')}</div>
+              <div className="text-xs font-medium text-muted">{t('runs.finished')}</div>
               <div className="text-sm text-default">{formatDate(run.finishedAt)}</div>
             </div>
           )}

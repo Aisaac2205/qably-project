@@ -27,27 +27,27 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
-      className="flex items-center justify-between px-3 py-2.5 hover:bg-surface-hover/50 transition-colors"
+      className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-surface-hover/60 transition-colors"
     >
-      <div className="min-w-0 flex-1 flex items-center gap-3">
+      <div className="min-w-0 flex-1 flex items-center gap-3.5">
         <StatusChip status={run.status} />
         <div className="min-w-0">
-          <div className="text-xs font-medium text-default truncate">{run.name}</div>
-          <div className="text-xs text-muted truncate">{run.suiteName}</div>
+          <div className="text-sm font-semibold text-default truncate">{run.name}</div>
+          <div className="text-xs text-muted truncate mt-0.5">{run.suiteName}</div>
         </div>
       </div>
 
       <div className="shrink-0 flex items-center gap-4">
-        <span className="text-sm font-semibold tabular-nums font-mono text-default w-10 text-right">
+        <span className="text-sm font-semibold tabular-nums font-mono text-default w-12 text-right">
           {run.passRate}%
         </span>
-        <Badge variant="outline" className="uppercase hidden sm:inline-flex">
-          {run.source}
+        <Badge variant="outline" className="hidden sm:inline-flex font-normal text-xs">
+          {run.source.replace('_', ' ')}
         </Badge>
         <div className="text-right hidden sm:block">
-          <div className="text-xs text-muted">{formatDate(run.startedAt)}</div>
+          <div className="text-xs font-medium text-default">{formatDate(run.startedAt)}</div>
           {run.finishedAt && (
-            <div className="text-xs text-muted">{formatDate(run.finishedAt)}</div>
+            <div className="text-xs text-muted mt-0.5">{formatDate(run.finishedAt)}</div>
           )}
         </div>
       </div>
@@ -79,9 +79,9 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
   }
 
   return (
-    <Card>
+    <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
       <CardContent className="p-0">
-        <EntityList aria-label={t('runs.ariaRunCases')}>
+        <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
         {sorted.map((r) => (
           <li key={r.id}><RunRow run={r} projectId={projectId} /></li>
         ))}

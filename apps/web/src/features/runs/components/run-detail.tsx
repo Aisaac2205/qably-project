@@ -3,11 +3,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Run, CaseStatus } from '@qably/types'
-import { useRun, useProject } from '@/lib/use-mock-store'
-import { Breadcrumbs } from '@/components/shell/breadcrumbs'
-import { Button } from '@/components/ui/button'
-import { ArrowLeft } from '@phosphor-icons/react'
-import Link from 'next/link'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
 import { useRunAggregate } from '@/features/runs/lib/aggregate'
@@ -29,7 +24,7 @@ export function RunDetail({
   const updateStatus = useUpdateRunCase(run.id)
   const { delete: deleteRun } = useRunAggregate()
 
-  const sortedCases = useMemo(() => run.cases, [run.id, run.cases])
+  const sortedCases = useMemo(() => run.cases, [run.cases])
 
   const [selectedId, setSelectedId] = useState<string>(sortedCases[0]?.id ?? '')
   const [announcement, setAnnouncement] = useState('')
@@ -118,20 +113,20 @@ export function RunDetail({
   ]
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="space-y-6">
       <RunProgressHeader run={run} onDelete={() => setDeleteOpen(true)} />
 
-      {/* Keyboard shortcut hints — using surface tokens (not sidebar), readable text-xs */}
+      {/* Keyboard shortcut hints — rounded card with surface tokens */}
       <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2 border-b border-border bg-canvas"
+        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl border border-border bg-surface shadow-xs text-xs"
         aria-label={t('runs.keyboardShortcuts')}
       >
-        <span className="text-xs uppercase tracking-wide text-muted font-semibold">
+        <span className="text-xs font-semibold text-muted">
           {t('runs.shortcuts')}
         </span>
         {SHORTCUT_LABELS.map((s) => (
           <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-default">
-            <kbd className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded border border-border bg-surface text-default shadow-sm min-w-[20px] text-center">
+            <kbd className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded border border-border bg-surface-hover text-default shadow-sm min-w-[20px] text-center">
               {s.key}
             </kbd>
             <span className="text-muted">{s.label}</span>
@@ -149,16 +144,16 @@ export function RunDetail({
         {announcement}
       </div>
 
-      {/* Two-pane: case list + detail */}
-      <div className="flex-1 flex min-h-0">
-        <div className="w-72 shrink-0 border-r border-border overflow-y-auto">
+      {/* Two-pane workspace card: case list + detail */}
+      <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr] divide-y md:divide-y-0 md:divide-x divide-border min-h-[440px]">
+        <div className="flex flex-col overflow-y-auto">
           <CaseList
             cases={sortedCases}
             selectedId={activeCaseId}
             onSelect={selectCase}
           />
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex flex-col overflow-y-auto">
           {selectedCase ? (
             <CaseDetail c={selectedCase} />
           ) : (

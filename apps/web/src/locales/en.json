@@ -292,6 +292,8 @@
   },
 
   "runs": {
+    "title": "Runs",
+    "subtitle": "Test execution history, statuses, and CI simulation for this project.",
     "steps": "Steps",
     "expectedResult": "Expected result",
     "noCases": "No cases in this run",

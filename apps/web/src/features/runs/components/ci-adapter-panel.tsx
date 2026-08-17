@@ -81,18 +81,18 @@ export function CiAdapterPanel({ projectId }: { projectId: string }) {
   return (
     <section
       aria-labelledby="ci-adapter-heading"
-      className="mb-4 rounded-xl border border-border bg-surface px-4 py-3"
+      className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
           <h2 id="ci-adapter-heading" className="text-sm font-semibold text-default">
             {t('runs.ciAdapterHeading')}
           </h2>
-          <p className="text-xs text-muted">{connection.config?.repoUrl}</p>
+          <p className="text-xs sm:text-sm font-mono text-muted mt-0.5">{connection.config?.repoUrl}</p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <Button size="sm" variant="outline" onClick={simulate} disabled={loading} aria-label={actionLabel}>
-            <ArrowsClockwise size={14} aria-hidden="true" />
+        <div className="flex flex-col items-end gap-1.5">
+          <Button size="sm" variant="outline" onClick={simulate} disabled={loading} aria-label={actionLabel} className="active:scale-[0.98] transition-all duration-150">
+            <ArrowsClockwise size={14} aria-hidden="true" className={loading ? "animate-spin" : ""} />
             {actionLabel}
           </Button>
           {error ? (
