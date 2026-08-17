@@ -4,37 +4,38 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
-  BellSimple,
-  SquaresFour,
-  FolderSimple,
-  GearSix,
-  Stack,
-  Play,
-  Sparkle,
-  ChartLine,
-  Tray,
-  CaretLeft,
-} from '@phosphor-icons/react'
-import { useProject } from '@/lib/use-mock-store'
-import { useTranslation } from '@/lib/i18n'
-import {
   Sidebar as ShadcnSidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarHeader,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuButton,
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
+import {
+  SquaresFour,
+  FolderSimple,
+  BellSimple,
+  GearSix,
+  Play,
+  ChartLine,
+  Sparkle,
+  Stack,
+  Tray,
+  CaretLeft,
+} from '@phosphor-icons/react'
+import type { Icon } from '@phosphor-icons/react'
+import { useProject } from '@/lib/use-mock-store'
+import { useTranslation } from '@/lib/i18n'
 
 interface NavItem {
   label: string
   href: string
-  icon: React.ElementType
+  icon: Icon
   exact?: boolean
   aliasHref?: string
 }
@@ -114,7 +115,7 @@ export function Sidebar() {
               className="flex min-h-9 items-center gap-1.5 px-2 text-sm font-normal text-sidebar-fg-muted transition-colors hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               <CaretLeft size={18} weight="bold" aria-hidden="true" />
-              {!isCollapsed && <><span>{t('sidebar.projects')}</span><span aria-hidden="true">/</span><span className="truncate">{project.name}</span></>}
+              {!isCollapsed && <span className="truncate">{project.name}</span>}
             </Link>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -128,10 +129,9 @@ export function Sidebar() {
                       <SidebarMenuButton
                         render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
                         isActive={isActive}
-                        tooltip={item.label}
-                        className="h-9 text-sm font-normal"
+                        tooltip={isCollapsed ? item.label : undefined}
                       >
-                        <item.icon size={18} weight="regular" aria-hidden="true" />
+                        <item.icon aria-hidden="true" />
                         <span>{item.label}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -142,21 +142,20 @@ export function Sidebar() {
           </SidebarGroup>
         )}
 
-        {/* Global nav is only available outside a project context. */}
-        {!projectContext && <SidebarGroup className="px-2">
+        {/* Global navigation items when not in project context */}
+        {!projectContext && <SidebarGroup className="px-2 pt-2">
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map(item => {
-                const isActive = !projectContext && (pathname === item.href || (!item.exact && pathname.startsWith(item.href + '/')))
+                const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
                 return (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
                       render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
                       isActive={isActive}
-                      tooltip={item.label}
-                      className="h-9 text-sm"
+                      tooltip={isCollapsed ? item.label : undefined}
                     >
-                      <item.icon size={18} weight="regular" aria-hidden="true" />
+                      <item.icon aria-hidden="true" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

@@ -46,11 +46,6 @@ vi.mock('@/components/ui/sidebar', () => ({
 import { TopBar } from '@/components/shell/top-bar'
 
 describe('TopBar', () => {
-  // NOTE: The top bar does NOT render inline breadcrumbs yet.
-  // Breadcrumbs live in the page-level shell wrapper. The top bar renders
-  // the project context indicator (name + health dot) on project routes.
-  // If breadcrumbs are added to the top bar in the future, restore the
-  // assertions below (Dashboard / Projects > Name > Segment).
   it('renders a Dashboard title heading on /dashboard', async () => {
     mockPathname.mockReturnValue('/dashboard')
     const { container } = render(<TopBar />)
@@ -64,24 +59,11 @@ describe('TopBar', () => {
     expect(container.firstElementChild).not.toHaveClass('border-b')
   })
 
-  it('shows the project name in the context indicator on project routes', async () => {
+  it('shows the sub-route title on project routes', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/runs')
     await act(async () => { render(<TopBar />) })
-    // Project name appears in the context indicator on the right
-    expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Runs' })).toBeInTheDocument()
   })
-
-  it('shows project context on the right inside a project', async () => {
-    mockPathname.mockReturnValue('/projects/proj-1/runs')
-    await act(async () => { render(<TopBar />) })
-    // The project name appears in both breadcrumbs and the project context indicator
-    const occurrences = screen.getAllByText('Ecommerce App')
-    // Should appear at least once (at least in breadcrumbs; the context indicator may duplicate)
-    expect(occurrences.length).toBeGreaterThanOrEqual(1)
-  })
-
-
-
 
   it('does not expose the deferred search command as a dead control', async () => {
     mockPathname.mockReturnValue('/dashboard')

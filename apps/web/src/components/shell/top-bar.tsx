@@ -7,12 +7,6 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { NotificationsMenu } from '@/features/notifications'
 import { useTranslation } from '@/lib/i18n'
 
-function healthColor(score: number): string {
-  if (score >= 80) return 'bg-pass'
-  if (score >= 50) return 'bg-warn'
-  return 'bg-fail'
-}
-
 function getPageTitle(pathname: string, project: Project | undefined, t: (key: string) => string): string {
   if (pathname === '/' || pathname === '/dashboard') return t('sidebar.dashboard')
   if (pathname === '/projects') return t('sidebar.projects')
@@ -41,7 +35,6 @@ export function TopBar() {
   const pathname = usePathname()
   const { t } = useTranslation()
   const segments = pathname.split('/').filter(Boolean)
-  const isProjectRoute = segments[0] === 'projects' && segments.length >= 3
   const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
   const project = useProject(projectId ?? '')
   const title = getPageTitle(pathname, project, t)
@@ -57,15 +50,6 @@ export function TopBar() {
           >
             {title}
           </h1>
-        )}
-        {isProjectRoute && project && (
-          <div className="flex items-center gap-1.5 text-xs text-muted">
-            <div
-              className={`w-2 h-2 rounded-full ${healthColor(project.healthScore)}`}
-              aria-hidden="true"
-            />
-            <span className="truncate max-w-[180px] font-medium">{project.name}</span>
-          </div>
         )}
       </div>
 
