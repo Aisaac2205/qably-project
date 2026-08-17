@@ -117,7 +117,7 @@ function createReviewDomain() {
   const evidence = [...mockAiCases.map<Evidence>((aiCase) => ({
     id: `evidence-${aiCase.id}`,
     projectId: aiCase.projectId,
-    kind: 'source_excerpt',
+    kind: aiCase.source === 'chat' ? 'artifact' : 'source_excerpt',
     title: aiCase.sourceFile,
     uri: `mock://${aiCase.sourceFile}`,
     excerpt: aiCase.sourceSnippet,
@@ -340,6 +340,10 @@ export function getOfficialTestCase(id: string): OfficialTestCase | undefined {
 
 export function getTestCaseVersions(testCaseId: string): TestCaseVersion[] {
   return testCaseVersions.filter((version) => version.testCaseId === testCaseId)
+}
+
+export function getTestCaseVersion(id: string): TestCaseVersion | undefined {
+  return testCaseVersions.find((version) => version.id === id)
 }
 
 export function getTraceabilityLinks({ entityId }: { entityId: string }): TraceabilityLink[] {
@@ -977,6 +981,40 @@ export function sendChatMessage(
     aiCases = [...aiCases, newCase]
     generatedCaseIds = [newCase.id]
     generatedCaseName = newCase.name
+
+    // Chat-drafted cases must be governed by the same ExtractedProposal
+    // contract as repository-detected ones so the AI Review queue (which
+    // reads proposals, not AiCase) can surface them.
+    const newEvidence: Evidence = {
+      id: `evidence-${newCase.id}`,
+      projectId,
+      kind: 'artifact',
+      title: newCase.sourceFile,
+      uri: `mock://chat/${newCase.id}`,
+      excerpt: newCase.sourceSnippet,
+      createdAt: ts,
+    }
+    const newProposal: ExtractedProposal = {
+      id: `proposal-${newCase.id}`,
+      projectId,
+      status: 'in_review',
+      title: newCase.name,
+      objective: newCase.name,
+      preconditions: [],
+      steps: newCase.steps,
+      expectedResult: newCase.expectedResult,
+      priority: 'medium',
+      evidenceId: newEvidence.id,
+    }
+    evidence = [...evidence, newEvidence]
+    proposals = [...proposals, newProposal]
+    proposalIdByAiCaseId = { ...proposalIdByAiCaseId, [newCase.id]: newProposal.id }
+    traceabilityLinks = [...traceabilityLinks, {
+      id: `link-${newProposal.id}-evidence`,
+      from: { type: 'proposal', id: newProposal.id },
+      to: { type: 'evidence', id: newEvidence.id },
+      relation: 'evidence_for',
+    }]
   }
 
   const projectCases = aiCases.filter((c) => c.projectId === projectId)

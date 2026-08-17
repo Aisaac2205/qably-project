@@ -31,6 +31,8 @@ import type {
   TraceabilityLink,
   IngestionBatch,
   CodeChange,
+  OfficialTestCase,
+  TestCaseVersion,
 } from '@qably/types'
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
@@ -203,6 +205,32 @@ export function useCodeChanges(projectId?: string): CodeChange[] {
   return useStableArray(
     () => getSnapshot().codeChanges.filter((change) => !projectId || change.projectId === projectId),
     () => getServerSnapshot().codeChanges.filter((change) => !projectId || change.projectId === projectId),
+  )
+}
+
+export function useProposals(projectId?: string): ExtractedProposal[] {
+  return useStableArray(
+    () => {
+      const all = getSnapshot().proposals
+      return projectId ? all.filter((p) => p.projectId === projectId) : all
+    },
+    () => getServerSnapshot().proposals.filter((p) => !projectId || p.projectId === projectId),
+  )
+}
+
+export function useOfficialTestCase(id?: string): OfficialTestCase | undefined {
+  return useSyncExternalStore(
+    subscribe,
+    () => id ? getSnapshot().officialTestCases.find((item) => item.id === id) : undefined,
+    () => id ? getServerSnapshot().officialTestCases.find((item) => item.id === id) : undefined,
+  )
+}
+
+export function useTestCaseVersion(id?: string): TestCaseVersion | undefined {
+  return useSyncExternalStore(
+    subscribe,
+    () => id ? getSnapshot().testCaseVersions.find((item) => item.id === id) : undefined,
+    () => id ? getServerSnapshot().testCaseVersions.find((item) => item.id === id) : undefined,
   )
 }
 
