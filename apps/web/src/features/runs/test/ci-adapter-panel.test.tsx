@@ -74,7 +74,7 @@ describe('CiAdapterPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Simular CI' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('La simulación de CI falló')
-    expect(screen.getByRole('alert')).toHaveTextContent('No pudimos conectarnos')
+    expect(screen.getByRole('alert')).toHaveTextContent('No fue posible conectarse')
     expect(screen.getByRole('alert')).not.toHaveTextContent('proxy https://ci.internal.example failed')
   })
 
