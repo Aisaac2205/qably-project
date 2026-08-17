@@ -19,7 +19,7 @@ export function TopBar() {
   const project = useProject(projectId ?? '')
 
   return (
-    <div className="h-14 flex items-center justify-between px-4 md:px-6 bg-surface border-b border-border">
+    <div className="flex h-14 items-center justify-between bg-sidebar px-4 md:px-6">
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <SidebarTrigger className="-ml-1" />
         {isProjectRoute && project && (

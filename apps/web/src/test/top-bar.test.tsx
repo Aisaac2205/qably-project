@@ -53,12 +53,14 @@ describe('TopBar', () => {
   // assertions below (Dashboard / Projects > Name > Segment).
   it('does not render a Dashboard label on /dashboard (no inline breadcrumb)', async () => {
     mockPathname.mockReturnValue('/dashboard')
-    await act(async () => { render(<TopBar />) })
+    const { container } = render(<TopBar />)
     // Unimplemented controls stay out of the keyboard order.
     expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /user menu/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument()
     expect(screen.getByText('IF')).toBeInTheDocument()
+    expect(container.firstElementChild).toHaveClass('bg-sidebar')
+    expect(container.firstElementChild).not.toHaveClass('border-b')
   })
 
   it('shows the project name in the context indicator on project routes', async () => {

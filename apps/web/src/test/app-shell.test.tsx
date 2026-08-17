@@ -41,15 +41,24 @@ describe('AppShell', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument()
   })
 
-  it('renders the product inside a quiet inset workspace frame', async () => {
+  it('keeps shell chrome flat and frames only the central workspace', async () => {
     const { container } = render(
       <AppShell>
         <div>Content</div>
       </AppShell>,
     )
 
-    expect(container.querySelector('[data-slot="sidebar"]')).toHaveAttribute('data-variant', 'inset')
-    expect(container.querySelector('[data-slot="sidebar-inset"]')).toHaveClass('bg-surface', 'overflow-hidden')
+    expect(container.querySelector('[data-slot="sidebar"]')).toHaveAttribute('data-variant', 'sidebar')
+    expect(container.querySelector('[data-slot="sidebar-wrapper"]')).toHaveClass('bg-sidebar')
+    expect(container.querySelector('[data-slot="sidebar-inset"]')).toHaveClass('bg-sidebar')
+    expect(screen.getByRole('main')).toHaveClass(
+      'bg-surface',
+      'overflow-auto',
+      'md:m-3',
+      'md:mt-0',
+      'md:rounded-2xl',
+      'md:ring-1',
+    )
   })
 
   it('starts keyboard order with a visible-on-focus skip link and one main landmark', async () => {
