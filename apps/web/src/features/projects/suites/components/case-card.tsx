@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash, GitCommit } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
+import { useOfficialTestCase, useTestCaseVersion, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -18,21 +20,31 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
+  const [traceOpen, setTraceOpen] = useState(false)
+
+  const officialCaseId = `case-${testCase.id}`
+  const officialCase = useOfficialTestCase(officialCaseId)
+  const currentVersionId = officialCase?.currentVersionId ?? `version-${testCase.id}-1`
+  const currentVersion = useTestCaseVersion(currentVersionId)
+  const links = useTraceabilityLinks(officialCaseId)
 
   return (
-    <div className="py-3 px-4 sm:px-5 hover:bg-surface-hover/50 transition-colors group">
-      <div className="flex items-center gap-2.5 mb-1.5">
-        <span className="text-sm font-semibold text-default truncate flex-1">
+    <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <span className="text-sm font-semibold text-default truncate flex-1 min-w-[200px]">
           {testCase.name}
+        </span>
+        <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
+          v{currentVersion?.version ?? 1}
         </span>
         <PriorityBadge priority={testCase.priority} />
         <StatusChip status={testCase.state} scope="lifecycle" />
 
-        {/* Row actions — revealed on hover/focus so the list stays quiet */}
+        {/* Row actions */}
         <Menu>
           <MenuTrigger
             aria-label={t('suites.caseActions')}
-            className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100 focus-visible:outline-2 focus-visible:outline-primary"
+            className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-[popup-open]:opacity-100 outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
           >
             <DotsThree size={16} weight="bold" aria-hidden="true" />
           </MenuTrigger>
@@ -56,43 +68,68 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
         </Menu>
       </div>
 
-      {/* Steps */}
-      <div className="mt-1">
+      {/* Steps, Expected result, & Traceability toggles */}
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setStepsOpen(!stepsOpen)}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded py-0.5"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-default hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/70 border border-border/70 cursor-pointer"
           aria-expanded={stepsOpen}
           type="button"
         >
-          {stepsOpen ? <CaretDown size={12} aria-hidden="true" /> : <CaretRight size={12} aria-hidden="true" />}
+          {stepsOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
           {t('suites.stepsCount', { count: testCase.steps.length })}
         </button>
-        {stepsOpen && (
-          <ol className="mt-1.5 ml-4 text-xs text-muted space-y-1 list-decimal list-inside">
-            {testCase.steps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
+
+        {testCase.expectedResult && (
+          <button
+            onClick={() => setExpectedOpen(!expectedOpen)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-default hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/70 border border-border/70 cursor-pointer"
+            aria-expanded={expectedOpen}
+            type="button"
+          >
+            {expectedOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
+            {t('suites.expectedResult')}
+          </button>
+        )}
+
+        {links.length > 0 && (
+          <button
+            onClick={() => setTraceOpen(!traceOpen)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/50 border border-border/70 cursor-pointer"
+            aria-expanded={traceOpen}
+            type="button"
+          >
+            <GitCommit size={13} weight="bold" aria-hidden="true" />
+            {traceOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
+            {t('suites.traceability')}
+          </button>
         )}
       </div>
 
-      {/* Expected result */}
-      <div className="mt-1">
-        <button
-          onClick={() => setExpectedOpen(!expectedOpen)}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded py-0.5"
-          aria-expanded={expectedOpen}
-          type="button"
-        >
-          {expectedOpen ? <CaretDown size={12} aria-hidden="true" /> : <CaretRight size={12} aria-hidden="true" />}
-          {t('suites.expectedResult')}
-        </button>
-        {expectedOpen && (
-          <p className="mt-1.5 ml-4 text-xs text-default bg-canvas border border-border rounded-lg p-2.5 leading-relaxed">
-            {testCase.expectedResult}
-          </p>
-        )}
-      </div>
+      {/* Expanded steps */}
+      {stepsOpen && (
+        <ol className="mt-2 text-sm text-default font-normal leading-relaxed space-y-1.5 list-decimal list-inside p-3.5 rounded-lg bg-canvas border border-border/70">
+          {testCase.steps.map((step, i) => (
+            <li key={i} className="text-default font-medium">{step}</li>
+          ))}
+        </ol>
+      )}
+
+      {/* Expanded expected result */}
+      {expectedOpen && testCase.expectedResult && (
+        <div className="mt-2 text-sm text-default font-normal bg-canvas border border-border/70 rounded-lg p-3.5 leading-relaxed">
+          <p className="text-xs font-semibold text-muted mb-1">{t('suites.expectedResult')}:</p>
+          <p className="font-medium text-default">{testCase.expectedResult}</p>
+        </div>
+      )}
+
+      {/* Expanded traceability trail */}
+      {traceOpen && links.length > 0 && (
+        <div className="mt-2 p-3.5 rounded-lg bg-canvas border border-border/70 space-y-2">
+          <h5 className="text-xs font-semibold text-muted">{t('suites.traceability')}</h5>
+          <TraceabilityTrail links={links} />
+        </div>
+      )}
     </div>
   )
 }

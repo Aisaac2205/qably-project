@@ -38,8 +38,8 @@ describe('CaseCard', () => {
   it('shows steps count and can toggle expand', async () => {
     const user = userEvent.setup()
     await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
-    expect(screen.getByText(/Steps \(3\)/)).toBeInTheDocument()
-    await user.click(screen.getByText(/Steps \(3\)/))
+    expect(screen.getByText(/3 steps/i)).toBeInTheDocument()
+    await user.click(screen.getByText(/3 steps/i))
     expect(screen.getByText('Navigate to /login')).toBeInTheDocument()
   })
 
@@ -53,7 +53,7 @@ describe('CaseCard', () => {
 
   it('has accessible expand/collapse buttons', async () => {
     await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
-    const stepsBtn = screen.getByText(/Steps \(3\)/)
+    const stepsBtn = screen.getByText(/3 steps/i)
     expect(stepsBtn).toHaveAttribute('aria-expanded', 'false')
   })
 

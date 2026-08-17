@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
 import type { TestCase } from '@qably/types'
-import { useSuite, useProject, useRuns } from '@/lib/use-mock-store'
+import { useSuite, useProject } from '@/lib/use-mock-store'
 import { deleteSuite, deleteCase } from '@/lib/mock-store'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -42,7 +42,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const { t } = useTranslation()
   const suite = useSuite(suiteId)
   const project = useProject(projectId)
-  const runs = useRuns(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
 
@@ -64,7 +63,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   if (!suite) {
     return (
-      <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
         <Breadcrumbs
           items={[
             { label: t('suites.breadcrumbProjects'), href: '/projects' },
@@ -87,7 +86,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   }
 
   return (
-    <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
+    <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
@@ -173,7 +172,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         {/* Health strip — explains what this suite is doing right now */}
         {metrics && (
           <div
-            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted border-t border-border pt-4"
+            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm border-t border-border pt-4"
             role="group"
             aria-label={t('suites.ariaSuiteHealth')}
           >
@@ -184,7 +183,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted">{t('suites.passRate7d')}</span>
               <span
-                className={`text-base font-mono font-semibold tabular-nums ${
+                className={`text-sm font-mono font-semibold tabular-nums ${
                   metrics.passRate7d >= 70
                     ? 'text-pass'
                     : metrics.passRate7d > 0
@@ -197,7 +196,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted">{t('suites.lastRun')}</span>
-              <span className="text-sm text-default">{formatRelative(metrics.lastRun?.startedAt)}</span>
+              <span className="text-sm font-medium text-default">{formatRelative(metrics.lastRun?.startedAt)}</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted">{t('suites.casesLabel')}</span>

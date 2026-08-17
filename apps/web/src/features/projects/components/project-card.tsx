@@ -37,7 +37,7 @@ export function ProjectCard({ project }: { project: Project }) {
     <div className="group relative flex flex-col h-52 rounded-xl bg-surface border border-border/80 p-5 hover:border-primary/40 hover:shadow-card transition-shadow duration-200 focus-within:border-primary/40">
       <Link
         href={`/projects/${project.id}`}
-        className="absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-primary"
+        className="absolute inset-0 rounded-xl outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
         aria-label={project.name}
       />
 
@@ -59,7 +59,7 @@ export function ProjectCard({ project }: { project: Project }) {
           <Menu>
             <MenuTrigger
               aria-label={t('projects.projectActions')}
-              className="relative z-10 opacity-0 group-hover:opacity-100 size-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-default hover:bg-surface-hover transition-colors focus-visible:opacity-100 data-[popup-open]:opacity-100 focus-visible:outline-2 focus-visible:outline-primary"
+              className="relative z-10 opacity-0 group-hover:opacity-100 size-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-default hover:bg-surface-hover transition-colors focus-visible:opacity-100 data-[popup-open]:opacity-100 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
             >
               <DotsThreeVertical size={14} weight="bold" aria-hidden="true" />
             </MenuTrigger>
