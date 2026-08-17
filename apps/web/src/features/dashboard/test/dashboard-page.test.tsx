@@ -63,6 +63,14 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Recent pipelines')).toBeInTheDocument()
   })
 
+  it('does not end the workspace with a decorative operational footer', async () => {
+    await act(async () => {
+      render(<DashboardPage />)
+    })
+
+    expect(screen.queryByText('All systems operational')).not.toBeInTheDocument()
+  })
+
   it('heading has the correct typography class', async () => {
     await act(async () => {
       render(<DashboardPage />)

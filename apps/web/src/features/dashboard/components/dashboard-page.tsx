@@ -13,7 +13,7 @@ export function DashboardPage() {
   const { t } = useTranslation()
 
   return (
-    <div className="mx-auto min-h-full max-w-[1440px] px-5 py-7 text-default sm:px-7 lg:px-9 lg:py-9">
+    <div className="mx-auto max-w-[1440px] px-5 py-7 text-default sm:px-7 lg:px-9 lg:py-9">
       <header className="mb-7 flex flex-col gap-1.5">
         <p className="text-sm font-medium text-muted">{org.name}</p>
         <h1 className="text-2xl font-semibold tracking-[-0.025em] text-default">
@@ -34,9 +34,6 @@ export function DashboardPage() {
         <RecentActivity />
       </div>
 
-      <footer className="mt-8 border-t border-border pt-5 text-xs text-muted">
-        {t('dashboard.allOperational')}
-      </footer>
     </div>
   )
 }
