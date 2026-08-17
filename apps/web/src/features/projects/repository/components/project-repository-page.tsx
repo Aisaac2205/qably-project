@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
-import { GithubLogo } from '@phosphor-icons/react'
 import type { CodeChange } from '@qably/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { InspectorPanel } from '@/components/ui/inspector-panel'
@@ -28,24 +28,28 @@ function DetectedTestItem({
   const originEvidence = useEvidence(detectedChange.evidenceId)
 
   return (
-    <li className="min-w-0 rounded-md border border-border px-3 py-2 sm:flex sm:items-start sm:justify-between sm:gap-4">
-      <p className="min-w-0 break-all text-sm text-default">{detectedChange.filePath}</p>
-      <p className="mt-2 shrink-0 text-sm text-muted sm:mt-0">
-        {t('repository.detectedPattern')}: <code className="break-all font-mono text-default">{detectedChange.detectedPattern}</code>
-      </p>
+    <li className="min-w-0 rounded-lg border border-border bg-canvas/40 p-4 transition-colors hover:border-border hover:bg-canvas/70 space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <p className="min-w-0 break-all font-mono text-xs sm:text-sm font-medium text-default">{detectedChange.filePath}</p>
+        <p className="shrink-0 text-xs text-muted">
+          {t('repository.detectedPattern')}: <code className="break-all font-mono text-default font-semibold bg-surface px-1.5 py-0.5 rounded border border-border/80 text-xs">{detectedChange.detectedPattern}</code>
+        </p>
+      </div>
       {originEvidence ? (
-        <p className="mt-2 w-full min-w-0 text-sm sm:mt-1">
-          <span className="text-xs font-medium text-muted">{t('repository.origin')}: </span>
-          <span className="min-w-0 break-all text-default">{originEvidence.uri}</span>
+        <p className="w-full min-w-0 text-xs text-muted flex items-start gap-1.5 rounded-md bg-surface/80 px-2.5 py-1.5 border border-border/60">
+          <span className="font-medium shrink-0">{t('repository.origin')}: </span>
+          <span className="min-w-0 break-all font-mono text-default">{originEvidence.uri}</span>
         </p>
       ) : null}
       {proposal ? (
-        <div className="mt-2 w-full sm:mt-1">
-          <p className="text-xs font-medium text-muted">{t('repository.linkedProposal')}</p>
-          <p className="text-sm text-default">{proposal.title}</p>
+        <div className="rounded-lg border border-border/80 bg-surface p-3.5 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-muted">{t('repository.linkedProposal')}</p>
+            <p className="text-sm font-semibold text-default mt-0.5">{proposal.title}</p>
+          </div>
           <Link
             href={`/projects/${projectId}/ai-review`}
-            className="text-sm font-medium text-default underline underline-offset-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+            className="mt-2 sm:mt-0 inline-flex shrink-0 items-center text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary transition-colors"
           >
             {t('sidebar.aiReview')}
           </Link>
@@ -77,91 +81,99 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
     : detectedTests.filter((item) => item.detectedPattern === patternFilter)
 
   return (
-    <div className="px-4 py-6 sm:px-6">
+    <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
       <PageHeader title={t('repository.title')} description={t('repository.subtitle')} />
 
       {source ? (
-        <section className="mt-6 max-w-2xl rounded-xl border border-border bg-surface px-5 py-4" aria-labelledby="repository-source-heading">
-          <h2 id="repository-source-heading" className="text-sm font-semibold text-default">
+        <section className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card" aria-labelledby="repository-source-heading">
+          <h2 id="repository-source-heading" className="text-base font-semibold text-default">
             {t('repository.sourceHeading')}
           </h2>
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-muted">
-              <GithubLogo size={20} aria-hidden="true" />
+          <div className="mt-4 flex items-center gap-3.5">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-canvas/60 p-2.5 text-default">
+              <Image src="/logos/github.svg" alt="" width={22} height={22} className="size-full object-contain" />
             </div>
-            <div>
-              <p className="text-sm font-medium text-default">{source.provider}</p>
-              <p className="text-sm text-muted">{source.repository}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-default">{source.provider}</p>
+              <p className="text-xs sm:text-sm font-mono text-muted truncate">{source.repository}</p>
             </div>
           </div>
-          <p className="mt-4 text-sm text-muted">{t('repository.simulatedDescription')}</p>
+          <p className="mt-4 text-xs sm:text-sm text-muted rounded-lg border border-border/60 bg-canvas/40 p-3">
+            {t('repository.simulatedDescription')}
+          </p>
         </section>
       ) : (
-        <div className="mt-6">
-          <StateView
-            kind="no-source"
-            title={t('repository.noSourceTitle')}
-            description={t('repository.noSourceDescription')}
-          />
-        </div>
+        <StateView
+          kind="no-source"
+          title={t('repository.noSourceTitle')}
+          description={t('repository.noSourceDescription')}
+        />
       )}
 
       {batch ? (
-        <section className="mt-6 max-w-3xl" aria-labelledby="repository-ingestion-heading">
-          <h2 id="repository-ingestion-heading" className="text-sm font-semibold text-default">
-            {t('repository.ingestionHeading')}
-          </h2>
-          <dl className="mt-3 grid gap-3 rounded-lg border border-border bg-surface p-4 text-sm sm:grid-cols-3">
-            <div>
-              <dt className="text-muted">{t('repository.ingestionSource')}</dt>
-              <dd className="mt-1 font-medium text-default">{t(`repository.source${batch.source === 'repository' ? 'Repository' : 'Webhook'}`)}</dd>
+        <section className="space-y-6" aria-labelledby="repository-ingestion-heading">
+          <div className="space-y-3">
+            <h2 id="repository-ingestion-heading" className="text-base font-semibold text-default">
+              {t('repository.ingestionHeading')}
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-card">
+              <dl className="grid grid-cols-1 divide-y divide-border text-sm sm:grid-cols-3 sm:divide-y-0 sm:divide-x">
+                <div className="p-4 sm:p-5">
+                  <dt className="text-xs font-medium text-muted">{t('repository.ingestionSource')}</dt>
+                  <dd className="mt-1 font-semibold text-default">{t(`repository.source${batch.source === 'repository' ? 'Repository' : 'Webhook'}`)}</dd>
+                </div>
+                <div className="p-4 sm:p-5">
+                  <dt className="text-xs font-medium text-muted">{t('repository.ingestionStatus')}</dt>
+                  <dd className="mt-1 font-semibold text-default">{t(`repository.status${batch.status === 'completed' ? 'Completed' : batch.status === 'pending' ? 'Pending' : 'Failed'}`)}</dd>
+                </div>
+                <div className="p-4 sm:p-5">
+                  <dt className="text-xs font-medium text-muted">{t('repository.ingestionCreated')}</dt>
+                  <dd className="mt-1 font-medium text-default text-xs sm:text-sm">{formatTimestamp(batch.createdAt, locale)}</dd>
+                </div>
+              </dl>
             </div>
-            <div>
-              <dt className="text-muted">{t('repository.ingestionStatus')}</dt>
-              <dd className="mt-1 font-medium text-default">{t(`repository.status${batch.status === 'completed' ? 'Completed' : batch.status === 'pending' ? 'Pending' : 'Failed'}`)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">{t('repository.ingestionCreated')}</dt>
-              <dd className="mt-1 font-medium text-default">{formatTimestamp(batch.createdAt, locale)}</dd>
-            </div>
-          </dl>
+          </div>
 
           {batch.status === 'failed' ? (
-            <div className="mt-4">
-              <StateView
-                kind="error"
-                title={t('repository.ingestionErrorTitle')}
-                description={t('repository.ingestionErrorDescription')}
-              />
-            </div>
+            <StateView
+              kind="error"
+              title={t('repository.ingestionErrorTitle')}
+              description={t('repository.ingestionErrorDescription')}
+            />
           ) : change && evidence ? (
             <>
-              <InspectorPanel title={t('repository.inspectorHeading')} className="mt-4">
-                <dl className="grid gap-3 p-5 text-sm sm:grid-cols-[auto_1fr]">
-                  <dt className="text-muted">{t('repository.pullRequest')}</dt>
-                  <dd className="font-medium text-default">PR #{change.pullRequestNumber}</dd>
-                  <dt className="text-muted">{t('repository.commit')}</dt>
-                  <dd className="font-mono text-default">{change.commitSha.slice(0, 7)}</dd>
-                  <dt className="text-muted">{t('repository.file')}</dt>
-                  <dd className="min-w-0 break-all text-default">{change.filePath}</dd>
-                  <dt className="text-muted">{t('repository.diff')}</dt>
-                  <dd className="min-w-0 overflow-x-auto rounded border border-border bg-canvas p-3 font-mono text-xs text-default"><pre>{change.diff}</pre></dd>
-                  <dt className="text-muted">{t('repository.origin')}</dt>
-                  <dd className="min-w-0 break-all text-default">{evidence.uri}</dd>
+              <InspectorPanel title={t('repository.inspectorHeading')} className="shadow-card">
+                <dl className="grid gap-3.5 p-5 text-sm sm:grid-cols-[160px_1fr] sm:items-baseline">
+                  <dt className="text-xs font-medium text-muted sm:text-right sm:pr-2">{t('repository.pullRequest')}</dt>
+                  <dd className="font-semibold text-default">PR #{change.pullRequestNumber}</dd>
+                  <dt className="text-xs font-medium text-muted sm:text-right sm:pr-2">{t('repository.commit')}</dt>
+                  <dd className="font-mono text-xs font-medium text-default bg-canvas/80 px-2 py-0.5 rounded border border-border w-fit">{change.commitSha.slice(0, 7)}</dd>
+                  <dt className="text-xs font-medium text-muted sm:text-right sm:pr-2">{t('repository.file')}</dt>
+                  <dd className="min-w-0 break-all font-mono text-xs sm:text-sm text-default font-medium">{change.filePath}</dd>
+                  <dt className="text-xs font-medium text-muted sm:text-right sm:pr-2">{t('repository.diff')}</dt>
+                  <dd className="min-w-0 overflow-x-auto rounded-lg border border-border bg-canvas p-3.5 font-mono text-xs text-default leading-relaxed"><pre className="font-mono">{change.diff}</pre></dd>
+                  <dt className="text-xs font-medium text-muted sm:text-right sm:pr-2">{t('repository.origin')}</dt>
+                  <dd className="min-w-0 break-all font-mono text-xs text-muted bg-canvas/40 px-2.5 py-1.5 rounded border border-border/60">{evidence.uri}</dd>
                 </dl>
               </InspectorPanel>
-              <section className="mt-4 rounded-lg border border-border bg-surface p-4" aria-labelledby="repository-detected-tests-heading">
-                <h3 id="repository-detected-tests-heading" className="text-sm font-semibold text-default">
-                  {t('repository.detectedTestsHeading')}
-                </h3>
-                <p className="mt-1 text-sm text-muted">{t('repository.detectedTestsDescription')}</p>
-                <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label={t('repository.detectedPattern')}>
+
+              <section className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card space-y-4" aria-labelledby="repository-detected-tests-heading">
+                <div>
+                  <h3 id="repository-detected-tests-heading" className="text-sm font-semibold text-default">
+                    {t('repository.detectedTestsHeading')}
+                  </h3>
+                  <p className="mt-1 text-xs sm:text-sm text-muted">{t('repository.detectedTestsDescription')}</p>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-canvas border border-border/60 w-fit" role="group" aria-label={t('repository.detectedPattern')}>
                   <button
                     type="button"
                     aria-pressed={patternFilter === 'all'}
                     onClick={() => setPatternFilter('all')}
-                    className={`rounded px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
-                      patternFilter === 'all' ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
+                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary ${
+                      patternFilter === 'all'
+                        ? 'bg-surface text-default font-semibold shadow-xs border border-border'
+                        : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent'
                     }`}
                   >
                     {t('repository.filterAll')}
@@ -172,15 +184,18 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
                       type="button"
                       aria-pressed={patternFilter === pattern}
                       onClick={() => setPatternFilter(pattern)}
-                      className={`rounded px-3 py-1.5 font-mono text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${
-                        patternFilter === pattern ? 'bg-primary/10 text-primary' : 'text-muted hover:bg-canvas'
+                      className={`rounded-md px-3 py-1.5 font-mono text-xs font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary ${
+                        patternFilter === pattern
+                          ? 'bg-surface text-default font-semibold shadow-xs border border-border'
+                          : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent'
                       }`}
                     >
                       {pattern}
                     </button>
                   ))}
                 </div>
-                <ul className="mt-4 space-y-3" aria-label={t('repository.detectedTestsHeading')}>
+
+                <ul className="space-y-3 pt-1" aria-label={t('repository.detectedTestsHeading')}>
                   {visibleDetectedTests.map((detectedChange) => (
                     <DetectedTestItem key={detectedChange.id} detectedChange={detectedChange} projectId={projectId} />
                   ))}
