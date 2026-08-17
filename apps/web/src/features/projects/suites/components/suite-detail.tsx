@@ -64,7 +64,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   if (!suite) {
     return (
-      <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
         <Breadcrumbs
           items={[
             { label: t('suites.breadcrumbProjects'), href: '/projects' },
@@ -87,7 +87,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+    <div className="max-w-5xl 2xl:max-w-6xl mx-auto p-4 md:p-6 space-y-6 animate-page-enter">
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
@@ -98,11 +98,11 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       />
 
       {/* Hero */}
-      <header className="space-y-3">
+      <header className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-3xl font-semibold tracking-tight text-default text-wrap-balance">
+              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-default text-wrap-balance">
                 {suite.name}
               </h1>
               {suite.isDefault && (
@@ -173,16 +173,16 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         {/* Health strip — explains what this suite is doing right now */}
         {metrics && (
           <div
-            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted border-t border-border pt-3"
+            className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted border-t border-border pt-4"
             role="group"
             aria-label={t('suites.ariaSuiteHealth')}
           >
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.statusLabel')}</span>
+              <span className="text-xs font-medium text-muted">{t('suites.statusLabel')}</span>
               <StatusChip status={metrics.status} />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.passRate7d')}</span>
+              <span className="text-xs font-medium text-muted">{t('suites.passRate7d')}</span>
               <span
                 className={`text-base font-mono font-semibold tabular-nums ${
                   metrics.passRate7d >= 70
@@ -196,11 +196,11 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.lastRun')}</span>
+              <span className="text-xs font-medium text-muted">{t('suites.lastRun')}</span>
               <span className="text-sm text-default">{formatRelative(metrics.lastRun?.startedAt)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-muted">{t('suites.casesLabel')}</span>
+              <span className="text-xs font-medium text-muted">{t('suites.casesLabel')}</span>
               <span className="text-sm font-mono font-semibold text-default tabular-nums">
                 {suite.cases.length}
               </span>
@@ -218,8 +218,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       </header>
 
       {/* Case list */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-2">
             <h2 className="text-base font-semibold text-default">{t('suites.testCases')}</h2>
             <span className="text-xs text-muted">
@@ -231,7 +231,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             {t('suites.addCase')}
           </Button>
         </div>
-        <Card>
+        <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
           <CardContent className="p-0 divide-y divide-border">
             {suite.cases.length === 0 ? (
               <div className="py-12 flex flex-col items-center gap-2 text-center">

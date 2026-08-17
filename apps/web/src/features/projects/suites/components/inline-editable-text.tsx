@@ -41,7 +41,7 @@ export function InlineEditableText({ value, onSave, ariaLabel }: InlineEditableT
     return (
       <button
         onClick={() => { setDraft(value); setIsEditing(true) }}
-        className="text-left hover:bg-canvas rounded px-1 -mx-1 transition-colors text-default cursor-text"
+        className="text-left font-semibold text-sm hover:text-primary hover:bg-surface-hover/80 rounded px-1.5 py-0.5 -mx-1.5 transition-colors text-default cursor-text"
         aria-label={ariaLabel ?? t('suites.editText')}
         type="button"
       >

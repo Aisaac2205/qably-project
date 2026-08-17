@@ -156,9 +156,9 @@ export function SuiteList({ projectId }: SuiteListProps) {
           ) : undefined}
         />
       ) : (
-        <Card>
+        <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
           <CardContent className="p-0">
-            <EntityList aria-label={t('suites.ariaFilterSuites')}>
+            <EntityList aria-label={t('suites.ariaFilterSuites')} className="divide-y divide-border">
             {sorted.map((m) => (
               <li key={m.suite.id}>
                 <Link

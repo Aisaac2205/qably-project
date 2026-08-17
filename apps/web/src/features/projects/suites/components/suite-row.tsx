@@ -58,7 +58,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
 
   return (
     <div
-      className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 md:gap-4 items-center py-3 px-3 md:px-4 hover:bg-canvas transition-colors group"
+      className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3.5 md:gap-4 items-center py-3.5 px-4 sm:px-5 hover:bg-surface-hover/60 transition-colors group"
       data-testid={`suite-row-${suite.id}`}
     >
       {/* Col 1: status-tinted icon */}
@@ -88,12 +88,12 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
           )}
         </div>
         {suite.description && (
-          <p className="text-xs text-muted truncate">{suite.description}</p>
+          <p className="text-xs text-muted truncate text-wrap-pretty mt-0.5">{suite.description}</p>
         )}
         {suite.tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
             {suite.tags.map((tagItem) => (
-              <Badge key={tagItem} variant="outline">
+              <Badge key={tagItem} variant="outline" className="text-xs font-normal">
                 {tagItem}
               </Badge>
             ))}
@@ -106,21 +106,21 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         <span className="text-sm font-mono font-semibold text-default tabular-nums">
           {suite.cases.length}
         </span>
-        <span className="text-xs text-muted">{suite.cases.length === 1 ? t('suites.caseSuffix_one') : t('suites.caseSuffix_other')}</span>
+        <span className="text-xs text-muted mt-0.5">{suite.cases.length === 1 ? t('suites.caseSuffix_one') : t('suites.caseSuffix_other')}</span>
       </div>
 
       {/* Col 4: last run reference (hidden on mobile) */}
       <div className="hidden md:flex flex-col items-end shrink-0 w-24">
-        <span className="text-xs text-default">
+        <span className="text-xs font-medium text-default">
           {formatRelative(lastRun?.startedAt)}
         </span>
-        <span className="text-xs text-muted">
+        <span className="text-xs text-muted mt-0.5">
           {lastRun?.source === 'github_actions' ? t('suites.sourceCi') : lastRun ? t('suites.sourceManual') : ''}
         </span>
       </div>
 
       {/* Col 5: pass rate 7d + sparkline (hidden on mobile) */}
-      <div className="hidden md:flex items-center gap-2 shrink-0">
+      <div className="hidden md:flex items-center gap-2.5 shrink-0">
         <span
           className={`text-sm font-mono font-semibold tabular-nums ${passRate7d >= 70 ? 'text-pass' : passRate7d > 0 ? 'text-warn' : 'text-muted'}`}
         >

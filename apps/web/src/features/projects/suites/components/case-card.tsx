@@ -20,9 +20,9 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const [expectedOpen, setExpectedOpen] = useState(false)
 
   return (
-    <div className="py-2 px-3 hover:bg-canvas transition-colors rounded group">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-sm font-medium text-default truncate flex-1">
+    <div className="py-3 px-4 sm:px-5 hover:bg-surface-hover/50 transition-colors group">
+      <div className="flex items-center gap-2.5 mb-1.5">
+        <span className="text-sm font-semibold text-default truncate flex-1">
           {testCase.name}
         </span>
         <PriorityBadge priority={testCase.priority} />
@@ -60,15 +60,15 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
       <div className="mt-1">
         <button
           onClick={() => setStepsOpen(!stepsOpen)}
-          className="flex items-center gap-1 text-xs text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded py-0.5"
           aria-expanded={stepsOpen}
           type="button"
         >
-          {stepsOpen ? <CaretDown size={10} aria-hidden="true" /> : <CaretRight size={10} aria-hidden="true" />}
+          {stepsOpen ? <CaretDown size={12} aria-hidden="true" /> : <CaretRight size={12} aria-hidden="true" />}
           {t('suites.stepsCount', { count: testCase.steps.length })}
         </button>
         {stepsOpen && (
-          <ol className="mt-1 ml-3 text-xs text-muted space-y-0.5 list-decimal list-inside">
+          <ol className="mt-1.5 ml-4 text-xs text-muted space-y-1 list-decimal list-inside">
             {testCase.steps.map((step, i) => (
               <li key={i}>{step}</li>
             ))}
@@ -80,15 +80,15 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
       <div className="mt-1">
         <button
           onClick={() => setExpectedOpen(!expectedOpen)}
-          className="flex items-center gap-1 text-xs text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-default transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded py-0.5"
           aria-expanded={expectedOpen}
           type="button"
         >
-          {expectedOpen ? <CaretDown size={10} aria-hidden="true" /> : <CaretRight size={10} aria-hidden="true" />}
+          {expectedOpen ? <CaretDown size={12} aria-hidden="true" /> : <CaretRight size={12} aria-hidden="true" />}
           {t('suites.expectedResult')}
         </button>
         {expectedOpen && (
-          <p className="mt-1 ml-3 text-xs text-muted">
+          <p className="mt-1.5 ml-4 text-xs text-default bg-canvas border border-border rounded-lg p-2.5 leading-relaxed">
             {testCase.expectedResult}
           </p>
         )}
