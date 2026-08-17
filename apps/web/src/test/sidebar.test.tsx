@@ -79,10 +79,23 @@ afterEach(() => {
 describe('Sidebar — global state (no project route)', () => {
   it('anchors navigation with the Qably product identity instead of workspace data', async () => {
     mockPathname.mockReturnValue('/dashboard')
-    await act(async () => { renderSidebar() })
+    const { container } = await act(async () => renderSidebar())
 
     expect(screen.getByRole('link', { name: 'Qably' })).toHaveAttribute('href', '/dashboard')
     expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    expect(container.querySelector('[data-slot="sidebar-container"]')).toHaveClass('border-r-0!')
+  })
+
+  it('presents the current user as a compact bordered account card without a divider', async () => {
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+
+    const footer = container.querySelector('[data-slot="sidebar-footer"]')
+    const account = container.querySelector('[data-slot="sidebar-account"]')
+    expect(footer).not.toHaveClass('border-t')
+    expect(account).toHaveClass('h-10', 'rounded-lg', 'border', 'border-border-sidebar')
+    expect(account).toHaveTextContent('Isaac F.')
+    expect(account).toHaveTextContent('Admin')
   })
 
   it('shows the aligned global destinations', async () => {

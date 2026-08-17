@@ -74,7 +74,7 @@ export function Sidebar() {
     : []
 
   return (
-    <ShadcnSidebar variant="sidebar" collapsible="icon" className="bg-sidebar">
+    <ShadcnSidebar variant="sidebar" collapsible="icon" className="border-r-0! bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
       <SidebarHeader className="h-14 justify-center p-2">
         <Link
@@ -152,21 +152,21 @@ export function Sidebar() {
         </SidebarGroup>}
       </SidebarContent>
 
-       <SidebarFooter className="border-t border-border-sidebar p-3">
+       <SidebarFooter className="p-2">
         {isCollapsed ? (
           <div className="flex items-center justify-center py-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-sidebar bg-primary text-sm font-normal text-primary-fg">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-xs font-medium text-primary-fg">
               IF
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2 px-2.5 py-2 mt-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-sidebar bg-primary text-sm font-normal text-primary-fg">
+          <div data-slot="sidebar-account" className="flex h-10 w-full items-center gap-2 rounded-lg border border-border-sidebar px-2.5">
+            <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary text-[10px] font-medium text-primary-fg">
               IF
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-normal text-sidebar-foreground">Isaac F.</div>
-              <div className="truncate text-sm text-sidebar-fg-muted">{t('sidebar.admin')}</div>
+              <div className="truncate text-xs font-medium text-sidebar-foreground">Isaac F.</div>
+              <div className="truncate text-[10px] leading-3 text-sidebar-fg-muted">{t('sidebar.admin')}</div>
             </div>
           </div>
         )}
