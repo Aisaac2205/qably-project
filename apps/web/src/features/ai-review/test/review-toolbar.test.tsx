@@ -9,7 +9,7 @@ describe('ReviewToolbar', () => {
     await act(async () => {
       render(<ReviewToolbar {...props} />)
     })
-    expect(screen.getByRole('button', { name: 'Confirm case' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /approve & publish case|confirm case/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reject case' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Skip case' })).toBeInTheDocument()
   })
@@ -20,7 +20,7 @@ describe('ReviewToolbar', () => {
     await act(async () => {
       render(<ReviewToolbar disabled={false} onConfirm={onConfirm} onReject={vi.fn()} onSkip={vi.fn()} />)
     })
-    await user.click(screen.getByRole('button', { name: 'Confirm case' }))
+    await user.click(screen.getByRole('button', { name: /approve & publish case|confirm case/i }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
@@ -48,7 +48,7 @@ describe('ReviewToolbar', () => {
     await act(async () => {
       render(<ReviewToolbar disabled onConfirm={vi.fn()} onReject={vi.fn()} onSkip={vi.fn()} />)
     })
-    const buttons = screen.getAllByRole('button', { name: /confirm case|reject case|skip case/i })
+    const buttons = screen.getAllByRole('button', { name: /approve & publish case|confirm case|reject case|skip case/i })
     buttons.forEach((btn) => {
       expect(btn).toBeDisabled()
     })

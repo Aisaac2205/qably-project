@@ -16,10 +16,11 @@ describe('ChatMessageList', () => {
     expect(screen.getByText('Second')).toBeInTheDocument()
   })
 
-  it('shows an empty state when there are no messages', async () => {
+  it('shows greeting and hint in empty state when there are no messages', async () => {
     await act(async () => {
       render(<ChatMessageList messages={[]} onViewCase={vi.fn()} />)
     })
-    expect(screen.getByText(/ask anything/i)).toBeInTheDocument()
+    expect(screen.getByText(/how can I help you today|en qué puedo ayudarte hoy/i)).toBeInTheDocument()
+    expect(screen.getByText(/ask anything|pregunta cualquier cosa/i)).toBeInTheDocument()
   })
 })

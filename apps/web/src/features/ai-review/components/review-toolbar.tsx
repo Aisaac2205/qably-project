@@ -19,10 +19,11 @@ export function ReviewToolbar({
   onSkip: () => void
 }) {
   const { t } = useTranslation()
-  
+
   return (
-    <div className="flex flex-wrap items-center gap-2.5 px-5 py-4 border-t border-border bg-surface/80">
+    <div className="flex flex-wrap items-center gap-2.5 px-5 py-4 border-t border-border bg-surface/90 backdrop-blur-xs">
       <button
+        type="button"
         onClick={onConfirm}
         disabled={disabled}
         aria-label={t('aiReview.ariaConfirmCase')}
@@ -30,13 +31,14 @@ export function ReviewToolbar({
           bg-primary text-primary-fg hover:bg-primary-hover active:scale-[0.98]
           disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100
           focus-visible:outline-2 focus-visible:outline-primary
-          transition-all duration-150"
+          shadow-xs transition-all duration-150"
       >
         <CheckCircle size={16} weight="fill" aria-hidden="true" />
-        {t('common.confirm')}
+        {t('aiReview.actionApprove')}
       </button>
 
       <button
+        type="button"
         onClick={onReject}
         disabled={disabled}
         aria-label={t('aiReview.ariaRejectCase')}
@@ -47,10 +49,11 @@ export function ReviewToolbar({
           transition-all duration-150"
       >
         <XCircle size={16} weight="fill" aria-hidden="true" />
-        {t('common.reject')}
+        {t('aiReview.actionReject')}
       </button>
 
       <button
+        type="button"
         onClick={onSkip}
         disabled={disabled}
         aria-label={t('aiReview.ariaSkipCase')}
@@ -61,7 +64,7 @@ export function ReviewToolbar({
           transition-all duration-150"
       >
         <ArrowRight size={16} weight="bold" aria-hidden="true" />
-        {t('common.skip')}
+        {t('aiReview.actionSkip')}
       </button>
     </div>
   )

@@ -25,23 +25,26 @@ function ReviewCaseListRow({
   return (
     <li>
       <button
+        type="button"
         aria-current={isSelected ? 'true' : undefined}
         onClick={() => onSelect(proposal.id)}
-        className={`w-full text-left px-3.5 py-2.5 sm:px-4 sm:py-3 transition-colors hover:bg-surface-hover/70 focus-visible:outline-2 focus-visible:outline-primary ${
+        className={`w-full text-left p-3.5 sm:p-4 transition-all duration-150 border-b border-border/70 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary ${
           isSelected
-            ? 'bg-surface-hover/90 border-l-2 border-primary'
-            : 'border-l-2 border-transparent'
+            ? 'bg-surface-hover/90 border-l-4 border-l-primary shadow-xs'
+            : 'border-l-4 border-l-transparent'
         }`}
       >
-        <div className="flex items-center justify-between gap-2 mb-1">
-          <span className="text-xs sm:text-sm font-semibold text-default truncate flex items-center gap-2">
-            {isChatOrigin ? (
-              <ChatCircleText size={14} className="text-ai shrink-0" aria-label={t('aiReview.ariaGeneratedChat')} />
-            ) : (
-              <GitBranch size={14} className="text-muted shrink-0" aria-label={t('aiReview.ariaGeneratedWebhook')} />
-            )}
-            {proposal.title}
-          </span>
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs sm:text-sm font-semibold text-default truncate flex items-center gap-2">
+              {isChatOrigin ? (
+                <ChatCircleText size={14} className="text-ai shrink-0" aria-label={t('aiReview.ariaGeneratedChat')} />
+              ) : (
+                <GitBranch size={14} className="text-muted shrink-0" aria-label={t('aiReview.ariaGeneratedWebhook')} />
+              )}
+              <span className="truncate">{proposal.title}</span>
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 pl-5 text-xs text-muted">
           {proposal.targetOfficialTestCaseId && (
@@ -50,7 +53,11 @@ function ReviewCaseListRow({
               {t('aiReview.possibleDuplicate')}
             </Badge>
           )}
-          {evidence?.title && <span className="font-mono text-[11px] text-muted truncate">{evidence.title}</span>}
+          {evidence?.title && (
+            <span className="font-mono text-[11px] text-muted truncate max-w-56">
+              {evidence.title}
+            </span>
+          )}
         </div>
       </button>
     </li>

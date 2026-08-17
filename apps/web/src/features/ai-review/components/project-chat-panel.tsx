@@ -5,6 +5,7 @@ import { useProjectChat } from '@/features/projects/test-generation/hooks/use-pr
 import { useAiProviders } from '@/features/projects/test-generation/hooks/use-ai-providers'
 import { ChatMessageList } from './chat-message-list'
 import { ChatComposer } from './chat-composer'
+import { ChatThreadSidebar } from './chat-thread-sidebar'
 import { Button } from '@/components/ui/button'
 import { StateView } from '@/components/ui/state-view'
 import type { AiProvider } from '@qably/types'
@@ -21,7 +22,16 @@ export function ProjectChatPanel({
   onReturnToReview: () => void
   prefillPrompt?: string
 }) {
-  const { messages, send } = useProjectChat(projectId)
+  const {
+    threads,
+    activeThreadId,
+    messages,
+    allMessages,
+    startNewChat,
+    selectThread,
+    removeThread,
+    send,
+  } = useProjectChat(projectId)
   const { providers, connectedProviders, hasConnected } = useAiProviders()
   const { t } = useTranslation()
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>(
@@ -48,17 +58,31 @@ export function ProjectChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
-        <ChatMessageList messages={messages} onViewCase={onViewCase} />
-      </div>
-      <ChatComposer
-        providers={providers}
-        selectedProvider={selectedProvider}
-        onSelectProvider={setSelectedProvider}
-        onSend={send}
-        initialValue={prefillPrompt}
+    <div className="flex h-full min-h-0">
+      <ChatThreadSidebar
+        threads={threads}
+        activeThreadId={activeThreadId}
+        onSelectThread={selectThread}
+        onNewChat={startNewChat}
+        onDeleteThread={removeThread}
+        messages={allMessages}
       />
+      <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
+          <ChatMessageList
+            messages={messages}
+            onViewCase={onViewCase}
+            onSelectSuggestion={send}
+          />
+        </div>
+        <ChatComposer
+          providers={providers}
+          selectedProvider={selectedProvider}
+          onSelectProvider={setSelectedProvider}
+          onSend={send}
+          initialValue={prefillPrompt}
+        />
+      </div>
     </div>
   )
 }

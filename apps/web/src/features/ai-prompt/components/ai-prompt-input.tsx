@@ -170,7 +170,6 @@ export const AiPromptInput = React.forwardRef<HTMLTextAreaElement, AiPromptInput
         className={cn(
           'bg-surface border border-border relative w-full overflow-visible rounded-2xl p-3.5 sm:p-4 shadow-card',
           'transition-[border-color,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
-          focused && 'border-primary/50 shadow-md',
           disabled && 'pointer-events-none opacity-55',
           className
         )}
@@ -244,15 +243,18 @@ export const AiPromptInput = React.forwardRef<HTMLTextAreaElement, AiPromptInput
               'text-default relative z-10 block w-full resize-none bg-transparent px-1 font-normal',
               'text-[14px] leading-6 sm:text-[15px]',
               'placeholder:text-transparent',
-              'outline-none focus-visible:outline-none',
+              'border-0 border-none outline-none ring-0 shadow-none',
+              'focus:border-none focus:outline-none focus:ring-0',
+              'focus-visible:border-none focus-visible:outline-none focus-visible:ring-0',
               'disabled:cursor-not-allowed',
               textareaClassName
             )}
-            style={
-              reduceMotion && typeof height === 'number'
-                ? { height }
-                : undefined
-            }
+            style={{
+              outline: 'none',
+              border: 'none',
+              boxShadow: 'none',
+              ...(reduceMotion && typeof height === 'number' ? { height } : {}),
+            }}
           />
         </div>
 

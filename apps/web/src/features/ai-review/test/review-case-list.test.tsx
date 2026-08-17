@@ -54,7 +54,7 @@ describe('ReviewCaseList', () => {
     const selected = screen.getByRole('button', { name: /Discount code reduces total/i })
     expect(screen.getByRole('list', { name: 'AI review cases' })).toBeInTheDocument()
     expect(selected).toHaveAttribute('aria-current', 'true')
-    expect(selected.className).toContain('border-primary')
+    expect(selected.className).toContain('bg-surface-hover')
   })
 
   it('shows empty state', async () => {

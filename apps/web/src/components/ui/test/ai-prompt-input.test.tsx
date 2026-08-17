@@ -24,4 +24,13 @@ describe('AiPromptInput', () => {
       id: 'gemini-3.5-flash-lite',
     }))
   })
+
+  it('does not have harsh border or ring on container', async () => {
+    await act(async () => {
+      render(<AiPromptInput />)
+    })
+    const container = screen.getByRole('textbox', { name: 'AI prompt' }).closest('[data-slot="ai-prompt-input"]')
+    expect(container).not.toHaveClass('border-primary/50')
+    expect(container).not.toHaveClass('focus-within:ring-1')
+  })
 })

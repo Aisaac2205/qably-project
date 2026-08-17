@@ -80,7 +80,7 @@ describe('AiReviewPage', () => {
     const user = userEvent.setup()
     render(<div style={{ width: 320 }}><AiReviewPage projectId="proj-1" /></div>)
     const all = screen.getByRole('button', { name: 'All' })
-    const confirm = screen.getByRole('button', { name: 'Confirm case' })
+    const confirm = screen.getByRole('button', { name: /approve & publish case|confirm case/i })
 
     all.focus()
     for (let step = 0; step < 12 && document.activeElement !== confirm; step += 1) {

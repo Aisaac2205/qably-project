@@ -24,7 +24,7 @@ describe('ChatComposer', () => {
     })
     const textarea = screen.getByRole('textbox', { name: 'AI prompt' })
     await user.type(textarea, 'Hello there')
-    await user.click(screen.getByRole('button', { name: /send prompt/i }))
+    await user.click(screen.getByRole('button', { name: /send message|enviar mensaje|send prompt/i }))
     expect(onSend).toHaveBeenCalledWith('Hello there')
     expect(textarea).toHaveValue('')
   })
