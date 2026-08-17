@@ -11,6 +11,17 @@ import { StateView } from '@/components/ui/state-view'
 import type { AiProvider } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 
+const CHAT_SIDEBAR_STORAGE_KEY = 'qably:project-chat-sidebar-collapsed'
+
+function getInitialSidebarCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return localStorage.getItem(CHAT_SIDEBAR_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
 export function ProjectChatPanel({
   projectId,
   onViewCase,
@@ -37,8 +48,20 @@ export function ProjectChatPanel({
   const [selectedProvider, setSelectedProvider] = useState<AiProvider>(
     connectedProviders[0]?.provider ?? 'claude',
   )
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialSidebarCollapsed)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const handleToggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem(CHAT_SIDEBAR_STORAGE_KEY, String(next))
+      } catch {
+        // Ignore storage errors in private browsing/sandboxes
+      }
+      return next
+    })
+  }
 
   useEffect(() => {
     const el = scrollRef.current
@@ -68,7 +91,7 @@ export function ProjectChatPanel({
         onDeleteThread={removeThread}
         messages={allMessages}
         isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+        onToggleCollapse={handleToggleSidebar}
       />
       <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">
