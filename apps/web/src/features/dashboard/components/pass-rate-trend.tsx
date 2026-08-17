@@ -1,19 +1,9 @@
 'use client'
 
-import { CaretDown, ArrowUp } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { ArrowUp, CaretDown } from '@phosphor-icons/react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { useTranslation } from '@/lib/i18n'
-import { useHydrated } from '@/hooks/use-hydrated'
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 
 const CHART_DATA = [
   { day: 'May 8', rate: 78 },
@@ -25,101 +15,119 @@ const CHART_DATA = [
   { day: 'May 14', rate: 89 },
 ]
 
+const CHART_WIDTH = 560
+const CHART_HEIGHT = 172
+const PLOT_LEFT = 36
+const PLOT_RIGHT = 548
+const PLOT_TOP = 12
+const PLOT_BOTTOM = 140
+
+function xPosition(index: number) {
+  return PLOT_LEFT + (index / (CHART_DATA.length - 1)) * (PLOT_RIGHT - PLOT_LEFT)
+}
+
+function yPosition(rate: number) {
+  return PLOT_TOP + ((100 - rate) / 100) * (PLOT_BOTTOM - PLOT_TOP)
+}
+
+const linePath = CHART_DATA.map((item, index) => {
+  const command = index === 0 ? 'M' : 'L'
+  return `${command} ${xPosition(index)} ${yPosition(item.rate)}`
+}).join(' ')
+
+const areaPath = `${linePath} L ${xPosition(CHART_DATA.length - 1)} ${PLOT_BOTTOM} L ${PLOT_LEFT} ${PLOT_BOTTOM} Z`
+
 export function PassRateTrend() {
   const stats = useDashboardStats()
   const { t } = useTranslation()
   const period = '7 days'
-  const hydrated = useHydrated()
 
   return (
-    <Card className="col-span-1 border border-border/80 flex flex-col justify-between">
-      <CardHeader className="flex flex-row items-center justify-between pb-2 p-5">
+    <Card className="col-span-1 flex flex-col justify-between border border-border/80">
+      <CardHeader className="flex flex-row items-center justify-between p-5 pb-2">
         <CardTitle className="text-sm font-semibold text-default">{t('dashboard.passRateTrend')}</CardTitle>
         <button
-          className="text-xs font-semibold px-2 py-1 bg-canvas hover:bg-canvas-hover border border-border rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer text-muted-foreground hover:text-default"
+          className="flex items-center gap-1.5 rounded-lg border border-border bg-canvas px-2 py-1 text-xs font-semibold text-muted transition-colors hover:bg-canvas-hover hover:text-default"
           aria-label="Select time period"
         >
           <span>{period}</span>
-          <CaretDown size={10} />
+          <CaretDown size={10} aria-hidden="true" />
         </button>
       </CardHeader>
-      
-      <CardContent className="p-5 pt-0 flex-1 flex flex-col justify-between">
-        <div className="flex items-baseline gap-2 mb-4">
-          <span className="text-3xl font-semibold tracking-tight tabular-nums font-mono text-default">
+
+      <CardContent className="flex flex-1 flex-col justify-between p-5 pt-0">
+        <div className="mb-4 flex items-baseline gap-2">
+          <span className="text-3xl font-semibold tracking-[-0.025em] tabular-nums text-default">
             {stats.passRateLast7d}%
           </span>
-          <div className="flex items-center gap-0.5 text-xs text-pass font-semibold tabular-nums font-mono">
+          <div className="flex items-center gap-0.5 text-xs font-semibold tabular-nums text-pass">
             <ArrowUp size={12} weight="bold" aria-hidden="true" />
             <span>{stats.passRateTrend || 8}%</span>
-            <span className="text-xs font-normal text-muted-foreground ml-1">{t('dashboard.vsPrior7d')}</span>
+            <span className="ml-1 text-xs font-normal text-muted">{t('dashboard.vsPrior7d')}</span>
           </div>
         </div>
 
-        <div className="w-full h-36 mt-1">
-          {hydrated ? (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <AreaChart
-              data={CHART_DATA}
-              margin={{ top: 5, right: 5, left: -25, bottom: 0 }}
+        <svg
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          preserveAspectRatio="none"
+          className="h-40 w-full"
+          role="img"
+          aria-label="Pass rate trend chart"
+          aria-describedby="pass-rate-chart-description"
+        >
+          <title>Pass rate trend chart</title>
+          <desc id="pass-rate-chart-description">
+            Seven day pass rate ranging from 78 to 90 percent, ending at {stats.passRateLast7d} percent.
+          </desc>
+
+          {[0, 25, 50, 75, 100].map((tick) => {
+            const y = yPosition(tick)
+
+            return (
+              <g key={tick}>
+                <line
+                  x1={PLOT_LEFT}
+                  x2={PLOT_RIGHT}
+                  y1={y}
+                  y2={y}
+                  stroke="var(--color-border)"
+                  strokeDasharray="3 4"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <text x={0} y={y + 3} fontSize={9} fill="var(--color-muted)">
+                  {tick}%
+                </text>
+              </g>
+            )
+          })}
+
+          <path
+            d={areaPath}
+            fill="color-mix(in oklch, var(--color-default) 7%, transparent)"
+          />
+          <path
+            d={linePath}
+            fill="none"
+            stroke="var(--color-default)"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          {CHART_DATA.map((item, index) => (
+            <text
+              key={item.day}
+              x={xPosition(index)}
+              y={164}
+              textAnchor="middle"
+              fontSize={9}
+              fill="var(--color-muted)"
             >
-              <defs>
-                <linearGradient id="colorPassRate" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                vertical={false} 
-                stroke="var(--color-border)" 
-              />
-              <XAxis 
-                dataKey="day" 
-                tickLine={false}
-                axisLine={false}
-                stroke="var(--color-muted)"
-                fontSize={10}
-                dy={8}
-              />
-              <YAxis 
-                tickLine={false}
-                axisLine={false}
-                stroke="var(--color-muted)"
-                fontSize={10}
-                domain={[0, 100]}
-                tickFormatter={(value) => `${value}%`}
-                ticks={[0, 25, 50, 75, 100]}
-              />
-              <Tooltip
-                content={({ active, payload }) => {
-                  if (active && payload && payload.length) {
-                    return (
-                      <div className="bg-surface border border-border p-2 rounded-lg shadow-md text-xs">
-                        <p className="font-semibold text-default">{payload[0].payload.day}</p>
-                        <p className="font-mono text-primary font-bold mt-0.5">
-                          {t('dashboard.passRateKpi')}: {payload[0].value}%
-                        </p>
-                      </div>
-                    )
-                  }
-                  return null
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="rate"
-                stroke="var(--color-primary)"
-                strokeWidth={2}
-                fillOpacity={1}
-                fill="url(#colorPassRate)"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-          ) : (
-            <div style={{ width: '100%', height: '100%' }} />
-          )}
-        </div>
+              {item.day}
+            </text>
+          ))}
+        </svg>
       </CardContent>
     </Card>
   )

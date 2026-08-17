@@ -27,6 +27,21 @@ describe('KpiCard', () => {
     expect(svgs.length).toBeGreaterThan(0)
   })
 
+  it('uses the available width for a detail affordance', async () => {
+    await act(async () => {
+      render(
+        <KpiCard
+          label="Projects"
+          value="4"
+          icon={TestTube}
+          href="/projects"
+        />,
+      )
+    })
+
+    expect(screen.getByRole('link', { name: /view details/i })).toHaveAttribute('href', '/projects')
+  })
+
   it('renders trend with up arrow when positive', async () => {
     await act(async () => {
       render(

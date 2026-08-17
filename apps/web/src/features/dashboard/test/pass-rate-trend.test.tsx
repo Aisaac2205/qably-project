@@ -2,22 +2,6 @@ import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { __resetStore } from '@/lib/mock-store'
 
-// ── Mock Recharts to avoid jsdom SVG issues ──────────────────────
-vi.mock('recharts', () => {
-  const MockResponsiveContainer = ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="responsive-container">{children}</div>
-  )
-  return {
-    AreaChart: ({ children }: { children: React.ReactNode }) => <div data-testid="area-chart">{children}</div>,
-    Area: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    CartesianGrid: () => <div />,
-    Tooltip: () => <div />,
-    ResponsiveContainer: MockResponsiveContainer,
-  }
-})
-
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
@@ -54,12 +38,11 @@ describe('PassRateTrend', () => {
     expect(screen.getByText('vs prior 7d')).toBeInTheDocument()
   })
 
-  it('renders the area chart container after mount', async () => {
+  it('renders an accessible pass-rate chart', async () => {
     await act(async () => {
       render(<PassRateTrend />)
     })
-    expect(screen.getByTestId('area-chart')).toBeInTheDocument()
-    expect(screen.getByTestId('responsive-container')).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Pass rate trend chart' })).toBeInTheDocument()
   })
 
   it('renders the period selector', async () => {

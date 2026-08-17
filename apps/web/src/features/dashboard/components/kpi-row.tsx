@@ -10,12 +10,17 @@ export function KpiRow() {
   const { t } = useTranslation()
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <section
+      aria-label="Quality overview"
+      className="min-w-0"
+    >
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       <KpiCard 
         label={t('dashboard.projectsKpi')} 
         value={stats.totalProjects} 
         icon={FolderOpen} 
         accent="primary"
+        href="/projects"
         subtext={t('dashboard.activeThisWeek')}
       />
       <KpiCard 
@@ -23,6 +28,7 @@ export function KpiRow() {
         value={stats.totalSuites} 
         icon={TestTube} 
         accent="running"
+        href="/projects"
         trend={{ value: 5, label: t('dashboard.vsPrior7d'), isPercentage: false }}
       />
       <KpiCard
@@ -30,6 +36,7 @@ export function KpiRow() {
         value={stats.totalRuns}
         icon={Play}
         accent="fail"
+        href="/projects"
         trend={{ value: 1, label: t('dashboard.vsPrior7d'), isPercentage: false }}
       />
       <KpiCard
@@ -37,6 +44,7 @@ export function KpiRow() {
         value={`${stats.passRateLast7d}%`}
         icon={ChartBar}
         accent="pass"
+        href="/projects"
         trend={{ 
           value: stats.passRateTrend || 8, 
           label: t('dashboard.vsPrior7d'), 
@@ -48,8 +56,10 @@ export function KpiRow() {
         value={stats.pendingAiCases}
         icon={Sparkle}
         accent="ai"
+        href="/review-inbox"
         subtext={t('dashboard.readyForReview')}
       />
-    </div>
+      </dl>
+    </section>
   )
 }

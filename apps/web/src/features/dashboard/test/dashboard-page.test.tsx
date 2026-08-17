@@ -20,23 +20,26 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Dashboard')).toBeInTheDocument()
   })
 
-  it('renders welcome message with org name', async () => {
+  it('renders a focused operational introduction without decorative emoji', async () => {
     await act(async () => {
       render(<DashboardPage />)
     })
-    expect(screen.getByText(/Welcome back/)).toBeInTheDocument()
     expect(screen.getByText(/Acme QA Team/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.queryByText(/👋/)).not.toBeInTheDocument()
   })
 
-  it('renders KPI cards', async () => {
+  it('groups the quality metrics in one labelled summary strip', async () => {
     await act(async () => {
       render(<DashboardPage />)
     })
-    expect(screen.getByText('Projects')).toBeInTheDocument()
-    expect(screen.getByText('Test Suites')).toBeInTheDocument()
-    expect(screen.getByText('Runs (7d)')).toBeInTheDocument()
-    expect(screen.getByText('Pass Rate (7d)')).toBeInTheDocument()
-    expect(screen.getByText('Pending AI')).toBeInTheDocument()
+    const summary = screen.getByLabelText('Quality overview')
+    expect(summary).toBeInTheDocument()
+    expect(summary).toHaveTextContent('Projects')
+    expect(summary).toHaveTextContent('Test Suites')
+    expect(summary).toHaveTextContent('Runs (7d)')
+    expect(summary).toHaveTextContent('Pass Rate (7d)')
+    expect(summary).toHaveTextContent('Pending AI')
   })
 
   it('renders project health section', async () => {
@@ -56,7 +59,7 @@ describe('DashboardPage', () => {
       render(<DashboardPage />)
     })
     expect(screen.getByText('Recent runs')).toBeInTheDocument()
-    expect(screen.getByText('Pending AI cases')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Pending AI cases' })).toBeInTheDocument()
     expect(screen.getByText('Recent pipelines')).toBeInTheDocument()
   })
 
@@ -68,6 +71,6 @@ describe('DashboardPage', () => {
     expect(heading).toHaveTextContent('Dashboard')
     expect(heading.className).toContain('text-2xl')
     expect(heading.className).toContain('font-semibold')
-    expect(heading.className).toContain('tracking-tight')
+    expect(heading.className).toContain('tracking-[-0.025em]')
   })
 })

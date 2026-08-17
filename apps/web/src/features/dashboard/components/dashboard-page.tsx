@@ -13,33 +13,29 @@ export function DashboardPage() {
   const { t } = useTranslation()
 
   return (
-    <div className="max-w-[1600px] mx-auto p-6 md:p-8 space-y-8 bg-canvas min-h-screen text-default">
-      <h1 className="sr-only text-2xl font-semibold tracking-tight">{t('sidebar.dashboard')}</h1>
-      <span className="sr-only">Welcome back, {org.name}</span>
-
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-default">
-          {t('dashboard.greeting')}, Isaac 👋
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1.5">
-          {t('dashboard.subtitle')}
-        </p>
-      </div>
+    <div className="mx-auto min-h-full max-w-[1440px] px-5 py-7 text-default sm:px-7 lg:px-9 lg:py-9">
+      <header className="mb-7 flex flex-col gap-1.5">
+        <p className="text-sm font-medium text-muted">{org.name}</p>
+        <h1 className="text-2xl font-semibold tracking-[-0.025em] text-default">
+          {t('sidebar.dashboard')}
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted">{t('dashboard.subtitle')}</p>
+      </header>
 
       <KpiRow />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="mt-7 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)]">
         <ProjectHealthTable />
         <PassRateTrend />
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(22rem,0.78fr)_minmax(0,1.22fr)]">
         <AiCasesOverview />
         <RecentActivity />
       </div>
 
-      <footer className="flex items-center justify-between border-t border-border/60 pt-6 text-xs text-muted-foreground pb-8">
-        <div>
-          © 2026 Qably · {t('dashboard.allOperational')}
-          <span className="inline-block w-2 h-2 rounded-full bg-pass animate-pulse ml-2" />
-        </div>
+      <footer className="mt-8 border-t border-border pt-5 text-xs text-muted">
+        {t('dashboard.allOperational')}
       </footer>
     </div>
   )

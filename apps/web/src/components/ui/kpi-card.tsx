@@ -1,47 +1,18 @@
 'use client'
 
+import Link from 'next/link'
 import type { ElementType } from 'react'
-import { ArrowUp, ArrowDown } from '@phosphor-icons/react'
-import { Card, CardContent } from '@/components/ui/card'
+import { ArrowDown, ArrowRight, ArrowUp } from '@phosphor-icons/react'
 
 export type KpiAccent = 'default' | 'primary' | 'running' | 'fail' | 'pass' | 'ai' | 'warn'
-
-const ACCENT_CLASSES: Record<KpiAccent, { container: string; icon: string }> = {
-  default: {
-    container: 'bg-primary/10 border border-primary/20',
-    icon: 'text-primary',
-  },
-  primary: {
-    container: 'bg-primary/10 border border-primary/20',
-    icon: 'text-primary',
-  },
-  running: {
-    container: 'bg-running-bg border border-running/20',
-    icon: 'text-running',
-  },
-  fail: {
-    container: 'bg-fail-bg border border-fail/20',
-    icon: 'text-fail',
-  },
-  pass: {
-    container: 'bg-pass-bg border border-pass/20',
-    icon: 'text-pass',
-  },
-  ai: {
-    container: 'bg-ai-bg border border-ai/20',
-    icon: 'text-ai',
-  },
-  warn: {
-    container: 'bg-warn-bg border border-warn/20',
-    icon: 'text-warn',
-  },
-}
 
 interface KpiCardProps {
   label: string
   value: string | number
   icon: ElementType
   accent?: KpiAccent
+  href?: string
+  detailLabel?: string
   subtext?: string
   trend?: {
     value: number
@@ -50,58 +21,67 @@ interface KpiCardProps {
   }
 }
 
+/** A compact operational card derived from the approved dashboard reference. */
 export function KpiCard({
   label,
   value,
   icon: Icon,
-  accent = 'primary',
+  href,
+  detailLabel = 'View details',
   subtext,
   trend,
 }: KpiCardProps) {
-  const colors = ACCENT_CLASSES[accent] || ACCENT_CLASSES.primary
-  const showPercent = trend && trend.isPercentage !== false
+  const showPercent = trend?.isPercentage !== false
 
   return (
-    <Card className="hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 border border-border/80">
-      <CardContent className="p-5 flex flex-col justify-between h-full">
-        <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors.container} shrink-0`}>
-            <Icon size={18} className={colors.icon} aria-hidden="true" />
-          </div>
-          <span className="text-sm font-medium text-muted truncate">{label}</span>
+    <div className="group min-w-0 rounded-xl border border-border bg-surface p-3.5 transition-colors duration-200 hover:border-border-strong">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-default text-surface">
+          <Icon size={16} weight="regular" aria-hidden="true" />
+        </span>
+        {href ? (
+          <Link
+            href={href}
+            className="inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted transition-colors duration-200 hover:text-default"
+          >
+            {detailLabel}
+            <ArrowRight size={13} aria-hidden="true" />
+          </Link>
+        ) : null}
+      </div>
+
+      <div className="mt-4 flex min-w-0 items-end justify-between gap-3">
+        <div className="min-w-0">
+          <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
+            {value}
+          </dd>
+          <dt className="mt-0.5 truncate text-xs text-muted">{label}</dt>
         </div>
 
-        <div className="mt-4 text-3xl font-semibold tracking-tight tabular-nums font-mono text-default">
-          {value}
-        </div>
-
-        <div className="mt-2.5 min-h-[16px] flex items-center">
+        <div className="min-w-0 pb-0.5 text-right">
           {trend ? (
-            <div className="flex items-center gap-1.5">
-              {trend.value > 0 ? (
-                <span className="flex items-center gap-0.5 text-xs text-pass font-semibold tabular-nums font-mono">
-                  <ArrowUp size={12} weight="bold" aria-hidden="true" />
-                  +{trend.value}{showPercent ? '%' : ''}
-                </span>
-              ) : trend.value < 0 ? (
-                <span className="flex items-center gap-0.5 text-xs text-fail font-semibold tabular-nums font-mono">
-                  <ArrowDown size={12} weight="bold" aria-hidden="true" />
-                  {trend.value}{showPercent ? '%' : ''}
-                </span>
-              ) : (
-                <span className="text-xs text-muted font-medium tabular-nums font-mono">
-                  {trend.value}{showPercent ? '%' : ''}
-                </span>
-              )}
-              <span className="text-xs text-muted">{trend.label}</span>
-            </div>
+            <>
+              <span
+                className={
+                  trend.value > 0
+                    ? 'inline-flex items-center gap-0.5 text-xs font-medium tabular-nums text-pass'
+                    : trend.value < 0
+                      ? 'inline-flex items-center gap-0.5 text-xs font-medium tabular-nums text-fail'
+                      : 'text-xs font-medium tabular-nums text-muted'
+                }
+              >
+                {trend.value > 0 ? <ArrowUp size={11} weight="bold" aria-hidden="true" /> : null}
+                {trend.value < 0 ? <ArrowDown size={11} weight="bold" aria-hidden="true" /> : null}
+                {trend.value > 0 ? '+' : ''}
+                {trend.value}{showPercent ? '%' : ''}
+              </span>
+              <span className="block max-w-24 truncate text-[11px] text-muted">{trend.label}</span>
+            </>
           ) : subtext ? (
-            <span className="text-xs text-muted font-medium">{subtext}</span>
-          ) : (
-            <span className="text-xs text-transparent" aria-hidden="true">—</span>
-          )}
+            <span className="block max-w-24 text-pretty text-[11px] leading-4 text-muted">{subtext}</span>
+          ) : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

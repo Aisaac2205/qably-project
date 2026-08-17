@@ -4,30 +4,32 @@
 
 :root {
   /* Backgrounds */
-  --bg:                oklch(0.97 0.000 0);
+  --bg:                oklch(0.978 0.002 85);
   --bg-surface:        oklch(1.000 0.000 0);
-  --bg-sidebar:        oklch(1.000 0.000 0);
-  --bg-sidebar-hover:  oklch(0.945 0.000 0);
-  --bg-sidebar-active: oklch(0.920 0.000 0);
+  --bg-surface-raised: oklch(0.995 0.002 85);
+  --bg-sidebar:        oklch(0.950 0.003 85);
+  --bg-sidebar-hover:  oklch(0.920 0.004 85);
+  --bg-sidebar-active: oklch(0.995 0.001 85);
 
   /* Foregrounds */
-  --fg:                oklch(0.12 0.000 0);
-  --fg-muted:          oklch(0.46 0.000 0);
-  --fg-sidebar:        oklch(0.12 0.000 0);
-  --fg-sidebar-muted:  oklch(0.46 0.000 0);
+  --fg:                oklch(0.185 0.004 85);
+  --fg-muted:          oklch(0.475 0.008 85);
+  --fg-sidebar:        oklch(0.205 0.004 85);
+  --fg-sidebar-muted:  oklch(0.465 0.008 85);
 
   /* Borders */
-  --border:            oklch(0.91 0.000 0);
-  --border-sidebar:    oklch(0.91 0.000 0);
+  --border:            oklch(0.890 0.004 85);
+  --border-strong:     oklch(0.820 0.006 85);
+  --border-sidebar:    oklch(0.865 0.005 85);
 
   /* Brand */
-  --primary:           oklch(0.15 0.000 0);
-  --primary-hover:     oklch(0.25 0.000 0);
-  --primary-fg:        oklch(0.98 0.000 0);
+  --primary:           oklch(0.185 0.004 85);
+  --primary-hover:     oklch(0.290 0.006 85);
+  --primary-fg:        oklch(0.990 0.000 0);
 
   /* AI accent — only for AI-generated content markers */
-  --accent-ai:         oklch(0.50 0.19 295);
-  --accent-ai-bg:      oklch(0.95 0.06 295);
+  --accent-ai:         oklch(0.405 0.008 85);
+  --accent-ai-bg:      oklch(0.940 0.003 85);
 
   /* Status — semantic only, never for brand use */
   --status-pass:       oklch(0.45 0.15 145);
@@ -45,7 +47,7 @@
 
   /* Hover surface — for ghost/outline interactive states. Distinct from
      --fg-muted: that token is a TEXT color, this one is a BACKGROUND. */
-  --surface-hover:     oklch(0.945 0.000 0);
+  --surface-hover:     oklch(0.930 0.004 85);
 
   /* shadcn/ui bridge — maps shadcn variable names to our tokens */
   --background: var(--bg);
@@ -62,7 +64,7 @@
   --sidebar-accent: var(--bg-sidebar-active);
   --sidebar-accent-foreground: var(--fg-sidebar);
   --sidebar-border: var(--border-sidebar);
-  --sidebar-ring: var(--fg-sidebar);
+  --sidebar-ring: var(--primary);
 }
 
 /* ─── Tailwind v4 theme mapping ─────────────────────────────────── */
@@ -74,8 +76,9 @@
 
   /* bg-canvas, text-canvas, border-canvas */
   --color-canvas:             var(--bg);
+  --color-canvas-hover:       var(--surface-hover);
   --color-surface:            var(--bg-surface);
-  --color-sidebar:            var(--bg-sidebar);
+  --color-surface-raised:     var(--bg-surface-raised);
   --color-sidebar-hover:      var(--bg-sidebar-hover);
   --color-sidebar-active:     var(--bg-sidebar-active);
 
@@ -85,6 +88,7 @@
   --color-sidebar-fg-muted:   var(--fg-sidebar-muted);
 
   --color-border:             var(--border);
+  --color-border-strong:      var(--border-strong);
   --color-border-sidebar:     var(--border-sidebar);
   --color-input:              var(--border);
 
@@ -105,7 +109,7 @@
 
   /* Elevation tokens — tinted to the ink hue, never pure black.
      shadow-card: resting cards. shadow-pop: dialogs, menus, popovers. */
-  --shadow-card:              0 1px 2px 0 oklch(0.12 0 0 / 0.04);
+  --shadow-card:              0 1px 1px 0 oklch(0.185 0.004 85 / 0.025);
   --shadow-pop:               0 4px 12px -2px oklch(0.12 0 0 / 0.08), 0 2px 4px -2px oklch(0.12 0 0 / 0.04);
   --color-blocked:            var(--status-blocked);
   --color-blocked-bg:         var(--status-blocked-bg);
@@ -140,6 +144,17 @@
 body {
   background-color: var(--bg);
   color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background-color: color-mix(in oklch, var(--primary) 18%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
 }
 
 .resizable-split-pane {
