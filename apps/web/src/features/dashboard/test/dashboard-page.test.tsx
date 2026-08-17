@@ -71,6 +71,16 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('All systems operational')).not.toBeInTheDocument()
   })
 
+  it('uses the available workspace width instead of capping the dashboard canvas', async () => {
+    await act(async () => {
+      render(<DashboardPage />)
+    })
+
+    const workspace = screen.getByRole('region', { name: 'Dashboard' })
+    expect(workspace).toHaveClass('w-full')
+    expect(workspace).not.toHaveClass('max-w-[1440px]')
+  })
+
   it('heading has the correct typography class', async () => {
     await act(async () => {
       render(<DashboardPage />)

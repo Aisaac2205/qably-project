@@ -13,10 +13,10 @@ export function DashboardPage() {
   const { t } = useTranslation()
 
   return (
-    <div className="mx-auto max-w-[1440px] px-5 py-7 text-default sm:px-7 lg:px-9 lg:py-9">
+    <section aria-labelledby="dashboard-title" className="w-full px-5 py-7 text-default sm:px-7 lg:px-9 lg:py-9">
       <header className="mb-7 flex flex-col gap-1.5">
         <p className="text-sm font-medium text-muted">{org.name}</p>
-        <h1 className="text-2xl font-semibold tracking-[-0.025em] text-default">
+        <h1 id="dashboard-title" className="text-2xl font-semibold tracking-[-0.025em] text-default">
           {t('sidebar.dashboard')}
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-muted">{t('dashboard.subtitle')}</p>
@@ -34,6 +34,6 @@ export function DashboardPage() {
         <RecentActivity />
       </div>
 
-    </div>
+    </section>
   )
 }
