@@ -95,7 +95,7 @@ export function Sidebar() {
                 alt="Qably"
                 width={416}
                 height={126}
-                className="h-7 w-auto object-contain"
+                className="h-7 w-auto object-contain translate-y-0.5"
                 priority
               />
             </Link>
