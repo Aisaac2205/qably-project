@@ -1,66 +1,58 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ReviewCaseList } from '@/features/ai-review/components/review-case-list'
-import type { AiCase } from '@qably/types'
+import { __resetStore, getProposal } from '@/lib/mock-store'
+import type { ExtractedProposal } from '@qably/types'
 
-const mockCases: AiCase[] = [
-  {
-    id: 'ai-1', name: 'Checkout blocked', steps: [], expectedResult: '',
-    sourceFile: 'checkout.spec.ts', sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-    source: 'webhook',
-  },
-  {
-    id: 'ai-2', name: 'Discount code', steps: [], expectedResult: '',
-    sourceFile: 'checkout.spec.ts', sourceSnippet: '', reviewStatus: 'confirmed', projectId: 'proj-1',
-    source: 'webhook',
-  },
-  {
-    id: 'ai-3', name: 'Login error', steps: [], expectedResult: '',
-    sourceFile: 'auth.spec.ts', sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-    source: 'webhook',
-  },
-]
+function proposal(id: string): ExtractedProposal {
+  const found = getProposal(id)
+  if (!found) throw new Error(`Missing seeded proposal: ${id}`)
+  return found
+}
 
 describe('ReviewCaseList', () => {
-  it('renders all cases', async () => {
+  beforeEach(() => __resetStore())
+
+  it('renders all proposals', async () => {
     const onSelect = vi.fn()
+    const proposals = [proposal('review-proposal-checkout'), proposal('proposal-ai-3'), proposal('proposal-ai-4')]
     await act(async () => {
-      render(<ReviewCaseList cases={mockCases} onSelect={onSelect} />)
+      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} />)
     })
-    expect(screen.getByText('Checkout blocked')).toBeInTheDocument()
-    expect(screen.getByText('Discount code')).toBeInTheDocument()
-    expect(screen.getByText('Login error')).toBeInTheDocument()
+    expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
+    expect(screen.getByText('Discount code reduces total')).toBeInTheDocument()
+    expect(screen.getByText('Invalid login shows error message')).toBeInTheDocument()
   })
 
-  it('renders source file names', async () => {
+  it('renders source file names from linked evidence', async () => {
     const onSelect = vi.fn()
+    const proposals = [proposal('review-proposal-checkout'), proposal('proposal-ai-3'), proposal('proposal-ai-4')]
     await act(async () => {
-      render(<ReviewCaseList cases={mockCases} onSelect={onSelect} />)
+      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} />)
     })
-    const sourceFiles = screen.getAllByText('checkout.spec.ts')
-    expect(sourceFiles.length).toBe(2)
+    expect(screen.getAllByText('checkout.spec.ts').length).toBe(2)
   })
 
-  it('calls onSelect on click', async () => {
+  it('calls onSelect with the proposal id on click', async () => {
     const onSelect = vi.fn()
     const user = userEvent.setup()
+    const proposals = [proposal('review-proposal-checkout'), proposal('proposal-ai-4')]
     await act(async () => {
-      render(<ReviewCaseList cases={mockCases} onSelect={onSelect} />)
+      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} />)
     })
-    await user.click(screen.getByRole('button', { name: /Login error/i }))
-    expect(onSelect).toHaveBeenCalledWith('ai-3')
+    await user.click(screen.getByRole('button', { name: /Invalid login shows error message/i }))
+    expect(onSelect).toHaveBeenCalledWith('proposal-ai-4')
   })
 
-  it('highlights selected case', async () => {
+  it('highlights the selected proposal', async () => {
     const onSelect = vi.fn()
+    const proposals = [proposal('review-proposal-checkout'), proposal('proposal-ai-3')]
     await act(async () => {
-      render(<ReviewCaseList cases={mockCases} selectedId="ai-2" onSelect={onSelect} />)
+      render(<ReviewCaseList proposals={proposals} selectedId="proposal-ai-3" onSelect={onSelect} />)
     })
-    const selected = screen.getByRole('button', { name: /Discount code/i })
+    const selected = screen.getByRole('button', { name: /Discount code reduces total/i })
     expect(screen.getByRole('list', { name: 'AI review cases' })).toBeInTheDocument()
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
-    expect(screen.queryByRole('option')).not.toBeInTheDocument()
     expect(selected).toHaveAttribute('aria-current', 'true')
     expect(selected.className).toContain('border-primary')
   })
@@ -68,53 +60,36 @@ describe('ReviewCaseList', () => {
   it('shows empty state', async () => {
     const onSelect = vi.fn()
     await act(async () => {
-      render(<ReviewCaseList cases={[]} onSelect={onSelect} />)
+      render(<ReviewCaseList proposals={[]} onSelect={onSelect} />)
     })
     expect(screen.getByText('No AI cases pending review')).toBeInTheDocument()
   })
 
-  it('shows a duplicate badge for cases with possibleDuplicateOf', async () => {
-    const cases: AiCase[] = [
-      {
-        id: 'ai-x', name: 'Dup case', steps: [], expectedResult: '', sourceFile: 'a.spec.ts',
-        sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-        source: 'webhook', possibleDuplicateOf: 'case-1', similarityScore: 0.9,
-      },
-    ]
+  it('shows a duplicate badge when the proposal targets an existing test case', async () => {
+    const onSelect = vi.fn()
+    const proposals = [proposal('review-proposal-checkout')]
     await act(async () => {
-      render(<ReviewCaseList cases={cases} onSelect={vi.fn()} />)
+      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} />)
     })
     expect(screen.getByText('Possible duplicate')).toBeInTheDocument()
   })
 
-  it('filters to only duplicates when filter="duplicates"', async () => {
-    const cases: AiCase[] = [
-      {
-        id: 'ai-x', name: 'Dup case', steps: [], expectedResult: '', sourceFile: 'a.spec.ts',
-        sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-        source: 'webhook', possibleDuplicateOf: 'case-1', similarityScore: 0.9,
-      },
-      {
-        id: 'ai-y', name: 'Unique case', steps: [], expectedResult: '', sourceFile: 'b.spec.ts',
-        sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1',
-        source: 'webhook',
-      },
-    ]
+  it('filters to only proposals that target an existing test case', async () => {
+    const onSelect = vi.fn()
+    const proposals = [proposal('review-proposal-checkout'), proposal('proposal-ai-4')]
     await act(async () => {
-      render(<ReviewCaseList cases={cases} onSelect={vi.fn()} filter="duplicates" />)
+      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} filter="duplicates" />)
     })
-    expect(screen.getByText('Dup case')).toBeInTheDocument()
-    expect(screen.queryByText('Unique case')).not.toBeInTheDocument()
+    expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
+    expect(screen.queryByText('Invalid login shows error message')).not.toBeInTheDocument()
   })
 
-  it('labels cases suggested from a coverage gap', async () => {
-    const cases: AiCase[] = [{
-      id: 'ai-gap', name: 'Refund flow', steps: [], expectedResult: '', sourceFile: 'refunds.spec.ts',
-      sourceSnippet: '', reviewStatus: 'pending', projectId: 'proj-1', source: 'chat', coverageGapId: 'gap-1',
-    }]
+  it('shows the chat origin icon for proposals sourced from chat evidence', async () => {
+    const onSelect = vi.fn()
+    const proposals = [proposal('proposal-ai-5')]
     await act(async () => {
-      render(<ReviewCaseList cases={cases} onSelect={vi.fn()} />)
+      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} />)
     })
-    expect(screen.getByText('Suggested from coverage gap')).toBeInTheDocument()
+    expect(screen.getByLabelText('Generated from chat')).toBeInTheDocument()
   })
 })

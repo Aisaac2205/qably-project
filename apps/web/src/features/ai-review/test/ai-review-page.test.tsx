@@ -2,11 +2,14 @@ import { render, screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { AiReviewPage } from '@/features/ai-review/components/ai-review-page'
-import { __resetStore, confirmAiCase, disconnectAiProvider, getAiCases } from '@/lib/mock-store'
+import { __resetStore, approveProposal, disconnectAiProvider, getMembers, getSnapshot } from '@/lib/mock-store'
 
 function confirmPendingCases(projectId: string) {
-  for (const testCase of getAiCases(projectId)) {
-    if (testCase.reviewStatus === 'pending') confirmAiCase(testCase.id)
+  const actor = getMembers()[0]
+  for (const proposal of getSnapshot().proposals) {
+    if (proposal.projectId === projectId && proposal.status === 'in_review') {
+      approveProposal(proposal.id, { actorId: actor.id })
+    }
   }
 }
 
@@ -19,13 +22,6 @@ describe('AiReviewPage', () => {
     })
     expect(screen.getByRole('tab', { name: 'Review Queue' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getAllByText('Checkout with empty cart blocked').length).toBeGreaterThan(0)
-  })
-
-  it('shows a connected-provider badge in the header', async () => {
-    await act(async () => {
-      render(<AiReviewPage projectId="proj-1" />)
-    })
-    expect(screen.getByText('Claude connected')).toBeInTheDocument()
   })
 
   it('switches to the Project Chat tab', async () => {
@@ -97,12 +93,12 @@ describe('AiReviewPage', () => {
 
   it('returns blocked chat to the active Review Queue tab', async () => {
     const user = userEvent.setup()
-    disconnectAiProvider('claude')
+    disconnectAiProvider('gemini')
     render(<AiReviewPage projectId="proj-1" />)
 
     await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
     expect(screen.getByText('AI chat is unavailable')).toBeInTheDocument()
-    expect(screen.getByText('No AI provider connected').closest('a')).toBeNull()
+    expect(screen.getByText('No AI provider is connected. You can continue reviewing the existing queue.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Return to Review Queue' }))
 
     expect(screen.getByRole('tab', { name: 'Review Queue' })).toHaveAttribute('aria-selected', 'true')

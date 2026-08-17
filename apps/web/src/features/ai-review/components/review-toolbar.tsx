@@ -21,16 +21,16 @@ export function ReviewToolbar({
   const { t } = useTranslation()
   
   return (
-    <div className="flex flex-wrap items-center gap-2.5 px-4 py-3.5 border-t border-border bg-surface">
+    <div className="flex flex-wrap items-center gap-2.5 px-5 py-4 border-t border-border bg-surface/80">
       <button
         onClick={onConfirm}
         disabled={disabled}
         aria-label={t('aiReview.ariaConfirmCase')}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded
-          bg-primary text-primary-fg hover:bg-primary-hover
-          disabled:opacity-40 disabled:cursor-not-allowed
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg
+          bg-primary text-primary-fg hover:bg-primary-hover active:scale-[0.98]
+          disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100
           focus-visible:outline-2 focus-visible:outline-primary
-          transition-colors"
+          transition-all duration-150"
       >
         <CheckCircle size={16} weight="fill" aria-hidden="true" />
         {t('common.confirm')}
@@ -40,11 +40,11 @@ export function ReviewToolbar({
         onClick={onReject}
         disabled={disabled}
         aria-label={t('aiReview.ariaRejectCase')}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded
-          bg-fail-bg text-fail hover:bg-fail-bg/80
-          disabled:opacity-40 disabled:cursor-not-allowed
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg
+          bg-fail-bg text-fail hover:bg-fail-bg/80 active:scale-[0.98]
+          disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100
           focus-visible:outline-2 focus-visible:outline-fail
-          transition-colors"
+          transition-all duration-150"
       >
         <XCircle size={16} weight="fill" aria-hidden="true" />
         {t('common.reject')}
@@ -54,11 +54,11 @@ export function ReviewToolbar({
         onClick={onSkip}
         disabled={disabled}
         aria-label={t('aiReview.ariaSkipCase')}
-        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded
-          bg-skip-bg text-skip hover:bg-skip-bg/80
-          disabled:opacity-40 disabled:cursor-not-allowed
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg
+          bg-skip-bg text-skip hover:bg-skip-bg/80 active:scale-[0.98]
+          disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100
           focus-visible:outline-2 focus-visible:outline-skip
-          transition-colors"
+          transition-all duration-150"
       >
         <ArrowRight size={16} weight="bold" aria-hidden="true" />
         {t('common.skip')}

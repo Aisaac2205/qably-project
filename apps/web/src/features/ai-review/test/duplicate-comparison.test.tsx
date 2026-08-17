@@ -6,29 +6,17 @@ import { __resetStore } from '@/lib/mock-store'
 describe('DuplicateComparison', () => {
   beforeEach(() => __resetStore())
 
-  it('shows a not-found message if the referenced case cannot be resolved', async () => {
+  it('shows a not-found message if the referenced test case cannot be resolved', async () => {
     await act(async () => {
-      render(
-        <DuplicateComparison
-          possibleDuplicateOf="does-not-exist"
-          similarityScore={0.8}
-          projectId="proj-1"
-        />,
-      )
+      render(<DuplicateComparison targetOfficialTestCaseId="does-not-exist" />)
     })
     expect(screen.getByText(/could not be located/i)).toBeInTheDocument()
   })
 
-  it('shows the similarity percentage', async () => {
+  it('shows the linked test case title when it resolves', async () => {
     await act(async () => {
-      render(
-        <DuplicateComparison
-          possibleDuplicateOf="does-not-exist"
-          similarityScore={0.86}
-          projectId="proj-1"
-        />,
-      )
+      render(<DuplicateComparison targetOfficialTestCaseId="case-tc-4" />)
     })
-    expect(screen.getByText('86%')).toBeInTheDocument()
+    expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
   })
 })

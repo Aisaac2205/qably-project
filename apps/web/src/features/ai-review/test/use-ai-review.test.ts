@@ -6,10 +6,20 @@ import { __resetStore, getSnapshot } from '@/lib/mock-store'
 describe('useAiReview governed decisions', () => {
   beforeEach(() => __resetStore())
 
-  it('approves the associated proposal and creates the governed review graph', () => {
+  it('exposes the pending queue as ExtractedProposal records, not AiCase', () => {
     const { result } = renderHook(() => useAiReview('proj-1'))
-    const selectedId = result.current.selectedCase!.id
-    const proposalId = getSnapshot().proposalIdByAiCaseId[selectedId]
+    expect(result.current.selectedCase).toMatchObject({
+      status: 'in_review',
+      title: expect.any(String),
+      evidenceId: expect.any(String),
+    })
+    expect(result.current.selectedCase).not.toHaveProperty('reviewStatus')
+    expect(result.current.selectedCase).not.toHaveProperty('sourceFile')
+  })
+
+  it('approves the selected proposal and creates the governed review graph', () => {
+    const { result } = renderHook(() => useAiReview('proj-1'))
+    const proposalId = result.current.selectedCase!.id
     const casesBefore = getSnapshot().officialTestCases.length
     const versionsBefore = getSnapshot().testCaseVersions.length
 
@@ -25,13 +35,11 @@ describe('useAiReview governed decisions', () => {
     const publishedVersion = snapshot.testCaseVersions.at(-1)!
     expect(snapshot.officialTestCases.find((item) => item.id === publishedVersion.testCaseId)?.currentVersionId).toBe(publishedVersion.id)
     expect(snapshot.traceabilityLinks.some((link) => link.from.id === proposalId && link.relation === 'produced')).toBe(true)
-    expect(snapshot.aiCases.find((item) => item.id === selectedId)?.reviewStatus).toBe('confirmed')
   })
 
-  it('rejects the associated proposal with a review decision', () => {
+  it('rejects the selected proposal with a review decision', () => {
     const { result } = renderHook(() => useAiReview('proj-1'))
-    const selectedId = result.current.selectedCase!.id
-    const proposalId = getSnapshot().proposalIdByAiCaseId[selectedId]
+    const proposalId = result.current.selectedCase!.id
 
     act(() => {
       result.current.rejectSelected()
@@ -40,12 +48,22 @@ describe('useAiReview governed decisions', () => {
     const snapshot = getSnapshot()
     expect(snapshot.proposals.find((proposal) => proposal.id === proposalId)?.status).toBe('rejected')
     expect(snapshot.reviewDecisions.at(-1)).toMatchObject({ proposalId, actorId: 'member-1', action: 'rejected' })
-    expect(snapshot.aiCases.find((item) => item.id === selectedId)?.reviewStatus).toBe('rejected')
+  })
+
+  it('advances selection on skip without mutating the proposal', () => {
+    const { result } = renderHook(() => useAiReview('proj-1'))
+    const firstId = result.current.selectedCase!.id
+
+    act(() => {
+      result.current.skipSelected()
+    })
+
+    expect(result.current.selectedCase?.id).not.toBe(firstId)
+    expect(getSnapshot().proposals.find((p) => p.id === firstId)?.status).toBe('in_review')
   })
 
   it('does not expose a mass-confirm action', () => {
     const { result } = renderHook(() => useAiReview('proj-1'))
-
     expect(result.current).not.toHaveProperty('confirmAll')
   })
 })

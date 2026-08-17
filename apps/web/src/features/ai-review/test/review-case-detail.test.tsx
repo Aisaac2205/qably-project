@@ -1,80 +1,68 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ReviewCaseDetail } from '@/features/ai-review/components/review-case-detail'
-import { __resetStore } from '@/lib/mock-store'
-import type { AiCase } from '@qably/types'
-
-const mockCase: AiCase = {
-  id: 'ai-2',
-  name: 'Checkout with empty cart blocked',
-  steps: ['Navigate to /checkout', 'Observe button state'],
-  expectedResult: 'Button disabled, message shown',
-  sourceFile: 'checkout.spec.ts',
-  sourceSnippet: "it('should block', async () => {\n  await expect(btn).toBeDisabled()\n})",
-  reviewStatus: 'pending',
-  projectId: 'proj-1',
-  source: 'webhook',
-}
+import { __resetStore, getProposal } from '@/lib/mock-store'
 
 describe('ReviewCaseDetail', () => {
   beforeEach(() => __resetStore())
 
-  it('renders case name', async () => {
+  it('renders the proposal title', async () => {
+    const proposal = getProposal('review-proposal-checkout')!
     await act(async () => {
-      render(<ReviewCaseDetail c={mockCase} />)
+      render(<ReviewCaseDetail proposal={proposal} />)
     })
-    expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Checkout with empty cart blocked' })).toBeInTheDocument()
   })
 
   it('renders steps', async () => {
+    const proposal = getProposal('review-proposal-checkout')!
     await act(async () => {
-      render(<ReviewCaseDetail c={mockCase} />)
+      render(<ReviewCaseDetail proposal={proposal} />)
     })
-    expect(screen.getByText('Navigate to /checkout')).toBeInTheDocument()
-    expect(screen.getByText('Observe button state')).toBeInTheDocument()
+    expect(screen.getByText('Navigate to /checkout without any items in cart')).toBeInTheDocument()
+    expect(screen.getByText('Observe the proceed button')).toBeInTheDocument()
   })
 
   it('renders expected result', async () => {
+    const proposal = getProposal('review-proposal-checkout')!
     await act(async () => {
-      render(<ReviewCaseDetail c={mockCase} />)
+      render(<ReviewCaseDetail proposal={proposal} />)
     })
-    expect(screen.getByText('Button disabled, message shown')).toBeInTheDocument()
+    expect(screen.getByText('Proceed button is disabled, "Your cart is empty" message is shown')).toBeInTheDocument()
   })
 
-  it('renders code snippet', async () => {
+  it('renders the source snippet from linked evidence', async () => {
+    const proposal = getProposal('review-proposal-checkout')!
     await act(async () => {
-      render(<ReviewCaseDetail c={mockCase} />)
+      render(<ReviewCaseDetail proposal={proposal} />)
     })
     const code = document.querySelector('code')
     expect(code?.textContent).toContain('should block')
   })
 
   it('shows the matching Phase 0 provenance and traceability contracts', async () => {
+    const proposal = getProposal('review-proposal-checkout')!
     await act(async () => {
-      render(<ReviewCaseDetail c={mockCase} />)
+      render(<ReviewCaseDetail proposal={proposal} />)
     })
-
     expect(screen.getByRole('region', { name: 'Provenance' })).toHaveTextContent('mock://checkout.spec.ts')
     expect(screen.getByRole('region', { name: 'Traceability' })).toHaveTextContent('evidence-ai-2')
   })
 
-  it('uses the explicit review case association when proposal IDs do not follow the legacy convention', async () => {
+  it('renders the duplicate comparison card when the proposal targets an existing test case', async () => {
+    const proposal = getProposal('review-proposal-checkout')!
     await act(async () => {
-      render(<ReviewCaseDetail c={mockCase} />)
-    })
-
-    expect(screen.getByRole('region', { name: 'Provenance' })).toHaveTextContent('mock://checkout.spec.ts')
-  })
-
-  it('renders the duplicate comparison card when possibleDuplicateOf is set', async () => {
-    const c: AiCase = {
-      id: 'ai-x', name: 'Dup case', steps: ['step'], expectedResult: 'result', sourceFile: 'a.spec.ts',
-      sourceSnippet: 'code', reviewStatus: 'pending', projectId: 'proj-1',
-      source: 'webhook', possibleDuplicateOf: 'case-1', similarityScore: 0.9,
-    }
-    await act(async () => {
-      render(<ReviewCaseDetail c={c} />)
+      render(<ReviewCaseDetail proposal={proposal} />)
     })
     expect(screen.getByText('Possible duplicate')).toBeInTheDocument()
+    expect(screen.getAllByText('Checkout with empty cart blocked').length).toBeGreaterThan(1)
+  })
+
+  it('does not render the duplicate comparison card when the proposal has no target test case', async () => {
+    const proposal = getProposal('proposal-ai-4')!
+    await act(async () => {
+      render(<ReviewCaseDetail proposal={proposal} />)
+    })
+    expect(screen.queryByText('Possible duplicate')).not.toBeInTheDocument()
   })
 })
