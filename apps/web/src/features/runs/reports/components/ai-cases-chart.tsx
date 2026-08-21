@@ -1,25 +1,25 @@
 'use client'
 
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import type { AiCase } from '@qably/types'
+import type { ExtractedProposal } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useHydrated } from '@/hooks/use-hydrated'
 
-interface AiCasesChartProps {
-  aiCases: AiCase[]
+interface ProposalReviewChartProps {
+  proposals: ExtractedProposal[]
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'var(--status-warn)',
-  confirmed: 'var(--status-pass)',
+  in_review: 'var(--status-warn)',
+  approved: 'var(--status-pass)',
   rejected: 'var(--status-fail)',
 }
 
-export function AiCasesChart({ aiCases }: AiCasesChartProps) {
+export function ProposalReviewChart({ proposals }: ProposalReviewChartProps) {
   const { t } = useTranslation()
   const hydrated = useHydrated()
   
-  if (aiCases.length === 0) {
+  if (proposals.length === 0) {
     return (
       <div className="flex items-center justify-center h-48 text-muted text-sm">
         {t('common.noData')}
@@ -27,18 +27,18 @@ export function AiCasesChart({ aiCases }: AiCasesChartProps) {
     )
   }
 
-  const pending = aiCases.filter((c) => c.reviewStatus === 'pending').length
-  const confirmed = aiCases.filter((c) => c.reviewStatus === 'confirmed').length
-  const rejected = aiCases.filter((c) => c.reviewStatus === 'rejected').length
+  const inReview = proposals.filter((p) => p.status === 'in_review').length
+  const approved = proposals.filter((p) => p.status === 'approved').length
+  const rejected = proposals.filter((p) => p.status === 'rejected').length
 
   const data = [
-    { name: t('aiReview.statusPending'), count: pending, fill: STATUS_COLORS.pending },
-    { name: t('aiReview.statusConfirmed'), count: confirmed, fill: STATUS_COLORS.confirmed },
+    { name: t('aiReview.statusPending'), count: inReview, fill: STATUS_COLORS.in_review },
+    { name: t('aiReview.statusConfirmed'), count: approved, fill: STATUS_COLORS.approved },
     { name: t('aiReview.statusRejected'), count: rejected, fill: STATUS_COLORS.rejected },
   ]
 
   return (
-    <div className="h-64" aria-label={t('reports.ariaAiCasesChart')}>
+    <div className="h-64" aria-label={t('reports.ariaProposalReviewChart')}>
       {hydrated ? (
       <ResponsiveContainer width="100%" height="100%" minWidth={0}>
         <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
