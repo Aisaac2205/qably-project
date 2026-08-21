@@ -67,6 +67,22 @@ Domain operations that can fail for expected reasons return `Result<T, E>` from 
 
 `AllExceptionsFilter` handles everything that reaches the HTTP boundary. It preserves the status and body of a thrown `HttpException`, including the structured `issues` array produced by `ZodValidationPipe`, and maps anything else to `500`. Outside production the underlying message is exposed; in production it is replaced with a generic message so connection strings and credentials cannot leak.
 
+### Authentication
+
+better-auth backs email and password sign-in plus GitHub OAuth. Its HTTP handler is mounted at `/api/auth/*` by `AuthController`, which marks that route `@Public()` because better-auth performs its own credential checks.
+
+`SessionGuard` is registered as an `APP_GUARD`, so **every route is protected by default**. A route opts out with `@Public()`. The guard resolves the session through the `SessionReader` port rather than calling better-auth directly, which keeps feature tests free of the auth library.
+
+A failed session lookup is logged with its stack and answered with a generic `401 Authentication required`; the underlying reason never reaches the caller.
+
+Inside a protected handler, `@CurrentUser()` returns the authenticated user. It throws if the route is not covered by `SessionGuard`, so a missing guard fails loudly instead of yielding `undefined`.
+
+Express's JSON body parser is disabled globally and re-applied to every path except `/api/auth`, because better-auth needs to read the raw request body.
+
+#### Testing against better-auth
+
+better-auth ships as ESM and its transitive dependencies cannot be loaded by the CommonJS Jest runtime. The e2e suite maps `better-auth`, `better-auth/node` and `better-auth/adapters/prisma` to stubs in `test/stubs/`, and overrides `AUTH_INSTANCE` and `SESSION_READER`. The `betterAuth` and `prismaAdapter` stubs throw when called, so a test that forgets to override a provider fails loudly rather than silently exercising a fake.
+
 ### Input validation
 
 Request payloads are validated with Zod schemas through `ZodValidationPipe`. A rejected payload produces `400` with a `issues` array of `{ path, message }` entries.
