@@ -68,4 +68,16 @@ describe('parseEnv', () => {
   it('reports every missing variable in a single error', () => {
     expect(() => parseEnv({ NODE_ENV: 'test' })).toThrow(/REDIS_URL/);
   });
+
+  it('starts without RESEND_API_KEY because notifications ship last', () => {
+    expect(
+      parseEnv(omit(validEnv, 'RESEND_API_KEY')).RESEND_API_KEY,
+    ).toBeUndefined();
+  });
+
+  it('still rejects an empty RESEND_API_KEY when one is supplied', () => {
+    expect(() => parseEnv({ ...validEnv, RESEND_API_KEY: '' })).toThrow(
+      /RESEND_API_KEY/,
+    );
+  });
 });

@@ -34,7 +34,7 @@ On a deployed environment the platform injects the variables directly and no `.e
 | `GITHUB_CLIENT_ID` | yes | string | GitHub OAuth application id. |
 | `GITHUB_CLIENT_SECRET` | yes | string | GitHub OAuth application secret. |
 | `ANTHROPIC_API_KEY` | yes | string | Claude API key used by the extraction service. |
-| `RESEND_API_KEY` | yes | string | Resend API key used for run notifications. |
+| `RESEND_API_KEY` | no | string | Resend API key for run notifications. Optional because notifications ship last; when supplied it must be non-empty. The Unit 4 notification service requires it at its own boundary. |
 
 Local development values for `DATABASE_URL` and `REDIS_URL` match the `docker-compose.yml` services:
 
