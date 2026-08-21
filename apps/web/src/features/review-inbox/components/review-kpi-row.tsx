@@ -20,110 +20,82 @@ export function ReviewKpiRow() {
     <section aria-label={t('reviewInbox.queueTitle')} className="min-w-0">
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {/* Pending Review */}
-        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-200 hover:border-border-strong hover:shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex shrink-0 items-center justify-center text-ai transition-colors duration-200">
-              <Sparkle size={18} weight="fill" aria-hidden="true" />
-            </span>
-            <span className="inline-flex items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
-              {t('reviewInbox.kpiPendingSub')}
+        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-150 hover:border-border-strong">
+          <div className="flex items-center justify-between">
+            <dt className="text-xs font-medium text-muted">
+              {t('reviewInbox.kpiPending')}
+            </dt>
+            <span className="flex shrink-0 items-center justify-center text-ai" aria-hidden="true">
+              <Sparkle size={16} weight="fill" />
             </span>
           </div>
-          <div className="mt-3.5 flex min-w-0 items-end justify-between gap-3">
-            <div className="min-w-0">
-              <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
-                {pendingProposals.length}
-              </dd>
-              <dt className="mt-0.5 truncate text-xs font-medium text-muted">
-                {t('reviewInbox.kpiPending')}
-              </dt>
-            </div>
-            <div className="min-w-0 pb-0.5 text-right">
-              <span className="block max-w-24 truncate text-[11px] text-muted">
-                {t('common.acrossProjects', { count: projects.length })}
-              </span>
-            </div>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
+              {pendingProposals.length}
+            </dd>
+            <span className="text-[11px] text-muted truncate">
+              {t('common.acrossProjects', { count: projects.length })}
+            </span>
           </div>
         </div>
 
         {/* Approved & Published */}
-        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-200 hover:border-border-strong hover:shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex shrink-0 items-center justify-center text-pass transition-colors duration-200">
-              <CheckCircle size={18} weight="fill" aria-hidden="true" />
-            </span>
-            <span className="inline-flex items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
-              {t('reviewInbox.kpiApprovedSub')}
+        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-150 hover:border-border-strong">
+          <div className="flex items-center justify-between">
+            <dt className="text-xs font-medium text-muted">
+              {t('reviewInbox.kpiApproved')}
+            </dt>
+            <span className="flex shrink-0 items-center justify-center text-pass" aria-hidden="true">
+              <CheckCircle size={16} weight="fill" />
             </span>
           </div>
-          <div className="mt-3.5 flex min-w-0 items-end justify-between gap-3">
-            <div className="min-w-0">
-              <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
-                {approvedProposals.length}
-              </dd>
-              <dt className="mt-0.5 truncate text-xs font-medium text-muted">
-                {t('reviewInbox.kpiApproved')}
-              </dt>
-            </div>
-            <div className="min-w-0 pb-0.5 text-right">
-              <span className="block max-w-24 truncate text-[11px] text-pass font-medium">
-                {approvedProposals.length > 0 ? t('common.versioned') : ''}
-              </span>
-            </div>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
+              {approvedProposals.length}
+            </dd>
+            <span className="text-[11px] font-medium text-pass truncate">
+              {approvedProposals.length > 0 ? t('common.versioned') : ''}
+            </span>
           </div>
         </div>
 
         {/* Potential Duplicates */}
-        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-200 hover:border-border-strong hover:shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex shrink-0 items-center justify-center text-warn transition-colors duration-200">
-              <CopySimple size={18} weight="bold" aria-hidden="true" />
-            </span>
-            <span className="inline-flex items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
-              {t('reviewInbox.kpiDuplicatesSub')}
+        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-150 hover:border-border-strong">
+          <div className="flex items-center justify-between">
+            <dt className="text-xs font-medium text-muted">
+              {t('reviewInbox.kpiDuplicates')}
+            </dt>
+            <span className="flex shrink-0 items-center justify-center text-warn" aria-hidden="true">
+              <CopySimple size={16} weight="bold" />
             </span>
           </div>
-          <div className="mt-3.5 flex min-w-0 items-end justify-between gap-3">
-            <div className="min-w-0">
-              <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
-                {duplicateProposals.length}
-              </dd>
-              <dt className="mt-0.5 truncate text-xs font-medium text-muted">
-                {t('reviewInbox.kpiDuplicates')}
-              </dt>
-            </div>
-            <div className="min-w-0 pb-0.5 text-right">
-              <span className="block max-w-24 truncate text-[11px] text-muted">
-                {duplicateProposals.length > 0 ? t('aiReview.possibleDuplicate') : ''}
-              </span>
-            </div>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
+              {duplicateProposals.length}
+            </dd>
+            <span className="text-[11px] text-warn truncate">
+              {duplicateProposals.length > 0 ? t('reviewInbox.possibleDuplicate') : ''}
+            </span>
           </div>
         </div>
 
         {/* Active Projects */}
-        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-200 hover:border-border-strong hover:shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex shrink-0 items-center justify-center text-muted transition-colors duration-200 group-hover:text-default">
-              <Folders size={18} aria-hidden="true" />
-            </span>
-            <span className="inline-flex items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
-              {t('reviewInbox.kpiProjectsSub')}
+        <div className="group min-w-0 rounded-xl border border-border bg-surface p-4 shadow-xs transition-all duration-150 hover:border-border-strong">
+          <div className="flex items-center justify-between">
+            <dt className="text-xs font-medium text-muted">
+              {t('reviewInbox.kpiProjects')}
+            </dt>
+            <span className="flex shrink-0 items-center justify-center text-muted group-hover:text-default" aria-hidden="true">
+              <Folders size={16} />
             </span>
           </div>
-          <div className="mt-3.5 flex min-w-0 items-end justify-between gap-3">
-            <div className="min-w-0">
-              <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
-                {activeProjectsCount}
-              </dd>
-              <dt className="mt-0.5 truncate text-xs font-medium text-muted">
-                {t('reviewInbox.kpiProjects')}
-              </dt>
-            </div>
-            <div className="min-w-0 pb-0.5 text-right">
-              <span className="block max-w-24 truncate text-[11px] text-muted">
-                / {projects.length} {t('common.total')}
-              </span>
-            </div>
+          <div className="mt-2 flex items-baseline justify-between gap-2">
+            <dd className="text-2xl font-semibold tracking-[-0.025em] tabular-nums text-default">
+              {activeProjectsCount}
+            </dd>
+            <span className="text-[11px] text-muted truncate">
+              / {projects.length} {t('common.total')}
+            </span>
           </div>
         </div>
       </dl>
