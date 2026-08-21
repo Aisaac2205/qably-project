@@ -1,3 +1,5 @@
+export const MIN_PASSWORD_LENGTH = 12
+
 export function validateEmail(value: string): string | undefined {
   const trimmed = value.trim()
   if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -6,8 +8,8 @@ export function validateEmail(value: string): string | undefined {
 }
 
 export function validatePassword(value: string): string | undefined {
-  if (value.length < 8) {
-    return 'Password must be at least 8 characters'
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters`
   }
 }
 

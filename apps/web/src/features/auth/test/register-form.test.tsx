@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RegisterForm } from '@/features/auth/components/register-form'
 
 const push = vi.fn()
@@ -8,6 +8,27 @@ const push = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }))
+
+const signInEmail = vi.fn()
+const signUpEmail = vi.fn()
+const signInSocial = vi.fn()
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    signIn: {
+      email: (...args: unknown[]) => signInEmail(...args),
+      social: (...args: unknown[]) => signInSocial(...args),
+    },
+    signUp: { email: (...args: unknown[]) => signUpEmail(...args) },
+  },
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  signInEmail.mockResolvedValue({ data: {}, error: null })
+  signUpEmail.mockResolvedValue({ data: {}, error: null })
+  signInSocial.mockResolvedValue({ data: {}, error: null })
+})
 
 async function renderForm() {
   await act(async () => {
@@ -90,5 +111,58 @@ describe('RegisterForm', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
     await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/projects'))
+  })
+
+  it('registers against the api with the trimmed name', async () => {
+    const user = userEvent.setup()
+    await renderForm()
+
+    await user.type(screen.getByLabelText('Name'), '  Ada Lovelace  ')
+    await user.type(screen.getByLabelText('Email'), 'qa@acme.test')
+    await user.type(screen.getByLabelText('Password'), 'longenoughpassword')
+    await user.type(screen.getByLabelText('Confirm password'), 'longenoughpassword')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    await vi.waitFor(() =>
+      expect(signUpEmail).toHaveBeenCalledWith({
+        email: 'qa@acme.test',
+        password: 'longenoughpassword',
+        name: 'Ada Lovelace',
+      }),
+    )
+  })
+
+  it('shows a taken email without navigating', async () => {
+    signUpEmail.mockResolvedValue({
+      data: null,
+      error: { code: 'USER_ALREADY_EXISTS' },
+    })
+    const user = userEvent.setup()
+    await renderForm()
+
+    await user.type(screen.getByLabelText('Name'), 'Ada')
+    await user.type(screen.getByLabelText('Email'), 'qa@acme.test')
+    await user.type(screen.getByLabelText('Password'), 'longenoughpassword')
+    await user.type(screen.getByLabelText('Confirm password'), 'longenoughpassword')
+    await user.click(screen.getByRole('button', { name: 'Create account' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That email is already registered',
+    )
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('starts the GitHub redirect when the GitHub button is pressed', async () => {
+    const user = userEvent.setup()
+    await renderForm()
+
+    await user.click(screen.getByRole('button', { name: /Sign up with GitHub/ }))
+
+    await vi.waitFor(() =>
+      expect(signInSocial).toHaveBeenCalledWith({
+        provider: 'github',
+        callbackURL: `${window.location.origin}/projects`,
+      }),
+    )
   })
 })

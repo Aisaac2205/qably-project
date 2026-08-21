@@ -16,14 +16,14 @@ describe('validation', () => {
   })
 
   describe('validatePassword', () => {
-    it('returns undefined for password of 8+ characters', () => {
-      expect(validatePassword('longenough')).toBeUndefined()
-      expect(validatePassword('abcdefgh')).toBeUndefined()
+    it('returns undefined for password of 12+ characters', () => {
+      expect(validatePassword('longenoughpass')).toBeUndefined()
+      expect(validatePassword('abcdefghijkl')).toBeUndefined()
     })
 
     it('returns error for short password', () => {
-      expect(validatePassword('short')).toBe('Password must be at least 8 characters')
-      expect(validatePassword('')).toBe('Password must be at least 8 characters')
+      expect(validatePassword('short')).toBe('Password must be at least 12 characters')
+      expect(validatePassword('')).toBe('Password must be at least 12 characters')
     })
   })
 

@@ -1,6 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LoginForm } from '@/features/auth/components/login-form'
 
 const push = vi.fn()
@@ -8,6 +8,27 @@ const push = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }))
+
+const signInEmail = vi.fn()
+const signUpEmail = vi.fn()
+const signInSocial = vi.fn()
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    signIn: {
+      email: (...args: unknown[]) => signInEmail(...args),
+      social: (...args: unknown[]) => signInSocial(...args),
+    },
+    signUp: { email: (...args: unknown[]) => signUpEmail(...args) },
+  },
+}))
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  signInEmail.mockResolvedValue({ data: {}, error: null })
+  signUpEmail.mockResolvedValue({ data: {}, error: null })
+  signInSocial.mockResolvedValue({ data: {}, error: null })
+})
 
 async function renderForm() {
   await act(async () => {
@@ -88,5 +109,53 @@ describe('LoginForm', () => {
     await user.click(screen.getByRole('button', { name: 'Login' }))
 
     await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/projects'))
+  })
+
+  it('signs in against the api with the credentials entered', async () => {
+    const user = userEvent.setup()
+    await renderForm()
+
+    await user.type(screen.getByLabelText('Email'), 'qa@acme.test')
+    await user.type(screen.getByLabelText('Password'), 'longenoughpassword')
+    await user.click(screen.getByRole('button', { name: 'Login' }))
+
+    await vi.waitFor(() =>
+      expect(signInEmail).toHaveBeenCalledWith({
+        email: 'qa@acme.test',
+        password: 'longenoughpassword',
+      }),
+    )
+  })
+
+  it('shows the api rejection and stays on the page', async () => {
+    signInEmail.mockResolvedValue({
+      data: null,
+      error: { code: 'INVALID_EMAIL_OR_PASSWORD' },
+    })
+    const user = userEvent.setup()
+    await renderForm()
+
+    await user.type(screen.getByLabelText('Email'), 'qa@acme.test')
+    await user.type(screen.getByLabelText('Password'), 'longenoughpassword')
+    await user.click(screen.getByRole('button', { name: 'Login' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Invalid email or password',
+    )
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('starts the GitHub redirect when the GitHub button is pressed', async () => {
+    const user = userEvent.setup()
+    await renderForm()
+
+    await user.click(screen.getByRole('button', { name: /Login with GitHub/ }))
+
+    await vi.waitFor(() =>
+      expect(signInSocial).toHaveBeenCalledWith({
+        provider: 'github',
+        callbackURL: `${window.location.origin}/projects`,
+      }),
+    )
   })
 })

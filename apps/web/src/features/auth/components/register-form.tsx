@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { AuthHeading } from '@/features/auth/components/auth-heading'
+import { AuthFormError } from '@/features/auth/components/auth-form-error'
 import { GithubAuthButton } from '@/features/auth/components/github-auth-button'
 import { useRegisterForm } from '@/features/auth/hooks/use-register-form'
 
@@ -23,12 +24,15 @@ export function RegisterForm() {
     password,
     confirmPassword,
     errors,
+    formError,
     isSubmitting,
+    isRedirecting,
     setName,
     setEmail,
     setPassword,
     setConfirmPassword,
     submit,
+    continueWithGithub,
   } = useRegisterForm()
 
   return (
@@ -45,6 +49,8 @@ export function RegisterForm() {
           title="Create your account"
           description="Enter your details below to start using Qably"
         />
+
+        {formError && <AuthFormError id="register-error" message={formError} />}
 
         <Field data-invalid={!!errors.name}>
           <FieldLabel htmlFor="name">Name</FieldLabel>
@@ -85,7 +91,7 @@ export function RegisterForm() {
           <Input
             id="password"
             type="password"
-            placeholder="At least 8 characters"
+            placeholder="At least 12 characters"
             autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -123,7 +129,7 @@ export function RegisterForm() {
         </Field>
 
         <Field>
-          <Button type="submit" size="lg" disabled={isSubmitting}>
+          <Button type="submit" size="lg" disabled={isSubmitting || isRedirecting}>
             {isSubmitting && (
               <CircleNotch
                 className="mr-1.5 size-4 animate-spin motion-reduce:animate-none"
@@ -138,7 +144,12 @@ export function RegisterForm() {
         <FieldSeparator>Or continue with</FieldSeparator>
 
         <Field>
-          <GithubAuthButton label="Sign up with GitHub" disabled={isSubmitting} />
+          <GithubAuthButton
+            label="Sign up with GitHub"
+            disabled={isSubmitting}
+            pending={isRedirecting}
+            onClick={() => void continueWithGithub()}
+          />
           <FieldDescription className="text-center">
             Already have an account?{' '}
             <Link href="/login" className="underline underline-offset-4">

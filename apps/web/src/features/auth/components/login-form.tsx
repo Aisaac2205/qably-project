@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { CircleNotch } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { AuthHeading } from '@/features/auth/components/auth-heading'
+import { AuthFormError } from '@/features/auth/components/auth-form-error'
 import { GithubAuthButton } from '@/features/auth/components/github-auth-button'
 import {
   Field,
@@ -17,8 +18,18 @@ import { Input } from '@/components/ui/input'
 import { useLoginForm } from '@/features/auth/hooks/use-login-form'
 
 export function LoginForm() {
-  const { email, password, errors, isSubmitting, setEmail, setPassword, submit } =
-    useLoginForm()
+  const {
+    email,
+    password,
+    errors,
+    formError,
+    isSubmitting,
+    isRedirecting,
+    setEmail,
+    setPassword,
+    submit,
+    continueWithGithub,
+  } = useLoginForm()
 
   return (
     <form
@@ -34,6 +45,8 @@ export function LoginForm() {
           title="Login to your account"
           description="Enter your email below to login to your account"
         />
+
+        {formError && <AuthFormError id="login-error" message={formError} />}
 
         <Field data-invalid={!!errors.email}>
           <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -80,7 +93,7 @@ export function LoginForm() {
         </Field>
 
         <Field>
-          <Button type="submit" size="lg" disabled={isSubmitting}>
+          <Button type="submit" size="lg" disabled={isSubmitting || isRedirecting}>
             {isSubmitting && (
               <CircleNotch
                 className="mr-1.5 size-4 animate-spin motion-reduce:animate-none"
@@ -95,7 +108,12 @@ export function LoginForm() {
         <FieldSeparator>Or continue with</FieldSeparator>
 
         <Field>
-          <GithubAuthButton label="Login with GitHub" disabled={isSubmitting} />
+          <GithubAuthButton
+            label="Login with GitHub"
+            disabled={isSubmitting}
+            pending={isRedirecting}
+            onClick={() => void continueWithGithub()}
+          />
           <FieldDescription className="text-center">
             Don&apos;t have an account?{' '}
             <Link href="/register" className="underline underline-offset-4">

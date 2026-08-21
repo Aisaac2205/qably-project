@@ -62,6 +62,31 @@ Both read the same normalized value through `resolveAllowedOrigins`, so they can
 
 Cookies work under `SameSite=Lax` while both apps share a site — different ports on `localhost`, or subdomains of one production domain. If the web app is ever deployed to a different registrable domain than the API, the session cookie becomes third-party and better-auth needs `advanced.defaultCookieAttributes` set to `sameSite: 'none'`, `secure: true`, `partitioned: true`. Safari's Intelligent Tracking Prevention can still block it. Keeping both on one domain avoids the problem entirely.
 
+### The web client half
+
+`apps/web` talks to the API through a single better-auth client at `src/lib/auth-client.ts`. It is the only place allowed to know the API exists.
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | yes | Origin of the Qably API, `http://localhost:3001` locally. Lives in `apps/web/.env`. |
+
+Three constraints hold this together:
+
+- `fetchOptions.credentials: 'include'` on the client. Without it the browser never attaches the session cookie to a cross-origin request, no matter how permissive CORS is.
+- `NEXT_PUBLIC_` prefix. Next inlines the value into the browser bundle **at build time**, so a deployed build is frozen to whatever the variable held when `next build` ran. Setting it only at runtime does nothing.
+- `next.config.ts` calls `resolveApiBaseUrl()` at load, so a missing or malformed value fails the build with the variable named instead of shipping a bundle that silently posts to the wrong origin.
+
+`useAuth` (`src/features/auth/hooks/use-auth.ts`) is the only consumer of the client in feature code. It returns `{ error: string | null }` rather than throwing, so forms render a message instead of an error boundary. `toAuthMessage` (`src/features/auth/lib/auth-errors.ts`) maps better-auth's `BASE_ERROR_CODES` to user-facing copy; `USER_NOT_FOUND` and `INVALID_EMAIL_OR_PASSWORD` deliberately produce the same sentence so the form cannot be used to enumerate registered accounts.
+
+`validatePassword` enforces 12 characters because `minPasswordLength` in `auth.options.ts` is 12. These two numbers must move together — a lower client rule just converts an inline field error into a round trip that fails.
+
+### GitHub OAuth
+
+`signIn.social({ provider: 'github', callbackURL })` sends the browser to GitHub and back. Two registrations must match or the flow dies at the redirect:
+
+- The GitHub OAuth app's authorization callback URL must be `{BETTER_AUTH_URL}/api/auth/callback/github` — the **API** origin, not the web app's.
+- `callbackURL` is where better-auth returns the browser after the exchange. It is validated against `trustedOrigins`, so it must sit under `WEB_APP_URL`.
+
 ## Architecture
 
 Modules are organised by feature, not by technical layer. Each feature module owns its controllers, services, repositories and contracts.
