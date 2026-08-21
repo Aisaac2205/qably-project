@@ -33,7 +33,7 @@ On a deployed environment the platform injects the variables directly and no `.e
 | `ENCRYPTION_KEY` | yes | 64 hex chars | AES-256-GCM key for provider tokens and webhook secrets at rest. Generate with `openssl rand -hex 32`. |
 | `GITHUB_CLIENT_ID` | yes | string | GitHub OAuth application id. |
 | `GITHUB_CLIENT_SECRET` | yes | string | GitHub OAuth application secret. |
-| `ANTHROPIC_API_KEY` | yes | string | Claude API key used by the extraction service. |
+| `ANTHROPIC_API_KEY` | no | string | Key for the AI extraction provider. Optional because extraction ships last and the provider is not yet chosen; when supplied it must be non-empty. The Unit 3 extraction service requires it at its own boundary, and this variable is renamed if a provider other than Claude is selected. |
 | `RESEND_API_KEY` | no | string | Resend API key for run notifications. Optional because notifications ship last; when supplied it must be non-empty. The Unit 4 notification service requires it at its own boundary. |
 
 Local development values for `DATABASE_URL` and `REDIS_URL` match the `docker-compose.yml` services:

@@ -69,6 +69,27 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ NODE_ENV: 'test' })).toThrow(/REDIS_URL/);
   });
 
+  it('starts without ANTHROPIC_API_KEY because extraction ships last', () => {
+    expect(
+      parseEnv(omit(validEnv, 'ANTHROPIC_API_KEY')).ANTHROPIC_API_KEY,
+    ).toBeUndefined();
+  });
+
+  it('still rejects an empty ANTHROPIC_API_KEY when one is supplied', () => {
+    expect(() => parseEnv({ ...validEnv, ANTHROPIC_API_KEY: '' })).toThrow(
+      /ANTHROPIC_API_KEY/,
+    );
+  });
+
+  it('starts with neither optional provider key present', () => {
+    const withoutProviders = omit(
+      omit(validEnv, 'ANTHROPIC_API_KEY'),
+      'RESEND_API_KEY',
+    );
+
+    expect(() => parseEnv(withoutProviders)).not.toThrow();
+  });
+
   it('starts without RESEND_API_KEY because notifications ship last', () => {
     expect(
       parseEnv(omit(validEnv, 'RESEND_API_KEY')).RESEND_API_KEY,
