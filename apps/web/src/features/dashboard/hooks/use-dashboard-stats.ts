@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import {
   useProjects,
   useRuns,
-  useAiCases,
+  useProposals,
   useOrg,
   useCoverageGaps,
 } from '@/lib/use-mock-store'
@@ -12,7 +12,7 @@ import { MOCK_NOW } from '@/lib/mock-data'
 import type {
   Project,
   Run,
-  AiCase,
+  ExtractedProposal,
   RunStatus,
 } from '@qably/types'
 
@@ -21,7 +21,7 @@ export interface DashboardStats {
   totalSuites: number
   totalRuns: number
   runsLast7d: number
-  pendingAiCases: number
+  pendingProposals: number
   passRateLast7d: number
   passRateTrend: number
   coverageGapsCount: number
@@ -32,7 +32,7 @@ export interface DashboardStats {
     lastRunAt: string
   }>
   recentRuns: Run[]
-  recentAiCases: AiCase[]
+  recentProposals: ExtractedProposal[]
   recentCiRuns: Run[]
 }
 
@@ -41,7 +41,7 @@ const MS_7D = 7 * 24 * 60 * 60 * 1000
 export function useDashboardStats(): DashboardStats {
   const projects = useProjects()
   const runs = useRuns()
-  const aiCases = useAiCases()
+  const proposals = useProposals()
   const org = useOrg()
   const coverageGaps = useCoverageGaps()
 
@@ -89,9 +89,9 @@ export function useDashboardStats(): DashboardStats {
         : 0
     const passRateTrend = passRateLast7d - priorRate
 
-    // Pending AI cases (all projects)
-    const pendingAiCases = aiCases.filter(
-      (c) => c.reviewStatus === 'pending',
+    // Pending proposals (all projects)
+    const pendingProposals = proposals.filter(
+      (p) => p.status === 'in_review',
     ).length
 
     // Projects by health
@@ -109,10 +109,10 @@ export function useDashboardStats(): DashboardStats {
       )
       .slice(0, 5)
 
-    // Recent AI cases: top 5 pending by sourceFile (stable sort for determinism)
-    const recentAiCases = [...aiCases]
-      .filter((c) => c.reviewStatus === 'pending')
-      .sort((a, b) => a.sourceFile.localeCompare(b.sourceFile))
+    // Recent proposals: top 5 in_review by title (stable sort for determinism)
+    const recentProposals = [...proposals]
+      .filter((p) => p.status === 'in_review')
+      .sort((a, b) => a.title.localeCompare(b.title))
       .slice(0, 5)
 
     // Recent CI runs: top 5 github_actions runs by startedAt desc
@@ -129,15 +129,15 @@ export function useDashboardStats(): DashboardStats {
       totalSuites,
       totalRuns: runs.length,
       runsLast7d,
-      pendingAiCases,
+      pendingProposals,
       passRateLast7d,
       passRateTrend,
       coverageGapsCount: coverageGaps.length,
       activeRuns,
       projectsByHealth,
       recentRuns,
-      recentAiCases,
+      recentProposals,
       recentCiRuns,
     }
-  }, [projects, runs, aiCases, org, coverageGaps])
+  }, [projects, runs, proposals, org, coverageGaps])
 }

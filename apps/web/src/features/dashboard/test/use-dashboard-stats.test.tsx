@@ -15,13 +15,13 @@ describe('useDashboardStats — pure derivation', () => {
       'totalProjects',
       'totalSuites',
       'totalRuns',
-      'pendingAiCases',
+      'pendingProposals',
       'passRateLast7d',
       'passRateTrend',
       'activeRuns',
       'projectsByHealth',
       'recentRuns',
-      'recentAiCases',
+      'recentProposals',
       'recentCiRuns',
     ]
     expect(expectedKeys.length).toBe(11)
@@ -31,7 +31,7 @@ describe('useDashboardStats — pure derivation', () => {
     const snap = getSnapshot()
     expect(snap.projects.length).toBe(4)
     expect(snap.runs.length).toBe(4)
-    expect(snap.aiCases.length).toBe(6)
+    expect(snap.proposals.length).toBe(6)
     expect(snap.org.name).toBe('Acme QA Team')
   })
 })
