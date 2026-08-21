@@ -1,9 +1,22 @@
 'use client'
 
-import { Buildings, Briefcase, FolderSimple, Sparkle, Users } from '@phosphor-icons/react'
+import Image from 'next/image'
+import {
+  Buildings,
+  Briefcase,
+  FolderSimple,
+  Sparkle,
+  Users,
+  CreditCard,
+  Receipt,
+  DownloadSimple,
+  CheckCircle,
+  ArrowUpRight,
+} from '@phosphor-icons/react'
 import type { Plan } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
-import { useOrg } from '@/lib/use-mock-store'
+import { Button } from '@/components/ui/button'
+import { useOrg, useProjects, useMembers, useProposals } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
 
 const planIcons: Record<Plan, typeof Briefcase> = {
@@ -12,44 +25,280 @@ const planIcons: Record<Plan, typeof Briefcase> = {
   empresa: Buildings,
 }
 
+const mockInvoices = [
+  { id: 'INV-2026-003', date: '2026-06-01', amount: '$49.00 USD' },
+  { id: 'INV-2026-002', date: '2026-05-01', amount: '$49.00 USD' },
+  { id: 'INV-2026-001', date: '2026-04-01', amount: '$49.00 USD' },
+]
+
 export function AccountPlanSection() {
   const org = useOrg()
+  const projects = useProjects()
+  const members = useMembers()
+  const proposals = useProposals()
   const { t } = useTranslation()
+
   const PlanIcon = planIcons[org.plan]
+
+  // Usage calculations
+  const projectsCount = projects.length
+  const membersCount = members.length
+  const casesCount = proposals.length
+
+  const projectPercent = Math.min(100, Math.round((projectsCount / org.planLimits.maxProjects) * 100))
+  const memberPercent = Math.min(100, Math.round((membersCount / org.planLimits.maxUsers) * 100))
+  const casesPercent = Math.min(100, Math.round((casesCount / org.planLimits.maxCases) * 100))
+
   const limits = [
-    { label: t('settings.accountPlan.projects'), value: org.planLimits.maxProjects, Icon: FolderSimple },
-    { label: t('settings.accountPlan.members'), value: org.planLimits.maxUsers, Icon: Users },
-    { label: t('settings.accountPlan.aiCases'), value: org.planLimits.maxCases, Icon: Sparkle },
+    {
+      label: t('settings.accountPlan.projects'),
+      value: org.planLimits.maxProjects,
+      used: projectsCount,
+      percent: projectPercent,
+      Icon: FolderSimple,
+      barColor: 'bg-primary',
+    },
+    {
+      label: t('settings.accountPlan.members'),
+      value: org.planLimits.maxUsers,
+      used: membersCount,
+      percent: memberPercent,
+      Icon: Users,
+      barColor: 'bg-primary',
+    },
+    {
+      label: t('settings.accountPlan.aiCases'),
+      value: org.planLimits.maxCases,
+      used: casesCount,
+      percent: casesPercent,
+      Icon: Sparkle,
+      barColor: 'bg-ai',
+    },
+  ]
+
+  const features = [
+    t('settings.accountPlan.featureParallel'),
+    t('settings.accountPlan.featureAi'),
+    t('settings.accountPlan.featureTrace'),
+    t('settings.accountPlan.featureIntegrations'),
   ]
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-5" aria-labelledby="account-plan-heading">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 id="account-plan-heading" className="text-sm font-semibold text-default">
-            {t('settings.accountPlan.title')}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">{t('settings.accountPlan.description')}</p>
+    <div className="space-y-5">
+      {/* Plan & Subscription Card */}
+      <section
+        className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-2xs"
+        aria-labelledby="account-plan-heading"
+      >
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="flex items-center gap-2.5">
+              <h2 id="account-plan-heading" className="text-base font-semibold tracking-tight text-default">
+                {t('settings.accountPlan.title')}
+              </h2>
+              <Badge variant="default" className="gap-1.5 px-2.5 py-0.5 text-xs font-semibold">
+                <PlanIcon size={12} weight="bold" aria-hidden="true" />
+                <span>{t(`settings.accountPlan.${org.plan}`)}</span>
+              </Badge>
+              <span className="inline-flex items-center gap-1 rounded-md bg-pass-bg px-2 py-0.5 text-[11px] font-semibold text-pass">
+                {t('settings.accountPlan.active')}
+              </span>
+            </div>
+            <p className="text-xs text-muted leading-relaxed">
+              {t('settings.accountPlan.description')}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="pr-2 text-left sm:text-right border-r border-border/80 hidden sm:block">
+              <p className="text-sm font-semibold tracking-tight text-default">
+                {t('settings.accountPlan.price')}
+              </p>
+              <p className="text-[11px] text-muted">
+                {t('settings.accountPlan.renewsOn', { date: '01/07/2026' })}
+              </p>
+            </div>
+            <Button size="sm" className="active:scale-[0.98] transition-transform font-semibold">
+              {t('settings.accountPlan.upgrade')}
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5 active:scale-[0.98] transition-transform">
+              <span>{t('settings.accountPlan.manageStripe')}</span>
+              <ArrowUpRight size={12} aria-hidden="true" />
+            </Button>
+          </div>
         </div>
-        <Badge variant="default">
-          <PlanIcon size={12} weight="bold" aria-hidden="true" />
-          {t(`settings.accountPlan.${org.plan}`)}
-        </Badge>
+
+        {/* Live Quota Consumption Meters */}
+        <div className="mt-6 border-t border-border/70 pt-5">
+          <div className="mb-3 space-y-0.5">
+            <h3 className="text-xs font-semibold text-default">
+              {t('settings.accountPlan.usageTitle')}
+            </h3>
+            <p className="text-[11px] text-muted">
+              {t('settings.accountPlan.usageSubtitle')}
+            </p>
+          </div>
+
+          <dl className="grid gap-3 sm:grid-cols-3">
+            {limits.map(({ label, value, used, percent, Icon, barColor }) => (
+              <div
+                key={label}
+                className="rounded-lg border border-border/70 bg-canvas/30 p-4 transition-colors hover:border-border"
+              >
+                <div className="flex items-center justify-between">
+                  <dt className="flex items-center gap-1.5 text-xs font-medium text-muted">
+                    <Icon size={14} aria-hidden="true" />
+                    <span>{label}</span>
+                  </dt>
+                  <span className="text-xs font-semibold text-default">
+                    {used} / {value}
+                  </span>
+                </div>
+
+                {/* Meter progress bar */}
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${barColor}`}
+                    style={{ width: `${Math.max(4, percent)}%` }}
+                  />
+                </div>
+
+                <div className="mt-2.5 flex items-center justify-between text-[11px] text-muted">
+                  <span>{t('settings.accountPlan.limit', { count: value })}</span>
+                  <span className="font-medium">{percent}%</span>
+                </div>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      {/* Payment Method & Features 2-column Grid */}
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        {/* Payment Method */}
+        <section
+          className="rounded-xl border border-border bg-surface p-5 shadow-2xs flex flex-col justify-between"
+          aria-labelledby="payment-method-heading"
+        >
+          <div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard size={16} aria-hidden="true" className="text-muted" />
+                <h3 id="payment-method-heading" className="text-sm font-semibold text-default">
+                  {t('settings.accountPlan.paymentMethod')}
+                </h3>
+              </div>
+              <div className="flex items-center gap-1.5 opacity-80">
+                <Image src="/visa.svg" alt="Visa" width={22} height={14} className="object-contain" />
+                <Image src="/ma_symbol.svg" alt="Mastercard" width={22} height={14} className="object-contain" />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              {t('settings.accountPlan.paymentMethodDesc')}
+            </p>
+
+            <div className="mt-4 rounded-lg border border-border/70 bg-canvas/30 p-3.5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <Image src="/visa.svg" alt="Visa" width={36} height={24} className="shrink-0 object-contain" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-default">
+                    {t('settings.accountPlan.cardDetails')}
+                  </p>
+                  <p className="truncate text-[11px] text-muted">
+                    {t('settings.accountPlan.cardExpiry')} · {t('settings.accountPlan.billingEmail')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-border/60 flex justify-end">
+            <Button size="sm" variant="outline" className="text-xs active:scale-[0.98] transition-transform">
+              {t('settings.accountPlan.updateCard')}
+            </Button>
+          </div>
+        </section>
+
+        {/* Included Features */}
+        <section
+          className="rounded-xl border border-border bg-surface p-5 shadow-2xs flex flex-col justify-between"
+          aria-labelledby="included-features-heading"
+        >
+          <div>
+            <div className="flex items-center gap-2">
+              <Receipt size={16} aria-hidden="true" className="text-muted" />
+              <h3 id="included-features-heading" className="text-sm font-semibold text-default">
+                {t('settings.accountPlan.includedFeatures')}
+              </h3>
+            </div>
+            <p className="mt-1 text-xs text-muted">
+              {t('settings.accountPlan.description')}
+            </p>
+
+            <ul className="mt-4 space-y-2.5">
+              {features.map((feature, idx) => (
+                <li key={idx} className="flex items-center gap-2 text-xs text-default">
+                  <CheckCircle size={14} weight="fill" className="text-pass shrink-0" aria-hidden="true" />
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-3">
-        {limits.map(({ label, value, Icon }) => (
-          <div key={label} className="border-t border-border pt-3">
-            <dt className="flex items-center gap-1.5 text-xs text-muted">
-              <Icon size={14} aria-hidden="true" />
-              {label}
-            </dt>
-            <dd className="mt-1 text-sm font-semibold text-default">
-              {t('settings.accountPlan.limit', { count: value })}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+      {/* Invoice History Section */}
+      <section
+        className="rounded-xl border border-border bg-surface p-5 shadow-2xs"
+        aria-labelledby="invoices-heading"
+      >
+        <div className="space-y-0.5 mb-4">
+          <h3 id="invoices-heading" className="text-sm font-semibold text-default">
+            {t('settings.accountPlan.invoicesTitle')}
+          </h3>
+          <p className="text-xs text-muted">
+            {t('settings.accountPlan.invoicesDesc')}
+          </p>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[420px]">
+            <thead>
+              <tr className="border-b border-border/80 text-muted">
+                <th className="py-2.5 px-3 font-medium">{t('settings.accountPlan.invoiceNumber')}</th>
+                <th className="py-2.5 px-3 font-medium">{t('settings.accountPlan.invoiceDate')}</th>
+                <th className="py-2.5 px-3 font-medium">{t('settings.accountPlan.invoiceAmount')}</th>
+                <th className="py-2.5 px-3 font-medium">{t('settings.accountPlan.invoiceStatus')}</th>
+                <th className="py-2.5 px-3 font-medium text-right">{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {mockInvoices.map((inv) => (
+                <tr key={inv.id} className="hover:bg-canvas/30 transition-colors">
+                  <td className="py-3 px-3 font-semibold text-default">{inv.id}</td>
+                  <td className="py-3 px-3 text-muted">{inv.date}</td>
+                  <td className="py-3 px-3 text-default font-medium">{inv.amount}</td>
+                  <td className="py-3 px-3">
+                    <span className="inline-flex items-center gap-1 rounded bg-pass-bg px-2 py-0.5 text-[11px] font-semibold text-pass">
+                      <CheckCircle size={12} weight="fill" aria-hidden="true" />
+                      <span>{t('settings.accountPlan.invoicePaid')}</span>
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover hover:underline transition-all cursor-pointer active:scale-[0.98]"
+                    >
+                      <DownloadSimple size={13} weight="bold" aria-hidden="true" />
+                      <span>{t('settings.accountPlan.download')}</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   )
 }
