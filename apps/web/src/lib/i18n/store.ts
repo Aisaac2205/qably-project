@@ -5,6 +5,30 @@ import es from '@/locales/es.json'
 
 export type Locale = 'en' | 'es'
 
+export const SUPPORTED_LOCALES: readonly Locale[] = ['en', 'es']
+export const DEFAULT_LOCALE: Locale = 'en'
+export const LOCALE_STORAGE_KEY = 'qably-locale'
+
+export function matchLocale(languageTags: readonly string[]): Locale {
+  for (const tag of languageTags) {
+    const base = tag.toLowerCase().split('-')[0]
+    const supported = SUPPORTED_LOCALES.find((locale) => locale === base)
+    if (supported) return supported
+  }
+
+  return DEFAULT_LOCALE
+}
+
+export function detectBrowserLocale(): Locale {
+  if (typeof navigator === 'undefined') return DEFAULT_LOCALE
+
+  const tags = navigator.languages?.length
+    ? navigator.languages
+    : [navigator.language].filter(Boolean)
+
+  return matchLocale(tags)
+}
+
 type Dict = Record<string, unknown>
 
 const dictionaries: Record<Locale, Dict> = { en, es }
@@ -34,12 +58,12 @@ interface I18nState {
 export const useI18nStore = create<I18nState>()(
   persist(
     (set, get) => ({
-      locale: 'en',
+      locale: DEFAULT_LOCALE,
       setLocale: (locale) => set({ locale }),
       t: (key, params) => resolve(key, dictionaries[get().locale], params),
     }),
     {
-      name: 'qably-locale',
+      name: LOCALE_STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       skipHydration: true,
     },

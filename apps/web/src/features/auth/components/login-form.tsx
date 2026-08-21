@@ -81,7 +81,7 @@ export function LoginForm() {
         </Field>
 
         <Field>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" size="lg" disabled={isSubmitting}>
             {isSubmitting && (
               <CircleNotch
                 className="mr-1.5 size-4 animate-spin motion-reduce:animate-none"
@@ -96,7 +96,7 @@ export function LoginForm() {
         <FieldSeparator>Or continue with</FieldSeparator>
 
         <Field>
-          <Button className="flex gap-2" variant="outline" type="button">
+          <Button className="flex gap-2" variant="outline" size="lg" type="button">
             <GithubMark className="size-4" />
             <span>Login with GitHub</span>
           </Button>
