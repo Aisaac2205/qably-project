@@ -12,26 +12,35 @@ export function LanguageSection() {
   const setLocale = useSetLocale()
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-5">
-      <h3 className="text-sm font-semibold text-default">{t('settings.language.title')}</h3>
-      <p className="text-xs text-muted-foreground mt-1 mb-4">{t('settings.language.description')}</p>
-
-      <div className="flex gap-2">
-        {LANGUAGES.map((lang) => (
-          <button
-            key={lang.value}
-            onClick={() => setLocale(lang.value)}
-            className={[
-              'px-4 py-2 text-sm font-medium rounded-lg border transition-colors cursor-pointer',
-              locale === lang.value
-                ? 'bg-default text-surface border-default'
-                : 'bg-surface text-default border-border hover:bg-canvas',
-            ].join(' ')}
-          >
-            {t(lang.labelKey)}
-          </button>
-        ))}
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-2xs" aria-labelledby="language-heading">
+      <div className="space-y-0.5">
+        <h2 id="language-heading" className="text-sm font-semibold text-default">
+          {t('settings.language.title')}
+        </h2>
+        <p className="text-xs text-muted-foreground">{t('settings.language.description')}</p>
       </div>
-    </div>
+
+      <div className="mt-4 inline-flex p-1 rounded-lg border border-border/80 bg-canvas/40 gap-1">
+        {LANGUAGES.map((lang) => {
+          const isSelected = locale === lang.value
+          return (
+            <button
+              key={lang.value}
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => setLocale(lang.value)}
+              className={[
+                'px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 cursor-pointer active:scale-[0.98]',
+                isSelected
+                  ? 'bg-surface text-default shadow-2xs border border-border/60'
+                  : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent',
+              ].join(' ')}
+            >
+              {t(lang.labelKey)}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
