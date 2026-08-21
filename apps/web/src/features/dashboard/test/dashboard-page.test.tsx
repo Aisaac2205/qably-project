@@ -43,7 +43,7 @@ describe('DashboardPage', () => {
       render(<DashboardPage />)
     })
     expect(screen.getByText('Recent runs')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Pending AI cases' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Pending proposals' })).toBeInTheDocument()
     expect(screen.getByText('Recent pipelines')).toBeInTheDocument()
   })
 
