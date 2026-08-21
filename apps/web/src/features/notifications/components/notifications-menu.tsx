@@ -55,7 +55,7 @@ export function NotificationsMenu() {
       >
         <Bell size={18} aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-fail px-1 text-center font-mono text-[10px] leading-4 text-primary-fg" aria-hidden="true">
+          <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-fail px-1 text-center text-[10px] font-semibold leading-4 text-primary-fg" aria-hidden="true">
             {unreadCount}
           </span>
         )}
