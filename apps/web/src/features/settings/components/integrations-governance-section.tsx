@@ -27,38 +27,41 @@ export function IntegrationsGovernanceSection() {
 
   const addIntegration = () => {
     create({
-      type: 'email',
+      type: 'discord',
       name: t('modules.integrations.newName'),
-      config: { description: t('modules.integrations.newDescription') },
+      config: { descriptionKey: 'modules.integrations.newDescription' },
     })
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-5" aria-labelledby="integrations-governance-heading">
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section className="rounded-xl border border-border bg-surface p-5 shadow-2xs" aria-labelledby="integrations-governance-heading">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-0.5">
           <h2 id="integrations-governance-heading" className="text-sm font-semibold text-default">
             {t('settings.integrationsGovernance.title')}
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">{t('settings.integrationsGovernance.description')}</p>
+          <p className="text-xs text-muted-foreground">{t('settings.integrationsGovernance.description')}</p>
         </div>
-        <Button size="sm" onClick={addIntegration}>
+        <Button size="sm" onClick={addIntegration} className="gap-1.5 active:scale-[0.98] transition-transform">
           <Plus size={14} weight="bold" aria-hidden="true" />
-          {t('modules.integrations.add')}
+          <span>{t('settings.integrationsGovernance.add')}</span>
         </Button>
       </div>
 
-      <ul aria-label={t('settings.integrationsGovernance.title')} className="mt-4 divide-y divide-border">
+      <ul aria-label={t('settings.integrationsGovernance.title')} className="mt-4 divide-y divide-border/70">
         {governedConnections.map((connection) => (
-          <li key={connection.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+          <li
+            key={connection.id}
+            className="group flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-1 last:pb-0 transition-colors rounded-lg hover:bg-canvas/30 px-2 -mx-2"
+          >
             <div className="flex min-w-0 items-center gap-3">
-              <ConnectionLogo name={connection.name} />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-default">{connection.name}</p>
-                <p className="truncate text-xs text-muted">{connectionResource(connection, notConnected)}</p>
+              <ConnectionLogo name={connection.name} type={connection.type} />
+              <div className="min-w-0 space-y-0.5">
+                <p className="truncate text-sm font-semibold text-default">{connection.name}</p>
+                <p className="truncate text-xs text-muted">{connectionResource(connection, notConnected, t)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               <ConnectionStatus status={connection.status} />
               <ConnectionActions connection={connection} onTransition={transition} />
             </div>

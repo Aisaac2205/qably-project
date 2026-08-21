@@ -13,9 +13,10 @@ describe('IntegrationsGovernanceSection', () => {
     })
 
     const list = screen.getByRole('list', { name: 'Integration credentials' })
-    expect(within(list).getByText('Gmail')).toBeInTheDocument()
-    expect(within(list).queryByText('GitHub')).not.toBeInTheDocument()
-    expect(within(list).queryByText('Bitbucket')).not.toBeInTheDocument()
+    expect(within(list).getByText('Slack')).toBeInTheDocument()
+    expect(within(list).getByText('Discord')).toBeInTheDocument()
+    expect(within(list).getByText('Jira')).toBeInTheDocument()
+    expect(within(list).getByText('Qably Alerts')).toBeInTheDocument()
     expect(within(list).queryByText('GitHub Actions')).not.toBeInTheDocument()
   })
 
@@ -25,11 +26,11 @@ describe('IntegrationsGovernanceSection', () => {
       render(<IntegrationsGovernanceSection />)
     })
 
-    const gmailItem = screen.getByText('Gmail').closest('li')
-    expect(gmailItem).not.toBeNull()
-    await user.click(within(gmailItem!).getByRole('button', { name: 'Connect' }))
+    const discordItem = screen.getByText('Discord').closest('li')
+    expect(discordItem).not.toBeNull()
+    await user.click(within(discordItem!).getByRole('button', { name: 'Connect' }))
 
-    expect(within(gmailItem!).getByText('Connected')).toBeInTheDocument()
+    expect(within(discordItem!).getByText('Connected')).toBeInTheDocument()
   })
 
   it('adds a new notification integration', async () => {
