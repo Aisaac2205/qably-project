@@ -16,7 +16,11 @@ The service listens on `PORT` (default `3001`). `GET /health` reports service an
 
 ## Environment variables
 
-`.env` is validated at boot by `src/config/env.ts`. A missing or malformed variable aborts startup with an error naming every offending key — the service never starts in a partially configured state.
+`.env` is loaded by `dotenv/config`, imported as the very first statement in `src/main.ts` so it runs before Nest resolves the `ENV` provider. The Prisma CLI loads it separately through `prisma.config.ts`; the two paths are independent, so a variable that works for `prisma migrate` is not necessarily visible to the running service.
+
+Values are then validated by `src/config/env.ts`. A missing or malformed variable aborts startup with an error naming every offending key — the service never starts in a partially configured state.
+
+On a deployed environment the platform injects the variables directly and no `.env` file exists; `dotenv/config` is a no-op there.
 
 | Variable | Required | Format | Purpose |
 |---|---|---|---|

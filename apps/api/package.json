@@ -30,6 +30,7 @@
     "@qably/types": "workspace:*",
     "better-auth": "^1.6.0",
     "bullmq": "^5.73.0",
+    "dotenv": "^17.4.2",
     "helmet": "^8.3.0",
     "ioredis": "^5.10.1",
     "pg": "^8.23.0",
