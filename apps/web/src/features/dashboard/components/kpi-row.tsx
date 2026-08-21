@@ -34,7 +34,7 @@ export function KpiRow() {
       />
       <KpiCard
         label={t('dashboard.pendingAiKpi')}
-        value={stats.pendingAiCases}
+        value={stats.pendingProposals}
         icon={Sparkle}
         href="/review-inbox"
         subtext={t('dashboard.readyForReview')}

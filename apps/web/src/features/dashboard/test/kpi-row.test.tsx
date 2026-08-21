@@ -36,7 +36,7 @@ describe('KpiRow', () => {
     await act(async () => {
       render(<KpiRow />)
     })
-    // Five of the six seeded AI cases are pending review.
+    // Five of the six seeded proposals are in_review.
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
