@@ -11,10 +11,8 @@ export type RunSource = 'manual' | 'api' | 'github_actions'
 export type NotificationSeverity = 'critical' | 'high' | 'medium' | 'low'
 export type NotificationChannel = 'in_app' | 'slack' | 'email'
 
-/** Suite-level execution status, derived from run history (not stored on Suite). */
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
 
-// ─── Organization ─────────────────────────────────────────────────────────────
 
 export interface Organization {
   id: string
@@ -47,8 +45,6 @@ export interface ApiKey {
   lastUsedAt?: string
 }
 
-// ─── Projects ─────────────────────────────────────────────────────────────────
-
 export interface Project {
   id: string
   name: string
@@ -65,7 +61,6 @@ export interface Project {
   technologies?: string[]
 }
 
-// ─── Suites & Cases ───────────────────────────────────────────────────────────
 
 export interface TestCase {
   id: string
@@ -84,17 +79,11 @@ export interface Suite {
   name: string
   cases: TestCase[]
   createdAt: string
-  /** Human-readable description of the suite's scope. Required; may be empty string. */
   description: string
-  /** Lowercase short tags for filtering/labeling. Max 8 entries, 32 chars each, hyphens allowed, no spaces. */
   tags: string[]
-  /** Whether this suite is the project's default (exactly one per project at most). */
   isDefault: boolean
-  /** ISO timestamp of the last mutation to this suite. */
   updatedAt: string
 }
-
-// ─── Runs ─────────────────────────────────────────────────────────────────────
 
 export interface RunCase {
   id: string
@@ -117,9 +106,7 @@ export interface Run {
   source: RunSource
   startedAt: string
   finishedAt?: string
-  /** Who executed this run (manual/API). Typically undefined for CI runs. */
   executedBy?: { id: string; name: string }
-  /** CI metadata — only populated when source === 'github_actions'. */
   commitSha?: string
   commitMessage?: string
   commitAuthor?: { name: string; email: string }
@@ -127,7 +114,6 @@ export interface Run {
   workflowName?: string
 }
 
-// ─── Notifications ────────────────────────────────────────────────────────────
 
 export interface Notification {
   id: string
@@ -140,8 +126,6 @@ export interface Notification {
   createdAt: string
   readAt?: string
 }
-
-// ─── Thesis-aligned QA flow ───────────────────────────────────────────────────
 
 export type ProposalStatus = 'in_review' | 'approved' | 'rejected' | 'changes_requested'
 export type ReviewDecisionAction = 'approved' | 'rejected' | 'changes_requested'
@@ -250,8 +234,6 @@ export type ProposalMutationResult =
   | { ok: true; decision: ReviewDecision }
   | { ok: false; reason: 'not_found' | 'invalid_transition' | 'missing_evidence' }
 
-// ─── AI Cases ─────────────────────────────────────────────────────────────────
-
 export interface AiCase {
   id: string
   name: string
@@ -261,19 +243,12 @@ export interface AiCase {
   sourceSnippet: string
   reviewStatus: ReviewStatus
   projectId: string
-  /** Where this case originated. Defaults to 'webhook' for pre-existing mock data. */
   source: 'webhook' | 'chat'
-  /** Reference to an existing TestCase when the AI detects a possible duplicate. */
   possibleDuplicateOf?: string
-  /** @deprecated Use possibleDuplicateOf. Retained for existing consumers. */
   duplicateOfCaseId?: string
-  /** 0-1 similarity score, only present when a duplicate reference is set. */
   similarityScore?: number
-  /** Coverage gap that prompted this suggestion, when applicable. */
   coverageGapId?: string
 }
-
-// ─── AI Providers ─────────────────────────────────────────────────────────────
 
 export type AiProvider = 'claude' | 'gemini'
 
@@ -285,8 +260,6 @@ export interface AiProviderConnection {
   model: string
   connectedAt?: string
 }
-
-// ─── Project Chat ─────────────────────────────────────────────────────────────
 
 export interface ChatThread {
   id: string
@@ -304,8 +277,6 @@ export interface ChatMessage {
   generatedCaseIds?: string[]
 }
 
-// ─── Coverage Gaps ─────────────────────────────────────────────────────────────
-
 export interface CoverageGap {
   id: string
   projectId: string
@@ -316,7 +287,6 @@ export interface CoverageGap {
   suggestedCaseId: string
 }
 
-// ─── Integrations ─────────────────────────────────────────────────────────────
 
 export interface GithubIntegration {
   webhookUrl: string
@@ -325,10 +295,6 @@ export interface GithubIntegration {
   repoUrl?: string
 }
 
-// Connection aggregate root — one row per third-party integration
-// (CI provider, notification channel). The state machine is:
-//   pending → connected → disconnected
-// and is driven by `useConnections().transition()`.
 export type ConnectionType =
   | 'github'
   | 'bitbucket'
@@ -336,6 +302,8 @@ export type ConnectionType =
   | 'slack'
   | 'discord'
   | 'email'
+  | 'jira'
+  | 'qably'
 
 export type ConnectionStatus = 'pending' | 'connected' | 'disconnected' | 'error'
 
@@ -344,7 +312,6 @@ export interface Connection {
   type: ConnectionType
   name: string
   status: ConnectionStatus
-  /** Provider-specific configuration (repo URL, channel ID, email, etc.). */
   config?: Record<string, string>
   createdAt: string
   lastSyncAt?: string
