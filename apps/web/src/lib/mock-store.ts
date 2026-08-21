@@ -28,7 +28,7 @@ import {
 import { validateTags } from '@/lib/tag-validation'
 import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
 import type {
-  Project,
+  ProjectSummary,
   Suite,
   Run,
   AiCase,
@@ -69,7 +69,7 @@ import type {
 type Listener = () => void
 
 export interface StoreSnapshot {
-  projects: Project[]
+  projects: ProjectSummary[]
   suites: Suite[]
   runs: Run[]
   aiCases: AiCase[]
@@ -99,7 +99,7 @@ export interface StoreSnapshot {
 
 // ── State ─────────────────────────────────────────────────────────
 
-let projects: Project[] = structuredClone(mockProjects)
+let projects: ProjectSummary[] = structuredClone(mockProjects)
 let suites: Suite[] = structuredClone(mockSuites)
 let runs: Run[] = structuredClone(mockRuns)
 let aiCases: AiCase[] = structuredClone(mockAiCases)
@@ -239,11 +239,11 @@ export function getServerSnapshot(): StoreSnapshot {
 
 // ── Readers ───────────────────────────────────────────────────────
 
-export function getProjects(): Project[] {
+export function getProjects(): ProjectSummary[] {
   return projects
 }
 
-export function getProject(id: string): Project | undefined {
+export function getProject(id: string): ProjectSummary | undefined {
   return projects.find((p) => p.id === id)
 }
 
@@ -928,8 +928,8 @@ export function revokeApiKey(id: string): boolean {
 
 export function updateProject(
   id: string,
-  patch: Partial<Pick<Project, 'name' | 'description' | 'githubRepo' | 'technologies'>>,
-): Project | undefined {
+  patch: Partial<Pick<ProjectSummary, 'name' | 'description' | 'githubRepo' | 'technologies'>>,
+): ProjectSummary | undefined {
   projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p))
   notify()
   return projects.find((p) => p.id === id)
@@ -948,9 +948,9 @@ export function createProject(input: {
   description?: string
   githubRepo?: string
   technologies?: string[]
-}): Project {
+}): ProjectSummary {
   const id = `proj-${projects.length + 1}`
-  const newProject: Project = {
+  const newProject: ProjectSummary = {
     id,
     name: input.name,
     description: input.description ?? '',
@@ -963,6 +963,7 @@ export function createProject(input: {
     activeRunCount: 0,
     aiPendingCount: 0,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     technologies: input.technologies ?? [],
   }
   projects = [...projects, newProject]

@@ -1,5 +1,5 @@
 import type {
-  Project,
+  ProjectSummary,
   Suite,
   TestCase,
   Run,
@@ -109,7 +109,7 @@ export const mockApiKeys: ApiKey[] = [
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 
-export const mockProjects: Project[] = [
+export const mockProjects: ProjectSummary[] = [
   {
     id: 'proj-1',
     name: 'Ecommerce App',
@@ -123,6 +123,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 0,
     aiPendingCount: 3,
     createdAt: '2026-01-20T00:00:00Z',
+    updatedAt: '2026-01-20T00:00:00Z',
     technologies: ['react', 'typescript', 'vite'],
   },
   {
@@ -138,6 +139,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 1,
     aiPendingCount: 0,
     createdAt: '2026-02-05T00:00:00Z',
+    updatedAt: '2026-02-05T00:00:00Z',
     technologies: ['flutter', 'javascript', 'typescript'],
   },
   {
@@ -153,6 +155,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 1,
     aiPendingCount: 0,
     createdAt: '2026-02-20T00:00:00Z',
+    updatedAt: '2026-02-20T00:00:00Z',
     technologies: ['java', 'springboot', 'postgresql'],
   },
   {
@@ -168,6 +171,7 @@ export const mockProjects: Project[] = [
     activeRunCount: 0,
     aiPendingCount: 4,
     createdAt: '2026-03-10T00:00:00Z',
+    updatedAt: '2026-03-10T00:00:00Z',
     technologies: ['angular', 'typescript', 'express'],
   },
 ]

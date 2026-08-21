@@ -15,6 +15,7 @@ const SELECT = {
   name: true,
   description: true,
   githubRepo: true,
+  organizationId: true,
   technologies: true,
   createdAt: true,
   updatedAt: true,
@@ -25,6 +26,7 @@ interface ProjectRow {
   name: string;
   description: string | null;
   githubRepo: string | null;
+  organizationId: string;
   technologies: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -42,8 +44,9 @@ function toView(row: ProjectRow): ProjectView {
   return {
     id: row.id,
     name: row.name,
-    description: row.description,
-    githubRepo: row.githubRepo,
+    description: row.description ?? undefined,
+    githubRepo: row.githubRepo ?? undefined,
+    organizationId: row.organizationId,
     technologies: row.technologies,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

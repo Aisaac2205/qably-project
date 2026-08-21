@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { Project, RunStatus } from '@qably/types'
+import type { ProjectSummary, RunStatus } from '@qably/types'
 import {
   Card,
   CardHeader,
@@ -13,7 +13,7 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
 
 interface ProjectHealthCardProps {
-  project: Project
+  project: ProjectSummary
   lastRunStatus: RunStatus
   lastRunAt: string
   suiteCount: number

@@ -4,9 +4,9 @@ import {
   ProjectProvider,
   useProjectContext,
 } from '@/features/projects/context/project-context'
-import type { Project } from '@qably/types'
+import type { ProjectSummary } from '@qably/types'
 
-const mockProject: Project = {
+const mockProject: ProjectSummary = {
   id: 'proj-1',
   name: 'Ecommerce App',
   description: 'Checkout flows',
@@ -19,6 +19,8 @@ const mockProject: Project = {
   activeRunCount: 1,
   aiPendingCount: 3,
   createdAt: '2026-01-20T00:00:00Z',
+  updatedAt: '2026-01-20T00:00:00Z',
+  technologies: [],
 }
 
 function ReadContext({ testId }: { testId: string }) {

@@ -1,6 +1,6 @@
 import { render, screen, act, within } from '@testing-library/react'
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import type { Project } from '@qably/types'
+import type { ProjectSummary } from '@qably/types'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 const mockPathname = vi.fn(() => '/dashboard')
@@ -34,7 +34,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-const mockProject: Project = {
+const mockProject: ProjectSummary = {
   id: 'proj-1',
   name: 'Ecommerce App',
   description: 'Test project',
@@ -46,6 +46,8 @@ const mockProject: Project = {
   activeRunCount: 0,
   aiPendingCount: 3,
   createdAt: '2026-01-20T00:00:00Z',
+  updatedAt: '2026-01-20T00:00:00Z',
+  technologies: [],
 }
 
 vi.mock('@/lib/use-mock-store', () => ({

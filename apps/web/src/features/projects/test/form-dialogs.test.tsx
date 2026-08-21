@@ -1,12 +1,12 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { Project, Suite, TestCase } from '@qably/types'
+import type { ProjectSummary, Suite, TestCase } from '@qably/types'
 import { EditProjectDialog } from '@/features/projects/components/edit-project-dialog'
 import { CaseFormDialog } from '@/features/projects/suites/components/case-form-dialog'
 import { SuiteFormDialog } from '@/features/projects/suites/components/suite-form-dialog'
 
-const project: Project = {
+const project: ProjectSummary = {
   id: 'project-1',
   name: 'Original project',
   description: 'Original description',
@@ -19,6 +19,7 @@ const project: Project = {
   activeRunCount: 0,
   aiPendingCount: 0,
   createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
   technologies: ['React'],
 }
 

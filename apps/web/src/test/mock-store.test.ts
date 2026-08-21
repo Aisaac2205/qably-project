@@ -33,7 +33,7 @@ import {
   getServerSnapshot,
   __resetStore,
 } from '@/lib/mock-store'
-import type { Project, Suite, Run, AiCase, ApiKey, OrgMember } from '@qably/types'
+import type { ProjectSummary, Suite, Run, AiCase, ApiKey, OrgMember } from '@qably/types'
 
 describe('mock-store', () => {
   beforeEach(() => {

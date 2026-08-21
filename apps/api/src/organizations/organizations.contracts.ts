@@ -1,19 +1,9 @@
-import type { OrgRole } from '../../generated/prisma/enums';
+import type { OrganizationContext, OrganizationSummary } from '@qably/types';
 import type { RequestWithSession } from '../auth/auth.contracts';
 
-export interface OrgContext {
-  organizationId: string;
-  slug: string;
-  role: OrgRole;
-}
+export type OrgContext = OrganizationContext;
 
-export interface OrganizationSummary {
-  id: string;
-  name: string;
-  slug: string;
-  plan: string;
-  role: OrgRole;
-}
+export type { OrganizationSummary };
 
 export type OrgResolutionError = 'not-a-member';
 

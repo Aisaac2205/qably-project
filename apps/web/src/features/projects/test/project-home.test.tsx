@@ -2,14 +2,14 @@ import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ProjectHome } from '@/features/projects/components/project-home'
 import { __resetStore } from '@/lib/mock-store'
-import type { Project } from '@qably/types'
+import type { ProjectSummary } from '@qably/types'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
 }))
 
-const mockProject: Project = {
+const mockProject: ProjectSummary = {
   id: 'proj-1',
   name: 'Ecommerce App',
   description: 'Checkout, catalog, and user account flows.',
@@ -22,6 +22,8 @@ const mockProject: Project = {
   activeRunCount: 1,
   aiPendingCount: 3,
   createdAt: '2026-01-20T00:00:00Z',
+  updatedAt: '2026-01-20T00:00:00Z',
+  technologies: [],
 }
 
 describe('ProjectHome (thin shell)', () => {

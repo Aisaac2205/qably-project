@@ -10,7 +10,7 @@ import {
 } from '@/lib/use-mock-store'
 import { MOCK_NOW } from '@/lib/mock-data'
 import type {
-  Project,
+  ProjectSummary,
   Run,
   ExtractedProposal,
   RunStatus,
@@ -27,7 +27,7 @@ export interface DashboardStats {
   coverageGapsCount: number
   activeRuns: number
   projectsByHealth: Array<{
-    project: Project
+    project: ProjectSummary
     lastRunStatus: RunStatus
     lastRunAt: string
   }>

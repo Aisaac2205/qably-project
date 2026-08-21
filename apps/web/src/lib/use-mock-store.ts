@@ -14,7 +14,7 @@ import {
   getServerSnapshot,
 } from '@/lib/mock-store'
 import type {
-  Project,
+  ProjectSummary,
   Suite,
   Run,
   AiCase,
@@ -71,12 +71,12 @@ function sameContents<T>(a: T[], b: T[]): boolean {
   return true
 }
 
-export function useProjects(): Project[] {
+export function useProjects(): ProjectSummary[] {
   return useStableArray(() => getSnapshot().projects, () => getServerSnapshot().projects)
 }
 
-export function useProject(id: string): Project | undefined {
-  const cacheRef = useRef<{ id: string; value: Project | undefined }>({ id: '', value: undefined })
+export function useProject(id: string): ProjectSummary | undefined {
+  const cacheRef = useRef<{ id: string; value: ProjectSummary | undefined }>({ id: '', value: undefined })
   return useSyncExternalStore(
     subscribe,
     () => {

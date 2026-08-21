@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import type { Project } from '@qably/types'
+import type { ProjectSummary } from '@qably/types'
 
 const mockPathname = vi.fn(() => '/dashboard')
 
@@ -13,7 +13,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-const mockProject: Project = {
+const mockProject: ProjectSummary = {
   id: 'proj-1',
   name: 'Ecommerce App',
   description: '',
@@ -25,6 +25,8 @@ const mockProject: Project = {
   activeRunCount: 0,
   aiPendingCount: 3,
   createdAt: '2026-01-20T00:00:00Z',
+  updatedAt: '2026-01-20T00:00:00Z',
+  technologies: [],
 }
 
 vi.mock('@/lib/use-mock-store', () => ({

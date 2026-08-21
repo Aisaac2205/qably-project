@@ -51,14 +51,32 @@ export interface Project {
   description?: string
   githubRepo?: string
   organizationId: string
+  technologies: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ProjectSummary extends Project {
   healthScore: number
   lastRunStatus: RunStatus
   lastRunAt: string
   suiteCount: number
   activeRunCount: number
   aiPendingCount: number
-  createdAt: string
-  technologies?: string[]
+}
+
+export interface OrganizationSummary {
+  id: string
+  name: string
+  slug: string
+  plan: Plan
+  role: OrgRole
+}
+
+export interface OrganizationContext {
+  organizationId: string
+  slug: string
+  role: OrgRole
 }
 
 

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { DotsThreeVertical, PencilSimple, Trash } from '@phosphor-icons/react'
-import type { Project } from '@qably/types'
+import type { ProjectSummary } from '@qably/types'
 import { StatusChip } from './status-chip'
 import { TechBadge } from './tech-badge'
 import { EditProjectDialog } from './edit-project-dialog'
@@ -15,7 +15,7 @@ import { useTranslation } from '@/lib/i18n'
 
 const MAX_ICONS = 4
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({ project }: { project: ProjectSummary }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { t } = useTranslation()
