@@ -12,5 +12,3 @@ export type {
   ProjectPatch,
 } from './lib/aggregate'
 
-export { generateAutomation } from './lib/automation'
-export type { GeneratedAutomation } from './lib/automation'
