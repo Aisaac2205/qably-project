@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+const optionalSecret = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.string().min(1).optional(),
+);
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -12,8 +17,8 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  RESEND_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY: optionalSecret,
+  RESEND_API_KEY: optionalSecret,
 });
 
 export type Env = z.infer<typeof envSchema>;

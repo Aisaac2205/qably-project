@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import express from 'express';
 import helmet from 'helmet';
@@ -31,7 +31,6 @@ async function bootstrap(): Promise<void> {
 
   app.use(helmet());
   app.enableCors({ origin: env.BETTER_AUTH_URL, credentials: true });
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.useGlobalFilters(new AllExceptionsFilter(env.NODE_ENV === 'production'));
   app.enableShutdownHooks();
 

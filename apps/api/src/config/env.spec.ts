@@ -75,10 +75,10 @@ describe('parseEnv', () => {
     ).toBeUndefined();
   });
 
-  it('still rejects an empty ANTHROPIC_API_KEY when one is supplied', () => {
-    expect(() => parseEnv({ ...validEnv, ANTHROPIC_API_KEY: '' })).toThrow(
-      /ANTHROPIC_API_KEY/,
-    );
+  it('treats a blank ANTHROPIC_API_KEY as absent, matching dotenv semantics', () => {
+    expect(
+      parseEnv({ ...validEnv, ANTHROPIC_API_KEY: '' }).ANTHROPIC_API_KEY,
+    ).toBeUndefined();
   });
 
   it('starts with neither optional provider key present', () => {
@@ -96,9 +96,15 @@ describe('parseEnv', () => {
     ).toBeUndefined();
   });
 
-  it('still rejects an empty RESEND_API_KEY when one is supplied', () => {
-    expect(() => parseEnv({ ...validEnv, RESEND_API_KEY: '' })).toThrow(
-      /RESEND_API_KEY/,
+  it('treats a blank RESEND_API_KEY as absent, matching dotenv semantics', () => {
+    expect(
+      parseEnv({ ...validEnv, RESEND_API_KEY: '' }).RESEND_API_KEY,
+    ).toBeUndefined();
+  });
+
+  it('keeps rejecting a blank value for a variable that is required', () => {
+    expect(() => parseEnv({ ...validEnv, BETTER_AUTH_SECRET: '' })).toThrow(
+      /BETTER_AUTH_SECRET/,
     );
   });
 });
