@@ -1,13 +1,135 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider     = "prisma-client"
+  output       = "../generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+
+  importFileExtension = ""
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Plan {
+  gratuito
+  equipo
+  empresa
+}
+
+enum OrgRole {
+  owner
+  admin
+  member
+}
+
+model User {
+  id            String      @id @default(cuid())
+  name          String
+  email         String
+  emailVerified Boolean     @default(false)
+  image         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  memberships   OrgMember[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model Organization {
+  id          String      @id @default(cuid())
+  name        String
+  slug        String
+  plan        Plan        @default(gratuito)
+  maxProjects Int         @default(3)
+  maxUsers    Int         @default(5)
+  maxCases    Int         @default(100)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  members     OrgMember[]
+  projects    Project[]
+
+  @@unique([slug])
+  @@map("organization")
+}
+
+model OrgMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           OrgRole      @default(member)
+  joinedAt       DateTime     @default(now())
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("org_member")
+}
+
+model Project {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  githubRepo     String?
+  technologies   String[]     @default([])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("project")
 }
