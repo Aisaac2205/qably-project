@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { CircleNotch, GithubLogo } from '@phosphor-icons/react'
+import { CircleNotch } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { GithubMark } from '@/features/auth/components/brand-marks'
 import {
   Field,
   FieldDescription,
@@ -96,7 +97,7 @@ export function LoginForm() {
 
         <Field>
           <Button className="flex gap-2" variant="outline" type="button">
-            <GithubLogo aria-hidden="true" weight="fill" />
+            <GithubMark className="size-4" />
             <span>Login with GitHub</span>
           </Button>
           <FieldDescription className="text-center">

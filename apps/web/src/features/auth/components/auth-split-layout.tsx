@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { QablyWordmark } from '@/features/auth/components/brand-marks'
 import { GradientMesh } from '@/features/auth/components/gradient-mesh'
 
 interface AuthSplitLayoutProps {
@@ -11,7 +12,7 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <Link href="/" aria-label="Qably home" className="flex items-center gap-2">
-            <span className="text-lg font-semibold tracking-tight">Qably</span>
+            <QablyWordmark className="h-8 w-auto text-foreground" />
           </Link>
         </div>
         <div className="flex w-full flex-1 items-center justify-center">

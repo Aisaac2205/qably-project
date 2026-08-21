@@ -49,6 +49,13 @@
      --fg-muted: that token is a TEXT color, this one is a BACKGROUND. */
   --surface-hover:     oklch(0.930 0.004 85);
 
+  /* Auth mesh — decorative panel only, never for content or status.
+     The shader's colour-dodge grain doubles each channel, so these stay
+     dark enough that the doubled result never reaches white. */
+  --mesh-ink:          oklch(0.000 0.000 0);
+  --mesh-graphite:     oklch(0.220 0.000 0);
+  --mesh-ash:          oklch(0.380 0.000 0);
+
   /* shadcn/ui bridge — maps shadcn variable names to our tokens */
   --background: var(--bg);
   --foreground: var(--fg);
