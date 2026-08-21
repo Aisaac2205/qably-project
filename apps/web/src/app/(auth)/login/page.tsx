@@ -1,17 +1,10 @@
-import Link from 'next/link'
-import { AuthCard } from '@/features/auth/components/auth-card'
-import { AuthForm } from '@/features/auth/components/auth-form'
+import { AuthSplitLayout } from '@/features/auth/components/auth-split-layout'
+import { LoginForm } from '@/features/auth/components/login-form'
 
 export default function LoginPage() {
   return (
-    <AuthCard title="Sign in">
-      <AuthForm mode="login" />
-      <p className="mt-4 text-center text-sm text-muted-foreground">
-        Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium text-primary hover:underline">
-          Create one
-        </Link>
-      </p>
-    </AuthCard>
+    <AuthSplitLayout>
+      <LoginForm />
+    </AuthSplitLayout>
   )
 }
