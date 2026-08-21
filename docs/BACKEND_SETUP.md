@@ -87,6 +87,33 @@ Three constraints hold this together:
 - The GitHub OAuth app's authorization callback URL must be `{BETTER_AUTH_URL}/api/auth/callback/github` — the **API** origin, not the web app's.
 - `callbackURL` is where better-auth returns the browser after the exchange. It is validated against `trustedOrigins`, so it must sit under `WEB_APP_URL`.
 
+## Organization scope
+
+Every project-scoped route runs behind two guards in order: `SessionGuard` (global, via `APP_GUARD`) establishes *who* is calling, then `OrgScopeGuard` (route-level, via `@UseGuards`) establishes *which organization* they are calling as. `@CurrentOrg()` reads the result; it throws if the guard did not run, so a route can never silently operate without a scope.
+
+`OrgScopeGuard` resolves the scope in one of two ways:
+
+- No `x-organization-id` header — the caller's oldest membership.
+- With the header — that organization, but only if the caller is a member. Otherwise `403`. This is what stops one organization from reading another's projects by guessing an id.
+
+### Why the bootstrap is lazy
+
+A user created by sign-up has no organization, so `resolveContext` creates one — name, slug, and an `owner` membership — inside a single `$transaction`.
+
+This deliberately does **not** live in better-auth's `databaseHooks.user.create.after`. That hook runs through `queueAfterTransactionHook`, meaning it fires *after* the user-creation transaction has already committed and it never receives the transaction adapter. A failure there would leave a committed user with no organization and no way to retry. Resolving lazily on first use is idempotent instead: it is correct for users created by email sign-up, by GitHub OAuth, by a seed script, or by hand in psql, and it self-heals any user that somehow lost their membership.
+
+Slug collisions are handled by retrying `withSlugSuffix` up to five times on a `P2002`; any other database error is rethrown rather than swallowed.
+
+### Plan limits
+
+`Organization.maxProjects` is checked in `ProjectsService.create` before insert, counting only that organization's projects. Exceeding it returns `plan-limit-reached`, which the controller maps to `403`. `maxUsers` and `maxCases` are declared on the model but not yet enforced — they belong to the membership and test-case units.
+
+### Roles
+
+`owner` and `admin` may delete a project; `member` may not. The check happens before the lookup, so a member probing ids cannot tell an existing project from a missing one.
+
+Services return `Result<T, ProjectError>` rather than throwing. The controller owns the mapping to HTTP — `not-found` → 404, `name-taken` → 409, `plan-limit-reached` and `forbidden` → 403 — so the domain layer stays free of transport concerns.
+
 ## Architecture
 
 Modules are organised by feature, not by technical layer. Each feature module owns its controllers, services, repositories and contracts.
