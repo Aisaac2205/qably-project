@@ -6,8 +6,6 @@ import {
   CheckCircle,
   XCircle,
   ArrowUpRight,
-  Sparkle,
-  CopySimple,
   ShieldCheck,
 } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -57,16 +55,12 @@ export function ReviewProposalInspector({
     <Card className="rounded-none border-0 h-full flex flex-col justify-between overflow-hidden bg-surface">
       <CardContent className="flex-1 overflow-y-auto space-y-6 p-5 sm:p-6">
         {/* Header with Title and Metadata */}
-        <div className="space-y-3 pb-4 border-b border-border">
+        <div className="space-y-2 pb-4 border-b border-border">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-md bg-ai-bg px-2 py-0.5 text-xs font-semibold text-ai">
-              <Sparkle size={12} weight="fill" aria-hidden="true" />
-              {t('reviewInbox.inspectorSubtitle')}
-            </span>
             {project && (
               <Link
                 href={`/projects/${project.id}`}
-                className="inline-flex items-center gap-1 rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-default transition-colors hover:border-border-strong hover:text-primary"
+                className="inline-flex items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-default transition-colors hover:border-border-strong hover:text-primary"
               >
                 {project.name}
               </Link>
@@ -105,13 +99,7 @@ export function ReviewProposalInspector({
 
         {/* Duplicate Comparison if present */}
         {proposal.targetOfficialTestCaseId && (
-          <div className="rounded-lg border border-warn/30 bg-warn-bg/10 p-4">
-            <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-warn">
-              <CopySimple size={14} weight="bold" aria-hidden="true" />
-              <span>{t('reviewInbox.possibleDuplicate')}</span>
-            </div>
-            <DuplicateComparison targetOfficialTestCaseId={proposal.targetOfficialTestCaseId} />
-          </div>
+          <DuplicateComparison targetOfficialTestCaseId={proposal.targetOfficialTestCaseId} />
         )}
 
         {/* Objective */}
