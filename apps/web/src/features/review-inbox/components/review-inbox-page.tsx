@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { CheckCircle, Info } from '@phosphor-icons/react'
+import { CheckCircle, Info, X } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '@/lib/use-mock-store'
 import { approveProposal, rejectProposal } from '@/lib/mock-store'
 import { useTranslation } from '@/lib/i18n'
 import { ReviewKpiRow } from './review-kpi-row'
-import { ReviewGovernanceBanner } from './review-governance-banner'
 import { ReviewInboxQueue, type ReviewQueueStatusFilter } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
 import { RecentReviewDecisions } from './recent-review-decisions'
@@ -106,18 +105,16 @@ export function ReviewInboxPage() {
           <button
             type="button"
             onClick={() => setFeedbackToast(null)}
-            className="rounded px-1.5 py-0.5 hover:bg-canvas text-muted hover:text-default"
+            aria-label={t('common.cancel')}
+            className="rounded p-1 hover:bg-canvas text-muted hover:text-default transition-colors"
           >
-            ✕
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
       )}
 
       {/* KPI Overview Row */}
       <ReviewKpiRow />
-
-      {/* Governance & Traceability Banner */}
-      <ReviewGovernanceBanner />
 
       {/* Main Review Workspace Split */}
       <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden min-h-[600px] h-[720px] max-h-[85vh]">

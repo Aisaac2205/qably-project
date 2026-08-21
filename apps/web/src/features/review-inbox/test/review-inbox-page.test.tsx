@@ -11,14 +11,11 @@ describe('ReviewInboxPage', () => {
     useI18nStore.setState({ locale: 'en' })
   })
 
-  it('renders page header, KPIs, governance banner, queue, inspector, and analytics', () => {
+  it('renders page header, KPIs, queue, inspector, and analytics', () => {
     render(<ReviewInboxPage />)
 
     // Header & Breadcrumb
     expect(screen.getByRole('heading', { level: 1, name: /Review Inbox/i })).toBeInTheDocument()
-
-    // Governance Banner
-    expect(screen.getByRole('heading', { level: 2, name: /Human authority required for publication/i })).toBeInTheDocument()
 
     // KPIs
     expect(screen.getAllByText(/Pending review/i).length).toBeGreaterThan(0)
