@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { PendingAiCases } from '@/features/dashboard/components/pending-ai-cases'
+import { PendingProposals } from '@/features/dashboard/components/pending-ai-cases'
 import { __resetStore } from '@/lib/mock-store'
 
 vi.mock('next/link', () => ({
@@ -8,26 +8,26 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-describe('PendingAiCases', () => {
+describe('PendingProposals', () => {
   beforeEach(() => {
     __resetStore()
   })
 
-  it('renders pending AI proposals heading with count badge', async () => {
+  it('renders pending proposals heading with count badge', async () => {
     await act(async () => {
-      render(<PendingAiCases />)
+      render(<PendingProposals />)
     })
-    expect(screen.getByRole('heading', { name: /pending ai cases/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /pending proposals/i })).toBeInTheDocument()
     expect(screen.getByText(/pending/)).toBeInTheDocument()
     expect(screen.getByText('Review inbox')).toBeInTheDocument()
   })
 
-  it('shows pending AI proposals with source files and review CTA', async () => {
+  it('shows pending proposals with titles and review CTA', async () => {
     await act(async () => {
-      render(<PendingAiCases />)
+      render(<PendingProposals />)
     })
+    // Proposals are sorted by title; the first seed proposals include this one
     expect(screen.getByText('Invalid login shows error message')).toBeInTheDocument()
-    expect(screen.getByText('auth.spec.ts')).toBeInTheDocument()
     const reviewButtons = screen.getAllByText('Review')
     expect(reviewButtons.length).toBeGreaterThan(0)
   })

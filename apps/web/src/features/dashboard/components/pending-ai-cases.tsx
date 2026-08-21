@@ -5,14 +5,14 @@ import { Sparkle, CaretRight } from '@phosphor-icons/react'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { useTranslation } from '@/lib/i18n'
 
-export function PendingAiCases() {
+export function PendingProposals() {
   const stats = useDashboardStats()
   const { t } = useTranslation()
-  const aiCases = stats.recentAiCases.slice(0, 4)
+  const proposals = stats.recentProposals.slice(0, 4)
 
   return (
     <section
-      aria-labelledby="pending-ai-proposals-heading"
+      aria-labelledby="pending-proposals-heading"
       className="flex flex-col justify-between rounded-xl border border-border bg-surface p-5 shadow-xs md:p-6"
     >
       <div>
@@ -20,17 +20,17 @@ export function PendingAiCases() {
           <div>
             <div className="flex items-center gap-2.5">
               <h2
-                id="pending-ai-proposals-heading"
+                id="pending-proposals-heading"
                 className="text-base font-semibold tracking-[-0.015em] text-default"
               >
-                {t('dashboard.pendingAiCases')}
+                {t('dashboard.pendingProposals')}
               </h2>
               <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-muted">
-                {t('dashboard.pendingAiCasesCount', { count: aiCases.length })}
+                {t('dashboard.pendingProposalsCount', { count: proposals.length })}
               </span>
             </div>
             <p className="mt-0.5 text-xs text-muted">
-              {t('dashboard.pendingAiCasesSubtitle')}
+              {t('dashboard.pendingProposalsSubtitle')}
             </p>
           </div>
 
@@ -44,12 +44,12 @@ export function PendingAiCases() {
         </div>
 
         <div className="mt-4 divide-y divide-border/60">
-          {aiCases.length === 0 ? (
+          {proposals.length === 0 ? (
             <p className="py-6 text-center text-xs text-muted">{t('dashboard.noPendingAi')}</p>
           ) : (
-            aiCases.map((testCase) => (
+            proposals.map((proposal) => (
               <div
-                key={testCase.id}
+                key={proposal.id}
                 className="group flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -58,10 +58,7 @@ export function PendingAiCases() {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-default group-hover:text-primary transition-colors">
-                      {testCase.name}
-                    </p>
-                    <p className="truncate text-xs text-muted">
-                      {testCase.sourceFile}
+                      {proposal.title}
                     </p>
                   </div>
                 </div>
