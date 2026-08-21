@@ -7,7 +7,6 @@ import {
   Stack,
   Play,
   CaretRight,
-  ShieldCheck,
 } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import {
@@ -130,14 +129,6 @@ export function GovernancePipeline() {
             </Link>
           )
         })}
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3 text-xs text-muted">
-        <span className="inline-flex items-center gap-1.5 font-medium">
-          <ShieldCheck size={14} weight="regular" aria-hidden="true" className="text-default" />
-          {t('dashboard.governanceHumanAuthority')}
-        </span>
-        <span className="text-xs text-muted">{t('dashboard.governanceTraceability')}</span>
       </div>
     </section>
   )
