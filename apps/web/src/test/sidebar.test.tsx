@@ -54,6 +54,7 @@ vi.mock('@/lib/use-mock-store', () => ({
   useSuites: () => [],
   useRuns: () => [],
   useAiCases: () => [],
+  useProposals: () => [],
   useOrg: () => ({ id: 'org-1', name: 'Acme', slug: 'acme', plan: 'equipo', planLimits: { maxProjects: 20, maxUsers: 10, maxCases: 5000 } }),
   useMembers: () => [],
   useApiKeys: () => [],

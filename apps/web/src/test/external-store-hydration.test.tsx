@@ -4,12 +4,12 @@ import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { __resetStore, getSnapshot, subscribe } from '@/lib/mock-store'
-import { useAiCases, useChatMessages, useConnections } from '@/lib/use-mock-store'
+import { useProposals, useChatMessages, useConnections } from '@/lib/use-mock-store'
 
 function SeededCounts() {
-  const cases = useAiCases('proj-1')
+  const proposals = useProposals('proj-1')
   const connections = useConnections()
-  return <output>{cases.length}:{connections.length}</output>
+  return <output>{proposals.length}:{connections.length}</output>
 }
 
 function MobileState() {
