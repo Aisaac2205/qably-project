@@ -216,7 +216,7 @@ export function GradientMesh({
     <div
       ref={containerRef}
       aria-hidden="true"
-      className="absolute inset-0 h-full w-full overflow-hidden bg-canvas"
+      className="absolute inset-0 h-full w-full overflow-hidden bg-mesh-ink"
     />
   )
 }

@@ -32,17 +32,17 @@ function SelectTrigger({ className, children, ...props }: SelectTriggerProps) {
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-surface px-2.5 py-1 text-sm outline-none transition-colors",
-        "placeholder:text-muted-foreground",
-        "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+        "flex h-10 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-default shadow-xs outline-none transition-all duration-150 ease-out",
+        "placeholder:text-muted",
+        "focus:outline-none focus-visible:outline-none focus-visible:border-primary focus-visible:ring-1 focus-visible:ring-primary/20",
+        "disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-canvas-hover/40",
         "[&>span]:line-clamp-1",
         className,
       )}
       {...props}
     >
       {children}
-      <CaretDown className="size-4 shrink-0 text-muted-foreground" weight="bold" />
+      <CaretDown className="size-4 shrink-0 text-muted" weight="bold" />
     </SelectPrimitive.Trigger>
   )
 }

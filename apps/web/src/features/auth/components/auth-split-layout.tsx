@@ -19,7 +19,7 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
           <div className="w-full max-w-sm">{children}</div>
         </div>
       </div>
-      <div className="relative hidden bg-canvas lg:block">
+      <div className="relative hidden bg-mesh-ink lg:block">
         <GradientMesh />
       </div>
     </div>

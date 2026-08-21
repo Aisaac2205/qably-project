@@ -107,6 +107,8 @@
   --color-ai:                 var(--accent-ai);
   --color-ai-bg:              var(--accent-ai-bg);
 
+  --color-mesh-ink:           var(--mesh-ink);
+
   --color-pass:               var(--status-pass);
   --color-pass-bg:            var(--status-pass-bg);
   --color-fail:               var(--status-fail);
@@ -162,6 +164,22 @@ body {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Form controls manage their own clean, minimalist focus states without thick double outlines */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+button:focus,
+button:focus-visible,
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"],
+[data-slot="button"] {
+  outline: none !important;
 }
 
 [data-slot="ai-prompt-input"] textarea,

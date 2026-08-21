@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { CircleNotch } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
-import { GithubMark } from '@/features/auth/components/brand-marks'
+import { AuthHeading } from '@/features/auth/components/auth-heading'
+import { GithubAuthButton } from '@/features/auth/components/github-auth-button'
 import {
   Field,
   FieldDescription,
@@ -21,7 +22,7 @@ export function LoginForm() {
 
   return (
     <form
-      className="flex flex-col gap-6"
+      className="animate-page-enter flex flex-col gap-6"
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -29,12 +30,10 @@ export function LoginForm() {
       }}
     >
       <FieldGroup>
-        <div className="flex flex-col items-center gap-1 text-center">
-          <h1 className="text-2xl font-bold">Login to your account</h1>
-          <p className="text-muted-foreground text-sm text-balance">
-            Enter your email below to login to your account
-          </p>
-        </div>
+        <AuthHeading
+          title="Login to your account"
+          description="Enter your email below to login to your account"
+        />
 
         <Field data-invalid={!!errors.email}>
           <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -96,10 +95,7 @@ export function LoginForm() {
         <FieldSeparator>Or continue with</FieldSeparator>
 
         <Field>
-          <Button className="flex gap-2" variant="outline" size="lg" type="button">
-            <GithubMark className="size-4" />
-            <span>Login with GitHub</span>
-          </Button>
+          <GithubAuthButton label="Login with GitHub" disabled={isSubmitting} />
           <FieldDescription className="text-center">
             Don&apos;t have an account?{' '}
             <Link href="/register" className="underline underline-offset-4">

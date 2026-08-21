@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
+import { AuthSplitLayout } from '@/features/auth/components/auth-split-layout'
 
 export const metadata: Metadata = {
   title: 'Qably',
 }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return <div className="min-h-screen bg-canvas">{children}</div>
+  return <AuthSplitLayout>{children}</AuthSplitLayout>
 }
