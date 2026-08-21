@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useProjectContext } from '@/features/projects/context/project-context'
-import { useRuns, useAiCases } from '@/lib/use-mock-store'
+import { useRuns, useProposals } from '@/lib/use-mock-store'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useTranslation } from '@/lib/i18n'
 
@@ -22,8 +22,8 @@ const DistributionChart = dynamic(
   },
 )
 
-const AiCasesChart = dynamic(
-  () => import('./ai-cases-chart').then((mod) => mod.AiCasesChart),
+const ProposalReviewChart = dynamic(
+  () => import('./ai-cases-chart').then((mod) => mod.ProposalReviewChart),
   {
     ssr: false,
     loading: () => <ChartSkeleton />,
@@ -44,7 +44,7 @@ function ChartSkeleton() {
 export function ReportsPage() {
   const { projectId } = useProjectContext()
   const runs = useRuns(projectId)
-  const aiCases = useAiCases(projectId)
+  const proposals = useProposals(projectId)
   const { t } = useTranslation()
 
   return (
@@ -74,13 +74,13 @@ export function ReportsPage() {
           </CardContent>
         </Card>
 
-        {/* AI Cases Chart */}
+        {/* Proposal Review Chart */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">{t('reports.aiCaseReviewStatus')}</CardTitle>
+            <CardTitle className="text-base">{t('reports.proposalReviewStatus')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <AiCasesChart aiCases={aiCases} />
+            <ProposalReviewChart proposals={proposals} />
           </CardContent>
         </Card>
       </div>

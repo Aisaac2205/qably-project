@@ -7,7 +7,7 @@ import type { Project } from '@qably/types'
 vi.mock('@/lib/use-mock-store', () => ({
   useRuns: vi.fn(() => []),
   useSuites: vi.fn(() => []),
-  useAiCases: vi.fn(() => []),
+  useProposals: vi.fn(() => []),
 }))
 
 // ── Mock the project context ─────────────────────────────────────
@@ -60,7 +60,7 @@ describe('ReportsPage', () => {
     })
     expect(screen.getByText('Pass Rate Over Time')).toBeInTheDocument()
     expect(screen.getByText('Pass / Fail Distribution')).toBeInTheDocument()
-    expect(screen.getByText('AI Case Review Status')).toBeInTheDocument()
+    expect(screen.getByText('Proposal Review Status')).toBeInTheDocument()
   })
 
   it('renders chart containers as Card components', async () => {
