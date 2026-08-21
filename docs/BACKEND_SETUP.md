@@ -29,7 +29,8 @@ On a deployed environment the platform injects the variables directly and no `.e
 | `DATABASE_URL` | yes | URL | PostgreSQL connection string used by the Prisma pg driver adapter. |
 | `REDIS_URL` | yes | URL | Redis connection string for BullMQ ingestion and extraction queues. |
 | `BETTER_AUTH_SECRET` | yes | string, min 32 chars | Signing secret for better-auth sessions. |
-| `BETTER_AUTH_URL` | yes | URL | Public base URL of the API. Also the allowed CORS origin. |
+| `BETTER_AUTH_URL` | yes | http(s) URL | Public base URL of the API itself. |
+| `WEB_APP_URL` | yes | http(s) URL | Browser origin of the Next.js web app. Sole allowed CORS origin and the only better-auth trusted origin. Path, query and trailing slash are ignored — only scheme, host and port are compared. |
 | `ENCRYPTION_KEY` | yes | 64 hex chars | AES-256-GCM key for provider tokens and webhook secrets at rest. Generate with `openssl rand -hex 32`. |
 | `GITHUB_CLIENT_ID` | yes | string | GitHub OAuth application id. |
 | `GITHUB_CLIENT_SECRET` | yes | string | GitHub OAuth application secret. |
@@ -42,6 +43,24 @@ Local development values for `DATABASE_URL` and `REDIS_URL` match the `docker-co
 DATABASE_URL=postgresql://qably:qably@localhost:5432/qably
 REDIS_URL=redis://localhost:6379
 ```
+
+The API and the web app run on different ports, so every browser call from the web app is cross-origin:
+
+```
+BETTER_AUTH_URL=http://localhost:3001
+WEB_APP_URL=http://localhost:3000
+```
+
+### Cross-origin access
+
+Two independent gates must both name the web origin, or the session cookie never reaches the API:
+
+1. **CORS** (`src/config/cors.ts`) — allows `WEB_APP_URL` with `credentials: true`, so the browser is permitted to attach and store the session cookie. Any other origin gets no `Access-Control-Allow-Origin` header.
+2. **better-auth trusted origins** (`src/auth/auth.options.ts`) — better-auth validates the `Origin` header of every auth request as CSRF protection and rejects unknown origins with `403` even when CORS already passed.
+
+Both read the same normalized value through `resolveAllowedOrigins`, so they cannot drift apart.
+
+Cookies work under `SameSite=Lax` while both apps share a site — different ports on `localhost`, or subdomains of one production domain. If the web app is ever deployed to a different registrable domain than the API, the session cookie becomes third-party and better-auth needs `advanced.defaultCookieAttributes` set to `sameSite: 'none'`, `secure: true`, `partitioned: true`. Safari's Intelligent Tracking Prevention can still block it. Keeping both on one domain avoids the problem entirely.
 
 ## Architecture
 

@@ -7,6 +7,7 @@ const validEnv = {
   REDIS_URL: 'redis://localhost:6379',
   BETTER_AUTH_SECRET: 'x'.repeat(32),
   BETTER_AUTH_URL: 'http://localhost:3001',
+  WEB_APP_URL: 'http://localhost:3000',
   ENCRYPTION_KEY: 'a'.repeat(64),
   GITHUB_CLIENT_ID: 'gh-client-id',
   GITHUB_CLIENT_SECRET: 'gh-client-secret',
@@ -57,6 +58,18 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...validEnv, ENCRYPTION_KEY: 'zz' })).toThrow(
       /ENCRYPTION_KEY/,
     );
+  });
+
+  it('throws naming the missing variable when WEB_APP_URL is absent', () => {
+    expect(() => parseEnv(omit(validEnv, 'WEB_APP_URL'))).toThrow(
+      /WEB_APP_URL/,
+    );
+  });
+
+  it('rejects a WEB_APP_URL that is not a valid url', () => {
+    expect(() =>
+      parseEnv({ ...validEnv, WEB_APP_URL: 'localhost:3000' }),
+    ).toThrow(/WEB_APP_URL/);
   });
 
   it('rejects a DATABASE_URL that is not a valid url', () => {

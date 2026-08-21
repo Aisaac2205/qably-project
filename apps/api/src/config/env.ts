@@ -5,6 +5,17 @@ const optionalSecret = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const httpUrl = z.url().refine(
+  (value) => {
+    try {
+      return /^https?:$/.test(new URL(value).protocol);
+    } catch {
+      return false;
+    }
+  },
+  { message: 'must be an absolute http(s) url' },
+);
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -13,7 +24,8 @@ const envSchema = z.object({
   DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
   BETTER_AUTH_SECRET: z.string().min(32),
-  BETTER_AUTH_URL: z.url(),
+  BETTER_AUTH_URL: httpUrl,
+  WEB_APP_URL: httpUrl,
   ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),

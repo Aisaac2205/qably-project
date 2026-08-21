@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { ENV } from './config/config.tokens';
+import { buildCorsOptions } from './config/cors';
 import type { Env } from './config/env';
 
 const AUTH_PATH_PREFIX = '/api/auth';
@@ -30,7 +31,7 @@ async function bootstrap(): Promise<void> {
   );
 
   app.use(helmet());
-  app.enableCors({ origin: env.BETTER_AUTH_URL, credentials: true });
+  app.enableCors(buildCorsOptions(env));
   app.useGlobalFilters(new AllExceptionsFilter(env.NODE_ENV === 'production'));
   app.enableShutdownHooks();
 
