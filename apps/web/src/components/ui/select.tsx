@@ -41,7 +41,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        'flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-border bg-canvas px-2.5 py-1 text-xs font-medium text-default select-none shadow-xs outline-none transition-all duration-150 ease-out',
+        'flex h-9 w-full items-center justify-between gap-2.5 rounded-lg border border-border bg-canvas px-3 py-1.5 text-xs font-medium text-default select-none shadow-xs outline-none transition-all duration-150 ease-out',
         'placeholder:text-muted',
         'hover:border-border-strong hover:bg-canvas-hover',
         'focus:outline-none focus-visible:outline-2 focus-visible:outline-primary',
@@ -54,7 +54,7 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon className="flex shrink-0 text-muted">
-        <CaretUpDown size={12} weight="bold" />
+        <CaretUpDown size={13} weight="bold" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )
@@ -105,14 +105,16 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        'relative flex w-full cursor-pointer select-none items-center justify-between rounded-sm px-2.5 py-1.5 text-xs text-default outline-none transition-colors',
+        'relative flex w-full cursor-pointer select-none items-center justify-between rounded-md px-3 py-1.5 text-xs text-default outline-none transition-colors',
         'data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
         className,
       )}
       {...props}
     >
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText className="flex items-center gap-2">
+        {children}
+      </SelectPrimitive.ItemText>
       <span className="ml-2 flex size-3.5 items-center justify-center">
         <SelectPrimitive.ItemIndicator>
           <Check size={12} weight="bold" />
@@ -138,6 +140,8 @@ function SelectSeparator({
 export interface SelectOption<T = string | number | null> {
   readonly label: string
   readonly value: T
+  readonly badge?: string | number | null
+  readonly icon?: React.ReactNode
 }
 
 export interface SelectSimpleProps<T = string | number | null> {
@@ -150,7 +154,7 @@ export interface SelectSimpleProps<T = string | number | null> {
 }
 
 /**
- * Shorthand declarative Select component for simple option lists
+ * Shorthand declarative Select component for option lists with circular badge support
  */
 function SelectSimple<T extends string | number | null>({
   options,
@@ -159,18 +163,46 @@ function SelectSimple<T extends string | number | null>({
   placeholder,
   triggerClassName,
 }: SelectSimpleProps<T>) {
+  const activeOption = options.find((o) => o.value === value)
+
   return (
     <Select
       value={value}
       onValueChange={(val) => onValueChange?.(val as T)}
     >
       <SelectTrigger className={triggerClassName}>
-        <SelectValue placeholder={placeholder} />
+        <SelectValue placeholder={placeholder}>
+          {activeOption ? (
+            <span className="flex items-center gap-1.5">
+              {activeOption.icon && (
+                <span className="shrink-0 text-muted">{activeOption.icon}</span>
+              )}
+              <span>{activeOption.label}</span>
+              {activeOption.badge !== undefined && activeOption.badge !== null && (
+                <span className="inline-flex items-center justify-center rounded-full bg-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted">
+                  {typeof activeOption.badge === 'number'
+                    ? activeOption.badge.toLocaleString()
+                    : activeOption.badge}
+                </span>
+              )}
+            </span>
+          ) : undefined}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent>
         {options.map((opt) => (
           <SelectItem key={`${opt.label}-${opt.value}`} value={opt.value}>
-            {opt.label}
+            <span className="flex items-center gap-1.5">
+              {opt.icon && <span className="shrink-0 text-muted">{opt.icon}</span>}
+              <span>{opt.label}</span>
+              {opt.badge !== undefined && opt.badge !== null && (
+                <span className="inline-flex items-center justify-center rounded-full bg-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted">
+                  {typeof opt.badge === 'number'
+                    ? opt.badge.toLocaleString()
+                    : opt.badge}
+                </span>
+              )}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>

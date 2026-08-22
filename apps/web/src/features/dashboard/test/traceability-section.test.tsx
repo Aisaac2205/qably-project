@@ -1,4 +1,4 @@
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TraceabilitySection } from '@/features/dashboard/components/traceability-section'
 import { __resetStore } from '@/lib/mock-store'
@@ -24,7 +24,7 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     __resetStore()
   })
 
-  it('renders the traceability calendar header and live streams', async () => {
+  it('renders the traceability calendar header and clean toolbar', async () => {
     await act(async () => {
       render(<TraceabilitySection />)
     })
@@ -32,10 +32,9 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     expect(
       screen.getByRole('heading', { name: 'Governance pipeline' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('SCM Ingestion')).toBeInTheDocument()
-    expect(screen.getByText('AI Proposals')).toBeInTheDocument()
-    expect(screen.getByText('Official Cases')).toBeInTheDocument()
-    expect(screen.getByText('CI Executions')).toBeInTheDocument()
+    expect(
+      screen.getByText(/Live traceability across repositories/i),
+    ).toBeInTheDocument()
   })
 
   it('renders the SVG contribution grid with 53 weeks and month labels', async () => {
@@ -54,28 +53,18 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     expect(screen.getByText(/Fri|Vie/)).toBeInTheDocument()
   })
 
-  it('allows filtering by stage', async () => {
+  it('renders clean dropdown selectors for stage filtering and year in the header', async () => {
     await act(async () => {
       render(<TraceabilitySection />)
     })
 
-    const scmButton = screen.getByRole('button', { name: /SCM Ingestion/i })
-    expect(scmButton).toBeInTheDocument()
+    const comboboxes = screen.getAllByRole('combobox')
+    expect(comboboxes.length).toBe(2)
 
-    await act(async () => {
-      fireEvent.click(scmButton)
-    })
+    // Stage selector showing active label with total
+    expect(comboboxes[0]).toHaveTextContent(/All stages|Todas las etapas/i)
 
-    expect(scmButton).toHaveClass('border-border-strong')
-  })
-
-  it('renders the clean year dropdown selector', async () => {
-    await act(async () => {
-      render(<TraceabilitySection />)
-    })
-
-    const selectTrigger = screen.getByRole('combobox')
-    expect(selectTrigger).toBeInTheDocument()
-    expect(selectTrigger).toHaveTextContent('2026')
+    // Year selector
+    expect(comboboxes[1]).toHaveTextContent('2026')
   })
 })

@@ -180,14 +180,12 @@ export function TraceabilityCalendar({
       </div>
 
       {/* Legend & Footer */}
-      <div className="mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-        {footerNote ? (
+      <div className={`mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 text-xs text-muted sm:flex-row sm:items-center ${footerNote ? 'sm:justify-between' : 'sm:justify-end'}`}>
+        {footerNote && (
           <span className="inline-flex items-center gap-1.5 text-[11px]">
             <span className="size-1.5 rounded-full bg-pass" />
             {footerNote}
           </span>
-        ) : (
-          <span />
         )}
 
         <div className="flex items-center gap-1.5 text-[11px]">

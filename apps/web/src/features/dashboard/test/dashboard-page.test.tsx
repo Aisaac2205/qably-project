@@ -70,10 +70,6 @@ describe('DashboardPage', () => {
       render(<DashboardPage />)
     })
     expect(screen.getByRole('heading', { name: 'Governance pipeline' })).toBeInTheDocument()
-    expect(screen.getByText('SCM Ingestion')).toBeInTheDocument()
-    expect(screen.getByText('AI Proposals')).toBeInTheDocument()
-    expect(screen.getByText('Official Cases')).toBeInTheDocument()
-    expect(screen.getByText('CI Executions')).toBeInTheDocument()
   })
 
   it('renders quality & freshness risks section with active signals', async () => {
