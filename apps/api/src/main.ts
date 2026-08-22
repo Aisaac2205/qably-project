@@ -5,6 +5,7 @@ import express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { jsonWithRawBody } from './common/http/raw-body';
 import { ENV } from './config/config.tokens';
 import { buildCorsOptions } from './config/cors';
 import type { Env } from './config/env';
@@ -18,7 +19,7 @@ async function bootstrap(): Promise<void> {
   });
   const env = app.get<Env>(ENV);
 
-  const jsonParser = express.json({ limit: '1mb' });
+  const jsonParser = jsonWithRawBody();
   app.use(
     (
       request: express.Request,

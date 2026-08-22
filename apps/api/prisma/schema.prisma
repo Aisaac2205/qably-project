@@ -202,10 +202,45 @@ model Connection {
   repo           String
   encryptedToken String
   encryptedWebhookSecret String
+  events         ScmEvent[]
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
   @@unique([organizationId, provider, repo])
   @@index([organizationId])
   @@map("connection")
+}
+
+enum ScmEventKind {
+  PUSH
+  PULL_REQUEST
+}
+
+enum ScmEventStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+model ScmEvent {
+  id             String             @id @default(cuid())
+  connectionId   String
+  connection     Connection         @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organizationId String
+  provider       ConnectionProvider
+  eventId        String
+  kind           ScmEventKind
+  repo           String
+  branch         String
+  commitSha      String
+  author         String
+  title          String
+  url            String
+  status         ScmEventStatus     @default(PENDING)
+  receivedAt     DateTime           @default(now())
+
+  @@unique([provider, eventId])
+  @@index([organizationId])
+  @@index([connectionId])
+  @@map("scm_event")
 }

@@ -27,3 +27,11 @@ export interface ScmPayloadAdapter {
 
   normalize(payload: unknown, headers: ScmHeaders): NormalizedScmEvent | null;
 }
+
+export type IngestOutcome = 'accepted' | 'duplicate' | 'ignored';
+
+export type IngestError = 'unknown-provider' | 'unverified' | 'invalid-payload';
+
+export interface ScmEventJob {
+  scmEventId: string;
+}
