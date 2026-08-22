@@ -325,6 +325,14 @@ export interface RepoConnection {
   updatedAt: string
 }
 
+export interface RepoConnectionWithSecret extends RepoConnection {
+  webhookSecret: string
+}
+
+export interface WebhookSecretView {
+  webhookSecret: string
+}
+
 export type ConnectionType =
   | 'github'
   | 'bitbucket'

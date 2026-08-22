@@ -1,3 +1,4 @@
+import { isErr } from '../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { ConnectionsService } from './connections.service';
 
@@ -16,6 +17,7 @@ const row = {
   name: 'Primary',
   repo: 'acme/shop',
   encryptedToken: 'iv:tag:cipher',
+  encryptedWebhookSecret: 'iv:tag:secret',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
 };
@@ -45,12 +47,14 @@ function createPrisma(): FakePrisma {
 interface FakeEncryption {
   encrypt: jest.Mock;
   decrypt: jest.Mock;
+  generateSecret: jest.Mock;
 }
 
 function createEncryption(): FakeEncryption {
   return {
     encrypt: jest.fn((plaintext: string) => `enc(${plaintext})`),
     decrypt: jest.fn((packed: string) => packed),
+    generateSecret: jest.fn(() => 'generated-secret'),
   };
 }
 
@@ -263,5 +267,115 @@ describe('ConnectionsService.remove', () => {
     await expect(
       build(prisma, encryption).remove(owner, 'connection-x'),
     ).resolves.toEqual({ ok: false, error: 'not-found' });
+  });
+});
+
+describe('ConnectionsService webhook secret', () => {
+  it('stores a generated secret encrypted when creating a connection', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    encryption.generateSecret.mockReturnValue('s3cr3t');
+    prisma.connection.create.mockResolvedValue(row);
+
+    await build(prisma, encryption).create(owner, {
+      provider: 'GITHUB',
+      name: 'Primary',
+      repo: 'acme/shop',
+      token: 'ghp_live',
+    });
+
+    const [call] = prisma.connection.create.mock.calls as [
+      [{ data: { encryptedWebhookSecret: string } }],
+    ];
+    expect(call[0].data.encryptedWebhookSecret).toBe('enc(s3cr3t)');
+  });
+
+  it('reveals the plaintext secret once in the create response', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    encryption.generateSecret.mockReturnValue('s3cr3t');
+    prisma.connection.create.mockResolvedValue(row);
+
+    const result = await build(prisma, encryption).create(owner, {
+      provider: 'GITHUB',
+      name: 'Primary',
+      repo: 'acme/shop',
+      token: 'ghp_live',
+    });
+
+    expect(isErr(result)).toBe(false);
+    if (isErr(result)) return;
+    expect(result.value.webhookSecret).toBe('s3cr3t');
+  });
+
+  it('never exposes the webhook secret when listing connections', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    prisma.connection.findMany.mockResolvedValue([row]);
+
+    const [connection] = await build(prisma, encryption).list(owner);
+
+    expect(JSON.stringify(connection)).not.toContain('webhookSecret');
+  });
+
+  it('replaces the stored secret when rotating', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    encryption.generateSecret.mockReturnValue('rotated');
+    prisma.connection.findFirst.mockResolvedValue(row);
+    prisma.connection.update.mockResolvedValue(row);
+
+    await build(prisma, encryption).rotateWebhookSecret(owner, 'connection-1');
+
+    expect(prisma.connection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'connection-1' },
+        data: { encryptedWebhookSecret: 'enc(rotated)' },
+      }),
+    );
+  });
+
+  it('returns the new plaintext secret when rotating', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    encryption.generateSecret.mockReturnValue('rotated');
+    prisma.connection.findFirst.mockResolvedValue(row);
+    prisma.connection.update.mockResolvedValue(row);
+
+    const result = await build(prisma, encryption).rotateWebhookSecret(
+      owner,
+      'connection-1',
+    );
+
+    expect(isErr(result)).toBe(false);
+    if (isErr(result)) return;
+    expect(result.value.webhookSecret).toBe('rotated');
+  });
+
+  it('refuses to rotate for a member', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+
+    const result = await build(prisma, encryption).rotateWebhookSecret(
+      member,
+      'connection-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'forbidden' });
+    expect(prisma.connection.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to rotate a connection of another organization', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    prisma.connection.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, encryption).rotateWebhookSecret(
+      admin,
+      'connection-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(prisma.connection.update).not.toHaveBeenCalled();
   });
 });

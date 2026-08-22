@@ -68,3 +68,17 @@ describe('EncryptionService', () => {
     expect(() => service.decrypt('only-one-part')).toThrow();
   });
 });
+
+describe('EncryptionService.generateSecret', () => {
+  it('returns 64 hexadecimal characters', () => {
+    const secret = build().generateSecret();
+
+    expect(secret).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('returns a different secret on each call', () => {
+    const service = build();
+
+    expect(service.generateSecret()).not.toBe(service.generateSecret());
+  });
+});

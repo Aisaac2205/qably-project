@@ -271,6 +271,74 @@ describe('Connections (e2e)', () => {
     expect(call[0].data.encryptedToken).not.toContain('ghp_rotated-secret');
   });
 
+  it('returns the webhook secret once when creating a connection', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/connections')
+      .send({
+        provider: 'GITHUB',
+        name: 'Primary',
+        repo: 'acme/shop',
+        token: 'ghp_super-secret-token',
+      })
+      .expect(201);
+
+    const { webhookSecret } = response.body as { webhookSecret: string };
+    expect(webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+
+    const [call] = prisma.connection.create.mock.calls as [
+      [{ data: { encryptedWebhookSecret: string } }],
+    ];
+    expect(call[0].data.encryptedWebhookSecret).not.toContain(webhookSecret);
+    expect(call[0].data.encryptedWebhookSecret.split(':')).toHaveLength(3);
+  });
+
+  it('never returns the webhook secret when reading a connection', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/connections/connection-1')
+      .expect(200);
+
+    expect(JSON.stringify(response.body)).not.toContain('webhookSecret');
+  });
+
+  it('rotates the webhook secret and returns only the new value', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/connections/connection-1/webhook-secret')
+      .expect(201);
+
+    const body = response.body as Record<string, string>;
+    expect(Object.keys(body)).toEqual(['webhookSecret']);
+    expect(body.webhookSecret).toMatch(/^[0-9a-f]{64}$/);
+
+    const [call] = prisma.connection.update.mock.calls as [
+      [{ data: { encryptedWebhookSecret: string } }],
+    ];
+    expect(call[0].data.encryptedWebhookSecret).not.toContain(
+      body.webhookSecret,
+    );
+  });
+
+  it('answers 403 when a member tries to rotate the webhook secret', async () => {
+    prisma.orgMember.findFirst.mockResolvedValue({
+      organizationId: 'org-1',
+      role: 'member',
+      organization: { slug: 'acme' },
+    });
+
+    await request(app.getHttpServer())
+      .post('/connections/connection-1/webhook-secret')
+      .expect(403);
+
+    expect(prisma.connection.update).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 when rotating a connection of another organization', async () => {
+    prisma.connection.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/connections/connection-1/webhook-secret')
+      .expect(404);
+  });
+
   it('answers 403 when the organization header names a foreign organization', async () => {
     prisma.orgMember.findFirst.mockResolvedValue(null);
 

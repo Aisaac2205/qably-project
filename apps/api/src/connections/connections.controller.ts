@@ -18,7 +18,12 @@ import { isErr, type Result } from '../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { ConnectionError, ConnectionView } from './connections.contracts';
+import type {
+  ConnectionError,
+  ConnectionView,
+  ConnectionWithSecretView,
+  WebhookSecretResult,
+} from './connections.contracts';
 import {
   createConnectionSchema,
   updateConnectionSchema,
@@ -66,8 +71,17 @@ export class ConnectionsController {
     @CurrentOrg() org: OrgContext,
     @Body(new ZodValidationPipe(createConnectionSchema))
     body: CreateConnectionInput,
-  ): Promise<ConnectionView> {
+  ): Promise<ConnectionWithSecretView> {
     return unwrap(await this.connections.create(org, body));
+  }
+
+  @Post(':id/webhook-secret')
+  @HttpCode(HttpStatus.CREATED)
+  async rotateWebhookSecret(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+  ): Promise<WebhookSecretResult> {
+    return unwrap(await this.connections.rotateWebhookSecret(org, id));
   }
 
   @Patch(':id')

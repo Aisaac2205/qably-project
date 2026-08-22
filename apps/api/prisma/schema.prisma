@@ -201,6 +201,7 @@ model Connection {
   name           String
   repo           String
   encryptedToken String
+  encryptedWebhookSecret String
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 

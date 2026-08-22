@@ -6,6 +6,7 @@ import type { Env } from '../../config/env';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
 const SEGMENT_COUNT = 3;
+const SECRET_LENGTH = 32;
 
 @Injectable()
 export class EncryptionService {
@@ -13,6 +14,10 @@ export class EncryptionService {
 
   constructor(@InjectEnv() env: Env) {
     this.key = Buffer.from(env.ENCRYPTION_KEY, 'hex');
+  }
+
+  generateSecret(): string {
+    return randomBytes(SECRET_LENGTH).toString('hex');
   }
 
   encrypt(plaintext: string): string {

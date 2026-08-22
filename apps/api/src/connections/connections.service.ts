@@ -3,7 +3,12 @@ import { EncryptionService } from '../common/crypto/encryption.service';
 import { err, ok, type Result } from '../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../prisma/prisma.service';
-import type { ConnectionError, ConnectionView } from './connections.contracts';
+import type {
+  ConnectionError,
+  ConnectionView,
+  ConnectionWithSecretView,
+  WebhookSecretResult,
+} from './connections.contracts';
 import type {
   CreateConnectionInput,
   UpdateConnectionInput,
@@ -84,10 +89,11 @@ export class ConnectionsService {
   async create(
     org: OrgContext,
     input: CreateConnectionInput,
-  ): Promise<Result<ConnectionView, ConnectionError>> {
+  ): Promise<Result<ConnectionWithSecretView, ConnectionError>> {
     if (!canWrite(org)) return err('forbidden');
 
     const encryptedToken = this.encryption.encrypt(input.token);
+    const webhookSecret = this.encryption.generateSecret();
 
     try {
       const row = await this.prisma.connection.create({
@@ -96,16 +102,37 @@ export class ConnectionsService {
           name: input.name,
           repo: input.repo,
           encryptedToken,
+          encryptedWebhookSecret: this.encryption.encrypt(webhookSecret),
           organizationId: org.organizationId,
         },
         select: SELECT,
       });
 
-      return ok(toView(row));
+      return ok({ ...toView(row), webhookSecret });
     } catch (error) {
       if (isUniqueViolation(error)) return err('duplicate');
       throw error;
     }
+  }
+
+  async rotateWebhookSecret(
+    org: OrgContext,
+    id: string,
+  ): Promise<Result<WebhookSecretResult, ConnectionError>> {
+    if (!canWrite(org)) return err('forbidden');
+
+    const existing = await this.scoped(org, id);
+
+    if (existing === null) return err('not-found');
+
+    const webhookSecret = this.encryption.generateSecret();
+
+    await this.prisma.connection.update({
+      where: { id },
+      data: { encryptedWebhookSecret: this.encryption.encrypt(webhookSecret) },
+    });
+
+    return ok({ webhookSecret });
   }
 
   async update(
