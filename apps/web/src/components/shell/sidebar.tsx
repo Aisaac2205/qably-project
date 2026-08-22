@@ -29,6 +29,7 @@ import {
   CaretLeft,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
+import { SidebarAccount } from '@/components/shell/sidebar-account'
 import { useProject } from '@/lib/use-mock-store'
 import { useTranslation } from '@/lib/i18n'
 
@@ -166,34 +167,8 @@ export function Sidebar() {
         </SidebarGroup>}
       </SidebarContent>
 
-       <SidebarFooter className="p-2">
-        {isCollapsed ? (
-          <div className="flex items-center justify-center py-1">
-            <div
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-fg shadow-xs"
-              title="Isaac F. (Admin)"
-              aria-label="Isaac F."
-            >
-              IF
-            </div>
-          </div>
-        ) : (
-          <div
-            data-slot="sidebar-account"
-            className="flex h-12 w-full items-center gap-2.5 rounded-xl border border-border-sidebar bg-sidebar/50 px-3 py-2 transition-colors hover:bg-sidebar-hover"
-          >
-            <div
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-fg shadow-xs"
-            >
-              IF
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium leading-tight text-sidebar-foreground">Isaac F.</div>
-              <div className="truncate text-xs leading-normal text-sidebar-fg-muted">{t('sidebar.admin')}</div>
-            </div>
-          </div>
-        )}
+      <SidebarFooter className="p-2">
+        <SidebarAccount name="Isaac F." role={t('sidebar.admin')} initials="IF" collapsed={isCollapsed} />
       </SidebarFooter>
       </nav>
     </ShadcnSidebar>

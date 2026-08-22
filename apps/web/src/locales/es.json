@@ -55,7 +55,9 @@
     "reports": "Reportes",
     "aiReview": "Revisi\u00f3n IA",
     "organization": "Organizaci\u00f3n",
-    "admin": "Administrador"
+    "admin": "Administrador",
+    "signOut": "Cerrar sesión",
+    "signingOut": "Cerrando sesión…"
   },
 
   "reviewInbox": {

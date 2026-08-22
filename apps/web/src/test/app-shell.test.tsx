@@ -5,6 +5,15 @@ import { AppShell } from '@/components/shell/app-shell'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
+}))
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    signIn: { email: vi.fn(), social: vi.fn() },
+    signUp: { email: vi.fn() },
+    signOut: vi.fn().mockResolvedValue({ data: {}, error: null }),
+  },
 }))
 
 describe('AppShell', () => {

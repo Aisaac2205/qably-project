@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/hooks/use-auth'
 const signInEmail = vi.fn()
 const signUpEmail = vi.fn()
 const signInSocial = vi.fn()
+const signOut = vi.fn()
 
 vi.mock('@/lib/auth-client', () => ({
   authClient: {
@@ -13,6 +14,7 @@ vi.mock('@/lib/auth-client', () => ({
       social: (...args: unknown[]) => signInSocial(...args),
     },
     signUp: { email: (...args: unknown[]) => signUpEmail(...args) },
+    signOut: (...args: unknown[]) => signOut(...args),
   },
 }))
 
@@ -92,6 +94,33 @@ describe('useAuth', () => {
     expect(signInSocial).toHaveBeenCalledWith({
       provider: 'github',
       callbackURL: `${window.location.origin}/projects`,
+    })
+  })
+
+  it('ends the session on the server when signing out', async () => {
+    signOut.mockResolvedValue({ data: {}, error: null })
+    const { result } = renderHook(() => useAuth())
+
+    let outcome
+    await act(async () => {
+      outcome = await result.current.logout()
+    })
+
+    expect(signOut).toHaveBeenCalled()
+    expect(outcome).toEqual({ error: null })
+  })
+
+  it('reports a failed sign out instead of pretending the session ended', async () => {
+    signOut.mockRejectedValue(new TypeError('Failed to fetch'))
+    const { result } = renderHook(() => useAuth())
+
+    let outcome
+    await act(async () => {
+      outcome = await result.current.logout()
+    })
+
+    expect(outcome).toEqual({
+      error: 'Could not reach the Qably API. Check your connection and try again.',
     })
   })
 })

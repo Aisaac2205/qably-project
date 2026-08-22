@@ -27,6 +27,15 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
   useParams: () => ({}),
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
+}))
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    signIn: { email: vi.fn(), social: vi.fn() },
+    signUp: { email: vi.fn() },
+    signOut: vi.fn().mockResolvedValue({ data: {}, error: null }),
+  },
 }))
 
 vi.mock('next/link', () => ({

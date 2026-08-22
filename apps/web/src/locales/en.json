@@ -55,7 +55,9 @@
     "reports": "Reports",
     "aiReview": "AI Review",
     "organization": "Organization",
-    "admin": "Admin"
+    "admin": "Admin",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…"
   },
 
   "reviewInbox": {

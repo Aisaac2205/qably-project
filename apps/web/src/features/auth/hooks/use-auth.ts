@@ -20,6 +20,7 @@ export interface Auth {
   login: (email: string, password: string) => Promise<AuthOutcome>
   register: (email: string, password: string, name: string) => Promise<AuthOutcome>
   signInWithGithub: (destination: string) => Promise<AuthOutcome>
+  logout: () => Promise<AuthOutcome>
 }
 
 async function run(call: () => Promise<AuthCall>): Promise<AuthOutcome> {
@@ -55,5 +56,7 @@ export function useAuth(): Auth {
     [],
   )
 
-  return { login, register, signInWithGithub }
+  const logout = useCallback(() => run(() => authClient.signOut()), [])
+
+  return { login, register, signInWithGithub, logout }
 }
