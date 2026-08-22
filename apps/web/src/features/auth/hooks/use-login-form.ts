@@ -23,7 +23,7 @@ export interface LoginForm {
   continueWithGithub: () => Promise<void>
 }
 
-const DESTINATION = '/projects'
+const DESTINATION = '/dashboard'
 
 export function useLoginForm(): LoginForm {
   const router = useRouter()

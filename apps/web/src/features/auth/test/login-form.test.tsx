@@ -100,7 +100,7 @@ describe('LoginForm', () => {
     expect(screen.getByLabelText('Password')).toHaveAttribute('aria-invalid', 'true')
   })
 
-  it('navigates to projects once both fields are valid', async () => {
+  it('navigates to the dashboard once both fields are valid', async () => {
     const user = userEvent.setup()
     await renderForm()
 
@@ -108,7 +108,7 @@ describe('LoginForm', () => {
     await user.type(screen.getByLabelText('Password'), 'longenoughpassword')
     await user.click(screen.getByRole('button', { name: 'Login' }))
 
-    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/projects'))
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'))
   })
 
   it('signs in against the api with the credentials entered', async () => {
@@ -154,7 +154,7 @@ describe('LoginForm', () => {
     await vi.waitFor(() =>
       expect(signInSocial).toHaveBeenCalledWith({
         provider: 'github',
-        callbackURL: `${window.location.origin}/projects`,
+        callbackURL: `${window.location.origin}/dashboard`,
       }),
     )
   })
