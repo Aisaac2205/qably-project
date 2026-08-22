@@ -114,6 +114,26 @@ Slug collisions are handled by retrying `withSlugSuffix` up to five times on a `
 
 Services return `Result<T, ProjectError>` rather than throwing. The controller owns the mapping to HTTP — `not-found` → 404, `name-taken` → 409, `plan-limit-reached` and `forbidden` → 403 — so the domain layer stays free of transport concerns.
 
+## Suites and test cases
+
+`Suite` carries `organizationId` alongside `projectId`. The duplication is deliberate: `OrgScopeGuard` already resolved an organization, so every suite query filters on it directly instead of joining through `Project` on each read.
+
+`TestCase` rows are ordered by an explicit `position` column rather than `createdAt`, so reordering never depends on insert time. New cases append at `cases.length`.
+
+Every case mutation returns the **whole suite**, not the case. The UI renders a suite with its cases embedded, so returning the parent removes a second round trip and the chance of the client holding a stale sibling list.
+
+### One default suite per project
+
+`isDefault` is enforced in application code, not by a constraint: promoting a suite runs `updateMany` to demote its siblings and the update itself inside one `$transaction`. A partial unique index would reject the intermediate state during a swap, so the invariant lives in the transaction instead.
+
+## Shared contract
+
+`packages/types` is the single source of truth for shapes crossing the API/web boundary. The API imports it; `apps/api/src/**/*.contracts.ts` files alias those types rather than redeclaring them.
+
+`Project` holds only the persisted fields the API can return. `ProjectSummary` extends it with the aggregates (`healthScore`, `suiteCount`, `lastRunStatus`, …) that the web currently computes in `mock-store`. When Runs land, the API can fill `ProjectSummary` and the mock disappears; until then the split keeps the compiler honest about which fields actually come from the database.
+
+Nullable columns are returned as **omitted keys**, never `null`, so one optional TypeScript property describes both the Prisma row and the JSON payload.
+
 ## Architecture
 
 Modules are organised by feature, not by technical layer. Each feature module owns its controllers, services, repositories and contracts.

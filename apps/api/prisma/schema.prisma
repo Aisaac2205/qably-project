@@ -23,6 +23,19 @@ enum OrgRole {
   member
 }
 
+enum CasePriority {
+  critical
+  high
+  medium
+  low
+}
+
+enum CaseState {
+  active
+  draft
+  deprecated
+}
+
 model User {
   id            String      @id @default(cuid())
   name          String
@@ -99,6 +112,7 @@ model Organization {
   updatedAt   DateTime    @updatedAt
   members     OrgMember[]
   projects    Project[]
+  suites      Suite[]
 
   @@unique([slug])
   @@map("organization")
@@ -128,8 +142,47 @@ model Project {
   technologies   String[]     @default([])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  suites         Suite[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("project")
+}
+
+model Suite {
+  id             String       @id @default(cuid())
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String       @default("")
+  tags           String[]     @default([])
+  isDefault      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  cases          TestCase[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@index([organizationId])
+  @@map("suite")
+}
+
+model TestCase {
+  id             String       @id @default(cuid())
+  suiteId        String
+  suite          Suite        @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  name           String
+  steps          String[]     @default([])
+  expectedResult String       @default("")
+  priority       CasePriority @default(medium)
+  state          CaseState    @default(active)
+  position       Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([suiteId])
+  @@index([suiteId, position])
+  @@map("test_case")
 }
