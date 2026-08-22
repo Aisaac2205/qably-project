@@ -313,6 +313,18 @@ export interface GithubIntegration {
   repoUrl?: string
 }
 
+export type RepoConnectionProvider = 'GITHUB' | 'BITBUCKET'
+
+export interface RepoConnection {
+  id: string
+  organizationId: string
+  provider: RepoConnectionProvider
+  name: string
+  repo: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type ConnectionType =
   | 'github'
   | 'bitbucket'

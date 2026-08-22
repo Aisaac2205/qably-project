@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
+import { ConnectionsModule } from './connections/connections.module';
 import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -16,6 +17,7 @@ import { SuitesModule } from './suites/suites.module';
     OrganizationsModule,
     ProjectsModule,
     SuitesModule,
+    ConnectionsModule,
   ],
 })
 export class AppModule {}

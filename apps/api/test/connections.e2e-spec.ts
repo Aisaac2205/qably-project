@@ -1,0 +1,282 @@
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import type { App } from 'supertest/types';
+import {
+  SESSION_READER,
+  type SessionContext,
+} from '../src/auth/auth.contracts';
+import { AUTH_INSTANCE } from '../src/auth/auth.instance';
+import { AuthModule } from '../src/auth/auth.module';
+import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { ConfigModule } from '../src/config/config.module';
+import { ENV } from '../src/config/config.tokens';
+import type { Env } from '../src/config/env';
+import { ConnectionsModule } from '../src/connections/connections.module';
+import { OrganizationsModule } from '../src/organizations/organizations.module';
+import { PrismaModule } from '../src/prisma/prisma.module';
+import { PrismaService } from '../src/prisma/prisma.service';
+
+const testEnv: Env = {
+  NODE_ENV: 'test',
+  PORT: 3001,
+  DATABASE_URL: 'postgresql://qably:qably@localhost:5432/qably',
+  REDIS_URL: 'redis://localhost:6379',
+  BETTER_AUTH_SECRET: 'x'.repeat(32),
+  BETTER_AUTH_URL: 'http://localhost:3001',
+  WEB_APP_URL: 'http://localhost:3000',
+  ENCRYPTION_KEY: 'a'.repeat(64),
+  GITHUB_CLIENT_ID: 'gh-client-id',
+  GITHUB_CLIENT_SECRET: 'gh-client-secret',
+};
+
+const session: SessionContext = {
+  user: {
+    id: 'user-1',
+    email: 'ada@acme.test',
+    name: 'Ada Lovelace',
+    emailVerified: true,
+  },
+  sessionId: 'session-1',
+  expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+};
+
+const connectionRow = {
+  id: 'connection-1',
+  organizationId: 'org-1',
+  provider: 'GITHUB',
+  name: 'Primary',
+  repo: 'acme/shop',
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+};
+
+function assertNoTokenLeak(body: unknown, plaintext: string): void {
+  const serialized = JSON.stringify(body);
+
+  expect(serialized).not.toContain(plaintext);
+  expect(serialized).not.toMatch(/"token"/);
+  expect(serialized).not.toMatch(/"encryptedToken"/);
+}
+
+describe('Connections (e2e)', () => {
+  let app: INestApplication<App>;
+  const read = jest.fn();
+  const prisma = {
+    orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
+    organization: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
+    connection: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    },
+    $transaction: jest.fn(),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    read.mockResolvedValue(session);
+    prisma.$transaction.mockImplementation(
+      (run: (tx: typeof prisma) => unknown) => run(prisma),
+    );
+    prisma.orgMember.findFirst.mockResolvedValue({
+      organizationId: 'org-1',
+      role: 'owner',
+      organization: { slug: 'acme' },
+    });
+    prisma.connection.findFirst.mockResolvedValue(connectionRow);
+    prisma.connection.create.mockResolvedValue(connectionRow);
+    prisma.connection.update.mockResolvedValue(connectionRow);
+
+    const moduleFixture = await Test.createTestingModule({
+      imports: [
+        ConfigModule,
+        PrismaModule,
+        AuthModule,
+        OrganizationsModule,
+        ConnectionsModule,
+      ],
+    })
+      .overrideProvider(PrismaService)
+      .useValue(prisma)
+      .overrideProvider(AUTH_INSTANCE)
+      .useValue({ handler: () => new Response('{}', { status: 200 }) })
+      .overrideProvider(SESSION_READER)
+      .useValue({ read })
+      .overrideProvider(ENV)
+      .useValue(testEnv)
+      .compile();
+
+    app = moduleFixture.createNestApplication();
+    app.useGlobalFilters(new AllExceptionsFilter(false));
+    await app.init();
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it('refuses the connection routes without a session', async () => {
+    read.mockResolvedValue(null);
+
+    await request(app.getHttpServer()).get('/connections').expect(401);
+  });
+
+  it('returns the connections of the caller organization', async () => {
+    prisma.connection.findMany.mockResolvedValue([connectionRow]);
+
+    const response = await request(app.getHttpServer())
+      .get('/connections')
+      .expect(200);
+
+    expect(prisma.connection.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organizationId: 'org-1' } }),
+    );
+    expect(response.body).toEqual([
+      expect.objectContaining({ id: 'connection-1', repo: 'acme/shop' }),
+    ]);
+  });
+
+  it('never leaks the token when listing connections', async () => {
+    prisma.connection.findMany.mockResolvedValue([connectionRow]);
+
+    const response = await request(app.getHttpServer())
+      .get('/connections')
+      .expect(200);
+
+    assertNoTokenLeak(response.body, 'ghp_super-secret-token');
+  });
+
+  it('creates a connection, encrypts the token, and never returns it', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/connections')
+      .send({
+        provider: 'GITHUB',
+        name: 'Primary',
+        repo: 'acme/shop',
+        token: 'ghp_super-secret-token',
+      })
+      .expect(201);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({ id: 'connection-1', repo: 'acme/shop' }),
+    );
+    assertNoTokenLeak(response.body, 'ghp_super-secret-token');
+
+    const [call] = prisma.connection.create.mock.calls as [
+      [{ data: { encryptedToken: string } }],
+    ];
+    expect(call[0].data.encryptedToken).not.toContain('ghp_super-secret-token');
+    expect(call[0].data.encryptedToken.split(':')).toHaveLength(3);
+  });
+
+  it('returns a single connection without leaking the token', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/connections/connection-1')
+      .expect(200);
+
+    assertNoTokenLeak(response.body, 'ghp_super-secret-token');
+  });
+
+  it('rejects a body with an unsupported provider', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/connections')
+      .send({
+        provider: 'GITLAB',
+        name: 'Primary',
+        repo: 'acme/shop',
+        token: 't',
+      })
+      .expect(400);
+
+    const body = response.body as { issues: { path: string }[] };
+    expect(body.issues.map((issue) => issue.path)).toContain('provider');
+  });
+
+  it('answers 409 when the connection already exists for that repo', async () => {
+    prisma.connection.create.mockRejectedValue({ code: 'P2002' });
+
+    await request(app.getHttpServer())
+      .post('/connections')
+      .send({
+        provider: 'GITHUB',
+        name: 'Primary',
+        repo: 'acme/shop',
+        token: 'ghp_super-secret-token',
+      })
+      .expect(409);
+  });
+
+  it('answers 404 for a connection owned by another organization', async () => {
+    prisma.connection.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/connections/connection-x')
+      .expect(404);
+  });
+
+  it('answers 403 when a member tries to create a connection', async () => {
+    prisma.orgMember.findFirst.mockResolvedValue({
+      organizationId: 'org-1',
+      role: 'member',
+      organization: { slug: 'acme' },
+    });
+
+    await request(app.getHttpServer())
+      .post('/connections')
+      .send({
+        provider: 'GITHUB',
+        name: 'Primary',
+        repo: 'acme/shop',
+        token: 'ghp_super-secret-token',
+      })
+      .expect(403);
+  });
+
+  it('answers 403 when a member tries to delete a connection', async () => {
+    prisma.orgMember.findFirst.mockResolvedValue({
+      organizationId: 'org-1',
+      role: 'member',
+      organization: { slug: 'acme' },
+    });
+
+    await request(app.getHttpServer())
+      .delete('/connections/connection-1')
+      .expect(403);
+  });
+
+  it('deletes with 204 when the caller owns the organization', async () => {
+    await request(app.getHttpServer())
+      .delete('/connections/connection-1')
+      .expect(204);
+
+    expect(prisma.connection.delete).toHaveBeenCalledWith({
+      where: { id: 'connection-1' },
+    });
+  });
+
+  it('rotates the token on update without leaking it', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/connections/connection-1')
+      .send({ token: 'ghp_rotated-secret' })
+      .expect(200);
+
+    assertNoTokenLeak(response.body, 'ghp_rotated-secret');
+    const [call] = prisma.connection.update.mock.calls as [
+      [{ data: { encryptedToken?: string } }],
+    ];
+    expect(call[0].data.encryptedToken).toBeDefined();
+    expect(call[0].data.encryptedToken).not.toContain('ghp_rotated-secret');
+  });
+
+  it('answers 403 when the organization header names a foreign organization', async () => {
+    prisma.orgMember.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/connections')
+      .set('x-organization-id', 'org-someone-else')
+      .expect(403);
+  });
+});

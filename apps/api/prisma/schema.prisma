@@ -36,6 +36,11 @@ enum CaseState {
   deprecated
 }
 
+enum ConnectionProvider {
+  GITHUB
+  BITBUCKET
+}
+
 model User {
   id            String      @id @default(cuid())
   name          String
@@ -113,6 +118,7 @@ model Organization {
   members     OrgMember[]
   projects    Project[]
   suites      Suite[]
+  connections Connection[]
 
   @@unique([slug])
   @@map("organization")
@@ -185,4 +191,20 @@ model TestCase {
   @@index([suiteId])
   @@index([suiteId, position])
   @@map("test_case")
+}
+
+model Connection {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider       ConnectionProvider
+  name           String
+  repo           String
+  encryptedToken String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, provider, repo])
+  @@index([organizationId])
+  @@map("connection")
 }
