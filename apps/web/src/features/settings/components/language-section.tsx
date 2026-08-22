@@ -32,7 +32,7 @@ export function LanguageSection() {
               className={[
                 'px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 cursor-pointer active:scale-[0.98]',
                 isSelected
-                  ? 'bg-surface text-default shadow-2xs border border-border/60'
+                  ? 'bg-primary text-primary-fg shadow-2xs border border-primary'
                   : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent',
               ].join(' ')}
             >
