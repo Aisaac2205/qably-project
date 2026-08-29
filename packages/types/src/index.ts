@@ -65,6 +65,23 @@ export interface ProjectSummary extends Project {
   aiPendingCount: number
 }
 
+/**
+ * Metrics that only exist once the Runs module lands. `null` on a project
+ * means "not measured yet", never "zero" — the UI must not invent numbers.
+ */
+export interface ProjectActivity {
+  healthScore: number
+  lastRunStatus: RunStatus
+  lastRunAt: string
+  activeRunCount: number
+  aiPendingCount: number
+}
+
+export interface ProjectListItem extends Project {
+  suiteCount: number
+  activity: ProjectActivity | null
+}
+
 export interface OrganizationSummary {
   id: string
   name: string

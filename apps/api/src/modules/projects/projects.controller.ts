@@ -18,7 +18,11 @@ import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { ProjectError, ProjectView } from './projects.contracts';
+import type {
+  ProjectError,
+  ProjectListView,
+  ProjectView,
+} from './projects.contracts';
 import {
   createProjectSchema,
   updateProjectSchema,
@@ -52,7 +56,7 @@ export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
   @Get()
-  list(@CurrentOrg() org: OrgContext): Promise<ProjectView[]> {
+  list(@CurrentOrg() org: OrgContext): Promise<ProjectListView[]> {
     return this.projects.list(org);
   }
 

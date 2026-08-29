@@ -2,7 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { ProjectError, ProjectView } from './projects.contracts';
+import type {
+  ProjectError,
+  ProjectListView,
+  ProjectView,
+} from './projects.contracts';
 import type {
   CreateProjectInput,
   UpdateProjectInput,
@@ -21,6 +25,15 @@ const SELECT = {
   updatedAt: true,
 } as const;
 
+const LIST_SELECT = {
+  ...SELECT,
+  _count: { select: { suites: true } },
+} as const;
+
+interface ProjectListRow extends ProjectRow {
+  _count?: { suites: number };
+}
+
 interface ProjectRow {
   id: string;
   name: string;
@@ -38,6 +51,14 @@ function isUniqueViolation(error: unknown): boolean {
     error !== null &&
     (error as { code?: unknown }).code === UNIQUE_VIOLATION
   );
+}
+
+function toListView(row: ProjectListRow): ProjectListView {
+  return {
+    ...toView(row),
+    suiteCount: row._count?.suites ?? 0,
+    activity: null,
+  };
 }
 
 function toView(row: ProjectRow): ProjectView {
@@ -61,14 +82,14 @@ function canDelete(org: OrgContext): boolean {
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(org: OrgContext): Promise<ProjectView[]> {
+  async list(org: OrgContext): Promise<ProjectListView[]> {
     const rows = await this.prisma.project.findMany({
       where: { organizationId: org.organizationId },
       orderBy: { createdAt: 'desc' },
-      select: SELECT,
+      select: LIST_SELECT,
     });
 
-    return rows.map(toView);
+    return rows.map(toListView);
   }
 
   async findOne(

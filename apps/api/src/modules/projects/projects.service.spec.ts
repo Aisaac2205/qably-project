@@ -196,3 +196,48 @@ describe('ProjectsService.remove', () => {
     });
   });
 });
+
+describe('ProjectsService.list summary fields', () => {
+  it('asks postgres to count the suites of each project', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([]);
+
+    await build(prisma).list(owner);
+
+    const [call] = prisma.project.findMany.mock.calls as [
+      [{ select: Record<string, unknown> }],
+    ];
+    expect(call[0].select._count).toEqual({ select: { suites: true } });
+  });
+
+  it('exposes the counted suites as suiteCount', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([
+      { ...row, _count: { suites: 4 } },
+    ]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.suiteCount).toBe(4);
+  });
+
+  it('reports no activity while the runs module does not exist', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([
+      { ...row, _count: { suites: 0 } },
+    ]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity).toBeNull();
+  });
+
+  it('never invents a suite count when the relation is missing', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([{ ...row }]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.suiteCount).toBe(0);
+  });
+});
