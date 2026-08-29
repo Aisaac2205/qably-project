@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCreateProject } from '../hooks/use-create-project'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { useAvailableRepos } from '@/features/integrations/hooks/use-available-repos'
+import { RepoPicker } from '@/features/integrations/components/repo-picker'
 import {
   createConnection,
   detectStack,
@@ -18,7 +19,7 @@ export function NewProjectForm() {
   const router = useRouter()
   const { t } = useTranslation()
   const { connections } = useConnections()
-  const { repos } = useAvailableRepos()
+  const { repos, isLoading: reposLoading, refresh } = useAvailableRepos()
   const repoOptions = buildRepoOptions(connections, repos)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -131,30 +132,19 @@ export function NewProjectForm() {
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="connectionId" className="block text-xs font-semibold text-default">
-          {t('projects.repoConnectionLabel')} <span className="text-muted font-normal">({t('projects.repoConnectionHint')})</span>
-        </label>
-        <select
-          id="connectionId"
-          name="connectionId"
+        <p className="text-xs font-semibold text-default" id="repo-picker-label">
+          {t('projects.repoConnectionLabel')}{' '}
+          <span className="font-normal text-muted">
+            ({t('projects.repoConnectionHint')})
+          </span>
+        </p>
+        <RepoPicker
+          options={repoOptions}
           value={connectionId}
-          onChange={(e) => setConnectionId(e.target.value)}
-          disabled={repoOptions.length === 0}
-          className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
-          aria-describedby={repoOptions.length === 0 ? 'connection-empty' : undefined}
-        >
-          <option value="">{t('projects.repoConnectionNone')}</option>
-          {repoOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.repo}
-            </option>
-          ))}
-        </select>
-        {repoOptions.length === 0 && (
-          <p id="connection-empty" className="text-xs text-muted">
-            {t('projects.repoConnectionEmpty')}
-          </p>
-        )}
+          onChange={setConnectionId}
+          onRefresh={refresh}
+          isLoading={reposLoading}
+        />
         {errors.connectionId && (
           <p className="text-xs text-fail" role="alert">
             {errors.connectionId}

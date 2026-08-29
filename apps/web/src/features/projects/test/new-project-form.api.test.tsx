@@ -150,7 +150,9 @@ describe('NewProjectForm against the api', () => {
 
     expect(screen.getByLabelText(/Project name/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Description/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Repository connection/)).toBeInTheDocument()
+    expect(
+      screen.getByRole('radiogroup', { name: /Repository connection/ }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Create project/ })).toBeInTheDocument()
   })
 
@@ -169,7 +171,7 @@ describe('NewProjectForm against the api', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('option', { name: 'acme/payments' }),
+        screen.getByRole('radio', { name: /acme\/payments/ }),
       ).toBeInTheDocument()
     })
   })
@@ -180,11 +182,11 @@ describe('NewProjectForm against the api', () => {
     await act(async () => { renderForm() })
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Repository connection/)).toBeDisabled()
+      expect(screen.getByRole('status')).toHaveTextContent(
+        /We found no repositories in your GitHub account/,
+      )
     })
-    expect(
-      screen.getByText(/We found no repositories in your GitHub account/),
-    ).toBeInTheDocument()
+    expect(screen.queryAllByRole('radio')).toHaveLength(0)
   })
 
   it('sends the optional fields when they are filled in', async () => {
@@ -195,13 +197,10 @@ describe('NewProjectForm against the api', () => {
     await user.type(screen.getByLabelText(/Description/), 'Checkout flows')
     await waitFor(() => {
       expect(
-        screen.getByRole('option', { name: 'acme/payments' }),
+        screen.getByRole('radio', { name: /acme\/payments/ }),
       ).toBeInTheDocument()
     })
-    await user.selectOptions(
-      screen.getByLabelText(/Repository connection/),
-      'conn-1',
-    )
+    await user.click(screen.getByRole('radio', { name: /acme\/payments/ }))
     await user.click(screen.getByRole('button', { name: /Create project/ }))
 
     await waitFor(() => {
@@ -232,7 +231,7 @@ describe('NewProjectForm against the api', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('option', { name: 'acme/checkout' }),
+        screen.getByRole('radio', { name: /acme\/checkout/ }),
       ).toBeInTheDocument()
     })
   })
@@ -244,9 +243,11 @@ describe('NewProjectForm against the api', () => {
     await act(async () => { renderForm() })
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Repository connection/)).toBeEnabled()
+      expect(screen.getAllByRole('radio')).toHaveLength(1)
     })
-    expect(screen.getAllByRole('option', { name: 'acme/payments' })).toHaveLength(1)
+    expect(
+      screen.getAllByRole('radio', { name: /acme\/payments/ }),
+    ).toHaveLength(1)
   })
 
   it('connects a github repository before creating the project against it', async () => {
@@ -256,13 +257,10 @@ describe('NewProjectForm against the api', () => {
     await user.type(screen.getByLabelText(/Project name/), 'Checkout')
     await waitFor(() => {
       expect(
-        screen.getByRole('option', { name: 'acme/checkout' }),
+        screen.getByRole('radio', { name: /acme\/checkout/ }),
       ).toBeInTheDocument()
     })
-    await user.selectOptions(
-      screen.getByLabelText(/Repository connection/),
-      'repo:acme/checkout',
-    )
+    await user.click(screen.getByRole('radio', { name: /acme\/checkout/ }))
     await user.click(screen.getByRole('button', { name: /Create project/ }))
 
     await waitFor(() => {
@@ -287,13 +285,10 @@ describe('NewProjectForm against the api', () => {
     await user.type(screen.getByLabelText(/Project name/), 'Checkout')
     await waitFor(() => {
       expect(
-        screen.getByRole('option', { name: 'acme/checkout' }),
+        screen.getByRole('radio', { name: /acme\/checkout/ }),
       ).toBeInTheDocument()
     })
-    await user.selectOptions(
-      screen.getByLabelText(/Repository connection/),
-      'repo:acme/checkout',
-    )
+    await user.click(screen.getByRole('radio', { name: /acme\/checkout/ }))
 
     await waitFor(() => {
       expect(detectStackMock).toHaveBeenCalledWith('acme/checkout')
@@ -312,7 +307,7 @@ describe('NewProjectForm against the api', () => {
     await act(async () => { renderForm() })
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/Repository connection/)).toBeEnabled()
+      expect(screen.getAllByRole('radio').length).toBeGreaterThan(0)
     })
     expect(detectStackMock).not.toHaveBeenCalled()
   })

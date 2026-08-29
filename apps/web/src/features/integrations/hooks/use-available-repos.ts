@@ -17,5 +17,6 @@ export function useAvailableRepos() {
     repos: query.data ?? EMPTY,
     isLoading: query.isLoading,
     isError: query.isError,
+    refresh: () => void query.refetch(),
   }
 }
