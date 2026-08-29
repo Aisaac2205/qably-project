@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from './config/config.module';
 import { ConnectionsModule } from './modules/connections/connections.module';
@@ -19,6 +20,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     ProjectsModule,
     SuitesModule,
     ConnectionsModule,
+    ApiKeysModule,
     IngestionModule,
   ],
 })

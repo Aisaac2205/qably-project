@@ -149,10 +149,30 @@ model Project {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   suites         Suite[]
+  apiKeys        ApiKey[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@map("project")
+}
+
+model ApiKey {
+  id             String    @id @default(cuid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId String
+  name           String
+  lookupId       String
+  hashedSecret   String
+  lastFour       String
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+
+  @@unique([lookupId])
+  @@index([projectId])
+  @@index([organizationId])
+  @@map("api_key")
 }
 
 model Suite {

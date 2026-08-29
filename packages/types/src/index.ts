@@ -38,11 +38,17 @@ export interface OrgMember {
 
 export interface ApiKey {
   id: string
+  projectId: string
   name: string
   prefix: string
   lastFour: string
   createdAt: string
   lastUsedAt?: string
+  revokedAt?: string
+}
+
+export interface ApiKeyWithSecret extends ApiKey {
+  token: string
 }
 
 export interface Project {

@@ -92,16 +92,18 @@ export const mockMembers: OrgMember[] = [
 export const mockApiKeys: ApiKey[] = [
   {
     id: 'key-1',
+    projectId: 'proj-1',
     name: 'CI/CD Pipeline',
-    prefix: 'org_',
+    prefix: 'qbly_8f2a1c4d9e6b',
     lastFour: '4a2f',
     createdAt: '2026-04-01T00:00:00Z',
     lastUsedAt: '2026-06-18T14:22:00Z',
   },
   {
     id: 'key-2',
+    projectId: 'proj-1',
     name: 'Local Dev',
-    prefix: 'org_',
+    prefix: 'qbly_3d7e5b0a2f81',
     lastFour: 'b7c9',
     createdAt: '2026-05-15T00:00:00Z',
   },

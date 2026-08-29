@@ -901,13 +901,15 @@ export function skipAiCase(id: string): AiCase | undefined {
   return aiCases.find((c) => c.id === id)
 }
 
-export function createApiKey(name: string): ApiKey {
+export function createApiKey(name: string, projectId = 'proj-1'): ApiKey {
   const id = `key-${apiKeys.length + 1}`
+  const lookupId = Math.random().toString(16).slice(2, 14)
   const lastFour = Math.random().toString(16).slice(2, 6)
   const newKey: ApiKey = {
     id,
+    projectId,
     name,
-    prefix: 'org_',
+    prefix: `qbly_${lookupId}`,
     lastFour,
     createdAt: new Date().toISOString(),
   }
