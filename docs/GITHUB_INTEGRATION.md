@@ -52,21 +52,24 @@ Two consequences follow, and both are recorded as future work rather than solved
 Migrating to a GitHub App is the natural continuation, alongside the single-SCM-provider limit
 recorded in the thesis (§1.6.2, limit 2).
 
-## Detecting the stack from `package.json`
+## Detecting the stack from repository manifests
 
-`GET /connections/detect-stack?repo=owner/name` reads the repository's `package.json` with the same
-OAuth token and maps its dependencies onto the shared technology catalogue. The project form calls it
+`GET /connections/detect-stack?repo=owner/name` reads the repository's manifests with the same OAuth
+token and maps their dependencies onto the shared technology catalogue. The project form calls it
 when a repository is picked and merges the result into the technology selection, never removing what
 the user chose by hand.
 
-The mapping is deliberately small and explicit: `react`, `typescript`, `@angular/core`, `@nestjs/core`,
-`express`, `vite`, `pg` and Cloudflare's `wrangler`. A repository with a manifest but no recognised
-dependency is still reported as JavaScript, and as TypeScript instead when `typescript` is declared.
+Detection reads the repository root once, then fetches only the manifests that are actually there:
 
-**What this cannot detect.** Java, PHP, Laravel, Spring Boot and Flutter do not appear in a
-`package.json`. Those remain a manual choice, and no amount of dependency mapping will change that —
-detecting them would require reading `pom.xml`, `composer.json` or `pubspec.yaml`, which is a
-separate piece of work rather than an extension of this one.
+| Manifest | Detects |
+| --- | --- |
+| `package.json` | React, Angular, NestJS, Express, Vite, PostgreSQL (`pg`), Cloudflare (`wrangler`), plus TypeScript or JavaScript |
+| `composer.json` | PHP, and Laravel when a `laravel/*` package is required |
+| `pom.xml`, `build.gradle`, `build.gradle.kts` | Java, and Spring Boot when the build declares it |
+| `pubspec.yaml` | Flutter, only when the manifest actually depends on the Flutter SDK |
+
+A polyglot repository reports every stack it declares. A Dart package that is not a Flutter app is
+not reported as Flutter, and a manifest that fails to parse is skipped rather than guessed at.
 
 ## Background work has no credential yet
 

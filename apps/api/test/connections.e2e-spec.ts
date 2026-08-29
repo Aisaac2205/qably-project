@@ -65,7 +65,7 @@ describe('Connections (e2e)', () => {
   const read = jest.fn();
   const repoDirectory = {
     listForUser: jest.fn(),
-    readPackageManifest: jest.fn(),
+    readManifests: jest.fn(),
   };
   const prisma = {
     orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
@@ -376,16 +376,18 @@ describe('Connections (e2e)', () => {
   });
 
   it('detects the stack of a repository from its package.json', async () => {
-    repoDirectory.readPackageManifest.mockResolvedValue({
-      dependencies: { react: '^19.0.0' },
-      devDependencies: { typescript: '^5.0.0' },
+    repoDirectory.readManifests.mockResolvedValue({
+      'package.json': JSON.stringify({
+        dependencies: { react: '^19.0.0' },
+        devDependencies: { typescript: '^5.0.0' },
+      }),
     });
 
     const response = await request(app.getHttpServer())
       .get('/connections/detect-stack?repo=acme/shop')
       .expect(200);
 
-    expect(repoDirectory.readPackageManifest).toHaveBeenCalledWith(
+    expect(repoDirectory.readManifests).toHaveBeenCalledWith(
       'user-1',
       'acme/shop',
     );
@@ -395,7 +397,7 @@ describe('Connections (e2e)', () => {
   });
 
   it('answers an empty stack when the repository has no readable manifest', async () => {
-    repoDirectory.readPackageManifest.mockResolvedValue(null);
+    repoDirectory.readManifests.mockResolvedValue({});
 
     const response = await request(app.getHttpServer())
       .get('/connections/detect-stack?repo=acme/shop')
@@ -411,6 +413,6 @@ describe('Connections (e2e)', () => {
       .get('/connections/detect-stack?repo=not-a-repo')
       .expect(400);
 
-    expect(repoDirectory.readPackageManifest).not.toHaveBeenCalled();
+    expect(repoDirectory.readManifests).not.toHaveBeenCalled();
   });
 });

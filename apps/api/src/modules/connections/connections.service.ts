@@ -78,9 +78,9 @@ export class ConnectionsService {
   }
 
   async detectStack(userId: string, repo: string): Promise<DetectedStackView> {
-    const manifest = await this.repos.readPackageManifest(userId, repo);
+    const manifests = await this.repos.readManifests(userId, repo);
 
-    return { technologies: detectStack(manifest) };
+    return { technologies: detectStack(manifests) };
   }
 
   async list(org: OrgContext): Promise<ConnectionView[]> {

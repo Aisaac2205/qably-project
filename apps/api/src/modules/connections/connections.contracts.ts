@@ -1,3 +1,4 @@
+import type { RepoManifests } from './lib/detect-stack';
 import type {
   AvailableRepo,
   DetectedStack,
@@ -22,5 +23,7 @@ export const REPO_DIRECTORY = Symbol('REPO_DIRECTORY');
 
 export interface RepoDirectory {
   listForUser(userId: string): Promise<AvailableRepo[]>;
-  readPackageManifest(userId: string, repo: string): Promise<unknown>;
+  readManifests(userId: string, repo: string): Promise<RepoManifests>;
 }
+
+export type { RepoManifests };

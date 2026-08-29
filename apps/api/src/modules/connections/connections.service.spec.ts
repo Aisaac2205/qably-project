@@ -59,7 +59,7 @@ function createEncryption(): FakeEncryption {
 
 const repoDirectory = {
   listForUser: jest.fn(),
-  readPackageManifest: jest.fn(),
+  readManifests: jest.fn(),
 };
 
 function build(prisma: FakePrisma, encryption: FakeEncryption) {

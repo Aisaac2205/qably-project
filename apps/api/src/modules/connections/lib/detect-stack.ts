@@ -1,6 +1,19 @@
 import type { TechKey } from '@qably/types';
 
-const DEPENDENCY_MAP: Record<string, TechKey> = {
+export const MANIFEST_PATHS = [
+  'package.json',
+  'composer.json',
+  'pom.xml',
+  'build.gradle',
+  'build.gradle.kts',
+  'pubspec.yaml',
+] as const;
+
+export type ManifestPath = (typeof MANIFEST_PATHS)[number];
+
+export type RepoManifests = Partial<Record<ManifestPath, string>>;
+
+const NPM_DEPENDENCIES: Record<string, TechKey> = {
   react: 'react',
   typescript: 'typescript',
   '@angular/core': 'angular',
@@ -12,34 +25,92 @@ const DEPENDENCY_MAP: Record<string, TechKey> = {
   '@cloudflare/workers-types': 'cloudflare',
 };
 
-interface PackageManifest {
-  dependencies?: Record<string, string>;
-  devDependencies?: Record<string, string>;
+function parseJson(raw: string | undefined): Record<string, unknown> | null {
+  if (raw === undefined) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+
+    return typeof parsed === 'object' && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
-function readDependencyNames(manifest: PackageManifest): string[] {
-  return [
-    ...Object.keys(manifest.dependencies ?? {}),
-    ...Object.keys(manifest.devDependencies ?? {}),
+function keysOf(value: unknown): string[] {
+  return typeof value === 'object' && value !== null ? Object.keys(value) : [];
+}
+
+function readNpm(raw: string | undefined, into: Set<TechKey>): void {
+  const manifest = parseJson(raw);
+
+  if (manifest === null) return;
+
+  const names = [
+    ...keysOf(manifest.dependencies),
+    ...keysOf(manifest.devDependencies),
   ];
-}
-
-export function detectStack(payload: unknown): TechKey[] {
-  if (typeof payload !== 'object' || payload === null) return [];
-
-  const names = readDependencyNames(payload);
-
-  if (names.length === 0) return [];
-
-  const detected = new Set<TechKey>();
 
   for (const name of names) {
-    const tech = DEPENDENCY_MAP[name];
+    const tech = NPM_DEPENDENCIES[name];
 
-    if (tech !== undefined) detected.add(tech);
+    if (tech !== undefined) into.add(tech);
   }
 
-  if (!detected.has('typescript')) detected.add('javascript');
+  into.add(into.has('typescript') ? 'typescript' : 'javascript');
+}
+
+function readComposer(raw: string | undefined, into: Set<TechKey>): void {
+  const manifest = parseJson(raw);
+
+  if (manifest === null) return;
+
+  into.add('php');
+
+  const names = [
+    ...keysOf(manifest.require),
+    ...keysOf(manifest['require-dev']),
+  ];
+
+  if (names.some((name) => name.startsWith('laravel/'))) into.add('laravel');
+}
+
+function readJava(manifests: RepoManifests, into: Set<TechKey>): void {
+  const sources = [
+    manifests['pom.xml'],
+    manifests['build.gradle'],
+    manifests['build.gradle.kts'],
+  ].filter((source): source is string => source !== undefined);
+
+  if (sources.length === 0) return;
+
+  into.add('java');
+
+  if (sources.some((source) => source.includes('spring-boot'))) {
+    into.add('springboot');
+  }
+
+  if (sources.some((source) => source.includes('springframework.boot'))) {
+    into.add('springboot');
+  }
+}
+
+function readDart(raw: string | undefined, into: Set<TechKey>): void {
+  if (raw === undefined) return;
+  if (!/^\s*flutter\s*:/m.test(raw)) return;
+
+  into.add('flutter');
+}
+
+export function detectStack(manifests: RepoManifests): TechKey[] {
+  const detected = new Set<TechKey>();
+
+  readNpm(manifests['package.json'], detected);
+  readComposer(manifests['composer.json'], detected);
+  readJava(manifests, detected);
+  readDart(manifests['pubspec.yaml'], detected);
 
   return [...detected];
 }

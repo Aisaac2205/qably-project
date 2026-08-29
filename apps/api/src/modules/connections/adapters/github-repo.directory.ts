@@ -2,12 +2,22 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { AvailableRepo } from '@qably/types';
 import { AUTH_INSTANCE, type AuthInstance } from '../../auth/auth.instance';
 import type { RepoDirectory } from '../connections.contracts';
+import {
+  MANIFEST_PATHS,
+  type ManifestPath,
+  type RepoManifests,
+} from '../lib/detect-stack';
 import { toAvailableRepos } from '../lib/github-repos';
 
-const REPOS_URL =
-  'https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,organization_member';
-
+const API = 'https://api.github.com';
 const PROVIDER_ID = 'github';
+const PER_PAGE = 100;
+const MAX_PAGES = 5;
+
+interface RootEntry {
+  name?: unknown;
+  type?: unknown;
+}
 
 @Injectable()
 export class GithubRepoDirectory implements RepoDirectory {
@@ -15,55 +25,95 @@ export class GithubRepoDirectory implements RepoDirectory {
 
   constructor(@Inject(AUTH_INSTANCE) private readonly auth: AuthInstance) {}
 
-  async readPackageManifest(userId: string, repo: string): Promise<unknown> {
-    const accessToken = await this.readAccessToken(userId);
-
-    if (accessToken === null) return null;
-
-    const response = await fetch(
-      `https://api.github.com/repos/${repo}/contents/package.json`,
-      { headers: this.headers(accessToken) },
-    );
-
-    if (!response.ok) return null;
-
-    const payload = (await response.json()) as { content?: unknown };
-
-    if (typeof payload.content !== 'string') return null;
-
-    try {
-      return JSON.parse(
-        Buffer.from(payload.content, 'base64').toString('utf8'),
-      ) as unknown;
-    } catch {
-      this.logger.warn(`Unreadable package.json in ${repo}`);
-      return null;
-    }
-  }
-
   async listForUser(userId: string): Promise<AvailableRepo[]> {
     const accessToken = await this.readAccessToken(userId);
 
     if (accessToken === null) return [];
 
-    const response = await fetch(REPOS_URL, {
-      headers: this.headers(accessToken),
+    const collected: AvailableRepo[] = [];
+
+    for (let page = 1; page <= MAX_PAGES; page += 1) {
+      const payload = await this.get(
+        `/user/repos?per_page=${PER_PAGE}&page=${page}&sort=updated&affiliation=owner,organization_member`,
+        accessToken,
+      );
+
+      if (payload === null) break;
+
+      const batch = toAvailableRepos(payload);
+
+      collected.push(...batch);
+
+      if (!Array.isArray(payload) || payload.length < PER_PAGE) break;
+    }
+
+    return collected.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
+
+  async readManifests(userId: string, repo: string): Promise<RepoManifests> {
+    const accessToken = await this.readAccessToken(userId);
+
+    if (accessToken === null) return {};
+
+    const root = await this.get(`/repos/${repo}/contents`, accessToken);
+
+    if (!Array.isArray(root)) return {};
+
+    const present = new Set(
+      (root as RootEntry[])
+        .filter((entry) => entry.type === 'file')
+        .map((entry) => entry.name)
+        .filter((name): name is string => typeof name === 'string'),
+    );
+
+    const wanted = MANIFEST_PATHS.filter((path) => present.has(path));
+    const manifests: RepoManifests = {};
+
+    await Promise.all(
+      wanted.map(async (path) => {
+        const content = await this.readFile(accessToken, repo, path);
+
+        if (content !== null) manifests[path] = content;
+      }),
+    );
+
+    return manifests;
+  }
+
+  private async readFile(
+    accessToken: string,
+    repo: string,
+    path: ManifestPath,
+  ): Promise<string | null> {
+    const payload = await this.get(
+      `/repos/${repo}/contents/${path}`,
+      accessToken,
+    );
+
+    if (payload === null || Array.isArray(payload)) return null;
+
+    const { content } = payload as { content?: unknown };
+
+    if (typeof content !== 'string') return null;
+
+    return Buffer.from(content, 'base64').toString('utf8');
+  }
+
+  private async get(path: string, accessToken: string): Promise<unknown> {
+    const response = await fetch(`${API}${path}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
     });
 
     if (!response.ok) {
-      this.logger.warn(`GitHub rejected the repository listing for ${userId}`);
-      return [];
+      this.logger.warn(`GitHub answered ${response.status} for ${path}`);
+      return null;
     }
 
-    return toAvailableRepos(await response.json());
-  }
-
-  private headers(accessToken: string): Record<string, string> {
-    return {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
-    };
+    return response.json();
   }
 
   private async readAccessToken(userId: string): Promise<string | null> {
