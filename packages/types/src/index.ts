@@ -51,6 +51,29 @@ export interface ApiKeyWithSecret extends ApiKey {
   token: string
 }
 
+export const TECH_KEYS = [
+  'react',
+  'typescript',
+  'javascript',
+  'angular',
+  'nestjs',
+  'express',
+  'java',
+  'php',
+  'vite',
+  'flutter',
+  'laravel',
+  'springboot',
+  'postgresql',
+  'cloudflare',
+] as const
+
+export type TechKey = (typeof TECH_KEYS)[number]
+
+export interface DetectedStack {
+  technologies: TechKey[]
+}
+
 export interface Project {
   id: string
   name: string

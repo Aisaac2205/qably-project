@@ -1,4 +1,6 @@
-export const TECH_ICONS = {
+import type { TechKey } from '@qably/types'
+
+export const TECH_ICONS: Record<TechKey, { label: string; src: string }> = {
   react:      { label: 'React',      src: '/tech-icons/react.svg' },
   typescript: { label: 'TypeScript', src: '/tech-icons/typescript.svg' },
   javascript: { label: 'JavaScript', src: '/tech-icons/javascript.svg' },
@@ -13,6 +15,6 @@ export const TECH_ICONS = {
   springboot: { label: 'Spring Boot', src: '/tech-icons/spring-boot-icon.svg' },
   postgresql: { label: 'PostgreSQL', src: '/tech-icons/postgresql-icon.svg' },
   cloudflare: { label: 'Cloudflare', src: '/tech-icons/cloudflare.svg' },
-} as const
+}
 
-export type TechKey = keyof typeof TECH_ICONS
+export type { TechKey }
