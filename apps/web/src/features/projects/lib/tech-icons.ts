@@ -12,6 +12,7 @@ export const TECH_ICONS = {
   laravel:    { label: 'Laravel',    src: '/tech-icons/laravel.svg' },
   springboot: { label: 'Spring Boot', src: '/tech-icons/spring-boot-icon.svg' },
   postgresql: { label: 'PostgreSQL', src: '/tech-icons/postgresql-icon.svg' },
+  cloudflare: { label: 'Cloudflare', src: '/tech-icons/cloudflare.svg' },
 } as const
 
 export type TechKey = keyof typeof TECH_ICONS

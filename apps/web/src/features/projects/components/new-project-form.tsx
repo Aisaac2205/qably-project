@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { useCreateProject } from '../hooks/use-create-project'
 import { TechSelector } from './tech-selector'
 import { useTranslation } from '@/lib/i18n'
@@ -8,14 +9,14 @@ import { useTranslation } from '@/lib/i18n'
 const GITHUB_REPO_RE = /^[\w-]+\/[\w-]+$/
 
 export function NewProjectForm() {
-  const createProject = useCreateProject()
+  const { mutate: createProject, isPending, error } = useCreateProject()
+  const router = useRouter()
   const { t } = useTranslation()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [githubRepo, setGithubRepo] = useState('')
   const [technologies, setTechnologies] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   function validate(): Record<string, string> {
     const errs: Record<string, string> = {}
@@ -26,14 +27,12 @@ export function NewProjectForm() {
     return errs
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const errs = validate()
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
 
-    setIsSubmitting(true)
-    await new Promise((r) => setTimeout(r, 200))
     createProject({
       name: name.trim(),
       description: description.trim() || undefined,
@@ -112,13 +111,31 @@ export function NewProjectForm() {
         <TechSelector selected={technologies} onChange={setTechnologies} />
       </div>
 
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full px-4 py-2 rounded bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-primary"
-      >
-        {isSubmitting ? t('projects.creating') : t('projects.createProject')}
-      </button>
+      {error && (
+        <p
+          className="rounded border border-fail/30 bg-fail-bg px-3 py-2 text-xs text-fail"
+          role="alert"
+        >
+          {error.message}
+        </p>
+      )}
+
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          className="min-h-11 px-4 py-2 rounded border border-border bg-surface text-default text-sm font-semibold hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="submit"
+          disabled={isPending}
+          className="min-h-11 px-4 py-2 rounded bg-primary text-primary-fg text-sm font-semibold hover:bg-primary-hover transition-colors disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          {isPending ? t('projects.creating') : t('projects.createProject')}
+        </button>
+      </div>
     </form>
   )
 }

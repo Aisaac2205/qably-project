@@ -1,19 +1,19 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { createProject } from '@/lib/mock-store'
-import { useCallback } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { createProject, type CreateProjectPayload } from '../api/projects.api'
+import { projectKeys } from '../lib/query-keys'
 
 export function useCreateProject() {
   const router = useRouter()
+  const queryClient = useQueryClient()
 
-  const create = useCallback(
-    (input: { name: string; description?: string; githubRepo?: string; technologies?: string[] }) => {
-      const project = createProject(input)
+  return useMutation({
+    mutationFn: (payload: CreateProjectPayload) => createProject(payload),
+    onSuccess: async (project) => {
+      await queryClient.invalidateQueries({ queryKey: projectKeys.all })
       router.push(`/projects/${project.id}`)
     },
-    [router],
-  )
-
-  return create
+  })
 }
