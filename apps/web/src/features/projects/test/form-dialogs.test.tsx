@@ -1,10 +1,23 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProjectSummary, Suite, TestCase } from '@qably/types'
 import { EditProjectDialog } from '@/features/projects/components/edit-project-dialog'
 import { CaseFormDialog } from '@/features/projects/suites/components/case-form-dialog'
 import { SuiteFormDialog } from '@/features/projects/suites/components/suite-form-dialog'
+
+vi.mock('@/features/integrations/api/connections.api', () => ({
+  listConnections: vi.fn().mockResolvedValue([]),
+}))
+
+function withQueryClient(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>
+}
 
 const project: ProjectSummary = {
   id: 'project-1',
@@ -50,13 +63,13 @@ describe('controlled form dialogs', () => {
   it('resets the edit project draft when the parent reopens it', async () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
-    const view = render(<EditProjectDialog project={project} open onOpenChange={onOpenChange} />)
+    const view = render(withQueryClient(<EditProjectDialog project={project} open onOpenChange={onOpenChange} />))
     const name = screen.getByRole('textbox', { name: /Project name/ })
 
     await user.clear(name)
     await user.type(name, 'Unsaved project')
-    view.rerender(<EditProjectDialog project={project} open={false} onOpenChange={onOpenChange} />)
-    view.rerender(<EditProjectDialog project={project} open onOpenChange={onOpenChange} />)
+    view.rerender(withQueryClient(<EditProjectDialog project={project} open={false} onOpenChange={onOpenChange} />))
+    view.rerender(withQueryClient(<EditProjectDialog project={project} open onOpenChange={onOpenChange} />))
 
     expect(screen.getByRole('textbox', { name: /Project name/ })).toHaveValue('Original project')
   })

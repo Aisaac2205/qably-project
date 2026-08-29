@@ -4,14 +4,14 @@ import { apiRequest } from '@/lib/api-client'
 export interface CreateProjectPayload {
   name: string
   description?: string
-  githubRepo?: string
+  connectionId?: string
   technologies: string[]
 }
 
 export type UpdateProjectPayload = Partial<{
   name: string
   description: string | null
-  githubRepo: string | null
+  connectionId: string | null
   technologies: string[]
 }>
 

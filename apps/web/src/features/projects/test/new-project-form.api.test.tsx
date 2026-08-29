@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NewProjectForm } from '@/features/projects/components/new-project-form'
 import { createProject } from '@/features/projects/api/projects.api'
+import { listConnections } from '@/features/integrations/api/connections.api'
 import { ApiError } from '@/lib/api-client'
 
 const mockPush = vi.fn()
@@ -17,7 +18,22 @@ vi.mock('@/features/projects/api/projects.api', () => ({
   createProject: vi.fn(),
 }))
 
+vi.mock('@/features/integrations/api/connections.api', () => ({
+  listConnections: vi.fn(),
+}))
+
 const create = vi.mocked(createProject)
+const listConnectionsMock = vi.mocked(listConnections)
+
+const connection = {
+  id: 'conn-1',
+  organizationId: 'org-1',
+  provider: 'GITHUB' as const,
+  name: 'Primary',
+  repo: 'acme/payments',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+}
 
 function renderForm() {
   const client = new QueryClient({
@@ -32,6 +48,7 @@ function renderForm() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listConnectionsMock.mockResolvedValue([connection])
   create.mockResolvedValue({
     id: 'p1',
     name: 'Shop',
@@ -54,7 +71,7 @@ describe('NewProjectForm against the api', () => {
       expect(create).toHaveBeenCalledWith({
         name: 'Shop',
         description: undefined,
-        githubRepo: undefined,
+        connectionId: undefined,
         technologies: [],
       })
     })
@@ -112,7 +129,7 @@ describe('NewProjectForm against the api', () => {
 
     expect(screen.getByLabelText(/Project name/)).toBeInTheDocument()
     expect(screen.getByLabelText(/Description/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/GitHub repo/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Repository connection/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Create project/ })).toBeInTheDocument()
   })
 
@@ -126,16 +143,26 @@ describe('NewProjectForm against the api', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  it('blocks the request when the repo is not in org/repo form', async () => {
-    const user = userEvent.setup()
+  it('offers only the repositories already connected to the organization', async () => {
     await act(async () => { renderForm() })
 
-    await user.type(screen.getByLabelText(/Project name/), 'Shop')
-    await user.type(screen.getByLabelText(/GitHub repo/), 'not-a-valid-repo')
-    await user.click(screen.getByRole('button', { name: /Create project/ }))
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'acme/payments' }),
+      ).toBeInTheDocument()
+    })
+  })
 
-    expect(screen.getByText('Format must be org/repo')).toBeInTheDocument()
-    expect(create).not.toHaveBeenCalled()
+  it('explains why no repository is selectable when none is connected', async () => {
+    listConnectionsMock.mockResolvedValue([])
+    await act(async () => { renderForm() })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Repository connection/)).toBeDisabled()
+    })
+    expect(
+      screen.getByText(/No repository is connected yet/),
+    ).toBeInTheDocument()
   })
 
   it('sends the optional fields when they are filled in', async () => {
@@ -144,14 +171,22 @@ describe('NewProjectForm against the api', () => {
 
     await user.type(screen.getByLabelText(/Project name/), 'Payment Gateway')
     await user.type(screen.getByLabelText(/Description/), 'Checkout flows')
-    await user.type(screen.getByLabelText(/GitHub repo/), 'acme/payments')
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'acme/payments' }),
+      ).toBeInTheDocument()
+    })
+    await user.selectOptions(
+      screen.getByLabelText(/Repository connection/),
+      'conn-1',
+    )
     await user.click(screen.getByRole('button', { name: /Create project/ }))
 
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith({
         name: 'Payment Gateway',
         description: 'Checkout flows',
-        githubRepo: 'acme/payments',
+        connectionId: 'conn-1',
         technologies: [],
       })
     })

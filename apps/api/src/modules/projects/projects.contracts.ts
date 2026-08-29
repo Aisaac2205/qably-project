@@ -8,4 +8,5 @@ export type ProjectError =
   | 'not-found'
   | 'name-taken'
   | 'plan-limit-reached'
+  | 'connection-not-found'
   | 'forbidden';

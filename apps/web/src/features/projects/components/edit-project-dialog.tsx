@@ -23,9 +23,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { TechSelector } from './tech-selector'
 import { useUpdateProject } from '../hooks/use-update-project'
+import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { useTranslation } from '@/lib/i18n'
-
-const GITHUB_REPO_RE = /^[\w-]+\/[\w-]+$/
 
 interface EditProjectDialogProps {
   project: Project
@@ -47,10 +46,11 @@ function EditProjectDialogContent({
 }: Omit<EditProjectDialogProps, 'open'>) {
   const updateProject = useUpdateProject()
   const { t } = useTranslation()
+  const { connections } = useConnections()
 
   const [name, setName] = useState(project.name)
   const [description, setDescription] = useState(project.description ?? '')
-  const [githubRepo, setGithubRepo] = useState(project.githubRepo ?? '')
+  const [connectionId, setConnectionId] = useState(project.connectionId ?? '')
   const [technologies, setTechnologies] = useState<string[]>(project.technologies ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -66,16 +66,13 @@ function EditProjectDialogContent({
     e.preventDefault()
     const errs: Record<string, string> = {}
     if (!name.trim()) errs.name = t('projects.nameRequiredError')
-    if (githubRepo.trim() && !GITHUB_REPO_RE.test(githubRepo.trim())) {
-      errs.githubRepo = t('projects.formatOrgRepoError')
-    }
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
 
     updateProject(project.id, {
       name: name.trim(),
       description: description.trim(),
-      githubRepo: githubRepo.trim(),
+      connectionId: connectionId || undefined,
       technologies,
     })
     onOpenChange(false)
@@ -121,20 +118,25 @@ function EditProjectDialogContent({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="edit-project-repo">{t('projects.githubRepoLabel')}</Label>
-          <Input
+          <Label htmlFor="edit-project-repo">{t('projects.repoConnectionLabel')}</Label>
+          <select
             id="edit-project-repo"
-            value={githubRepo}
-            onChange={(e) => {
-              setGithubRepo(e.target.value)
-              clearError('githubRepo')
-            }}
-            placeholder={t('projects.githubRepoPlaceholder')}
-            aria-invalid={!!errors.githubRepo}
-          />
-          {errors.githubRepo && (
-            <p role="alert" className="text-xs text-fail">
-              {errors.githubRepo}
+            value={connectionId}
+            onChange={(e) => setConnectionId(e.target.value)}
+            disabled={connections.length === 0}
+            className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
+            aria-describedby={connections.length === 0 ? 'edit-connection-empty' : undefined}
+          >
+            <option value="">{t('projects.repoConnectionNone')}</option>
+            {connections.map((connection) => (
+              <option key={connection.id} value={connection.id}>
+                {connection.repo}
+              </option>
+            ))}
+          </select>
+          {connections.length === 0 && (
+            <p id="edit-connection-empty" className="text-xs text-muted">
+              {t('projects.repoConnectionEmpty')}
             </p>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { isErr, isOk } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { ProjectsService } from './projects.service';
 
@@ -12,7 +13,8 @@ const row = {
   id: 'project-1',
   name: 'Checkout',
   description: null,
-  githubRepo: null,
+  connectionId: null,
+  connection: null,
   technologies: [],
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
@@ -28,6 +30,7 @@ interface FakePrisma {
     count: jest.Mock;
   };
   organization: { findUniqueOrThrow: jest.Mock };
+  connection: { findFirst: jest.Mock };
 }
 
 function createPrisma(): FakePrisma {
@@ -43,6 +46,7 @@ function createPrisma(): FakePrisma {
     organization: {
       findUniqueOrThrow: jest.fn().mockResolvedValue({ maxProjects: 3 }),
     },
+    connection: { findFirst: jest.fn().mockResolvedValue({ id: 'conn-1' }) },
   };
 }
 
@@ -239,5 +243,92 @@ describe('ProjectsService.list summary fields', () => {
     const [project] = await build(prisma).list(owner);
 
     expect(project.suiteCount).toBe(0);
+  });
+});
+
+describe('ProjectsService repository link', () => {
+  const linkedRow = {
+    ...row,
+    connectionId: 'conn-1',
+    connection: { repo: 'acme/shop' },
+  };
+
+  it('reads the repository from the linked connection instead of a stored copy', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue(linkedRow);
+
+    const result = await build(prisma).findOne(owner, 'project-1');
+
+    expect(isOk(result) && result.value.githubRepo).toBe('acme/shop');
+    expect(isOk(result) && result.value.connectionId).toBe('conn-1');
+  });
+
+  it('reports no repository when the project is not linked yet', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue(row);
+
+    const result = await build(prisma).findOne(owner, 'project-1');
+
+    expect(isOk(result) && result.value.githubRepo).toBeUndefined();
+  });
+
+  it('links a project to a connection of the caller organization', async () => {
+    const prisma = createPrisma();
+    prisma.project.create.mockResolvedValue(linkedRow);
+
+    await build(prisma).create(owner, {
+      name: 'Checkout',
+      technologies: [],
+      connectionId: 'conn-1',
+    });
+
+    expect(prisma.connection.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'conn-1', organizationId: 'org-1' },
+      }),
+    );
+    expect(prisma.project.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ connectionId: 'conn-1' }) as unknown,
+      }),
+    );
+  });
+
+  it('refuses a connection that belongs to another organization', async () => {
+    const prisma = createPrisma();
+    prisma.connection.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).create(owner, {
+      name: 'Checkout',
+      technologies: [],
+      connectionId: 'conn-foreign',
+    });
+
+    expect(isErr(result) && result.error).toBe('connection-not-found');
+    expect(prisma.project.create).not.toHaveBeenCalled();
+  });
+
+  it('validates the connection when relinking an existing project', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.connection.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).update(owner, 'project-1', {
+      connectionId: 'conn-foreign',
+    });
+
+    expect(isErr(result) && result.error).toBe('connection-not-found');
+    expect(prisma.project.update).not.toHaveBeenCalled();
+  });
+
+  it('unlinks without looking up a connection', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.project.update.mockResolvedValue(row);
+
+    await build(prisma).update(owner, 'project-1', { connectionId: null });
+
+    expect(prisma.connection.findFirst).not.toHaveBeenCalled();
+    expect(prisma.project.update).toHaveBeenCalled();
   });
 });

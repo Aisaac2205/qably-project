@@ -11,19 +11,17 @@ describe('createProjectSchema', () => {
     expect(createProjectSchema.safeParse({ name: '   ' }).success).toBe(false);
   });
 
-  it('accepts a repository in owner/name form', () => {
+  it('accepts the identifier of an existing repository connection', () => {
     expect(
-      createProjectSchema.parse({ name: 'Checkout', githubRepo: 'acme/shop' })
-        .githubRepo,
-    ).toBe('acme/shop');
+      createProjectSchema.parse({ name: 'Checkout', connectionId: 'conn-1' })
+        .connectionId,
+    ).toBe('conn-1');
   });
 
-  it('rejects a repository given as a full url', () => {
+  it('rejects a repository typed by hand instead of a connection', () => {
     expect(
-      createProjectSchema.safeParse({
-        name: 'Checkout',
-        githubRepo: 'https://github.com/acme/shop',
-      }).success,
+      createProjectSchema.safeParse({ name: 'Checkout', connectionId: '   ' })
+        .success,
     ).toBe(false);
   });
 });

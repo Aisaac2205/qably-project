@@ -29,7 +29,8 @@ const projectRow = {
   id: 'project-1',
   name: 'Checkout',
   description: null,
-  githubRepo: null,
+  connectionId: null,
+  connection: null,
   technologies: [],
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -146,11 +147,11 @@ describe('Projects (e2e)', () => {
   it('rejects an invalid body with 400 and the offending path', async () => {
     const response = await request(app.getHttpServer())
       .post('/projects')
-      .send({ name: '', githubRepo: 'https://github.com/acme/shop' })
+      .send({ name: '', connectionId: '   ' })
       .expect(400);
 
     const body = response.body as { issues: { path: string }[] };
-    expect(body.issues.map((issue) => issue.path)).toContain('githubRepo');
+    expect(body.issues.map((issue) => issue.path)).toContain('connectionId');
   });
 
   it('answers 409 when the project name is already used', async () => {

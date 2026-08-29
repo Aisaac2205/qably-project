@@ -55,6 +55,7 @@ export interface Project {
   id: string
   name: string
   description?: string
+  connectionId?: string
   githubRepo?: string
   organizationId: string
   technologies: string[]

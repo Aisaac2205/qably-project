@@ -18,7 +18,8 @@ const SELECT = {
   id: true,
   name: true,
   description: true,
-  githubRepo: true,
+  connectionId: true,
+  connection: { select: { repo: true } },
   organizationId: true,
   technologies: true,
   createdAt: true,
@@ -38,7 +39,8 @@ interface ProjectRow {
   id: string;
   name: string;
   description: string | null;
-  githubRepo: string | null;
+  connectionId: string | null;
+  connection: { repo: string } | null;
   organizationId: string;
   technologies: string[];
   createdAt: Date;
@@ -66,7 +68,8 @@ function toView(row: ProjectRow): ProjectView {
     id: row.id,
     name: row.name,
     description: row.description ?? undefined,
-    githubRepo: row.githubRepo ?? undefined,
+    connectionId: row.connectionId ?? undefined,
+    githubRepo: row.connection?.repo ?? undefined,
     organizationId: row.organizationId,
     technologies: row.technologies,
     createdAt: row.createdAt.toISOString(),
@@ -112,6 +115,10 @@ export class ProjectsService {
 
     if (!withinAllowance) return err('plan-limit-reached');
 
+    if (!(await this.connectionIsUsable(org, input.connectionId))) {
+      return err('connection-not-found');
+    }
+
     try {
       const row = await this.prisma.project.create({
         data: { ...input, organizationId: org.organizationId },
@@ -136,6 +143,10 @@ export class ProjectsService {
     });
 
     if (scoped === null) return err('not-found');
+
+    if (!(await this.connectionIsUsable(org, input.connectionId))) {
+      return err('connection-not-found');
+    }
 
     try {
       const row = await this.prisma.project.update({
@@ -167,6 +178,20 @@ export class ProjectsService {
     await this.prisma.project.delete({ where: { id } });
 
     return ok(undefined);
+  }
+
+  private async connectionIsUsable(
+    org: OrgContext,
+    connectionId: string | null | undefined,
+  ): Promise<boolean> {
+    if (connectionId === undefined || connectionId === null) return true;
+
+    const connection = await this.prisma.connection.findFirst({
+      where: { id: connectionId, organizationId: org.organizationId },
+      select: { id: true },
+    });
+
+    return connection !== null;
   }
 
   private async hasProjectAllowance(org: OrgContext): Promise<boolean> {

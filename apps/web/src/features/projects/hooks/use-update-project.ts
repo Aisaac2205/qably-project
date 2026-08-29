@@ -6,7 +6,7 @@ import type { Project } from '@qably/types'
 
 export function useUpdateProject() {
   return useCallback(
-    (id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'githubRepo' | 'technologies'>>) => {
+    (id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'connectionId' | 'technologies'>>) => {
       updateProject(id, patch)
     },
     [],

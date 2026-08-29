@@ -3,27 +3,24 @@
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateProject } from '../hooks/use-create-project'
+import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { TechSelector } from './tech-selector'
 import { useTranslation } from '@/lib/i18n'
-
-const GITHUB_REPO_RE = /^[\w-]+\/[\w-]+$/
 
 export function NewProjectForm() {
   const { mutate: createProject, isPending, error } = useCreateProject()
   const router = useRouter()
   const { t } = useTranslation()
+  const { connections } = useConnections()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [githubRepo, setGithubRepo] = useState('')
+  const [connectionId, setConnectionId] = useState('')
   const [technologies, setTechnologies] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   function validate(): Record<string, string> {
     const errs: Record<string, string> = {}
     if (!name.trim()) errs.name = t('projects.nameRequired')
-    if (githubRepo.trim() && !GITHUB_REPO_RE.test(githubRepo.trim())) {
-      errs.githubRepo = t('projects.formatOrgRepo')
-    }
     return errs
   }
 
@@ -36,7 +33,7 @@ export function NewProjectForm() {
     createProject({
       name: name.trim(),
       description: description.trim() || undefined,
-      githubRepo: githubRepo.trim() || undefined,
+      connectionId: connectionId || undefined,
       technologies,
     })
   }
@@ -83,23 +80,28 @@ export function NewProjectForm() {
       </div>
 
       <div className="space-y-1.5">
-        <label htmlFor="githubRepo" className="block text-xs font-semibold text-default">
-          {t('projects.githubRepoLabel')} <span className="text-muted font-normal">({t('projects.githubRepoHint')})</span>
+        <label htmlFor="connectionId" className="block text-xs font-semibold text-default">
+          {t('projects.repoConnectionLabel')} <span className="text-muted font-normal">({t('projects.repoConnectionHint')})</span>
         </label>
-        <input
-          id="githubRepo"
-          name="githubRepo"
-          type="text"
-          value={githubRepo}
-          onChange={(e) => { setGithubRepo(e.target.value); setErrors((prev) => { const next = { ...prev }; delete next.githubRepo; return next }) }}
-          placeholder={t('projects.githubRepoPlaceholder')}
-          className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors"
-          aria-invalid={!!errors.githubRepo}
-          aria-describedby={errors.githubRepo ? 'repo-error' : undefined}
-        />
-        {errors.githubRepo && (
-          <p id="repo-error" className="text-xs text-fail" role="alert">
-            {errors.githubRepo}
+        <select
+          id="connectionId"
+          name="connectionId"
+          value={connectionId}
+          onChange={(e) => setConnectionId(e.target.value)}
+          disabled={connections.length === 0}
+          className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
+          aria-describedby={connections.length === 0 ? 'connection-empty' : undefined}
+        >
+          <option value="">{t('projects.repoConnectionNone')}</option>
+          {connections.map((connection) => (
+            <option key={connection.id} value={connection.id}>
+              {connection.repo}
+            </option>
+          ))}
+        </select>
+        {connections.length === 0 && (
+          <p id="connection-empty" className="text-xs text-muted">
+            {t('projects.repoConnectionEmpty')}
           </p>
         )}
       </div>

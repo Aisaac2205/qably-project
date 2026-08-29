@@ -45,6 +45,10 @@ function unwrap<T>(result: Result<T, ProjectError>): T {
       throw new ForbiddenException(
         'This organization has reached the project limit for its plan',
       );
+    case 'connection-not-found':
+      throw new NotFoundException(
+        'That repository connection does not exist in this organization',
+      );
     case 'forbidden':
       throw new ForbiddenException('Your role cannot perform this action');
   }
