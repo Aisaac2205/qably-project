@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { DotsThreeVertical, PencilSimple, Trash } from '@phosphor-icons/react'
-import type { ProjectSummary } from '@qably/types'
+import type { ProjectListItem } from '@qably/types'
 import { StatusChip } from './status-chip'
 import { TechBadge } from './tech-badge'
 import { EditProjectDialog } from './edit-project-dialog'
@@ -15,19 +15,22 @@ import { useTranslation } from '@/lib/i18n'
 
 const MAX_ICONS = 4
 
-export function ProjectCard({ project }: { project: ProjectSummary }) {
+export function ProjectCard({ project }: { project: ProjectListItem }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { t } = useTranslation()
   const { delete: deleteProject } = useProjectAggregate()
 
-  const passedCount = project.lastRunStatus === 'fail'
+  const { activity } = project
+
+  const passedCount = activity?.lastRunStatus === 'fail'
     ? Math.max(0, project.suiteCount - 1)
     : project.suiteCount
 
-  let dotColor = 'bg-pass'
-  if (project.lastRunStatus === 'fail') dotColor = 'bg-fail'
-  else if (project.lastRunStatus === 'running') dotColor = 'bg-running animate-pulse'
+  let dotColor = 'bg-border'
+  if (activity?.lastRunStatus === 'fail') dotColor = 'bg-fail'
+  else if (activity?.lastRunStatus === 'running') dotColor = 'bg-running animate-pulse'
+  else if (activity) dotColor = 'bg-pass'
 
   const validTechs = (project.technologies ?? []).filter((t): t is TechKey => t in TECH_ICONS)
   const visibleTechs = validTechs.slice(0, MAX_ICONS)
@@ -47,15 +50,17 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           {project.name}
         </h3>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
-            project.healthScore >= 80
-              ? 'bg-pass-bg text-pass border-pass/20'
-              : project.healthScore >= 50
-                ? 'bg-warn-bg text-warn border-warn/20'
-                : 'bg-fail-bg text-fail border-fail/20'
-          }`}>
-            {project.healthScore}%
-          </span>
+          {activity && (
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+              activity.healthScore >= 80
+                ? 'bg-pass-bg text-pass border-pass/20'
+                : activity.healthScore >= 50
+                  ? 'bg-warn-bg text-warn border-warn/20'
+                  : 'bg-fail-bg text-fail border-fail/20'
+            }`}>
+              {activity.healthScore}%
+            </span>
+          )}
           <Menu>
             <MenuTrigger
               aria-label={t('projects.projectActions')}
@@ -104,16 +109,22 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
       <div className="flex items-center gap-2 border-t border-border/40 pt-3">
         <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} aria-hidden="true" />
         <span className="text-xs text-muted-foreground">
-          {t('projects.production')} · {passedCount}/{project.suiteCount} {project.suiteCount === 1 ? t('projects.service_one') : t('projects.service_other')} {t('projects.online')}
+          {activity
+            ? `${t('projects.production')} · ${passedCount}/${project.suiteCount} ${project.suiteCount === 1 ? t('projects.service_one') : t('projects.service_other')} ${t('projects.online')}`
+            : `${t('projects.noRunsYet')} · ${project.suiteCount}${t('projects.suitesSuffix')}`}
         </span>
       </div>
 
       {/* Screen-reader summary for tests and SR users */}
       <div className="sr-only">
-        <StatusChip status={project.lastRunStatus} />
+        {activity && (
+          <>
+            <StatusChip status={activity.lastRunStatus} />
+            <span><span>{activity.activeRunCount}</span>{t('projects.activeSuffix')}</span>
+            <span><span>{activity.aiPendingCount}</span>{t('projects.aiPendingSuffix')}</span>
+          </>
+        )}
         <span><span>{project.suiteCount}</span>{t('projects.suitesSuffix')}</span>
-        <span><span>{project.activeRunCount}</span>{t('projects.activeSuffix')}</span>
-        <span><span>{project.aiPendingCount}</span>{t('projects.aiPendingSuffix')}</span>
       </div>
 
       <EditProjectDialog project={project} open={editOpen} onOpenChange={setEditOpen} />

@@ -1,25 +1,27 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { ProjectCard } from '@/features/projects/components/project-card'
-import type { ProjectSummary } from '@qably/types'
+import type { ProjectListItem } from '@qably/types'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
 }))
 
-const mockProject: ProjectSummary = {
+const mockProject: ProjectListItem = {
   id: 'proj-1',
   name: 'Ecommerce App',
   description: 'Checkout, catalog, and user account flows.',
   githubRepo: 'acme/ecommerce-app',
   organizationId: 'org-1',
-  healthScore: 90,
-  lastRunStatus: 'pass',
-  lastRunAt: '2026-06-16T10:00:00Z',
   suiteCount: 12,
-  activeRunCount: 1,
-  aiPendingCount: 3,
+  activity: {
+    healthScore: 90,
+    lastRunStatus: 'pass',
+    lastRunAt: '2026-06-16T10:00:00Z',
+    activeRunCount: 1,
+    aiPendingCount: 3,
+  },
   createdAt: '2026-01-20T00:00:00Z',
   updatedAt: '2026-01-20T00:00:00Z',
   technologies: ['react'],

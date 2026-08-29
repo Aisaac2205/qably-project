@@ -1,4 +1,4 @@
-import type { Project } from '@qably/types'
+import type { Project, ProjectListItem } from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
 export interface CreateProjectPayload {
@@ -15,8 +15,8 @@ export type UpdateProjectPayload = Partial<{
   technologies: string[]
 }>
 
-export function listProjects(signal?: AbortSignal): Promise<Project[]> {
-  return apiRequest<Project[]>('/projects', { signal })
+export function listProjects(signal?: AbortSignal): Promise<ProjectListItem[]> {
+  return apiRequest<ProjectListItem[]>('/projects', { signal })
 }
 
 export function getProject(id: string, signal?: AbortSignal): Promise<Project> {

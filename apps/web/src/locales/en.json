@@ -287,6 +287,8 @@
     "listView": "List view",
     "noProjects": "No projects yet",
     "createFirst": "Create your first project",
+    "loadFailed": "Could not load projects",
+    "noRunsYet": "No runs yet",
     "noStackSelected": "No stack selected",
     "production": "Production",
     "service_one": "service",

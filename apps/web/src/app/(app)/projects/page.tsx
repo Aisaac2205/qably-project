@@ -1,13 +1,13 @@
 'use client'
 
-import { useProjects } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { ProjectGrid } from '@/features/projects/components/project-grid'
 import Link from 'next/link'
 import { Plus, CaretDown, SquaresFour, List } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 
 export default function ProjectsListPage() {
-  const projects = useProjects()
+  const { projects } = useProjects()
   const { t } = useTranslation()
 
   return (
