@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateProject } from '../hooks/use-create-project'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { useAvailableRepos } from '@/features/integrations/hooks/use-available-repos'
-import { createConnection } from '@/features/integrations/api/connections.api'
+import {
+  createConnection,
+  detectStack,
+} from '@/features/integrations/api/connections.api'
 import { REPO_OPTION_PREFIX, buildRepoOptions } from '../lib/repo-options'
 import { TechSelector } from './tech-selector'
 import { useTranslation } from '@/lib/i18n'
@@ -22,6 +25,27 @@ export function NewProjectForm() {
   const [connectionId, setConnectionId] = useState('')
   const [technologies, setTechnologies] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const selectedRepo =
+    repoOptions.find((option) => option.value === connectionId)?.repo ?? null
+
+  useEffect(() => {
+    if (selectedRepo === null) return
+
+    let active = true
+
+    detectStack(selectedRepo)
+      .then((stack) => {
+        if (!active) return
+        setTechnologies((current) => [
+          ...new Set([...current, ...stack.technologies]),
+        ])
+      })
+      .catch(() => undefined)
+
+    return () => {
+      active = false
+    }
+  }, [selectedRepo])
 
   function validate(): Record<string, string> {
     const errs: Record<string, string> = {}

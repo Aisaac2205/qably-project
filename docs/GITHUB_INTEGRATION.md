@@ -52,6 +52,22 @@ Two consequences follow, and both are recorded as future work rather than solved
 Migrating to a GitHub App is the natural continuation, alongside the single-SCM-provider limit
 recorded in the thesis (§1.6.2, limit 2).
 
+## Detecting the stack from `package.json`
+
+`GET /connections/detect-stack?repo=owner/name` reads the repository's `package.json` with the same
+OAuth token and maps its dependencies onto the shared technology catalogue. The project form calls it
+when a repository is picked and merges the result into the technology selection, never removing what
+the user chose by hand.
+
+The mapping is deliberately small and explicit: `react`, `typescript`, `@angular/core`, `@nestjs/core`,
+`express`, `vite`, `pg` and Cloudflare's `wrangler`. A repository with a manifest but no recognised
+dependency is still reported as JavaScript, and as TypeScript instead when `typescript` is declared.
+
+**What this cannot detect.** Java, PHP, Laravel, Spring Boot and Flutter do not appear in a
+`package.json`. Those remain a manual choice, and no amount of dependency mapping will change that —
+detecting them would require reading `pom.xml`, `composer.json` or `pubspec.yaml`, which is a
+separate piece of work rather than an extension of this one.
+
 ## Background work has no credential yet
 
 Because every GitHub call borrows the acting user's token, any process that runs without a user

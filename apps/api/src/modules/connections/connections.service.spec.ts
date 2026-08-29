@@ -57,7 +57,10 @@ function createEncryption(): FakeEncryption {
   };
 }
 
-const repoDirectory = { listForUser: jest.fn() };
+const repoDirectory = {
+  listForUser: jest.fn(),
+  readPackageManifest: jest.fn(),
+};
 
 function build(prisma: FakePrisma, encryption: FakeEncryption) {
   return new ConnectionsService(

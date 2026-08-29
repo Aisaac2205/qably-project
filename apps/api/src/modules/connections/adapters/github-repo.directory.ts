@@ -15,17 +15,39 @@ export class GithubRepoDirectory implements RepoDirectory {
 
   constructor(@Inject(AUTH_INSTANCE) private readonly auth: AuthInstance) {}
 
+  async readPackageManifest(userId: string, repo: string): Promise<unknown> {
+    const accessToken = await this.readAccessToken(userId);
+
+    if (accessToken === null) return null;
+
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/contents/package.json`,
+      { headers: this.headers(accessToken) },
+    );
+
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as { content?: unknown };
+
+    if (typeof payload.content !== 'string') return null;
+
+    try {
+      return JSON.parse(
+        Buffer.from(payload.content, 'base64').toString('utf8'),
+      ) as unknown;
+    } catch {
+      this.logger.warn(`Unreadable package.json in ${repo}`);
+      return null;
+    }
+  }
+
   async listForUser(userId: string): Promise<AvailableRepo[]> {
     const accessToken = await this.readAccessToken(userId);
 
     if (accessToken === null) return [];
 
     const response = await fetch(REPOS_URL, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
+      headers: this.headers(accessToken),
     });
 
     if (!response.ok) {
@@ -34,6 +56,14 @@ export class GithubRepoDirectory implements RepoDirectory {
     }
 
     return toAvailableRepos(await response.json());
+  }
+
+  private headers(accessToken: string): Record<string, string> {
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
   }
 
   private async readAccessToken(userId: string): Promise<string | null> {

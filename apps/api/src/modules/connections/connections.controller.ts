@@ -11,6 +11,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
@@ -22,6 +23,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type {
   AvailableRepoView,
+  DetectedStackView,
   ConnectionError,
   ConnectionView,
   ConnectionWithSecretView,
@@ -29,8 +31,10 @@ import type {
 } from './connections.contracts';
 import {
   createConnectionSchema,
+  detectStackQuerySchema,
   updateConnectionSchema,
   type CreateConnectionInput,
+  type DetectStackQuery,
   type UpdateConnectionInput,
 } from './connections.schemas';
 import { ConnectionsService } from './connections.service';
@@ -65,6 +69,15 @@ export class ConnectionsController {
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<AvailableRepoView[]> {
     return this.connections.listAvailableRepos(user.id);
+  }
+
+  @Get('detect-stack')
+  detectStack(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query(new ZodValidationPipe(detectStackQuerySchema))
+    query: DetectStackQuery,
+  ): Promise<DetectedStackView> {
+    return this.connections.detectStack(user.id, query.repo);
   }
 
   @Get(':id')

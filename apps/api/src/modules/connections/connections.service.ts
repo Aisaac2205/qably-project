@@ -3,9 +3,11 @@ import { EncryptionService } from '../../common/crypto/encryption.service';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { detectStack } from './lib/detect-stack';
 import {
   REPO_DIRECTORY,
   type AvailableRepoView,
+  type DetectedStackView,
   type ConnectionError,
   type ConnectionView,
   type ConnectionWithSecretView,
@@ -73,6 +75,12 @@ export class ConnectionsService {
 
   listAvailableRepos(userId: string): Promise<AvailableRepoView[]> {
     return this.repos.listForUser(userId);
+  }
+
+  async detectStack(userId: string, repo: string): Promise<DetectedStackView> {
+    const manifest = await this.repos.readPackageManifest(userId, repo);
+
+    return { technologies: detectStack(manifest) };
   }
 
   async list(org: OrgContext): Promise<ConnectionView[]> {

@@ -6,6 +6,7 @@ import { NewProjectForm } from '@/features/projects/components/new-project-form'
 import { createProject } from '@/features/projects/api/projects.api'
 import {
   createConnection,
+  detectStack,
   listAvailableRepos,
   listConnections,
 } from '@/features/integrations/api/connections.api'
@@ -26,12 +27,14 @@ vi.mock('@/features/integrations/api/connections.api', () => ({
   listConnections: vi.fn(),
   listAvailableRepos: vi.fn(),
   createConnection: vi.fn(),
+  detectStack: vi.fn(),
 }))
 
 const create = vi.mocked(createProject)
 const listConnectionsMock = vi.mocked(listConnections)
 const listAvailableReposMock = vi.mocked(listAvailableRepos)
 const createConnectionMock = vi.mocked(createConnection)
+const detectStackMock = vi.mocked(detectStack)
 
 const availableRepo = {
   id: '7',
@@ -66,6 +69,7 @@ beforeEach(() => {
   listConnectionsMock.mockResolvedValue([connection])
   listAvailableReposMock.mockResolvedValue([availableRepo])
   createConnectionMock.mockResolvedValue({ ...connection, id: 'conn-new' })
+  detectStackMock.mockResolvedValue({ technologies: [] })
   create.mockResolvedValue({
     id: 'p1',
     name: 'Shop',
@@ -273,5 +277,43 @@ describe('NewProjectForm against the api', () => {
         expect.objectContaining({ connectionId: 'conn-new' }),
       )
     })
+  })
+
+  it('fills the stack from the package.json of the chosen repository', async () => {
+    const user = userEvent.setup()
+    detectStackMock.mockResolvedValue({ technologies: ['react', 'typescript'] })
+    await act(async () => { renderForm() })
+
+    await user.type(screen.getByLabelText(/Project name/), 'Checkout')
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'acme/checkout' }),
+      ).toBeInTheDocument()
+    })
+    await user.selectOptions(
+      screen.getByLabelText(/Repository connection/),
+      'repo:acme/checkout',
+    )
+
+    await waitFor(() => {
+      expect(detectStackMock).toHaveBeenCalledWith('acme/checkout')
+    })
+
+    await user.click(screen.getByRole('button', { name: /Create project/ }))
+
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ technologies: ['react', 'typescript'] }),
+      )
+    })
+  })
+
+  it('does not ask github for a stack when no repository is chosen', async () => {
+    await act(async () => { renderForm() })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Repository connection/)).toBeEnabled()
+    })
+    expect(detectStackMock).not.toHaveBeenCalled()
   })
 })

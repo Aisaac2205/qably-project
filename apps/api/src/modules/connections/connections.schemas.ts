@@ -21,5 +21,9 @@ export const updateConnectionSchema = z
     message: 'provide at least one field to update',
   });
 
+export const detectStackQuerySchema = z.object({ repo });
+
+export type DetectStackQuery = z.infer<typeof detectStackQuerySchema>;
+
 export type CreateConnectionInput = z.infer<typeof createConnectionSchema>;
 export type UpdateConnectionInput = z.infer<typeof updateConnectionSchema>;

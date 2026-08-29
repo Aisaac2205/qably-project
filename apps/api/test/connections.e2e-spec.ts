@@ -63,7 +63,10 @@ function assertNoTokenLeak(body: unknown, plaintext: string): void {
 describe('Connections (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
-  const repoDirectory = { listForUser: jest.fn() };
+  const repoDirectory = {
+    listForUser: jest.fn(),
+    readPackageManifest: jest.fn(),
+  };
   const prisma = {
     orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
     organization: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
@@ -370,5 +373,44 @@ describe('Connections (e2e)', () => {
       .expect(200);
 
     expect(prisma.connection.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('detects the stack of a repository from its package.json', async () => {
+    repoDirectory.readPackageManifest.mockResolvedValue({
+      dependencies: { react: '^19.0.0' },
+      devDependencies: { typescript: '^5.0.0' },
+    });
+
+    const response = await request(app.getHttpServer())
+      .get('/connections/detect-stack?repo=acme/shop')
+      .expect(200);
+
+    expect(repoDirectory.readPackageManifest).toHaveBeenCalledWith(
+      'user-1',
+      'acme/shop',
+    );
+    expect((response.body as { technologies: string[] }).technologies).toEqual(
+      expect.arrayContaining(['react', 'typescript']),
+    );
+  });
+
+  it('answers an empty stack when the repository has no readable manifest', async () => {
+    repoDirectory.readPackageManifest.mockResolvedValue(null);
+
+    const response = await request(app.getHttpServer())
+      .get('/connections/detect-stack?repo=acme/shop')
+      .expect(200);
+
+    expect((response.body as { technologies: string[] }).technologies).toEqual(
+      [],
+    );
+  });
+
+  it('rejects a detection request without a repository in owner/name form', async () => {
+    await request(app.getHttpServer())
+      .get('/connections/detect-stack?repo=not-a-repo')
+      .expect(400);
+
+    expect(repoDirectory.readPackageManifest).not.toHaveBeenCalled();
   });
 });
