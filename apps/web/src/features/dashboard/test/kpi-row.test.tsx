@@ -49,3 +49,5 @@ describe('KpiRow', () => {
     expect(values.length).toBeGreaterThanOrEqual(1)
   })
 })
+
+
