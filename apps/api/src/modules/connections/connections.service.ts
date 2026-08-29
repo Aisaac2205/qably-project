@@ -1,13 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
-import type {
-  ConnectionError,
-  ConnectionView,
-  ConnectionWithSecretView,
-  WebhookSecretResult,
+import {
+  REPO_DIRECTORY,
+  type AvailableRepoView,
+  type ConnectionError,
+  type ConnectionView,
+  type ConnectionWithSecretView,
+  type RepoDirectory,
+  type WebhookSecretResult,
 } from './connections.contracts';
 import type {
   CreateConnectionInput,
@@ -65,7 +68,12 @@ export class ConnectionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    @Inject(REPO_DIRECTORY) private readonly repos: RepoDirectory,
   ) {}
+
+  listAvailableRepos(userId: string): Promise<AvailableRepoView[]> {
+    return this.repos.listForUser(userId);
+  }
 
   async list(org: OrgContext): Promise<ConnectionView[]> {
     const rows = await this.prisma.connection.findMany({
@@ -92,7 +100,6 @@ export class ConnectionsService {
   ): Promise<Result<ConnectionWithSecretView, ConnectionError>> {
     if (!canWrite(org)) return err('forbidden');
 
-    const encryptedToken = this.encryption.encrypt(input.token);
     const webhookSecret = this.encryption.generateSecret();
 
     try {
@@ -101,7 +108,6 @@ export class ConnectionsService {
           provider: input.provider,
           name: input.name,
           repo: input.repo,
-          encryptedToken,
           encryptedWebhookSecret: this.encryption.encrypt(webhookSecret),
           organizationId: org.organizationId,
         },
@@ -146,15 +152,9 @@ export class ConnectionsService {
 
     if (existing === null) return err('not-found');
 
-    const { token, ...rest } = input;
-    const data =
-      token === undefined
-        ? rest
-        : { ...rest, encryptedToken: this.encryption.encrypt(token) };
-
     const row = await this.prisma.connection.update({
       where: { id },
-      data,
+      data: input,
       select: SELECT,
     });
 

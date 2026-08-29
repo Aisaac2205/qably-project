@@ -222,7 +222,6 @@ model Connection {
   provider       ConnectionProvider
   name           String
   repo           String
-  encryptedToken String
   encryptedWebhookSecret String
   events         ScmEvent[]
   projects       Project[]

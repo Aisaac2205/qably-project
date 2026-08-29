@@ -4,7 +4,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NewProjectForm } from '@/features/projects/components/new-project-form'
 import { createProject } from '@/features/projects/api/projects.api'
-import { listConnections } from '@/features/integrations/api/connections.api'
+import {
+  createConnection,
+  listAvailableRepos,
+  listConnections,
+} from '@/features/integrations/api/connections.api'
 import { ApiError } from '@/lib/api-client'
 
 const mockPush = vi.fn()
@@ -20,10 +24,21 @@ vi.mock('@/features/projects/api/projects.api', () => ({
 
 vi.mock('@/features/integrations/api/connections.api', () => ({
   listConnections: vi.fn(),
+  listAvailableRepos: vi.fn(),
+  createConnection: vi.fn(),
 }))
 
 const create = vi.mocked(createProject)
 const listConnectionsMock = vi.mocked(listConnections)
+const listAvailableReposMock = vi.mocked(listAvailableRepos)
+const createConnectionMock = vi.mocked(createConnection)
+
+const availableRepo = {
+  id: '7',
+  fullName: 'acme/checkout',
+  isPrivate: true,
+  defaultBranch: 'main',
+}
 
 const connection = {
   id: 'conn-1',
@@ -49,6 +64,8 @@ function renderForm() {
 beforeEach(() => {
   vi.clearAllMocks()
   listConnectionsMock.mockResolvedValue([connection])
+  listAvailableReposMock.mockResolvedValue([availableRepo])
+  createConnectionMock.mockResolvedValue({ ...connection, id: 'conn-new' })
   create.mockResolvedValue({
     id: 'p1',
     name: 'Shop',
@@ -153,15 +170,16 @@ describe('NewProjectForm against the api', () => {
     })
   })
 
-  it('explains why no repository is selectable when none is connected', async () => {
+  it('explains why no repository is selectable when github returns nothing', async () => {
     listConnectionsMock.mockResolvedValue([])
+    listAvailableReposMock.mockResolvedValue([])
     await act(async () => { renderForm() })
 
     await waitFor(() => {
       expect(screen.getByLabelText(/Repository connection/)).toBeDisabled()
     })
     expect(
-      screen.getByText(/No repository is connected yet/),
+      screen.getByText(/We found no repositories in your GitHub account/),
     ).toBeInTheDocument()
   })
 
@@ -203,5 +221,57 @@ describe('NewProjectForm against the api', () => {
     expect(
       await screen.findByRole('button', { name: /Creating/ }),
     ).toBeInTheDocument()
+  })
+
+  it('also offers github repositories that are not connected yet', async () => {
+    await act(async () => { renderForm() })
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'acme/checkout' }),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('does not offer a github repository that is already connected', async () => {
+    listAvailableReposMock.mockResolvedValue([
+      { ...availableRepo, fullName: 'acme/payments' },
+    ])
+    await act(async () => { renderForm() })
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Repository connection/)).toBeEnabled()
+    })
+    expect(screen.getAllByRole('option', { name: 'acme/payments' })).toHaveLength(1)
+  })
+
+  it('connects a github repository before creating the project against it', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderForm() })
+
+    await user.type(screen.getByLabelText(/Project name/), 'Checkout')
+    await waitFor(() => {
+      expect(
+        screen.getByRole('option', { name: 'acme/checkout' }),
+      ).toBeInTheDocument()
+    })
+    await user.selectOptions(
+      screen.getByLabelText(/Repository connection/),
+      'repo:acme/checkout',
+    )
+    await user.click(screen.getByRole('button', { name: /Create project/ }))
+
+    await waitFor(() => {
+      expect(createConnectionMock).toHaveBeenCalledWith({
+        provider: 'GITHUB',
+        name: 'acme/checkout',
+        repo: 'acme/checkout',
+      })
+    })
+    await waitFor(() => {
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ connectionId: 'conn-new' }),
+      )
+    })
   })
 })

@@ -376,6 +376,13 @@ export interface RepoConnectionWithSecret extends RepoConnection {
   webhookSecret: string
 }
 
+export interface AvailableRepo {
+  id: string
+  fullName: string
+  isPrivate: boolean
+  defaultBranch: string
+}
+
 export interface WebhookSecretView {
   webhookSecret: string
 }

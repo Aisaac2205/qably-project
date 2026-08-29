@@ -18,7 +18,10 @@ import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type {
+  AvailableRepoView,
   ConnectionError,
   ConnectionView,
   ConnectionWithSecretView,
@@ -55,6 +58,13 @@ export class ConnectionsController {
   @Get()
   list(@CurrentOrg() org: OrgContext): Promise<ConnectionView[]> {
     return this.connections.list(org);
+  }
+
+  @Get('available-repos')
+  listAvailableRepos(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AvailableRepoView[]> {
+    return this.connections.listAvailableRepos(user.id);
   }
 
   @Get(':id')

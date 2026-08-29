@@ -9,14 +9,12 @@ describe('createConnectionSchema', () => {
       provider: 'GITHUB',
       name: '  Primary  ',
       repo: 'acme/shop',
-      token: 'ghp_abc123',
     });
 
     expect(parsed).toEqual({
       provider: 'GITHUB',
       name: 'Primary',
       repo: 'acme/shop',
-      token: 'ghp_abc123',
     });
   });
 
@@ -26,7 +24,6 @@ describe('createConnectionSchema', () => {
         provider: 'BITBUCKET',
         name: 'Primary',
         repo: 'acme/shop',
-        token: 'bb_abc123',
       }).success,
     ).toBe(true);
   });
@@ -37,7 +34,6 @@ describe('createConnectionSchema', () => {
         provider: 'GITHUB',
         name: 'Primary',
         repo: 'https://github.com/acme/shop',
-        token: 'ghp_abc123',
       }).success,
     ).toBe(false);
   });
@@ -48,20 +44,18 @@ describe('createConnectionSchema', () => {
         provider: 'GITLAB',
         name: 'Primary',
         repo: 'acme/shop',
-        token: 'ghp_abc123',
       }).success,
     ).toBe(false);
   });
 
-  it('rejects an empty token', () => {
+  it('ignores a pasted token because the login already carries the credential', () => {
     expect(
-      createConnectionSchema.safeParse({
+      createConnectionSchema.parse({
         provider: 'GITHUB',
         name: 'Primary',
         repo: 'acme/shop',
-        token: '',
-      }).success,
-    ).toBe(false);
+      }),
+    ).not.toHaveProperty('token');
   });
 
   it('rejects a name that is only whitespace', () => {
@@ -70,7 +64,6 @@ describe('createConnectionSchema', () => {
         provider: 'GITHUB',
         name: '   ',
         repo: 'acme/shop',
-        token: 'ghp_abc123',
       }).success,
     ).toBe(false);
   });
@@ -87,9 +80,9 @@ describe('updateConnectionSchema', () => {
     });
   });
 
-  it('allows rotating the token alone', () => {
-    expect(updateConnectionSchema.parse({ token: 'ghp_new-token' })).toEqual({
-      token: 'ghp_new-token',
-    });
+  it('refuses an update that carries only a token', () => {
+    expect(updateConnectionSchema.safeParse({ token: 'ghp_new' }).success).toBe(
+      false,
+    );
   });
 });

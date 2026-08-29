@@ -16,7 +16,6 @@ const row = {
   provider: 'GITHUB' as const,
   name: 'Primary',
   repo: 'acme/shop',
-  encryptedToken: 'iv:tag:cipher',
   encryptedWebhookSecret: 'iv:tag:secret',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
   updatedAt: new Date('2026-01-02T00:00:00.000Z'),
@@ -58,8 +57,14 @@ function createEncryption(): FakeEncryption {
   };
 }
 
+const repoDirectory = { listForUser: jest.fn() };
+
 function build(prisma: FakePrisma, encryption: FakeEncryption) {
-  return new ConnectionsService(prisma as never, encryption as never);
+  return new ConnectionsService(
+    prisma as never,
+    encryption as never,
+    repoDirectory,
+  );
 }
 
 describe('ConnectionsService.list', () => {
@@ -93,21 +98,19 @@ describe('ConnectionsService.create', () => {
     provider: 'GITHUB' as const,
     name: 'Primary',
     repo: 'acme/shop',
-    token: 'ghp_super-secret',
   };
 
-  it('encrypts the token before persisting it', async () => {
+  it('stores no personal access token because github speaks through the login', async () => {
     const prisma = createPrisma();
     const encryption = createEncryption();
     prisma.connection.create.mockResolvedValue(row);
 
     await build(prisma, encryption).create(owner, input);
 
-    expect(encryption.encrypt).toHaveBeenCalledWith('ghp_super-secret');
     const [call] = prisma.connection.create.mock.calls as [
-      [{ data: { encryptedToken: string; organizationId: string } }],
+      [{ data: Record<string, unknown> }],
     ];
-    expect(call[0].data.encryptedToken).toBe('enc(ghp_super-secret)');
+    expect(call[0].data).not.toHaveProperty('encryptedToken');
     expect(call[0].data.organizationId).toBe('org-1');
   });
 
@@ -181,24 +184,7 @@ describe('ConnectionsService.update', () => {
     expect(prisma.connection.update).not.toHaveBeenCalled();
   });
 
-  it('re-encrypts the token when rotating it', async () => {
-    const prisma = createPrisma();
-    const encryption = createEncryption();
-    prisma.connection.findFirst.mockResolvedValue(row);
-    prisma.connection.update.mockResolvedValue(row);
-
-    await build(prisma, encryption).update(owner, 'connection-1', {
-      token: 'ghp_rotated',
-    });
-
-    expect(encryption.encrypt).toHaveBeenCalledWith('ghp_rotated');
-    const [call] = prisma.connection.update.mock.calls as [
-      [{ data: { encryptedToken?: string } }],
-    ];
-    expect(call[0].data.encryptedToken).toBe('enc(ghp_rotated)');
-  });
-
-  it('leaves the stored token untouched when only the name changes', async () => {
+  it('touches no credential when only the name changes', async () => {
     const prisma = createPrisma();
     const encryption = createEncryption();
     prisma.connection.findFirst.mockResolvedValue(row);
@@ -210,9 +196,9 @@ describe('ConnectionsService.update', () => {
 
     expect(encryption.encrypt).not.toHaveBeenCalled();
     const [call] = prisma.connection.update.mock.calls as [
-      [{ data: { encryptedToken?: string } }],
+      [{ data: Record<string, unknown> }],
     ];
-    expect(call[0].data.encryptedToken).toBeUndefined();
+    expect(call[0].data).not.toHaveProperty('encryptedToken');
   });
 
   it('refuses a plain member before it even looks the connection up', async () => {
@@ -281,7 +267,6 @@ describe('ConnectionsService webhook secret', () => {
       provider: 'GITHUB',
       name: 'Primary',
       repo: 'acme/shop',
-      token: 'ghp_live',
     });
 
     const [call] = prisma.connection.create.mock.calls as [
@@ -300,7 +285,6 @@ describe('ConnectionsService webhook secret', () => {
       provider: 'GITHUB',
       name: 'Primary',
       repo: 'acme/shop',
-      token: 'ghp_live',
     });
 
     expect(isErr(result)).toBe(false);

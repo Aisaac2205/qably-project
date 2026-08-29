@@ -13,6 +13,7 @@ import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import type { Env } from '../src/config/env';
 import { ConnectionsModule } from '../src/modules/connections/connections.module';
+import { REPO_DIRECTORY } from '../src/modules/connections/connections.contracts';
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -62,6 +63,7 @@ function assertNoTokenLeak(body: unknown, plaintext: string): void {
 describe('Connections (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
+  const repoDirectory = { listForUser: jest.fn() };
   const prisma = {
     orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
     organization: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
@@ -107,6 +109,8 @@ describe('Connections (e2e)', () => {
       .useValue({ read })
       .overrideProvider(ENV)
       .useValue(testEnv)
+      .overrideProvider(REPO_DIRECTORY)
+      .useValue(repoDirectory)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -149,14 +153,13 @@ describe('Connections (e2e)', () => {
     assertNoTokenLeak(response.body, 'ghp_super-secret-token');
   });
 
-  it('creates a connection, encrypts the token, and never returns it', async () => {
+  it('creates a connection without ever accepting a pasted token', async () => {
     const response = await request(app.getHttpServer())
       .post('/connections')
       .send({
         provider: 'GITHUB',
         name: 'Primary',
         repo: 'acme/shop',
-        token: 'ghp_super-secret-token',
       })
       .expect(201);
 
@@ -166,10 +169,9 @@ describe('Connections (e2e)', () => {
     assertNoTokenLeak(response.body, 'ghp_super-secret-token');
 
     const [call] = prisma.connection.create.mock.calls as [
-      [{ data: { encryptedToken: string } }],
+      [{ data: Record<string, unknown> }],
     ];
-    expect(call[0].data.encryptedToken).not.toContain('ghp_super-secret-token');
-    expect(call[0].data.encryptedToken.split(':')).toHaveLength(3);
+    expect(call[0].data).not.toHaveProperty('encryptedToken');
   });
 
   it('returns a single connection without leaking the token', async () => {
@@ -204,7 +206,6 @@ describe('Connections (e2e)', () => {
         provider: 'GITHUB',
         name: 'Primary',
         repo: 'acme/shop',
-        token: 'ghp_super-secret-token',
       })
       .expect(409);
   });
@@ -230,7 +231,6 @@ describe('Connections (e2e)', () => {
         provider: 'GITHUB',
         name: 'Primary',
         repo: 'acme/shop',
-        token: 'ghp_super-secret-token',
       })
       .expect(403);
   });
@@ -257,18 +257,13 @@ describe('Connections (e2e)', () => {
     });
   });
 
-  it('rotates the token on update without leaking it', async () => {
-    const response = await request(app.getHttpServer())
+  it('refuses an update that only carries a token', async () => {
+    await request(app.getHttpServer())
       .patch('/connections/connection-1')
       .send({ token: 'ghp_rotated-secret' })
-      .expect(200);
+      .expect(400);
 
-    assertNoTokenLeak(response.body, 'ghp_rotated-secret');
-    const [call] = prisma.connection.update.mock.calls as [
-      [{ data: { encryptedToken?: string } }],
-    ];
-    expect(call[0].data.encryptedToken).toBeDefined();
-    expect(call[0].data.encryptedToken).not.toContain('ghp_rotated-secret');
+    expect(prisma.connection.update).not.toHaveBeenCalled();
   });
 
   it('returns the webhook secret once when creating a connection', async () => {
@@ -278,7 +273,6 @@ describe('Connections (e2e)', () => {
         provider: 'GITHUB',
         name: 'Primary',
         repo: 'acme/shop',
-        token: 'ghp_super-secret-token',
       })
       .expect(201);
 
@@ -346,5 +340,35 @@ describe('Connections (e2e)', () => {
       .get('/connections')
       .set('x-organization-id', 'org-someone-else')
       .expect(403);
+  });
+
+  it('lists the repositories the signed in user can reach on github', async () => {
+    repoDirectory.listForUser.mockResolvedValue([
+      {
+        id: '1',
+        fullName: 'acme/shop',
+        isPrivate: true,
+        defaultBranch: 'main',
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/connections/available-repos')
+      .expect(200);
+
+    expect(repoDirectory.listForUser).toHaveBeenCalledWith('user-1');
+    expect(response.body).toEqual([
+      expect.objectContaining({ fullName: 'acme/shop' }),
+    ]);
+  });
+
+  it('does not mistake the repo listing route for a connection id', async () => {
+    repoDirectory.listForUser.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .get('/connections/available-repos')
+      .expect(200);
+
+    expect(prisma.connection.findFirst).not.toHaveBeenCalled();
   });
 });

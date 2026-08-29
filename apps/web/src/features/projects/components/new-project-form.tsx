@@ -4,6 +4,9 @@ import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateProject } from '../hooks/use-create-project'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
+import { useAvailableRepos } from '@/features/integrations/hooks/use-available-repos'
+import { createConnection } from '@/features/integrations/api/connections.api'
+import { REPO_OPTION_PREFIX, buildRepoOptions } from '../lib/repo-options'
 import { TechSelector } from './tech-selector'
 import { useTranslation } from '@/lib/i18n'
 
@@ -12,6 +15,8 @@ export function NewProjectForm() {
   const router = useRouter()
   const { t } = useTranslation()
   const { connections } = useConnections()
+  const { repos } = useAvailableRepos()
+  const repoOptions = buildRepoOptions(connections, repos)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [connectionId, setConnectionId] = useState('')
@@ -24,18 +29,40 @@ export function NewProjectForm() {
     return errs
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function resolveConnectionId(): Promise<string | undefined> {
+    if (connectionId === '') return undefined
+    if (!connectionId.startsWith(REPO_OPTION_PREFIX)) return connectionId
+
+    const repo = connectionId.slice(REPO_OPTION_PREFIX.length)
+    const connection = await createConnection({
+      provider: 'GITHUB',
+      name: repo,
+      repo,
+    })
+
+    return connection.id
+  }
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const errs = validate()
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
 
-    createProject({
-      name: name.trim(),
-      description: description.trim() || undefined,
-      connectionId: connectionId || undefined,
-      technologies,
-    })
+    setErrors({})
+
+    try {
+      const resolved = await resolveConnectionId()
+
+      createProject({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        connectionId: resolved,
+        technologies,
+      })
+    } catch {
+      setErrors({ connectionId: t('projects.repoConnectionFailed') })
+    }
   }
 
   return (
@@ -88,20 +115,25 @@ export function NewProjectForm() {
           name="connectionId"
           value={connectionId}
           onChange={(e) => setConnectionId(e.target.value)}
-          disabled={connections.length === 0}
+          disabled={repoOptions.length === 0}
           className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
-          aria-describedby={connections.length === 0 ? 'connection-empty' : undefined}
+          aria-describedby={repoOptions.length === 0 ? 'connection-empty' : undefined}
         >
           <option value="">{t('projects.repoConnectionNone')}</option>
-          {connections.map((connection) => (
-            <option key={connection.id} value={connection.id}>
-              {connection.repo}
+          {repoOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.repo}
             </option>
           ))}
         </select>
-        {connections.length === 0 && (
+        {repoOptions.length === 0 && (
           <p id="connection-empty" className="text-xs text-muted">
             {t('projects.repoConnectionEmpty')}
+          </p>
+        )}
+        {errors.connectionId && (
+          <p className="text-xs text-fail" role="alert">
+            {errors.connectionId}
           </p>
         )}
       </div>
