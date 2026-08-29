@@ -1,5 +1,5 @@
-import { resolveAllowedOrigins } from '../config/origins';
-import type { Env } from '../config/env';
+import { resolveAllowedOrigins } from '../../config/origins';
+import type { Env } from '../../config/env';
 
 export function buildAuthOptions(env: Env) {
   return {

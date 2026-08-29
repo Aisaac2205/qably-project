@@ -5,15 +5,15 @@ import type { App } from 'supertest/types';
 import {
   SESSION_READER,
   type SessionContext,
-} from '../src/auth/auth.contracts';
-import { AUTH_INSTANCE } from '../src/auth/auth.instance';
-import { AuthModule } from '../src/auth/auth.module';
+} from '../src/modules/auth/auth.contracts';
+import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
+import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import type { Env } from '../src/config/env';
-import { ConnectionsModule } from '../src/connections/connections.module';
-import { OrganizationsModule } from '../src/organizations/organizations.module';
+import { ConnectionsModule } from '../src/modules/connections/connections.module';
+import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 

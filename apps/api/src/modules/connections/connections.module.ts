@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { EncryptionService } from '../common/crypto/encryption.service';
+import { EncryptionService } from '../../common/crypto/encryption.service';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { ConnectionsController } from './connections.controller';
 import { ConnectionsService } from './connections.service';

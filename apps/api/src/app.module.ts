@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
-import { AuthModule } from './auth/auth.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from './config/config.module';
-import { ConnectionsModule } from './connections/connections.module';
+import { ConnectionsModule } from './modules/connections/connections.module';
 import { HealthModule } from './health/health.module';
-import { IngestionModule } from './ingestion/ingestion.module';
-import { OrganizationsModule } from './organizations/organizations.module';
+import { IngestionModule } from './modules/ingestion/ingestion.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { ProjectsModule } from './projects/projects.module';
-import { SuitesModule } from './suites/suites.module';
+import { ProjectsModule } from './modules/projects/projects.module';
+import { SuitesModule } from './modules/suites/suites.module';
 
 @Module({
   imports: [

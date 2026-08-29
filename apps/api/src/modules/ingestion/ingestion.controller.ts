@@ -10,8 +10,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Public } from '../auth/decorators/public.decorator';
-import type { RawBodyRequest } from '../common/http/raw-body';
-import { isErr } from '../common/result';
+import type { RawBodyRequest } from '../../common/http/raw-body';
+import { isErr } from '../../common/result';
 import type { ScmHeaders } from './ingestion.contracts';
 import { IngestionService } from './ingestion.service';
 

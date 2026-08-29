@@ -56,7 +56,7 @@ WEB_APP_URL=http://localhost:3000
 Two independent gates must both name the web origin, or the session cookie never reaches the API:
 
 1. **CORS** (`src/config/cors.ts`) — allows `WEB_APP_URL` with `credentials: true`, so the browser is permitted to attach and store the session cookie. Any other origin gets no `Access-Control-Allow-Origin` header.
-2. **better-auth trusted origins** (`src/auth/auth.options.ts`) — better-auth validates the `Origin` header of every auth request as CSRF protection and rejects unknown origins with `403` even when CORS already passed.
+2. **better-auth trusted origins** (`src/modules/auth/auth.options.ts`) — better-auth validates the `Origin` header of every auth request as CSRF protection and rejects unknown origins with `403` even when CORS already passed.
 
 Both read the same normalized value through `resolveAllowedOrigins`, so they cannot drift apart.
 

@@ -1,4 +1,4 @@
-import type { Env } from '../config/env';
+import type { Env } from '../../config/env';
 import { buildAuthOptions } from './auth.options';
 
 const env = {

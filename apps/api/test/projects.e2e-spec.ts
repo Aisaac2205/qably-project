@@ -5,14 +5,14 @@ import type { App } from 'supertest/types';
 import {
   SESSION_READER,
   type SessionContext,
-} from '../src/auth/auth.contracts';
-import { AUTH_INSTANCE } from '../src/auth/auth.instance';
-import { AuthModule } from '../src/auth/auth.module';
+} from '../src/modules/auth/auth.contracts';
+import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
+import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
-import { OrganizationsModule } from '../src/organizations/organizations.module';
+import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { ProjectsModule } from '../src/projects/projects.module';
+import { ProjectsModule } from '../src/modules/projects/projects.module';
 
 const session: SessionContext = {
   user: {

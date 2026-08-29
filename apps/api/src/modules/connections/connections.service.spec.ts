@@ -1,4 +1,4 @@
-import { isErr } from '../common/result';
+import { isErr } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { ConnectionsService } from './connections.service';
 

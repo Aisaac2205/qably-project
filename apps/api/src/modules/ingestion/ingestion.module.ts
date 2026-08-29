@@ -1,10 +1,10 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '../config/config.module';
-import { ENV } from '../config/config.tokens';
-import type { Env } from '../config/env';
-import { EncryptionService } from '../common/crypto/encryption.service';
-import { PrismaModule } from '../prisma/prisma.module';
+import { ConfigModule } from '../../config/config.module';
+import { ENV } from '../../config/config.tokens';
+import type { Env } from '../../config/env';
+import { EncryptionService } from '../../common/crypto/encryption.service';
+import { PrismaModule } from '../../prisma/prisma.module';
 import { BitbucketAdapter } from './adapters/bitbucket.adapter';
 import { GithubAdapter } from './adapters/github.adapter';
 import { IngestionController } from './ingestion.controller';

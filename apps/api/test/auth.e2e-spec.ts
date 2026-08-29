@@ -5,9 +5,9 @@ import type { App } from 'supertest/types';
 import {
   SESSION_READER,
   type SessionContext,
-} from '../src/auth/auth.contracts';
-import { AUTH_INSTANCE } from '../src/auth/auth.instance';
-import { AuthModule } from '../src/auth/auth.module';
+} from '../src/modules/auth/auth.contracts';
+import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
+import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { DATABASE_PROBE } from '../src/health/health.contracts';
 import { HealthModule } from '../src/health/health.module';

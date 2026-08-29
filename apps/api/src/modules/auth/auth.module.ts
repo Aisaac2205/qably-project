@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { ENV } from '../config/config.tokens';
-import type { Env } from '../config/env';
-import { PrismaService } from '../prisma/prisma.service';
+import { ENV } from '../../config/config.tokens';
+import type { Env } from '../../config/env';
+import { PrismaService } from '../../prisma/prisma.service';
 import { SESSION_READER } from './auth.contracts';
 import { AuthController } from './auth.controller';
 import { AUTH_INSTANCE, createAuth } from './auth.instance';

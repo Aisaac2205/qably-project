@@ -3,7 +3,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
-import { err, ok } from '../../common/result';
+import { err, ok } from '../../../common/result';
 import { OrgScopeGuard } from './org-scope.guard';
 
 const session = {

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
-import { err, ok, type Result } from '../common/result';
-import { PrismaService } from '../prisma/prisma.service';
+import { err, ok, type Result } from '../../common/result';
+import { PrismaService } from '../../prisma/prisma.service';
 import { toSlug, withSlugSuffix } from './lib/slug';
 import type {
   OrgContext,

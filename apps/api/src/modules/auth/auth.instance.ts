@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
-import type { Env } from '../config/env';
-import type { PrismaService } from '../prisma/prisma.service';
+import type { Env } from '../../config/env';
+import type { PrismaService } from '../../prisma/prisma.service';
 import { buildAuthOptions } from './auth.options';
 
 export type AuthInstance = ReturnType<typeof createAuth>;

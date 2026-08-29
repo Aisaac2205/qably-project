@@ -7,18 +7,18 @@ import type { App } from 'supertest/types';
 import {
   SESSION_READER,
   type SessionContext,
-} from '../src/auth/auth.contracts';
-import { AUTH_INSTANCE } from '../src/auth/auth.instance';
-import { AuthModule } from '../src/auth/auth.module';
+} from '../src/modules/auth/auth.contracts';
+import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
+import { AuthModule } from '../src/modules/auth/auth.module';
 import { EncryptionService } from '../src/common/crypto/encryption.service';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { jsonWithRawBody } from '../src/common/http/raw-body';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import type { Env } from '../src/config/env';
-import { IngestionModule } from '../src/ingestion/ingestion.module';
-import { IngestionProcessor } from '../src/ingestion/ingestion.processor';
-import { INGESTION_QUEUE } from '../src/ingestion/ingestion.tokens';
+import { IngestionModule } from '../src/modules/ingestion/ingestion.module';
+import { IngestionProcessor } from '../src/modules/ingestion/ingestion.processor';
+import { INGESTION_QUEUE } from '../src/modules/ingestion/ingestion.tokens';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 

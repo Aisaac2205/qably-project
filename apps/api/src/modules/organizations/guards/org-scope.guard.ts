@@ -5,7 +5,7 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
-import { isErr } from '../../common/result';
+import { isErr } from '../../../common/result';
 import {
   ORGANIZATION_HEADER,
   type RequestWithOrg,

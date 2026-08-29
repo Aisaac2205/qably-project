@@ -13,8 +13,8 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { isErr, type Result } from '../common/result';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';

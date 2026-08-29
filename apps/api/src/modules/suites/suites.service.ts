@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { err, ok, type Result } from '../common/result';
+import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import type { SuiteError, SuiteView } from './suites.contracts';
 import type {
   CreateCaseInput,

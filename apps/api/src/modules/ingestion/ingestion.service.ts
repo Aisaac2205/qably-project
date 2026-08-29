@@ -2,9 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { RepoConnectionProvider } from '@qably/types';
-import { EncryptionService } from '../common/crypto/encryption.service';
-import { err, ok, type Result } from '../common/result';
-import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../../common/crypto/encryption.service';
+import { err, ok, type Result } from '../../common/result';
+import { PrismaService } from '../../prisma/prisma.service';
 import type {
   IngestError,
   IngestOutcome,
