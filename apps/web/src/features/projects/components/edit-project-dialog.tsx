@@ -44,7 +44,7 @@ function EditProjectDialogContent({
   project,
   onOpenChange,
 }: Omit<EditProjectDialogProps, 'open'>) {
-  const updateProject = useUpdateProject()
+  const { update: updateProject } = useUpdateProject()
   const { t } = useTranslation()
   const { connections } = useConnections()
 
@@ -71,8 +71,8 @@ function EditProjectDialogContent({
 
     updateProject(project.id, {
       name: name.trim(),
-      description: description.trim(),
-      connectionId: connectionId || undefined,
+      description: description.trim() || null,
+      connectionId: connectionId || null,
       technologies,
     })
     onOpenChange(false)

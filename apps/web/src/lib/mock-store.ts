@@ -928,51 +928,6 @@ export function revokeApiKey(id: string): boolean {
   return false
 }
 
-export function updateProject(
-  id: string,
-  patch: Partial<Pick<ProjectSummary, 'name' | 'description' | 'githubRepo' | 'technologies'>>,
-): ProjectSummary | undefined {
-  projects = projects.map((p) => (p.id === id ? { ...p, ...patch } : p))
-  notify()
-  return projects.find((p) => p.id === id)
-}
-
-export function deleteProject(id: string): boolean {
-  const before = projects.length
-  projects = projects.filter((p) => p.id !== id)
-  if (projects.length === before) return false
-  notify()
-  return true
-}
-
-export function createProject(input: {
-  name: string
-  description?: string
-  githubRepo?: string
-  technologies?: string[]
-}): ProjectSummary {
-  const id = `proj-${projects.length + 1}`
-  const newProject: ProjectSummary = {
-    id,
-    name: input.name,
-    description: input.description ?? '',
-    githubRepo: input.githubRepo ?? '',
-    organizationId: 'org-1',
-    healthScore: 100,
-    lastRunStatus: 'pass',
-    lastRunAt: new Date().toISOString(),
-    suiteCount: 0,
-    activeRunCount: 0,
-    aiPendingCount: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    technologies: input.technologies ?? [],
-  }
-  projects = [...projects, newProject]
-  notify()
-  return newProject
-}
-
 export function updateIntegration(patch: Partial<GithubIntegration>): GithubIntegration {
   integration = { ...integration, ...patch }
   notify()

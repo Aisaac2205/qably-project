@@ -25,7 +25,6 @@ import {
   skipAiCase,
   createApiKey,
   revokeApiKey,
-  createProject,
   updateIntegration,
   inviteMember,
   subscribe,
@@ -46,10 +45,10 @@ describe('mock-store', () => {
     let calls = 0
     const unsub = subscribe(() => { calls++ })
     expect(calls).toBe(1)
-    createProject({ name: 'Test Project' })
+    updateSuite('suite-1', { name: 'Renamed' })
     expect(calls).toBe(2)
     unsub()
-    createProject({ name: 'Another Project' })
+    updateSuite('suite-1', { name: 'Renamed again' })
     expect(calls).toBe(2)
   })
 
@@ -58,7 +57,7 @@ describe('mock-store', () => {
     subscribe(() => calls.push(0))
     subscribe(() => calls.push(1))
     calls.length = 0
-    createProject({ name: 'Test' })
+    updateSuite('suite-1', { name: 'Broadcast' })
     expect(calls).toEqual([0, 1])
   })
 
@@ -108,31 +107,6 @@ describe('mock-store', () => {
   it('getProject returns undefined for unknown id', () => {
     expect(getProject('nonexistent')).toBeUndefined()
   })
-
-  it('createProject adds a project and notifies subscribers', () => {
-    let notified = false
-    subscribe(() => { notified = true })
-
-    const p = createProject({
-      name: 'New Project',
-      description: 'Test desc',
-      githubRepo: 'org/repo',
-    })
-
-    expect(notified).toBe(true)
-    expect(p.id).toMatch(/^proj-/)
-    expect(p.name).toBe('New Project')
-    expect(p.description).toBe('Test desc')
-    expect(p.githubRepo).toBe('org/repo')
-    expect(p.healthScore).toBe(100)
-    expect(p.lastRunStatus).toBe('pass')
-    expect(p.suiteCount).toBe(0)
-    expect(p.activeRunCount).toBe(0)
-    expect(p.aiPendingCount).toBe(0)
-    expect(getProject(p.id)).toEqual(p)
-  })
-
-  // ── Suites ──────────────────────────────────────────────────────
 
   it('getSuites returns suites for a project', () => {
     const suites = getSuites('proj-1')
@@ -538,7 +512,6 @@ describe('mock-store', () => {
   // ── Reset ───────────────────────────────────────────────────────
 
   it('__resetStore restores the seed data', () => {
-    createProject({ name: 'Temp' })
     updateSuite('suite-1', { name: 'Changed' })
     confirmAiCase('ai-2')
     revokeApiKey('key-1')

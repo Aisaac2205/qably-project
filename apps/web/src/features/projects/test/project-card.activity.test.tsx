@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { ProjectListItem } from '@qably/types'
 import { ProjectCard } from '@/features/projects/components/project-card'
 
-vi.mock('@/features/projects/lib/aggregate', () => ({
-  useProjectAggregate: () => ({ delete: vi.fn() }),
+vi.mock('@/features/projects/hooks/use-delete-project', () => ({
+  useDeleteProject: () => ({ remove: vi.fn(), isPending: false, isError: false }),
 }))
 
 const base: ProjectListItem = {

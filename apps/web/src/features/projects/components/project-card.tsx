@@ -9,7 +9,7 @@ import { TechBadge } from './tech-badge'
 import { EditProjectDialog } from './edit-project-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
-import { useProjectAggregate } from '../lib/aggregate'
+import { useDeleteProject } from '../hooks/use-delete-project'
 import { TECH_ICONS, type TechKey } from '../lib/tech-icons'
 import { useTranslation } from '@/lib/i18n'
 
@@ -19,7 +19,7 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { t } = useTranslation()
-  const { delete: deleteProject } = useProjectAggregate()
+  const { remove: deleteProject } = useDeleteProject()
 
   const { activity } = project
 

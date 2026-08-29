@@ -3,6 +3,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { ProjectCard } from '@/features/projects/components/project-card'
 import type { ProjectListItem } from '@qably/types'
 
+vi.mock('@/features/projects/hooks/use-delete-project', () => ({
+  useDeleteProject: () => ({ remove: vi.fn(), isPending: false, isError: false }),
+}))
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,

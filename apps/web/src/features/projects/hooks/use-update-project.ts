@@ -1,14 +1,33 @@
 'use client'
 
-import { useCallback } from 'react'
-import { updateProject } from '@/lib/mock-store'
-import type { Project } from '@qably/types'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { updateProject, type UpdateProjectPayload } from '../api/projects.api'
+import { projectKeys } from '../lib/query-keys'
 
 export function useUpdateProject() {
-  return useCallback(
-    (id: string, patch: Partial<Pick<Project, 'name' | 'description' | 'connectionId' | 'technologies'>>) => {
-      updateProject(id, patch)
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string
+      patch: UpdateProjectPayload
+    }) => updateProject(id, patch),
+    onSuccess: async (project) => {
+      await queryClient.invalidateQueries({ queryKey: projectKeys.all })
+      await queryClient.invalidateQueries({
+        queryKey: projectKeys.detail(project.id),
+      })
     },
-    [],
-  )
+  })
+
+  return {
+    update: (id: string, patch: UpdateProjectPayload) =>
+      mutation.mutate({ id, patch }),
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error,
+  }
 }
