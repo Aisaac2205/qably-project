@@ -40,3 +40,15 @@ describe('buildAuthOptions', () => {
     ).toBe(true);
   });
 });
+
+describe('buildAuthOptions provider credentials', () => {
+  it('encrypts provider access tokens so a database dump does not hand over source code', () => {
+    expect(buildAuthOptions(env).account.encryptOAuthTokens).toBe(true);
+  });
+
+  it('asks github for repository access so the user can pick a repo without pasting a token', () => {
+    expect(buildAuthOptions(env).socialProviders.github.scope).toContain(
+      'repo',
+    );
+  });
+});
