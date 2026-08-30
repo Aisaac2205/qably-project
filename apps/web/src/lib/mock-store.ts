@@ -21,7 +21,6 @@ import {
   mockNotifications,
   mockQualityRisks,
   mockIngestionBatches,
-  mockCodeChanges,
   mockIngestionEvidence,
   MOCK_NOW,
 } from '@/lib/mock-data'
@@ -50,7 +49,6 @@ import type {
   ConnectionType,
   Notification,
   IngestionBatch,
-  CodeChange,
   ExtractedProposal,
   ReviewDecision,
   OfficialTestCase,
@@ -84,7 +82,6 @@ export interface StoreSnapshot {
   connections: Connection[]
   notifications: Notification[]
   ingestionBatches: IngestionBatch[]
-  codeChanges: CodeChange[]
   proposals: ExtractedProposal[]
   proposalIdByAiCaseId: Record<string, string>
   reviewDecisions: ReviewDecision[]
@@ -191,7 +188,6 @@ function createReviewDomain() {
 let reviewDomain = createReviewDomain()
 let { evidence, proposals, proposalIdByAiCaseId, officialTestCases, testCaseVersions, traceabilityLinks } = reviewDomain
 let ingestionBatches: IngestionBatch[] = structuredClone(mockIngestionBatches)
-let codeChanges: CodeChange[] = structuredClone(mockCodeChanges)
 let reviewDecisions: ReviewDecision[] = []
 let executions: Execution[] = []
 let executionResults: ExecutionResult[] = []
@@ -220,7 +216,7 @@ function currentSnapshot(): StoreSnapshot {
   return {
     projects, suites, runs, aiCases, org, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
-    ingestionBatches, codeChanges, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
+    ingestionBatches, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
     testCaseVersions, traceabilityLinks, executions, executionResults, evidence, qualityRisks,
   }
 }
@@ -371,10 +367,6 @@ export function markAllNotificationsAsRead(projectId?: string): void {
 
 export function getIngestionBatches(projectId?: string): IngestionBatch[] {
   return projectId ? ingestionBatches.filter((batch) => batch.projectId === projectId) : ingestionBatches
-}
-
-export function getCodeChanges(projectId?: string): CodeChange[] {
-  return projectId ? codeChanges.filter((change) => change.projectId === projectId) : codeChanges
 }
 
 export function getProposal(id: string): ExtractedProposal | undefined {
@@ -1097,7 +1089,6 @@ export function __resetStore(): void {
   testCaseVersions = reviewDomain.testCaseVersions
   traceabilityLinks = reviewDomain.traceabilityLinks
   ingestionBatches = structuredClone(mockIngestionBatches)
-  codeChanges = structuredClone(mockCodeChanges)
   reviewDecisions = []
   executions = []
   executionResults = []

@@ -439,3 +439,16 @@ export function matchDeclaredTestPattern(
     return suffix !== undefined && normalizedPath.endsWith(suffix)
   })
 }
+
+export interface RepositorySource {
+  provider: RepoConnectionProvider
+  repo: string
+  testFilePatterns: string[]
+}
+
+export interface ProjectRepositoryView {
+  source: RepositorySource | null
+  batch: IngestionBatch | null
+  codeChanges: CodeChange[]
+  evidence: Evidence[]
+}

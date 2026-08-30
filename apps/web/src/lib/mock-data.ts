@@ -16,7 +16,6 @@ import type {
   Connection,
   Notification,
   IngestionBatch,
-  CodeChange,
   Evidence,
   QualityRisk,
 } from '@qably/types'
@@ -506,25 +505,6 @@ export const mockGithubIntegration: GithubIntegration = {
   repoUrl: 'https://github.com/acme/ecommerce-app',
 }
 
-type RepositorySourceFixture = {
-  provider: 'GitHub'
-  repository: string
-  testFilePatterns: ['*.spec.ts', '*.test.ts']
-}
-
-export const mockRepositorySources: Record<string, RepositorySourceFixture> = {
-  'proj-1': {
-    provider: 'GitHub',
-    repository: 'acme/ecommerce-app',
-    testFilePatterns: ['*.spec.ts', '*.test.ts'],
-  },
-  'proj-3': {
-    provider: 'GitHub',
-    repository: 'acme/api-backend',
-    testFilePatterns: ['*.spec.ts', '*.test.ts'],
-  },
-}
-
 export const mockIngestionBatches: IngestionBatch[] = [
   {
     id: 'batch-repository-1', projectId: 'proj-1', source: 'repository', status: 'completed',
@@ -538,30 +518,6 @@ export const mockIngestionBatches: IngestionBatch[] = [
   {
     id: 'batch-repository-failed-1', projectId: 'proj-3', source: 'repository', status: 'failed',
     codeChangeIds: [], createdAt: '2026-06-15T09:20:00Z',
-  },
-]
-
-export const mockCodeChanges: CodeChange[] = [
-  {
-    id: 'change-empty-cart-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-    filePath: 'tests/checkout/empty-cart.spec.ts',
-    diff: '+  await expect(checkoutButton).toBeDisabled()',
-    evidenceId: 'evidence-change-empty-cart-1',
-  },
-  {
-    id: 'change-cart-total-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-    filePath: 'tests/checkout/cart-total.test.ts',
-    diff: '+  expect(total).toBe(42)', evidenceId: 'evidence-change-cart-total-1',
-  },
-  {
-    id: 'change-cart-service-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-    filePath: 'src/checkout/cart-service.ts',
-    diff: '+  return total', evidenceId: 'evidence-change-cart-service-1',
-  },
-  {
-    id: 'change-checkout-docs-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-    filePath: 'docs/checkout.md',
-    diff: '+ Updated checkout guidance', evidenceId: 'evidence-change-checkout-docs-1',
   },
 ]
 

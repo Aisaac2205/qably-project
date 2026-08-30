@@ -8,6 +8,7 @@ import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { RepositoryModule } from './modules/repository/repository.module';
 import { SuitesModule } from './modules/suites/suites.module';
 
 @Module({
@@ -18,6 +19,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     HealthModule,
     OrganizationsModule,
     ProjectsModule,
+    RepositoryModule,
     SuitesModule,
     ConnectionsModule,
     ApiKeysModule,

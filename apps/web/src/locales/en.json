@@ -168,15 +168,20 @@
     "diff": "Diff",
     "origin": "Origin",
     "detectedTestsHeading": "Detected tests",
-    "detectedTestsDescription": "Matches configured patterns against paths already in this simulated ingestion batch.",
+    "detectedTestsDescription": "Matches the configured patterns against the paths in this ingestion batch.",
     "detectedPattern": "Pattern",
     "filterAll": "All",
     "linkedProposal": "Linked proposal",
-    "simulatedDescription": "This is simulated source data, not a live provider connection.",
+    "sourceDescription": "Pushes to this repository are ingested automatically.",
     "noSourceTitle": "No SCM source",
     "noSourceDescription": "This project does not have an SCM source configured.",
     "ingestionErrorTitle": "Extraction failed",
-    "ingestionErrorDescription": "This ingestion batch could not be processed, so no test changes were extracted."
+    "ingestionErrorDescription": "This ingestion batch could not be processed, so no test changes were extracted.",
+    "loadingTitle": "Loading repository\u2026",
+    "loadErrorTitle": "Repository unavailable",
+    "loadErrorDescription": "The repository data for this project could not be loaded. Try again.",
+    "emptyBatchTitle": "No ingested changes yet",
+    "emptyBatchDescription": "Push to this repository and the changes will appear here."
   },
 
   "status": {

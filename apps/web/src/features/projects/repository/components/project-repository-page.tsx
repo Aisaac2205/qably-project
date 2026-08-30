@@ -3,20 +3,22 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import type { CodeChange } from '@qably/types'
+import type { CodeChange, Evidence } from '@qably/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { InspectorPanel } from '@/components/ui/inspector-panel'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
-import { mockRepositorySources } from '@/lib/mock-data'
-import { useCodeChanges, useEvidence, useIngestionBatches, useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { useProjectRepository } from '../hooks/use-project-repository'
 import { selectDetectedTestChanges } from '../lib/test-file-patterns'
 
 function DetectedTestItem({
   detectedChange,
+  originEvidence,
   projectId,
 }: {
   detectedChange: CodeChange & { detectedPattern: string }
+  originEvidence?: Evidence
   projectId: string
 }) {
   const { t } = useTranslation()
@@ -25,7 +27,6 @@ function DetectedTestItem({
     (link) => link.relation === 'produced' && link.from.id === detectedChange.id && link.to.type === 'proposal',
   )
   const proposal = useProposal(proposalLink?.to.id ?? '')
-  const originEvidence = useEvidence(detectedChange.evidenceId)
 
   return (
     <li className="min-w-0 rounded-lg border border-border bg-canvas/40 p-4 transition-colors hover:border-border hover:bg-canvas/70 space-y-3">
@@ -59,6 +60,8 @@ function DetectedTestItem({
   )
 }
 
+const PROVIDER_LABEL = { GITHUB: 'GitHub', BITBUCKET: 'Bitbucket' } as const
+
 function formatTimestamp(timestamp: string, locale: 'en' | 'es') {
   return new Intl.DateTimeFormat(locale === 'es' ? 'es-ES' : 'en-US', {
     timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -67,18 +70,40 @@ function formatTimestamp(timestamp: string, locale: 'en' | 'es') {
 
 export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   const { t, locale } = useTranslation()
-  const source = mockRepositorySources[projectId]
-  const batches = useIngestionBatches(projectId)
-  const changes = useCodeChanges(projectId)
-  const batch = batches[0]
-  const change = batch ? changes.find((item) => batch.codeChangeIds.includes(item.id)) : undefined
-  const evidence = useEvidence(change?.evidenceId)
-  const batchChanges = batch ? changes.filter((item) => batch.codeChangeIds.includes(item.id)) : []
-  const detectedTests = source ? selectDetectedTestChanges(batchChanges, source.testFilePatterns) : []
+  const { repository, isLoading, isError } = useProjectRepository(projectId)
   const [patternFilter, setPatternFilter] = useState<string>('all')
+  const source = repository?.source ?? undefined
+  const batch = repository?.batch ?? undefined
+  const batchChanges = repository?.codeChanges ?? []
+  const evidenceById = new Map((repository?.evidence ?? []).map((item) => [item.id, item]))
+  const change = batchChanges[0]
+  const evidence = change ? evidenceById.get(change.evidenceId) : undefined
+  const detectedTests = source ? selectDetectedTestChanges(batchChanges, source.testFilePatterns) : []
   const visibleDetectedTests = patternFilter === 'all'
     ? detectedTests
     : detectedTests.filter((item) => item.detectedPattern === patternFilter)
+
+  if (isLoading) {
+    return (
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6">
+        <PageHeader title={t('repository.title')} description={t('repository.subtitle')} />
+        <StateView kind="loading" title={t('repository.loadingTitle')} />
+      </div>
+    )
+  }
+
+  if (isError || repository === undefined) {
+    return (
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6">
+        <PageHeader title={t('repository.title')} description={t('repository.subtitle')} />
+        <StateView
+          kind="error"
+          title={t('repository.loadErrorTitle')}
+          description={t('repository.loadErrorDescription')}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
@@ -94,12 +119,12 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
               <Image src="/logos/github.svg" alt="" width={22} height={22} className="size-full object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-default">{source.provider}</p>
-              <p className="text-xs sm:text-sm font-mono text-muted truncate">{source.repository}</p>
+              <p className="text-sm font-semibold text-default">{PROVIDER_LABEL[source.provider]}</p>
+              <p className="text-xs sm:text-sm font-mono text-muted truncate">{source.repo}</p>
             </div>
           </div>
           <p className="mt-4 text-xs sm:text-sm text-muted rounded-lg border border-border/60 bg-canvas/40 p-3">
-            {t('repository.simulatedDescription')}
+            {t('repository.sourceDescription')}
           </p>
         </section>
       ) : (
@@ -197,13 +222,24 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
 
                 <ul className="space-y-3 pt-1" aria-label={t('repository.detectedTestsHeading')}>
                   {visibleDetectedTests.map((detectedChange) => (
-                    <DetectedTestItem key={detectedChange.id} detectedChange={detectedChange} projectId={projectId} />
+                    <DetectedTestItem
+                      key={detectedChange.id}
+                      detectedChange={detectedChange}
+                      originEvidence={evidenceById.get(detectedChange.evidenceId)}
+                      projectId={projectId}
+                    />
                   ))}
                 </ul>
               </section>
             </>
           ) : null}
         </section>
+      ) : source ? (
+        <StateView
+          kind="empty"
+          title={t('repository.emptyBatchTitle')}
+          description={t('repository.emptyBatchDescription')}
+        />
       ) : null}
     </div>
   )

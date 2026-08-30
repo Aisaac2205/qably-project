@@ -168,15 +168,20 @@
     "diff": "Diferencia",
     "origin": "Origen",
     "detectedTestsHeading": "Pruebas detectadas",
-    "detectedTestsDescription": "Coincide patrones configurados con rutas ya incluidas en este lote de ingesta simulado.",
+    "detectedTestsDescription": "Coincide los patrones configurados con las rutas de este lote de ingesta.",
     "detectedPattern": "Patrón",
     "filterAll": "Todo",
     "linkedProposal": "Propuesta vinculada",
-    "simulatedDescription": "Estos datos de fuente son simulados, no una conexi\u00f3n activa con un proveedor.",
+    "sourceDescription": "Los env\u00edos a este repositorio se ingieren autom\u00e1ticamente.",
     "noSourceTitle": "Sin fuente SCM",
     "noSourceDescription": "Este proyecto no tiene una fuente SCM configurada.",
     "ingestionErrorTitle": "La extracción falló",
-    "ingestionErrorDescription": "Este lote de ingesta no pudo procesarse, por lo que no se extrajeron cambios de prueba."
+    "ingestionErrorDescription": "Este lote de ingesta no pudo procesarse, por lo que no se extrajeron cambios de prueba.",
+    "loadingTitle": "Cargando repositorio\u2026",
+    "loadErrorTitle": "Repositorio no disponible",
+    "loadErrorDescription": "No se pudieron cargar los datos del repositorio de este proyecto. Prob\u00e1 de nuevo.",
+    "emptyBatchTitle": "Todav\u00eda no hay cambios ingeridos",
+    "emptyBatchDescription": "Hac\u00e9 un env\u00edo a este repositorio y los cambios van a aparecer ac\u00e1."
   },
 
   "status": {

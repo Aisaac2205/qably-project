@@ -32,7 +32,6 @@ import type {
   Evidence,
   TraceabilityLink,
   IngestionBatch,
-  CodeChange,
   OfficialTestCase,
   TestCaseVersion,
   ReviewDecision,
@@ -231,13 +230,6 @@ export function useIngestionBatches(projectId?: string): IngestionBatch[] {
   return useStableArray(
     () => getSnapshot().ingestionBatches.filter((batch) => !projectId || batch.projectId === projectId),
     () => getServerSnapshot().ingestionBatches.filter((batch) => !projectId || batch.projectId === projectId),
-  )
-}
-
-export function useCodeChanges(projectId?: string): CodeChange[] {
-  return useStableArray(
-    () => getSnapshot().codeChanges.filter((change) => !projectId || change.projectId === projectId),
-    () => getServerSnapshot().codeChanges.filter((change) => !projectId || change.projectId === projectId),
   )
 }
 
