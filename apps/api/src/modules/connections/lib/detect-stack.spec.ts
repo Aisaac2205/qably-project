@@ -9,6 +9,11 @@ describe('MANIFEST_PATHS', () => {
       'build.gradle',
       'build.gradle.kts',
       'pubspec.yaml',
+      'requirements.txt',
+      'pyproject.toml',
+      'go.mod',
+      'docker-compose.yml',
+      'docker-compose.yaml',
     ]);
   });
 });
@@ -138,5 +143,95 @@ describe('detectStack across manifests', () => {
 
   it('returns nothing when the repository declares no manifest', () => {
     expect(detectStack({})).toEqual([]);
+  });
+});
+
+describe('detectStack recognises more javascript frameworks', () => {
+  it('recognises next on top of react', () => {
+    const detected = detectStack({
+      'package.json': JSON.stringify({ dependencies: { next: '^15.0.0' } }),
+    });
+
+    expect(detected).toContain('nextjs');
+  });
+
+  it('recognises vue', () => {
+    const detected = detectStack({
+      'package.json': JSON.stringify({ dependencies: { vue: '^3.5.0' } }),
+    });
+
+    expect(detected).toContain('vue');
+  });
+});
+
+describe('detectStack recognises database engines', () => {
+  it('maps the mysql driver to mysql', () => {
+    const detected = detectStack({
+      'package.json': JSON.stringify({ dependencies: { mysql2: '^3.0.0' } }),
+    });
+
+    expect(detected).toContain('mysql');
+  });
+
+  it('maps mongoose to mongodb', () => {
+    const detected = detectStack({
+      'package.json': JSON.stringify({ dependencies: { mongoose: '^8.0.0' } }),
+    });
+
+    expect(detected).toContain('mongodb');
+  });
+
+  it('maps ioredis to redis', () => {
+    const detected = detectStack({
+      'package.json': JSON.stringify({ dependencies: { ioredis: '^5.0.0' } }),
+    });
+
+    expect(detected).toContain('redis');
+  });
+
+  it('reads the engines a compose file declares, whatever the language', () => {
+    const compose = [
+      'services:',
+      '  db:',
+      '    image: postgres:16',
+      '  cache:',
+      '    image: redis:7',
+    ].join('\n');
+
+    const detected = detectStack({ 'docker-compose.yml': compose });
+
+    expect(detected).toEqual(
+      expect.arrayContaining(['docker', 'postgresql', 'redis']),
+    );
+  });
+
+  it('recognises the postgres driver of a maven build', () => {
+    const detected = detectStack({
+      'pom.xml': '<groupId>org.postgresql</groupId>',
+    });
+
+    expect(detected).toEqual(expect.arrayContaining(['java', 'postgresql']));
+  });
+});
+
+describe('detectStack recognises python and go', () => {
+  it('recognises python from a requirements file', () => {
+    expect(detectStack({ 'requirements.txt': 'requests==2.32.0' })).toContain(
+      'python',
+    );
+  });
+
+  it('recognises django inside a requirements file', () => {
+    const detected = detectStack({ 'requirements.txt': 'Django==5.0' });
+
+    expect(detected).toEqual(expect.arrayContaining(['python', 'django']));
+  });
+
+  it('recognises python from a pyproject file', () => {
+    expect(detectStack({ 'pyproject.toml': '[project]' })).toContain('python');
+  });
+
+  it('recognises go from its module file', () => {
+    expect(detectStack({ 'go.mod': 'module example.com/api' })).toContain('go');
   });
 });

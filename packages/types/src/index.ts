@@ -66,6 +66,15 @@ export const TECH_KEYS = [
   'springboot',
   'postgresql',
   'cloudflare',
+  'nextjs',
+  'vue',
+  'mysql',
+  'mongodb',
+  'redis',
+  'docker',
+  'python',
+  'django',
+  'go',
 ] as const
 
 export type TechKey = (typeof TECH_KEYS)[number]

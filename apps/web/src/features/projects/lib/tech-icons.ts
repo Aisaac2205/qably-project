@@ -15,6 +15,15 @@ export const TECH_ICONS: Record<TechKey, { label: string; src: string }> = {
   springboot: { label: 'Spring Boot', src: '/tech-icons/spring-boot-icon.svg' },
   postgresql: { label: 'PostgreSQL', src: '/tech-icons/postgresql-icon.svg' },
   cloudflare: { label: 'Cloudflare', src: '/tech-icons/cloudflare.svg' },
+  nextjs:     { label: 'Next.js',    src: '/tech-icons/nextjs.svg' },
+  vue:        { label: 'Vue',        src: '/tech-icons/vue.svg' },
+  mysql:      { label: 'MySQL',      src: '/tech-icons/mysql.svg' },
+  mongodb:    { label: 'MongoDB',    src: '/tech-icons/mongodb.svg' },
+  redis:      { label: 'Redis',      src: '/tech-icons/redis.svg' },
+  docker:     { label: 'Docker',     src: '/tech-icons/docker.svg' },
+  python:     { label: 'Python',     src: '/tech-icons/python.svg' },
+  django:     { label: 'Django',     src: '/tech-icons/django.svg' },
+  go:         { label: 'Go',         src: '/tech-icons/go.svg' },
 }
 
 export type { TechKey }

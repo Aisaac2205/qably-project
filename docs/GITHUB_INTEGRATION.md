@@ -63,10 +63,21 @@ Detection reads the repository root once, then fetches only the manifests that a
 
 | Manifest | Detects |
 | --- | --- |
-| `package.json` | React, Angular, NestJS, Express, Vite, PostgreSQL (`pg`), Cloudflare (`wrangler`), plus TypeScript or JavaScript |
+| `package.json` | React, Next.js, Vue/Nuxt, Angular, NestJS, Express, Vite, Cloudflare, the PostgreSQL / MySQL / MongoDB / Redis drivers, plus TypeScript or JavaScript |
 | `composer.json` | PHP, and Laravel when a `laravel/*` package is required |
-| `pom.xml`, `build.gradle`, `build.gradle.kts` | Java, and Spring Boot when the build declares it |
+| `pom.xml`, `build.gradle`, `build.gradle.kts` | Java, Spring Boot, and the PostgreSQL / MySQL / MongoDB drivers |
 | `pubspec.yaml` | Flutter, only when the manifest actually depends on the Flutter SDK |
+| `requirements.txt`, `pyproject.toml` | Python, Django, and the psycopg / PyMySQL / PyMongo / redis clients |
+| `go.mod` | Go, and PostgreSQL via `lib/pq` or `jackc/pgx` |
+| `docker-compose.yml` | Docker, and the engine behind each `image:` — Postgres, MySQL/MariaDB, Mongo, Redis |
+
+The compose file is the cheapest reliable signal for a database engine, because a language manifest
+often names an ORM rather than the engine behind it. It costs nothing extra: the root listing that
+finds the manifests already tells us the file is there.
+
+**Deliberately not done: scanning source code.** Walking the repository tree to grep imports would
+cost many API calls and produce weak evidence — a library imported in one test file does not make it
+part of the stack. Manifests are a declaration of intent; loose code is circumstantial.
 
 A polyglot repository reports every stack it declares. A Dart package that is not a Flutter app is
 not reported as Flutter, and a manifest that fails to parse is skipped rather than guessed at.
