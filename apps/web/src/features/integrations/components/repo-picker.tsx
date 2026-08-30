@@ -92,7 +92,7 @@ export function RepoPicker({
           return (
             <label
               key={option.value}
-              className={`flex min-h-11 cursor-pointer items-center gap-2.5 border-b border-border/60 px-3 py-2 text-sm transition-colors last:border-b-0 hover:bg-surface-hover has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-primary ${
+              className={`relative flex min-h-11 cursor-pointer items-center gap-2.5 border-b border-border/60 px-3 py-2 text-sm transition-colors last:border-b-0 hover:bg-surface-hover has-[:focus-visible]:outline-2 has-[:focus-visible]:-outline-offset-2 has-[:focus-visible]:outline-primary ${
                 checked ? 'bg-surface-hover' : ''
               }`}
             >

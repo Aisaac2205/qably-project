@@ -3,6 +3,18 @@ import { describe, expect, it, vi } from 'vitest'
 import SuitesPage from './page'
 import { __resetStore } from '@/lib/mock-store'
 
+vi.mock('@/features/projects/hooks/use-project', async () => {
+  const { getProject } = await import('@/lib/mock-store')
+  return {
+    useProject: (id: string) => ({
+      project: getProject(id),
+      isLoading: false,
+      isError: false,
+    }),
+  }
+})
+
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [key: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,

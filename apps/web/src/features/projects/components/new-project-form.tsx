@@ -1,17 +1,15 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCreateProject } from '../hooks/use-create-project'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { useAvailableRepos } from '@/features/integrations/hooks/use-available-repos'
 import { RepoPicker } from '@/features/integrations/components/repo-picker'
-import {
-  createConnection,
-  detectStack,
-} from '@/features/integrations/api/connections.api'
+import { createConnection } from '@/features/integrations/api/connections.api'
+import { useDetectedStack } from '@/features/integrations/hooks/use-detected-stack'
 import { REPO_OPTION_PREFIX, buildRepoOptions } from '../lib/repo-options'
-import { TechSelector } from './tech-selector'
+import { DetectedStack } from './detected-stack'
 import { useTranslation } from '@/lib/i18n'
 
 export function NewProjectForm() {
@@ -24,29 +22,14 @@ export function NewProjectForm() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [connectionId, setConnectionId] = useState('')
-  const [technologies, setTechnologies] = useState<string[]>([])
+  const [dropped, setDropped] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+
   const selectedRepo =
     repoOptions.find((option) => option.value === connectionId)?.repo ?? null
+  const { technologies: detected, isDetecting } = useDetectedStack(selectedRepo)
+  const technologies = detected.filter((tech) => !dropped.includes(tech))
 
-  useEffect(() => {
-    if (selectedRepo === null) return
-
-    let active = true
-
-    detectStack(selectedRepo)
-      .then((stack) => {
-        if (!active) return
-        setTechnologies((current) => [
-          ...new Set([...current, ...stack.technologies]),
-        ])
-      })
-      .catch(() => undefined)
-
-    return () => {
-      active = false
-    }
-  }, [selectedRepo])
 
   function validate(): Record<string, string> {
     const errs: Record<string, string> = {}
@@ -154,9 +137,15 @@ export function NewProjectForm() {
 
       <div className="space-y-1.5">
         <p className="text-xs font-semibold text-default">
-          {t('projects.techStackLabel')} <span className="text-muted font-normal">({t('common.optional')})</span>
+          {t('projects.techStackLabel')}
         </p>
-        <TechSelector selected={technologies} onChange={setTechnologies} />
+        <DetectedStack
+          technologies={technologies}
+          onChange={(kept) =>
+            setDropped(detected.filter((tech) => !kept.includes(tech)))
+          }
+          isDetecting={isDetecting}
+        />
       </div>
 
       {error && (

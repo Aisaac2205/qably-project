@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
 import type { TestCase } from '@qably/types'
-import { useSuite, useProject } from '@/lib/use-mock-store'
+import { useSuite } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { deleteSuite, deleteCase } from '@/lib/mock-store'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
@@ -41,7 +42,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const router = useRouter()
   const { t } = useTranslation()
   const suite = useSuite(suiteId)
-  const project = useProject(projectId)
+  const { project } = useProject(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
 

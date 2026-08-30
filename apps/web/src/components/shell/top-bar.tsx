@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import type { Project } from '@qably/types'
-import { useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { NotificationsMenu } from '@/features/notifications'
 import { useTranslation } from '@/lib/i18n'
@@ -36,7 +36,7 @@ export function TopBar() {
   const { t } = useTranslation()
   const segments = pathname.split('/').filter(Boolean)
   const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
-  const project = useProject(projectId ?? '')
+  const { project } = useProject(projectId ?? '')
   const title = getPageTitle(pathname, project, t)
 
   return (

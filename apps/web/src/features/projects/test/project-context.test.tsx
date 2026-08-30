@@ -4,65 +4,52 @@ import {
   ProjectProvider,
   useProjectContext,
 } from '@/features/projects/context/project-context'
-import type { ProjectSummary } from '@qably/types'
 
-const mockProject: ProjectSummary = {
-  id: 'proj-1',
-  name: 'Ecommerce App',
-  description: 'Checkout flows',
-  githubRepo: 'acme/ecommerce',
-  organizationId: 'org-1',
-  healthScore: 90,
-  lastRunStatus: 'pass',
-  lastRunAt: '2026-06-16T10:00:00Z',
-  suiteCount: 12,
-  activeRunCount: 1,
-  aiPendingCount: 3,
-  createdAt: '2026-01-20T00:00:00Z',
-  updatedAt: '2026-01-20T00:00:00Z',
-  technologies: [],
+function ReadContext() {
+  const { projectId } = useProjectContext()
+  return <span data-testid="ctx-id">{projectId}</span>
 }
 
-function ReadContext({ testId }: { testId: string }) {
-  const { projectId, project } = useProjectContext()
-  return (
-    <div data-testid={testId}>
-      <span data-testid="ctx-id">{projectId}</span>
-      <span data-testid="ctx-name">{project?.name}</span>
-    </div>
-  )
+function CaptureContext({ sink }: { sink: string[] }) {
+  const context = useProjectContext()
+  sink.push(...Object.keys(context))
+  return null
 }
 
 describe('ProjectContext', () => {
-  it('provides projectId and project to children', async () => {
+  it('provides the project id to children', async () => {
     await act(async () => {
       render(
-        <ProjectProvider projectId="proj-1" project={mockProject}>
-          <ReadContext testId="child" />
+        <ProjectProvider projectId="proj-1">
+          <ReadContext />
         </ProjectProvider>,
       )
     })
+
     expect(screen.getByTestId('ctx-id')).toHaveTextContent('proj-1')
-    expect(screen.getByTestId('ctx-name')).toHaveTextContent('Ecommerce App')
+  })
+
+  it('carries no project copy, so pages read it from the api instead', async () => {
+    const keys: string[] = []
+
+    await act(async () => {
+      render(
+        <ProjectProvider projectId="proj-1">
+          <CaptureContext sink={keys} />
+        </ProjectProvider>,
+      )
+    })
+
+    expect([...new Set(keys)]).toEqual(['projectId'])
   })
 
   it('throws when useProjectContext is used outside provider', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(() => render(<ReadContext testId="child" />)).toThrow(
+
+    expect(() => render(<ReadContext />)).toThrow(
       'useProjectContext must be used within a ProjectProvider',
     )
-    consoleError.mockRestore()
-  })
 
-  it('handles undefined project gracefully', async () => {
-    await act(async () => {
-      render(
-        <ProjectProvider projectId="proj-1" project={undefined}>
-          <ReadContext testId="child" />
-        </ProjectProvider>,
-      )
-    })
-    expect(screen.getByTestId('ctx-id')).toHaveTextContent('proj-1')
-    expect(screen.getByTestId('ctx-name')).toBeEmptyDOMElement()
+    consoleError.mockRestore()
   })
 })

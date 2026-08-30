@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
-import { useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { ReviewCaseList } from './review-case-list'
 import { ReviewCaseDetail } from './review-case-detail'
@@ -14,7 +14,7 @@ import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 
 export function AiReviewPage({ projectId }: { projectId: string }) {
-  const project = useProject(projectId)
+  const { project } = useProject(projectId)
   const {
     cases,
     selectedCase,

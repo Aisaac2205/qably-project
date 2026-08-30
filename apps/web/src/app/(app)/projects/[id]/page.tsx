@@ -3,14 +3,29 @@
 import { use } from 'react'
 import Link from 'next/link'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
-import { useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { ProjectHome } from '@/features/projects/components/project-home'
+import { useTranslation } from '@/lib/i18n'
 
 type Params = Promise<{ id: string }>
 
 export default function ProjectDetailPage({ params }: { params: Params }) {
   const { id } = use(params)
-  const project = useProject(id)
+  const { t } = useTranslation()
+  const { project, isLoading } = useProject(id)
+
+  if (isLoading) {
+    return (
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6">
+        <div className="h-4 w-48 animate-pulse rounded bg-surface-hover" />
+        <div className="h-8 w-72 animate-pulse rounded bg-surface-hover" />
+        <div className="h-40 w-full animate-pulse rounded-xl bg-surface-hover" />
+        <span className="sr-only" role="status">
+          {t('projects.loadingProject')}
+        </span>
+      </div>
+    )
+  }
 
   if (!project) {
     return (

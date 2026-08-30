@@ -182,9 +182,9 @@ describe('NewProjectForm against the api', () => {
     await act(async () => { renderForm() })
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(
-        /We found no repositories in your GitHub account/,
-      )
+      expect(
+        screen.getByText(/We found no repositories in your GitHub account/),
+      ).toBeInTheDocument()
     })
     expect(screen.queryAllByRole('radio')).toHaveLength(0)
   })
@@ -291,7 +291,10 @@ describe('NewProjectForm against the api', () => {
     await user.click(screen.getByRole('radio', { name: /acme\/checkout/ }))
 
     await waitFor(() => {
-      expect(detectStackMock).toHaveBeenCalledWith('acme/checkout')
+      expect(detectStackMock).toHaveBeenCalledWith(
+        'acme/checkout',
+        expect.anything(),
+      )
     })
 
     await user.click(screen.getByRole('button', { name: /Create project/ }))

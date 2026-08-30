@@ -48,6 +48,18 @@ vi.mock('@/components/ui/sidebar', () => ({
 
 import { TopBar } from '@/components/shell/top-bar'
 
+vi.mock('@/features/projects/hooks/use-project', async () => {
+  const { getProject } = await import('@/lib/mock-store')
+  return {
+    useProject: (id: string) => ({
+      project: getProject(id),
+      isLoading: false,
+      isError: false,
+    }),
+  }
+})
+
+
 describe('TopBar', () => {
   it('renders a Dashboard title heading on /dashboard', async () => {
     mockPathname.mockReturnValue('/dashboard')

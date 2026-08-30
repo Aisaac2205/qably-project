@@ -4,13 +4,13 @@ import { use } from 'react'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import { useTranslation } from '@/lib/i18n'
-import { useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 
 type Params = Promise<{ id: string }>
 
 export default function SuitesPage({ params }: { params: Params }) {
   const { id } = use(params)
-  const project = useProject(id)
+  const { project } = useProject(id)
   const { t } = useTranslation()
 
   return (

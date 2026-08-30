@@ -30,7 +30,7 @@ import {
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
-import { useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { useTranslation } from '@/lib/i18n'
 
 interface NavItem {
@@ -50,7 +50,7 @@ export function Sidebar() {
   // Project routes replace, rather than append to, global navigation.
   const segments = pathname.split('/').filter(Boolean)
   const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
-  const project = useProject(projectId ?? '')
+  const { project } = useProject(projectId ?? '')
   const projectContext = project ? projectId : null
 
   const navItems: NavItem[] = [

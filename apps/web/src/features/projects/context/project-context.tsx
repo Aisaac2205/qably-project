@@ -1,26 +1,22 @@
 'use client'
 
 import { createContext, useContext, type ReactNode } from 'react'
-import type { Project } from '@qably/types'
 
 interface ProjectContextValue {
   projectId: string
-  project: Project | undefined
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null)
 
 export function ProjectProvider({
   projectId,
-  project,
   children,
 }: {
   projectId: string
-  project: Project | undefined
   children: ReactNode
 }) {
   return (
-    <ProjectContext.Provider value={{ projectId, project }}>
+    <ProjectContext.Provider value={{ projectId }}>
       {children}
     </ProjectContext.Provider>
   )

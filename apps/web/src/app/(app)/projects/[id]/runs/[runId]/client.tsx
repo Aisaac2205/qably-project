@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRun, useProject } from '@/lib/use-mock-store'
+import { useRun } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { ArrowLeft } from '@phosphor-icons/react'
 import { RunDetail } from '@/features/runs/components/run-detail'
@@ -16,7 +17,7 @@ export function RunDetailPageClient({
 }) {
   const { t } = useTranslation()
   const run = useRun(runId)
-  const project = useProject(projectId)
+  const { project } = useProject(projectId)
 
   if (!run) {
     return (

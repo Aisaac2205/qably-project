@@ -3,6 +3,18 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { AppShell } from '@/components/shell/app-shell'
 
+vi.mock('@/features/projects/hooks/use-project', async () => {
+  const { getProject } = await import('@/lib/mock-store')
+  return {
+    useProject: (id: string) => ({
+      project: getProject(id),
+      isLoading: false,
+      isError: false,
+    }),
+  }
+})
+
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),

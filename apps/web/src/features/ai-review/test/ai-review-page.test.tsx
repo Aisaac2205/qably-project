@@ -1,8 +1,20 @@
 import { render, screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { AiReviewPage } from '@/features/ai-review/components/ai-review-page'
 import { __resetStore, approveProposal, disconnectAiProvider, getMembers, getSnapshot } from '@/lib/mock-store'
+
+vi.mock('@/features/projects/hooks/use-project', async () => {
+  const { getProject } = await import('@/lib/mock-store')
+  return {
+    useProject: (id: string) => ({
+      project: getProject(id),
+      isLoading: false,
+      isError: false,
+    }),
+  }
+})
+
 
 function confirmPendingCases(projectId: string) {
   const actor = getMembers()[0]

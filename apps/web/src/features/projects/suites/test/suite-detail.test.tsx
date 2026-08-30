@@ -8,6 +8,13 @@ const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
+vi.mock('@/features/projects/hooks/use-project', () => ({
+  useProject: () => ({
+    project: { id: 'proj-1', name: 'Ecommerce App' },
+    isLoading: false,
+    isError: false,
+  }),
+}))
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,

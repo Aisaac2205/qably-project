@@ -8,12 +8,12 @@ import { buttonVariants } from '@/components/ui/button'
 import { RunList } from '@/features/runs/components/run-list'
 import { CiAdapterPanel } from '@/features/runs/components/ci-adapter-panel'
 import { useTranslation } from '@/lib/i18n'
-import { useProject } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { cn } from '@/lib/utils'
 
 export function RunListPageClient({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
-  const project = useProject(projectId)
+  const { project } = useProject(projectId)
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">

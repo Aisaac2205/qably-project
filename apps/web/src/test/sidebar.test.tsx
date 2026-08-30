@@ -74,6 +74,18 @@ vi.mock('@/lib/use-mock-store', () => ({
 
 import { Sidebar } from '@/components/shell/sidebar'
 
+vi.mock('@/features/projects/hooks/use-project', async () => {
+  const { getProject } = await import('@/lib/mock-store')
+  return {
+    useProject: (id: string) => ({
+      project: getProject(id),
+      isLoading: false,
+      isError: false,
+    }),
+  }
+})
+
+
 // Sidebar uses useSidebar() which requires a SidebarProvider. Wrap renders.
 function renderSidebar({ defaultOpen = true, includeTrigger = false } = {}) {
   return render(
