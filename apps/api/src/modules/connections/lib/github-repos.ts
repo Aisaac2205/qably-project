@@ -7,6 +7,18 @@ interface GithubRepoPayload {
   full_name?: unknown;
   private?: unknown;
   default_branch?: unknown;
+  pushed_at?: unknown;
+  updated_at?: unknown;
+}
+
+function readTimestamp(payload: GithubRepoPayload): string {
+  const pushed = payload.pushed_at;
+
+  if (typeof pushed === 'string' && pushed !== '') return pushed;
+
+  const updated = payload.updated_at;
+
+  return typeof updated === 'string' ? updated : '';
 }
 
 function toAvailableRepo(payload: GithubRepoPayload): AvailableRepo | null {
@@ -23,7 +35,19 @@ function toAvailableRepo(payload: GithubRepoPayload): AvailableRepo | null {
       payload.default_branch.trim() !== ''
         ? payload.default_branch
         : DEFAULT_BRANCH,
+    updatedAt: readTimestamp(payload),
   };
+}
+
+export function byMostRecentActivity(
+  a: AvailableRepo,
+  b: AvailableRepo,
+): number {
+  if (a.updatedAt === b.updatedAt) return a.fullName.localeCompare(b.fullName);
+  if (a.updatedAt === '') return 1;
+  if (b.updatedAt === '') return -1;
+
+  return b.updatedAt.localeCompare(a.updatedAt);
 }
 
 export function toAvailableRepos(payload: unknown): AvailableRepo[] {
@@ -32,5 +56,5 @@ export function toAvailableRepos(payload: unknown): AvailableRepo[] {
   return payload
     .map((entry) => toAvailableRepo(entry as GithubRepoPayload))
     .filter((repo): repo is AvailableRepo => repo !== null)
-    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    .sort(byMostRecentActivity);
 }

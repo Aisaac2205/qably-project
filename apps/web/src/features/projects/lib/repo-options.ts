@@ -12,21 +12,25 @@ export function buildRepoOptions(
   connections: RepoConnection[],
   repos: AvailableRepo[],
 ): RepoOption[] {
-  const connected = new Set(connections.map((connection) => connection.repo))
+  const byRepo = new Map(
+    connections.map((connection) => [connection.repo, connection]),
+  )
+  const listed = new Set(repos.map((repo) => repo.fullName))
 
-  return [
-    ...connections.map((connection) => ({
+  const fromGithub = repos.map((repo) => ({
+    value:
+      byRepo.get(repo.fullName)?.id ?? `${REPO_OPTION_PREFIX}${repo.fullName}`,
+    repo: repo.fullName,
+    isPrivate: repo.isPrivate,
+  }))
+
+  const orphaned = connections
+    .filter((connection) => !listed.has(connection.repo))
+    .map((connection) => ({
       value: connection.id,
       repo: connection.repo,
-      isPrivate: repos.find((repo) => repo.fullName === connection.repo)
-        ?.isPrivate ?? false,
-    })),
-    ...repos
-      .filter((repo) => !connected.has(repo.fullName))
-      .map((repo) => ({
-        value: `${REPO_OPTION_PREFIX}${repo.fullName}`,
-        repo: repo.fullName,
-        isPrivate: repo.isPrivate,
-      })),
-  ]
+      isPrivate: false,
+    }))
+
+  return [...fromGithub, ...orphaned]
 }

@@ -9,9 +9,10 @@ token. The credential comes from the GitHub sign-in the user already performed.
    row it already owns.
 2. `GET /connections/available-repos` reads that token and asks GitHub for the repositories the user
    can reach, across their own account and the organizations they belong to.
-3. The user picks a repository in the project form. The picker merges two sources into one list:
-   repositories already connected to the organization, and repositories that GitHub offers but
-   Qably has not connected yet.
+3. The user picks a repository in the project form. The picker merges two sources into one list,
+   ordered by most recent push so the repository someone touched today sits at the top: repositories
+   already connected to the organization, and repositories that GitHub offers but Qably has not
+   connected yet.
 4. Picking an unconnected repository creates the `Connection` first, then creates the project
    pointing at it. Picking an already-connected one links straight to it.
 
@@ -59,17 +60,25 @@ token and maps their dependencies onto the shared technology catalogue. The proj
 when a repository is picked and merges the result into the technology selection, never removing what
 the user chose by hand.
 
-Detection reads the repository root once, then fetches only the manifests that are actually there:
+Detection asks GitHub for the repository tree once, picks the manifests worth reading, and fetches
+only those. It looks up to three directories deep, so a monorepo reports the stack of **every**
+workspace rather than only what the root manifest declares — a root `package.json` that holds nothing
+but `turbo` and `typescript` is exactly the case that used to report a repository as TypeScript and
+nothing else. Dependency directories (`node_modules`, `vendor`) and build output (`dist`, `.next`,
+`target`, …) are skipped, and at most twelve manifests are read per repository.
 
 | Manifest | Detects |
 | --- | --- |
-| `package.json` | React, Next.js, Vue/Nuxt, Angular, NestJS, Express, Vite, Cloudflare, the PostgreSQL / MySQL / MongoDB / Redis drivers, plus TypeScript or JavaScript |
+| `package.json` | React, Next.js, Vue/Nuxt, Astro, Angular, NestJS, Express, Vite, Cloudflare, the PostgreSQL / MySQL / MongoDB / Redis drivers, the Playwright and Jest test runners, plus TypeScript or JavaScript |
 | `composer.json` | PHP, and Laravel when a `laravel/*` package is required |
 | `pom.xml`, `build.gradle`, `build.gradle.kts` | Java, Spring Boot, and the PostgreSQL / MySQL / MongoDB drivers |
 | `pubspec.yaml` | Flutter, only when the manifest actually depends on the Flutter SDK |
-| `requirements.txt`, `pyproject.toml` | Python, Django, and the psycopg / PyMySQL / PyMongo / redis clients |
+| `requirements.txt`, `pyproject.toml` | Python, Django, FastAPI, and the psycopg / PyMySQL / PyMongo / redis clients |
 | `go.mod` | Go, and PostgreSQL via `lib/pq` or `jackc/pgx` |
 | `docker-compose.yml` | Docker, and the engine behind each `image:` — Postgres, MySQL/MariaDB, Mongo, Redis |
+
+Test runners matter more here than anywhere else: Qably exists to orchestrate them, so knowing a
+repository runs Playwright or Jest is the single most actionable thing detection can report.
 
 The compose file is the cheapest reliable signal for a database engine, because a language manifest
 often names an ORM rather than the engine behind it. It costs nothing extra: the root listing that

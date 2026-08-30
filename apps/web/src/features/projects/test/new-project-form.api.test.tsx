@@ -41,6 +41,7 @@ const availableRepo = {
   fullName: 'acme/checkout',
   isPrivate: true,
   defaultBranch: 'main',
+  updatedAt: '2026-08-01T00:00:00Z',
 }
 
 const connection = {

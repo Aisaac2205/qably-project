@@ -352,6 +352,7 @@ describe('Connections (e2e)', () => {
         fullName: 'acme/shop',
         isPrivate: true,
         defaultBranch: 'main',
+        updatedAt: '2026-06-01T00:00:00Z',
       },
     ]);
 
@@ -377,10 +378,10 @@ describe('Connections (e2e)', () => {
 
   it('detects the stack of a repository from its package.json', async () => {
     repoDirectory.readManifests.mockResolvedValue({
-      'package.json': JSON.stringify({
-        dependencies: { react: '^19.0.0' },
-        devDependencies: { typescript: '^5.0.0' },
-      }),
+      'package.json': [
+        JSON.stringify({ devDependencies: { typescript: '^5.0.0' } }),
+        JSON.stringify({ dependencies: { react: '^19.0.0' } }),
+      ],
     });
 
     const response = await request(app.getHttpServer())

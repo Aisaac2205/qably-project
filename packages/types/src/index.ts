@@ -75,6 +75,10 @@ export const TECH_KEYS = [
   'python',
   'django',
   'go',
+  'fastapi',
+  'playwright',
+  'jest',
+  'astro',
 ] as const
 
 export type TechKey = (typeof TECH_KEYS)[number]
@@ -390,6 +394,7 @@ export interface AvailableRepo {
   fullName: string
   isPrivate: boolean
   defaultBranch: string
+  updatedAt: string
 }
 
 export interface WebhookSecretView {

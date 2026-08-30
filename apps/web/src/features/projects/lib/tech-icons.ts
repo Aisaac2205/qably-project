@@ -24,6 +24,10 @@ export const TECH_ICONS: Record<TechKey, { label: string; src: string }> = {
   python:     { label: 'Python',     src: '/tech-icons/python.svg' },
   django:     { label: 'Django',     src: '/tech-icons/django.svg' },
   go:         { label: 'Go',         src: '/tech-icons/go.svg' },
+  fastapi:    { label: 'FastAPI',    src: '/tech-icons/fastapi-icon.svg' },
+  playwright: { label: 'Playwright', src: '/tech-icons/playwright.svg' },
+  jest:       { label: 'Jest',       src: '/tech-icons/jest-icon.svg' },
+  astro:      { label: 'Astro',      src: '/tech-icons/astro-icon-light-gradient.svg' },
 }
 
 export type { TechKey }

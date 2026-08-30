@@ -2,22 +2,14 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { AvailableRepo } from '@qably/types';
 import { AUTH_INSTANCE, type AuthInstance } from '../../auth/auth.instance';
 import type { RepoDirectory } from '../connections.contracts';
-import {
-  MANIFEST_PATHS,
-  type ManifestPath,
-  type RepoManifests,
-} from '../lib/detect-stack';
-import { toAvailableRepos } from '../lib/github-repos';
+import type { RepoManifests } from '../lib/detect-stack';
+import { byMostRecentActivity, toAvailableRepos } from '../lib/github-repos';
+import { manifestKind, selectManifestPaths } from '../lib/manifest-paths';
 
 const API = 'https://api.github.com';
 const PROVIDER_ID = 'github';
 const PER_PAGE = 100;
 const MAX_PAGES = 5;
-
-interface RootEntry {
-  name?: unknown;
-  type?: unknown;
-}
 
 @Injectable()
 export class GithubRepoDirectory implements RepoDirectory {
@@ -47,7 +39,7 @@ export class GithubRepoDirectory implements RepoDirectory {
       if (!Array.isArray(payload) || payload.length < PER_PAGE) break;
     }
 
-    return collected.sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return collected.sort(byMostRecentActivity);
   }
 
   async readManifests(userId: string, repo: string): Promise<RepoManifests> {
@@ -55,35 +47,50 @@ export class GithubRepoDirectory implements RepoDirectory {
 
     if (accessToken === null) return {};
 
-    const root = await this.get(`/repos/${repo}/contents`, accessToken);
+    const branch = await this.readDefaultBranch(repo, accessToken);
 
-    if (!Array.isArray(root)) return {};
+    if (branch === null) return {};
 
-    const present = new Set(
-      (root as RootEntry[])
-        .filter((entry) => entry.type === 'file')
-        .map((entry) => entry.name)
-        .filter((name): name is string => typeof name === 'string'),
+    const tree = await this.get(
+      `/repos/${repo}/git/trees/${branch}?recursive=1`,
+      accessToken,
     );
 
-    const wanted = MANIFEST_PATHS.filter((path) => present.has(path));
+    const paths = selectManifestPaths(tree);
     const manifests: RepoManifests = {};
 
     await Promise.all(
-      wanted.map(async (path) => {
+      paths.map(async (path) => {
         const content = await this.readFile(accessToken, repo, path);
 
-        if (content !== null) manifests[path] = content;
+        if (content === null) return;
+
+        const kind = manifestKind(path);
+
+        manifests[kind] = [...(manifests[kind] ?? []), content];
       }),
     );
 
     return manifests;
   }
 
+  private async readDefaultBranch(
+    repo: string,
+    accessToken: string,
+  ): Promise<string | null> {
+    const payload = await this.get(`/repos/${repo}`, accessToken);
+
+    if (payload === null || Array.isArray(payload)) return null;
+
+    const { default_branch: branch } = payload as { default_branch?: unknown };
+
+    return typeof branch === 'string' && branch !== '' ? branch : null;
+  }
+
   private async readFile(
     accessToken: string,
     repo: string,
-    path: ManifestPath,
+    path: string,
   ): Promise<string | null> {
     const payload = await this.get(
       `/repos/${repo}/contents/${path}`,

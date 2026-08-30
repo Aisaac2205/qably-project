@@ -16,13 +16,21 @@ export const MANIFEST_PATHS = [
 
 export type ManifestPath = (typeof MANIFEST_PATHS)[number];
 
-export type RepoManifests = Partial<Record<ManifestPath, string>>;
+export type RepoManifests = Partial<Record<ManifestPath, string[]>>;
+
+function contentsOf(
+  manifests: RepoManifests,
+  ...kinds: ManifestPath[]
+): string[] {
+  return kinds.flatMap((kind) => manifests[kind] ?? []);
+}
 
 const NPM_DEPENDENCIES: Record<string, TechKey> = {
   react: 'react',
   next: 'nextjs',
   vue: 'vue',
   nuxt: 'vue',
+  astro: 'astro',
   typescript: 'typescript',
   '@angular/core': 'angular',
   '@nestjs/core': 'nestjs',
@@ -38,6 +46,11 @@ const NPM_DEPENDENCIES: Record<string, TechKey> = {
   ioredis: 'redis',
   wrangler: 'cloudflare',
   '@cloudflare/workers-types': 'cloudflare',
+  '@playwright/test': 'playwright',
+  playwright: 'playwright',
+  jest: 'jest',
+  'ts-jest': 'jest',
+  '@jest/globals': 'jest',
 };
 
 const COMPOSE_IMAGES: Record<string, TechKey> = {
@@ -73,46 +86,57 @@ function keysOf(value: unknown): string[] {
   return typeof value === 'object' && value !== null ? Object.keys(value) : [];
 }
 
-function readNpm(raw: string | undefined, into: Set<TechKey>): void {
-  const manifest = parseJson(raw);
+function readNpm(sources: string[], into: Set<TechKey>): void {
+  const manifests = sources
+    .map(parseJson)
+    .filter(
+      (manifest): manifest is Record<string, unknown> => manifest !== null,
+    );
 
-  if (manifest === null) return;
+  if (manifests.length === 0) return;
 
-  const names = [
-    ...keysOf(manifest.dependencies),
-    ...keysOf(manifest.devDependencies),
-  ];
+  for (const manifest of manifests) {
+    const names = [
+      ...keysOf(manifest.dependencies),
+      ...keysOf(manifest.devDependencies),
+    ];
 
-  for (const name of names) {
-    const tech = NPM_DEPENDENCIES[name];
+    for (const name of names) {
+      const tech = NPM_DEPENDENCIES[name];
 
-    if (tech !== undefined) into.add(tech);
+      if (tech !== undefined) into.add(tech);
+    }
   }
 
   into.add(into.has('typescript') ? 'typescript' : 'javascript');
 }
 
-function readComposer(raw: string | undefined, into: Set<TechKey>): void {
-  const manifest = parseJson(raw);
+function readComposer(sources: string[], into: Set<TechKey>): void {
+  const manifests = sources
+    .map(parseJson)
+    .filter(
+      (manifest): manifest is Record<string, unknown> => manifest !== null,
+    );
 
-  if (manifest === null) return;
+  if (manifests.length === 0) return;
 
   into.add('php');
 
-  const names = [
+  const names = manifests.flatMap((manifest) => [
     ...keysOf(manifest.require),
     ...keysOf(manifest['require-dev']),
-  ];
+  ]);
 
   if (names.some((name) => name.startsWith('laravel/'))) into.add('laravel');
 }
 
 function readJava(manifests: RepoManifests, into: Set<TechKey>): void {
-  const sources = [
-    manifests['pom.xml'],
-    manifests['build.gradle'],
-    manifests['build.gradle.kts'],
-  ].filter((source): source is string => source !== undefined);
+  const sources = contentsOf(
+    manifests,
+    'pom.xml',
+    'build.gradle',
+    'build.gradle.kts',
+  );
 
   if (sources.length === 0) return;
 
@@ -132,18 +156,14 @@ function readJava(manifests: RepoManifests, into: Set<TechKey>): void {
   }
 }
 
-function readDart(raw: string | undefined, into: Set<TechKey>): void {
-  if (raw === undefined) return;
-  if (!/^\s*flutter\s*:/m.test(raw)) return;
+function readDart(sources: string[], into: Set<TechKey>): void {
+  if (!sources.some((source) => /^\s*flutter\s*:/m.test(source))) return;
 
   into.add('flutter');
 }
 
 function readPython(manifests: RepoManifests, into: Set<TechKey>): void {
-  const sources = [
-    manifests['requirements.txt'],
-    manifests['pyproject.toml'],
-  ].filter((source): source is string => source !== undefined);
+  const sources = contentsOf(manifests, 'requirements.txt', 'pyproject.toml');
 
   if (sources.length === 0) return;
 
@@ -152,6 +172,7 @@ function readPython(manifests: RepoManifests, into: Set<TechKey>): void {
   const joined = sources.join('\n').toLowerCase();
 
   if (joined.includes('django')) into.add('django');
+  if (joined.includes('fastapi')) into.add('fastapi');
   if (joined.includes('psycopg')) into.add('postgresql');
   if (joined.includes('pymysql') || joined.includes('mysqlclient')) {
     into.add('mysql');
@@ -160,25 +181,30 @@ function readPython(manifests: RepoManifests, into: Set<TechKey>): void {
   if (/^\s*redis/m.test(joined)) into.add('redis');
 }
 
-function readGo(raw: string | undefined, into: Set<TechKey>): void {
-  if (raw === undefined) return;
+function readGo(sources: string[], into: Set<TechKey>): void {
+  if (sources.length === 0) return;
 
   into.add('go');
 
-  if (raw.includes('lib/pq') || raw.includes('jackc/pgx')) {
+  const joined = sources.join('\n');
+
+  if (joined.includes('lib/pq') || joined.includes('jackc/pgx')) {
     into.add('postgresql');
   }
 }
 
 function readCompose(manifests: RepoManifests, into: Set<TechKey>): void {
-  const raw =
-    manifests['docker-compose.yml'] ?? manifests['docker-compose.yaml'];
+  const sources = contentsOf(
+    manifests,
+    'docker-compose.yml',
+    'docker-compose.yaml',
+  );
 
-  if (raw === undefined) return;
+  if (sources.length === 0) return;
 
   into.add('docker');
 
-  for (const line of raw.split('\n')) {
+  for (const line of sources.join('\n').split('\n')) {
     const match = /^\s*image:\s*["']?([\w.\-/]+)/.exec(line);
 
     if (match === null) continue;
@@ -194,12 +220,12 @@ function readCompose(manifests: RepoManifests, into: Set<TechKey>): void {
 export function detectStack(manifests: RepoManifests): TechKey[] {
   const detected = new Set<TechKey>();
 
-  readNpm(manifests['package.json'], detected);
-  readComposer(manifests['composer.json'], detected);
+  readNpm(contentsOf(manifests, 'package.json'), detected);
+  readComposer(contentsOf(manifests, 'composer.json'), detected);
   readJava(manifests, detected);
-  readDart(manifests['pubspec.yaml'], detected);
+  readDart(contentsOf(manifests, 'pubspec.yaml'), detected);
   readPython(manifests, detected);
-  readGo(manifests['go.mod'], detected);
+  readGo(contentsOf(manifests, 'go.mod'), detected);
   readCompose(manifests, detected);
 
   return [...detected];

@@ -5,6 +5,7 @@ const repo = {
   full_name: 'acme/shop',
   private: true,
   default_branch: 'main',
+  pushed_at: '2026-06-01T00:00:00Z',
 };
 
 describe('toAvailableRepos', () => {
@@ -15,6 +16,7 @@ describe('toAvailableRepos', () => {
         fullName: 'acme/shop',
         isPrivate: true,
         defaultBranch: 'main',
+        updatedAt: '2026-06-01T00:00:00Z',
       },
     ]);
   });
@@ -34,13 +36,44 @@ describe('toAvailableRepos', () => {
     expect(toAvailableRepos({ message: 'Bad credentials' })).toEqual([]);
   });
 
-  it('sorts repositories by name so the picker is predictable', () => {
-    const zulu = { ...repo, id: 2, full_name: 'acme/zulu' };
-    const alpha = { ...repo, id: 3, full_name: 'acme/alpha' };
+  it('puts the most recently pushed repository first, like the picker expects', () => {
+    const stale = {
+      ...repo,
+      id: 2,
+      full_name: 'acme/alpha',
+      pushed_at: '2026-01-01T00:00:00Z',
+    };
+    const fresh = {
+      ...repo,
+      id: 3,
+      full_name: 'acme/zulu',
+      pushed_at: '2026-08-01T00:00:00Z',
+    };
 
-    expect(toAvailableRepos([zulu, alpha]).map((r) => r.fullName)).toEqual([
-      'acme/alpha',
+    expect(toAvailableRepos([stale, fresh]).map((r) => r.fullName)).toEqual([
       'acme/zulu',
+      'acme/alpha',
+    ]);
+  });
+
+  it('falls back to the update timestamp when github reports no push', () => {
+    const withoutPush = {
+      id: 9,
+      full_name: 'acme/docs',
+      updated_at: '2026-05-05T00:00:00Z',
+    };
+
+    expect(toAvailableRepos([withoutPush])[0].updatedAt).toBe(
+      '2026-05-05T00:00:00Z',
+    );
+  });
+
+  it('sinks a repository with no timestamp to the bottom instead of dropping it', () => {
+    const undated = { id: 9, full_name: 'acme/docs' };
+
+    expect(toAvailableRepos([repo, undated]).map((r) => r.fullName)).toEqual([
+      'acme/shop',
+      'acme/docs',
     ]);
   });
 });
