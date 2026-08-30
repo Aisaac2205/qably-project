@@ -97,6 +97,7 @@ export class BitbucketAdapter implements ScmPayloadAdapter {
       author: payload.actor?.display_name ?? 'unknown',
       title: change.target.message ?? '',
       url: change.target.links?.html?.href ?? '',
+      changedFiles: [],
     };
   }
 
@@ -120,6 +121,7 @@ export class BitbucketAdapter implements ScmPayloadAdapter {
       author: payload.actor?.display_name ?? 'unknown',
       title: pull?.title ?? '',
       url: pull?.links?.html?.href ?? '',
+      changedFiles: [],
     };
   }
 }

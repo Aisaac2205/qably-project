@@ -135,6 +135,7 @@ export class IngestionService {
           author: event.author,
           title: event.title,
           url: event.url,
+          changedFiles: event.changedFiles,
         },
         select: { id: true },
       });

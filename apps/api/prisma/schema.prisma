@@ -147,10 +147,14 @@ model Project {
   connectionId   String?
   connection     Connection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   technologies   String[]     @default([])
+  testFilePatterns String[]   @default(["*.spec.ts", "*.test.ts"])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   suites         Suite[]
   apiKeys        ApiKey[]
+  ingestionBatches IngestionBatch[]
+  codeChanges    CodeChange[]
+  evidence       Evidence[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -258,11 +262,82 @@ model ScmEvent {
   author         String
   title          String
   url            String
+  changedFiles   String[]           @default([])
   status         ScmEventStatus     @default(PENDING)
   receivedAt     DateTime           @default(now())
+  batches        IngestionBatch[]
 
   @@unique([provider, eventId])
   @@index([organizationId])
   @@index([connectionId])
   @@map("scm_event")
+}
+
+enum EvidenceKind {
+  SOURCE_EXCERPT
+  ARTIFACT
+  URL
+}
+
+enum IngestionSource {
+  REPOSITORY
+  WEBHOOK
+}
+
+enum IngestionBatchStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Evidence {
+  id        String       @id @default(cuid())
+  projectId String
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind      EvidenceKind
+  title     String
+  uri       String
+  excerpt   String?
+  createdAt DateTime     @default(now())
+  codeChanges CodeChange[]
+
+  @@index([projectId])
+  @@map("evidence")
+}
+
+model IngestionBatch {
+  id          String               @id @default(cuid())
+  projectId   String
+  project     Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scmEventId  String?
+  scmEvent    ScmEvent?            @relation(fields: [scmEventId], references: [id], onDelete: SetNull)
+  source      IngestionSource
+  status      IngestionBatchStatus @default(PENDING)
+  createdAt   DateTime             @default(now())
+  codeChanges CodeChange[]
+
+  @@unique([scmEventId, projectId])
+  @@index([projectId])
+  @@map("ingestion_batch")
+}
+
+model CodeChange {
+  id                String         @id @default(cuid())
+  projectId         String
+  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  batchId           String
+  batch             IngestionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  evidenceId        String
+  evidence          Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  pullRequestNumber Int?
+  commitSha         String
+  filePath          String
+  diff              String         @default("")
+  detectedPattern   String?
+  createdAt         DateTime       @default(now())
+
+  @@unique([batchId, filePath])
+  @@index([projectId])
+  @@index([batchId])
+  @@map("code_change")
 }

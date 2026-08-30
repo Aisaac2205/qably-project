@@ -422,3 +422,20 @@ export interface Connection {
   createdAt: string
   lastSyncAt?: string
 }
+
+const DECLARED_TEST_SUFFIXES: Record<string, string> = {
+  '*.spec.ts': '.spec.ts',
+  '*.test.ts': '.test.ts',
+}
+
+export function matchDeclaredTestPattern(
+  filePath: string,
+  patterns: readonly string[],
+): string | undefined {
+  const normalizedPath = filePath.replaceAll('\\', '/')
+
+  return patterns.find((pattern) => {
+    const suffix = DECLARED_TEST_SUFFIXES[pattern]
+    return suffix !== undefined && normalizedPath.endsWith(suffix)
+  })
+}

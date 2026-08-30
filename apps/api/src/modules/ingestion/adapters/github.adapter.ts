@@ -16,7 +16,13 @@ interface PushPayload {
   ref?: string;
   repository?: { full_name?: string };
   pusher?: { name?: string };
-  head_commit?: { id?: string; message?: string; url?: string } | null;
+  head_commit?: {
+    id?: string;
+    message?: string;
+    url?: string;
+    added?: string[];
+    modified?: string[];
+  } | null;
 }
 
 interface PullRequestPayload {
@@ -91,6 +97,7 @@ export class GithubAdapter implements ScmPayloadAdapter {
       author: payload.pusher?.name ?? 'unknown',
       title: commit.message ?? '',
       url: commit.url ?? '',
+      changedFiles: [...(commit.added ?? []), ...(commit.modified ?? [])],
     };
   }
 
@@ -115,6 +122,7 @@ export class GithubAdapter implements ScmPayloadAdapter {
       author: pull.user?.login ?? 'unknown',
       title: pull.title ?? '',
       url: pull.html_url ?? '',
+      changedFiles: [],
     };
   }
 }

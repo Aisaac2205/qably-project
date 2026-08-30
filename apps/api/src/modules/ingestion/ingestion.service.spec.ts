@@ -13,6 +13,8 @@ const pushPayload = {
     id: 'a'.repeat(40),
     message: 'Add checkout guard',
     url: 'https://github.com/acme/shop/commit/aaa',
+    added: ['src/cart.spec.ts'],
+    modified: ['src/cart.ts'],
   },
 };
 
@@ -172,6 +174,7 @@ describe('IngestionService.ingest', () => {
       author: 'ada',
       title: 'Add checkout guard',
       url: 'https://github.com/acme/shop/commit/aaa',
+      changedFiles: ['src/cart.spec.ts', 'src/cart.ts'],
     });
   });
 

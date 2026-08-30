@@ -72,6 +72,7 @@ describe('BitbucketAdapter.normalize', () => {
       author: 'Ada Lovelace',
       title: 'Add checkout guard',
       url: 'https://bitbucket.org/acme/shop/commits/ccc',
+      changedFiles: [],
     });
   });
 
@@ -104,6 +105,7 @@ describe('BitbucketAdapter.normalize', () => {
       author: 'Ada Lovelace',
       title: 'Guard the checkout',
       url: 'https://bitbucket.org/acme/shop/pull-requests/7',
+      changedFiles: [],
     });
   });
 

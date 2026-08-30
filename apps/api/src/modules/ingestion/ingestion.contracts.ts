@@ -12,6 +12,7 @@ export interface NormalizedScmEvent {
   author: string;
   title: string;
   url: string;
+  changedFiles: string[];
 }
 
 export type ScmHeaders = Record<string, string | undefined>;

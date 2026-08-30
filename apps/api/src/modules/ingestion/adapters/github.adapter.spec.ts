@@ -83,6 +83,7 @@ describe('GithubAdapter.normalize', () => {
       author: 'ada',
       title: 'Add checkout guard',
       url: 'https://github.com/acme/shop/commit/aaa',
+      changedFiles: [],
     });
   });
 
@@ -112,6 +113,7 @@ describe('GithubAdapter.normalize', () => {
       author: 'ada',
       title: 'Guard the checkout',
       url: 'https://github.com/acme/shop/pull/42',
+      changedFiles: [],
     });
   });
 
@@ -144,5 +146,55 @@ describe('GithubAdapter.normalize', () => {
         { 'x-github-event': 'push', 'x-github-delivery': 'd' },
       ),
     ).toBeNull();
+  });
+});
+
+describe('GithubAdapter.normalize changed files', () => {
+  it('collects added and modified paths from a push head commit', () => {
+    const event = build().normalize(
+      {
+        ...pushPayload,
+        head_commit: {
+          ...pushPayload.head_commit,
+          added: ['src/cart/cart.spec.ts'],
+          modified: ['src/cart/cart.ts', 'README.md'],
+          removed: ['src/cart/legacy.spec.ts'],
+        },
+      },
+      { 'x-github-event': 'push', 'x-github-delivery': 'delivery-files' },
+    );
+
+    expect(event?.changedFiles).toEqual([
+      'src/cart/cart.spec.ts',
+      'src/cart/cart.ts',
+      'README.md',
+    ]);
+  });
+
+  it('yields no changed files when the push head commit omits them', () => {
+    const event = build().normalize(pushPayload, {
+      'x-github-event': 'push',
+      'x-github-delivery': 'delivery-empty',
+    });
+
+    expect(event?.changedFiles).toEqual([]);
+  });
+
+  it('yields no changed files for a pull request payload', () => {
+    const event = build().normalize(
+      {
+        action: 'opened',
+        repository: { full_name: 'acme/shop' },
+        pull_request: {
+          head: { ref: 'feat/cart', sha: 'b'.repeat(40) },
+          title: 'Guard the cart',
+          html_url: 'https://github.com/acme/shop/pull/7',
+          user: { login: 'ada' },
+        },
+      },
+      { 'x-github-event': 'pull_request', 'x-github-delivery': 'delivery-pr' },
+    );
+
+    expect(event?.changedFiles).toEqual([]);
   });
 });
