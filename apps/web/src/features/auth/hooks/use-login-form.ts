@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/features/auth/hooks/use-auth'
+import { resolveDestination } from '@/features/auth/lib/destination'
 import { validateEmail, validatePassword } from '@/features/auth/lib/validation'
 
 export interface LoginFieldErrors {
@@ -22,8 +23,6 @@ export interface LoginForm {
   submit: () => Promise<void>
   continueWithGithub: () => Promise<void>
 }
-
-const DESTINATION = '/dashboard'
 
 export function useLoginForm(): LoginForm {
   const router = useRouter()
@@ -58,7 +57,7 @@ export function useLoginForm(): LoginForm {
         return
       }
 
-      router.push(DESTINATION)
+      router.push(resolveDestination(window.location.search))
     } finally {
       setIsSubmitting(false)
     }
@@ -69,7 +68,9 @@ export function useLoginForm(): LoginForm {
     setFormError(null)
     setIsRedirecting(true)
 
-    const { error } = await signInWithGithub(DESTINATION)
+    const { error } = await signInWithGithub(
+      resolveDestination(window.location.search),
+    )
 
     if (error) {
       setFormError(error)
