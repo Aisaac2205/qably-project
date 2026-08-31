@@ -52,6 +52,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   memberships   OrgMember[]
+  runs          Run[]
 
   @@unique([email])
   @@map("user")
@@ -106,19 +107,20 @@ model Verification {
 }
 
 model Organization {
-  id          String      @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   slug        String
-  plan        Plan        @default(gratuito)
-  maxProjects Int         @default(3)
-  maxUsers    Int         @default(5)
-  maxCases    Int         @default(100)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  plan        Plan         @default(gratuito)
+  maxProjects Int          @default(3)
+  maxUsers    Int          @default(5)
+  maxCases    Int          @default(100)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
   members     OrgMember[]
   projects    Project[]
   suites      Suite[]
   connections Connection[]
+  runs        Run[]
 
   @@unique([slug])
   @@map("organization")
@@ -139,22 +141,23 @@ model OrgMember {
 }
 
 model Project {
-  id             String       @id @default(cuid())
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  description    String?
-  connectionId   String?
-  connection     Connection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
-  technologies   String[]     @default([])
-  testFilePatterns String[]   @default(["*.spec.ts", "*.test.ts"])
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  suites         Suite[]
-  apiKeys        ApiKey[]
+  id               String           @id @default(cuid())
+  organizationId   String
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  connectionId     String?
+  connection       Connection?      @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  technologies     String[]         @default([])
+  testFilePatterns String[]         @default(["*.spec.ts", "*.test.ts"])
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  suites           Suite[]
+  apiKeys          ApiKey[]
+  runs             Run[]
   ingestionBatches IngestionBatch[]
-  codeChanges    CodeChange[]
-  evidence       Evidence[]
+  codeChanges      CodeChange[]
+  evidence         Evidence[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -194,6 +197,7 @@ model Suite {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   cases          TestCase[]
+  runs           Run[]
 
   @@unique([projectId, name])
   @@index([projectId])
@@ -213,6 +217,7 @@ model TestCase {
   position       Int          @default(0)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  runCases       RunCase[]
 
   @@index([suiteId])
   @@index([suiteId, position])
@@ -220,17 +225,17 @@ model TestCase {
 }
 
 model Connection {
-  id             String             @id @default(cuid())
-  organizationId String
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  provider       ConnectionProvider
-  name           String
-  repo           String
+  id                     String             @id @default(cuid())
+  organizationId         String
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider               ConnectionProvider
+  name                   String
+  repo                   String
   encryptedWebhookSecret String
-  events         ScmEvent[]
-  projects       Project[]
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  events                 ScmEvent[]
+  projects               Project[]
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   @@unique([organizationId, provider, repo])
   @@index([organizationId])
@@ -291,14 +296,14 @@ enum IngestionBatchStatus {
 }
 
 model Evidence {
-  id        String       @id @default(cuid())
-  projectId String
-  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  kind      EvidenceKind
-  title     String
-  uri       String
-  excerpt   String?
-  createdAt DateTime     @default(now())
+  id          String       @id @default(cuid())
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        EvidenceKind
+  title       String
+  uri         String
+  excerpt     String?
+  createdAt   DateTime     @default(now())
   codeChanges CodeChange[]
 
   @@index([projectId])
@@ -340,4 +345,74 @@ model CodeChange {
   @@index([projectId])
   @@index([batchId])
   @@map("code_change")
+}
+
+enum RunStatus {
+  pending
+  running
+  pass
+  fail
+}
+
+enum RunCaseStatus {
+  pending
+  running
+  pass
+  fail
+  skip
+  blocked
+}
+
+enum RunSource {
+  manual
+  api
+  github_actions
+}
+
+model Run {
+  id             String       @id @default(cuid())
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  suiteId        String
+  suite          Suite        @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  name           String
+  status         RunStatus    @default(pending)
+  source         RunSource
+  externalId     String?
+  startedAt      DateTime     @default(now())
+  finishedAt     DateTime?
+  executedById   String?
+  executedBy     User?        @relation(fields: [executedById], references: [id], onDelete: SetNull)
+  commitSha      String?
+  commitMessage  String?
+  commitAuthor   String?
+  cases          RunCase[]
+
+  @@unique([projectId, source, externalId])
+  @@index([projectId, startedAt])
+  @@index([organizationId])
+  @@index([commitSha])
+  @@map("run")
+}
+
+model RunCase {
+  id             String        @id @default(cuid())
+  runId          String
+  run            Run           @relation(fields: [runId], references: [id], onDelete: Cascade)
+  testCaseId     String?
+  testCase       TestCase?     @relation(fields: [testCaseId], references: [id], onDelete: SetNull)
+  name           String
+  suiteName      String
+  steps          String[]      @default([])
+  expectedResult String        @default("")
+  status         RunCaseStatus @default(pending)
+  position       Int           @default(0)
+  recordedAt     DateTime?
+
+  @@unique([runId, position])
+  @@index([runId])
+  @@index([testCaseId])
+  @@map("run_case")
 }

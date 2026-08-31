@@ -165,6 +165,7 @@ export interface Suite {
 
 export interface RunCase {
   id: string
+  testCaseId?: string
   name: string
   suite: string
   steps: string[]
@@ -207,7 +208,7 @@ export interface Notification {
 
 export type ProposalStatus = 'in_review' | 'approved' | 'rejected' | 'changes_requested'
 export type ReviewDecisionAction = 'approved' | 'rejected' | 'changes_requested'
-export type TraceabilityEntityType = 'code_change' | 'evidence' | 'proposal' | 'test_case' | 'test_case_version' | 'execution' | 'execution_result' | 'quality_risk'
+export type TraceabilityEntityType = 'code_change' | 'evidence' | 'proposal' | 'test_case' | 'test_case_version' | 'run' | 'run_case' | 'quality_risk'
 
 export interface Evidence {
   id: string
@@ -282,20 +283,6 @@ export interface TraceabilityLink {
   from: { type: TraceabilityEntityType; id: string }
   to: { type: TraceabilityEntityType; id: string }
   relation: 'evidence_for' | 'produced' | 'version_of' | 'executed_as' | 'signals'
-}
-export interface Execution {
-  id: string
-  projectId: string
-  environment: string
-  testCaseVersionIds: string[]
-  status: 'pending' | 'running' | 'completed'
-}
-export interface ExecutionResult {
-  id: string
-  executionId: string
-  testCaseVersionId: string
-  verdict: CaseStatus
-  evidenceIds: string[]
 }
 export interface QualityRisk {
   id: string

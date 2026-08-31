@@ -54,8 +54,6 @@ import type {
   OfficialTestCase,
   TestCaseVersion,
   TraceabilityLink,
-  Execution,
-  ExecutionResult,
   Evidence,
   QualityRisk,
   ReviewScenario,
@@ -88,8 +86,6 @@ export interface StoreSnapshot {
   officialTestCases: OfficialTestCase[]
   testCaseVersions: TestCaseVersion[]
   traceabilityLinks: TraceabilityLink[]
-  executions: Execution[]
-  executionResults: ExecutionResult[]
   evidence: Evidence[]
   qualityRisks: QualityRisk[]
 }
@@ -189,8 +185,6 @@ let reviewDomain = createReviewDomain()
 let { evidence, proposals, proposalIdByAiCaseId, officialTestCases, testCaseVersions, traceabilityLinks } = reviewDomain
 let ingestionBatches: IngestionBatch[] = structuredClone(mockIngestionBatches)
 let reviewDecisions: ReviewDecision[] = []
-let executions: Execution[] = []
-let executionResults: ExecutionResult[] = []
 let qualityRisks: QualityRisk[] = structuredClone(mockQualityRisks)
 const reviewScenarios: ReviewScenario[] = [
   { id: 'approval-new', proposalId: 'proposal-ai-4' },
@@ -217,7 +211,7 @@ function currentSnapshot(): StoreSnapshot {
     projects, suites, runs, aiCases, org, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
     ingestionBatches, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
-    testCaseVersions, traceabilityLinks, executions, executionResults, evidence, qualityRisks,
+    testCaseVersions, traceabilityLinks, evidence, qualityRisks,
   }
 }
 
@@ -400,20 +394,6 @@ export function getTestCaseVersions(testCaseId?: string): TestCaseVersion[] {
 
 export function getTestCaseVersion(id: string): TestCaseVersion | undefined {
   return testCaseVersions.find((version) => version.id === id)
-}
-
-export function getExecutions(projectId?: string): Execution[] {
-  if (!projectId) return executions
-  return executions.filter((e) => e.projectId === projectId)
-}
-
-export function getExecution(id: string): Execution | undefined {
-  return executions.find((e) => e.id === id)
-}
-
-export function getExecutionResults(executionId?: string): ExecutionResult[] {
-  if (!executionId) return executionResults
-  return executionResults.filter((r) => r.executionId === executionId)
 }
 
 export function getTraceabilityLinks({ entityId }: { entityId: string }): TraceabilityLink[] {
@@ -1090,8 +1070,6 @@ export function __resetStore(): void {
   traceabilityLinks = reviewDomain.traceabilityLinks
   ingestionBatches = structuredClone(mockIngestionBatches)
   reviewDecisions = []
-  executions = []
-  executionResults = []
   qualityRisks = structuredClone(mockQualityRisks)
   ciEventLog.length = 0
   notify()

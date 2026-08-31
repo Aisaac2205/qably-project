@@ -35,8 +35,6 @@ import type {
   OfficialTestCase,
   TestCaseVersion,
   ReviewDecision,
-  Execution,
-  ExecutionResult,
 } from '@qably/types'
 
 function useStableArray<T>(selector: () => T[], fallback: () => T[]): T[] {
@@ -285,40 +283,6 @@ export function useTestCaseVersions(testCaseId?: string): TestCaseVersion[] {
     () => {
       const all = getServerSnapshot().testCaseVersions
       return testCaseId ? all.filter((v) => v.testCaseId === testCaseId) : all
-    },
-  )
-}
-
-export function useExecutions(projectId?: string): Execution[] {
-  return useStableArray(
-    () => {
-      const all = getSnapshot().executions
-      return projectId ? all.filter((e) => e.projectId === projectId) : all
-    },
-    () => {
-      const all = getServerSnapshot().executions
-      return projectId ? all.filter((e) => e.projectId === projectId) : all
-    },
-  )
-}
-
-export function useExecution(id?: string): Execution | undefined {
-  return useSyncExternalStore(
-    subscribe,
-    () => id ? getSnapshot().executions.find((item) => item.id === id) : undefined,
-    () => id ? getServerSnapshot().executions.find((item) => item.id === id) : undefined,
-  )
-}
-
-export function useExecutionResults(executionId?: string): ExecutionResult[] {
-  return useStableArray(
-    () => {
-      const all = getSnapshot().executionResults
-      return executionId ? all.filter((r) => r.executionId === executionId) : all
-    },
-    () => {
-      const all = getServerSnapshot().executionResults
-      return executionId ? all.filter((r) => r.executionId === executionId) : all
     },
   )
 }
