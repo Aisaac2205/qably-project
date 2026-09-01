@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { CaseStatus, RunCaseCounts } from '@qably/types';
+import type { AuthenticatedUser } from '../auth/auth.contracts';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { deriveRunStatus } from './lib/derive-run-status';
 import {
   CASE_SELECT,
   RUN_SELECT,
@@ -11,6 +13,12 @@ import {
   type RunRow,
 } from './lib/run-view';
 import type { RunQueryError, RunSummaryView, RunView } from './runs.contracts';
+import type {
+  CreateManualRunInput,
+  UpdateRunCaseStatusInput,
+} from './runs.schemas';
+
+const OPEN_CASE_STATUSES: readonly CaseStatus[] = ['pending', 'running'];
 
 const ZERO_COUNTS: RunCaseCounts = {
   total: 0,
@@ -109,6 +117,105 @@ export class RunQueriesService {
     const cases = await this.loadCases(id);
 
     return ok(toRunView(run, cases));
+  }
+
+  async createManual(
+    org: OrgContext,
+    user: AuthenticatedUser,
+    input: CreateManualRunInput,
+  ): Promise<Result<RunView, RunQueryError>> {
+    const suite = await this.prisma.suite.findFirst({
+      where: {
+        id: input.suiteId,
+        projectId: input.projectId,
+        organizationId: org.organizationId,
+      },
+      select: {
+        id: true,
+        name: true,
+        cases: {
+          select: { id: true, name: true, steps: true, expectedResult: true },
+          orderBy: { position: 'asc' },
+        },
+      },
+    });
+
+    if (suite === null) return err('suite-not-found');
+    if (suite.cases.length === 0) return err('empty-suite');
+
+    const { run, cases } = await this.prisma.$transaction(async (tx) => {
+      const run = await tx.run.create({
+        data: {
+          projectId: input.projectId,
+          organizationId: org.organizationId,
+          suiteId: suite.id,
+          name: input.name ?? suite.name,
+          status: 'pending',
+          source: 'manual',
+          externalId: null,
+          executedById: user.id,
+        },
+        select: RUN_SELECT,
+      });
+
+      const cases = (await tx.runCase.createManyAndReturn({
+        data: suite.cases.map((testCase, index) => ({
+          runId: run.id,
+          testCaseId: testCase.id,
+          name: testCase.name,
+          suiteName: suite.name,
+          steps: testCase.steps,
+          expectedResult: testCase.expectedResult,
+          status: 'pending',
+          position: index,
+        })),
+        select: CASE_SELECT,
+      })) as RunCaseRow[];
+
+      return { run, cases };
+    });
+
+    return ok(toRunView(run, cases));
+  }
+
+  async updateCaseStatus(
+    org: OrgContext,
+    runId: string,
+    caseId: string,
+    input: UpdateRunCaseStatusInput,
+  ): Promise<Result<RunView, RunQueryError>> {
+    const run = await this.scoped(org, runId);
+
+    if (run === null) return err('not-found');
+
+    const cases = await this.loadCases(runId);
+    const targetCase = cases.find((row) => row.id === caseId);
+
+    if (targetCase === undefined) return err('case-not-found');
+
+    await this.prisma.runCase.update({
+      where: { id: caseId },
+      data: { status: input.status, recordedAt: new Date() },
+    });
+
+    const updatedCases = await this.loadCases(runId);
+    const status = deriveRunStatus(updatedCases.map((row) => row.status));
+    const stillOpen = updatedCases.some((row) =>
+      OPEN_CASE_STATUSES.includes(row.status),
+    );
+
+    const updatedRun = await this.prisma.run.update({
+      where: { id: runId },
+      data: {
+        status,
+        ...(!stillOpen && run.finishedAt === null
+          ? { finishedAt: new Date() }
+          : {}),
+      },
+      select: RUN_SELECT,
+    });
+
+    return ok(toRunView(updatedRun, updatedCases));
   }
 
   private scoped(org: OrgContext, id: string): Promise<RunRow | null> {

@@ -1,4 +1,9 @@
-import { ingestRunSchema, listRunsQuerySchema } from './runs.schemas';
+import {
+  createManualRunSchema,
+  ingestRunSchema,
+  listRunsQuerySchema,
+  updateRunCaseStatusSchema,
+} from './runs.schemas';
 
 const baseCase = {
   name: 'Adds to cart',
@@ -139,5 +144,65 @@ describe('listRunsQuerySchema', () => {
 
     expect(result.success).toBe(true);
     expect(result.success && result.data.projectId).toBe('project-1');
+  });
+});
+
+describe('createManualRunSchema', () => {
+  it('accepts a minimal valid payload', () => {
+    const result = createManualRunSchema.safeParse({
+      projectId: 'project-1',
+      suiteId: 'suite-1',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an explicit name', () => {
+    const result = createManualRunSchema.safeParse({
+      projectId: 'project-1',
+      suiteId: 'suite-1',
+      name: 'Manual smoke test',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.name).toBe('Manual smoke test');
+  });
+
+  it('rejects a payload without a suiteId', () => {
+    const result = createManualRunSchema.safeParse({ projectId: 'project-1' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a payload without a projectId', () => {
+    const result = createManualRunSchema.safeParse({ suiteId: 'suite-1' });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('updateRunCaseStatusSchema', () => {
+  it.each(['pass', 'fail', 'skip', 'blocked'])(
+    'accepts status %s',
+    (status) => {
+      const result = updateRunCaseStatusSchema.safeParse({ status });
+
+      expect(result.success).toBe(true);
+    },
+  );
+
+  it.each(['pending', 'running'])(
+    'rejects status %s because it cannot be set through this endpoint',
+    (status) => {
+      const result = updateRunCaseStatusSchema.safeParse({ status });
+
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it('rejects a missing status', () => {
+    const result = updateRunCaseStatusSchema.safeParse({});
+
+    expect(result.success).toBe(false);
   });
 });

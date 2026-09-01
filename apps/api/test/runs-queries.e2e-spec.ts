@@ -57,18 +57,46 @@ function runCaseRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const suiteWithCases = {
+  id: 'suite-1',
+  name: 'Checkout',
+  cases: [
+    {
+      id: 'case-1',
+      name: 'Adds to cart',
+      steps: ['open', 'add'],
+      expectedResult: 'cart has one item',
+    },
+  ],
+};
+
 describe('Runs queries (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
   const prisma = {
     orgMember: { findFirst: jest.fn() },
-    run: { findMany: jest.fn(), findFirst: jest.fn() },
-    runCase: { findMany: jest.fn(), groupBy: jest.fn() },
+    run: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    runCase: {
+      findMany: jest.fn(),
+      groupBy: jest.fn(),
+      createManyAndReturn: jest.fn(),
+      update: jest.fn(),
+    },
+    suite: { findFirst: jest.fn() },
+    $transaction: jest.fn(),
   };
 
   beforeEach(async () => {
     jest.clearAllMocks();
     read.mockResolvedValue(session);
+    prisma.$transaction.mockImplementation(
+      (run: (tx: typeof prisma) => unknown) => run(prisma),
+    );
     prisma.orgMember.findFirst.mockResolvedValue({
       organizationId: 'org-1',
       role: 'member',
@@ -76,10 +104,15 @@ describe('Runs queries (e2e)', () => {
     });
     prisma.run.findMany.mockResolvedValue([runRow]);
     prisma.run.findFirst.mockResolvedValue(runRow);
+    prisma.run.create.mockResolvedValue(runRow);
+    prisma.run.update.mockResolvedValue(runRow);
     prisma.runCase.findMany.mockResolvedValue([runCaseRow()]);
     prisma.runCase.groupBy.mockResolvedValue([
       { runId: 'run-1', status: 'pending', _count: { _all: 1 } },
     ]);
+    prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
+    prisma.runCase.update.mockResolvedValue(runCaseRow({ status: 'pass' }));
+    prisma.suite.findFirst.mockResolvedValue(suiteWithCases);
 
     const moduleFixture = await Test.createTestingModule({
       imports: [PrismaModule, AuthModule, OrganizationsModule, RunsModule],
@@ -157,5 +190,66 @@ describe('Runs queries (e2e)', () => {
     const body = response.body as { id: string; cases: unknown[] };
     expect(body.id).toBe('run-1');
     expect(body.cases).toHaveLength(1);
+  });
+
+  it('starts a manual run and returns 201 with the snapshotted cases', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/runs')
+      .send({ projectId: 'project-1', suiteId: 'suite-1' })
+      .expect(201);
+
+    const body = response.body as { source: string; status: string };
+    expect(body.source).toBe('manual');
+    expect(body.status).toBe('pending');
+    expect(prisma.run.create).toHaveBeenCalled();
+  });
+
+  it('rejects starting a run from a suite with no cases', async () => {
+    prisma.suite.findFirst.mockResolvedValue({ ...suiteWithCases, cases: [] });
+
+    await request(app.getHttpServer())
+      .post('/runs')
+      .send({ projectId: 'project-1', suiteId: 'suite-1' })
+      .expect(400);
+  });
+
+  it('answers 404 when the suite is outside the project or organization', async () => {
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/runs')
+      .send({ projectId: 'project-1', suiteId: 'suite-1' })
+      .expect(404);
+  });
+
+  it('patches a case status and returns the updated run', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/runs/run-1/cases/run-case-1')
+      .send({ status: 'pass' })
+      .expect(200);
+
+    const body = response.body as { id: string };
+    expect(body.id).toBe('run-1');
+    expect(prisma.runCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'run-case-1' },
+      }),
+    );
+  });
+
+  it('rejects an invalid case status', async () => {
+    await request(app.getHttpServer())
+      .patch('/runs/run-1/cases/run-case-1')
+      .send({ status: 'pending' })
+      .expect(400);
+  });
+
+  it('answers 404 when the case does not belong to the run', async () => {
+    prisma.runCase.findMany.mockResolvedValue([]);
+
+    await request(app.getHttpServer())
+      .patch('/runs/run-1/cases/run-case-missing')
+      .send({ status: 'pass' })
+      .expect(404);
   });
 });

@@ -59,4 +59,20 @@ export const listRunsQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
 });
 
+export const createManualRunSchema = z.object({
+  projectId: z.string().min(1),
+  suiteId: z.string().min(1),
+  name: runName.optional(),
+});
+
+const runCaseStatus = z.enum(['pass', 'fail', 'skip', 'blocked']);
+
+export const updateRunCaseStatusSchema = z.object({
+  status: runCaseStatus,
+});
+
 export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;
+export type CreateManualRunInput = z.infer<typeof createManualRunSchema>;
+export type UpdateRunCaseStatusInput = z.infer<
+  typeof updateRunCaseStatusSchema
+>;
