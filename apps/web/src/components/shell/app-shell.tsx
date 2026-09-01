@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect } from 'react'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { Sidebar } from './sidebar'
 import { TopBar } from './top-bar'
-import { registerRunSubscriber } from '@/features/runs'
 import { useTranslation } from '@/lib/i18n'
 
 interface AppShellProps {
@@ -17,11 +15,6 @@ function focusMainContent() {
 
 export function AppShell({ children }: AppShellProps) {
   const { t } = useTranslation()
-  // Cross-module glue (per design, Commit 3): the run subscriber listens
-  // to CI events on the bus and transitions runs. HMR-safe via cleanup.
-  useEffect(() => {
-    return registerRunSubscriber()
-  }, [])
 
   return (
     <SidebarProvider defaultOpen={true} className="min-h-dvh w-full overflow-hidden bg-sidebar">

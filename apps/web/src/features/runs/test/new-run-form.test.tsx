@@ -2,11 +2,13 @@ import { screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NewRunForm } from '@/features/runs/components/new-run-form'
-import { __resetStore, createRun } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
+)
+vi.mock('@/features/runs/api/runs.api', async () =>
+  await import('@/test/runs-api-stub'),
 )
 
 vi.mock('next/navigation', () => ({
@@ -15,7 +17,6 @@ vi.mock('next/navigation', () => ({
 
 describe('NewRunForm', () => {
   beforeEach(() => {
-    __resetStore()
     vi.clearAllMocks()
   })
 
