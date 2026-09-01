@@ -8,7 +8,7 @@
  * All functions are deterministic given a `now` reference timestamp — pass
  * `now` explicitly in tests to avoid time-based flakiness.
  */
-import type { Run, RunStatus, Suite, SuiteRunStatus } from '@qably/types'
+import type { RunStatus, RunSummaryRecord, Suite, SuiteRunStatus } from '@qably/types'
 
 /**
  * Project-level aggregated metrics for KPI cards and dashboards.
@@ -41,15 +41,15 @@ function isCompleted(status: RunStatus): boolean {
   return status === 'pass' || status === 'fail'
 }
 
-function runsForSuite(runs: Run[], suiteId: string): Run[] {
+function runsForSuite(runs: RunSummaryRecord[], suiteId: string): RunSummaryRecord[] {
   return runs.filter((r) => r.suiteId === suiteId)
 }
 
-function byStartedAtDesc(a: Run, b: Run): number {
+function byStartedAtDesc(a: RunSummaryRecord, b: RunSummaryRecord): number {
   return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
 }
 
-function sortByStartedAtDesc(runs: Run[]): Run[] {
+function sortByStartedAtDesc(runs: RunSummaryRecord[]): RunSummaryRecord[] {
   return [...runs].sort(byStartedAtDesc)
 }
 
@@ -63,7 +63,7 @@ function windowStart(now: number, n: number): number {
  * Get the most recent run for a suite, sorted by startedAt descending.
  * Returns undefined if no runs exist for the suite.
  */
-export function getLastRun(runs: Run[], suiteId: string): Run | undefined {
+export function getLastRun(runs: RunSummaryRecord[], suiteId: string): RunSummaryRecord | undefined {
   const suiteRuns = runsForSuite(runs, suiteId)
   if (suiteRuns.length === 0) return undefined
   return sortByStartedAtDesc(suiteRuns)[0]
@@ -77,7 +77,7 @@ export function getLastRun(runs: Run[], suiteId: string): Run | undefined {
  * @param now - Reference timestamp (epoch ms). Defaults to Date.now().
  */
 export function getPassRateLastNDays(
-  runs: Run[],
+  runs: RunSummaryRecord[],
   suiteId: string,
   n: number,
   now: number = Date.now(),
@@ -102,7 +102,7 @@ export function getPassRateLastNDays(
  * Days with no runs report passRate: 0 and runCount: 0.
  */
 export function getSparklineData(
-  runs: Run[],
+  runs: RunSummaryRecord[],
   suiteId: string,
   now: number = Date.now(),
 ): Array<{ date: string; passRate: number; runCount: number }> {
@@ -153,7 +153,7 @@ export function getSparklineData(
  * @param now - Reference timestamp (epoch ms). Defaults to Date.now().
  */
 export function getSuiteRunStatus(
-  runs: Run[],
+  runs: RunSummaryRecord[],
   suiteId: string,
   now: number = Date.now(),
 ): SuiteRunStatus {
@@ -178,7 +178,7 @@ export function getSuiteRunStatus(
  * `suites` is the list of suites that belong to the project.
  */
 export function aggregateForProject(
-  runs: Run[],
+  runs: RunSummaryRecord[],
   suites: Suite[],
   now: number = Date.now(),
 ): ProjectMetrics {

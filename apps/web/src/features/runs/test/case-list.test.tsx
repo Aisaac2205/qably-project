@@ -2,20 +2,20 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { CaseList } from '@/features/runs/components/case-list'
-import type { RunCase } from '@qably/types'
+import type { RunCaseRecord } from '@qably/types'
 
-const mockCases: RunCase[] = [
+const mockCases: RunCaseRecord[] = [
   {
-    id: 'tc-1', name: 'Login redirects', suite: 'Auth',
-    steps: [], expectedResult: '', status: 'pass',
+    id: 'tc-1', testCaseId: 'tc-1', name: 'Login redirects', suiteName: 'Auth',
+    steps: [], expectedResult: '', status: 'pass', position: 0,
   },
   {
-    id: 'tc-2', name: 'Invalid credentials', suite: 'Auth',
-    steps: [], expectedResult: '', status: 'fail',
+    id: 'tc-2', testCaseId: 'tc-2', name: 'Invalid credentials', suiteName: 'Auth',
+    steps: [], expectedResult: '', status: 'fail', position: 1,
   },
   {
-    id: 'tc-3', name: 'Reset password', suite: 'Auth',
-    steps: [], expectedResult: '', status: 'pending',
+    id: 'tc-3', testCaseId: 'tc-3', name: 'Reset password', suiteName: 'Auth',
+    steps: [], expectedResult: '', status: 'pending', position: 2,
   },
 ]
 

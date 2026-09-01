@@ -1,19 +1,19 @@
-import { renderHook, act } from '@testing-library/react'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { act, renderHook } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { createMockSuite } from '@/lib/test-utils'
-import { __resetStore, createRun } from '@/lib/mock-store'
-import { renderWithQuery, withQueryClient } from '@/lib/query-test-utils'
+import { createTestQueryClient, withQueryClient } from '@/lib/query-test-utils'
+import { runKeys } from '@/features/runs/lib/query-keys'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+vi.mock('@/features/runs/api/runs.api', async () =>
+  await import('@/test/runs-api-stub'),
+)
 
 describe('useSuiteMetrics', () => {
-  beforeEach(() => {
-    __resetStore()
-  })
-
   it('returns one entry per suite in the project', () => {
     const { result } = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
     expect(result.current.perSuite).toHaveLength(3)
@@ -58,19 +58,46 @@ describe('useSuiteMetrics', () => {
     })
   })
 
-  it('recomputes perSuite when a new run is added', () => {
-    const { result } = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
+  it('recomputes perSuite when the runs cache changes', async () => {
+    const client = createTestQueryClient()
+    const { result } = renderHook(() => useSuiteMetrics('proj-1'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+    // Let the initial mount's background refetch (staleTime: 0) settle before
+    // asserting, otherwise it can race the cache write below and clobber it.
+    await act(async () => {})
+
     const beforeFirst = result.current.perSuite[0]
     expect(beforeFirst.lastRun).toBeDefined()
 
-    act(() => {
-      createRun({ projectId: 'proj-1', suiteId: 'suite-3', name: 'New Run' })
+    await act(async () => {
+      const existing = client.getQueryData<Array<{ id: string }>>(runKeys.list('proj-1')) ?? []
+      client.setQueryData(runKeys.list('proj-1'), [
+        {
+          id: 'run-hot',
+          projectId: 'proj-1',
+          organizationId: 'org-1',
+          suiteId: 'suite-1',
+          name: 'Hot run',
+          status: 'pass',
+          source: 'manual',
+          externalId: '',
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          caseCounts: { total: 1, pending: 0, running: 0, pass: 1, fail: 0, skip: 0, blocked: 0 },
+          passRate: 1,
+        },
+        ...existing,
+      ])
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    // After adding a run, the hook should reflect new state on next render
-    const after = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
-    const afterFirst = after.result.current.perSuite[0]
-    // The reference should differ now (runs changed → recompute)
+    const afterFirst = result.current.perSuite[0]
+    expect(afterFirst.lastRun?.id).toBe('run-hot')
     expect(afterFirst).not.toBe(beforeFirst)
   })
 
@@ -80,30 +107,6 @@ describe('useSuiteMetrics', () => {
     expect(m1!.suite.isDefault).toBe(true)
     expect(m1!.suite.description.length).toBeGreaterThan(0)
     expect(m1!.suite.tags.length).toBeGreaterThan(0)
-  })
-
-  it('reflects mock-store mutations across hook instances (useSyncExternalStore)', () => {
-    // Render the hook once
-    const { result: result1, unmount } = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
-    const suitesBefore = result1.current.perSuite.length
-    // Capture m1Old BEFORE the store mutates (result.current is a live getter that
-    // updates on each render, so a later read would see the post-mutation value).
-    const m1Old = result1.current.perSuite.find((m) => m.suite.id === 'suite-1')!
-
-    // Mutate store directly: create a new run for suite-1
-    act(() => {
-      createRun({ projectId: 'proj-1', suiteId: 'suite-1', name: 'Hot' })
-    })
-
-    unmount()
-
-    // Render a fresh hook: should see the new run reflected
-    const { result: result2 } = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
-    expect(result2.current.perSuite).toHaveLength(suitesBefore) // still 3 suites
-    // suite-1 should have a different lastRun now
-    const m1New = result2.current.perSuite.find((m) => m.suite.id === 'suite-1')!
-    expect(m1New.lastRun).not.toBe(m1Old.lastRun)
-    expect(m1New.lastRun?.id).not.toBe(m1Old.lastRun?.id)
   })
 })
 

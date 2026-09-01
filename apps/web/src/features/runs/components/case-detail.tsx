@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { RunCase, Run } from '@qably/types'
+import type { RunCaseRecord, RunRecord } from '@qably/types'
 import { ArrowSquareOut, GitCommit } from '@phosphor-icons/react'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
@@ -13,9 +13,9 @@ export function CaseDetail({
   projectId,
   run,
 }: {
-  c: RunCase
+  c: RunCaseRecord
   projectId?: string
-  run?: Run
+  run?: RunRecord
 }) {
   const { t } = useTranslation()
   const officialCaseId = `case-${c.id}`

@@ -1,6 +1,7 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -16,7 +17,7 @@ describe('ProjectHealthTable', () => {
 
   it('renders the title "Project health"', async () => {
     await act(async () => {
-      render(<ProjectHealthTable />)
+      renderWithQuery(<ProjectHealthTable />)
     })
     expect(screen.getByRole('heading', { name: 'Project health' })).toBeInTheDocument()
     expect(screen.getByRole('table', { name: 'Project health' })).toBeInTheDocument()
@@ -24,7 +25,7 @@ describe('ProjectHealthTable', () => {
 
   it('renders the "View all" link', async () => {
     await act(async () => {
-      render(<ProjectHealthTable />)
+      renderWithQuery(<ProjectHealthTable />)
     })
     const link = screen.getByText('View all')
     expect(link).toBeInTheDocument()
@@ -33,7 +34,7 @@ describe('ProjectHealthTable', () => {
 
   it('renders table headers', async () => {
     await act(async () => {
-      render(<ProjectHealthTable />)
+      renderWithQuery(<ProjectHealthTable />)
     })
     expect(screen.getByText('Project')).toBeInTheDocument()
     expect(screen.getByText('Health')).toBeInTheDocument()
@@ -44,7 +45,7 @@ describe('ProjectHealthTable', () => {
 
   it('renders all 4 projects from mock data', async () => {
     await act(async () => {
-      render(<ProjectHealthTable />)
+      renderWithQuery(<ProjectHealthTable />)
     })
     expect(screen.getByText('Ecommerce App')).toBeInTheDocument()
     expect(screen.getByText('Mobile App')).toBeInTheDocument()
@@ -54,7 +55,7 @@ describe('ProjectHealthTable', () => {
 
   it('renders project health scores', async () => {
     await act(async () => {
-      render(<ProjectHealthTable />)
+      renderWithQuery(<ProjectHealthTable />)
     })
     expect(screen.getByText('90%')).toBeInTheDocument()
     expect(screen.getByText('45%')).toBeInTheDocument()
@@ -64,7 +65,7 @@ describe('ProjectHealthTable', () => {
 
   it('renders project links pointing to correct URLs', async () => {
     await act(async () => {
-      render(<ProjectHealthTable />)
+      renderWithQuery(<ProjectHealthTable />)
     })
     const ecommerceLink = screen.getByText('Ecommerce App').closest('a')
     expect(ecommerceLink).toHaveAttribute('href', '/projects/proj-1')

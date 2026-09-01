@@ -1,12 +1,12 @@
 'use client'
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import type { Run } from '@qably/types'
+import type { RunSummaryRecord } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useHydrated } from '@/hooks/use-hydrated'
 
 interface DistributionChartProps {
-  runs: Run[]
+  runs: RunSummaryRecord[]
 }
 
 export function DistributionChart({ runs }: DistributionChartProps) {
@@ -26,11 +26,9 @@ export function DistributionChart({ runs }: DistributionChartProps) {
   let totalOther = 0
 
   for (const run of runs) {
-    for (const c of run.cases) {
-      if (c.status === 'pass') totalPass++
-      else if (c.status === 'fail') totalFail++
-      else totalOther++
-    }
+    totalPass += run.caseCounts.pass
+    totalFail += run.caseCounts.fail
+    totalOther += run.caseCounts.total - run.caseCounts.pass - run.caseCounts.fail
   }
 
   const total = totalPass + totalFail + totalOther

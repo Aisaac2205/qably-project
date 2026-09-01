@@ -1,7 +1,14 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { RunList } from '@/features/runs/components/run-list'
-import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/runs/api/runs.api', async () =>
+  await import('@/test/runs-api-stub'),
+)
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -10,12 +17,12 @@ vi.mock('next/link', () => ({
 
 describe('RunList', () => {
   beforeEach(() => {
-    __resetStore()
+    vi.clearAllMocks()
   })
 
   it('renders runs for a project', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" />)
+      renderWithQuery(<RunList projectId="proj-1" />)
     })
     // proj-1 has 4 runs: run-12, run-11, run-10, run-9
     expect(screen.getByText('Run #12')).toBeInTheDocument()
@@ -26,7 +33,7 @@ describe('RunList', () => {
 
   it('sorts runs by startedAt descending', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" />)
+      renderWithQuery(<RunList projectId="proj-1" />)
     })
     const runNames = screen.getAllByText(/Run #/)
     // run-12 has latest startedAt (2026-06-16)
@@ -37,7 +44,7 @@ describe('RunList', () => {
 
   it('renders status chips for each run', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" />)
+      renderWithQuery(<RunList projectId="proj-1" />)
     })
     expect(screen.getByText('Running')).toBeInTheDocument()
     // Multiple runs with "Pass" status
@@ -48,8 +55,9 @@ describe('RunList', () => {
 
   it('renders pass rate in mono font', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" />)
+      renderWithQuery(<RunList projectId="proj-1" />)
     })
+    // run-11 and run-9 finished with every case passing
     const passRates = screen.getAllByText('100%')
     expect(passRates.length).toBeGreaterThan(0)
     expect(passRates[0].className).toContain('font-mono')
@@ -57,7 +65,7 @@ describe('RunList', () => {
 
   it('renders links to run detail', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" />)
+      renderWithQuery(<RunList projectId="proj-1" />)
     })
     const link = screen.getByRole('link', { name: /Run #12/ })
     expect(link.getAttribute('href')).toBe('/projects/proj-1/runs/run-12')
@@ -65,14 +73,14 @@ describe('RunList', () => {
 
   it('shows empty state for project with no runs', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-4" />)
+      renderWithQuery(<RunList projectId="proj-4" />)
     })
     expect(screen.getByText('No runs yet')).toBeInTheDocument()
   })
 
   it('filters runs by source when source prop provided', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" source="github_actions" />)
+      renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
     })
     // Only run-10 has source=github_actions
     expect(screen.getByText('Run #10')).toBeInTheDocument()
@@ -84,7 +92,7 @@ describe('RunList', () => {
 
   it('shows all runs when source prop omitted', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" />)
+      renderWithQuery(<RunList projectId="proj-1" />)
     })
     // No source filter — all 4 runs visible
     expect(screen.getByText('Run #12')).toBeInTheDocument()
@@ -95,7 +103,7 @@ describe('RunList', () => {
 
   it('shows empty state when source filter matches no runs', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" source="api" />)
+      renderWithQuery(<RunList projectId="proj-1" source="api" />)
     })
     // proj-1 has run-9 with source=api — so should show that
     expect(screen.getByText('Run #9')).toBeInTheDocument()
@@ -105,7 +113,7 @@ describe('RunList', () => {
 
   it('filters correctly for manual source', async () => {
     await act(async () => {
-      render(<RunList projectId="proj-1" source="manual" />)
+      renderWithQuery(<RunList projectId="proj-1" source="manual" />)
     })
     // run-12 and run-11 are manual
     expect(screen.getByText('Run #12')).toBeInTheDocument()
@@ -113,5 +121,13 @@ describe('RunList', () => {
     // github_actions and api runs should not appear
     expect(screen.queryByText('Run #10')).not.toBeInTheDocument()
     expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
+  })
+
+  it('resolves the suite name through the suites api instead of the run', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" />)
+    })
+    expect(screen.getAllByText('Authentication').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Checkout').length).toBeGreaterThan(0)
   })
 })

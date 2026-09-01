@@ -5,6 +5,7 @@ import { Code, Play, CaretRight } from '@phosphor-icons/react'
 import { StatusChip } from '@/components/ui/status-chip'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { formatRelativeTime } from '@/features/dashboard/lib/format'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { useTranslation } from '@/lib/i18n'
 
 interface QueueSectionProps {
@@ -33,8 +34,10 @@ function QueueSection({ title, href = '/projects', children }: QueueSectionProps
 
 export function RecentActivity() {
   const stats = useDashboardStats()
+  const { suites } = useSuites()
   const { t } = useTranslation()
 
+  const suiteNameById = new Map(suites.map((suite) => [suite.id, suite.name]))
   const runs = stats.recentRuns.slice(0, 4)
   const ciRuns = stats.recentCiRuns.slice(0, 4)
 
@@ -57,7 +60,7 @@ export function RecentActivity() {
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-xs font-medium text-default group-hover:text-primary">{run.name}</p>
-                    <p className="truncate text-xs text-muted">{run.suiteName}</p>
+                    <p className="truncate text-xs text-muted">{suiteNameById.get(run.suiteId) ?? ''}</p>
                   </div>
                 </div>
                 <StatusChip status={run.status} />
@@ -86,8 +89,6 @@ export function RecentActivity() {
                     </p>
                     <p className="truncate text-xs text-muted">
                       {run.commitSha && <span>{run.commitSha}</span>}
-                      {run.commitSha && run.branch ? ' · ' : null}
-                      {run.branch ? <span>{run.branch}</span> : null}
                     </p>
                   </div>
                 </div>

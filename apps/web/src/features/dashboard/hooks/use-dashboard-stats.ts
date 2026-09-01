@@ -3,15 +3,15 @@
 import { useMemo } from 'react'
 import {
   useProjects,
-  useRuns,
   useProposals,
   useOrg,
   useCoverageGaps,
 } from '@/lib/use-mock-store'
+import { useRuns } from '@/features/runs/hooks/use-runs'
 import { MOCK_NOW } from '@/lib/mock-data'
 import type {
   ProjectSummary,
-  Run,
+  RunSummaryRecord,
   ExtractedProposal,
   RunStatus,
 } from '@qably/types'
@@ -31,16 +31,16 @@ export interface DashboardStats {
     lastRunStatus: RunStatus
     lastRunAt: string
   }>
-  recentRuns: Run[]
+  recentRuns: RunSummaryRecord[]
   recentProposals: ExtractedProposal[]
-  recentCiRuns: Run[]
+  recentCiRuns: RunSummaryRecord[]
 }
 
 const MS_7D = 7 * 24 * 60 * 60 * 1000
 
 export function useDashboardStats(): DashboardStats {
   const projects = useProjects()
-  const runs = useRuns()
+  const { runs } = useRuns()
   const proposals = useProposals()
   const org = useOrg()
   const coverageGaps = useCoverageGaps()
@@ -68,8 +68,9 @@ export function useDashboardStats(): DashboardStats {
     const passRateLast7d =
       recentFinished.length > 0
         ? Math.round(
-            recentFinished.reduce((sum, r) => sum + r.passRate, 0) /
-              recentFinished.length,
+            (recentFinished.reduce((sum, r) => sum + r.passRate, 0) /
+              recentFinished.length) *
+              100,
           )
         : 0
 
@@ -83,8 +84,9 @@ export function useDashboardStats(): DashboardStats {
     const priorRate =
       priorFinished.length > 0
         ? Math.round(
-            priorFinished.reduce((sum, r) => sum + r.passRate, 0) /
-              priorFinished.length,
+            (priorFinished.reduce((sum, r) => sum + r.passRate, 0) /
+              priorFinished.length) *
+              100,
           )
         : 0
     const passRateTrend = passRateLast7d - priorRate

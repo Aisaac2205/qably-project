@@ -1,15 +1,12 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import type { Run, CaseStatus } from '@qably/types'
+import type { RunRecord, CaseStatus } from '@qably/types'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
-import { useRunAggregate } from '@/features/runs/lib/aggregate'
 import { RunProgressHeader } from './run-progress-header'
 import { CaseList } from './case-list'
 import { CaseDetail } from './case-detail'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
 
 export function RunDetail({
@@ -17,23 +14,15 @@ export function RunDetail({
   run,
 }: {
   projectId: string
-  run: Run
+  run: RunRecord
 }) {
   const { t } = useTranslation()
-  const router = useRouter()
   const updateStatus = useUpdateRunCase(run.id)
-  const { delete: deleteRun } = useRunAggregate()
 
   const sortedCases = useMemo(() => run.cases, [run.cases])
 
   const [selectedId, setSelectedId] = useState<string>(sortedCases[0]?.id ?? '')
   const [announcement, setAnnouncement] = useState('')
-  const [deleteOpen, setDeleteOpen] = useState(false)
-
-  const handleDelete = useCallback(() => {
-    deleteRun(run.id)
-    router.push(`/projects/${projectId}/runs`)
-  }, [deleteRun, run.id, projectId, router])
 
   const selectedCase = sortedCases.find((c) => c.id === selectedId) ?? sortedCases[0]
   const activeCaseId = selectedCase?.id ?? ''
@@ -89,19 +78,15 @@ export function RunDetail({
     }
   }, [selectedIndex, sortedCases, updateStatus, t])
 
-  useKeyboardShortcuts(
-    {
-      p: () => setStatus('pass'),
-      f: () => setStatus('fail'),
-      s: () => setStatus('skip'),
-      b: () => setStatus('blocked'),
-      ArrowRight: () => goNext(),
-      ArrowLeft: () => goPrev(),
-      r: () => runNext(),
-    },
-    // Shortcuts pause while the delete confirmation owns keyboard focus.
-    { enabled: !deleteOpen },
-  )
+  useKeyboardShortcuts({
+    p: () => setStatus('pass'),
+    f: () => setStatus('fail'),
+    s: () => setStatus('skip'),
+    b: () => setStatus('blocked'),
+    ArrowRight: () => goNext(),
+    ArrowLeft: () => goPrev(),
+    r: () => runNext(),
+  })
 
   const SHORTCUT_LABELS: Array<{ key: string; label: string }> = [
     { key: 'P', label: t('runs.shortcutPass') },
@@ -114,7 +99,7 @@ export function RunDetail({
 
   return (
     <div className="space-y-6">
-      <RunProgressHeader run={run} onDelete={() => setDeleteOpen(true)} />
+      <RunProgressHeader run={run} />
 
       {/* Keyboard shortcut hints — rounded card with surface tokens */}
       <div
@@ -164,14 +149,6 @@ export function RunDetail({
           )}
         </div>
       </div>
-
-      <ConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title={t('runs.deleteRunTitle')}
-        description={t('runs.deleteRunDescription', { name: run.name })}
-        onConfirm={handleDelete}
-      />
     </div>
   )
 }

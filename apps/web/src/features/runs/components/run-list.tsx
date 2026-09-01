@@ -1,14 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import type { Run, RunSource } from '@qably/types'
-import { useRuns } from '@/lib/use-mock-store'
+import type { RunSource, RunSummaryRecord } from '@qably/types'
+import { useRuns } from '../hooks/use-runs'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from './status-chip'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
+import { formatPassRate } from '../lib/format'
 
 function formatDate(iso: string): string {
   try {
@@ -23,7 +25,15 @@ function formatDate(iso: string): string {
   }
 }
 
-function RunRow({ run, projectId }: { run: Run; projectId: string }) {
+function RunRow({
+  run,
+  projectId,
+  suiteName,
+}: {
+  run: RunSummaryRecord
+  projectId: string
+  suiteName: string
+}) {
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
@@ -33,13 +43,13 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
         <StatusChip status={run.status} />
         <div className="min-w-0">
           <div className="text-sm font-semibold text-default truncate">{run.name}</div>
-          <div className="text-xs text-muted truncate mt-0.5">{run.suiteName}</div>
+          <div className="text-xs text-muted truncate mt-0.5">{suiteName}</div>
         </div>
       </div>
 
       <div className="shrink-0 flex items-center gap-4">
         <span className="text-sm font-semibold tabular-nums font-mono text-default w-12 text-right">
-          {run.passRate}%
+          {formatPassRate(run.passRate)}
         </span>
         <Badge variant="outline" className="hidden sm:inline-flex font-normal text-xs">
           {run.source.replace('_', ' ')}
@@ -56,12 +66,14 @@ function RunRow({ run, projectId }: { run: Run; projectId: string }) {
 }
 
 export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
-  const allRuns = useRuns(projectId)
+  const { runs: allRuns } = useRuns(projectId)
+  const { suites } = useSuites(projectId)
   const { t } = useTranslation()
   const runs = source ? allRuns.filter((r) => r.source === source) : allRuns
   const sorted = [...runs].sort(
     (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
   )
+  const suiteNameById = new Map(suites.map((suite) => [suite.id, suite.name]))
 
   if (sorted.length === 0) {
     return (
@@ -83,7 +95,9 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
       <CardContent className="p-0">
         <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
         {sorted.map((r) => (
-          <li key={r.id}><RunRow run={r} projectId={projectId} /></li>
+          <li key={r.id}>
+            <RunRow run={r} projectId={projectId} suiteName={suiteNameById.get(r.suiteId) ?? ''} />
+          </li>
         ))}
         </EntityList>
       </CardContent>

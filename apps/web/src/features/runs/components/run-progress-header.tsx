@@ -1,11 +1,12 @@
 'use client'
 
-import type { Run } from '@qably/types'
-import { GitCommit, DotsThreeVertical, Trash } from '@phosphor-icons/react'
+import type { RunRecord } from '@qably/types'
+import { GitCommit } from '@phosphor-icons/react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
-import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
+import { useSuite } from '@/features/projects/suites/hooks/use-suites'
+import { formatPassRate } from '../lib/format'
 
 function formatDate(iso: string): string {
   try {
@@ -26,9 +27,16 @@ const SOURCE_LABELS: Record<string, string> = {
   github_actions: 'runs.sourceCi',
 }
 
-export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () => void }) {
+function computePassRate(run: RunRecord): number {
+  return run.cases.length === 0
+    ? 0
+    : run.cases.filter((c) => c.status === 'pass').length / run.cases.length
+}
+
+export function RunProgressHeader({ run }: { run: RunRecord }) {
   const { t } = useTranslation()
-  const passRateDisplay = `${run.passRate}%`
+  const { suite } = useSuite(run.suiteId)
+  const passRateDisplay = formatPassRate(computePassRate(run))
   const sourceLabelKey = SOURCE_LABELS[run.source]
   const sourceLabel = sourceLabelKey ? t(sourceLabelKey) : run.source
 
@@ -42,7 +50,7 @@ export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () =
               {run.name}
             </CardTitle>
             <CardDescription className="text-xs text-muted truncate">
-              {run.suiteName}
+              {suite?.name ?? ''}
             </CardDescription>
           </div>
         </div>
@@ -68,29 +76,6 @@ export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () =
               <div className="text-sm text-default">{formatDate(run.finishedAt)}</div>
             </div>
           )}
-          {onDelete && (
-            <Menu>
-              <MenuTrigger
-                aria-label={t('runs.runActions')}
-                className="size-7 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                <DotsThreeVertical size={15} weight="bold" aria-hidden="true" />
-              </MenuTrigger>
-              <MenuPortal>
-                <MenuPositioner align="end">
-                  <MenuContent>
-                    <MenuItem
-                      onClick={onDelete}
-                      className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
-                    >
-                      <Trash size={14} aria-hidden="true" />
-                      {t('runs.deleteRun')}
-                    </MenuItem>
-                  </MenuContent>
-                </MenuPositioner>
-              </MenuPortal>
-            </Menu>
-          )}
         </div>
       </CardHeader>
 
@@ -115,13 +100,11 @@ export function RunProgressHeader({ run, onDelete }: { run: Run; onDelete?: () =
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
                 <span className="font-mono">{run.commitSha.slice(0, 7)}</span>
-                {run.branch && <span>{t('runs.onBranch')}<span className="font-mono">{run.branch}</span></span>}
                 {run.commitAuthor && (
                   <span>
-                    {t('runs.byAuthor')}<span className="text-default">{run.commitAuthor.name}</span>
+                    {t('runs.byAuthor')}<span className="text-default">{run.commitAuthor}</span>
                   </span>
                 )}
-                {run.workflowName && <span>{t('runs.viaWorkflow')}{run.workflowName}</span>}
               </div>
             </div>
           </div>

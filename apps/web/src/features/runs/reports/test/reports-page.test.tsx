@@ -5,9 +5,12 @@ import type { Project } from '@qably/types'
 
 // ── Mock store hooks ─────────────────────────────────────────────
 vi.mock('@/lib/use-mock-store', () => ({
-  useRuns: vi.fn(() => []),
   useSuites: vi.fn(() => []),
   useProposals: vi.fn(() => []),
+}))
+
+vi.mock('@/features/runs/hooks/use-runs', () => ({
+  useRuns: vi.fn(() => ({ runs: [], isLoading: false, isError: false })),
 }))
 
 // ── Mock the project context ─────────────────────────────────────

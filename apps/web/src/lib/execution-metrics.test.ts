@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import type { Run, Suite } from '@qably/types'
+import type { RunCaseCounts, RunSummaryRecord, Suite } from '@qably/types'
 import {
   toLocalDateString,
   getLastRun,
@@ -15,17 +15,30 @@ const NOW_ISO = '2026-06-16T11:00:00Z'
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-function makeRun(overrides: Partial<Run> & { startedAt: string }): Run {
+const EMPTY_CASE_COUNTS: RunCaseCounts = {
+  total: 0,
+  pending: 0,
+  running: 0,
+  pass: 0,
+  fail: 0,
+  skip: 0,
+  blocked: 0,
+}
+
+function makeRun(
+  overrides: Partial<RunSummaryRecord> & { startedAt: string },
+): RunSummaryRecord {
   return {
     id: 'run-x',
     projectId: 'proj-1',
+    organizationId: 'org-1',
     name: 'Test Run',
     suiteId: 'suite-1',
-    suiteName: 'Authentication',
-    cases: [],
     status: 'pass',
-    passRate: 100,
     source: 'manual',
+    externalId: '',
+    caseCounts: EMPTY_CASE_COUNTS,
+    passRate: 1,
     ...overrides,
   }
 }
@@ -248,7 +261,7 @@ describe('getSuiteRunStatus', () => {
   })
 
   it('returns pass at exactly 70% (threshold is strict <)', () => {
-    const runs: Run[] = []
+    const runs: RunSummaryRecord[] = []
     for (let i = 0; i < 7; i++) {
       runs.push(makeRun({ id: `p${i}`, startedAt: daysAgo(i), finishedAt: daysAgo(i), status: 'pass' }))
     }

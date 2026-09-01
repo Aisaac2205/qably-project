@@ -1,15 +1,17 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { CaseDetail } from '@/features/runs/components/case-detail'
-import type { RunCase } from '@qably/types'
+import type { RunCaseRecord } from '@qably/types'
 
-const mockCase: RunCase = {
+const mockCase: RunCaseRecord = {
   id: 'tc-1',
+  testCaseId: 'tc-1',
   name: 'Valid login redirects to dashboard',
-  suite: 'Authentication',
+  suiteName: 'Authentication',
   steps: ['Navigate to /login', 'Enter valid email', 'Click Sign in'],
   expectedResult: 'Redirected to /dashboard',
   status: 'pass',
+  position: 0,
 }
 
 describe('CaseDetail', () => {

@@ -2,7 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { useProjectContext } from '@/features/projects/context/project-context'
-import { useRuns, useProposals } from '@/lib/use-mock-store'
+import { useProposals } from '@/lib/use-mock-store'
+import { useRuns } from '@/features/runs/hooks/use-runs'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useTranslation } from '@/lib/i18n'
 
@@ -43,7 +44,7 @@ function ChartSkeleton() {
 
 export function ReportsPage() {
   const { projectId } = useProjectContext()
-  const runs = useRuns(projectId)
+  const { runs } = useRuns(projectId)
   const proposals = useProposals(projectId)
   const { t } = useTranslation()
 

@@ -3,7 +3,7 @@
 /**
  * Hook that aggregates per-suite execution metrics for a project.
  *
- * Reads suites and runs from the mock store, then derives:
+ * Reads suites and runs from the api, then derives:
  * - perSuite: one entry per suite with lastRun, passRate7d, sparkline, status
  * - projectMetrics: project-wide aggregate via aggregateForProject
  *
@@ -11,8 +11,8 @@
  * re-renders with unchanged data do not recompute the metrics.
  */
 import { useMemo } from 'react'
-import type { Run, Suite, SuiteRunStatus } from '@qably/types'
-import { useRuns } from '@/lib/use-mock-store'
+import type { RunSummaryRecord, Suite, SuiteRunStatus } from '@qably/types'
+import { useRuns } from '@/features/runs/hooks/use-runs'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import {
   aggregateForProject,
@@ -24,7 +24,7 @@ import {
 
 export interface SuiteMetrics {
   suite: Suite
-  lastRun: Run | undefined
+  lastRun: RunSummaryRecord | undefined
   passRate7d: number
   sparkline: Array<{ date: string; passRate: number; runCount: number }>
   status: SuiteRunStatus
@@ -42,7 +42,7 @@ export interface UseSuiteMetricsResult {
 
 export function useSuiteMetrics(projectId: string): UseSuiteMetricsResult {
   const { suites } = useSuites(projectId)
-  const runs = useRuns(projectId)
+  const { runs } = useRuns(projectId)
 
   return useMemo<UseSuiteMetricsResult>(() => {
     const perSuite: SuiteMetrics[] = suites.map((suite) => ({
@@ -56,7 +56,5 @@ export function useSuiteMetrics(projectId: string): UseSuiteMetricsResult {
     const projectMetrics = aggregateForProject(runs, suites)
 
     return { perSuite, projectMetrics }
-    // useMemo depends on the runs and suites references returned by the store.
-    // useSyncExternalStore returns the same reference until the store mutates.
   }, [suites, runs])
 }

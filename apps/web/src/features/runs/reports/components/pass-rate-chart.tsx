@@ -1,12 +1,12 @@
 'use client'
 
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import type { Run } from '@qably/types'
+import type { RunSummaryRecord } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useHydrated } from '@/hooks/use-hydrated'
 
 interface PassRateChartProps {
-  runs: Run[]
+  runs: RunSummaryRecord[]
 }
 
 export function PassRateChart({ runs }: PassRateChartProps) {
@@ -27,7 +27,7 @@ export function PassRateChart({ runs }: PassRateChartProps) {
 
   const data = sorted.map((r) => ({
     name: new Date(r.startedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    passRate: r.passRate,
+    passRate: Math.round(r.passRate * 100),
   }))
 
   return (

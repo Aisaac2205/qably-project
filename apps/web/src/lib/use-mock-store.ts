@@ -15,8 +15,6 @@ import {
 } from '@/lib/mock-store'
 import type {
   ProjectSummary,
-  Suite,
-  Run,
   AiCase,
   Organization,
   OrgMember,
@@ -84,31 +82,6 @@ export function useProject(id: string): ProjectSummary | undefined {
       return cacheRef.current.value
     },
     () => getServerSnapshot().projects.find((p) => p.id === id),
-  )
-}
-
-export function useRuns(projectId?: string): Run[] {
-  return useStableArray(
-    () => {
-      const all = getSnapshot().runs
-      return projectId ? all.filter((r) => r.projectId === projectId) : all
-    },
-    () => getServerSnapshot().runs.filter((r) => !projectId || r.projectId === projectId),
-  )
-}
-
-export function useRun(runId: string): Run | undefined {
-  const cacheRef = useRef<{ id: string; value: Run | undefined }>({ id: '', value: undefined })
-  return useSyncExternalStore(
-    subscribe,
-    () => {
-      const r = getSnapshot().runs.find((r) => r.id === runId)
-      if (r !== cacheRef.current.value || runId !== cacheRef.current.id) {
-        cacheRef.current = { id: runId, value: r }
-      }
-      return cacheRef.current.value
-    },
-    () => getServerSnapshot().runs.find((r) => r.id === runId),
   )
 }
 

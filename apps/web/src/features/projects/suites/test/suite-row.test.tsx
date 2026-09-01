@@ -5,7 +5,7 @@ import { SuiteRow } from '@/features/projects/suites/components/suite-row'
 import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite } from '@/lib/test-utils'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
-import type { TestCase, Run } from '@qably/types'
+import type { TestCase, RunSummaryRecord } from '@qably/types'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
@@ -28,18 +28,19 @@ const mockCase: TestCase = {
   state: 'active',
 }
 
-const mockRun: Run = {
+const mockRun: RunSummaryRecord = {
   id: 'run-99',
   projectId: 'proj-1',
+  organizationId: 'org-1',
   name: 'Run #99',
   suiteId: 'suite-1',
-  suiteName: 'Authentication',
-  cases: [],
   status: 'pass',
-  passRate: 100,
   source: 'manual',
+  externalId: '',
   startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
   finishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
+  caseCounts: { total: 1, pending: 0, running: 0, pass: 1, fail: 0, skip: 0, blocked: 0 },
+  passRate: 1,
 }
 
 const mockMetrics: SuiteMetrics = {

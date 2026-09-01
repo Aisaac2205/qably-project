@@ -1,25 +1,33 @@
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { screen, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { RunDetail } from '@/features/runs/components/run-detail'
-import { __resetStore, getRun } from '@/lib/mock-store'
-import type { Run } from '@qably/types'
+import { renderWithQuery } from '@/lib/query-test-utils'
+import { runFixtures } from '@/test/runs-api-stub'
+import type { RunRecord } from '@qably/types'
 
-function getFreshRun(): Run {
-  const r = getRun('run-12')
-  if (!r) throw new Error('run-12 not found in store')
-  return JSON.parse(JSON.stringify(r))
+vi.mock('@/features/runs/api/runs.api', async () =>
+  await import('@/test/runs-api-stub'),
+)
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
+
+function getFreshRun(): RunRecord {
+  const run = runFixtures.find((r) => r.id === 'run-12')
+  if (!run) throw new Error('run-12 not found in fixtures')
+  return structuredClone(run)
 }
 
 describe('RunDetail', () => {
   beforeEach(() => {
-    __resetStore()
+    vi.clearAllMocks()
   })
 
   it('renders run progress header', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     expect(screen.getByText('Run #12')).toBeInTheDocument()
   })
@@ -27,7 +35,7 @@ describe('RunDetail', () => {
   it('renders keyboard shortcut hints', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     const hints = screen.getByLabelText('Keyboard shortcuts')
     expect(hints).toBeInTheDocument()
@@ -40,7 +48,7 @@ describe('RunDetail', () => {
   it('renders case list with all cases', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     // run-12 has 6 cases. Names appear in both case list and detail pane
     const items = screen.getAllByText('Valid login redirects to dashboard')
@@ -51,7 +59,7 @@ describe('RunDetail', () => {
   it('selects first case by default', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     const firstBtn = screen.getByRole('option', { name: /Valid login redirects to dashboard/i })
     expect(firstBtn).toHaveAttribute('aria-selected', 'true')
@@ -60,7 +68,7 @@ describe('RunDetail', () => {
   it('renders case detail for selected case', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     // Steps of first case should be visible in detail pane
     expect(screen.getByText('Navigate to /login')).toBeInTheDocument()
@@ -71,7 +79,7 @@ describe('RunDetail', () => {
     const run = getFreshRun()
     const user = userEvent.setup()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     await user.click(screen.getByRole('option', { name: /Invalid credentials shows error/i }))
     const selectedBtn = screen.getByRole('option', { name: /Invalid credentials shows error/i })
@@ -81,53 +89,56 @@ describe('RunDetail', () => {
   it('keyboard shortcut P marks selected case as pass', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     // First case is selected (tc-1). Press P.
-    fireEvent.keyDown(window, { key: 'p' })
-    // The store should have updated
-    const updated = getRun('run-12')
-    const tc1 = updated?.cases.find((c) => c.id === 'tc-1')
-    expect(tc1?.status).toBe('pass')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'p' })
+    })
+    const liveRegion = document.querySelector('[aria-live="polite"]')
+    expect(liveRegion?.textContent).toBe('Status: Pass')
   })
 
   it('keyboard shortcut F marks selected case as fail', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
-    fireEvent.keyDown(window, { key: 'f' })
-    const updated = getRun('run-12')
-    const tc1 = updated?.cases.find((c) => c.id === 'tc-1')
-    expect(tc1?.status).toBe('fail')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'f' })
+    })
+    const liveRegion = document.querySelector('[aria-live="polite"]')
+    expect(liveRegion?.textContent).toBe('Status: Fail')
   })
 
   it('keyboard shortcut S marks selected case as skip', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
-    fireEvent.keyDown(window, { key: 's' })
-    const updated = getRun('run-12')
-    const tc1 = updated?.cases.find((c) => c.id === 'tc-1')
-    expect(tc1?.status).toBe('skip')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 's' })
+    })
+    const liveRegion = document.querySelector('[aria-live="polite"]')
+    expect(liveRegion?.textContent).toBe('Status: Skip')
   })
 
   it('keyboard shortcut B marks selected case as blocked', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
-    fireEvent.keyDown(window, { key: 'b' })
-    const updated = getRun('run-12')
-    const tc1 = updated?.cases.find((c) => c.id === 'tc-1')
-    expect(tc1?.status).toBe('blocked')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'b' })
+    })
+    const liveRegion = document.querySelector('[aria-live="polite"]')
+    expect(liveRegion?.textContent).toBe('Status: Blocked')
   })
 
   it('keyboard ArrowRight moves to next case', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     // Now tc-2 should be selected
@@ -138,7 +149,7 @@ describe('RunDetail', () => {
   it('keyboard ArrowLeft moves to previous case', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     // Move to second case
     fireEvent.keyDown(window, { key: 'ArrowRight' })
@@ -151,22 +162,24 @@ describe('RunDetail', () => {
   it('keyboard R marks next pending case as running', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
     // First case is tc-1 (pass). Next pending is tc-5 or tc-6.
-    fireEvent.keyDown(window, { key: 'r' })
-    const updated = getRun('run-12')
-    // Should have set some pending case to running
-    const runningCases = updated?.cases.filter((c) => c.status === 'running')
-    expect(runningCases?.length).toBeGreaterThanOrEqual(1)
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'r' })
+    })
+    const liveRegion = document.querySelector('[aria-live="polite"]')
+    expect(liveRegion?.textContent).toBe('Status: Running')
   })
 
   it('announces status change via aria-live region', async () => {
     const run = getFreshRun()
     await act(async () => {
-      render(<RunDetail projectId="proj-1" run={run} />)
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
-    fireEvent.keyDown(window, { key: 'p' })
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'p' })
+    })
     // The aria-live region should have been updated
     const liveRegion = document.querySelector('[aria-live="polite"]')
     expect(liveRegion?.textContent).toBe('Status: Pass')

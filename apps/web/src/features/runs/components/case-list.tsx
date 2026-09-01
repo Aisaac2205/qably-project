@@ -1,6 +1,6 @@
 'use client'
 
-import type { RunCase } from '@qably/types'
+import type { RunCaseRecord } from '@qably/types'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
 
@@ -9,7 +9,7 @@ export function CaseList({
   selectedId,
   onSelect,
 }: {
-  cases: RunCase[]
+  cases: RunCaseRecord[]
   selectedId?: string
   onSelect: (id: string) => void
 }) {
