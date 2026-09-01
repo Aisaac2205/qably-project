@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useSuites } from '@/lib/use-mock-store'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { useCreateRun } from '@/features/runs/hooks/use-create-run'
 import {
   Select,
@@ -21,7 +21,7 @@ export function NewRunForm({
   projectId: string
   initialSuiteId?: string
 }) {
-  const suites = useSuites(projectId)
+  const { suites } = useSuites(projectId)
   const createRun = useCreateRun(projectId)
   const { t } = useTranslation()
   const [suiteId, setSuiteId] = useState(initialSuiteId ?? '')

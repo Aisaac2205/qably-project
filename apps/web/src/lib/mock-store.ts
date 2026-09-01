@@ -66,7 +66,6 @@ type Listener = () => void
 
 export interface StoreSnapshot {
   projects: ProjectSummary[]
-  suites: Suite[]
   runs: Run[]
   aiCases: AiCase[]
   org: Organization
@@ -93,7 +92,6 @@ export interface StoreSnapshot {
 // ── State ─────────────────────────────────────────────────────────
 
 let projects: ProjectSummary[] = structuredClone(mockProjects)
-let suites: Suite[] = structuredClone(mockSuites)
 let runs: Run[] = structuredClone(mockRuns)
 let aiCases: AiCase[] = structuredClone(mockAiCases)
 let org: Organization = { ...mockOrg }
@@ -208,7 +206,7 @@ export function subscribe(listener: Listener): () => void {
 
 function currentSnapshot(): StoreSnapshot {
   return {
-    projects, suites, runs, aiCases, org, members, apiKeys, integration,
+    projects, runs, aiCases, org, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
     ingestionBatches, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
     testCaseVersions, traceabilityLinks, evidence, qualityRisks,
@@ -235,15 +233,6 @@ export function getProjects(): ProjectSummary[] {
 
 export function getProject(id: string): ProjectSummary | undefined {
   return projects.find((p) => p.id === id)
-}
-
-export function getSuites(projectId?: string): Suite[] {
-  if (!projectId) return suites
-  return suites.filter((s) => s.projectId === projectId)
-}
-
-export function getSuite(suiteId: string): Suite | undefined {
-  return suites.find((s) => s.id === suiteId)
 }
 
 export function getRuns(projectId?: string): Run[] {
@@ -421,7 +410,9 @@ export function approveProposal(
   const existingCase = proposal.targetOfficialTestCaseId
     ? getOfficialTestCase(proposal.targetOfficialTestCaseId)
     : undefined
-  const suiteId = existingCase?.suiteId ?? getSuites(proposal.projectId)[0]?.id
+  const suiteId =
+    existingCase?.suiteId ??
+    mockSuites.find((suite) => suite.projectId === proposal.projectId)?.id
   if (!suiteId) return { ok: false, reason: 'missing_evidence' }
 
   const createdNewCase = !existingCase
@@ -606,173 +597,6 @@ function nowIso(): string {
   return new Date().toISOString()
 }
 
-export function createSuite(input: {
-  projectId: string
-  organizationId?: string
-  name: string
-  description: string
-  tags?: string[]
-}): Suite {
-  const id = `suite-${suites.length + 1}`
-  const tags = validateTags(input.tags ?? [])
-  // First suite for a project auto-defaults to isDefault: true.
-  const projectSuiteCount = suites.filter((s) => s.projectId === input.projectId).length
-  const isDefault = projectSuiteCount === 0
-  const createdAt = nowIso()
-  const newSuite: Suite = {
-    id,
-    projectId: input.projectId,
-    organizationId: input.organizationId ?? 'org-1',
-    name: input.name,
-    cases: [],
-    createdAt,
-    description: input.description,
-    tags,
-    isDefault,
-    updatedAt: createdAt,
-  }
-  suites = [...suites, newSuite]
-  notify()
-  return newSuite
-}
-
-export function updateSuite(
-  id: string,
-  patch: Partial<Pick<Suite, 'name' | 'description' | 'tags' | 'isDefault'>>,
-): Suite | undefined {
-  const target = suites.find((s) => s.id === id)
-  if (!target) return undefined
-  const normalizedPatch: Partial<Pick<Suite, 'name' | 'description' | 'tags' | 'isDefault'>> = {
-    ...patch,
-    ...(patch.tags !== undefined ? { tags: validateTags(patch.tags) } : {}),
-  }
-  const ts = nowIso()
-  // If switching default, unset the previous default in the same project.
-  if (normalizedPatch.isDefault === true && !target.isDefault) {
-    suites = suites.map((s) =>
-      s.projectId === target.projectId && s.id !== id && s.isDefault
-        ? { ...s, isDefault: false, updatedAt: ts }
-        : s,
-    )
-  }
-  suites = suites.map((s) => (s.id === id ? { ...s, ...normalizedPatch, updatedAt: ts } : s))
-  notify()
-  return suites.find((s) => s.id === id)
-}
-
-export function deleteSuite(id: string): boolean {
-  const target = suites.find((s) => s.id === id)
-  if (!target) return false
-  suites = suites.filter((s) => s.id !== id)
-  // If the deleted suite was the default, promote the next-most-recent in the same project.
-  if (target.isDefault) {
-    const remaining = suites
-      .filter((s) => s.projectId === target.projectId)
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    if (remaining.length > 0) {
-      const ts = nowIso()
-      const promotedId = remaining[0].id
-      suites = suites.map((s) =>
-        s.id === promotedId ? { ...s, isDefault: true, updatedAt: ts } : s,
-      )
-    }
-  }
-  notify()
-  return true
-}
-
-// ── Case mutators (cases live embedded in Suite.cases) ────────────
-
-function nextCaseId(): string {
-  let max = 0
-  for (const s of suites) {
-    for (const c of s.cases) {
-      const match = /^tc-(\d+)$/.exec(c.id)
-      if (match) max = Math.max(max, Number(match[1]))
-    }
-  }
-  return `tc-${max + 1}`
-}
-
-export function createCase(
-  suiteId: string,
-  input: {
-    name: string
-    steps?: string[]
-    expectedResult?: string
-    priority?: CasePriority
-    state?: CaseState
-  },
-): TestCase | undefined {
-  const target = suites.find((s) => s.id === suiteId)
-  if (!target) return undefined
-  const newCase: TestCase = {
-    id: nextCaseId(),
-    suiteId,
-    name: input.name,
-    steps: input.steps ?? [],
-    expectedResult: input.expectedResult ?? '',
-    priority: input.priority ?? 'medium',
-    state: input.state ?? 'active',
-  }
-  const ts = nowIso()
-  suites = suites.map((s) =>
-    s.id === suiteId ? { ...s, cases: [...s.cases, newCase], updatedAt: ts } : s,
-  )
-  notify()
-  return newCase
-}
-
-export function updateCase(
-  suiteId: string,
-  caseId: string,
-  patch: Partial<Pick<TestCase, 'name' | 'steps' | 'expectedResult' | 'priority' | 'state'>>,
-): TestCase | undefined {
-  const target = suites.find((s) => s.id === suiteId)
-  if (!target) return undefined
-  if (!target.cases.some((c) => c.id === caseId)) return undefined
-  const ts = nowIso()
-  suites = suites.map((s) =>
-    s.id === suiteId
-      ? {
-          ...s,
-          cases: s.cases.map((c) => (c.id === caseId ? { ...c, ...patch } : c)),
-          updatedAt: ts,
-        }
-      : s,
-  )
-  notify()
-  return suites.find((s) => s.id === suiteId)?.cases.find((c) => c.id === caseId)
-}
-
-export function deleteCase(suiteId: string, caseId: string): boolean {
-  const target = suites.find((s) => s.id === suiteId)
-  if (!target) return false
-  if (!target.cases.some((c) => c.id === caseId)) return false
-  const ts = nowIso()
-  suites = suites.map((s) =>
-    s.id === suiteId
-      ? { ...s, cases: s.cases.filter((c) => c.id !== caseId), updatedAt: ts }
-      : s,
-  )
-  notify()
-  return true
-}
-
-export function setDefaultSuite(suiteId: string): Suite | undefined {
-  const target = suites.find((s) => s.id === suiteId)
-  if (!target) return undefined
-  const ts = nowIso()
-  suites = suites.map((s) => {
-    if (s.projectId !== target.projectId) return s
-    const isNewDefault = s.id === suiteId
-    if (s.isDefault === isNewDefault) return s
-    return { ...s, isDefault: isNewDefault, updatedAt: ts }
-  })
-  notify()
-  return suites.find((s) => s.id === suiteId)
-}
-
 export function updateRunCaseStatus(runId: string, caseId: string, status: CaseStatus): Run | undefined {
   runs = runs.map((r) => {
     if (r.id !== runId) return r
@@ -836,7 +660,7 @@ export function createRun(input: {
 }): Run {
   const existing = runs.filter((r) => r.projectId === input.projectId)
   const id = `run-${existing.length + 13}`
-  const suite = suites.find((s) => s.id === input.suiteId)
+  const suite = mockSuites.find((s) => s.id === input.suiteId)
   const newRun: Run = {
     id,
     projectId: input.projectId,
@@ -1048,7 +872,6 @@ export function sendChatMessage(
 
 export function __resetStore(): void {
   projects = structuredClone(mockProjects)
-  suites = structuredClone(mockSuites)
   runs = structuredClone(mockRuns)
   aiCases = structuredClone(mockAiCases)
   org = { ...mockOrg }

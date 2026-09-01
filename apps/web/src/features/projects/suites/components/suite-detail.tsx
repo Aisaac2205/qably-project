@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
 import type { TestCase } from '@qably/types'
-import { useSuite } from '@/lib/use-mock-store'
+import { useSuite } from '@/features/projects/suites/hooks/use-suites'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { deleteSuite, deleteCase } from '@/lib/mock-store'
+import { useDeleteCase, useDeleteSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +41,9 @@ function formatRelative(iso: string | undefined): string {
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
   const { t } = useTranslation()
-  const suite = useSuite(suiteId)
+  const { suite } = useSuite(suiteId)
+  const removeSuite = useDeleteSuite()
+  const removeCase = useDeleteCase()
   const { project } = useProject(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
@@ -269,8 +271,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           count: suite.cases.length,
         })}
         onConfirm={() => {
-          deleteSuite(suite.id)
-          router.push(`/projects/${projectId}`)
+          removeSuite.mutate(suite.id, {
+            onSuccess: () => router.push(`/projects/${projectId}`),
+          })
         }}
       />
 
@@ -287,7 +290,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         title={t('suites.deleteCaseTitle')}
         description={t('suites.deleteCaseDescription', { name: deletingCase?.name ?? '' })}
         onConfirm={() => {
-          if (deletingCase) deleteCase(suite.id, deletingCase.id)
+          if (deletingCase) {
+            removeCase.mutate({ suiteId: suite.id, caseId: deletingCase.id })
+          }
         }}
       />
     </div>

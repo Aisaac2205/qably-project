@@ -216,7 +216,7 @@ describe('ProjectRepositoryPage', () => {
 
     await renderPage('proj-2')
 
-    const description = screen.getByText('Este proyecto no tiene una fuente SCM configurada.')
+    const description = screen.getByText('Este proyecto no tiene un repositorio de código configurado.')
     expect(description.closest('[data-state-kind]')).toHaveAttribute('data-state-kind', 'no-source')
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()

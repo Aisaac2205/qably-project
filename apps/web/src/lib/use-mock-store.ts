@@ -87,31 +87,6 @@ export function useProject(id: string): ProjectSummary | undefined {
   )
 }
 
-export function useSuites(projectId?: string): Suite[] {
-  return useStableArray(
-    () => {
-      const all = getSnapshot().suites
-      return projectId ? all.filter((s) => s.projectId === projectId) : all
-    },
-    () => getServerSnapshot().suites.filter((s) => !projectId || s.projectId === projectId),
-  )
-}
-
-export function useSuite(suiteId: string): Suite | undefined {
-  const cacheRef = useRef<{ id: string; value: Suite | undefined }>({ id: '', value: undefined })
-  return useSyncExternalStore(
-    subscribe,
-    () => {
-      const s = getSnapshot().suites.find((s) => s.id === suiteId)
-      if (s !== cacheRef.current.value || suiteId !== cacheRef.current.id) {
-        cacheRef.current = { id: suiteId, value: s }
-      }
-      return cacheRef.current.value
-    },
-    () => getServerSnapshot().suites.find((s) => s.id === suiteId),
-  )
-}
-
 export function useRuns(projectId?: string): Run[] {
   return useStableArray(
     () => {

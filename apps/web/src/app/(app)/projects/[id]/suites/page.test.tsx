@@ -1,7 +1,12 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import SuitesPage from './page'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 vi.mock('@/features/projects/hooks/use-project', async () => {
   const { getProject } = await import('@/lib/mock-store')
@@ -25,7 +30,7 @@ describe('SuitesPage', () => {
     __resetStore()
 
     await act(async () => {
-      render(<SuitesPage params={Promise.resolve({ id: 'proj-1' })} />)
+      renderWithQuery(<SuitesPage params={Promise.resolve({ id: 'proj-1' })} />)
     })
 
     expect(screen.getByRole('heading', { level: 1, name: 'Test Library' })).toBeInTheDocument()

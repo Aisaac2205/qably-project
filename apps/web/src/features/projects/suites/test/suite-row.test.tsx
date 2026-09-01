@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SuiteRow } from '@/features/projects/suites/components/suite-row'
@@ -7,6 +7,11 @@ import { createMockSuite } from '@/lib/test-utils'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { TestCase, Run } from '@qably/types'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -72,21 +77,21 @@ describe('SuiteRow (enriched)', () => {
 
   it('renders suite name', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText('Authentication')).toBeInTheDocument()
   })
 
   it('renders the description when present', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText(/Login flows/)).toBeInTheDocument()
   })
 
   it('renders tags as Badge pills', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText('auth')).toBeInTheDocument()
     expect(screen.getByText('security')).toBeInTheDocument()
@@ -94,7 +99,7 @@ describe('SuiteRow (enriched)', () => {
 
   it('shows default star indicator when isDefault is true', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     // sr-only "Default suite" text
     expect(screen.getByText('Default suite')).toBeInTheDocument()
@@ -103,14 +108,14 @@ describe('SuiteRow (enriched)', () => {
   it('hides default star when isDefault is false', async () => {
     const nonDefault = createMockSuite({ ...mockSuite, isDefault: false })
     await act(async () => {
-      render(<SuiteRow suite={nonDefault} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={nonDefault} metrics={metrics} />)
     })
     expect(screen.queryByText('Default suite')).not.toBeInTheDocument()
   })
 
   it('renders cases count', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByText('case')).toBeInTheDocument()
@@ -118,7 +123,7 @@ describe('SuiteRow (enriched)', () => {
 
   it('renders last run reference with relative time', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     // Should show "3 hours ago" or similar
     expect(screen.getByText(/ago/i)).toBeInTheDocument()
@@ -127,20 +132,20 @@ describe('SuiteRow (enriched)', () => {
   it('renders "Never" when no last run', async () => {
     const noRunMetrics = { ...metrics, lastRun: undefined }
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={noRunMetrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={noRunMetrics} />)
     })
     expect(screen.getByText('Never')).toBeInTheDocument()
   })
 
   it('renders the pass rate percentage', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText('80%')).toBeInTheDocument()
   })
 
   it('renders a sparkline SVG with role="img"', async () => {
-    const { container } = render(
+    const { container } = renderWithQuery(
       <SuiteRow suite={mockSuite} metrics={metrics} />,
     )
     expect(container.querySelector('svg[role="img"]')).toBeInTheDocument()
@@ -148,7 +153,7 @@ describe('SuiteRow (enriched)', () => {
 
   it('renders the status chip', async () => {
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText('Pass')).toBeInTheDocument()
   })
@@ -156,7 +161,7 @@ describe('SuiteRow (enriched)', () => {
   it('click name enters edit mode', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<SuiteRow suite={mockSuite} metrics={metrics} />)
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     await user.click(screen.getByText('Authentication'))
     const input = screen.getByRole('textbox')

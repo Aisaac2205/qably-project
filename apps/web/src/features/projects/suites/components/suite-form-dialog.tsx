@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { createSuite, updateSuite } from '@/lib/mock-store'
+import { useCreateSuite, useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { useTranslation } from '@/lib/i18n'
 
 interface SuiteFormDialogProps {
@@ -54,6 +54,8 @@ function SuiteFormDialogContent({
 }: Omit<SuiteFormDialogProps, 'open'>) {
   const { t } = useTranslation()
   const isEdit = suite !== undefined
+  const createSuiteMutation = useCreateSuite()
+  const updateSuiteMutation = useUpdateSuite()
 
   const [name, setName] = useState(suite?.name ?? '')
   const [description, setDescription] = useState(suite?.description ?? '')
@@ -73,9 +75,17 @@ function SuiteFormDialogContent({
       .filter(Boolean)
 
     if (isEdit) {
-      updateSuite(suite.id, { name: trimmed, description: description.trim(), tags: tagList })
+      updateSuiteMutation.mutate({
+        id: suite.id,
+        patch: { name: trimmed, description: description.trim(), tags: tagList },
+      })
     } else {
-      createSuite({ projectId, name: trimmed, description: description.trim(), tags: tagList })
+      createSuiteMutation.mutate({
+        projectId,
+        name: trimmed,
+        description: description.trim(),
+        tags: tagList,
+      })
     }
     onOpenChange(false)
   }

@@ -4,9 +4,9 @@ import { useMemo } from 'react'
 import {
   useIngestionBatches,
   useProposals,
-  useSuites,
   useRuns,
 } from '@/lib/use-mock-store'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { MOCK_NOW } from '@/lib/mock-data'
 import type {
   TraceabilityStageKey,
@@ -92,7 +92,7 @@ export function useTraceabilityCalendar({
 }: UseTraceabilityCalendarOptions = {}): TraceabilityCalendarData {
   const batches = useIngestionBatches()
   const proposals = useProposals()
-  const suites = useSuites()
+  const { suites } = useSuites()
   const runs = useRuns()
 
   return useMemo(() => {

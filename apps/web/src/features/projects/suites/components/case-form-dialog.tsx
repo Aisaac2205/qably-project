@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { createCase, updateCase } from '@/lib/mock-store'
+import { useCreateCase, useUpdateCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { useTranslation } from '@/lib/i18n'
 
 const PRIORITIES: CasePriority[] = ['critical', 'high', 'medium', 'low']
@@ -75,6 +75,8 @@ function CaseFormDialogContent({
 }: Omit<CaseFormDialogProps, 'open'>) {
   const { t } = useTranslation()
   const isEdit = testCase !== undefined
+  const createCaseMutation = useCreateCase()
+  const updateCaseMutation = useUpdateCase()
 
   const [name, setName] = useState(testCase?.name ?? '')
   const [priority, setPriority] = useState<CasePriority>(testCase?.priority ?? 'medium')
@@ -95,22 +97,18 @@ function CaseFormDialogContent({
       .map((step) => step.trim())
       .filter(Boolean)
 
+    const payload = {
+      name: trimmed,
+      priority,
+      state,
+      steps: stepList,
+      expectedResult: expectedResult.trim(),
+    }
+
     if (isEdit) {
-      updateCase(suiteId, testCase.id, {
-        name: trimmed,
-        priority,
-        state,
-        steps: stepList,
-        expectedResult: expectedResult.trim(),
-      })
+      updateCaseMutation.mutate({ suiteId, caseId: testCase.id, patch: payload })
     } else {
-      createCase(suiteId, {
-        name: trimmed,
-        priority,
-        state,
-        steps: stepList,
-        expectedResult: expectedResult.trim(),
-      })
+      createCaseMutation.mutate({ suiteId, payload })
     }
     onOpenChange(false)
   }

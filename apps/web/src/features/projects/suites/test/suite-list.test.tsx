@@ -1,8 +1,13 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -20,7 +25,7 @@ describe('SuiteList', () => {
 
   it('renders the filter bar and the 3 seeded suites', async () => {
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     expect(screen.getByText('Authentication')).toBeInTheDocument()
     expect(screen.getByText('Checkout')).toBeInTheDocument()
@@ -29,7 +34,7 @@ describe('SuiteList', () => {
 
   it('shows "No suites yet" empty state for a project with no suites', async () => {
     await act(async () => {
-      render(<SuiteList projectId="proj-empty" />)
+      renderWithQuery(<SuiteList projectId="proj-empty" />)
     })
     expect(screen.getByText('No suites yet')).toBeInTheDocument()
   })
@@ -37,7 +42,7 @@ describe('SuiteList', () => {
   it('shows "No matches" empty state when filter excludes everything', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     const input = screen.getByTestId('suite-search')
     await user.type(input, 'xyz-no-match')
@@ -47,7 +52,7 @@ describe('SuiteList', () => {
   it('shows "Clear filters" button when filter is active', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     const input = screen.getByTestId('suite-search')
     await user.type(input, 'xyz')
@@ -58,7 +63,7 @@ describe('SuiteList', () => {
   it('clears filters when "Clear filters" is clicked', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     const input = screen.getByTestId('suite-search') as HTMLInputElement
     await user.type(input, 'xyz')
@@ -73,7 +78,7 @@ describe('SuiteList', () => {
   it('filters by search (case-insensitive)', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     const input = screen.getByTestId('suite-search')
     await user.type(input, 'CHECKOUT')
@@ -85,7 +90,7 @@ describe('SuiteList', () => {
   it('search matches description text too', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     const input = screen.getByTestId('suite-search')
     // "Cart, payment" is in the description of suite-2 (Checkout)
@@ -95,7 +100,7 @@ describe('SuiteList', () => {
 
   it('suite rows link to suite detail', async () => {
     await act(async () => {
-      render(<SuiteListForTest />)
+      renderWithQuery(<SuiteListForTest />)
     })
     const link = screen.getByText('Authentication').closest('a')
     expect(link?.getAttribute('href')).toBe('/projects/proj-1/suites/suite-1')

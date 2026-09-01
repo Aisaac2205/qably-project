@@ -1,7 +1,12 @@
-import { render, screen, act, within } from '@testing-library/react'
+import { screen, act, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -15,7 +20,7 @@ describe('DashboardPage', () => {
 
   it('groups the quality metrics in one labelled summary strip', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
     const summary = screen.getByLabelText('Quality overview')
     expect(summary).toBeInTheDocument()
@@ -27,7 +32,7 @@ describe('DashboardPage', () => {
 
   it('renders project health section', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
     const table = screen.getByRole('table', { name: 'Project health' })
     expect(table).toBeInTheDocument()
@@ -40,7 +45,7 @@ describe('DashboardPage', () => {
 
   it('renders recent activity sections', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
     expect(screen.getByText('Recent runs')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Pending proposals' })).toBeInTheDocument()
@@ -49,7 +54,7 @@ describe('DashboardPage', () => {
 
   it('does not end the workspace with a decorative operational footer', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
 
     expect(screen.queryByText('All systems operational')).not.toBeInTheDocument()
@@ -57,7 +62,7 @@ describe('DashboardPage', () => {
 
   it('uses the available workspace width instead of capping the dashboard canvas', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
 
     const workspace = screen.getByRole('region', { name: 'Dashboard' })
@@ -67,14 +72,14 @@ describe('DashboardPage', () => {
 
   it('renders governance pipeline section with live stages', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
     expect(screen.getByRole('heading', { name: 'Governance pipeline' })).toBeInTheDocument()
   })
 
   it('renders quality & freshness risks section with active signals', async () => {
     await act(async () => {
-      render(<DashboardPage />)
+      renderWithQuery(<DashboardPage />)
     })
     expect(screen.getByRole('heading', { name: 'Quality & freshness risks' })).toBeInTheDocument()
     expect(screen.getByText(/coverage gap in payment refunds flow/i)).toBeInTheDocument()

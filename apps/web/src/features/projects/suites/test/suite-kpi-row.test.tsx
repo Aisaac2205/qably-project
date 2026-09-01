@@ -1,7 +1,12 @@
-import { render, screen, act } from '@testing-library/react'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { screen, act } from '@testing-library/react'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SuiteKpiRow } from '@/features/projects/suites/components/suite-kpi-row'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery, withQueryClient } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 describe('SuiteKpiRow', () => {
   beforeEach(() => {
@@ -10,7 +15,7 @@ describe('SuiteKpiRow', () => {
 
   it('renders 4 KPI labels', async () => {
     await act(async () => {
-      render(<SuiteKpiRow projectId="proj-1" />)
+      renderWithQuery(<SuiteKpiRow projectId="proj-1" />)
     })
     expect(screen.getByText('Suites')).toBeInTheDocument()
     expect(screen.getByText('Test Cases')).toBeInTheDocument()
@@ -20,7 +25,7 @@ describe('SuiteKpiRow', () => {
 
   it('shows the right counts for a project with suites', async () => {
     await act(async () => {
-      render(<SuiteKpiRow projectId="proj-1" />)
+      renderWithQuery(<SuiteKpiRow projectId="proj-1" />)
     })
     // proj-1 has 3 suites with 3+3+1 = 7 cases
     // "3" should appear at least once (Suites value) — use getAllByText since the digit
@@ -31,7 +36,7 @@ describe('SuiteKpiRow', () => {
 
   it('shows zeros for a project with no suites', async () => {
     await act(async () => {
-      render(<SuiteKpiRow projectId="proj-empty" />)
+      renderWithQuery(<SuiteKpiRow projectId="proj-empty" />)
     })
     // At least one "0" appears (Suites / Test Cases / Pass Rate)
     expect(screen.getAllByText('0').length).toBeGreaterThan(0)
@@ -40,7 +45,7 @@ describe('SuiteKpiRow', () => {
 
   it('shows "—" for Last Run when no runs exist', async () => {
     await act(async () => {
-      render(<SuiteKpiRow projectId="proj-empty" />)
+      renderWithQuery(<SuiteKpiRow projectId="proj-empty" />)
     })
     expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('No runs yet')).toBeInTheDocument()
@@ -48,7 +53,7 @@ describe('SuiteKpiRow', () => {
 
   it('pass rate shows a percentage string', async () => {
     await act(async () => {
-      render(<SuiteKpiRow projectId="proj-1" />)
+      renderWithQuery(<SuiteKpiRow projectId="proj-1" />)
     })
     // Some 7d pass rate is shown (mock data: suite-1 has 1 pass + 1 fail, suite-2 has 1 pass + 1 fail in window)
     const passRateEl = screen.getByText(/^\d+%/)
@@ -56,7 +61,7 @@ describe('SuiteKpiRow', () => {
   })
 
   it('groups KPIs in a grid', async () => {
-    const { container } = render(<SuiteKpiRow projectId="proj-1" />)
+    const { container } = renderWithQuery(<SuiteKpiRow projectId="proj-1" />)
     const grid = container.querySelector('[role="group"]')
     expect(grid).toBeInTheDocument()
     expect(grid?.className).toContain('grid-cols-2')

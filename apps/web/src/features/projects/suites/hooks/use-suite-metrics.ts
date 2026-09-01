@@ -12,7 +12,8 @@
  */
 import { useMemo } from 'react'
 import type { Run, Suite, SuiteRunStatus } from '@qably/types'
-import { useRuns, useSuites } from '@/lib/use-mock-store'
+import { useRuns } from '@/lib/use-mock-store'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import {
   aggregateForProject,
   getLastRun,
@@ -40,7 +41,7 @@ export interface UseSuiteMetricsResult {
 }
 
 export function useSuiteMetrics(projectId: string): UseSuiteMetricsResult {
-  const suites = useSuites(projectId)
+  const { suites } = useSuites(projectId)
   const runs = useRuns(projectId)
 
   return useMemo<UseSuiteMetricsResult>(() => {

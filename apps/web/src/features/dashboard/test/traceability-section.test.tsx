@@ -1,7 +1,12 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TraceabilitySection } from '@/features/dashboard/components/traceability-section'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 vi.mock('next/link', () => ({
   default: ({
@@ -26,7 +31,7 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
 
   it('renders the traceability calendar header and clean toolbar', async () => {
     await act(async () => {
-      render(<TraceabilitySection />)
+      renderWithQuery(<TraceabilitySection />)
     })
 
     expect(
@@ -39,7 +44,7 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
 
   it('renders the SVG contribution grid with 53 weeks and month labels', async () => {
     await act(async () => {
-      render(<TraceabilitySection />)
+      renderWithQuery(<TraceabilitySection />)
     })
 
     const svg = screen.getByRole('img', {
@@ -55,7 +60,7 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
 
   it('renders clean dropdown selectors for stage filtering and year in the header', async () => {
     await act(async () => {
-      render(<TraceabilitySection />)
+      renderWithQuery(<TraceabilitySection />)
     })
 
     const comboboxes = screen.getAllByRole('combobox')

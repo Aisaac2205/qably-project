@@ -150,8 +150,8 @@
 
   "repository": {
     "title": "Repositorio",
-    "subtitle": "Fuentes SCM de este proyecto.",
-    "sourceHeading": "Fuente",
+    "subtitle": "Repositorio de código conectado y sincronización de cambios.",
+    "sourceHeading": "Repositorio conectado",
     "ingestionHeading": "Ingesta",
     "inspectorHeading": "Inspector de cambios",
     "ingestionSource": "Fuente",
@@ -172,16 +172,16 @@
     "detectedPattern": "Patrón",
     "filterAll": "Todo",
     "linkedProposal": "Propuesta vinculada",
-    "sourceDescription": "Los env\u00edos a este repositorio se ingieren autom\u00e1ticamente.",
-    "noSourceTitle": "Sin fuente SCM",
-    "noSourceDescription": "Este proyecto no tiene una fuente SCM configurada.",
+    "sourceDescription": "Los envíos a este repositorio se ingieren automáticamente.",
+    "noSourceTitle": "Sin repositorio conectado",
+    "noSourceDescription": "Este proyecto no tiene un repositorio de código configurado.",
     "ingestionErrorTitle": "La extracción falló",
     "ingestionErrorDescription": "Este lote de ingesta no pudo procesarse, por lo que no se extrajeron cambios de prueba.",
-    "loadingTitle": "Cargando repositorio\u2026",
+    "loadingTitle": "Cargando repositorio…",
     "loadErrorTitle": "Repositorio no disponible",
-    "loadErrorDescription": "No se pudieron cargar los datos del repositorio de este proyecto. Prob\u00e1 de nuevo.",
-    "emptyBatchTitle": "Todav\u00eda no hay cambios ingeridos",
-    "emptyBatchDescription": "Hac\u00e9 un env\u00edo a este repositorio y los cambios van a aparecer ac\u00e1."
+    "loadErrorDescription": "No se pudieron cargar los datos del repositorio de este proyecto. Probá de nuevo.",
+    "emptyBatchTitle": "Todavía no hay cambios ingeridos",
+    "emptyBatchDescription": "Hacé un envío a este repositorio y los cambios van a aparecer acá."
   },
 
   "status": {
@@ -239,7 +239,7 @@
     "governancePipeline": "Trazabilidad",
     "governanceSubtitle": "Trazabilidad en vivo entre repositorios, propuestas, casos oficiales y ejecuciones",
     "viewChain": "Bandeja de revisión",
-    "stageScm": "Ingesta SCM",
+    "stageScm": "Ingesta de código",
     "stageScmDesc": "Archivos de prueba en Git",
     "stageScmCount": "{{count}} lotes",
     "stageProposals": "Propuestas IA",
@@ -763,7 +763,7 @@
       "subtitle": "Esta página ya no concentra flujos operativos: cada responsabilidad se movió a su superficie propia.",
       "movedHeading": "Adónde se movió cada cosa",
       "movedCiText": "Los adaptadores de CI ahora viven en la página Runs de cada proyecto.",
-      "movedScmText": "Las fuentes SCM ahora viven en la página Repository de cada proyecto.",
+      "movedScmText": "Los repositorios de código ahora viven en la página Repositorio de cada proyecto.",
       "movedCredentialsText": "Las credenciales y canales de notificación ahora viven en Configuración.",
       "add": "Agregar integración",
       "newName": "Nueva integración",

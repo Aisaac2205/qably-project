@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { StatusChip } from '@/components/ui/status-chip'
 import { Sparkline } from './sparkline'
 import { InlineEditableText } from './inline-editable-text'
-import { updateSuite } from '@/lib/mock-store'
+import { useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
 
@@ -51,9 +51,10 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
   const { lastRun, passRate7d, sparkline, status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
   const { t } = useTranslation()
+  const updateSuiteMutation = useUpdateSuite()
 
   function handleSave(newName: string) {
-    updateSuite(suite.id, { name: newName })
+    updateSuiteMutation.mutate({ id: suite.id, patch: { name: newName } })
   }
 
   return (

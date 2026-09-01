@@ -1,8 +1,13 @@
-import { render, screen, act, within } from '@testing-library/react'
+import { screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
 
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
@@ -27,12 +32,12 @@ describe('SuiteDetail (redesigned)', () => {
   })
 
   it('renders the suite name as h1', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByRole('heading', { level: 1, name: 'Authentication' })).toBeInTheDocument()
   })
 
   it('renders breadcrumbs with project + suites', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     const nav = screen.getByRole('navigation', { name: /breadcrumb/i })
     expect(within(nav).getByText('Projects')).toBeInTheDocument()
     expect(within(nav).getByText('Ecommerce App')).toBeInTheDocument()
@@ -41,23 +46,23 @@ describe('SuiteDetail (redesigned)', () => {
   })
 
   it('renders the description when present', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByText(/Login, registration, and password reset flows/)).toBeInTheDocument()
   })
 
   it('renders tags as Badge pills', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByText('auth')).toBeInTheDocument()
     expect(screen.getByText('security')).toBeInTheDocument()
   })
 
   it('shows default badge when isDefault is true', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByText('Default')).toBeInTheDocument()
   })
 
   it('renders a health strip with status, pass rate, last run, cases', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     const strip = screen.getByRole('group', { name: /Suite health/i })
     expect(within(strip).getByText(/Status/i)).toBeInTheDocument()
     expect(within(strip).getByText(/Pass rate/i)).toBeInTheDocument()
@@ -66,25 +71,25 @@ describe('SuiteDetail (redesigned)', () => {
   })
 
   it('has a "Run this suite" button', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByRole('button', { name: /Run this suite/ })).toBeInTheDocument()
   })
 
   it('clicking "Run this suite" navigates to runs/new with suite query param', async () => {
     const user = userEvent.setup()
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     await user.click(screen.getByRole('button', { name: /Run this suite/ }))
     expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/new?suite=suite-1')
   })
 
   it('renders the case list with a section heading', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByRole('heading', { level: 2, name: /Test cases/i })).toBeInTheDocument()
     expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
   })
 
   it('shows "Suite not found" with a back link for unknown id', async () => {
-    await act(async () => { render(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />) })
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />) })
     expect(screen.getByText('Suite not found')).toBeInTheDocument()
     const back = screen.getByRole('link', { name: /Back to project/i })
     expect(back.getAttribute('href')).toBe('/projects/proj-1')
