@@ -7,7 +7,6 @@
 import {
   mockProjects,
   mockSuites,
-  mockRuns,
   mockAiCases,
   mockOrg,
   mockMembers,
@@ -28,17 +27,11 @@ import { validateTags } from '@/lib/tag-validation'
 import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
 import type {
   ProjectSummary,
-  Suite,
-  Run,
   AiCase,
   Organization,
   OrgMember,
   ApiKey,
   GithubIntegration,
-  CaseStatus,
-  CasePriority,
-  CaseState,
-  TestCase,
   AiProvider,
   AiProviderConnection,
   ChatThread,
@@ -66,7 +59,6 @@ type Listener = () => void
 
 export interface StoreSnapshot {
   projects: ProjectSummary[]
-  runs: Run[]
   aiCases: AiCase[]
   org: Organization
   members: OrgMember[]
@@ -92,7 +84,6 @@ export interface StoreSnapshot {
 // ── State ─────────────────────────────────────────────────────────
 
 let projects: ProjectSummary[] = structuredClone(mockProjects)
-let runs: Run[] = structuredClone(mockRuns)
 let aiCases: AiCase[] = structuredClone(mockAiCases)
 let org: Organization = { ...mockOrg }
 let members: OrgMember[] = structuredClone(mockMembers)
@@ -206,7 +197,7 @@ export function subscribe(listener: Listener): () => void {
 
 function currentSnapshot(): StoreSnapshot {
   return {
-    projects, runs, aiCases, org, members, apiKeys, integration,
+    projects, aiCases, org, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
     ingestionBatches, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
     testCaseVersions, traceabilityLinks, evidence, qualityRisks,
@@ -233,15 +224,6 @@ export function getProjects(): ProjectSummary[] {
 
 export function getProject(id: string): ProjectSummary | undefined {
   return projects.find((p) => p.id === id)
-}
-
-export function getRuns(projectId?: string): Run[] {
-  if (!projectId) return runs
-  return runs.filter((r) => r.projectId === projectId)
-}
-
-export function getRun(runId: string): Run | undefined {
-  return runs.find((r) => r.id === runId)
 }
 
 export function getAiCases(projectId?: string): AiCase[] {
@@ -497,22 +479,6 @@ export function rejectProposal(
 
 // ── Connection aggregate (Commit 2) ────────────────────────────────────────
 
-// In-memory log of CI webhook events received. The runs/ module (Commit 3)
-// subscribes to this via the bus; for now we just keep a ring buffer so
-// the integrations UI can show "last received event" per connection.
-const ciEventLog: import('@/features/integrations/ci-providers/types').NormalizedCIEvent[] = []
-const CI_LOG_MAX = 50
-
-export function recordCiEvent(event: import('@/features/integrations/ci-providers/types').NormalizedCIEvent): void {
-  ciEventLog.push(event)
-  if (ciEventLog.length > CI_LOG_MAX) ciEventLog.shift()
-  notify()
-}
-
-export function getCiEventLog(): import('@/features/integrations/ci-providers/types').NormalizedCIEvent[] {
-  return ciEventLog
-}
-
 export function getConnections(): Connection[] {
   return connections
 }
@@ -595,87 +561,6 @@ export function transitionConnection(
 
 function nowIso(): string {
   return new Date().toISOString()
-}
-
-export function updateRunCaseStatus(runId: string, caseId: string, status: CaseStatus): Run | undefined {
-  runs = runs.map((r) => {
-    if (r.id !== runId) return r
-    const updatedCases = r.cases.map((c) => (c.id === caseId ? { ...c, status } : c))
-    return { ...r, cases: updatedCases }
-  })
-  notify()
-  return runs.find((r) => r.id === runId)
-}
-
-export function updateRun(
-  id: string,
-  patch: Partial<Pick<Run, 'name' | 'status' | 'passRate' | 'finishedAt'>>,
-): Run | undefined {
-  const target = runs.find((r) => r.id === id)
-  if (!target) return undefined
-  runs = runs.map((r) => (r.id === id ? { ...r, ...patch } : r))
-  notify()
-  return runs.find((r) => r.id === id)
-}
-
-export function deleteRun(id: string): boolean {
-  const before = runs.length
-  runs = runs.filter((r) => r.id !== id)
-  if (runs.length === before) return false
-  notify()
-  return true
-}
-
-/**
- * Run state machine. Returns the updated run or undefined if the id is
- * missing or the transition is invalid from the current status.
- *   running    → 'complete' → 'pass'
- *   running    → 'fail'     → 'fail'
- *   pending    → 'start'    → 'running'
- * Anything else is a no-op (returns undefined).
- */
-export function transitionRun(
-  id: string,
-  action: 'start' | 'complete' | 'fail',
-): Run | undefined {
-  const target = runs.find((r) => r.id === id)
-  if (!target) return undefined
-  const next: Run['status'] | null = (() => {
-    if (action === 'start' && target.status === 'pending') return 'running'
-    if (action === 'complete' && target.status === 'running') return 'pass'
-    if (action === 'fail' && target.status === 'running') return 'fail'
-    return null
-  })()
-  if (next === null) return undefined
-  const finishedAt = next === 'pass' || next === 'fail' ? nowIso() : target.finishedAt
-  runs = runs.map((r) => (r.id === id ? { ...r, status: next, finishedAt } : r))
-  notify()
-  return runs.find((r) => r.id === id)
-}
-
-export function createRun(input: {
-  projectId: string
-  suiteId: string
-  name?: string
-}): Run {
-  const existing = runs.filter((r) => r.projectId === input.projectId)
-  const id = `run-${existing.length + 13}`
-  const suite = mockSuites.find((s) => s.id === input.suiteId)
-  const newRun: Run = {
-    id,
-    projectId: input.projectId,
-    name: input.name ?? `Run #${existing.length + 13}`,
-    suiteId: input.suiteId,
-    suiteName: suite?.name ?? '',
-    status: 'running',
-    passRate: 0,
-    source: 'manual',
-    startedAt: new Date().toISOString(),
-    cases: [],
-  }
-  runs = [...runs, newRun]
-  notify()
-  return newRun
 }
 
 export function confirmAiCase(id: string): AiCase | undefined {
@@ -872,7 +757,6 @@ export function sendChatMessage(
 
 export function __resetStore(): void {
   projects = structuredClone(mockProjects)
-  runs = structuredClone(mockRuns)
   aiCases = structuredClone(mockAiCases)
   org = { ...mockOrg }
   members = structuredClone(mockMembers)
@@ -894,6 +778,5 @@ export function __resetStore(): void {
   ingestionBatches = structuredClone(mockIngestionBatches)
   reviewDecisions = []
   qualityRisks = structuredClone(mockQualityRisks)
-  ciEventLog.length = 0
   notify()
 }

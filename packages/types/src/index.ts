@@ -163,36 +163,6 @@ export interface Suite {
   updatedAt: string
 }
 
-export interface RunCase {
-  id: string
-  testCaseId?: string
-  name: string
-  suite: string
-  steps: string[]
-  expectedResult: string
-  status: CaseStatus
-}
-
-export interface Run {
-  id: string
-  projectId: string
-  name: string
-  suiteId: string
-  suiteName: string
-  cases: RunCase[]
-  status: RunStatus
-  passRate: number
-  source: RunSource
-  startedAt: string
-  finishedAt?: string
-  executedBy?: { id: string; name: string }
-  commitSha?: string
-  commitMessage?: string
-  commitAuthor?: { name: string; email: string }
-  branch?: string
-  workflowName?: string
-}
-
 export interface RunCaseRecord {
   id: string
   testCaseId: string | null

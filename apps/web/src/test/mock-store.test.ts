@@ -2,15 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   getProjects,
   getProject,
-  getRuns,
-  getRun,
   getAiCases,
   getOrg,
   getMembers,
   getApiKeys,
   getIntegration,
-  updateRunCaseStatus,
-  createRun,
   confirmAiCase,
   rejectAiCase,
   skipAiCase,
@@ -23,7 +19,6 @@ import {
   getServerSnapshot,
   __resetStore,
 } from '@/lib/mock-store'
-import type { ProjectSummary, Suite, Run, AiCase, ApiKey, OrgMember } from '@qably/types'
 
 describe('mock-store', () => {
   beforeEach(() => {
@@ -74,7 +69,6 @@ describe('mock-store', () => {
     // Each inner array must be the SAME reference — React 19 useSyncExternalStore
     // requires getServerSnapshot to return identical references for identical state.
     expect(a.projects).toBe(b.projects)
-    expect(a.runs).toBe(b.runs)
     expect(a.aiCases).toBe(b.aiCases)
     expect(a.members).toBe(b.members)
     expect(a.apiKeys).toBe(b.apiKeys)
@@ -96,46 +90,6 @@ describe('mock-store', () => {
 
   it('getProject returns undefined for unknown id', () => {
     expect(getProject('nonexistent')).toBeUndefined()
-  })
-
-  it('getRuns returns runs for a project', () => {
-    const runs = getRuns('proj-1')
-    expect(runs.length).toBeGreaterThanOrEqual(3)
-  })
-
-  it('getRun returns the correct run by id', () => {
-    const r = getRun('run-12')
-    expect(r).toBeDefined()
-    expect(r!.name).toBe('Run #12')
-  })
-
-  it('createRun creates a new run and notifies subscribers', () => {
-    let notified = false
-    subscribe(() => { notified = true })
-
-    const run = createRun({
-      projectId: 'proj-1',
-      suiteId: 'suite-1',
-      name: 'Custom Run',
-    })
-
-    expect(notified).toBe(true)
-    expect(run.id).toMatch(/^run-/)
-    expect(run.projectId).toBe('proj-1')
-    expect(run.suiteId).toBe('suite-1')
-    expect(run.status).toBe('running')
-    expect(getRun(run.id)).toEqual(run)
-  })
-
-  it('updateRunCaseStatus updates a case status', () => {
-    let notified = false
-    subscribe(() => { notified = true })
-
-    const run = updateRunCaseStatus('run-12', 'tc-1', 'fail')
-    expect(notified).toBe(true)
-    expect(run).toBeDefined()
-    const updatedCase = run!.cases.find(c => c.id === 'tc-1')
-    expect(updatedCase!.status).toBe('fail')
   })
 
   // ── AI Cases ────────────────────────────────────────────────────
