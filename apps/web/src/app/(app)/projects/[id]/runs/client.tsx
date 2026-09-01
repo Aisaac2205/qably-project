@@ -6,7 +6,6 @@ import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { PageHeader } from '@/components/ui/page-header'
 import { buttonVariants } from '@/components/ui/button'
 import { RunList } from '@/features/runs/components/run-list'
-import { CiAdapterPanel } from '@/features/runs/components/ci-adapter-panel'
 import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { cn } from '@/lib/utils'
@@ -40,7 +39,6 @@ export function RunListPageClient({ projectId }: { projectId: string }) {
       />
 
       <div className="space-y-6">
-        <CiAdapterPanel projectId={projectId} />
         <RunList projectId={projectId} />
       </div>
     </div>
