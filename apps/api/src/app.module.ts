@@ -9,6 +9,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { RepositoryModule } from './modules/repository/repository.module';
+import { RunsModule } from './modules/runs/runs.module';
 import { SuitesModule } from './modules/suites/suites.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     ConnectionsModule,
     ApiKeysModule,
     IngestionModule,
+    RunsModule,
   ],
 })
 export class AppModule {}

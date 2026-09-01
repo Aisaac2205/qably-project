@@ -193,6 +193,36 @@ export interface Run {
   workflowName?: string
 }
 
+export interface RunCaseRecord {
+  id: string
+  testCaseId: string | null
+  name: string
+  suiteName: string
+  steps: string[]
+  expectedResult: string
+  status: CaseStatus
+  position: number
+  recordedAt?: string
+}
+
+export interface RunRecord {
+  id: string
+  projectId: string
+  organizationId: string
+  suiteId: string
+  name: string
+  status: RunStatus
+  source: RunSource
+  externalId: string
+  startedAt: string
+  finishedAt?: string
+  executedById?: string
+  commitSha?: string
+  commitMessage?: string
+  commitAuthor?: string
+  cases: RunCaseRecord[]
+}
+
 
 export interface Notification {
   id: string

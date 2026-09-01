@@ -105,7 +105,6 @@ outage, which in practice means rotation never happens.
 
 ## Using a key from GitHub Actions
 
-The result ingestion endpoint ships in the next slice; this is the shape it is being built against.
 Store the token as a repository secret and read it from the environment. Never inline it in the
 workflow file.
 
@@ -118,11 +117,12 @@ workflow file.
       --header "Authorization: Bearer $QABLY_API_KEY" \
       --header "Content-Type: application/json" \
       --data @results.json \
-      https://api.qably.app/runs
+      https://api.qably.app/runs/ingest
 ```
 
-The payload carries the commit SHA, the branch and the external run identifier. It does not carry the
-project: that comes from the key.
+The payload carries the commit SHA, the external run identifier and the case results. It does not
+carry the project: that comes from the key. See `docs/RUN_INGESTION.md` for the full request and
+response contract, the idempotency guarantee, and how `Run.status` is derived from the cases.
 
 ## Threat model
 
