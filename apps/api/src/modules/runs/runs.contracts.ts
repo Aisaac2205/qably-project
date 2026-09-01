@@ -1,6 +1,9 @@
-import type { RunCaseRecord, RunRecord } from '@qably/types';
+import type { RunCaseRecord, RunRecord, RunSummaryRecord } from '@qably/types';
 
 export type RunView = RunRecord;
 export type RunCaseView = RunCaseRecord;
+export type RunSummaryView = RunSummaryRecord;
 
 export type RunError = 'suite-not-found' | 'source-not-allowed';
+
+export type RunQueryError = 'not-found';

@@ -1,4 +1,4 @@
-import { ingestRunSchema } from './runs.schemas';
+import { ingestRunSchema, listRunsQuerySchema } from './runs.schemas';
 
 const baseCase = {
   name: 'Adds to cart',
@@ -124,5 +124,20 @@ describe('ingestRunSchema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('listRunsQuerySchema', () => {
+  it('accepts an empty query', () => {
+    const result = listRunsQuerySchema.safeParse({});
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a projectId filter', () => {
+    const result = listRunsQuerySchema.safeParse({ projectId: 'project-1' });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.projectId).toBe('project-1');
   });
 });

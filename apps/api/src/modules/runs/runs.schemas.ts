@@ -54,3 +54,9 @@ export const ingestRunSchema = z
 
 export type IngestCaseInput = z.infer<typeof ingestCaseSchema>;
 export type IngestRunInput = z.infer<typeof ingestRunSchema>;
+
+export const listRunsQuerySchema = z.object({
+  projectId: z.string().min(1).optional(),
+});
+
+export type ListRunsQuery = z.infer<typeof listRunsQuerySchema>;

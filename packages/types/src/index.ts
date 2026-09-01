@@ -223,6 +223,35 @@ export interface RunRecord {
   cases: RunCaseRecord[]
 }
 
+export interface RunCaseCounts {
+  total: number
+  pending: number
+  running: number
+  pass: number
+  fail: number
+  skip: number
+  blocked: number
+}
+
+export interface RunSummaryRecord {
+  id: string
+  projectId: string
+  organizationId: string
+  suiteId: string
+  name: string
+  status: RunStatus
+  source: RunSource
+  externalId: string
+  startedAt: string
+  finishedAt?: string
+  executedById?: string
+  commitSha?: string
+  commitMessage?: string
+  commitAuthor?: string
+  caseCounts: RunCaseCounts
+  passRate: number
+}
+
 
 export interface Notification {
   id: string
