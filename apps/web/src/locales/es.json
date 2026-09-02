@@ -222,6 +222,7 @@
     "reviewAction": "Revisar",
     "recentPipelines": "Pipelines recientes",
     "noRuns": "Sin ejecuciones a\u00fan",
+    "notMeasured": "A\u00fan sin medir",
     "noPendingAi": "Sin casos IA pendientes",
     "noPipelines": "Sin pipelines a\u00fan",
     "allOperational": "Todos los sistemas operativos",

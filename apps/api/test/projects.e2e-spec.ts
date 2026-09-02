@@ -173,7 +173,7 @@ describe('Projects (e2e)', () => {
         lastRunStatus: string;
         lastRunAt: string;
         activeRunCount: number;
-        healthScore: number;
+        healthScore: number | null;
       } | null;
     }[];
     expect(body[0].activity).toEqual(
@@ -181,11 +181,46 @@ describe('Projects (e2e)', () => {
         lastRunStatus: 'pass',
         lastRunAt: '2026-06-15T10:00:00.000Z',
         activeRunCount: 0,
-        healthScore: 0,
+        // This run is outside the trailing metrics window (the window mock
+        // above returns no runs), so there is nothing to measure a pass
+        // rate from — null, never an invented zero.
+        healthScore: null,
       }),
     );
     expect(body[0].activity && 'aiPendingCount' in body[0].activity).toBe(
       false,
+    );
+  });
+
+  it('reports healthScore as an honest zero when every case inside the window failed', async () => {
+    prisma.project.findMany.mockResolvedValue([projectRow]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? [{ id: 'run-1', projectId: 'project-1' }]
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'fail',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+    prisma.runCase.groupBy.mockResolvedValue([
+      { runId: 'run-1', status: 'fail', _count: { _all: 4 } },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/projects')
+      .expect(200);
+
+    const body = response.body as {
+      activity: { lastRunStatus: string; healthScore: number | null } | null;
+    }[];
+    expect(body[0].activity).toEqual(
+      expect.objectContaining({ lastRunStatus: 'fail', healthScore: 0 }),
     );
   });
 

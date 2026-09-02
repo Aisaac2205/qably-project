@@ -50,7 +50,7 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
           {project.name}
         </h3>
         <div className="flex items-center gap-1.5 shrink-0">
-          {activity && (
+          {activity && activity.healthScore !== null && (
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
               activity.healthScore >= 80
                 ? 'bg-pass-bg text-pass border-pass/20'

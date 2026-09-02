@@ -103,7 +103,7 @@ For a project with at least one run:
 | `lastRunStatus` | `status` of that project's most recent run (by `startedAt`). |
 | `lastRunAt` | `startedAt` of that project's most recent run, ISO string. |
 | `activeRunCount` | Count of that project's runs with `status: "running"`, not windowed (same "right now" semantics as the summary's `activeRuns`). |
-| `healthScore` | The project's `passRate` inside the current `DASHBOARD_WINDOW_DAYS` window, rendered as a rounded 0–100 percentage (`Math.round(passRate * 100)`) — the web already renders this field as `{healthScore}%`. A project with no runs in the current window (even if it has run before) shows `0`, for the same reason a run with no cases shows a `0` pass rate: no invented numbers, an honest "nothing to measure right now." |
+| `healthScore` | The project's `passRate` inside the current `DASHBOARD_WINDOW_DAYS` window, rendered as a rounded 0–100 percentage (`Math.round(passRate * 100)`) — the web renders this field as `{healthScore}%`. `null` when the project has no cases counted inside the current window (no runs in the window, or runs with no recorded cases yet) — this follows the same `null`-means-"not measured" rule as `activity` itself, applied at the field level: a project can have run before (`activity` non-null) while still having nothing to measure right now. A real `0` means the window has case data and every one of those cases failed. The web must render these two states differently — never collapse a `null` into a printed `0%`. |
 
 ### What stays underivable: `aiPendingCount`
 

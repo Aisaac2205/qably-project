@@ -102,8 +102,8 @@ export function computePassRate(
 
 export function computeHealthScore(
   counts: Pick<RunCaseCounts, 'pass' | 'total'>,
-): number {
-  return Math.round(computePassRate(counts) * 100);
+): number | null {
+  return counts.total === 0 ? null : Math.round(computePassRate(counts) * 100);
 }
 
 export function computePassRateTrend(

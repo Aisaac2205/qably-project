@@ -62,3 +62,22 @@ describe('ProjectCard with run activity', () => {
     expect(screen.queryByText(/No runs yet/i)).not.toBeInTheDocument()
   })
 })
+
+describe('ProjectCard with activity but no runs in the trailing window', () => {
+  const measuredBefore: ProjectListItem = {
+    ...base,
+    activity: {
+      healthScore: null,
+      lastRunStatus: 'pass',
+      lastRunAt: '2026-01-15T00:00:00.000Z',
+      activeRunCount: 0,
+      aiPendingCount: 0,
+    },
+  }
+
+  it('does not invent a 0% health score when there is nothing to measure', () => {
+    render(<ProjectCard project={measuredBefore} />)
+
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument()
+  })
+})

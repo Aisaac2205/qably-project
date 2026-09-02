@@ -103,4 +103,62 @@ describe('ProjectHealthTable', () => {
 
     expect(screen.getByText('90%')).toBeInTheDocument()
   })
+
+  it('says the health is not measured instead of showing 0% when the project has no runs in the window', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    })
+    client.setQueryData(projectKeys.all, [
+      {
+        ...projectFixtures[0],
+        activity: {
+          healthScore: null,
+          lastRunStatus: 'pass',
+          lastRunAt: '2026-06-10T10:00:00Z',
+          activeRunCount: 0,
+          aiPendingCount: 3,
+        },
+      },
+    ])
+    client.setQueryData(runKeys.list('all'), [])
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <ProjectHealthTable />
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument()
+    expect(screen.getByText('Not measured yet')).toBeInTheDocument()
+  })
+
+  it('shows a dash instead of a fabricated AI-pending count for the Review/AI domain gap', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    })
+    client.setQueryData(projectKeys.all, [
+      {
+        ...projectFixtures[0],
+        activity: {
+          healthScore: 90,
+          lastRunStatus: 'pass',
+          lastRunAt: '2026-06-16T10:00:00Z',
+          activeRunCount: 0,
+        },
+      },
+    ])
+    client.setQueryData(runKeys.list('all'), [])
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <ProjectHealthTable />
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
 })

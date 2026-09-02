@@ -222,6 +222,7 @@
     "reviewAction": "Review",
     "recentPipelines": "Recent pipelines",
     "noRuns": "No runs yet",
+    "notMeasured": "Not measured yet",
     "noPendingAi": "No pending AI cases",
     "noPipelines": "No pipelines yet",
     "allOperational": "All systems operational",

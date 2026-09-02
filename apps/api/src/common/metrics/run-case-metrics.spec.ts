@@ -141,8 +141,12 @@ describe('computeHealthScore', () => {
     expect(computeHealthScore({ pass: 1, total: 3 })).toBe(33);
   });
 
-  it('reports zero for a project with no cases in scope', () => {
-    expect(computeHealthScore({ pass: 0, total: 0 })).toBe(0);
+  it('reports null, never zero, for a project with no cases in scope', () => {
+    expect(computeHealthScore({ pass: 0, total: 0 })).toBeNull();
+  });
+
+  it('reports an honest zero when every case in scope failed', () => {
+    expect(computeHealthScore({ pass: 0, total: 4 })).toBe(0);
   });
 });
 

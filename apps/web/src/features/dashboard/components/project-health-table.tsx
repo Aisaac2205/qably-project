@@ -55,11 +55,15 @@ export function ProjectHealthTable() {
                     {activity ? (
                       <div className="flex items-center gap-2">
                         <StatusChip status={activity.lastRunStatus} />
-                        <span className="text-xs text-muted-foreground">
-                          <span className="font-semibold text-default tabular-nums font-mono">
-                            {activity.healthScore}%
+                        {activity.healthScore === null ? (
+                          <span className="text-xs text-muted-foreground/60">{t('dashboard.notMeasured')}</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            <span className="font-semibold text-default tabular-nums font-mono">
+                              {activity.healthScore}%
+                            </span>
                           </span>
-                        </span>
+                        )}
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground/60">{t('dashboard.noRuns')}</span>
@@ -72,7 +76,7 @@ export function ProjectHealthTable() {
                     {project.suiteCount}
                   </td>
                   <td className="px-5 py-3.5 text-xs font-medium text-default text-center tabular-nums font-mono">
-                    {activity ? (
+                    {activity && activity.aiPendingCount !== undefined ? (
                       activity.aiPendingCount > 0 ? (
                         <span className="text-primary font-semibold">{activity.aiPendingCount}</span>
                       ) : (

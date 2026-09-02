@@ -333,6 +333,58 @@ describe('ProjectsService.list activity', () => {
     expect(project.activity?.healthScore).toBe(75);
   });
 
+  it('reports healthScore as null when the project has runs but none inside the trailing window', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? []
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'pass',
+                  startedAt: new Date('2026-05-01T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity).not.toBeNull();
+    expect(project.activity?.lastRunStatus).toBe('pass');
+    expect(project.activity?.healthScore).toBeNull();
+    expect(prisma.runCase.groupBy).not.toHaveBeenCalled();
+  });
+
+  it('reports healthScore as an honest 0 when every case inside the window failed', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? [{ id: 'run-1', projectId: 'project-1' }]
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'fail',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+    prisma.runCase.groupBy.mockResolvedValue([
+      { runId: 'run-1', status: 'fail', _count: { _all: 4 } },
+    ]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity?.healthScore).toBe(0);
+  });
+
   it('omits aiPendingCount instead of inventing a value for the Review/AI domain', async () => {
     const prisma = createPrisma();
     prisma.project.findMany.mockResolvedValue([row]);
