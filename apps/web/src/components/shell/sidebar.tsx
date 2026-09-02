@@ -27,6 +27,7 @@ import {
   Stack,
   Tray,
   CaretLeft,
+  Key,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
@@ -74,6 +75,7 @@ export function Sidebar() {
         },
         { label: t('sidebar.runs'), href: `/projects/${projectContext}/runs`, icon: Play },
         { label: t('sidebar.quality'), href: `/projects/${projectContext}/reports`, icon: ChartLine },
+        { label: t('sidebar.apiKeys'), href: `/projects/${projectContext}/api-keys`, icon: Key },
       ]
     : []
 
