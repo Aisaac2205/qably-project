@@ -8,6 +8,7 @@ import { useProposals } from '@/lib/use-mock-store'
 import { approveProposal, rejectProposal } from '@/lib/mock-store'
 import { useTranslation } from '@/lib/i18n'
 import { ReviewKpiRow } from './review-kpi-row'
+import { ReviewGovernanceBanner } from './review-governance-banner'
 import { ReviewInboxQueue, type ReviewQueueStatusFilter } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
 import { RecentReviewDecisions } from './recent-review-decisions'
@@ -83,6 +84,8 @@ export function ReviewInboxPage() {
       className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
       <h1 className="sr-only">{t('reviewInbox.title')}</h1>
+
+      <ReviewGovernanceBanner />
 
       {/* Optional feedback banner */}
       {feedbackToast && (
