@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter @qably/api run type-check
+
+      - name: Lint
+        run: pnpm --filter @qably/api run lint
+
+      - name: Build
+        run: pnpm --filter @qably/api run build
+
+      - name: Unit tests
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./reports
+          JEST_JUNIT_OUTPUT_NAME: junit-unit.xml
+        run: pnpm --filter @qably/api run test -- --reporters=default --reporters=jest-junit
+
+      - name: E2E tests
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./reports
+          JEST_JUNIT_OUTPUT_NAME: junit-e2e.xml
+        run: pnpm --filter @qably/api run test:e2e -- --reporters=default --reporters=jest-junit
+
+      - name: Report unit results to Qably
+        if: always()
+        env:
+          QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
+          QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
+        run: node scripts/qably-report.mjs apps/api/reports/junit-unit.xml
+
+      - name: Report e2e results to Qably
+        if: always()
+        env:
+          QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
+          QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
+        run: node scripts/qably-report.mjs apps/api/reports/junit-e2e.xml
+
+      - name: Upload JUnit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit-reports
+          path: apps/api/reports/*.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:3001
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter @qably/web run type-check
+
+      - name: Lint
+        run: pnpm --filter @qably/web run lint
+
+      - name: Build
+        run: pnpm --filter @qably/web run build
+
+      - name: Tests
+        run: pnpm --filter @qably/web run test:run -- --reporter=default --reporter=junit --outputFile=./reports/junit.xml
+
+      - name: Report results to Qably
+        if: always()
+        env:
+          QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
+          QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
+        run: node scripts/qably-report.mjs apps/web/reports/junit.xml
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-junit-report
+          path: apps/web/reports/junit.xml
+          if-no-files-found: warn
+          retention-days: 14

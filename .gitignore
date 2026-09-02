@@ -3,6 +3,7 @@ node_modules
 .turbo
 dist
 .next
+reports
 .env
 .env.local
 *.log
