@@ -4,7 +4,6 @@ import type {
   AiCase,
   OrgMember,
   ApiKey,
-  Organization,
   GithubIntegration,
   AiProviderConnection,
   ChatThread,
@@ -31,26 +30,11 @@ export type {
   AiCase,
   OrgMember,
   ApiKey,
-  Organization,
   GithubIntegration,
 } from '@qably/types'
 
 /** Fixed reference "now" for deterministic mock data calculations. */
 export const MOCK_NOW = '2026-06-16T11:00:00Z'
-
-// ─── Organization ─────────────────────────────────────────────────────────────
-
-export const mockOrg: Organization = {
-  id: 'org-1',
-  name: 'Acme QA Team',
-  slug: 'acme-qa',
-  plan: 'equipo',
-  planLimits: {
-    maxProjects: 20,
-    maxUsers: 10,
-    maxCases: 5000,
-  },
-}
 
 // ─── Members ──────────────────────────────────────────────────────────────────
 

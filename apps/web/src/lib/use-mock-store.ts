@@ -16,7 +16,6 @@ import {
 import type {
   ProjectSummary,
   AiCase,
-  Organization,
   OrgMember,
   ApiKey,
   GithubIntegration,
@@ -66,10 +65,6 @@ function sameContents<T>(a: T[], b: T[]): boolean {
   return true
 }
 
-export function useProjects(): ProjectSummary[] {
-  return useStableArray(() => getSnapshot().projects, () => getServerSnapshot().projects)
-}
-
 export function useProject(id: string): ProjectSummary | undefined {
   const cacheRef = useRef<{ id: string; value: ProjectSummary | undefined }>({ id: '', value: undefined })
   return useSyncExternalStore(
@@ -93,10 +88,6 @@ export function useAiCases(projectId?: string): AiCase[] {
     },
     () => getServerSnapshot().aiCases.filter((c) => !projectId || c.projectId === projectId),
   )
-}
-
-export function useOrg(): Organization {
-  return useSyncExternalStore(subscribe, () => getSnapshot().org, () => getServerSnapshot().org)
 }
 
 export function useMembers(): OrgMember[] {
@@ -166,10 +157,6 @@ export function useQualityRisks(projectId?: string): QualityRisk[] {
     },
     () => getServerSnapshot().qualityRisks.filter((r) => !projectId || r.projectId === projectId),
   )
-}
-
-export function useConnections(): Connection[] {
-  return useStableArray(() => getSnapshot().connections, () => getServerSnapshot().connections)
 }
 
 export function useIngestionBatches(projectId?: string): IngestionBatch[] {

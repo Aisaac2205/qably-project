@@ -8,7 +8,6 @@ import {
   mockProjects,
   mockSuites,
   mockAiCases,
-  mockOrg,
   mockMembers,
   mockApiKeys,
   mockGithubIntegration,
@@ -28,7 +27,6 @@ import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/te
 import type {
   ProjectSummary,
   AiCase,
-  Organization,
   OrgMember,
   ApiKey,
   GithubIntegration,
@@ -60,7 +58,6 @@ type Listener = () => void
 export interface StoreSnapshot {
   projects: ProjectSummary[]
   aiCases: AiCase[]
-  org: Organization
   members: OrgMember[]
   apiKeys: ApiKey[]
   integration: GithubIntegration
@@ -85,7 +82,6 @@ export interface StoreSnapshot {
 
 let projects: ProjectSummary[] = structuredClone(mockProjects)
 let aiCases: AiCase[] = structuredClone(mockAiCases)
-let org: Organization = { ...mockOrg }
 let members: OrgMember[] = structuredClone(mockMembers)
 let apiKeys: ApiKey[] = structuredClone(mockApiKeys)
 let integration: GithubIntegration = { ...mockGithubIntegration }
@@ -197,7 +193,7 @@ export function subscribe(listener: Listener): () => void {
 
 function currentSnapshot(): StoreSnapshot {
   return {
-    projects, aiCases, org, members, apiKeys, integration,
+    projects, aiCases, members, apiKeys, integration,
     aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
     ingestionBatches, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
     testCaseVersions, traceabilityLinks, evidence, qualityRisks,
@@ -233,10 +229,6 @@ export function getAiCases(projectId?: string): AiCase[] {
 
 export function getAiCase(id: string): AiCase | undefined {
   return aiCases.find((c) => c.id === id)
-}
-
-export function getOrg(): Organization {
-  return org
 }
 
 export function getMembers(): OrgMember[] {
@@ -758,7 +750,6 @@ export function sendChatMessage(
 export function __resetStore(): void {
   projects = structuredClone(mockProjects)
   aiCases = structuredClone(mockAiCases)
-  org = { ...mockOrg }
   members = structuredClone(mockMembers)
   apiKeys = structuredClone(mockApiKeys)
   integration = { ...mockGithubIntegration }

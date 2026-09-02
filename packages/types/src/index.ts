@@ -14,18 +14,6 @@ export type NotificationChannel = 'in_app' | 'slack' | 'email'
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
 
 
-export interface Organization {
-  id: string
-  name: string
-  slug: string
-  plan: Plan
-  planLimits: {
-    maxProjects: number
-    maxUsers: number
-    maxCases: number
-  }
-}
-
 export interface OrgMember {
   id: string
   userId: string

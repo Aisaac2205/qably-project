@@ -3,7 +3,6 @@ import {
   getProjects,
   getProject,
   getAiCases,
-  getOrg,
   getMembers,
   getApiKeys,
   getIntegration,
@@ -121,14 +120,7 @@ describe('mock-store', () => {
     expect(result!.reviewStatus).toBe('pending')
   })
 
-  // ── Org / Members / API Keys / Integration ─────────────────────
-
-  it('getOrg returns the mock organization', () => {
-    const org = getOrg()
-    expect(org.name).toBe('Acme QA Team')
-    expect(org.slug).toBe('acme-qa')
-    expect(org.plan).toBe('equipo')
-  })
+  // ── Members / API Keys / Integration ────────────────────────────
 
   it('getMembers returns all members', () => {
     const members = getMembers()

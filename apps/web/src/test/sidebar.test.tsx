@@ -61,12 +61,10 @@ const mockProject: ProjectSummary = {
 
 vi.mock('@/lib/use-mock-store', () => ({
   useProject: (id: string) => (id === 'proj-1' ? mockProject : undefined),
-  useProjects: () => [],
   useSuites: () => [],
   useRuns: () => [],
   useAiCases: () => [],
   useProposals: () => [],
-  useOrg: () => ({ id: 'org-1', name: 'Acme', slug: 'acme', plan: 'equipo', planLimits: { maxProjects: 20, maxUsers: 10, maxCases: 5000 } }),
   useMembers: () => [],
   useApiKeys: () => [],
   useIntegration: () => ({ webhookUrl: '', connected: false }),

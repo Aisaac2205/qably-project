@@ -4,12 +4,12 @@ import { renderToString } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { __resetStore, getSnapshot, subscribe } from '@/lib/mock-store'
-import { useProposals, useChatMessages, useConnections } from '@/lib/use-mock-store'
+import { useProposals, useChatMessages, useMembers } from '@/lib/use-mock-store'
 
 function SeededCounts() {
   const proposals = useProposals('proj-1')
-  const connections = useConnections()
-  return <output>{proposals.length}:{connections.length}</output>
+  const members = useMembers()
+  return <output>{proposals.length}:{members.length}</output>
 }
 
 function MobileState() {
@@ -46,7 +46,7 @@ describe('external-store hydration', () => {
     const { container, root, recoverableErrors } = hydrate(<SeededCounts />)
 
     try {
-      expect(container).toHaveTextContent('6:5')
+      expect(container).toHaveTextContent('6:3')
 
       await waitFor(() => expect(recoverableErrors).toEqual([]))
       expect(consoleError).not.toHaveBeenCalledWith(
