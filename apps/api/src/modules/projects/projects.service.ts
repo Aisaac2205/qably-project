@@ -1,4 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import type {
+  CaseStatus,
+  ProjectActivity,
+  RunCaseCounts,
+  RunStatus,
+} from '@qably/types';
+import {
+  buildCaseCountsByRun,
+  computeHealthScore,
+  computeMetricsWindow,
+  emptyCaseCounts,
+  sumCaseCounts,
+} from '../../common/metrics/run-case-metrics';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -55,11 +68,14 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-function toListView(row: ProjectListRow): ProjectListView {
+function toListView(
+  row: ProjectListRow,
+  activity: ProjectActivity | null,
+): ProjectListView {
   return {
     ...toView(row),
     suiteCount: row._count?.suites ?? 0,
-    activity: null,
+    activity,
   };
 }
 
@@ -92,7 +108,16 @@ export class ProjectsService {
       select: LIST_SELECT,
     });
 
-    return rows.map(toListView);
+    if (rows.length === 0) return [];
+
+    const activityByProject = await this.loadActivity(
+      org,
+      rows.map((row) => row.id),
+    );
+
+    return rows.map((row) =>
+      toListView(row, activityByProject.get(row.id) ?? null),
+    );
   }
 
   async findOne(
@@ -192,6 +217,96 @@ export class ProjectsService {
     });
 
     return connection !== null;
+  }
+
+  private async loadActivity(
+    org: OrgContext,
+    projectIds: string[],
+  ): Promise<Map<string, ProjectActivity>> {
+    const window = computeMetricsWindow(new Date());
+
+    const [lastRunRows, activeGroupRows, windowRunRows] = await Promise.all([
+      this.prisma.run.findMany({
+        where: {
+          projectId: { in: projectIds },
+          organizationId: org.organizationId,
+        },
+        orderBy: { startedAt: 'desc' },
+        distinct: ['projectId'],
+        select: { projectId: true, status: true, startedAt: true },
+      }),
+      this.prisma.run.groupBy({
+        by: ['projectId'],
+        where: {
+          projectId: { in: projectIds },
+          organizationId: org.organizationId,
+          status: 'running',
+        },
+        _count: { _all: true },
+      }),
+      this.prisma.run.findMany({
+        where: {
+          projectId: { in: projectIds },
+          organizationId: org.organizationId,
+          startedAt: { gte: window.currentStart, lte: window.currentEnd },
+        },
+        select: { id: true, projectId: true },
+      }),
+    ]);
+
+    const lastRuns = lastRunRows as {
+      projectId: string;
+      status: RunStatus;
+      startedAt: Date;
+    }[];
+    const activeGroups = activeGroupRows as {
+      projectId: string;
+      _count: { _all: number };
+    }[];
+    const windowRuns = windowRunRows as { id: string; projectId: string }[];
+
+    const caseGroupRows =
+      windowRuns.length === 0
+        ? []
+        : await this.prisma.runCase.groupBy({
+            by: ['runId', 'status'],
+            where: { runId: { in: windowRuns.map((run) => run.id) } },
+            _count: { _all: true },
+          });
+    const caseGroups = caseGroupRows as {
+      runId: string;
+      status: CaseStatus;
+      _count: { _all: number };
+    }[];
+
+    const countsByRun = buildCaseCountsByRun(caseGroups);
+    const activeCountByProject = new Map(
+      activeGroups.map((group) => [group.projectId, group._count._all]),
+    );
+    const countsByProject = new Map<string, RunCaseCounts[]>();
+
+    for (const run of windowRuns) {
+      const counts = countsByRun.get(run.id) ?? emptyCaseCounts();
+      const existing = countsByProject.get(run.projectId) ?? [];
+      countsByProject.set(run.projectId, [...existing, counts]);
+    }
+
+    const activityByProject = new Map<string, ProjectActivity>();
+
+    for (const lastRun of lastRuns) {
+      const projectCounts = sumCaseCounts(
+        countsByProject.get(lastRun.projectId) ?? [],
+      );
+
+      activityByProject.set(lastRun.projectId, {
+        healthScore: computeHealthScore(projectCounts),
+        lastRunStatus: lastRun.status,
+        lastRunAt: lastRun.startedAt.toISOString(),
+        activeRunCount: activeCountByProject.get(lastRun.projectId) ?? 0,
+      });
+    }
+
+    return activityByProject;
   }
 
   private async hasProjectAllowance(org: OrgContext): Promise<boolean> {

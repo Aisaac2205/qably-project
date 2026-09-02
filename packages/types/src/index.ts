@@ -99,13 +99,18 @@ export interface ProjectSummary extends Project {
 /**
  * Metrics that only exist once the Runs module lands. `null` on a project
  * means "not measured yet", never "zero" — the UI must not invent numbers.
+ *
+ * `aiPendingCount` belongs to the Review/AI domain, which has no API module
+ * yet. It stays optional here and is omitted by the API until that domain
+ * is real; the UI must treat a missing value the same way it treats a
+ * missing `activity` object, never as zero.
  */
 export interface ProjectActivity {
   healthScore: number
   lastRunStatus: RunStatus
   lastRunAt: string
   activeRunCount: number
-  aiPendingCount: number
+  aiPendingCount?: number
 }
 
 export interface ProjectListItem extends Project {

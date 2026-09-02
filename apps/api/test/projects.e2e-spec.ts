@@ -50,6 +50,8 @@ describe('Projects (e2e)', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    run: { findMany: jest.fn(), groupBy: jest.fn() },
+    runCase: { groupBy: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -66,6 +68,9 @@ describe('Projects (e2e)', () => {
     });
     prisma.organization.findUniqueOrThrow.mockResolvedValue({ maxProjects: 3 });
     prisma.project.count.mockResolvedValue(0);
+    prisma.run.findMany.mockResolvedValue([]);
+    prisma.run.groupBy.mockResolvedValue([]);
+    prisma.runCase.groupBy.mockResolvedValue([]);
 
     const moduleFixture = await Test.createTestingModule({
       imports: [PrismaModule, AuthModule, OrganizationsModule, ProjectsModule],
@@ -128,6 +133,59 @@ describe('Projects (e2e)', () => {
     ]);
     expect(prisma.project.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { organizationId: 'org-1' } }),
+    );
+  });
+
+  it('reports null activity for a project that has never run', async () => {
+    prisma.project.findMany.mockResolvedValue([projectRow]);
+
+    const response = await request(app.getHttpServer())
+      .get('/projects')
+      .expect(200);
+
+    const body = response.body as { activity: unknown }[];
+    expect(body[0].activity).toBeNull();
+  });
+
+  it('derives activity from the most recent run once runs exist', async () => {
+    prisma.project.findMany.mockResolvedValue([projectRow]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? []
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'pass',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/projects')
+      .expect(200);
+
+    const body = response.body as {
+      activity: {
+        lastRunStatus: string;
+        lastRunAt: string;
+        activeRunCount: number;
+        healthScore: number;
+      } | null;
+    }[];
+    expect(body[0].activity).toEqual(
+      expect.objectContaining({
+        lastRunStatus: 'pass',
+        lastRunAt: '2026-06-15T10:00:00.000Z',
+        activeRunCount: 0,
+        healthScore: 0,
+      }),
+    );
+    expect(body[0].activity && 'aiPendingCount' in body[0].activity).toBe(
+      false,
     );
   });
 

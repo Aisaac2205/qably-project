@@ -31,6 +31,8 @@ interface FakePrisma {
   };
   organization: { findUniqueOrThrow: jest.Mock };
   connection: { findFirst: jest.Mock };
+  run: { findMany: jest.Mock; groupBy: jest.Mock };
+  runCase: { groupBy: jest.Mock };
 }
 
 function createPrisma(): FakePrisma {
@@ -47,6 +49,11 @@ function createPrisma(): FakePrisma {
       findUniqueOrThrow: jest.fn().mockResolvedValue({ maxProjects: 3 }),
     },
     connection: { findFirst: jest.fn().mockResolvedValue({ id: 'conn-1' }) },
+    run: {
+      findMany: jest.fn().mockResolvedValue([]),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    runCase: { groupBy: jest.fn().mockResolvedValue([]) },
   };
 }
 
@@ -225,17 +232,6 @@ describe('ProjectsService.list summary fields', () => {
     expect(project.suiteCount).toBe(4);
   });
 
-  it('reports no activity while the runs module does not exist', async () => {
-    const prisma = createPrisma();
-    prisma.project.findMany.mockResolvedValue([
-      { ...row, _count: { suites: 0 } },
-    ]);
-
-    const [project] = await build(prisma).list(owner);
-
-    expect(project.activity).toBeNull();
-  });
-
   it('never invents a suite count when the relation is missing', async () => {
     const prisma = createPrisma();
     prisma.project.findMany.mockResolvedValue([{ ...row }]);
@@ -243,6 +239,167 @@ describe('ProjectsService.list summary fields', () => {
     const [project] = await build(prisma).list(owner);
 
     expect(project.suiteCount).toBe(0);
+  });
+});
+
+describe('ProjectsService.list activity', () => {
+  const rowB = { ...row, id: 'project-2', name: 'Payments' };
+
+  it('reports null activity for a project that has never run', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockResolvedValue([]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity).toBeNull();
+  });
+
+  it('derives lastRunStatus and lastRunAt from the most recent run', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? []
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'pass',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity).not.toBeNull();
+    expect(project.activity?.lastRunStatus).toBe('pass');
+    expect(project.activity?.lastRunAt).toBe('2026-06-15T10:00:00.000Z');
+  });
+
+  it('derives activeRunCount from runs currently in progress', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? []
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'running',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+    prisma.run.groupBy.mockResolvedValue([
+      { projectId: 'project-1', _count: { _all: 2 } },
+    ]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity?.activeRunCount).toBe(2);
+  });
+
+  it('derives healthScore from the pass rate of cases within the trailing window', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? [{ id: 'run-1', projectId: 'project-1' }]
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'pass',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+    prisma.runCase.groupBy.mockResolvedValue([
+      { runId: 'run-1', status: 'pass', _count: { _all: 3 } },
+      { runId: 'run-1', status: 'fail', _count: { _all: 1 } },
+    ]);
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity?.healthScore).toBe(75);
+  });
+
+  it('omits aiPendingCount instead of inventing a value for the Review/AI domain', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? []
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'pass',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+
+    const [project] = await build(prisma).list(owner);
+
+    expect(project.activity && 'aiPendingCount' in project.activity).toBe(
+      false,
+    );
+  });
+
+  it('loads activity for every listed project with a constant number of queries', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([row, rowB]);
+    prisma.run.findMany.mockImplementation(
+      ({ distinct }: { distinct?: string[] }) =>
+        Promise.resolve(
+          distinct === undefined
+            ? [
+                { id: 'run-1', projectId: 'project-1' },
+                { id: 'run-2', projectId: 'project-2' },
+              ]
+            : [
+                {
+                  projectId: 'project-1',
+                  status: 'pass',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+                {
+                  projectId: 'project-2',
+                  status: 'pass',
+                  startedAt: new Date('2026-06-15T10:00:00.000Z'),
+                },
+              ],
+        ),
+    );
+
+    await build(prisma).list(owner);
+
+    expect(prisma.run.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.run.groupBy).toHaveBeenCalledTimes(1);
+    expect(prisma.runCase.groupBy).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips activity queries entirely for an empty project list', async () => {
+    const prisma = createPrisma();
+    prisma.project.findMany.mockResolvedValue([]);
+
+    await build(prisma).list(owner);
+
+    expect(prisma.run.findMany).not.toHaveBeenCalled();
+    expect(prisma.run.groupBy).not.toHaveBeenCalled();
+    expect(prisma.runCase.groupBy).not.toHaveBeenCalled();
   });
 });
 
