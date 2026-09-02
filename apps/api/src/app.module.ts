@@ -3,6 +3,7 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from './config/config.module';
 import { ConnectionsModule } from './modules/connections/connections.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './health/health.module';
 import { IngestionModule } from './modules/ingestion/ingestion.module';
 import { OrganizationsModule } from './modules/organizations/organizations.module';
@@ -26,6 +27,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     ApiKeysModule,
     IngestionModule,
     RunsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

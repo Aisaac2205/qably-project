@@ -10,5 +10,6 @@ import { RunsService } from './runs.service';
   imports: [ApiKeysModule, OrganizationsModule],
   controllers: [RunsController, RunQueriesController],
   providers: [RunsService, RunQueriesService],
+  exports: [RunQueriesService],
 })
 export class RunsModule {}

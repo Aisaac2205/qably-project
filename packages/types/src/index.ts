@@ -210,6 +210,27 @@ export interface RunSummaryRecord {
   passRate: number
 }
 
+/**
+ * Server-computed quality snapshot for an organization, optionally scoped to
+ * one project via `?projectId=`. The server owns the clock: `windowDays` is
+ * the trailing window used for `runsInWindow`, `passRate`, `passRateTrend`
+ * and `defectsDetected`, anchored on the server's own "now" — the client
+ * must never compute or assume this window itself.
+ */
+export interface DashboardSummaryRecord {
+  totalProjects: number
+  totalSuites: number
+  totalRuns: number
+  runsInWindow: number
+  activeRuns: number
+  passRate: number
+  passRateTrend: number
+  defectsDetected: number
+  windowDays: number
+  recentRuns: RunSummaryRecord[]
+  recentCiRuns: RunSummaryRecord[]
+}
+
 
 export interface Notification {
   id: string

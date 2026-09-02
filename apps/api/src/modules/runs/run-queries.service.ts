@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { CaseStatus, RunCaseCounts } from '@qably/types';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
+import {
+  buildCaseCountsByRun,
+  computePassRate,
+  emptyCaseCounts,
+} from '../../common/metrics/run-case-metrics';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -20,34 +25,8 @@ import type {
 
 const OPEN_CASE_STATUSES: readonly CaseStatus[] = ['pending', 'running'];
 
-const ZERO_COUNTS: RunCaseCounts = {
-  total: 0,
-  pending: 0,
-  running: 0,
-  pass: 0,
-  fail: 0,
-  skip: 0,
-  blocked: 0,
-};
-
-function buildCaseCounts(
-  groups: { runId: string; status: CaseStatus; _count: { _all: number } }[],
-): Map<string, RunCaseCounts> {
-  const countsByRun = new Map<string, RunCaseCounts>();
-
-  for (const group of groups) {
-    const counts = countsByRun.get(group.runId) ?? { ...ZERO_COUNTS };
-
-    counts[group.status] += group._count._all;
-    counts.total += group._count._all;
-    countsByRun.set(group.runId, counts);
-  }
-
-  return countsByRun;
-}
-
 function toSummaryView(run: RunRow, counts: RunCaseCounts): RunSummaryView {
-  const passRate = counts.total === 0 ? 0 : counts.pass / counts.total;
+  const passRate = computePassRate(counts);
 
   return {
     id: run.id,
@@ -99,10 +78,10 @@ export class RunQueriesService {
       _count: { _all: number };
     }[];
 
-    const countsByRun = buildCaseCounts(groups);
+    const countsByRun = buildCaseCountsByRun(groups);
 
     return runs.map((run) =>
-      toSummaryView(run, countsByRun.get(run.id) ?? { ...ZERO_COUNTS }),
+      toSummaryView(run, countsByRun.get(run.id) ?? emptyCaseCounts()),
     );
   }
 
