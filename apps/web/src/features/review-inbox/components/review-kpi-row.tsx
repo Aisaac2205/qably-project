@@ -1,12 +1,13 @@
 'use client'
 
 import { Sparkle, CheckCircle, CopySimple, Folders } from '@phosphor-icons/react'
-import { useProposals, useProjects } from '@/lib/use-mock-store'
+import { useProposals } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 
 export function ReviewKpiRow() {
   const proposals = useProposals()
-  const projects = useProjects()
+  const { projects } = useProjects()
   const { t } = useTranslation()
 
   const pendingProposals = proposals.filter((p) => p.status === 'in_review')

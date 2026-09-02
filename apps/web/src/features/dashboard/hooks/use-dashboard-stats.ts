@@ -2,18 +2,16 @@
 
 import { useMemo } from 'react'
 import {
-  useProjects,
   useProposals,
-  useOrg,
   useCoverageGaps,
 } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useRuns } from '@/features/runs/hooks/use-runs'
 import { MOCK_NOW } from '@/lib/mock-data'
 import type {
-  ProjectSummary,
+  ProjectListItem,
   RunSummaryRecord,
   ExtractedProposal,
-  RunStatus,
 } from '@qably/types'
 
 export interface DashboardStats {
@@ -26,11 +24,7 @@ export interface DashboardStats {
   passRateTrend: number
   coverageGapsCount: number
   activeRuns: number
-  projectsByHealth: Array<{
-    project: ProjectSummary
-    lastRunStatus: RunStatus
-    lastRunAt: string
-  }>
+  projectsByHealth: Array<{ project: ProjectListItem }>
   recentRuns: RunSummaryRecord[]
   recentProposals: ExtractedProposal[]
   recentCiRuns: RunSummaryRecord[]
@@ -39,10 +33,9 @@ export interface DashboardStats {
 const MS_7D = 7 * 24 * 60 * 60 * 1000
 
 export function useDashboardStats(): DashboardStats {
-  const projects = useProjects()
+  const { projects } = useProjects()
   const { runs } = useRuns()
   const proposals = useProposals()
-  const org = useOrg()
   const coverageGaps = useCoverageGaps()
 
   return useMemo(() => {
@@ -97,11 +90,7 @@ export function useDashboardStats(): DashboardStats {
     ).length
 
     // Projects by health
-    const projectsByHealth = projects.map((p) => ({
-      project: p,
-      lastRunStatus: p.lastRunStatus,
-      lastRunAt: p.lastRunAt,
-    }))
+    const projectsByHealth = projects.map((p) => ({ project: p }))
 
     // Recent runs: top 5 by startedAt desc
     const recentRuns = [...runs]
@@ -141,5 +130,5 @@ export function useDashboardStats(): DashboardStats {
       recentProposals,
       recentCiRuns,
     }
-  }, [projects, runs, proposals, org, coverageGaps])
+  }, [projects, runs, proposals, coverageGaps])
 }

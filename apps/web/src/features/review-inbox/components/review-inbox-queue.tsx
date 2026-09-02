@@ -13,7 +13,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
-import { useEvidence, useProjects } from '@/lib/use-mock-store'
+import { useEvidence } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 
 export type ReviewQueueStatusFilter = 'in_review' | 'all' | 'approved' | 'rejected'
@@ -128,7 +129,7 @@ export function ReviewInboxQueue({
   onSearchQueryChange,
 }: ReviewInboxQueueProps) {
   const { t } = useTranslation()
-  const projects = useProjects()
+  const { projects } = useProjects()
 
   const projectMap = new Map(projects.map((p) => [p.id, p.name]))
 

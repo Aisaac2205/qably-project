@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { ReviewInboxPage } from '../components/review-inbox-page'
 import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
+import { renderWithQuery } from '@/lib/query-test-utils'
 
 describe('ReviewInboxPage', () => {
   beforeEach(() => {
@@ -12,7 +13,7 @@ describe('ReviewInboxPage', () => {
   })
 
   it('renders page header, KPIs, queue, inspector, and analytics', () => {
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     // Header & Breadcrumb
     expect(screen.getByRole('heading', { level: 1, name: /Review Inbox/i })).toBeInTheDocument()
@@ -35,7 +36,7 @@ describe('ReviewInboxPage', () => {
 
   it('allows filtering proposals by project', async () => {
     const user = userEvent.setup()
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     const projectSelect = screen.getByRole('combobox', { name: /Project/i })
     expect(projectSelect).toBeInTheDocument()
@@ -47,7 +48,7 @@ describe('ReviewInboxPage', () => {
 
   it('allows filtering proposals by duplicate toggle', async () => {
     const user = userEvent.setup()
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     const duplicateButton = screen.getByRole('button', { name: /Duplicates only/i })
     expect(duplicateButton).toHaveAttribute('aria-pressed', 'false')
@@ -58,7 +59,7 @@ describe('ReviewInboxPage', () => {
 
   it('allows searching proposals by text query', async () => {
     const user = userEvent.setup()
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     const searchInput = screen.getByRole('searchbox', { name: /Search by title/i })
     await user.type(searchInput, 'nonexistentquery123xyz')
@@ -68,7 +69,7 @@ describe('ReviewInboxPage', () => {
 
   it('approves a proposal when clicking Approve & publish', async () => {
     const user = userEvent.setup()
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
     await user.click(approveButton)
@@ -79,7 +80,7 @@ describe('ReviewInboxPage', () => {
 
   it('rejects a proposal when clicking Reject', async () => {
     const user = userEvent.setup()
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     const rejectButton = screen.getByRole('button', { name: 'Reject' })
     await user.click(rejectButton)
@@ -90,7 +91,7 @@ describe('ReviewInboxPage', () => {
 
   it('switches status filter between in_review, approved, rejected, and all', async () => {
     const user = userEvent.setup()
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     const allButton = screen.getByRole('button', { name: 'All' })
     await user.click(allButton)

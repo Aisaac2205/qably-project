@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { Folders, ArrowRight, Sparkle } from '@phosphor-icons/react'
-import { useProjects, useProposals } from '@/lib/use-mock-store'
+import { useProposals } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 
@@ -11,7 +12,7 @@ export function ProjectReviewDistribution({
 }: {
   onSelectProject?: (projectId: string) => void
 }) {
-  const projects = useProjects()
+  const { projects } = useProjects()
   const proposals = useProposals()
   const { t } = useTranslation()
 

@@ -6,6 +6,10 @@ import { mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
 import { runFixtures } from '@/test/runs-api-stub'
+import { projectFixtures } from '@/test/projects-api-stub'
+import { organizationFixtures } from '@/test/organizations-api-stub'
+import { projectKeys } from '@/features/projects/lib/query-keys'
+import { organizationKeys } from '@/features/organizations/lib/query-keys'
 
 /**
  * Suites and runs used to come from a synchronous store, so component tests
@@ -82,6 +86,14 @@ function seedRuns(client: QueryClient): void {
   }
 }
 
+function seedProjects(client: QueryClient): void {
+  client.setQueryData(projectKeys.all, structuredClone(projectFixtures))
+}
+
+function seedOrganizations(client: QueryClient): void {
+  client.setQueryData(organizationKeys.all, structuredClone(organizationFixtures))
+}
+
 export function createTestQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
@@ -92,6 +104,8 @@ export function createTestQueryClient(): QueryClient {
 
   seedSuites(client)
   seedRuns(client)
+  seedProjects(client)
+  seedOrganizations(client)
 
   return client
 }

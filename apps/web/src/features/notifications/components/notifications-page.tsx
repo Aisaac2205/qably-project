@@ -18,7 +18,7 @@ import {
 } from '@phosphor-icons/react'
 import type { NotificationSeverity, NotificationChannel } from '@qably/types'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
-import { useProjects } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 
@@ -90,7 +90,7 @@ function formatDate(iso: string): string {
 export function NotificationsPage() {
   const { t } = useTranslation()
   const { notifications, unreadCount, markAsRead, toggleRead, markAllAsRead } = useNotifications()
-  const projects = useProjects()
+  const { projects } = useProjects()
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'read'>('all')
   const [severityFilter, setSeverityFilter] = useState<NotificationSeverity | 'all'>('all')

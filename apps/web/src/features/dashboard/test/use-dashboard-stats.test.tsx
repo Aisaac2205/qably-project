@@ -29,9 +29,7 @@ describe('useDashboardStats — pure derivation', () => {
   it('mock store has expected seed counts for the parts still mocked', () => {
     __resetStore()
     const snap = getSnapshot()
-    expect(snap.projects.length).toBe(4)
     expect(snap.proposals.length).toBe(6)
-    expect(snap.org.name).toBe('Acme QA Team')
   })
 
   it('derives run stats from the api-backed runs list, not the mock store', () => {
@@ -42,5 +40,18 @@ describe('useDashboardStats — pure derivation', () => {
     expect(result.current.totalRuns).toBe(4)
     expect(result.current.recentRuns.length).toBeGreaterThan(0)
     expect(result.current.recentCiRuns.every((r) => r.source === 'github_actions')).toBe(true)
+  })
+
+  it('derives project totals from the api-backed projects list, not the mock store', () => {
+    const { result } = renderHook(() => useDashboardStats(), {
+      wrapper: ({ children }) => withQueryClient(children),
+    })
+    // Seeded fixture (projects-api-stub) has 4 organization projects.
+    expect(result.current.totalProjects).toBe(4)
+    expect(result.current.totalSuites).toBe(3)
+    expect(result.current.projectsByHealth).toHaveLength(4)
+    expect(result.current.projectsByHealth.map((entry) => entry.project.name)).toContain('Ecommerce App')
+    // activity is explicitly null (an honest gap), never fabricated data.
+    expect(result.current.projectsByHealth[0].project.activity).toBeNull()
   })
 })

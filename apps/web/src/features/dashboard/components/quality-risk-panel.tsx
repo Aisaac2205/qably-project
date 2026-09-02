@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { WarningCircle, ArrowSquareOut, FileText } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
-import { useQualityRisks, useProjects } from '@/lib/use-mock-store'
+import { useQualityRisks } from '@/lib/use-mock-store'
+import { useProjects } from '@/features/projects/hooks/use-projects'
 import { StateView } from '@/components/ui/state-view'
 
 const SEVERITY_CONFIG: Record<
@@ -39,7 +40,7 @@ const SEVERITY_CONFIG: Record<
 export function QualityRiskPanel() {
   const { t } = useTranslation()
   const risks = useQualityRisks()
-  const projects = useProjects()
+  const { projects } = useProjects()
   const projectsMap = new Map(projects.map((p) => [p.id, p]))
 
   return (

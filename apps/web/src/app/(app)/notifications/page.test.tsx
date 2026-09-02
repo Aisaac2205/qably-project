@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { __resetStore } from '@/lib/mock-store'
+import { renderWithQuery } from '@/lib/query-test-utils'
 import NotificationsPage from './page'
 
 describe('NotificationsPage', () => {
@@ -9,7 +10,7 @@ describe('NotificationsPage', () => {
 
   it('renders the interactive notifications center with real notifications and action links', async () => {
     const user = userEvent.setup()
-    render(<NotificationsPage />)
+    renderWithQuery(<NotificationsPage />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Notifications' })).toBeInTheDocument()
     expect(screen.getByText('Password reset flow failed in Run #12.')).toBeInTheDocument()
@@ -28,7 +29,7 @@ describe('NotificationsPage', () => {
 
   it('allows marking all notifications as read', async () => {
     const user = userEvent.setup()
-    render(<NotificationsPage />)
+    renderWithQuery(<NotificationsPage />)
 
     const markAllBtn = screen.getByRole('button', { name: /mark all as read/i })
     await user.click(markAllBtn)

@@ -4,8 +4,6 @@ import Image from 'next/image'
 import {
   Buildings,
   Briefcase,
-  FolderSimple,
-  Sparkle,
   Users,
   CreditCard,
   Receipt,
@@ -16,7 +14,8 @@ import {
 import type { Plan } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useOrg, useProjects, useMembers, useProposals } from '@/lib/use-mock-store'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
 import { useTranslation } from '@/lib/i18n'
 
 const planIcons: Record<Plan, typeof Briefcase> = {
@@ -32,49 +31,23 @@ const mockInvoices = [
 ]
 
 export function AccountPlanSection() {
-  const org = useOrg()
-  const projects = useProjects()
-  const members = useMembers()
-  const proposals = useProposals()
+  const { organization, isLoading } = useCurrentOrganization()
   const { t } = useTranslation()
 
-  const PlanIcon = planIcons[org.plan]
+  if (isLoading || !organization) {
+    return (
+      <div className="space-y-5" aria-busy="true">
+        <Skeleton className="h-36 w-full rounded-xl" />
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <Skeleton className="h-40 w-full rounded-xl" />
+          <Skeleton className="h-40 w-full rounded-xl" />
+        </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    )
+  }
 
-  // Usage calculations
-  const projectsCount = projects.length
-  const membersCount = members.length
-  const casesCount = proposals.length
-
-  const projectPercent = Math.min(100, Math.round((projectsCount / org.planLimits.maxProjects) * 100))
-  const memberPercent = Math.min(100, Math.round((membersCount / org.planLimits.maxUsers) * 100))
-  const casesPercent = Math.min(100, Math.round((casesCount / org.planLimits.maxCases) * 100))
-
-  const limits = [
-    {
-      label: t('settings.accountPlan.projects'),
-      value: org.planLimits.maxProjects,
-      used: projectsCount,
-      percent: projectPercent,
-      Icon: FolderSimple,
-      barColor: 'bg-primary',
-    },
-    {
-      label: t('settings.accountPlan.members'),
-      value: org.planLimits.maxUsers,
-      used: membersCount,
-      percent: memberPercent,
-      Icon: Users,
-      barColor: 'bg-primary',
-    },
-    {
-      label: t('settings.accountPlan.aiCases'),
-      value: org.planLimits.maxCases,
-      used: casesCount,
-      percent: casesPercent,
-      Icon: Sparkle,
-      barColor: 'bg-ai',
-    },
-  ]
+  const PlanIcon = planIcons[organization.plan]
 
   const features = [
     t('settings.accountPlan.featureParallel'),
@@ -98,7 +71,7 @@ export function AccountPlanSection() {
               </h2>
               <Badge variant="default" className="gap-1.5 px-2.5 py-0.5 text-xs font-semibold">
                 <PlanIcon size={12} weight="bold" aria-hidden="true" />
-                <span>{t(`settings.accountPlan.${org.plan}`)}</span>
+                <span>{t(`settings.accountPlan.${organization.plan}`)}</span>
               </Badge>
               <span className="inline-flex items-center gap-1 rounded-md bg-pass-bg px-2 py-0.5 text-[11px] font-semibold text-pass">
                 {t('settings.accountPlan.active')}
@@ -126,50 +99,6 @@ export function AccountPlanSection() {
               <ArrowUpRight size={12} aria-hidden="true" />
             </Button>
           </div>
-        </div>
-
-        {/* Live Quota Consumption Meters */}
-        <div className="mt-6 border-t border-border/70 pt-5">
-          <div className="mb-3 space-y-0.5">
-            <h3 className="text-xs font-semibold text-default">
-              {t('settings.accountPlan.usageTitle')}
-            </h3>
-            <p className="text-[11px] text-muted">
-              {t('settings.accountPlan.usageSubtitle')}
-            </p>
-          </div>
-
-          <dl className="grid gap-3 sm:grid-cols-3">
-            {limits.map(({ label, value, used, percent, Icon, barColor }) => (
-              <div
-                key={label}
-                className="rounded-lg border border-border/70 bg-canvas/30 p-4 transition-colors hover:border-border"
-              >
-                <div className="flex items-center justify-between">
-                  <dt className="flex items-center gap-1.5 text-xs font-medium text-muted">
-                    <Icon size={14} aria-hidden="true" />
-                    <span>{label}</span>
-                  </dt>
-                  <span className="text-xs font-semibold text-default">
-                    {used} / {value}
-                  </span>
-                </div>
-
-                {/* Meter progress bar */}
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-border/60">
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${barColor}`}
-                    style={{ width: `${Math.max(4, percent)}%` }}
-                  />
-                </div>
-
-                <div className="mt-2.5 flex items-center justify-between text-[11px] text-muted">
-                  <span>{t('settings.accountPlan.limit', { count: value })}</span>
-                  <span className="font-medium">{percent}%</span>
-                </div>
-              </div>
-            ))}
-          </dl>
         </div>
       </section>
 
