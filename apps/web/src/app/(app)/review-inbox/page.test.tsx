@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { describe, expect, it, beforeEach } from 'vitest'
 import ReviewInboxPage from './page'
 import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
+import { renderWithQuery } from '@/lib/query-test-utils'
 
 describe('ReviewInboxPage route', () => {
   beforeEach(() => {
@@ -11,7 +12,7 @@ describe('ReviewInboxPage route', () => {
   })
 
   it('renders the real review inbox workstation with KPIs and governance', () => {
-    render(<ReviewInboxPage />)
+    renderWithQuery(<ReviewInboxPage />)
 
     expect(screen.getByRole('heading', { level: 1, name: /Review Inbox/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 2, name: /Human authority required for publication/i })).toBeInTheDocument()
