@@ -5,9 +5,11 @@ import type { RunSummaryRecord } from '@qably/types'
 import { mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
+import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
 import { runFixtures } from '@/test/runs-api-stub'
 import { projectFixtures } from '@/test/projects-api-stub'
 import { organizationFixtures } from '@/test/organizations-api-stub'
+import { dashboardSummaryFixture } from '@/test/dashboard-api-stub'
 import { projectKeys } from '@/features/projects/lib/query-keys'
 import { organizationKeys } from '@/features/organizations/lib/query-keys'
 
@@ -94,6 +96,13 @@ function seedOrganizations(client: QueryClient): void {
   client.setQueryData(organizationKeys.all, structuredClone(organizationFixtures))
 }
 
+function seedDashboardSummary(client: QueryClient): void {
+  client.setQueryData(
+    dashboardKeys.summary('all'),
+    structuredClone(dashboardSummaryFixture),
+  )
+}
+
 export function createTestQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
@@ -106,6 +115,7 @@ export function createTestQueryClient(): QueryClient {
   seedRuns(client)
   seedProjects(client)
   seedOrganizations(client)
+  seedDashboardSummary(client)
 
   return client
 }
