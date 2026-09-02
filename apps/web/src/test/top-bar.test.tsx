@@ -36,7 +36,6 @@ vi.mock('@/lib/use-mock-store', () => ({
   useAiCases: () => [],
   useProposals: () => [],
   useMembers: () => [],
-  useApiKeys: () => [],
   useIntegration: () => ({ webhookUrl: '', connected: false }),
 }))
 

@@ -17,7 +17,6 @@ import type {
   ProjectSummary,
   AiCase,
   OrgMember,
-  ApiKey,
   GithubIntegration,
   AiProviderConnection,
   ChatThread,
@@ -92,10 +91,6 @@ export function useAiCases(projectId?: string): AiCase[] {
 
 export function useMembers(): OrgMember[] {
   return useStableArray(() => getSnapshot().members, () => getServerSnapshot().members)
-}
-
-export function useApiKeys(): ApiKey[] {
-  return useStableArray(() => getSnapshot().apiKeys, () => getServerSnapshot().apiKeys)
 }
 
 export function useIntegration(): GithubIntegration {
