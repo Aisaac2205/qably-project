@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Copy, Check, Terminal, FileCode, ArrowRight } from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { DocumentationTranslations } from '../../i18n/types';
 
@@ -8,62 +9,81 @@ interface DocumentationSectionProps {
   locale?: string;
 }
 
-const SNIPPETS = {
-  cli: `# Inicia Qably en tu proyecto existente
-pnpm dlx @qably/cli init
+type TabId = 'rest' | 'githubAction' | 'playwright';
 
-# O instala como dependencia de desarrollo
-pnpm add -D @qably/cli
+const SNIPPETS: Record<TabId, string> = {
+  rest: `curl -X POST https://api.qably.dev/runs/ingest \
+  -H "Authorization: Bearer $QABLY_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "externalId": "run-8412",
+    "source": "api",
+    "suiteName": "Checkout",
+    "name": "Nightly regression",
+    "commitSha": "a41f9c2",
+    "cases": [
+      { "name": "rejects an expired card", "status": "pass" },
+      { "name": "retries the webhook on 429", "status": "fail" }
+    ]
+  }'`,
 
-# Ejecuta análisis y sincroniza con tu dashboard
-pnpm qably scan --token=qbly_live_8f2a1c4d9e6b`,
-
-  githubAction: `name: Qably Quality Gate
+  githubAction: `name: Qably
 on: [push, pull_request]
 
 jobs:
-  qa:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v3
-      - name: Install dependencies
-        run: pnpm install
-      - name: Run Tests with Qably Telemetry
-        run: pnpm test --reporter=@qably/reporter
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test --reporter=json --outputFile=results.json
+
+      - name: Report to Qably
+        if: always()
         env:
-          QABLY_TOKEN: \${{ secrets.QABLY_TOKEN }}
-          QABLY_PROJECT_ID: \${{ vars.QABLY_PROJECT_ID }}`,
+          QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
+        run: |
+          node scripts/qably-report.mjs results.json \
+            --external-id "\${{ github.run_id }}" \
+            --source github_actions \
+            --commit "\${{ github.sha }}"`,
 
-  playwright: `import { defineConfig } from '@playwright/test';
+  playwright: `import { readFile } from 'node:fs/promises';
 
-export default defineConfig({
-  testDir: './e2e',
-  reporter: [
-    ['html'],
-    ['@qably/playwright-reporter', {
-      apiKey: process.env.QABLY_TOKEN,
-      projectId: 'proj_ecommerce_live',
-      captureScreenshotsOnFailure: true,
-    }],
-  ],
+// Maps Playwright's built-in JSON reporter onto POST /runs/ingest.
+const report = JSON.parse(await readFile('results.json', 'utf8'));
+
+const cases = report.suites.flatMap((suite) =>
+  suite.specs.map((spec) => ({
+    name: spec.title,
+    suiteName: suite.title,
+    status: spec.ok ? 'pass' : 'fail',
+  })),
+);
+
+await fetch('https://api.qably.dev/runs/ingest', {
+  method: 'POST',
+  headers: {
+    Authorization: \`Bearer \${process.env.QABLY_API_KEY}\`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    externalId: process.env.GITHUB_RUN_ID ?? crypto.randomUUID(),
+    suiteName: 'Playwright',
+    name: 'e2e',
+    cases,
+  }),
 });`,
-
-  jest: `/** @type {import('jest').Config} */
-module.exports = {
-  reporters: [
-    'default',
-    ['@qably/jest-reporter', {
-      apiKey: process.env.QABLY_TOKEN,
-      projectId: process.env.QABLY_PROJECT_ID,
-      autoReportFlaky: true,
-    }],
-  ],
-};`,
 };
 
+const TABS: { id: TabId; icon: Icon; labelKey: keyof DocumentationTranslations }[] = [
+  { id: 'rest', icon: Terminal, labelKey: 'tabRest' },
+  { id: 'githubAction', icon: FileCode, labelKey: 'tabGithubAction' },
+  { id: 'playwright', icon: FileCode, labelKey: 'tabPlaywright' },
+];
+
 export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionProps) {
-  const [activeTab, setActiveTab] = useState<'cli' | 'githubAction' | 'playwright' | 'jest'>('cli');
+  const [activeTab, setActiveTab] = useState<TabId>('rest');
   const [copied, setCopied] = useState(false);
   const isEn = locale === 'en';
 
@@ -81,89 +101,59 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
         <h2 id="docs-heading" className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-white mb-4">
           {t.title}
         </h2>
-        <p className="text-base text-zinc-400 leading-relaxed">
+        <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
           {t.subtitle}
         </p>
       </div>
 
-      {/* Code Window Box */}
       <div className="rounded-xl border border-white/10 bg-zinc-950 shadow-2xl overflow-hidden">
-        {/* Tab Header */}
-        <div className="flex flex-wrap items-center justify-between px-4 py-2.5 border-b border-white/[0.08] bg-zinc-900/60 gap-3">
-          <div className="flex items-center gap-1 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setActiveTab('cli')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'cli'
-                  ? 'bg-zinc-800 text-white shadow-xs'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Terminal size={14} />
-              {t.tabCli}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('githubAction')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'githubAction'
-                  ? 'bg-zinc-800 text-white shadow-xs'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <FileCode size={14} />
-              {t.tabGithubAction}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('playwright')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'playwright'
-                  ? 'bg-zinc-800 text-white shadow-xs'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <FileCode size={14} />
-              {t.tabPlaywright}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('jest')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
-                activeTab === 'jest'
-                  ? 'bg-zinc-800 text-white shadow-xs'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <FileCode size={14} />
-              {t.tabJest}
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] bg-zinc-900/60 px-3 py-2 sm:px-4 sm:py-2.5">
+          <div
+            role="tablist"
+            aria-label={t.title}
+            className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none"
+          >
+            {TABS.map((tab) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-all cursor-pointer sm:px-3 sm:text-xs ${
+                    isActive ? 'bg-zinc-800 text-white shadow-xs' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <tab.icon size={14} aria-hidden="true" />
+                  {t[tab.labelKey]}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Copy Button */}
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-zinc-300 bg-zinc-800 hover:bg-zinc-700 active:scale-[0.98] transition-all border border-white/10 shrink-0 cursor-pointer"
-            aria-label="Copy code to clipboard"
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-white/10 bg-zinc-800 px-2.5 py-1.5 text-[11px] font-medium text-zinc-300 transition-all hover:bg-zinc-700 active:scale-[0.98] cursor-pointer sm:px-3 sm:text-xs"
+            aria-label={t.copyCode}
           >
             {copied ? (
               <>
-                <Check size={14} weight="bold" className="text-emerald-400" />
+                <Check size={14} weight="bold" className="text-emerald-400" aria-hidden="true" />
                 <span className="text-emerald-400">{t.copied}</span>
               </>
             ) : (
               <>
-                <Copy size={14} />
-                <span>{t.copyCode}</span>
+                <Copy size={14} aria-hidden="true" />
+                <span className="hidden sm:inline">{t.copyCode}</span>
               </>
             )}
           </button>
         </div>
 
-        {/* Code Content with Motion */}
-        <div className="p-5 font-mono text-xs sm:text-sm text-zinc-300 overflow-x-auto leading-relaxed bg-black min-h-[160px]">
+        <div className="min-h-[200px] overflow-x-auto bg-black p-4 font-mono text-[11px] leading-relaxed text-zinc-300 sm:p-5 sm:text-sm">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -179,17 +169,18 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
           </AnimatePresence>
         </div>
 
-        {/* Footer Link to Dedicated Documentation Page */}
-        <div className="px-5 py-3 border-t border-white/[0.08] bg-zinc-950 flex items-center justify-between text-xs">
+        <div className="flex flex-col gap-2 border-t border-white/[0.08] bg-zinc-950 px-4 py-3 text-[11px] sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:text-xs">
           <span className="text-zinc-400">
-            {isEn ? 'Looking for full API schemas, NestJS backend setup, and Prisma models?' : '¿Buscas esquemas completos de API, setup de NestJS y modelos de Prisma?'}
+            {isEn
+              ? 'Looking for the full API reference and the run ingestion schema?'
+              : '¿Buscas la referencia completa de la API y el esquema de ingesta de ejecuciones?'}
           </span>
           <a
             href={isEn ? '/en/docs' : '/docs'}
-            className="inline-flex items-center gap-1 text-white hover:text-zinc-300 font-medium transition-colors"
+            className="inline-flex shrink-0 items-center gap-1 font-medium text-white transition-colors hover:text-zinc-300"
           >
-            <span>{isEn ? 'Read full documentation' : 'Ver documentación completa'}</span>
-            <ArrowRight size={13} />
+            <span>{isEn ? 'Read the documentation' : 'Ver la documentación'}</span>
+            <ArrowRight size={13} aria-hidden="true" />
           </a>
         </div>
       </div>
