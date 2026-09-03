@@ -9,13 +9,14 @@ export type OrgRole = 'owner' | 'admin' | 'member'
 export type Plan = 'gratuito' | 'equipo' | 'empresa'
 export type RunSource = 'manual' | 'api' | 'github_actions'
 export type NotificationSeverity = 'critical' | 'high' | 'medium' | 'low'
-export type NotificationChannel = 'in_app' | 'email'
+export type NotificationChannel = 'in_app' | 'email' | 'slack' | 'discord'
 export type NotificationEventType =
   | 'run_failed'
   | 'run_completed'
   | 'case_regressed'
   | 'ingestion_failed'
   | 'connection_security'
+export type NotificationWebhookType = 'slack' | 'discord'
 
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
 
@@ -274,15 +275,27 @@ export interface NotificationPreference {
   enabled: boolean
 }
 
+export interface NotificationWebhook {
+  id: string
+  organizationId: string
+  type: NotificationWebhookType
+  name: string
+  maskedUrl: string
+  enabled: boolean
+  eventTypes: NotificationEventType[]
+  createdAt: string
+  updatedAt: string
+}
+
 export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
   NotificationEventType,
   Record<NotificationChannel, boolean>
 > = {
-  run_failed: { in_app: true, email: false },
-  run_completed: { in_app: false, email: false },
-  case_regressed: { in_app: true, email: true },
-  ingestion_failed: { in_app: true, email: false },
-  connection_security: { in_app: true, email: true },
+  run_failed: { in_app: true, email: false, slack: false, discord: false },
+  run_completed: { in_app: false, email: false, slack: false, discord: false },
+  case_regressed: { in_app: true, email: true, slack: false, discord: false },
+  ingestion_failed: { in_app: true, email: false, slack: false, discord: false },
+  connection_security: { in_app: true, email: true, slack: false, discord: false },
 }
 
 export type ProposalStatus = 'in_review' | 'approved' | 'rejected' | 'changes_requested'

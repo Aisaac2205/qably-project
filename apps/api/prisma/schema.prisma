@@ -126,6 +126,7 @@ model Organization {
   runs                    Run[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  notificationWebhooks    NotificationWebhook[]
 
   @@unique([slug])
   @@map("organization")
@@ -434,6 +435,13 @@ enum NotificationEventType {
 enum NotificationChannel {
   in_app
   email
+  slack
+  discord
+}
+
+enum NotificationWebhookType {
+  slack
+  discord
 }
 
 enum NotificationSeverity {
@@ -479,4 +487,20 @@ model NotificationPreference {
 
   @@unique([userId, organizationId, eventType, channel])
   @@map("notification_preference")
+}
+
+model NotificationWebhook {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           NotificationWebhookType
+  name           String
+  encryptedUrl   String
+  enabled        Boolean                  @default(true)
+  eventTypes     NotificationEventType[]
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@index([organizationId])
+  @@map("notification_webhook")
 }

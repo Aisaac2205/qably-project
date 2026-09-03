@@ -41,6 +41,7 @@ interface FakePrisma {
   orgMember: { findMany: jest.Mock };
   notificationPreference: { findUnique: jest.Mock };
   notification: { upsert: jest.Mock };
+  notificationWebhook: { findMany: jest.Mock };
 }
 
 function createPrisma(
@@ -50,6 +51,7 @@ function createPrisma(
     orgMember: { findMany: jest.fn().mockResolvedValue(members) },
     notificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
     notification: { upsert: jest.fn().mockResolvedValue({}) },
+    notificationWebhook: { findMany: jest.fn().mockResolvedValue([]) },
   };
 }
 
@@ -57,8 +59,32 @@ function createMailer() {
   return { send: jest.fn().mockResolvedValue(undefined) };
 }
 
-function build(prisma: FakePrisma, mailer: { send: jest.Mock }) {
-  return new NotificationsProcessor(prisma as never, mailer as never);
+function createEncryption() {
+  return {
+    encrypt: jest.fn((plaintext: string) => `enc(${plaintext})`),
+    decrypt: jest.fn((packed: string) => packed.replace('enc(', '').replace(')', '')),
+    generateSecret: jest.fn(),
+  };
+}
+
+function createWebhookChannel() {
+  return { send: jest.fn().mockResolvedValue(undefined) };
+}
+
+function build(
+  prisma: FakePrisma,
+  mailer: { send: jest.Mock },
+  encryption: ReturnType<typeof createEncryption> = createEncryption(),
+  slack: ReturnType<typeof createWebhookChannel> = createWebhookChannel(),
+  discord: ReturnType<typeof createWebhookChannel> = createWebhookChannel(),
+) {
+  return new NotificationsProcessor(
+    prisma as never,
+    mailer as never,
+    encryption as never,
+    slack as never,
+    discord as never,
+  );
 }
 
 function job(data: NotificationJobData) {
@@ -184,5 +210,108 @@ describe('NotificationsProcessor dedupe upsert', () => {
     expect(secondCall[0].where.userId_organizationId_dedupeKey.organizationId).toBe(
       'org-2',
     );
+  });
+});
+
+describe('NotificationsProcessor team webhook fan-out', () => {
+  it('never queries webhooks without scoping by the event organizationId', async () => {
+    const prisma = createPrisma([]);
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    expect(prisma.notificationWebhook.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: 'org-1' }),
+      }),
+    );
+  });
+
+  it('only fans out to enabled webhooks whose eventTypes include the event', async () => {
+    const prisma = createPrisma([]);
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    expect(prisma.notificationWebhook.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          enabled: true,
+          eventTypes: { has: 'run_failed' },
+        }),
+      }),
+    );
+  });
+
+  it('decrypts the stored url and posts through the slack channel for a slack webhook', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      { encryptedUrl: 'enc(https://hooks.slack.com/services/x)', type: 'slack' },
+    ]);
+    const mailer = createMailer();
+    const slack = createWebhookChannel();
+    const discord = createWebhookChannel();
+
+    await build(prisma, mailer, createEncryption(), slack, discord).process(
+      job(runFailedEvent),
+    );
+
+    expect(slack.send).toHaveBeenCalledWith(
+      'https://hooks.slack.com/services/x',
+      expect.any(String),
+    );
+    expect(discord.send).not.toHaveBeenCalled();
+  });
+
+  it('posts through the discord channel for a discord webhook', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        encryptedUrl: 'enc(https://discord.com/api/webhooks/1/token)',
+        type: 'discord',
+      },
+    ]);
+    const mailer = createMailer();
+    const slack = createWebhookChannel();
+    const discord = createWebhookChannel();
+
+    await build(prisma, mailer, createEncryption(), slack, discord).process(
+      job(runFailedEvent),
+    );
+
+    expect(discord.send).toHaveBeenCalledTimes(1);
+    expect(slack.send).not.toHaveBeenCalled();
+  });
+
+  it('never reaches org B webhooks for an event published for org A', async () => {
+    const orgAPrisma = createPrisma([]);
+    orgAPrisma.notificationWebhook.findMany.mockImplementation(
+      ({ where }: { where: { organizationId: string } }) =>
+        Promise.resolve(
+          where.organizationId === 'org-1'
+            ? [
+                {
+                  encryptedUrl: 'enc(https://hooks.slack.com/services/org-1)',
+                  type: 'slack',
+                },
+              ]
+            : [],
+        ),
+    );
+    const mailer = createMailer();
+    const slack = createWebhookChannel();
+    const discord = createWebhookChannel();
+    const orgBEvent: NotificationJobData = {
+      ...runFailedEvent,
+      organizationId: 'org-2',
+      dedupeKey: 'run_failed:run-2',
+      runId: 'run-2',
+    };
+
+    await build(orgAPrisma, mailer, createEncryption(), slack, discord).process(
+      job(orgBEvent),
+    );
+
+    expect(slack.send).not.toHaveBeenCalled();
   });
 });

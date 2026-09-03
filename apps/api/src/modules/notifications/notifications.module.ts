@@ -11,12 +11,14 @@ import { NOTIFICATIONS_QUEUE } from './notifications.contracts';
 import { NotificationsProcessor } from './notifications.processor';
 import { NotificationsPublisher } from './notifications.publisher';
 import { NotificationsService } from './notifications.service';
+import { NotificationWebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
     AuthModule,
     OrganizationsModule,
     MailerModule,
+    NotificationWebhooksModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ENV],

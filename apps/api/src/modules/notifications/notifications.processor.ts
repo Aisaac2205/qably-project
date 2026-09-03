@@ -1,14 +1,19 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import type { Locale } from '@qably/i18n';
+import { DEFAULT_LOCALE, type Locale } from '@qably/i18n';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationChannel,
+  type NotificationWebhookType,
 } from '@qably/types';
+import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { notificationDigestEmail } from '../mailer/templates/notification-digest';
+import type { WebhookChannel } from './webhooks/channels/channel.contracts';
+import { DiscordChannel } from './webhooks/channels/discord.channel';
+import { SlackChannel } from './webhooks/channels/slack.channel';
 import type { NotificationJobData } from './notifications.contracts';
 import { NOTIFICATIONS_QUEUE } from './notifications.contracts';
 import { renderNotificationMessage } from './lib/render-notification-message';
@@ -18,6 +23,11 @@ interface RecipientRow {
   user: { locale: string; email: string; name: string };
 }
 
+interface NotificationWebhookRow {
+  encryptedUrl: string;
+  type: NotificationWebhookType;
+}
+
 @Processor(NOTIFICATIONS_QUEUE)
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);
@@ -25,6 +35,9 @@ export class NotificationsProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailer: MailerService,
+    private readonly encryption: EncryptionService,
+    private readonly slack: SlackChannel,
+    private readonly discord: DiscordChannel,
   ) {
     super();
   }
@@ -36,6 +49,36 @@ export class NotificationsProcessor extends WorkerHost {
     for (const recipient of recipients) {
       await this.notify(event, recipient);
     }
+
+    await this.notifyWebhooks(event);
+  }
+
+  private async notifyWebhooks(event: NotificationJobData): Promise<void> {
+    const webhooks = await this.prisma.notificationWebhook.findMany({
+      where: {
+        organizationId: event.organizationId,
+        enabled: true,
+        eventTypes: { has: event.eventType },
+      },
+      select: { encryptedUrl: true, type: true },
+    });
+
+    if (webhooks.length === 0) return;
+
+    const message = renderNotificationMessage(
+      DEFAULT_LOCALE,
+      event.eventType,
+      event.payload,
+    );
+
+    for (const webhook of webhooks as NotificationWebhookRow[]) {
+      const url = this.encryption.decrypt(webhook.encryptedUrl);
+      await this.resolveWebhookChannel(webhook.type).send(url, message);
+    }
+  }
+
+  private resolveWebhookChannel(type: NotificationWebhookType): WebhookChannel {
+    return type === 'slack' ? this.slack : this.discord;
   }
 
   private resolveRecipients(
