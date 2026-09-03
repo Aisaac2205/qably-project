@@ -73,6 +73,8 @@ export const es: Dictionary = {
     feature4Desc: 'Aísla las pruebas no determinísticas mediante modelos probabilísticos antes de que contaminen la cola de despliegue.',
     feature5Title: 'Trazabilidad bidireccional',
     feature5Desc: 'Conecta cada requerimiento de negocio con sus suites de pruebas correspondientes y su estado actual en producción.',
+    codeCardLabel: 'Análisis del diff de la PR #142',
+    codeCardConfidence: '96% de confianza',
   },
   docs: {
     sectionBadge: 'Integración directa',

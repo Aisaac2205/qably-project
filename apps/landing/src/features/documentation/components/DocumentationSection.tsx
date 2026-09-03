@@ -3,85 +3,15 @@ import { Copy, Check, Terminal, FileCode, ArrowRight } from '@phosphor-icons/rea
 import type { Icon } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { DocumentationTranslations } from '../../i18n/types';
-import { highlight, type CodeLanguage, type TokenKind } from '../lib/highlight';
+import { highlight, type TokenKind } from '../lib/highlight';
+import { SNIPPETS, SNIPPET_LANGUAGES, type SnippetId } from './snippets';
 
 interface DocumentationSectionProps {
   t: DocumentationTranslations;
   locale?: string;
 }
 
-type TabId = 'rest' | 'githubAction' | 'playwright';
-
-const SNIPPETS: Record<TabId, string> = {
-  rest: `curl -X POST https://api.qably.dev/runs/ingest \
-  -H "Authorization: Bearer $QABLY_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "externalId": "run-8412",
-    "source": "api",
-    "suiteName": "Checkout",
-    "name": "Nightly regression",
-    "commitSha": "a41f9c2",
-    "cases": [
-      { "name": "rejects an expired card", "status": "pass" },
-      { "name": "retries the webhook on 429", "status": "fail" }
-    ]
-  }'`,
-
-  githubAction: `name: Qably
-on: [push, pull_request]
-
-jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test --reporter=json --outputFile=results.json
-
-      - name: Report to Qably
-        if: always()
-        env:
-          QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
-        run: |
-          node scripts/qably-report.mjs results.json \
-            --external-id "\${{ github.run_id }}" \
-            --source github_actions \
-            --commit "\${{ github.sha }}"`,
-
-  playwright: `import { readFile } from 'node:fs/promises';
-
-// Maps Playwright's built-in JSON reporter onto POST /runs/ingest.
-const report = JSON.parse(await readFile('results.json', 'utf8'));
-
-const cases = report.suites.flatMap((suite) =>
-  suite.specs.map((spec) => ({
-    name: spec.title,
-    suiteName: suite.title,
-    status: spec.ok ? 'pass' : 'fail',
-  })),
-);
-
-await fetch('https://api.qably.dev/runs/ingest', {
-  method: 'POST',
-  headers: {
-    Authorization: \`Bearer \${process.env.QABLY_API_KEY}\`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    externalId: process.env.GITHUB_RUN_ID ?? crypto.randomUUID(),
-    suiteName: 'Playwright',
-    name: 'e2e',
-    cases,
-  }),
-});`,
-};
-
-const LANGUAGES: Record<TabId, CodeLanguage> = {
-  rest: 'shell',
-  githubAction: 'yaml',
-  playwright: 'typescript',
-};
+type TabId = SnippetId;
 
 const TOKEN_CLASSES: Record<TokenKind, string> = {
   plain: 'text-code-plain',
@@ -128,7 +58,7 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
           <div
             role="tablist"
             aria-label={t.title}
-            className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto scrollbar-none"
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
           >
             {TABS.map((tab) => {
               const isActive = activeTab === tab.id;
@@ -170,7 +100,7 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
           </button>
         </div>
 
-        <div className="min-h-[200px] overflow-x-auto bg-black p-4 font-mono text-[11px] leading-relaxed text-code-plain sm:p-5 sm:text-sm">
+        <div className="min-h-[220px] bg-black p-4 font-mono text-[11px] leading-relaxed text-code-plain sm:p-5 sm:text-xs">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -179,9 +109,9 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <pre>
+              <pre className="whitespace-pre-wrap break-words">
                 <code>
-                  {highlight(currentSnippet, LANGUAGES[activeTab]).map((token, index) => (
+                  {highlight(currentSnippet, SNIPPET_LANGUAGES[activeTab]).map((token, index) => (
                     <span key={index} className={TOKEN_CLASSES[token.kind]}>
                       {token.value}
                     </span>

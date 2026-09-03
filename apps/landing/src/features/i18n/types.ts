@@ -80,6 +80,8 @@ export interface FeaturesTranslations {
   feature4Desc: string;
   feature5Title: string;
   feature5Desc: string;
+  codeCardLabel: string;
+  codeCardConfidence: string;
 }
 
 export interface DocumentationTranslations {

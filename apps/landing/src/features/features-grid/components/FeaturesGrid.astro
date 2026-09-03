@@ -36,20 +36,22 @@ const f = dict.features;
         <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature1Desc}</p>
       </div>
 
-      {/* Code Preview - Flat container with high-visibility typography */}
-      <div class="rounded-xl border border-white/10 bg-black p-5 text-sm font-mono text-zinc-200">
-        <div class="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-3.5 text-xs sm:text-sm text-zinc-300 font-sans">
+      <div class="rounded-xl border border-white/10 bg-black p-4 sm:p-5 font-mono">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3.5 border-b border-white/[0.08] text-[11px] sm:text-xs text-zinc-300 font-sans">
           <span class="flex items-center gap-2">
-            <span class="size-2 rounded-full bg-emerald-400"></span>
-            ai-review: PR #142 Diff Analysis
+            <span class="size-2 rounded-full bg-pass"></span>
+            {f.codeCardLabel}
           </span>
-          <span class="text-white font-semibold">96% Confianza</span>
+          <span class="text-white font-semibold">{f.codeCardConfidence}</span>
         </div>
-        <pre class="text-xs sm:text-sm text-zinc-300 overflow-x-auto leading-relaxed">
-<span class="text-white font-semibold">+ test</span>(<span class="text-zinc-200">'should retry webhook with exponential backoff on 429'</span>, <span class="text-white font-semibold">async</span> (&#123; request &#125;) =&gt; &#123;
-    <span class="text-zinc-400">const res = await triggerWebhookRetry(&#123; delay: '2s', maxAttempts: 3 &#125;);</span>
-    <span class="text-white font-semibold">expect</span>(res.status).<span class="text-zinc-200">toBe</span>(200);
-&#125;);</pre>
+        <pre class="whitespace-pre-wrap break-words text-[11px] sm:text-xs leading-relaxed text-code-plain"><span class="text-pass">+</span> <span class="text-code-keyword">test</span><span class="text-code-punctuation">(</span><span class="text-code-string">'retries the webhook on 429'</span><span class="text-code-punctuation">,</span> <span class="text-code-keyword">async</span> <span class="text-code-punctuation">()</span> =&gt; <span class="text-code-punctuation">&#123;</span>
+  <span class="text-code-keyword">const</span> res = <span class="text-code-keyword">await</span> triggerWebhookRetry<span class="text-code-punctuation">(&#123;</span>
+    <span class="text-code-property">delay</span><span class="text-code-punctuation">:</span> <span class="text-code-string">'2s'</span><span class="text-code-punctuation">,</span>
+    <span class="text-code-property">maxAttempts</span><span class="text-code-punctuation">:</span> <span class="text-code-number">3</span><span class="text-code-punctuation">,</span>
+  <span class="text-code-punctuation">&#125;);</span>
+
+  <span class="text-code-keyword">expect</span><span class="text-code-punctuation">(</span>res.status<span class="text-code-punctuation">).</span>toBe<span class="text-code-punctuation">(</span><span class="text-code-number">200</span><span class="text-code-punctuation">);</span>
+<span class="text-code-punctuation">&#125;);</span></pre>
       </div>
     </div>
 

@@ -73,6 +73,8 @@ export const en: Dictionary = {
     feature4Desc: 'Isolate non-deterministic tests with probabilistic models before they poison the deployment queue.',
     feature5Title: 'Bi-directional traceability',
     feature5Desc: 'Connect every business requirement to its test suites and their current state in production.',
+    codeCardLabel: 'Diff analysis for PR #142',
+    codeCardConfidence: '96% confidence',
   },
   docs: {
     sectionBadge: 'Direct integration',
