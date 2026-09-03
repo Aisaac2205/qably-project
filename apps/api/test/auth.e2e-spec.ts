@@ -9,9 +9,12 @@ import {
 import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { ConfigModule } from '../src/config/config.module';
+import { ENV } from '../src/config/config.tokens';
 import { DATABASE_PROBE } from '../src/health/health.contracts';
 import { HealthModule } from '../src/health/health.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
   user: {
@@ -30,8 +33,10 @@ describe('Auth (e2e)', () => {
 
   beforeEach(async () => {
     const moduleFixture = await Test.createTestingModule({
-      imports: [AuthModule, HealthModule],
+      imports: [ConfigModule, AuthModule, HealthModule],
     })
+      .overrideProvider(ENV)
+      .useValue(testEnv)
       .overrideProvider(PrismaService)
       .useValue({})
       .overrideProvider(AUTH_INSTANCE)

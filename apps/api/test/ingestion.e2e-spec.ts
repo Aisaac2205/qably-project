@@ -15,25 +15,12 @@ import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter
 import { jsonWithRawBody } from '../src/common/http/raw-body';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
-import type { Env } from '../src/config/env';
 import { IngestionModule } from '../src/modules/ingestion/ingestion.module';
 import { IngestionProcessor } from '../src/modules/ingestion/ingestion.processor';
 import { INGESTION_QUEUE } from '../src/modules/ingestion/ingestion.tokens';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-
-const testEnv: Env = {
-  NODE_ENV: 'test',
-  PORT: 3001,
-  DATABASE_URL: 'postgresql://qably:qably@localhost:5432/qably',
-  REDIS_URL: 'redis://localhost:6379',
-  BETTER_AUTH_SECRET: 'x'.repeat(32),
-  BETTER_AUTH_URL: 'http://localhost:3001',
-  WEB_APP_URL: 'http://localhost:3000',
-  ENCRYPTION_KEY: 'a'.repeat(64),
-  GITHUB_CLIENT_ID: 'gh-client-id',
-  GITHUB_CLIENT_SECRET: 'gh-client-secret',
-};
+import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
   user: {

@@ -9,10 +9,13 @@ import {
 import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { ConfigModule } from '../src/config/config.module';
+import { ENV } from '../src/config/config.tokens';
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ProjectsModule } from '../src/modules/projects/projects.module';
+import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
   user: {
@@ -73,8 +76,16 @@ describe('Projects (e2e)', () => {
     prisma.runCase.groupBy.mockResolvedValue([]);
 
     const moduleFixture = await Test.createTestingModule({
-      imports: [PrismaModule, AuthModule, OrganizationsModule, ProjectsModule],
+      imports: [
+        ConfigModule,
+        PrismaModule,
+        AuthModule,
+        OrganizationsModule,
+        ProjectsModule,
+      ],
     })
+      .overrideProvider(ENV)
+      .useValue(testEnv)
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(AUTH_INSTANCE)

@@ -9,10 +9,13 @@ import {
 import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { ConfigModule } from '../src/config/config.module';
+import { ENV } from '../src/config/config.tokens';
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RepositoryModule } from '../src/modules/repository/repository.module';
+import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
   user: {
@@ -79,12 +82,15 @@ describe('Repository (e2e)', () => {
 
     const moduleFixture = await Test.createTestingModule({
       imports: [
+        ConfigModule,
         PrismaModule,
         AuthModule,
         OrganizationsModule,
         RepositoryModule,
       ],
     })
+      .overrideProvider(ENV)
+      .useValue(testEnv)
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(AUTH_INSTANCE)
