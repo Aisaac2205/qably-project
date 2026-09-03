@@ -88,12 +88,19 @@ node scripts/qably-report.mjs apps/api/reports/junit-e2e.xml
 node scripts/qably-report.mjs apps/web/reports/junit.xml
 ```
 
-The script reads `QABLY_API_KEY` (a GitHub Actions **secret**) and `QABLY_API_BASE_URL` (a GitHub
-Actions **variable**, e.g. `https://api.qably.app`) from the environment. **If either is unset, it
-logs a message and exits 0 without doing anything.** This is deliberate: the Qably API is not
-deployed yet (verified against the Railway project — it currently has only a Postgres and a Redis
-service, no API service), so there is nowhere to POST to today. The workflow must stay green until
-that changes.
+The script reads `QABLY_API_KEY` (a GitHub Actions **secret**) from the environment. **If it is
+unset, the script logs a message and exits 0 without doing anything.** This is deliberate: the
+Qably API is not deployed yet — `https://api.qably.dev` resolves through Cloudflare to Railway but
+answers Railway's own `{"status":"error","code":404,"message":"Application not found"}`, because
+the project has only a Postgres and a Redis service. There is nowhere to POST to today, and the
+workflow must stay green until that changes.
+
+The API origin defaults to `https://api.qably.dev` (`DEFAULT_API_BASE_URL` in the script).
+`QABLY_API_BASE_URL` overrides it and is **optional**: it exists for local runs
+(`http://localhost:3001`) and for a self-hosted deployment. A team wiring Qably into their own CI
+supplies a key and nothing else — the tool knows its own address, the same way Codecov or Sentry
+do. The project-scoped API key already identifies the organization and project, so the origin
+carries no information the key does not.
 
 ### Enabling it
 
@@ -104,11 +111,13 @@ Once the API is deployed and reachable:
 2. In the GitHub repository settings, add:
    - **Settings → Secrets and variables → Actions → Secrets** — `QABLY_API_KEY`, the plaintext key
      (`qbly_<lookupId>_<secret>`).
-   - **Settings → Secrets and variables → Actions → Variables** — `QABLY_API_BASE_URL`, the API's
-     origin (e.g. `https://api.qably.app`, no trailing slash, no path).
+   - Only if the reporter must target something other than the default origin,
+     **Settings → Secrets and variables → Actions → Variables** — `QABLY_API_BASE_URL`, an origin
+     with no trailing slash and no path.
 3. The very next workflow run starts reporting — no code change needed.
 
-Neither value is ever committed. The workflow reads both exclusively from `secrets.*` / `vars.*`.
+The key is never committed. The workflow reads it exclusively from `secrets.*`, and the optional
+override from `vars.*`.
 
 ## JUnit → `POST /runs/ingest` mapping
 

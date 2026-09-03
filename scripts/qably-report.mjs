@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
+const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
+
 const XML_ENTITIES = {
   amp: '&',
   lt: '<',
@@ -198,12 +200,10 @@ async function main() {
   }
 
   const apiKey = process.env.QABLY_API_KEY;
-  const baseUrl = process.env.QABLY_API_BASE_URL;
+  const baseUrl = process.env.QABLY_API_BASE_URL || DEFAULT_API_BASE_URL;
 
-  if (!apiKey || !baseUrl) {
-    console.log(
-      '[qably-report] QABLY_API_KEY or QABLY_API_BASE_URL is not set, skipping report.',
-    );
+  if (!apiKey) {
+    console.log('[qably-report] QABLY_API_KEY is not set, skipping report.');
     return;
   }
 
