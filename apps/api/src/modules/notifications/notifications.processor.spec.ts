@@ -43,7 +43,9 @@ interface FakePrisma {
   notification: { upsert: jest.Mock };
 }
 
-function createPrisma(members = [ownerMember, adminMember, memberMember]): FakePrisma {
+function createPrisma(
+  members = [ownerMember, adminMember, memberMember],
+): FakePrisma {
   return {
     orgMember: { findMany: jest.fn().mockResolvedValue(members) },
     notificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -107,7 +109,11 @@ describe('NotificationsProcessor preference resolution', () => {
   it('lets an explicit preference row override the default', async () => {
     const prisma = createPrisma([ownerMember]);
     prisma.notificationPreference.findUnique.mockImplementation(
-      ({ where }: { where: { userId_organizationId_eventType_channel: { channel: string } } }) =>
+      ({
+        where,
+      }: {
+        where: { userId_organizationId_eventType_channel: { channel: string } };
+      }) =>
         Promise.resolve(
           where.userId_organizationId_eventType_channel.channel === 'email'
             ? { enabled: true }
@@ -123,7 +129,9 @@ describe('NotificationsProcessor preference resolution', () => {
 
   it('renders the email in the recipient locale', async () => {
     const prisma = createPrisma([memberMember]);
-    prisma.notificationPreference.findUnique.mockResolvedValue({ enabled: true });
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
     const mailer = createMailer();
 
     await build(prisma, mailer).process(job(runFailedEvent));

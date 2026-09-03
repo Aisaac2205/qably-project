@@ -6,8 +6,8 @@ interface EventCatalog {
 }
 
 const dictionaries: Record<Locale, EventCatalog> = {
-  en: en as EventCatalog,
-  es: es as EventCatalog,
+  en: en,
+  es: es,
 };
 
 export function renderNotificationMessage(

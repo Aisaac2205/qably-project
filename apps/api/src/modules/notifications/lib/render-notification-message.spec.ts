@@ -16,7 +16,9 @@ describe('renderNotificationMessage', () => {
       suiteName: 'Checkout',
     });
 
-    expect(message).toBe('La ejecución "Checkout regression" en Checkout falló.');
+    expect(message).toBe(
+      'La ejecución "Checkout regression" en Checkout falló.',
+    );
   });
 
   it('falls back to the dotted event type when a param is missing', () => {

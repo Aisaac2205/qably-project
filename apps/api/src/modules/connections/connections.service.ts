@@ -161,7 +161,10 @@ export class ConnectionsService {
       eventType: 'connection_security',
       organizationId: org.organizationId,
       severity: 'critical',
-      payload: { action: 'Rotated the webhook secret', connectionName: existing.name },
+      payload: {
+        action: 'Rotated the webhook secret',
+        connectionName: existing.name,
+      },
       dedupeKey: `connection_security:${id}:rotated`,
       connectionId: id,
     });

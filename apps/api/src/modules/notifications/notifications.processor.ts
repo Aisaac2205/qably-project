@@ -48,15 +48,22 @@ export class NotificationsProcessor extends WorkerHost {
           ? { role: { in: ['owner', 'admin'] } }
           : {}),
       },
-      select: { userId: true, user: { select: { locale: true, email: true, name: true } } },
-    }) as unknown as Promise<RecipientRow[]>;
+      select: {
+        userId: true,
+        user: { select: { locale: true, email: true, name: true } },
+      },
+    });
   }
 
   private async notify(
     event: NotificationJobData,
     recipient: RecipientRow,
   ): Promise<void> {
-    const inAppEnabled = await this.isEnabled(event, recipient.userId, 'in_app');
+    const inAppEnabled = await this.isEnabled(
+      event,
+      recipient.userId,
+      'in_app',
+    );
     const emailEnabled = await this.isEnabled(event, recipient.userId, 'email');
 
     if (inAppEnabled) {
@@ -74,7 +81,9 @@ export class NotificationsProcessor extends WorkerHost {
           severity: event.severity,
           payload: event.payload,
           dedupeKey: event.dedupeKey,
-          ...(event.projectId === undefined ? {} : { projectId: event.projectId }),
+          ...(event.projectId === undefined
+            ? {}
+            : { projectId: event.projectId }),
           ...(event.runId === undefined ? {} : { runId: event.runId }),
           ...(event.testCaseId === undefined
             ? {}

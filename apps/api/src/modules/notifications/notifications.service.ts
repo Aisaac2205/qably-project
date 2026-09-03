@@ -136,6 +136,6 @@ export class NotificationsService {
   ): Promise<NotificationRow | null> {
     return this.prisma.notification.findFirst({
       where: { id, organizationId: org.organizationId, userId },
-    }) as Promise<NotificationRow | null>;
+    });
   }
 }

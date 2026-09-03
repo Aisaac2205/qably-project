@@ -426,7 +426,10 @@ describe('ConnectionsService connection_security notifications', () => {
     const notifications = createNotifications();
     prisma.connection.findFirst.mockResolvedValue(row);
 
-    await build(prisma, encryption, notifications).remove(owner, 'connection-1');
+    await build(prisma, encryption, notifications).remove(
+      owner,
+      'connection-1',
+    );
 
     expect(notifications.publish).toHaveBeenCalledWith(
       expect.objectContaining({

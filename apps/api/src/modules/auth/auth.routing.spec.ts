@@ -31,9 +31,7 @@ describe('better-auth catch-all route', () => {
   });
 
   it('matches a single-segment endpoint such as get-session', async () => {
-    await request(app.getHttpServer())
-      .get('/api/auth/get-session')
-      .expect(200);
+    await request(app.getHttpServer()).get('/api/auth/get-session').expect(200);
   });
 
   it('matches a nested endpoint such as sign-in/social', async () => {

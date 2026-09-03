@@ -529,7 +529,10 @@ describe('RunQueriesService.updateCaseStatus', () => {
   });
 });
 
-function findFirstByQueryShape(scopedValue: unknown, previousRunValue: unknown) {
+function findFirstByQueryShape(
+  scopedValue: unknown,
+  previousRunValue: unknown,
+) {
   return (args: { where: Record<string, unknown> }) =>
     Promise.resolve('suiteId' in args.where ? previousRunValue : scopedValue);
 }
@@ -657,7 +660,8 @@ describe('RunQueriesService.updateCaseStatus regression notifications', () => {
     );
 
     const regressionCalls = notifications.publish.mock.calls.filter(
-      ([event]: [{ eventType: string }]) => event.eventType === 'case_regressed',
+      ([event]: [{ eventType: string }]) =>
+        event.eventType === 'case_regressed',
     );
     expect(regressionCalls).toHaveLength(0);
   });
@@ -685,7 +689,8 @@ describe('RunQueriesService.updateCaseStatus regression notifications', () => {
     );
 
     const regressionCalls = notifications.publish.mock.calls.filter(
-      ([event]: [{ eventType: string }]) => event.eventType === 'case_regressed',
+      ([event]: [{ eventType: string }]) =>
+        event.eventType === 'case_regressed',
     );
     expect(regressionCalls).toHaveLength(0);
   });

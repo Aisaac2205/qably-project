@@ -414,7 +414,12 @@ describe('RunsService.ingest notifications', () => {
     await service.ingest(apiKey, {
       ...baseInput,
       cases: [
-        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'running' },
+        {
+          name: 'Adds to cart',
+          steps: [],
+          expectedResult: '',
+          status: 'running',
+        },
       ],
     });
     await service.ingest(apiKey, {
@@ -437,7 +442,12 @@ describe('RunsService.ingest notifications', () => {
     await build(prisma, notifications).ingest(apiKey, {
       ...baseInput,
       cases: [
-        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'running' },
+        {
+          name: 'Adds to cart',
+          steps: [],
+          expectedResult: '',
+          status: 'running',
+        },
       ],
     });
 

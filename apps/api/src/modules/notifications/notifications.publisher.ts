@@ -1,7 +1,10 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { NOTIFICATIONS_QUEUE, type NotificationJobData } from './notifications.contracts';
+import {
+  NOTIFICATIONS_QUEUE,
+  type NotificationJobData,
+} from './notifications.contracts';
 
 @Injectable()
 export class NotificationsPublisher {

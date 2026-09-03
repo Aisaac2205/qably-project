@@ -61,9 +61,10 @@ describe('IngestionProcessor', () => {
   it('marks the event processed once the job completes', async () => {
     const prisma = createPrisma();
 
-    await new IngestionProcessor(prisma as never, createNotifications() as never).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+    ).process(job('event-1'));
 
     expect(prisma.scmEvent.update).toHaveBeenCalledWith({
       where: { id: 'event-1' },
@@ -82,9 +83,10 @@ describe('IngestionProcessor', () => {
       },
     });
 
-    await new IngestionProcessor(prisma as never, createNotifications() as never).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+    ).process(job('event-1'));
 
     expect(prisma.ingestionBatch.create).toHaveBeenCalledTimes(2);
     expect(
@@ -95,9 +97,10 @@ describe('IngestionProcessor', () => {
   it('persists every changed file and flags only the ones matching a declared pattern', async () => {
     const prisma = createPrisma();
 
-    await new IngestionProcessor(prisma as never, createNotifications() as never).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+    ).process(job('event-1'));
 
     const [{ data }] = batchCalls(prisma);
 
@@ -120,9 +123,10 @@ describe('IngestionProcessor', () => {
   it('attaches source evidence pointing at the file on the pushed commit', async () => {
     const prisma = createPrisma();
 
-    await new IngestionProcessor(prisma as never, createNotifications() as never).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+    ).process(job('event-1'));
 
     const [{ data }] = batchCalls(prisma);
 
@@ -137,9 +141,10 @@ describe('IngestionProcessor', () => {
   it('records no batch when the event carries no changed files', async () => {
     const prisma = createPrisma({ ...defaultEvent, changedFiles: [] });
 
-    await new IngestionProcessor(prisma as never, createNotifications() as never).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+    ).process(job('event-1'));
 
     expect(prisma.ingestionBatch.create).not.toHaveBeenCalled();
     expect(prisma.scmEvent.update).toHaveBeenCalledWith({
@@ -154,9 +159,10 @@ describe('IngestionProcessor', () => {
       connection: { projects: [] },
     });
 
-    await new IngestionProcessor(prisma as never, createNotifications() as never).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+    ).process(job('event-1'));
 
     expect(prisma.ingestionBatch.create).not.toHaveBeenCalled();
   });
@@ -168,7 +174,7 @@ describe('IngestionProcessor', () => {
     prisma.ingestionBatch.create.mockRejectedValueOnce(failure);
 
     await expect(
-      new IngestionProcessor(prisma as never, (notifications as never)).process(
+      new IngestionProcessor(prisma as never, notifications as never).process(
         job('event-2'),
       ),
     ).rejects.toThrow(failure);
@@ -190,7 +196,7 @@ describe('IngestionProcessor', () => {
     prisma.ingestionBatch.create.mockRejectedValueOnce(failure);
 
     await expect(
-      new IngestionProcessor(prisma as never, (notifications as never)).process(
+      new IngestionProcessor(prisma as never, notifications as never).process(
         job('event-2'),
       ),
     ).rejects.toThrow(failure);
@@ -210,9 +216,10 @@ describe('IngestionProcessor', () => {
     const prisma = createPrisma();
     const notifications = createNotifications();
 
-    await new IngestionProcessor(prisma as never, (notifications as never)).process(
-      job('event-1'),
-    );
+    await new IngestionProcessor(
+      prisma as never,
+      notifications as never,
+    ).process(job('event-1'));
 
     expect(notifications.publish).not.toHaveBeenCalled();
   });
