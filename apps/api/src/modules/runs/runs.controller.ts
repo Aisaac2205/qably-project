@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentApiKey } from '../api-keys/decorators/current-api-key.decorator';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
@@ -55,6 +56,7 @@ export class RunsController {
   constructor(private readonly runs: RunsService) {}
 
   @Post('ingest')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   async ingest(
     @CurrentApiKey() apiKey: ApiKeyIdentity,
@@ -64,6 +66,7 @@ export class RunsController {
   }
 
   @Post('ingest/junit')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @HttpCode(HttpStatus.OK)
   async ingestJunit(
     @CurrentApiKey() apiKey: ApiKeyIdentity,

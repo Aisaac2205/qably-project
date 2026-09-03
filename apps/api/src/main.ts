@@ -37,6 +37,11 @@ async function bootstrap(): Promise<void> {
     },
   );
 
+  // Railway terminates TLS upstream, so without this every request looks
+  // like it came from the proxy and per-address throttling collapses.
+  const httpServer = app.getHttpAdapter().getInstance() as express.Express;
+  httpServer.set('trust proxy', 1);
+
   app.use(helmet());
   app.enableCors(buildCorsOptions(env));
   app.useGlobalFilters(new AllExceptionsFilter(env.NODE_ENV === 'production'));

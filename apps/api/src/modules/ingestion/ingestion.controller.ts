@@ -9,6 +9,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import type { RawBodyRequest } from '../../common/http/raw-body';
 import { isErr } from '../../common/result';
@@ -34,6 +35,7 @@ export class IngestionController {
   constructor(private readonly ingestion: IngestionService) {}
 
   @Post(':provider')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   async receive(
