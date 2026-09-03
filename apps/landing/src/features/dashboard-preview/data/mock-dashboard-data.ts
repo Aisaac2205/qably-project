@@ -195,3 +195,65 @@ export const MOCK_TRACEABILITY_ITEMS = [
   { req: 'REQ-104: Offline Order Sync in Mobile', tests: 5, coverage: '40%', status: 'fail' },
   { req: 'REQ-105: Role-based Access Control (RBAC)', tests: 12, coverage: '100%', status: 'pass' },
 ];
+
+export type MockRunStatus = 'pass' | 'fail' | 'running' | 'skip' | 'blocked' | 'pending';
+
+export interface MockDashboardRun {
+  id: string;
+  name: string;
+  suiteName: string;
+  status: MockRunStatus;
+}
+
+export interface MockCiPipeline {
+  id: string;
+  commitMessage: string;
+  commitSha: string;
+  timeAgo: string;
+}
+
+export interface MockRiskSignal {
+  id: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  projectName: string;
+  evidenceCount: number;
+  criteria: string[];
+}
+
+export const MOCK_DASHBOARD_RUNS: MockDashboardRun[] = [
+  { id: 'dr-1', name: 'Checkout · Regression', suiteName: 'Ecommerce App', status: 'pass' },
+  { id: 'dr-2', name: 'Stripe webhook retry', suiteName: 'Billing Service', status: 'pass' },
+  { id: 'dr-3', name: 'E2E Mobile Suite', suiteName: 'Mobile App', status: 'fail' },
+  { id: 'dr-4', name: 'Auth integration', suiteName: 'API Backend', status: 'running' },
+];
+
+export const MOCK_CI_PIPELINES: MockCiPipeline[] = [
+  { id: 'ci-1', commitMessage: 'fix(checkout): guard against duplicate intents', commitSha: 'a41f9c2', timeAgo: 'hace 4 min' },
+  { id: 'ci-2', commitMessage: 'feat(billing): idempotent webhook replay', commitSha: '7be0d13', timeAgo: 'hace 38 min' },
+  { id: 'ci-3', commitMessage: 'chore(ci): cache playwright browsers', commitSha: 'c92aa07', timeAgo: 'hace 2 h' },
+  { id: 'ci-4', commitMessage: 'refactor(auth): extract token verifier', commitSha: '1d47e8b', timeAgo: 'hace 5 h' },
+];
+
+export const MOCK_RISK_SIGNALS: MockRiskSignal[] = [
+  {
+    id: 'sig-1',
+    severity: 'critical',
+    projectName: 'Ecommerce App',
+    evidenceCount: 4,
+    criteria: ['checkout-modal.spec.ts inestable', '14% de flake en las últimas 50 ejecuciones'],
+  },
+  {
+    id: 'sig-2',
+    severity: 'high',
+    projectName: 'Billing Service',
+    evidenceCount: 3,
+    criteria: ['Índice de riesgo 82/100', '3 commits recientes con cambios incompatibles'],
+  },
+  {
+    id: 'sig-3',
+    severity: 'medium',
+    projectName: 'API Backend',
+    evidenceCount: 2,
+    criteria: ['Sin pruebas para el desajuste de state en OAuth2', 'Brecha de cobertura en callbacks'],
+  },
+];

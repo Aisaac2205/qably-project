@@ -1,25 +1,41 @@
 import React, { useState } from 'react';
 import {
-  SquaresFour,
-  FolderSimple,
-  Tray,
+  ArrowSquareOut,
+  ArrowUp,
   BellSimple,
-  GearSix,
-  Play,
-  ChartBar,
-  Sparkle,
-  Target,
   CalendarBlank,
-  CaretUpDown,
+  CaretDown,
   CaretRight,
-  SidebarSimple,
-  LockSimple,
-  MagnifyingGlass,
+  CaretUpDown,
   CheckCircle,
+  CircleNotch,
+  ChartBar,
+  Code,
+  FileText,
+  FolderSimple,
+  GearSix,
+  LockSimple,
+  Play,
+  SidebarSimple,
+  Sparkle,
+  SquaresFour,
+  Target,
+  Tray,
+  WarningCircle,
   XCircle,
 } from '@phosphor-icons/react';
+import type { Icon } from '@phosphor-icons/react';
 import { RealTraceabilityCalendar } from './RealTraceabilityCalendar';
-import { MOCK_PROJECTS, MOCK_DASHBOARD_STATS, MOCK_RECENT_RUNS, MOCK_AI_PROPOSALS } from '../data/mock-dashboard-data';
+import {
+  MOCK_AI_PROPOSALS,
+  MOCK_CI_PIPELINES,
+  MOCK_DASHBOARD_RUNS,
+  MOCK_DASHBOARD_STATS,
+  MOCK_PROJECTS,
+  MOCK_RISK_SIGNALS,
+  type MockRiskSignal,
+  type MockRunStatus,
+} from '../data/mock-dashboard-data';
 import type { DashboardTranslations, HeroTranslations } from '../../i18n/types';
 
 interface DashboardWindowFrameProps {
@@ -27,493 +43,628 @@ interface DashboardWindowFrameProps {
   tHero: HeroTranslations;
 }
 
-type NavSection = 'dashboard' | 'projects' | 'inbox' | 'notifications' | 'settings';
+type NavSection = 'dashboard' | 'projects' | 'review-inbox' | 'notifications' | 'settings';
+
+interface NavItem {
+  id: NavSection;
+  label: string;
+  icon: Icon;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'dashboard', label: 'Dashboard', icon: SquaresFour },
+  { id: 'projects', label: 'Proyectos', icon: FolderSimple },
+  { id: 'review-inbox', label: 'Bandeja de revisión', icon: Tray },
+  { id: 'notifications', label: 'Notificaciones', icon: BellSimple },
+  { id: 'settings', label: 'Configuración', icon: GearSix },
+];
+
+const STATUS_PRESENTATION: Record<
+  MockRunStatus,
+  { label: string; icon: Icon; tone: string; animated?: boolean }
+> = {
+  pass: { label: 'Aprobado', icon: CheckCircle, tone: 'bg-app-pass-bg text-app-pass' },
+  fail: { label: 'Fallido', icon: XCircle, tone: 'bg-app-fail-bg text-app-fail' },
+  running: { label: 'En ejecución', icon: CircleNotch, tone: 'bg-app-running-bg text-app-running', animated: true },
+  skip: { label: 'Omitido', icon: XCircle, tone: 'bg-app-skip-bg text-app-muted' },
+  blocked: { label: 'Bloqueado', icon: XCircle, tone: 'bg-app-blocked-bg text-app-blocked' },
+  pending: { label: 'Pendiente', icon: CircleNotch, tone: 'bg-app-skip-bg text-app-muted' },
+};
+
+const SEVERITY_PRESENTATION: Record<
+  MockRiskSignal['severity'],
+  { label: string; color: string; badge: string }
+> = {
+  critical: { label: 'Critical', color: 'text-app-fail', badge: 'bg-app-fail-bg text-app-fail' },
+  high: { label: 'High', color: 'text-app-warn', badge: 'bg-app-warn-bg text-app-warn' },
+  medium: { label: 'Medium', color: 'text-app-running', badge: 'bg-app-running-bg text-app-running' },
+  low: { label: 'Low', color: 'text-app-muted', badge: 'bg-app-canvas text-app-muted' },
+};
+
+function StatusChip({ status }: { status: MockRunStatus }) {
+  const presentation = STATUS_PRESENTATION[status];
+  const StatusIcon = presentation.icon;
+
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${presentation.tone}`}
+    >
+      <StatusIcon
+        size={12}
+        weight="fill"
+        aria-hidden="true"
+        className={presentation.animated ? 'animate-spin motion-reduce:animate-none' : undefined}
+      />
+      {presentation.label}
+    </span>
+  );
+}
+
+interface KpiCardProps {
+  label: string;
+  value: string | number;
+  icon: Icon;
+  trend?: { value: number; label: string };
+}
+
+function KpiCard({ label, value, icon: CardIcon, trend }: KpiCardProps) {
+  return (
+    <div className="group min-h-[120px] min-w-0 rounded-xl border border-app-border bg-app-surface p-4 text-left shadow-app-card transition-[border-color,box-shadow,transform,background-color] duration-150 ease-out hover:border-app-border-strong hover:bg-app-surface-raised">
+      <div className="flex h-full flex-col justify-between">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="truncate text-xs font-medium text-app-muted transition-colors duration-150 group-hover:text-app-default">
+            {label}
+          </dt>
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-app-border/50 bg-app-surface-raised text-app-muted transition-all duration-150 group-hover:border-app-border-strong group-hover:text-app-default">
+            <CardIcon size={15} weight="regular" aria-hidden="true" />
+          </span>
+        </div>
+
+        <div className="my-2.5">
+          <dd className="text-3xl font-semibold tracking-tight tabular-nums text-app-default">{value}</dd>
+        </div>
+
+        <div className="flex min-h-5 items-center justify-between gap-2 border-t border-app-border/40 pt-2.5">
+          {trend ? (
+            <div className="flex items-center gap-1.5 text-xs tabular-nums">
+              <span className="inline-flex items-center gap-0.5 font-semibold text-app-pass">
+                <ArrowUp size={12} weight="bold" aria-hidden="true" />+{trend.value}%
+              </span>
+              <span className="truncate text-[11px] text-app-muted">{trend.label}</span>
+            </div>
+          ) : (
+            <span className="text-[11px] text-app-muted/70 transition-colors duration-150 group-hover:text-app-muted">
+              Ver detalles
+            </span>
+          )}
+
+          <CaretRight
+            size={12}
+            weight="bold"
+            aria-hidden="true"
+            className="shrink-0 text-app-muted/40 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-app-default"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const CHART_DATA = [
+  { day: 'May 8', rate: 78 },
+  { day: 'May 9', rate: 84 },
+  { day: 'May 10', rate: 81 },
+  { day: 'May 11', rate: 86 },
+  { day: 'May 12', rate: 90 },
+  { day: 'May 13', rate: 87 },
+  { day: 'May 14', rate: 89 },
+];
+
+const CHART_WIDTH = 560;
+const CHART_HEIGHT = 172;
+const PLOT_LEFT = 36;
+const PLOT_RIGHT = 548;
+const PLOT_TOP = 12;
+const PLOT_BOTTOM = 140;
+
+function xPosition(index: number) {
+  return PLOT_LEFT + (index / (CHART_DATA.length - 1)) * (PLOT_RIGHT - PLOT_LEFT);
+}
+
+function yPosition(rate: number) {
+  return PLOT_TOP + ((100 - rate) / 100) * (PLOT_BOTTOM - PLOT_TOP);
+}
+
+const LINE_PATH = CHART_DATA.map((item, index) => {
+  const command = index === 0 ? 'M' : 'L';
+  return `${command} ${xPosition(index)} ${yPosition(item.rate)}`;
+}).join(' ');
+
+const AREA_PATH = `${LINE_PATH} L ${xPosition(CHART_DATA.length - 1)} ${PLOT_BOTTOM} L ${PLOT_LEFT} ${PLOT_BOTTOM} Z`;
+
+interface QueueSectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+function QueueSection({ title, children }: QueueSectionProps) {
+  return (
+    <section className="flex h-full min-w-0 flex-col p-5 md:p-6">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-sm font-semibold tracking-[-0.01em] text-app-default">{title}</h2>
+        <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-app-primary">
+          Ver todo
+          <CaretRight size={11} weight="bold" aria-hidden="true" />
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col justify-between divide-y divide-app-border">{children}</div>
+    </section>
+  );
+}
 
 export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) {
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard');
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-zinc-300/90 bg-white shadow-[0_25px_80px_rgba(0,0,0,0.85)] flex flex-col text-zinc-900 font-sans">
-      {/* macOS Authentic White / Light Window Titlebar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#fbfbfb] border-b border-zinc-200/80 select-none">
+    <div className="w-full overflow-hidden rounded-2xl border border-app-border-sidebar bg-app-sidebar font-sans text-app-default shadow-[0_25px_80px_rgba(0,0,0,0.85)]">
+      {/* Browser chrome — the window that hosts the product shell */}
+      <div className="flex select-none items-center justify-between border-b border-app-border-sidebar bg-app-canvas px-4 py-2.5">
         <div className="flex items-center gap-2">
-          {/* Authentic Mac Traffic Light Dots */}
-          <div className="size-3 rounded-full bg-[#ff5f56] border border-[#e0443e]/80 shadow-[0_0_4px_rgba(255,95,86,0.3)] transition-transform hover:scale-110 cursor-pointer" title="Cerrar" />
-          <div className="size-3 rounded-full bg-[#ffbd2e] border border-[#dea123]/80 shadow-[0_0_4px_rgba(255,189,46,0.3)] transition-transform hover:scale-110 cursor-pointer" title="Minimizar" />
-          <div className="size-3 rounded-full bg-[#27c93f] border border-[#1aab29]/80 shadow-[0_0_4px_rgba(39,201,63,0.3)] transition-transform hover:scale-110 cursor-pointer" title="Expandir" />
+          <span className="size-3 rounded-full bg-[#ff5f56]" aria-hidden="true" />
+          <span className="size-3 rounded-full bg-[#ffbd2e]" aria-hidden="true" />
+          <span className="size-3 rounded-full bg-[#27c93f]" aria-hidden="true" />
         </div>
 
-        {/* Real Official Route Badge in URL bar */}
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-zinc-100/90 border border-zinc-200/70 text-xs text-zinc-600 font-mono shadow-2xs">
-          <LockSimple size={12} weight="bold" className="text-zinc-500" />
-          <span className="select-none font-sans font-medium text-[11px] text-zinc-700">qably.dev/dashboard</span>
+        <div className="flex items-center gap-1.5 rounded-md border border-app-border bg-app-surface px-3 py-1 text-[11px] font-medium text-app-muted">
+          <LockSimple size={12} weight="bold" aria-hidden="true" />
+          <span>qably.dev/dashboard</span>
         </div>
 
-        {/* Live Sync Dot Indicator */}
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-sans">
-          <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="hidden sm:inline font-medium text-zinc-600">Live</span>
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-app-muted">
+          <span className="size-2 rounded-full bg-app-pass" aria-hidden="true" />
+          <span className="hidden sm:inline">Live</span>
         </div>
       </div>
 
-      {/* Main Window Body: 100% Identical Replica of apps/web (Light Theme) */}
-      <div className="grid grid-cols-1 md:grid-cols-[224px_1fr] min-h-[660px] text-zinc-900 font-sans bg-white">
-          {/* Left Sidebar (Exact replica of apps/web sidebar) */}
-          <aside className="hidden md:flex flex-col justify-between border-r border-zinc-200/80 bg-white p-3.5 select-none text-left">
-            <div className="space-y-4">
-              {/* Sidebar Brand Header with Collapse Button */}
-              <div className="flex items-center justify-between px-1 py-1">
-                <a href="/dashboard" aria-label="Qably Home" className="flex items-center">
-                  <img
-                    src="/qably-sidebar.svg"
-                    alt="Qably"
-                    className="h-6 w-auto object-contain"
-                  />
-                </a>
-                <button
-                  type="button"
-                  aria-label="Toggle sidebar"
-                  className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors border border-zinc-200/60 cursor-pointer"
-                >
-                  <SidebarSimple size={15} />
-                </button>
-              </div>
-
-              {/* Sidebar Navigation Items */}
-              <nav className="space-y-1" aria-label="Sidebar preview">
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('dashboard')}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeNav === 'dashboard'
-                      ? 'bg-zinc-100 text-zinc-900 shadow-2xs'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                  }`}
-                >
-                  <SquaresFour size={16} weight={activeNav === 'dashboard' ? 'bold' : 'regular'} />
-                  <span>Dashboard</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('projects')}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    activeNav === 'projects'
-                      ? 'bg-zinc-100 text-zinc-900 shadow-2xs'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                  }`}
-                >
-                  <FolderSimple size={16} />
-                  <span>Proyectos</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('inbox')}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    activeNav === 'inbox'
-                      ? 'bg-zinc-100 text-zinc-900 shadow-2xs'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Tray size={16} />
-                    <span>Bandeja de revisión</span>
-                  </div>
-                  <span className="rounded bg-zinc-200 px-1.5 py-0.2 text-[10px] font-semibold text-zinc-800">
-                    3
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('notifications')}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    activeNav === 'notifications'
-                      ? 'bg-zinc-100 text-zinc-900 shadow-2xs'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                  }`}
-                >
-                  <BellSimple size={16} />
-                  <span>Notificaciones</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveNav('settings')}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    activeNav === 'settings'
-                      ? 'bg-zinc-100 text-zinc-900 shadow-2xs'
-                      : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50'
-                  }`}
-                >
-                  <GearSix size={16} />
-                  <span>Configuración</span>
-                </button>
-              </nav>
-            </div>
-
-            {/* Sidebar Footer User Card (Exact SidebarAccount from apps/web) */}
-            <div className="border border-zinc-200/80 rounded-xl p-2 bg-white flex items-center justify-between shadow-2xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="size-7 rounded-full bg-black text-white text-xs font-bold flex items-center justify-center shrink-0 select-none">
-                  IF
-                </div>
-                <div className="flex flex-col min-w-0 text-left">
-                  <span className="text-xs font-semibold text-zinc-900 truncate">Isaac F.</span>
-                  <span className="text-[10px] text-zinc-500">Administrador</span>
-                </div>
-              </div>
-              <CaretUpDown size={14} className="text-zinc-400 shrink-0" />
-            </div>
-          </aside>
-
-          {/* Right Content Area */}
-          <div className="flex flex-col bg-[#f8f9fa] overflow-hidden text-left">
-            {/* Top Bar (Exact replica of apps/web top-bar.tsx) */}
-            <div className="h-14 bg-white border-b border-zinc-200/80 px-6 flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <h1 className="text-base sm:text-lg font-semibold tracking-[-0.015em] text-zinc-900 font-sans">
-                  Dashboard
-                </h1>
-              </div>
-
-              {/* Right Tools: Search box, Notification Bell with badge & User Avatar */}
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-zinc-50 border border-zinc-200 text-xs text-zinc-500 w-52">
-                  <MagnifyingGlass size={13} />
-                  <span className="truncate">Buscar proyectos, runs...</span>
-                  <kbd className="ml-auto text-[10px] bg-zinc-200/80 px-1 py-0.2 rounded text-zinc-600 font-mono">⌘K</kbd>
-                </div>
-
-                <div className="relative p-1.5 text-zinc-600 hover:text-zinc-900 rounded-md cursor-pointer">
-                  <BellSimple size={18} />
-                  <span className="absolute top-0.5 right-0.5 size-3.5 bg-rose-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
-                    2
-                  </span>
-                </div>
-
-                <div className="size-7 select-none rounded-full bg-black text-white font-bold text-xs flex items-center justify-center">
-                  IF
-                </div>
-              </div>
-            </div>
-
-            {/* Main Dashboard Workspace (Rich Mock Data) */}
-            <div className="p-5 sm:p-6 space-y-6 overflow-y-auto">
-              {/* 1. KpiRow: 4 Cards with Rich Mock Data */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Card 1: Ejecuciones */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500 font-medium">Ejecuciones • 7 días</span>
-                    <div className="size-6 rounded-md border border-zinc-200/80 flex items-center justify-center text-zinc-500 bg-zinc-50">
-                      <Play size={12} weight="bold" />
-                    </div>
-                  </div>
-                  <div className="my-2.5">
-                    <span className="text-3xl font-semibold text-zinc-900 tracking-tight tabular-nums">
-                      {MOCK_DASHBOARD_STATS.runsLast7d}
-                    </span>
-                  </div>
-                  <div className="border-t border-zinc-100 pt-2 flex items-center justify-between text-[11px] text-zinc-400">
-                    <span>Ver detalles</span>
-                    <CaretRight size={11} />
-                  </div>
-                </div>
-
-                {/* Card 2: Aprobación */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500 font-medium">Aprobación • 7 días</span>
-                    <div className="size-6 rounded-md border border-zinc-200/80 flex items-center justify-center text-zinc-500 bg-zinc-50">
-                      <ChartBar size={12} />
-                    </div>
-                  </div>
-                  <div className="my-2.5">
-                    <span className="text-3xl font-semibold text-zinc-900 tracking-tight tabular-nums">
-                      {MOCK_DASHBOARD_STATS.passRateLast7d}.4%
-                    </span>
-                  </div>
-                  <div className="border-t border-zinc-100 pt-2 flex items-center justify-between text-[11px] text-zinc-500">
-                    <span className="text-emerald-600 font-semibold">↑ +5% vs. los 7 días anteriores</span>
-                    <CaretRight size={11} />
-                  </div>
-                </div>
-
-                {/* Card 3: IA pendiente */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500 font-medium">IA pendiente</span>
-                    <div className="size-6 rounded-md border border-zinc-200/80 flex items-center justify-center text-zinc-500 bg-zinc-50">
-                      <Sparkle size={12} />
-                    </div>
-                  </div>
-                  <div className="my-2.5">
-                    <span className="text-3xl font-semibold text-zinc-900 tracking-tight tabular-nums">
-                      {MOCK_DASHBOARD_STATS.pendingProposals}
-                    </span>
-                  </div>
-                  <div className="border-t border-zinc-100 pt-2 flex items-center justify-between text-[11px] text-zinc-400">
-                    <span>Ver detalles</span>
-                    <CaretRight size={11} />
-                  </div>
-                </div>
-
-                {/* Card 4: Brechas de cobertura */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-zinc-500 font-medium">Brechas de cobertura</span>
-                    <div className="size-6 rounded-md border border-zinc-200/80 flex items-center justify-center text-zinc-500 bg-zinc-50">
-                      <Target size={12} />
-                    </div>
-                  </div>
-                  <div className="my-2.5">
-                    <span className="text-3xl font-semibold text-zinc-900 tracking-tight tabular-nums">
-                      {MOCK_DASHBOARD_STATS.coverageGapsCount}
-                    </span>
-                  </div>
-                  <div className="border-t border-zinc-100 pt-2 flex items-center justify-between text-[11px] text-zinc-400">
-                    <span>Ver detalles</span>
-                    <CaretRight size={11} />
-                  </div>
-                </div>
-              </div>
-
-              {/* 2. Trazabilidad Section (Contribution Calendar Heatmap) */}
-              <div className="bg-white rounded-xl border border-zinc-200/80 p-5 shadow-2xs space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-semibold text-zinc-900 tracking-[-0.015em]">
-                      Trazabilidad
-                    </h2>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      Trazabilidad en vivo entre repositorios, propuestas, casos oficiales y ejecuciones
-                    </p>
-                    <a
-                      href="#features"
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-zinc-800 hover:text-black mt-1.5 transition-colors"
-                    >
-                      <span>Bandeja de revisión</span>
-                      <CaretRight size={11} weight="bold" />
-                    </a>
-                  </div>
-
-                  {/* Filters */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="flex items-center gap-2 border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white text-xs text-zinc-700 shadow-2xs">
-                      <CalendarBlank size={14} className="text-zinc-500" />
-                      <span>Todas las etapas</span>
-                      <span className="rounded bg-zinc-100 px-1.5 py-0.2 text-[10px] font-semibold text-zinc-600">
-                        922
-                      </span>
-                      <CaretUpDown size={12} className="text-zinc-400 ml-1" />
-                    </div>
-
-                    <div className="flex items-center gap-1.5 border border-zinc-200 rounded-lg px-2.5 py-1.5 bg-white text-xs text-zinc-700 shadow-2xs">
-                      <span>2026</span>
-                      <CaretUpDown size={12} className="text-zinc-400" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Heatmap Matrix SVG */}
-                <RealTraceabilityCalendar />
-              </div>
-
-              {/* 3. Middle Grid: Salud de proyectos + Tendencia de aprobación */}
-              <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-                {/* Salud de proyectos with Rich Mock Projects */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-5 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-                    <h3 className="text-sm font-semibold text-zinc-900">Salud de proyectos</h3>
-                    <span className="text-xs text-zinc-500 hover:text-zinc-900 cursor-pointer font-medium">
-                      Ver todo
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto my-2">
-                    <table className="w-full text-left text-xs font-sans">
-                      <thead>
-                        <tr className="text-zinc-400 border-b border-zinc-100 text-[11px]">
-                          <th className="pb-2.5 font-medium">Proyecto</th>
-                          <th className="pb-2.5 font-medium">Salud</th>
-                          <th className="pb-2.5 font-medium">Última ejecución</th>
-                          <th className="pb-2.5 font-medium text-center">Suites</th>
-                          <th className="pb-2.5 font-medium text-center">IA pendiente</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {MOCK_PROJECTS.map((project) => (
-                          <tr key={project.id} className="hover:bg-zinc-50/60 transition-colors">
-                            <td className="py-3 font-semibold text-zinc-900">
-                              <div>{project.name}</div>
-                              <div className="text-[10px] text-zinc-400 font-normal">{project.technologies.join(' • ')}</div>
-                            </td>
-                            <td className="py-3">
-                              <div className="flex items-center gap-1.5">
-                                <span
-                                  className={`size-2 rounded-full ${
-                                    project.healthScore >= 80
-                                      ? 'bg-emerald-500'
-                                      : project.healthScore >= 60
-                                        ? 'bg-amber-500'
-                                        : 'bg-rose-500'
-                                  }`}
-                                />
-                                <span className="font-semibold text-zinc-800 tabular-nums">{project.healthScore}%</span>
-                              </div>
-                            </td>
-                            <td className="py-3 text-zinc-500">{project.lastRunAt}</td>
-                            <td className="py-3 text-center text-zinc-600 font-mono font-medium">{project.suiteCount}</td>
-                            <td className="py-3 text-center">
-                              {project.aiPendingCount > 0 ? (
-                                <span className="rounded bg-zinc-100 border border-zinc-200 px-1.5 py-0.2 text-[10px] font-semibold text-zinc-800">
-                                  +{project.aiPendingCount}
-                                </span>
-                              ) : (
-                                <span className="text-zinc-400">—</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Tendencia de aprobación with Smooth SVG Chart */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-5 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-100">
-                    <h3 className="text-sm font-semibold text-zinc-900">Tendencia de aprobación</h3>
-                    <div className="flex items-center gap-1 border border-zinc-200 rounded px-2 py-0.5 text-xs text-zinc-600">
-                      <span>7 days</span>
-                      <CaretUpDown size={10} />
-                    </div>
-                  </div>
-
-                  <div className="my-2">
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-2xl font-semibold text-zinc-900 tabular-nums">89.4%</span>
-                      <span className="text-xs font-semibold text-emerald-600">↑ 8% vs. los 7 días anteriores</span>
-                    </div>
-
-                    {/* Chart SVG */}
-                    <div className="w-full h-32">
-                      <svg viewBox="0 0 400 130" className="w-full h-full overflow-visible">
-                        <defs>
-                          <linearGradient id="landingTrendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-                        <line x1="0" y1="20" x2="400" y2="20" stroke="#f4f4f5" strokeDasharray="3 3" />
-                        <line x1="0" y1="50" x2="400" y2="50" stroke="#f4f4f5" strokeDasharray="3 3" />
-                        <line x1="0" y1="80" x2="400" y2="80" stroke="#f4f4f5" strokeDasharray="3 3" />
-                        <line x1="0" y1="110" x2="400" y2="110" stroke="#f4f4f5" />
-                        
-                        {/* Trend area and stroke */}
-                        <path
-                          d="M 0 85 L 60 72 L 120 78 L 180 65 L 240 58 L 300 62 L 360 52 L 400 50 L 400 120 L 0 120 Z"
-                          fill="url(#landingTrendFill)"
-                        />
-                        <path
-                          d="M 0 85 L 60 72 L 120 78 L 180 65 L 240 58 L 300 62 L 360 52 L 400 50"
-                          fill="none"
-                          stroke="#10b981"
-                          strokeWidth="2"
-                        />
-                        <circle cx="400" cy="50" r="3.5" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                      </svg>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-zinc-400 pt-1 font-mono">
-                      <span>May 8</span>
-                      <span>May 9</span>
-                      <span>May 10</span>
-                      <span>May 11</span>
-                      <span>May 12</span>
-                      <span>May 13</span>
-                      <span>May 14</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4. Bottom Cards: Ejecuciones recientes, Pipelines recientes, Propuestas pendientes */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Ejecuciones recientes */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-3">
-                    <h4 className="text-xs font-semibold text-zinc-900">Ejecuciones recientes</h4>
-                    <span className="text-[11px] text-zinc-500 font-medium cursor-pointer">View all &gt;</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    {MOCK_RECENT_RUNS.slice(0, 2).map((run) => (
-                      <div key={run.id} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          {run.status === 'pass' ? (
-                            <CheckCircle size={15} weight="fill" className="text-emerald-500 shrink-0" />
-                          ) : (
-                            <XCircle size={15} weight="fill" className="text-rose-500 shrink-0" />
-                          )}
-                          <span className="text-zinc-800 font-medium truncate">{run.title}</span>
-                        </div>
-                        <span className="text-zinc-400 text-[11px] shrink-0">{run.timeAgo}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Pipelines recientes */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-3">
-                    <h4 className="text-xs font-semibold text-zinc-900">Pipelines recientes</h4>
-                    <span className="text-[11px] text-zinc-500 font-medium cursor-pointer">View all &gt;</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CheckCircle size={15} weight="fill" className="text-emerald-500 shrink-0" />
-                        <span className="text-zinc-800 font-medium truncate">Main CI/CD Quality Gate</span>
-                      </div>
-                      <span className="text-zinc-400 text-[11px] shrink-0">4m ago</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <CheckCircle size={15} weight="fill" className="text-emerald-500 shrink-0" />
-                        <span className="text-zinc-800 font-medium truncate">Nightly E2E Regression</span>
-                      </div>
-                      <span className="text-zinc-400 text-[11px] shrink-0">2h ago</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Propuestas pendientes */}
-                <div className="bg-white rounded-xl border border-zinc-200/80 p-4 shadow-2xs flex flex-col justify-between">
-                  <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-3">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-semibold text-zinc-900">Propuestas pendientes</h4>
-                      <span className="rounded bg-zinc-100 px-1.5 py-0.2 text-[10px] font-semibold text-zinc-700">
-                        3 pendientes
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-zinc-500 font-medium cursor-pointer">Bandeja de revisión &gt;</span>
-                  </div>
-                  <div className="space-y-2.5">
-                    {MOCK_AI_PROPOSALS.slice(0, 2).map((proposal) => (
-                      <div key={proposal.id} className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-800 font-medium truncate">{proposal.title}</span>
-                        <span className="rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 text-[10px] font-semibold shrink-0">
-                          {proposal.confidence}% conf
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+      {/* Product shell — mirrors the AppShell of apps/web (sidebar + inset) */}
+      <div className="grid min-w-0 grid-cols-[13rem_minmax(0,1fr)] bg-app-sidebar text-left">
+        <aside className="flex min-h-0 flex-col bg-app-sidebar text-app-sidebar-fg">
+          <div className="flex h-14 flex-col justify-center p-2">
+            <div className="flex h-10 w-full items-center justify-between gap-1.5 px-0.5">
+              <span className="flex h-10 flex-1 items-center rounded-lg px-2 transition-colors hover:bg-app-sidebar-hover">
+                <img src="/qably-sidebar.svg" alt="Qably" className="h-7 w-auto translate-y-0.5 object-contain" />
+              </span>
+              <button
+                type="button"
+                aria-label="Toggle sidebar"
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg text-app-sidebar-fg transition-colors hover:bg-app-surface-hover hover:text-app-default"
+              >
+                <SidebarSimple size={20} weight="bold" aria-hidden="true" />
+              </button>
             </div>
           </div>
+
+          <nav aria-label="Sidebar preview" className="flex min-h-0 flex-1 flex-col p-2">
+            <ul className="flex w-full min-w-0 flex-col gap-0">
+              {NAV_ITEMS.map((item) => {
+                const isActive = activeNav === item.id;
+                return (
+                  <li key={item.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav(item.id)}
+                      aria-current={isActive ? 'page' : undefined}
+                      className={`flex h-8 w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm transition-colors ${
+                        isActive
+                          ? 'bg-app-sidebar-active font-normal text-app-sidebar-fg'
+                          : 'text-app-sidebar-fg hover:bg-app-sidebar-active'
+                      }`}
+                    >
+                      <item.icon size={16} aria-hidden="true" className="shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+
+          <div className="flex flex-col gap-2 p-2">
+            <span className="flex h-12 w-full items-center gap-2.5 rounded-xl border border-app-border-sidebar bg-app-sidebar/50 px-3 py-2 text-left">
+              <span
+                aria-hidden="true"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-primary text-xs font-semibold text-app-primary-fg"
+              >
+                IF
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium leading-tight text-app-sidebar-fg">Isaac F.</span>
+                <span className="block truncate text-xs leading-normal text-app-sidebar-fg-muted">Administrador</span>
+              </span>
+              <CaretUpDown size={16} aria-hidden="true" className="shrink-0 text-app-sidebar-fg-muted" />
+            </span>
+          </div>
+        </aside>
+
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-app-sidebar">
+          <header className="flex h-14 shrink-0 items-center justify-between bg-app-sidebar px-4 md:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <h1 className="text-base font-semibold tracking-[-0.015em] text-app-default md:text-lg">Dashboard</h1>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="relative flex size-8 items-center justify-center rounded-lg text-app-default transition-colors hover:bg-app-surface-hover">
+                <BellSimple size={18} aria-hidden="true" />
+                <span
+                  aria-hidden="true"
+                  className="absolute -right-1 -top-1 min-w-4 rounded-full bg-app-fail px-1 text-center text-[10px] font-semibold leading-4 text-app-primary-fg"
+                >
+                  2
+                </span>
+              </span>
+
+              <span className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-app-primary text-xs font-bold text-app-primary-fg">
+                IF
+              </span>
+            </div>
+          </header>
+
+          <main className="m-3 mt-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-app-surface shadow-app-pop ring-1 ring-app-border">
+            <section
+              aria-label="Dashboard"
+              className="w-full space-y-6 px-5 py-6 text-app-default sm:px-7 lg:px-9 lg:py-6"
+            >
+              <section aria-label="Quality overview" className="min-w-0">
+                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <KpiCard label={tDashboard.runsKpi} value={MOCK_DASHBOARD_STATS.runsLast7d} icon={Play} />
+                  <KpiCard
+                    label={tDashboard.passRateKpi}
+                    value={`${MOCK_DASHBOARD_STATS.passRateLast7d}%`}
+                    icon={ChartBar}
+                    trend={{ value: MOCK_DASHBOARD_STATS.passRateTrend, label: tDashboard.vsPrior7d }}
+                  />
+                  <KpiCard
+                    label={tDashboard.pendingAiKpi}
+                    value={MOCK_DASHBOARD_STATS.pendingProposals}
+                    icon={Sparkle}
+                  />
+                  <KpiCard
+                    label={tDashboard.coverageGapsKpi}
+                    value={MOCK_DASHBOARD_STATS.coverageGapsCount}
+                    icon={Target}
+                  />
+                </dl>
+              </section>
+
+              <section className="rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">Trazabilidad</h2>
+                    <p className="mt-0.5 text-xs text-app-muted">
+                      Trazabilidad en vivo entre repositorios, propuestas, casos oficiales y ejecuciones
+                    </p>
+                    <div className="mt-1.5">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-app-default">
+                        Bandeja de revisión
+                        <CaretRight size={11} weight="bold" aria-hidden="true" />
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="flex h-9 min-w-[175px] items-center justify-between gap-2.5 rounded-lg border border-app-border bg-app-canvas px-3 py-1.5 text-xs font-medium text-app-default shadow-xs">
+                      <span className="flex items-center gap-1.5">
+                        <span className="shrink-0 text-app-muted">
+                          <CalendarBlank size={14} weight="bold" aria-hidden="true" />
+                        </span>
+                        <span>Todas las etapas</span>
+                        <span className="inline-flex items-center justify-center rounded-full bg-app-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-app-muted">
+                          922
+                        </span>
+                      </span>
+                      <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />
+                    </span>
+
+                    <span className="flex h-9 min-w-[84px] items-center justify-between gap-2.5 rounded-lg border border-app-border bg-app-canvas px-3 py-1.5 text-xs font-semibold text-app-default shadow-xs">
+                      <span>2026</span>
+                      <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <RealTraceabilityCalendar />
+                </div>
+              </section>
+
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)]">
+                <div className="col-span-1 flex flex-col justify-between rounded-xl border border-app-border/80 bg-app-surface shadow-app-card">
+                  <div className="flex flex-row items-center justify-between p-5 pb-4">
+                    <h3 className="text-sm font-semibold text-app-default">{tDashboard.projectHealth}</h3>
+                    <span className="text-xs font-semibold text-app-primary">{tDashboard.viewAll}</span>
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="w-full overflow-x-auto">
+                      <table className="w-full min-w-[400px] border-collapse text-left">
+                        <thead>
+                          <tr className="border-b border-app-border bg-app-canvas/40">
+                            <th className="px-5 py-3 text-xs font-medium text-app-muted">{tDashboard.thProject}</th>
+                            <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thHealth}</th>
+                            <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thLastRun}</th>
+                            <th className="px-3 py-3 text-center text-xs font-medium text-app-muted">
+                              {tDashboard.thSuites}
+                            </th>
+                            <th className="px-5 py-3 text-center text-xs font-medium text-app-muted">
+                              {tDashboard.thAiPending}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-app-border/60">
+                          {MOCK_PROJECTS.map((project) => (
+                            <tr key={project.id} className="transition-colors hover:bg-app-canvas/20">
+                              <td className="px-5 py-3.5">
+                                <span className="text-xs font-semibold text-app-default">{project.name}</span>
+                              </td>
+                              <td className="px-3 py-3.5">
+                                <div className="flex items-center gap-2">
+                                  <StatusChip status={project.lastRunStatus} />
+                                  <span className="font-mono text-xs font-semibold tabular-nums text-app-default">
+                                    {project.healthScore}%
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3.5 text-xs text-app-muted">{project.lastRunAt}</td>
+                              <td className="px-3 py-3.5 text-center font-mono text-xs font-medium tabular-nums text-app-default">
+                                {project.suiteCount}
+                              </td>
+                              <td className="px-5 py-3.5 text-center font-mono text-xs font-medium tabular-nums">
+                                {project.aiPendingCount > 0 ? (
+                                  <span className="font-semibold text-app-primary">{project.aiPendingCount}</span>
+                                ) : (
+                                  <span className="text-app-muted/60">0</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="col-span-1 flex flex-col justify-between rounded-xl border border-app-border/80 bg-app-surface shadow-app-card">
+                  <div className="flex flex-row items-center justify-between p-5 pb-2">
+                    <h3 className="text-sm font-semibold text-app-default">{tDashboard.passRateTrend}</h3>
+                    <span className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-canvas px-2 py-1 text-xs font-semibold text-app-muted">
+                      <span>7 days</span>
+                      <CaretDown size={10} aria-hidden="true" />
+                    </span>
+                  </div>
+
+                  <div className="flex flex-1 flex-col justify-between p-5 pt-0">
+                    <div className="mb-4 flex items-baseline gap-2">
+                      <span className="text-3xl font-semibold tracking-[-0.025em] tabular-nums text-app-default">
+                        {MOCK_DASHBOARD_STATS.passRateLast7d}%
+                      </span>
+                      <div className="flex items-center gap-0.5 text-xs font-semibold tabular-nums text-app-pass">
+                        <ArrowUp size={12} weight="bold" aria-hidden="true" />
+                        <span>{MOCK_DASHBOARD_STATS.passRateTrend}%</span>
+                        <span className="ml-1 text-xs font-normal text-app-muted">{tDashboard.vsPrior7d}</span>
+                      </div>
+                    </div>
+
+                    <svg
+                      viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+                      preserveAspectRatio="none"
+                      className="h-40 w-full"
+                      role="img"
+                      aria-label="Tendencia de aprobación de los últimos 7 días"
+                    >
+                      {[0, 25, 50, 75, 100].map((tick) => {
+                        const y = yPosition(tick);
+                        return (
+                          <g key={tick}>
+                            <line
+                              x1={PLOT_LEFT}
+                              x2={PLOT_RIGHT}
+                              y1={y}
+                              y2={y}
+                              stroke="var(--color-app-border)"
+                              strokeDasharray="3 4"
+                              vectorEffect="non-scaling-stroke"
+                            />
+                            <text x={0} y={y + 3} fontSize={9} fill="var(--color-app-muted)">
+                              {tick}%
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      <path d={AREA_PATH} fill="color-mix(in oklch, var(--color-app-default) 7%, transparent)" />
+                      <path
+                        d={LINE_PATH}
+                        fill="none"
+                        stroke="var(--color-app-default)"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        vectorEffect="non-scaling-stroke"
+                      />
+
+                      {CHART_DATA.map((item, index) => (
+                        <text
+                          key={item.day}
+                          x={xPosition(index)}
+                          y={164}
+                          textAnchor="middle"
+                          fontSize={9}
+                          fill="var(--color-app-muted)"
+                        >
+                          {item.day}
+                        </text>
+                      ))}
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(21rem,0.72fr)]">
+                <section
+                  aria-label="Operational work queue"
+                  className="flex h-full flex-col overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-xs"
+                >
+                  <div className="grid flex-1 grid-cols-1 divide-y divide-app-border md:grid-cols-2 md:divide-x md:divide-y-0">
+                    <QueueSection title="Ejecuciones recientes">
+                      {MOCK_DASHBOARD_RUNS.map((run) => (
+                        <div key={run.id} className="flex min-h-14 items-center justify-between gap-3 py-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-canvas text-app-muted">
+                              <Play size={15} weight="fill" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-app-default">{run.name}</p>
+                              <p className="truncate text-xs text-app-muted">{run.suiteName}</p>
+                            </div>
+                          </div>
+                          <StatusChip status={run.status} />
+                        </div>
+                      ))}
+                    </QueueSection>
+
+                    <QueueSection title="Pipelines recientes">
+                      {MOCK_CI_PIPELINES.map((pipeline) => (
+                        <div key={pipeline.id} className="flex min-h-14 items-center justify-between gap-3 py-3">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-canvas text-app-muted">
+                              <Code size={15} weight="bold" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-app-default">{pipeline.commitMessage}</p>
+                              <p className="truncate font-mono text-xs text-app-muted">{pipeline.commitSha}</p>
+                            </div>
+                          </div>
+                          <span className="shrink-0 text-xs tabular-nums text-app-muted">{pipeline.timeAgo}</span>
+                        </div>
+                      ))}
+                    </QueueSection>
+                  </div>
+                </section>
+
+                <section className="flex flex-col justify-between rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
+                  <div>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2.5">
+                          <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
+                            {tDashboard.pendingProposals}
+                          </h2>
+                          <span className="inline-flex shrink-0 items-center rounded-md border border-app-border bg-app-canvas px-2 py-0.5 text-xs font-medium text-app-muted">
+                            {MOCK_AI_PROPOSALS.length} pendientes
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-app-muted">
+                          Propuestas de prueba generadas por IA en espera de verificación humana
+                        </p>
+                      </div>
+
+                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-app-default">
+                        Bandeja de revisión
+                        <CaretRight size={12} weight="bold" aria-hidden="true" />
+                      </span>
+                    </div>
+
+                    <div className="mt-4 divide-y divide-app-border/60">
+                      {MOCK_AI_PROPOSALS.map((proposal) => (
+                        <div
+                          key={proposal.id}
+                          className="flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
+                        >
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-app-ai-bg text-app-ai">
+                              <Sparkle size={15} weight="fill" aria-hidden="true" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold text-app-default">{proposal.title}</p>
+                            </div>
+                          </div>
+
+                          <span className="inline-flex shrink-0 items-center gap-1 self-end rounded border border-app-border/80 bg-app-canvas/60 px-2.5 py-1.5 text-xs font-medium text-app-default sm:self-center">
+                            Revisar
+                            <CaretRight size={11} weight="bold" aria-hidden="true" />
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <section className="rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
+                      Riesgos de calidad y vigencia
+                    </h2>
+                    <p className="mt-0.5 text-xs text-app-muted">
+                      Señales de pruebas desactualizadas, brechas de cobertura y estabilidad
+                    </p>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center rounded-md border border-app-border bg-app-canvas px-2.5 py-1 text-xs font-medium text-app-muted">
+                    {MOCK_RISK_SIGNALS.length} señales activas
+                  </span>
+                </div>
+
+                <div className="mt-4 divide-y divide-app-border/60">
+                  {MOCK_RISK_SIGNALS.map((risk) => {
+                    const severity = SEVERITY_PRESENTATION[risk.severity];
+
+                    return (
+                      <div
+                        key={risk.id}
+                        className="flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
+                      >
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <WarningCircle
+                            size={18}
+                            weight="fill"
+                            aria-hidden="true"
+                            className={`mt-0.5 shrink-0 ${severity.color}`}
+                          />
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span
+                                className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${severity.badge}`}
+                              >
+                                {severity.label}
+                              </span>
+                              <span className="inline-flex items-center rounded border border-app-border bg-app-canvas px-2 py-0.5 text-[11px] font-medium text-app-muted">
+                                {risk.projectName}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[11px] text-app-muted">
+                                <FileText size={12} aria-hidden="true" />
+                                <span>{risk.evidenceCount} evidencias</span>
+                              </span>
+                            </div>
+                            <p className="text-xs leading-relaxed text-app-default">{risk.criteria.join(' · ')}</p>
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 self-end sm:self-center">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-app-primary">
+                            <span>Ver repositorio</span>
+                            <ArrowSquareOut size={12} aria-hidden="true" />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </section>
+          </main>
         </div>
       </div>
+    </div>
   );
 }
