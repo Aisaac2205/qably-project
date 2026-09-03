@@ -139,7 +139,14 @@
     "kpiUnread": "Sin leer",
     "kpiCritical": "Críticas",
     "temporaryTitle": "Esta área todavía no está disponible",
-    "temporaryDescription": "Las notificaciones aparecerán aquí cuando se incorpore su entrega."
+    "temporaryDescription": "Las notificaciones aparecerán aquí cuando se incorpore su entrega.",
+    "events": {
+      "run_failed": "La ejecución \"{{runName}}\" en {{suiteName}} falló.",
+      "run_completed": "La ejecución \"{{runName}}\" en {{suiteName}} pasó.",
+      "case_regressed": "{{caseName}} tuvo una regresión en {{suiteName}} durante la ejecución \"{{runName}}\".",
+      "ingestion_failed": "La ingesta falló para {{repo}}.",
+      "connection_security": "{{action}} en la conexión {{connectionName}}."
+    }
   },
   "repository": {
     "title": "Repositorio",

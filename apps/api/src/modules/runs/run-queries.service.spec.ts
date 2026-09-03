@@ -84,6 +84,10 @@ interface FakePrisma {
   $transaction: jest.Mock;
 }
 
+function createNotifications() {
+  return { publish: jest.fn().mockResolvedValue(undefined) };
+}
+
 function createPrisma(): FakePrisma {
   const prisma: FakePrisma = {
     run: {
@@ -109,8 +113,11 @@ function createPrisma(): FakePrisma {
   return prisma;
 }
 
-function build(prisma: FakePrisma) {
-  return new RunQueriesService(prisma as never);
+function build(
+  prisma: FakePrisma,
+  notifications: { publish: jest.Mock } = createNotifications(),
+) {
+  return new RunQueriesService(prisma as never, notifications as never);
 }
 
 describe('RunQueriesService.list', () => {
@@ -519,5 +526,187 @@ describe('RunQueriesService.updateCaseStatus', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.cases).toHaveLength(1);
+  });
+});
+
+function findFirstByQueryShape(scopedValue: unknown, previousRunValue: unknown) {
+  return (args: { where: Record<string, unknown> }) =>
+    Promise.resolve('suiteId' in args.where ? previousRunValue : scopedValue);
+}
+
+describe('RunQueriesService.updateCaseStatus terminal notifications', () => {
+  it('publishes run_failed when the run transitions into fail', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.run.findFirst.mockImplementation(
+      findFirstByQueryShape(runRow, null),
+    );
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([runCaseRow({ id: 'run-case-1' })])
+      .mockResolvedValue([runCaseRow({ id: 'run-case-1', status: 'fail' })]);
+    prisma.run.update.mockResolvedValue({ ...runRow, status: 'fail' });
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'fail' },
+    );
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'run_failed',
+        dedupeKey: 'run_failed:run-1',
+      }),
+    );
+  });
+
+  it('publishes run_completed when the run transitions into pass', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([runCaseRow({ id: 'run-case-1' })])
+      .mockResolvedValue([runCaseRow({ id: 'run-case-1', status: 'pass' })]);
+    prisma.run.update.mockResolvedValue({ ...runRow, status: 'pass' });
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'pass' },
+    );
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'run_completed',
+        dedupeKey: 'run_completed:run-1',
+      }),
+    );
+  });
+
+  it('does not publish when the derived status does not change', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([runCaseRow({ id: 'run-case-1' })])
+      .mockResolvedValue([runCaseRow({ id: 'run-case-1', status: 'pending' })]);
+    prisma.run.update.mockResolvedValue({ ...runRow, status: 'pending' });
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'pass' },
+    );
+
+    expect(notifications.publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('RunQueriesService.updateCaseStatus regression notifications', () => {
+  it('publishes case_regressed when the same case passed in the previous finished run', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.run.findFirst.mockImplementation(
+      findFirstByQueryShape(runRow, { id: 'run-0' }),
+    );
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([
+        runCaseRow({ id: 'run-case-1', testCaseId: 'case-1' }),
+      ])
+      .mockResolvedValueOnce([{ testCaseId: 'case-1', status: 'pass' }])
+      .mockResolvedValue([
+        runCaseRow({ id: 'run-case-1', testCaseId: 'case-1', status: 'fail' }),
+      ]);
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'fail' },
+    );
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'case_regressed',
+        dedupeKey: 'case_regressed:run-1:case-1',
+        testCaseId: 'case-1',
+      }),
+    );
+  });
+
+  it('does not publish case_regressed when there is no previous finished run', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.run.findFirst.mockImplementation(
+      findFirstByQueryShape(runRow, null),
+    );
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([
+        runCaseRow({ id: 'run-case-1', testCaseId: 'case-1' }),
+      ])
+      .mockResolvedValue([
+        runCaseRow({ id: 'run-case-1', testCaseId: 'case-1', status: 'fail' }),
+      ]);
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'fail' },
+    );
+
+    const regressionCalls = notifications.publish.mock.calls.filter(
+      ([event]: [{ eventType: string }]) => event.eventType === 'case_regressed',
+    );
+    expect(regressionCalls).toHaveLength(0);
+  });
+
+  it('does not publish case_regressed when the previous run case was not pass', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.run.findFirst.mockImplementation(
+      findFirstByQueryShape(runRow, { id: 'run-0' }),
+    );
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([
+        runCaseRow({ id: 'run-case-1', testCaseId: 'case-1' }),
+      ])
+      .mockResolvedValueOnce([{ testCaseId: 'case-1', status: 'fail' }])
+      .mockResolvedValue([
+        runCaseRow({ id: 'run-case-1', testCaseId: 'case-1', status: 'fail' }),
+      ]);
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'fail' },
+    );
+
+    const regressionCalls = notifications.publish.mock.calls.filter(
+      ([event]: [{ eventType: string }]) => event.eventType === 'case_regressed',
+    );
+    expect(regressionCalls).toHaveLength(0);
+  });
+
+  it('does not check regression when the case does not transition to fail', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    prisma.run.findFirst.mockImplementation(
+      findFirstByQueryShape(runRow, null),
+    );
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([runCaseRow({ id: 'run-case-1' })])
+      .mockResolvedValue([runCaseRow({ id: 'run-case-1', status: 'pass' })]);
+
+    await build(prisma, notifications).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      { status: 'pass' },
+    );
+
+    expect(prisma.run.findFirst).toHaveBeenCalledTimes(1);
   });
 });

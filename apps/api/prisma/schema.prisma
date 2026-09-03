@@ -42,17 +42,20 @@ enum ConnectionProvider {
 }
 
 model User {
-  id            String      @id @default(cuid())
-  name          String
-  email         String
-  emailVerified Boolean     @default(false)
-  image         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  memberships   OrgMember[]
-  runs          Run[]
+  id                      String                   @id @default(cuid())
+  name                    String
+  email                   String
+  emailVerified           Boolean                  @default(false)
+  image                   String?
+  locale                  String                   @default("en")
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  sessions                Session[]
+  accounts                Account[]
+  memberships             OrgMember[]
+  runs                    Run[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@unique([email])
   @@map("user")
@@ -107,20 +110,22 @@ model Verification {
 }
 
 model Organization {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String
-  plan        Plan         @default(gratuito)
-  maxProjects Int          @default(3)
-  maxUsers    Int          @default(5)
-  maxCases    Int          @default(100)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  members     OrgMember[]
-  projects    Project[]
-  suites      Suite[]
-  connections Connection[]
-  runs        Run[]
+  id                      String                   @id @default(cuid())
+  name                    String
+  slug                    String
+  plan                    Plan                     @default(gratuito)
+  maxProjects             Int                      @default(3)
+  maxUsers                Int                      @default(5)
+  maxCases                Int                      @default(100)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  members                 OrgMember[]
+  projects                Project[]
+  suites                  Suite[]
+  connections             Connection[]
+  runs                    Run[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@unique([slug])
   @@map("organization")
@@ -416,4 +421,62 @@ model RunCase {
   @@index([runId])
   @@index([testCaseId])
   @@map("run_case")
+}
+
+enum NotificationEventType {
+  run_failed
+  run_completed
+  case_regressed
+  ingestion_failed
+  connection_security
+}
+
+enum NotificationChannel {
+  in_app
+  email
+}
+
+enum NotificationSeverity {
+  critical
+  high
+  medium
+  low
+}
+
+model Notification {
+  id               String                @id @default(cuid())
+  organizationId   String
+  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventType        NotificationEventType
+  severity         NotificationSeverity
+  payload          Json
+  dedupeKey        String
+  projectId        String?
+  runId            String?
+  testCaseId       String?
+  ingestionBatchId String?
+  connectionId     String?
+  createdAt        DateTime              @default(now())
+  readAt           DateTime?
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt])
+  @@index([organizationId, createdAt])
+  @@map("notification")
+}
+
+model NotificationPreference {
+  id             String                @id @default(cuid())
+  userId         String
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventType      NotificationEventType
+  channel        NotificationChannel
+  enabled        Boolean
+
+  @@unique([userId, organizationId, eventType, channel])
+  @@map("notification_preference")
 }

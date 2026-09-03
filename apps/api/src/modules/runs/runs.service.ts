@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { RunSource } from '@qably/types';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { err, ok, type Result } from '../../common/result';
+import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
@@ -47,7 +48,10 @@ interface AdoptionTx {
 
 @Injectable()
 export class RunsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsPublisher,
+  ) {}
 
   async ingest(
     apiKey: ApiKeyIdentity,
@@ -153,6 +157,18 @@ export class RunsService {
 
       return { run, cases };
     });
+
+    if (status === 'fail' || status === 'pass') {
+      await this.notifications.publish({
+        eventType: status === 'fail' ? 'run_failed' : 'run_completed',
+        organizationId: apiKey.organizationId,
+        severity: status === 'fail' ? 'high' : 'low',
+        payload: { runName: run.name, suiteName: cases[0]?.suiteName ?? '' },
+        dedupeKey: `${status === 'fail' ? 'run_failed' : 'run_completed'}:${run.id}`,
+        projectId: apiKey.projectId,
+        runId: run.id,
+      });
+    }
 
     return ok(toRunView(run, cases));
   }

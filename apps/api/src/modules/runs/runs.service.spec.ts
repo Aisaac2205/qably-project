@@ -87,8 +87,15 @@ function createPrisma(): FakePrisma {
   return prisma;
 }
 
-function build(prisma: FakePrisma) {
-  return new RunsService(prisma as never);
+function createNotifications() {
+  return { publish: jest.fn().mockResolvedValue(undefined) };
+}
+
+function build(
+  prisma: FakePrisma,
+  notifications: { publish: jest.Mock } = createNotifications(),
+) {
+  return new RunsService(prisma as never, notifications as never);
 }
 
 const baseInput: IngestRunInput = {
@@ -362,5 +369,78 @@ describe('RunsService.ingest known suite with unregistered cases', () => {
       data: [{ suiteId: 'suite-1', name: 'A brand new case', state: 'draft' }],
       skipDuplicates: true,
     });
+  });
+});
+
+describe('RunsService.ingest notifications', () => {
+  it('publishes run_completed when the derived status is pass', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+
+    await build(prisma, notifications).ingest(apiKey, baseInput);
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'run_completed',
+        dedupeKey: 'run_completed:run-1',
+      }),
+    );
+  });
+
+  it('publishes run_failed when the derived status is fail', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+
+    await build(prisma, notifications).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'fail' },
+      ],
+    });
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'run_failed',
+        dedupeKey: 'run_failed:run-1',
+      }),
+    );
+  });
+
+  it('publishes on a later report that flips a run to fail, not only on create', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    const service = build(prisma, notifications);
+
+    await service.ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'running' },
+      ],
+    });
+    await service.ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'fail' },
+      ],
+    });
+
+    const runFailedCalls = notifications.publish.mock.calls.filter(
+      ([event]: [{ eventType: string }]) => event.eventType === 'run_failed',
+    );
+    expect(runFailedCalls).toHaveLength(1);
+  });
+
+  it('does not publish for a non-terminal derived status', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+
+    await build(prisma, notifications).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'running' },
+      ],
+    });
+
+    expect(notifications.publish).not.toHaveBeenCalled();
   });
 });

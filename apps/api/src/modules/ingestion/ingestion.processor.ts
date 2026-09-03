@@ -6,6 +6,7 @@ import {
   type RepoConnectionProvider,
 } from '@qably/types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import type { ScmEventJob } from './ingestion.contracts';
 import { INGESTION_QUEUE } from './ingestion.tokens';
 
@@ -32,7 +33,10 @@ interface PendingEvent {
 export class IngestionProcessor extends WorkerHost {
   private readonly logger = new Logger(IngestionProcessor.name);
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsPublisher,
+  ) {
     super();
   }
 
@@ -54,8 +58,27 @@ export class IngestionProcessor extends WorkerHost {
         where: { id: scmEventId },
         data: { status: 'FAILED' },
       });
+      await this.publishFailure(scmEventId);
       throw error;
     }
+  }
+
+  private async publishFailure(scmEventId: string): Promise<void> {
+    const event = await this.prisma.scmEvent.findUnique({
+      where: { id: scmEventId },
+      select: { organizationId: true, repo: true, connectionId: true },
+    });
+
+    if (event === null) return;
+
+    await this.notifications.publish({
+      eventType: 'ingestion_failed',
+      organizationId: event.organizationId,
+      severity: 'high',
+      payload: { repo: event.repo },
+      dedupeKey: `ingestion_failed:${scmEventId}`,
+      connectionId: event.connectionId,
+    });
   }
 
   private async pendingEvent(scmEventId: string): Promise<PendingEvent | null> {

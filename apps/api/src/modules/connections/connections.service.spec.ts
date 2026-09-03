@@ -62,11 +62,20 @@ const repoDirectory = {
   readManifests: jest.fn(),
 };
 
-function build(prisma: FakePrisma, encryption: FakeEncryption) {
+function createNotifications() {
+  return { publish: jest.fn().mockResolvedValue(undefined) };
+}
+
+function build(
+  prisma: FakePrisma,
+  encryption: FakeEncryption,
+  notifications: { publish: jest.Mock } = createNotifications(),
+) {
   return new ConnectionsService(
     prisma as never,
     encryption as never,
     repoDirectory,
+    notifications as never,
   );
 }
 
@@ -364,5 +373,81 @@ describe('ConnectionsService webhook secret', () => {
 
     expect(result).toEqual({ ok: false, error: 'not-found' });
     expect(prisma.connection.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ConnectionsService connection_security notifications', () => {
+  it('publishes on create', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const notifications = createNotifications();
+    prisma.connection.create.mockResolvedValue(row);
+
+    await build(prisma, encryption, notifications).create(owner, {
+      provider: 'GITHUB',
+      name: 'Primary',
+      repo: 'acme/shop',
+    });
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'connection_security',
+        organizationId: 'org-1',
+        connectionId: 'connection-1',
+        dedupeKey: 'connection_security:connection-1:created',
+      }),
+    );
+  });
+
+  it('publishes on rotateWebhookSecret', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const notifications = createNotifications();
+    prisma.connection.findFirst.mockResolvedValue(row);
+    prisma.connection.update.mockResolvedValue(row);
+
+    await build(prisma, encryption, notifications).rotateWebhookSecret(
+      owner,
+      'connection-1',
+    );
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'connection_security',
+        connectionId: 'connection-1',
+        dedupeKey: 'connection_security:connection-1:rotated',
+      }),
+    );
+  });
+
+  it('publishes on remove', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const notifications = createNotifications();
+    prisma.connection.findFirst.mockResolvedValue(row);
+
+    await build(prisma, encryption, notifications).remove(owner, 'connection-1');
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'connection_security',
+        connectionId: 'connection-1',
+        dedupeKey: 'connection_security:connection-1:removed',
+      }),
+    );
+  });
+
+  it('does not publish when a plain member is refused', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const notifications = createNotifications();
+
+    await build(prisma, encryption, notifications).create(member, {
+      provider: 'GITHUB',
+      name: 'Primary',
+      repo: 'acme/shop',
+    });
+
+    expect(notifications.publish).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
 import { detectStack } from './lib/detect-stack';
 import {
@@ -71,6 +72,7 @@ export class ConnectionsService {
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
     @Inject(REPO_DIRECTORY) private readonly repos: RepoDirectory,
+    private readonly notifications: NotificationsPublisher,
   ) {}
 
   listAvailableRepos(userId: string): Promise<AvailableRepoView[]> {
@@ -122,6 +124,15 @@ export class ConnectionsService {
         select: SELECT,
       });
 
+      await this.notifications.publish({
+        eventType: 'connection_security',
+        organizationId: org.organizationId,
+        severity: 'critical',
+        payload: { action: 'Created', connectionName: row.name },
+        dedupeKey: `connection_security:${row.id}:created`,
+        connectionId: row.id,
+      });
+
       return ok({ ...toView(row), webhookSecret });
     } catch (error) {
       if (isUniqueViolation(error)) return err('duplicate');
@@ -144,6 +155,15 @@ export class ConnectionsService {
     await this.prisma.connection.update({
       where: { id },
       data: { encryptedWebhookSecret: this.encryption.encrypt(webhookSecret) },
+    });
+
+    await this.notifications.publish({
+      eventType: 'connection_security',
+      organizationId: org.organizationId,
+      severity: 'critical',
+      payload: { action: 'Rotated the webhook secret', connectionName: existing.name },
+      dedupeKey: `connection_security:${id}:rotated`,
+      connectionId: id,
     });
 
     return ok({ webhookSecret });
@@ -180,6 +200,15 @@ export class ConnectionsService {
     if (existing === null) return err('not-found');
 
     await this.prisma.connection.delete({ where: { id } });
+
+    await this.notifications.publish({
+      eventType: 'connection_security',
+      organizationId: org.organizationId,
+      severity: 'critical',
+      payload: { action: 'Removed', connectionName: existing.name },
+      dedupeKey: `connection_security:${id}:removed`,
+      connectionId: id,
+    });
 
     return ok(undefined);
   }

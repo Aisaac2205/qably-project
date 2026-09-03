@@ -9,7 +9,13 @@ export type OrgRole = 'owner' | 'admin' | 'member'
 export type Plan = 'gratuito' | 'equipo' | 'empresa'
 export type RunSource = 'manual' | 'api' | 'github_actions'
 export type NotificationSeverity = 'critical' | 'high' | 'medium' | 'low'
-export type NotificationChannel = 'in_app' | 'slack' | 'email'
+export type NotificationChannel = 'in_app' | 'email'
+export type NotificationEventType =
+  | 'run_failed'
+  | 'run_completed'
+  | 'case_regressed'
+  | 'ingestion_failed'
+  | 'connection_security'
 
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
 
@@ -245,14 +251,38 @@ export interface DashboardSummaryRecord {
 
 export interface Notification {
   id: string
-  projectId: string
-  runId: string
-  testCaseId: string
+  organizationId: string
+  userId: string
+  eventType: NotificationEventType
   severity: NotificationSeverity
-  message: string
-  channel: NotificationChannel
+  payload: Record<string, string | number>
+  projectId?: string
+  runId?: string
+  testCaseId?: string
+  ingestionBatchId?: string
+  connectionId?: string
   createdAt: string
   readAt?: string
+}
+
+export interface NotificationPreference {
+  id: string
+  userId: string
+  organizationId: string
+  eventType: NotificationEventType
+  channel: NotificationChannel
+  enabled: boolean
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: Record<
+  NotificationEventType,
+  Record<NotificationChannel, boolean>
+> = {
+  run_failed: { in_app: true, email: false },
+  run_completed: { in_app: false, email: false },
+  case_regressed: { in_app: true, email: true },
+  ingestion_failed: { in_app: true, email: false },
+  connection_security: { in_app: true, email: true },
 }
 
 export type ProposalStatus = 'in_review' | 'approved' | 'rejected' | 'changes_requested'

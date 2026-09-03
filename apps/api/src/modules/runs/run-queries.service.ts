@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { CaseStatus, RunCaseCounts } from '@qably/types';
+import type { CaseStatus, RunCaseCounts, RunStatus } from '@qably/types';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import {
   buildCaseCountsByRun,
@@ -8,6 +8,8 @@ import {
 } from '../../common/metrics/run-case-metrics';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { wasRegression } from '../notifications/lib/regression-check';
+import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
@@ -52,7 +54,10 @@ function toSummaryView(run: RunRow, counts: RunCaseCounts): RunSummaryView {
 
 @Injectable()
 export class RunQueriesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsPublisher,
+  ) {}
 
   async list(org: OrgContext, projectId?: string): Promise<RunSummaryView[]> {
     const runs = (await this.prisma.run.findMany({
@@ -178,6 +183,10 @@ export class RunQueriesService {
       data: { status: input.status, recordedAt: new Date() },
     });
 
+    if (input.status === 'fail') {
+      await this.checkRegression(org, run, targetCase);
+    }
+
     const updatedCases = await this.loadCases(runId);
     const status = deriveRunStatus(updatedCases.map((row) => row.status));
     const stillOpen = updatedCases.some((row) =>
@@ -195,7 +204,84 @@ export class RunQueriesService {
       select: RUN_SELECT,
     });
 
+    await this.publishTerminalTransition(
+      org,
+      run.status,
+      updatedRun,
+      updatedCases,
+    );
+
     return ok(toRunView(updatedRun, updatedCases));
+  }
+
+  private async checkRegression(
+    org: OrgContext,
+    run: RunRow,
+    targetCase: RunCaseRow,
+  ): Promise<void> {
+    const previousRun = await this.prisma.run.findFirst({
+      where: {
+        suiteId: run.suiteId,
+        projectId: run.projectId,
+        status: { in: ['pass', 'fail'] },
+        finishedAt: { not: null },
+        startedAt: { lt: run.startedAt },
+      },
+      orderBy: { startedAt: 'desc' },
+      select: { id: true },
+    });
+
+    if (previousRun === null) return;
+
+    const previousCases = await this.prisma.runCase.findMany({
+      where: { runId: previousRun.id },
+      select: { testCaseId: true, status: true },
+    });
+
+    if (!wasRegression(targetCase.testCaseId, previousCases)) return;
+
+    await this.notifications.publish({
+      eventType: 'case_regressed',
+      organizationId: org.organizationId,
+      severity: 'high',
+      payload: {
+        caseName: targetCase.name,
+        suiteName: targetCase.suiteName,
+        runName: run.name,
+      },
+      dedupeKey: `case_regressed:${run.id}:${targetCase.testCaseId ?? ''}`,
+      projectId: run.projectId,
+      runId: run.id,
+      ...(targetCase.testCaseId === null
+        ? {}
+        : { testCaseId: targetCase.testCaseId }),
+    });
+  }
+
+  private async publishTerminalTransition(
+    org: OrgContext,
+    previousStatus: RunStatus,
+    updatedRun: RunRow,
+    cases: RunCaseRow[],
+  ): Promise<void> {
+    if (updatedRun.status === previousStatus) return;
+    if (updatedRun.status !== 'fail' && updatedRun.status !== 'pass') return;
+
+    const eventType =
+      updatedRun.status === 'fail' ? 'run_failed' : 'run_completed';
+
+    await this.notifications.publish({
+      eventType,
+      organizationId: org.organizationId,
+      severity: eventType === 'run_failed' ? 'high' : 'low',
+      payload: {
+        runName: updatedRun.name,
+        suiteName: cases[0]?.suiteName ?? '',
+      },
+      dedupeKey: `${eventType}:${updatedRun.id}`,
+      projectId: updatedRun.projectId,
+      runId: updatedRun.id,
+    });
   }
 
   private scoped(org: OrgContext, id: string): Promise<RunRow | null> {

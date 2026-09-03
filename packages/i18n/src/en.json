@@ -139,7 +139,14 @@
     "kpiUnread": "Unread",
     "kpiCritical": "Critical",
     "temporaryTitle": "This area is not yet available",
-    "temporaryDescription": "Notifications will appear here as delivery is integrated."
+    "temporaryDescription": "Notifications will appear here as delivery is integrated.",
+    "events": {
+      "run_failed": "The run \"{{runName}}\" in {{suiteName}} failed.",
+      "run_completed": "The run \"{{runName}}\" in {{suiteName}} passed.",
+      "case_regressed": "{{caseName}} regressed in {{suiteName}} during run \"{{runName}}\".",
+      "ingestion_failed": "Ingestion failed for {{repo}}.",
+      "connection_security": "{{action}} for connection {{connectionName}}."
+    }
   },
   "repository": {
     "title": "Repository",
