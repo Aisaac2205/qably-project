@@ -9,7 +9,6 @@ import {
   CheckCircle,
   CircleNotch,
   ChartBar,
-  Code,
   FolderSimple,
   GearSix,
   LockSimple,
@@ -24,9 +23,6 @@ import {
 import type { Icon } from '@phosphor-icons/react';
 import { RealTraceabilityCalendar, traceabilityTotalLabel } from './RealTraceabilityCalendar';
 import {
-  MOCK_AI_PROPOSALS,
-  MOCK_CI_PIPELINES,
-  MOCK_DASHBOARD_RUNS,
   MOCK_DASHBOARD_STATS,
   MOCK_DEMO_USER,
   MOCK_PROJECTS,
@@ -164,27 +160,6 @@ const LINE_PATH = CHART_DATA.map((item, index) => {
 
 const AREA_PATH = `${LINE_PATH} L ${xPosition(CHART_DATA.length - 1)} ${PLOT_BOTTOM} L ${PLOT_LEFT} ${PLOT_BOTTOM} Z`;
 
-interface QueueSectionProps {
-  title: string;
-  viewAllLabel: string;
-  children: React.ReactNode;
-}
-
-function QueueSection({ title, viewAllLabel, children }: QueueSectionProps) {
-  return (
-    <section className="flex h-full min-w-0 flex-col p-5 md:p-6">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold tracking-[-0.01em] text-app-default">{title}</h2>
-        <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-app-primary">
-          {viewAllLabel}
-          <CaretRight size={11} weight="bold" aria-hidden="true" />
-        </span>
-      </div>
-      <div className="flex flex-1 flex-col justify-between divide-y divide-app-border">{children}</div>
-    </section>
-  );
-}
-
 export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWindowFrameProps) {
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard');
 
@@ -302,13 +277,13 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
             </div>
           </header>
 
-          <main className="m-3 mt-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-app-surface shadow-app-pop ring-1 ring-app-border">
+          <main className="@container m-3 mt-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-app-surface shadow-app-pop ring-1 ring-app-border">
             <section
               aria-label="Dashboard"
-              className="w-full space-y-6 px-5 py-6 text-app-default sm:px-7 lg:px-9 lg:py-6"
+              className="w-full space-y-5 px-4 py-5 text-app-default @md:space-y-6 @md:px-6 @2xl:px-8"
             >
               <section aria-label="Quality overview" className="min-w-0">
-                <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <dl className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
                   <KpiCard label={tDashboard.runsKpi} value={MOCK_DASHBOARD_STATS.runsLast7d} icon={Play} />
                   <KpiCard
                     label={tDashboard.passRateKpi}
@@ -329,8 +304,8 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
                 </dl>
               </section>
 
-              <section className="rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <section className="rounded-xl border border-app-border bg-app-surface p-4 shadow-xs @md:p-5 @2xl:p-6">
+                <div className="flex flex-col gap-3 @lg:flex-row @lg:items-center @lg:justify-between">
                   <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
                     {fill(tDashboard.traceabilityHeading, {
                       count: traceabilityTotalLabel(isEn),
@@ -364,7 +339,7 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
                 </div>
               </section>
 
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)]">
+              <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,1fr)] @md:gap-6">
                 <div className="col-span-1 flex flex-col justify-between rounded-xl border border-app-border/80 bg-app-surface shadow-app-card">
                   <div className="flex flex-row items-center justify-between p-5 pb-4">
                     <h3 className="text-sm font-semibold text-app-default">{tDashboard.projectHealth}</h3>
@@ -494,97 +469,6 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
                     </svg>
                   </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.28fr)_minmax(21rem,0.72fr)]">
-                <section
-                  aria-label="Operational work queue"
-                  className="flex h-full flex-col overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-xs"
-                >
-                  <div className="grid flex-1 grid-cols-1 divide-y divide-app-border md:grid-cols-2 md:divide-x md:divide-y-0">
-                    <QueueSection title={tDashboard.recentRuns} viewAllLabel={tDashboard.viewAll}>
-                      {MOCK_DASHBOARD_RUNS.map((run) => (
-                        <div key={run.id} className="flex min-h-14 items-center justify-between gap-3 py-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-canvas text-app-muted">
-                              <Play size={15} weight="fill" aria-hidden="true" />
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-app-default">{run.name}</p>
-                              <p className="truncate text-xs text-app-muted">{run.suiteName}</p>
-                            </div>
-                          </div>
-                          <StatusChip status={run.status} tDashboard={tDashboard} />
-                        </div>
-                      ))}
-                    </QueueSection>
-
-                    <QueueSection title={tDashboard.recentPipelines} viewAllLabel={tDashboard.viewAll}>
-                      {MOCK_CI_PIPELINES.map((pipeline) => (
-                        <div key={pipeline.id} className="flex min-h-14 items-center justify-between gap-3 py-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-canvas text-app-muted">
-                              <Code size={15} weight="bold" aria-hidden="true" />
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-medium text-app-default">{pipeline.commitMessage}</p>
-                              <p className="truncate font-mono text-xs text-app-muted">{pipeline.commitSha}</p>
-                            </div>
-                          </div>
-                          <span className="shrink-0 text-xs tabular-nums text-app-muted">{pipeline.timeAgo}</span>
-                        </div>
-                      ))}
-                    </QueueSection>
-                  </div>
-                </section>
-
-                <section className="flex flex-col justify-between rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
-                  <div>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2.5">
-                          <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
-                            {tDashboard.pendingProposals}
-                          </h2>
-                          <span className="inline-flex shrink-0 items-center rounded-md border border-app-border bg-app-canvas px-2 py-0.5 text-xs font-medium text-app-muted">
-                            {fill(tDashboard.pendingProposalsCount, { count: MOCK_AI_PROPOSALS.length })}
-                          </span>
-                        </div>
-                        <p className="mt-0.5 text-xs text-app-muted">
-                          {tDashboard.pendingProposalsSubtitle}
-                        </p>
-                      </div>
-
-                      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-app-default">
-                        {tDashboard.navReviewInbox}
-                        <CaretRight size={12} weight="bold" aria-hidden="true" />
-                      </span>
-                    </div>
-
-                    <div className="mt-4 divide-y divide-app-border/60">
-                      {MOCK_AI_PROPOSALS.map((proposal) => (
-                        <div
-                          key={proposal.id}
-                          className="flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
-                        >
-                          <div className="flex min-w-0 items-start gap-3">
-                            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-app-ai-bg text-app-ai">
-                              <Sparkle size={15} weight="fill" aria-hidden="true" />
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-semibold text-app-default">{proposal.title}</p>
-                            </div>
-                          </div>
-
-                          <span className="inline-flex shrink-0 items-center gap-1 self-end rounded border border-app-border/80 bg-app-canvas/60 px-2.5 py-1.5 text-xs font-medium text-app-default sm:self-center">
-                            {tDashboard.reviewAction}
-                            <CaretRight size={11} weight="bold" aria-hidden="true" />
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
               </div>
 
             </section>

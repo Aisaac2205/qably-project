@@ -55,12 +55,6 @@ export interface DashboardTranslations {
   thAiPending: string;
   passRateTrend: string;
   trendPeriod: string;
-  recentRuns: string;
-  recentPipelines: string;
-  pendingProposals: string;
-  pendingProposalsCount: string;
-  pendingProposalsSubtitle: string;
-  reviewAction: string;
   statusPass: string;
   statusFail: string;
   statusRunning: string;

@@ -102,10 +102,10 @@ export function RealTraceabilityCalendar({ isEn = false }: RealTraceabilityCalen
 
   return (
     <div className="relative">
-      <div className="overflow-x-auto pb-1 pt-1">
+      <div className="pb-1 pt-1">
         <svg
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="w-full min-w-[700px] select-none"
+          className="w-full select-none"
           role="img"
           aria-label={isEn ? 'Traceability and governance calendar' : 'Calendario de trazabilidad y gobernanza'}
         >
