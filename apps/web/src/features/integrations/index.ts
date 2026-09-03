@@ -11,3 +11,4 @@ export {
   ConnectionStatus,
   connectionResource,
 } from './components/connection-presentation'
+export { NotificationWebhooksPanel } from './components/notification-webhooks-panel'

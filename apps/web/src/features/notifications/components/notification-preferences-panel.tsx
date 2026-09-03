@@ -47,6 +47,8 @@ const GROUPS: {
 const CHANNEL_LABEL_KEY: Record<NotificationChannel, string> = {
   in_app: 'settings.notifications.columnInApp',
   email: 'settings.notifications.columnEmail',
+  slack: 'settings.webhooks.typeSlack',
+  discord: 'settings.webhooks.typeDiscord',
 }
 
 function resolveEnabled(

@@ -622,6 +622,7 @@
       "members": "Members",
       "apiKeys": "API Keys",
       "notifications": "Notifications",
+      "integrations": "Integrations",
       "billing": "Billing"
     },
     "language": {
@@ -692,6 +693,38 @@
         "ingestion_failed": "Ingestion failed",
         "connection_security": "Connection security"
       }
+    },
+    "webhooks": {
+      "title": "Team notification channels",
+      "description": "Send alerts to your team's Slack or Discord for the events you choose.",
+      "addAction": "Add channel",
+      "createTitle": "Add a notification channel",
+      "typeLabel": "Channel",
+      "typeSlack": "Slack",
+      "typeDiscord": "Discord",
+      "nameLabel": "Name",
+      "namePlaceholder": "e.g. #qa-alerts",
+      "urlLabel": "Webhook URL",
+      "urlHint": "Paste the incoming webhook URL from Slack or Discord. It is encrypted at rest and never shown again.",
+      "eventTypesLabel": "Send alerts for",
+      "nameRequired": "A channel name is required",
+      "nameTooLong": "Name must be 80 characters or fewer",
+      "urlRequired": "A webhook URL is required",
+      "eventTypesRequired": "Choose at least one event",
+      "creating": "Adding…",
+      "create": "Add channel",
+      "createError": "Couldn't add the channel. Check the webhook URL and try again.",
+      "loadError": "Couldn't load the notification channels.",
+      "emptyTitle": "No team channels yet",
+      "emptyDescription": "Add a Slack or Discord webhook so your team hears about critical runs where they already talk.",
+      "emptyDescriptionReadOnly": "No Slack or Discord channels are configured yet. Ask an owner or admin to add one.",
+      "disabled": "Disabled",
+      "testAction": "Send a test message to {{name}}",
+      "testSuccess": "Test message sent",
+      "testError": "Test message failed",
+      "toggleAria": "Enable {{name}}",
+      "deleteTitle": "Remove “{{name}}”?",
+      "deleteDescription": "Qably stops sending alerts to this channel immediately. This cannot be undone."
     },
     "org": {
       "inviteMembers": "Invite members",

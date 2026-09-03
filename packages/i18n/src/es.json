@@ -622,6 +622,7 @@
       "members": "Miembros",
       "apiKeys": "Claves API",
       "notifications": "Notificaciones",
+      "integrations": "Integraciones",
       "billing": "Facturación"
     },
     "language": {
@@ -692,6 +693,38 @@
         "ingestion_failed": "Ingesta fallida",
         "connection_security": "Seguridad de la conexión"
       }
+    },
+    "webhooks": {
+      "title": "Canales de notificación del equipo",
+      "description": "Envía alertas a Slack o Discord de tu equipo para los eventos que elijas.",
+      "addAction": "Agregar canal",
+      "createTitle": "Agregar canal de notificación",
+      "typeLabel": "Canal",
+      "typeSlack": "Slack",
+      "typeDiscord": "Discord",
+      "nameLabel": "Nombre",
+      "namePlaceholder": "ej. #alertas-qa",
+      "urlLabel": "URL del webhook",
+      "urlHint": "Pegá la URL del webhook entrante de Slack o Discord. Se cifra en reposo y no vuelve a mostrarse.",
+      "eventTypesLabel": "Enviar alertas para",
+      "nameRequired": "El nombre del canal es obligatorio",
+      "nameTooLong": "El nombre debe tener 80 caracteres o menos",
+      "urlRequired": "La URL del webhook es obligatoria",
+      "eventTypesRequired": "Elegí al menos un evento",
+      "creating": "Agregando…",
+      "create": "Agregar canal",
+      "createError": "No se pudo agregar el canal. Revisá la URL del webhook e intentá de nuevo.",
+      "loadError": "No se pudieron cargar los canales de notificación.",
+      "emptyTitle": "Todavía no hay canales de equipo",
+      "emptyDescription": "Agregá un webhook de Slack o Discord para que tu equipo se entere donde ya conversa.",
+      "emptyDescriptionReadOnly": "Todavía no hay canales de Slack o Discord configurados. Pedile a un owner o admin que agregue uno.",
+      "disabled": "Desactivado",
+      "testAction": "Enviar mensaje de prueba a {{name}}",
+      "testSuccess": "Mensaje de prueba enviado",
+      "testError": "Falló el mensaje de prueba",
+      "toggleAria": "Activar {{name}}",
+      "deleteTitle": "¿Quitar “{{name}}”?",
+      "deleteDescription": "Qably deja de enviar alertas a este canal de inmediato. Esta acción no se puede deshacer."
     },
     "org": {
       "inviteMembers": "Invitar miembros",
