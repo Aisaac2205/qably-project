@@ -4,6 +4,7 @@ node_modules
 dist
 .next
 reports
+apps/api/generated/
 .env
 .env.local
 *.log
