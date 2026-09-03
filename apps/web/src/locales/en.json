@@ -65,8 +65,6 @@
     "title": "Review Inbox",
     "subtitle": "Global inbox for human governance and publication of AI-extracted test proposals.",
     "breadcrumb": "Review Inbox",
-    "governanceTitle": "Human authority required for publication",
-    "governanceSubtitle": "AI extracts test proposals from repository changes; human reviewers must approve, modify, or reject every case before official publication. Traceability is recorded bidirectionally.",
     "searchPlaceholder": "Search by title, file, or objective...",
     "allProjects": "All projects",
     "filterStatus": "Status",

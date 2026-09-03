@@ -104,12 +104,7 @@ export function ReviewInboxPage() {
       aria-labelledby="page-title"
       className="flex h-full min-h-0 w-full flex-col gap-4 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
-      <div className="shrink-0 space-y-4">
-        <p className="max-w-3xl text-xs text-muted sm:text-sm text-wrap-pretty">
-          <span className="font-medium text-default">{t('reviewInbox.governanceTitle')}.</span>{' '}
-          {t('reviewInbox.governanceSubtitle')}
-        </p>
-
+      <div className="shrink-0 space-y-4 empty:hidden">
         {feedbackToast && (
           <div
             role="status"

@@ -51,12 +51,12 @@ describe('Phase 1 i18n', () => {
     useI18nStore.setState({ locale: 'es' })
     renderWithQuery(<ReviewInboxPage />)
 
-    // The shell owns the single h1 for this route; the page itself renders none.
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
-    expect(screen.getByText(/^Autoridad humana requerida para la publicación\.$/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/Buscar por título, archivo u objetivo/i)).toBeInTheDocument()
+    expect(screen.getByText(/^Todos los proyectos$/i)).toBeInTheDocument()
     expect(
-      screen.getByText(/La IA extrae propuestas estructuradas desde el código del repositorio/i),
-    ).toBeInTheDocument()
+      screen.queryByText(/Autoridad humana requerida para la publicación/i),
+    ).not.toBeInTheDocument()
   })
 })
 

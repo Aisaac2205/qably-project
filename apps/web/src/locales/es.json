@@ -65,8 +65,6 @@
     "title": "Bandeja de revisión",
     "subtitle": "Bandeja global para el gobierno humano y publicación de propuestas de pruebas extraídas por IA.",
     "breadcrumb": "Bandeja de revisión",
-    "governanceTitle": "Autoridad humana requerida para la publicación",
-    "governanceSubtitle": "La IA extrae propuestas estructuradas desde el código del repositorio; un revisor humano debe aprobar, modificar o rechazar cada caso antes de su publicación oficial. La trazabilidad se registra bidireccionalmente.",
     "searchPlaceholder": "Buscar por título, archivo u objetivo...",
     "allProjects": "Todos los proyectos",
     "filterStatus": "Estado",

@@ -15,16 +15,13 @@ describe('ReviewInboxPage', () => {
   it('renders the governance statement, queue, and inspector without a local page heading', () => {
     const { container } = renderWithQuery(<ReviewInboxPage />)
 
-    // No local h1: the app shell owns the single document heading for this route.
     expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
     expect(container.querySelector('[aria-labelledby="page-title"]')).toBeInTheDocument()
 
-    expect(screen.getByText(/^Human authority required for publication\.$/i)).toBeInTheDocument()
     expect(
-      screen.getByText(/AI extracts test proposals from repository changes/i),
-    ).toBeInTheDocument()
+      screen.queryByText(/Human authority required for publication/i),
+    ).not.toBeInTheDocument()
 
-    // No hero-metric KPI row.
     expect(screen.queryByText(/Approved & published/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Active projects/i)).not.toBeInTheDocument()
 
