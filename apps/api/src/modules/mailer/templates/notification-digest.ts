@@ -1,3 +1,4 @@
+import { escapeHtml } from '../lib/escape-html';
 import type { EmailTemplate } from './password-reset';
 
 export interface NotificationDigestEmailInput {
@@ -13,7 +14,7 @@ export function notificationDigestEmail({
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
         <h1 style="font-size: 20px; margin-bottom: 16px;">Qably notification</h1>
         <p style="font-size: 14px; line-height: 1.5; color: #333;">
-          ${message}
+          ${escapeHtml(message)}
         </p>
       </div>
     `,

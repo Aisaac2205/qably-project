@@ -1,3 +1,4 @@
+import { escapeHtml } from '../lib/escape-html';
 import type { EmailTemplate } from './password-reset';
 
 export interface VerifyEmailEmailInput {
@@ -16,7 +17,7 @@ export function verifyEmailEmail({
           Confirm this is your email address to finish setting up your Qably account.
         </p>
         <p style="margin: 24px 0;">
-          <a href="${url}" style="display: inline-block; padding: 10px 20px; background-color: #111827; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px;">
+          <a href="${escapeHtml(url)}" style="display: inline-block; padding: 10px 20px; background-color: #111827; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px;">
             Verify email
           </a>
         </p>
@@ -24,7 +25,7 @@ export function verifyEmailEmail({
           If you did not create a Qably account, you can safely ignore this email.
         </p>
         <p style="font-size: 12px; color: #666; word-break: break-all;">
-          ${url}
+          ${escapeHtml(url)}
         </p>
       </div>
     `,
