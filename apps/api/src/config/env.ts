@@ -46,6 +46,7 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().min(1),
   ANTHROPIC_API_KEY: optionalSecret,
   RESEND_API_KEY: optionalSecret,
+  RESEND_FROM_EMAIL: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

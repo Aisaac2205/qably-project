@@ -136,6 +136,19 @@ describe('parseEnv', () => {
     ).toBeUndefined();
   });
 
+  it('starts without RESEND_FROM_EMAIL because it is optional', () => {
+    expect(parseEnv(validEnv).RESEND_FROM_EMAIL).toBeUndefined();
+  });
+
+  it('accepts a display-name sender address for RESEND_FROM_EMAIL', () => {
+    expect(
+      parseEnv({
+        ...validEnv,
+        RESEND_FROM_EMAIL: 'Qably <alerts@qably.dev>',
+      }).RESEND_FROM_EMAIL,
+    ).toBe('Qably <alerts@qably.dev>');
+  });
+
   it('keeps rejecting a blank value for a variable that is required', () => {
     expect(() => parseEnv({ ...validEnv, BETTER_AUTH_SECRET: '' })).toThrow(
       /BETTER_AUTH_SECRET/,
