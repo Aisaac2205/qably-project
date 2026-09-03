@@ -7,19 +7,19 @@ export default defineConfig({
   integrations: [react()],
   server: {
     host: true,
-    allowedHosts: true,
+    allowedHosts: ['qably.dev', 'www.qably.dev', '.qably.dev', 'localhost', '127.0.0.1'],
   },
   preview: {
     host: true,
-    allowedHosts: true,
+    allowedHosts: ['qably.dev', 'www.qably.dev', '.qably.dev', 'localhost', '127.0.0.1'],
   },
   vite: {
     plugins: [tailwindcss()],
     server: {
-      allowedHosts: true,
+      allowedHosts: ['qably.dev', 'www.qably.dev', '.qably.dev', 'localhost', '127.0.0.1'],
     },
     preview: {
-      allowedHosts: true,
+      allowedHosts: ['qably.dev', 'www.qably.dev', '.qably.dev', 'localhost', '127.0.0.1'],
     },
   },
   i18n: {
