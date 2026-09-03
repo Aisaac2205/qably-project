@@ -16,7 +16,6 @@ import {
   mockChatMessages,
   mockCoverageGaps,
   mockConnections,
-  mockNotifications,
   mockQualityRisks,
   mockIngestionBatches,
   mockIngestionEvidence,
@@ -38,7 +37,6 @@ import type {
   Connection,
   ConnectionStatus,
   ConnectionType,
-  Notification,
   IngestionBatch,
   ExtractedProposal,
   ReviewDecision,
@@ -66,7 +64,6 @@ export interface StoreSnapshot {
   chatMessages: ChatMessage[]
   coverageGaps: CoverageGap[]
   connections: Connection[]
-  notifications: Notification[]
   ingestionBatches: IngestionBatch[]
   proposals: ExtractedProposal[]
   proposalIdByAiCaseId: Record<string, string>
@@ -90,7 +87,6 @@ let chatThreads: ChatThread[] = structuredClone(mockChatThreads)
 let chatMessages: ChatMessage[] = structuredClone(mockChatMessages)
 let coverageGaps: CoverageGap[] = structuredClone(mockCoverageGaps)
 let connections: Connection[] = structuredClone(mockConnections)
-let notifications: Notification[] = structuredClone(mockNotifications)
 
 function createReviewDomain() {
   const evidence = [...mockAiCases.map<Evidence>((aiCase) => ({
@@ -194,7 +190,7 @@ export function subscribe(listener: Listener): () => void {
 function currentSnapshot(): StoreSnapshot {
   return {
     projects, aiCases, members, apiKeys, integration,
-    aiProviders, chatThreads, chatMessages, coverageGaps, connections, notifications,
+    aiProviders, chatThreads, chatMessages, coverageGaps, connections,
     ingestionBatches, proposals, proposalIdByAiCaseId, reviewDecisions, officialTestCases,
     testCaseVersions, traceabilityLinks, evidence, qualityRisks,
   }
@@ -291,35 +287,6 @@ export function getCoverageGaps(projectId?: string): CoverageGap[] {
 export function getQualityRisks(projectId?: string): QualityRisk[] {
   if (!projectId) return qualityRisks
   return qualityRisks.filter((r) => r.projectId === projectId)
-}
-
-export function getNotifications(): Notification[] {
-  return notifications
-}
-
-export function getServerNotifications(): Notification[] {
-  return FROZEN_SEEDED.notifications
-}
-
-export function markNotificationAsRead(id: string): void {
-  const ts = nowIso()
-  notifications = notifications.map((n) => (n.id === id ? { ...n, readAt: n.readAt ?? ts } : n))
-  notify()
-}
-
-export function toggleNotificationRead(id: string): void {
-  const ts = nowIso()
-  notifications = notifications.map((n) => (n.id === id ? { ...n, readAt: n.readAt ? undefined : ts } : n))
-  notify()
-}
-
-export function markAllNotificationsAsRead(projectId?: string): void {
-  const ts = nowIso()
-  notifications = notifications.map((n) => {
-    if (projectId && n.projectId !== projectId) return n
-    return { ...n, readAt: n.readAt ?? ts }
-  })
-  notify()
 }
 
 export function getIngestionBatches(projectId?: string): IngestionBatch[] {
@@ -758,7 +725,6 @@ export function __resetStore(): void {
   chatMessages = structuredClone(mockChatMessages)
   coverageGaps = structuredClone(mockCoverageGaps)
   connections = structuredClone(mockConnections)
-  notifications = structuredClone(mockNotifications)
   reviewDomain = createReviewDomain()
   evidence = reviewDomain.evidence
   proposals = reviewDomain.proposals
