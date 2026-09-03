@@ -243,6 +243,40 @@ describe('RunQueriesService.createManual', () => {
     expect(prisma.run.create).not.toHaveBeenCalled();
   });
 
+  it('rejects a suite that has only draft cases as empty', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({ ...suiteWithCases, cases: [] });
+
+    const result = await build(prisma).createManual(org, user, input);
+
+    expect(result).toEqual({ ok: false, error: 'empty-suite' });
+    expect(prisma.suite.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          cases: expect.objectContaining({
+            where: { state: 'active' },
+          }) as unknown,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('only snapshots active cases, excluding drafts from the official run', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).createManual(org, user, input);
+
+    expect(prisma.suite.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          cases: expect.objectContaining({
+            where: { state: 'active' },
+          }) as unknown,
+        }) as unknown,
+      }),
+    );
+  });
+
   function createDataOf(prisma: FakePrisma): Record<string, unknown> {
     const [[call]] = prisma.run.create.mock.calls as [
       [{ data: Record<string, unknown> }],

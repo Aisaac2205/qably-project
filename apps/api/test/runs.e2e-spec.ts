@@ -119,8 +119,12 @@ describe('Runs ingestion (e2e)', () => {
   const read = jest.fn();
   const prisma = {
     apiKey: { findUnique: jest.fn(), update: jest.fn() },
-    suite: { findFirst: jest.fn() },
-    testCase: { findMany: jest.fn() },
+    suite: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      findFirstOrThrow: jest.fn(),
+    },
+    testCase: { findMany: jest.fn(), createMany: jest.fn() },
     run: { upsert: jest.fn() },
     runCase: { deleteMany: jest.fn(), createManyAndReturn: jest.fn() },
     $transaction: jest.fn(),
@@ -143,7 +147,13 @@ describe('Runs ingestion (e2e)', () => {
     );
     prisma.apiKey.update.mockResolvedValue(activeKeyRow);
     prisma.suite.findFirst.mockResolvedValue(suiteRow);
+    prisma.suite.create.mockResolvedValue({
+      id: 'suite-adopted',
+      name: 'New Suite',
+    });
+    prisma.suite.findFirstOrThrow.mockResolvedValue(suiteRow);
     prisma.testCase.findMany.mockResolvedValue(officialCases);
+    prisma.testCase.createMany.mockResolvedValue({ count: 0 });
     prisma.run.upsert.mockResolvedValue(runRow);
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
@@ -262,5 +272,50 @@ describe('Runs ingestion (e2e)', () => {
       .set('Authorization', `Bearer ${generated.token}`)
       .send({ ...validBody, cases: [] })
       .expect(400);
+  });
+
+  it('adopts an unknown suiteName instead of 404ing, creating the suite and draft cases', async () => {
+    prisma.suite.findFirst.mockResolvedValue(null);
+    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.runCase.createManyAndReturn.mockResolvedValue([
+      runCaseRow({ testCaseId: 'draft-case-1' }),
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .post('/runs/ingest')
+      .set('Authorization', `Bearer ${generated.token}`)
+      .send({
+        externalId: 'gh-run-1',
+        suiteName: 'New Suite',
+        name: 'First CI report',
+        cases: [{ name: 'Adds to cart', status: 'pass' }],
+      })
+      .expect(200);
+
+    expect(prisma.suite.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ name: 'New Suite' }) as unknown,
+      }),
+    );
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          { suiteId: 'suite-adopted', name: 'Adds to cart', state: 'draft' },
+        ],
+      }),
+    );
+    expect(response.body).toHaveProperty('id', 'run-1');
+  });
+
+  it('still 404s when suiteId is given and does not resolve, even though suiteName would adopt', async () => {
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/runs/ingest')
+      .set('Authorization', `Bearer ${generated.token}`)
+      .send({ ...validBody, suiteId: 'suite-missing' })
+      .expect(404);
+
+    expect(prisma.suite.create).not.toHaveBeenCalled();
   });
 });

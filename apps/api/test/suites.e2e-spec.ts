@@ -209,6 +209,19 @@ describe('Suites (e2e)', () => {
       .expect(404);
   });
 
+  it('promotes a draft case to active through the existing case patch', async () => {
+    const response = await request(app.getHttpServer())
+      .patch('/suites/suite-1/cases/case-1')
+      .send({ state: 'active' })
+      .expect(200);
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { state: 'active' },
+    });
+    expect(response.body).toEqual(expect.objectContaining({ id: 'suite-1' }));
+  });
+
   it('answers 403 when a member tries to delete a suite', async () => {
     prisma.orgMember.findFirst.mockResolvedValue({
       organizationId: 'org-1',

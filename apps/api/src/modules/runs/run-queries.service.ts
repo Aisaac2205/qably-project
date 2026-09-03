@@ -113,6 +113,7 @@ export class RunQueriesService {
         id: true,
         name: true,
         cases: {
+          where: { state: 'active' },
           select: { id: true, name: true, steps: true, expectedResult: true },
           orderBy: { position: 'asc' },
         },

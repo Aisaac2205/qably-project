@@ -46,8 +46,12 @@ function caseRow(overrides: Record<string, unknown>) {
 }
 
 interface FakePrisma {
-  suite: { findFirst: jest.Mock };
-  testCase: { findMany: jest.Mock };
+  suite: {
+    findFirst: jest.Mock;
+    create: jest.Mock;
+    findFirstOrThrow: jest.Mock;
+  };
+  testCase: { findMany: jest.Mock; createMany: jest.Mock };
   run: { upsert: jest.Mock };
   runCase: { deleteMany: jest.Mock; createManyAndReturn: jest.Mock };
   $transaction: jest.Mock;
@@ -55,8 +59,19 @@ interface FakePrisma {
 
 function createPrisma(): FakePrisma {
   const prisma: FakePrisma = {
-    suite: { findFirst: jest.fn().mockResolvedValue(suiteRow) },
-    testCase: { findMany: jest.fn().mockResolvedValue(officialCases) },
+    suite: {
+      findFirst: jest.fn().mockResolvedValue(suiteRow),
+      create: jest
+        .fn()
+        .mockImplementation(({ data }: { data: { name: string } }) =>
+          Promise.resolve({ id: 'suite-adopted', name: data.name }),
+        ),
+      findFirstOrThrow: jest.fn().mockResolvedValue(suiteRow),
+    },
+    testCase: {
+      findMany: jest.fn().mockResolvedValue(officialCases),
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     run: { upsert: jest.fn().mockResolvedValue(runRow) },
     runCase: {
       deleteMany: jest.fn(),
@@ -126,7 +141,7 @@ describe('RunsService.ingest suite resolution', () => {
     );
   });
 
-  it('resolves the suite by name scoped to the api key project', async () => {
+  it('resolves an existing suite by name without creating a duplicate', async () => {
     const prisma = createPrisma();
 
     await build(prisma).ingest(apiKey, baseInputBySuiteName);
@@ -136,9 +151,10 @@ describe('RunsService.ingest suite resolution', () => {
         where: { name: 'Checkout', projectId: 'project-1' },
       }),
     );
+    expect(prisma.suite.create).not.toHaveBeenCalled();
   });
 
-  it('returns suite-not-found when the suite does not belong to the api key project', async () => {
+  it('returns suite-not-found when suiteId does not resolve to a suite in this project', async () => {
     const prisma = createPrisma();
     prisma.suite.findFirst.mockResolvedValue(null);
 
@@ -146,6 +162,66 @@ describe('RunsService.ingest suite resolution', () => {
 
     expect(result).toEqual({ ok: false, error: 'suite-not-found' });
     expect(prisma.run.upsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('RunsService.ingest suite adoption', () => {
+  it('adopts an unknown suiteName by creating the suite instead of 404ing', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).ingest(apiKey, baseInputBySuiteName);
+
+    expect(result.ok).toBe(true);
+    expect(prisma.suite.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          projectId: 'project-1',
+          organizationId: 'org-1',
+          name: 'Checkout',
+        },
+      }),
+    );
+  });
+
+  it('stores the run against the newly adopted suite', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    await build(prisma).ingest(apiKey, baseInputBySuiteName);
+
+    const [call] = prisma.run.upsert.mock.calls as [
+      [{ create: { suiteId: string } }],
+    ];
+    expect(call[0].create.suiteId).toBe('suite-adopted');
+  });
+
+  it('never adopts a suite from an unresolved suiteId, unlike suiteName', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).ingest(apiKey, baseInput);
+
+    expect(result).toEqual({ ok: false, error: 'suite-not-found' });
+    expect(prisma.suite.create).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the existing suite when adoption races into a unique violation', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+    prisma.suite.create.mockRejectedValue({ code: 'P2002' });
+    prisma.suite.findFirstOrThrow.mockResolvedValue({
+      id: 'suite-raced',
+      name: 'Checkout',
+    });
+
+    const result = await build(prisma).ingest(apiKey, baseInputBySuiteName);
+
+    expect(result.ok).toBe(true);
+    const [call] = prisma.run.upsert.mock.calls as [
+      [{ create: { suiteId: string } }],
+    ];
+    expect(call[0].create.suiteId).toBe('suite-raced');
   });
 });
 
@@ -215,9 +291,11 @@ describe('RunsService.ingest test case linking', () => {
     );
   });
 
-  it('leaves testCaseId null when no official test case matches the name', async () => {
+  it('links testCaseId to a freshly created draft when no official test case matches the name', async () => {
     const prisma = createPrisma();
-    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'draft-case-1', name: 'Unmatched case' }]);
 
     await build(prisma).ingest(apiKey, {
       ...baseInput,
@@ -231,14 +309,58 @@ describe('RunsService.ingest test case linking', () => {
       ],
     });
 
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith({
+      data: [{ suiteId: 'suite-1', name: 'Unmatched case', state: 'draft' }],
+      skipDuplicates: true,
+    });
+
     const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
       [{ data: { name: string; testCaseId: string | null }[] }],
     ];
     expect(call[0].data[0]).toEqual(
       expect.objectContaining({
         name: 'Unmatched case',
-        testCaseId: null,
+        testCaseId: 'draft-case-1',
       }),
     );
+  });
+
+  it('creates no draft and no duplicate work when every reported name already has an official case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.testCase.createMany).not.toHaveBeenCalled();
+    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RunsService.ingest known suite with unregistered cases', () => {
+  it('drafts only the case names that have no matching official test case', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([{ id: 'case-1', name: 'Adds to cart' }])
+      .mockResolvedValueOnce([
+        { id: 'case-1', name: 'Adds to cart' },
+        { id: 'draft-case-2', name: 'A brand new case' },
+      ]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'pass' },
+        {
+          name: 'A brand new case',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith({
+      data: [{ suiteId: 'suite-1', name: 'A brand new case', state: 'draft' }],
+      skipDuplicates: true,
+    });
   });
 });

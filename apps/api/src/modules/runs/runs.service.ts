@@ -14,9 +14,35 @@ import {
 import type { IngestCaseInput, IngestRunInput } from './runs.schemas';
 
 const ALLOWED_SOURCES: readonly RunSource[] = ['api', 'github_actions'];
+const UNIQUE_VIOLATION = 'P2002';
 
 function isSourceAllowed(source: RunSource): boolean {
   return ALLOWED_SOURCES.includes(source);
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === UNIQUE_VIOLATION
+  );
+}
+
+interface SuiteRef {
+  id: string;
+  name: string;
+}
+
+interface AdoptionTx {
+  suite: {
+    findFirst: PrismaService['suite']['findFirst'];
+    create: PrismaService['suite']['create'];
+    findFirstOrThrow: PrismaService['suite']['findFirstOrThrow'];
+  };
+  testCase: {
+    findMany: PrismaService['testCase']['findMany'];
+    createMany: PrismaService['testCase']['createMany'];
+  };
 }
 
 @Injectable()
@@ -29,9 +55,16 @@ export class RunsService {
   ): Promise<Result<RunView, RunError>> {
     if (!isSourceAllowed(input.source)) return err('source-not-allowed');
 
-    const suite = await this.resolveSuite(apiKey, input);
+    let knownSuite: SuiteRef | null = null;
 
-    if (suite === null) return err('suite-not-found');
+    if (input.suiteId !== undefined) {
+      knownSuite = await this.prisma.suite.findFirst({
+        where: { id: input.suiteId, projectId: apiKey.projectId },
+        select: { id: true, name: true },
+      });
+
+      if (knownSuite === null) return err('suite-not-found');
+    }
 
     const status = deriveRunStatus(
       input.cases.map((testCase) => testCase.status),
@@ -42,15 +75,14 @@ export class RunsService {
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
 
     const { run, cases } = await this.prisma.$transaction(async (tx) => {
-      const officialCases = await tx.testCase.findMany({
-        where: {
-          suiteId: suite.id,
-          name: { in: input.cases.map((testCase) => testCase.name) },
-        },
-        select: { id: true, name: true },
-      });
-      const testCaseIdByName = new Map(
-        officialCases.map((testCase) => [testCase.name, testCase.id]),
+      const suite =
+        knownSuite ??
+        (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
+
+      const testCaseIdByName = await this.ensureOfficialCases(
+        tx,
+        suite.id,
+        input.cases.map((testCase) => testCase.name),
       );
 
       const run = await tx.run.upsert({
@@ -125,24 +157,69 @@ export class RunsService {
     return ok(toRunView(run, cases));
   }
 
-  private resolveSuite(
+  private async adoptSuiteByName(
+    tx: AdoptionTx,
     apiKey: ApiKeyIdentity,
-    input: IngestRunInput,
-  ): Promise<{ id: string; name: string } | null> {
-    if (input.suiteId !== undefined) {
-      return this.prisma.suite.findFirst({
-        where: { id: input.suiteId, projectId: apiKey.projectId },
+    suiteName: string,
+  ): Promise<SuiteRef> {
+    const existing = await tx.suite.findFirst({
+      where: { name: suiteName, projectId: apiKey.projectId },
+      select: { id: true, name: true },
+    });
+
+    if (existing !== null) return existing;
+
+    try {
+      return await tx.suite.create({
+        data: {
+          projectId: apiKey.projectId,
+          organizationId: apiKey.organizationId,
+          name: suiteName,
+        },
+        select: { id: true, name: true },
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      return tx.suite.findFirstOrThrow({
+        where: { name: suiteName, projectId: apiKey.projectId },
         select: { id: true, name: true },
       });
     }
+  }
 
-    if (input.suiteName !== undefined) {
-      return this.prisma.suite.findFirst({
-        where: { name: input.suiteName, projectId: apiKey.projectId },
-        select: { id: true, name: true },
-      });
+  private async ensureOfficialCases(
+    tx: AdoptionTx,
+    suiteId: string,
+    caseNames: string[],
+  ): Promise<Map<string, string>> {
+    const uniqueNames = [...new Set(caseNames)];
+    const existing = await tx.testCase.findMany({
+      where: { suiteId, name: { in: uniqueNames } },
+      select: { id: true, name: true },
+    });
+
+    const existingNames = new Set(existing.map((testCase) => testCase.name));
+    const missingNames = uniqueNames.filter((name) => !existingNames.has(name));
+
+    if (missingNames.length === 0) {
+      return new Map(existing.map((testCase) => [testCase.name, testCase.id]));
     }
 
-    return Promise.resolve(null);
+    await tx.testCase.createMany({
+      data: missingNames.map((name) => ({
+        suiteId,
+        name,
+        state: 'draft' as const,
+      })),
+      skipDuplicates: true,
+    });
+
+    const all = await tx.testCase.findMany({
+      where: { suiteId, name: { in: uniqueNames } },
+      select: { id: true, name: true },
+    });
+
+    return new Map(all.map((testCase) => [testCase.name, testCase.id]));
   }
 }

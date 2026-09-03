@@ -277,3 +277,33 @@ describe('SuitesService case mutations', () => {
     expect(result.ok && result.value.id).toBe('suite-1');
   });
 });
+
+describe('SuitesService case promotion', () => {
+  it('promotes a draft case to active through the existing case update', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      state: 'active',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { state: 'active' },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses to promote a case that is not in the suite', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).updateCase(
+      owner,
+      'suite-1',
+      'case-elsewhere',
+      { state: 'active' },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+  });
+});

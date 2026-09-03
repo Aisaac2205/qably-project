@@ -157,21 +157,21 @@ gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(suiteName)>-<sha256(suiteName)[0:8]>
   so that two different suite names that happen to slugify to the same string still get distinct
   `externalId`s.
 
-## Known limitation: suite adoption
+## Suite adoption on first report
 
-`POST /runs/ingest` returns `404` when `suiteName` does not already match an existing suite in the
-project — the endpoint never creates a suite implicitly, by design (see "Known gap" in
-`docs/RUN_INGESTION.md` and the "never creates a suite" note in the ingestion contract). In
-practice, this means **the first real report for any suite name will 404** until either:
+`scripts/qably-report.mjs` always sends `suiteName` (the JUnit `<testsuite name="...">` value, see the
+mapping table below), never `suiteId`. `POST /runs/ingest` used to answer `404` whenever `suiteName`
+didn't already match an existing suite, which meant **the first real report for any suite name always
+404'd** until a human pre-created a suite with the exact name jest-junit or vitest assigned it. That is
+no longer true: an unrecognized `suiteName` is now adopted — the suite is created on the spot, along
+with a `draft` `TestCase` for every reported case name — and the report succeeds with `200` on its very
+first attempt. See `docs/RUN_INGESTION.md`'s "Suite adoption" section for the full behavior, including
+why drafts are not immediately official (§4.3.4 rule b) and how a human promotes one.
 
-- a human creates a suite in the Qably UI with the exact name jest-junit or vitest assigned it
-  (typically the spec file's relative path), or
-- the suite-adoption feature (auto-creating a suite from an unrecognized name on first ingest)
-  ships.
-
-`scripts/qably-report.mjs` detects a `404` specifically and prints a `::warning::` annotation
-explaining this, instead of a raw HTTP error dump, so it is diagnosable from the Actions log
-without reading the script's source.
+`scripts/qably-report.mjs` still detects a `404` specifically and prints a `::warning::` annotation
+instead of a raw HTTP error dump — that path now means an explicit `suiteId` didn't resolve, which
+this script never sends, or a genuinely revoked/misconfigured key, not the "unknown suite" case it used
+to mean.
 
 ### Does a failed report fail the CI job?
 
@@ -179,16 +179,11 @@ without reading the script's source.
 secrets, a `404`, any other non-2xx response, a network error) is caught, logged as a
 `::warning::` annotation, and counted in the final `N succeeded, M failed` summary line. The job's
 actual pass/fail signal comes entirely from the test step itself (`jest` / `vitest` exiting
-non-zero on a real test failure) — reporting to Qably is a best-effort side channel, not a gate.
-Two reasons:
-
-1. Today, every single report will `404` (see above) until suites are adopted or auto-created.
-   Failing the build on that would make CI permanently red for a reason that has nothing to do
-   with whether the code under test is correct.
-2. Even once reporting mostly works, a Qably-side outage or a revoked key is Qably's problem, not
-   the pull request's. Blocking merges on the availability of an external, optional integration
-   is the wrong failure mode — the uploaded JUnit artifact is still there for a human to inspect
-   either way.
+non-zero on a real test failure) — reporting to Qably is a best-effort side channel, not a gate. This
+stays true even now that first reports succeed: a Qably-side outage or a revoked key is Qably's
+problem, not the pull request's. Blocking merges on the availability of an external, optional
+integration is the wrong failure mode — the uploaded JUnit artifact is still there for a human to
+inspect either way.
 
 ## Limitations
 

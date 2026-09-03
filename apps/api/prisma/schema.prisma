@@ -219,6 +219,7 @@ model TestCase {
   updatedAt      DateTime     @updatedAt
   runCases       RunCase[]
 
+  @@unique([suiteId, name])
   @@index([suiteId])
   @@index([suiteId, position])
   @@map("test_case")
