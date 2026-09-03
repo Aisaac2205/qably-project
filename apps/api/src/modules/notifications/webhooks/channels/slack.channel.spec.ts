@@ -1,7 +1,7 @@
 import { SlackChannel } from './slack.channel';
 
 function mockFetch(response: Partial<Response>): jest.Mock {
-  const fetchMock = jest.fn().mockResolvedValue(response as Response);
+  const fetchMock = jest.fn().mockResolvedValue(response);
   (globalThis as { fetch: typeof fetch }).fetch = fetchMock as never;
   return fetchMock;
 }
@@ -23,7 +23,9 @@ describe('SlackChannel.send', () => {
       'https://hooks.slack.com/services/T00/B00/token',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ 'content-type': 'application/json' }),
+        headers: expect.objectContaining({
+          'content-type': 'application/json',
+        }) as unknown,
         body: JSON.stringify({ text: 'Run failed' }),
       }),
     );

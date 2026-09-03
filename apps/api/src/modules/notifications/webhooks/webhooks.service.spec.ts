@@ -47,7 +47,9 @@ function createPrisma(): FakePrisma {
 function createEncryption() {
   return {
     encrypt: jest.fn((plaintext: string) => `enc(${plaintext})`),
-    decrypt: jest.fn(() => 'https://hooks.slack.com/services/T00/B00/secrettoken'),
+    decrypt: jest.fn(
+      () => 'https://hooks.slack.com/services/T00/B00/secrettoken',
+    ),
     generateSecret: jest.fn(),
   };
 }
@@ -65,8 +67,8 @@ function build(
   return new NotificationWebhooksService(
     prisma as never,
     encryption as never,
-    slack as never,
-    discord as never,
+    slack,
+    discord,
   );
 }
 

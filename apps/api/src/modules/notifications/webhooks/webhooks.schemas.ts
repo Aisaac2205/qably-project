@@ -10,7 +10,8 @@ function hasAllowedHost(type: NotificationWebhookType, url: string): boolean {
   try {
     const parsed = new URL(url);
     return (
-      parsed.protocol === 'https:' && ALLOWED_HOSTS[type].includes(parsed.hostname)
+      parsed.protocol === 'https:' &&
+      ALLOWED_HOSTS[type].includes(parsed.hostname)
     );
   } catch {
     return false;

@@ -58,7 +58,7 @@ export class NotificationWebhooksService {
       },
     });
 
-    return ok(this.toView(row as NotificationWebhookRow));
+    return ok(this.toView(row));
   }
 
   async update(
@@ -77,7 +77,7 @@ export class NotificationWebhooksService {
       data: input,
     });
 
-    return ok(this.toView(row as NotificationWebhookRow));
+    return ok(this.toView(row));
   }
 
   async remove(
@@ -112,9 +112,7 @@ export class NotificationWebhooksService {
     return ok(undefined);
   }
 
-  private resolveChannel(
-    type: NotificationWebhookRow['type'],
-  ): WebhookChannel {
+  private resolveChannel(type: NotificationWebhookRow['type']): WebhookChannel {
     return type === 'slack' ? this.slack : this.discord;
   }
 
@@ -138,6 +136,6 @@ export class NotificationWebhooksService {
   ): Promise<NotificationWebhookRow | null> {
     return this.prisma.notificationWebhook.findFirst({
       where: { id, organizationId: org.organizationId },
-    }) as Promise<NotificationWebhookRow | null>;
+    });
   }
 }

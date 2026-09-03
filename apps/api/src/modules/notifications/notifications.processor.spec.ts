@@ -62,7 +62,9 @@ function createMailer() {
 function createEncryption() {
   return {
     encrypt: jest.fn((plaintext: string) => `enc(${plaintext})`),
-    decrypt: jest.fn((packed: string) => packed.replace('enc(', '').replace(')', '')),
+    decrypt: jest.fn((packed: string) =>
+      packed.replace('enc(', '').replace(')', ''),
+    ),
     generateSecret: jest.fn(),
   };
 }
@@ -82,8 +84,8 @@ function build(
     prisma as never,
     mailer as never,
     encryption as never,
-    slack as never,
-    discord as never,
+    slack,
+    discord,
   );
 }
 
@@ -199,17 +201,28 @@ describe('NotificationsProcessor dedupe upsert', () => {
     await build(prisma, mailer).process(job(runFailedEvent));
     await build(prisma, mailer).process(job(sameKeyOtherOrg));
 
-    const [firstCall, secondCall] = prisma.notification.upsert.mock
-      .calls as [
-      [{ where: { userId_organizationId_dedupeKey: { organizationId: string } } }],
-      [{ where: { userId_organizationId_dedupeKey: { organizationId: string } } }],
+    const [firstCall, secondCall] = prisma.notification.upsert.mock.calls as [
+      [
+        {
+          where: {
+            userId_organizationId_dedupeKey: { organizationId: string };
+          };
+        },
+      ],
+      [
+        {
+          where: {
+            userId_organizationId_dedupeKey: { organizationId: string };
+          };
+        },
+      ],
     ];
-    expect(firstCall[0].where.userId_organizationId_dedupeKey.organizationId).toBe(
-      'org-1',
-    );
-    expect(secondCall[0].where.userId_organizationId_dedupeKey.organizationId).toBe(
-      'org-2',
-    );
+    expect(
+      firstCall[0].where.userId_organizationId_dedupeKey.organizationId,
+    ).toBe('org-1');
+    expect(
+      secondCall[0].where.userId_organizationId_dedupeKey.organizationId,
+    ).toBe('org-2');
   });
 });
 
@@ -222,7 +235,7 @@ describe('NotificationsProcessor team webhook fan-out', () => {
 
     expect(prisma.notificationWebhook.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ organizationId: 'org-1' }),
+        where: expect.objectContaining({ organizationId: 'org-1' }) as unknown,
       }),
     );
   });
@@ -238,7 +251,7 @@ describe('NotificationsProcessor team webhook fan-out', () => {
         where: expect.objectContaining({
           enabled: true,
           eventTypes: { has: 'run_failed' },
-        }),
+        }) as unknown,
       }),
     );
   });
@@ -246,7 +259,10 @@ describe('NotificationsProcessor team webhook fan-out', () => {
   it('decrypts the stored url and posts through the slack channel for a slack webhook', async () => {
     const prisma = createPrisma([]);
     prisma.notificationWebhook.findMany.mockResolvedValue([
-      { encryptedUrl: 'enc(https://hooks.slack.com/services/x)', type: 'slack' },
+      {
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
     ]);
     const mailer = createMailer();
     const slack = createWebhookChannel();

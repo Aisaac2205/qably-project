@@ -1,7 +1,7 @@
 import { DiscordChannel } from './discord.channel';
 
 function mockFetch(response: Partial<Response>): jest.Mock {
-  const fetchMock = jest.fn().mockResolvedValue(response as Response);
+  const fetchMock = jest.fn().mockResolvedValue(response);
   (globalThis as { fetch: typeof fetch }).fetch = fetchMock as never;
   return fetchMock;
 }
