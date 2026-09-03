@@ -269,7 +269,6 @@
   },
 
   "reports": {
-    "title": "Reportes",
     "passRateOverTime": "Tasa de aprobaci\u00f3n en el tiempo",
     "passFailDistribution": "Distribuci\u00f3n de aprobados y fallidos",
     "proposalReviewStatus": "Estado de revisión de propuestas",

@@ -7,10 +7,15 @@ import type { Project } from '@qably/types'
 vi.mock('@/lib/use-mock-store', () => ({
   useSuites: vi.fn(() => []),
   useProposals: vi.fn(() => []),
+  useReviewDecisions: vi.fn(() => []),
 }))
 
 vi.mock('@/features/runs/hooks/use-runs', () => ({
   useRuns: vi.fn(() => ({ runs: [], isLoading: false, isError: false })),
+}))
+
+vi.mock('@/features/projects/hooks/use-projects', () => ({
+  useProjects: vi.fn(() => ({ projects: [], isLoading: false, isError: false })),
 }))
 
 // ── Mock the project context ─────────────────────────────────────
@@ -50,11 +55,13 @@ describe('ReportsPage', () => {
     vi.clearAllMocks()
   })
 
-  it('renders the page header "Reports"', async () => {
-    await act(async () => {
-      render(<ReportsPage />)
-    })
-    expect(screen.getByRole('heading', { name: /reports/i })).toBeInTheDocument()
+  it('renders no local page heading, deferring to the app shell title', async () => {
+    const { container } = await act(async () => render(<ReportsPage />))
+
+    // The app shell's TopBar owns the single document h1 for this route
+    // (id="page-title"); the page itself must not render a competing one.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-labelledby="page-title"]')).toBeInTheDocument()
   })
 
   it('renders three chart section headings', async () => {
@@ -73,5 +80,13 @@ describe('ReportsPage', () => {
     // Should have at least 3 chart cards (Card components with data-slot="card")
     const cards = document.querySelectorAll('[data-slot="card"]')
     expect(cards.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('mounts the review distribution and recent decisions panels', async () => {
+    await act(async () => {
+      render(<ReportsPage />)
+    })
+    expect(screen.getByRole('heading', { name: 'Review distribution' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Recent review decisions' })).toBeInTheDocument()
   })
 })

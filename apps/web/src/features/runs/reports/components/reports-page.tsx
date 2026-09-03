@@ -6,6 +6,8 @@ import { useProposals } from '@/lib/use-mock-store'
 import { useRuns } from '@/features/runs/hooks/use-runs'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useTranslation } from '@/lib/i18n'
+import { ProjectReviewDistribution } from './project-review-distribution'
+import { RecentReviewDecisions } from './recent-review-decisions'
 
 const PassRateChart = dynamic(
   () => import('./pass-rate-chart').then((mod) => mod.PassRateChart),
@@ -49,11 +51,7 @@ export function ReportsPage() {
   const { t } = useTranslation()
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      <h1 className="sr-only" id="reports-heading">
-        {t('reports.title')}
-      </h1>
-
+    <section aria-labelledby="page-title" className="flex flex-col gap-6 p-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Pass Rate Chart */}
         <Card>
@@ -85,6 +83,11 @@ export function ReportsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(21rem,0.9fr)]">
+        <ProjectReviewDistribution />
+        <RecentReviewDecisions />
+      </div>
+    </section>
   )
 }

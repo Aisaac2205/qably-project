@@ -269,7 +269,6 @@
   },
 
   "reports": {
-    "title": "Reports",
     "passRateOverTime": "Pass Rate Over Time",
     "passFailDistribution": "Pass / Fail Distribution",
     "proposalReviewStatus": "Proposal Review Status",
