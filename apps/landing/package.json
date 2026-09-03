@@ -9,7 +9,7 @@
     "start": "astro preview --host",
     "preview": "astro preview --host",
     "astro": "astro",
-    "type-check": "tsc --noEmit",
+    "type-check": "astro sync && tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run --maxWorkers=2 --no-file-parallelism"
   },
