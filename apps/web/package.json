@@ -9,7 +9,7 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "test": "vitest",
-    "test:run": "vitest run",
+    "test:run": "vitest run --maxWorkers=2",
     "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml"
   },
   "dependencies": {
