@@ -5,16 +5,31 @@ const optionalSecret = z.preprocess(
   z.string().min(1).optional(),
 );
 
-const httpUrl = z.url().refine(
-  (value) => {
-    try {
-      return /^https?:$/.test(new URL(value).protocol);
-    } catch {
-      return false;
-    }
-  },
-  { message: 'must be an absolute http(s) url' },
-);
+const httpUrl = z
+  .url()
+  .refine(
+    (value) => {
+      try {
+        return /^https?:$/.test(new URL(value).protocol);
+      } catch {
+        return false;
+      }
+    },
+    { message: 'must be an absolute http(s) url' },
+  )
+  .refine(
+    (value) => {
+      try {
+        const parsed = new URL(value);
+        return (
+          parsed.pathname === '/' && parsed.search === '' && parsed.hash === ''
+        );
+      } catch {
+        return false;
+      }
+    },
+    { message: 'must be a bare origin with no path, query or fragment' },
+  );
 
 const envSchema = z.object({
   NODE_ENV: z

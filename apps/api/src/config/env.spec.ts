@@ -72,6 +72,27 @@ describe('parseEnv', () => {
     ).toThrow(/WEB_APP_URL/);
   });
 
+  it('rejects a BETTER_AUTH_URL carrying a path, which better-auth mounts its router on', () => {
+    expect(() =>
+      parseEnv({
+        ...validEnv,
+        BETTER_AUTH_URL: 'https://api.qably.dev/,https://app.qably.dev/',
+      }),
+    ).toThrow(/BETTER_AUTH_URL/);
+  });
+
+  it('rejects a WEB_APP_URL carrying a path so cors compares bare origins', () => {
+    expect(() =>
+      parseEnv({ ...validEnv, WEB_APP_URL: 'https://app.qably.dev/dashboard' }),
+    ).toThrow(/WEB_APP_URL/);
+  });
+
+  it('accepts an origin written with a trailing slash', () => {
+    expect(() =>
+      parseEnv({ ...validEnv, BETTER_AUTH_URL: 'https://api.qably.dev/' }),
+    ).not.toThrow();
+  });
+
   it('rejects a DATABASE_URL that is not a valid url', () => {
     expect(() => parseEnv({ ...validEnv, DATABASE_URL: 'not-a-url' })).toThrow(
       /DATABASE_URL/,
