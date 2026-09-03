@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm --filter @qably/types --filter @qably/i18n run build
+
+      - name: Generate Prisma client
+        run: pnpm --filter @qably/api exec prisma generate
+
       - name: Type-check
         run: pnpm --filter @qably/api run type-check
 
@@ -95,6 +101,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        run: pnpm --filter @qably/types --filter @qably/i18n run build
+
       - name: Type-check
         run: pnpm --filter @qably/web run type-check
 
@@ -122,3 +131,31 @@ jobs:
           path: apps/web/reports/junit.xml
           if-no-files-found: warn
           retention-days: 14
+
+  landing:
+    name: Landing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type-check
+        run: pnpm --filter @qably/landing run type-check
+
+      - name: Tests
+        run: pnpm --filter @qably/landing run test:run
+
+      - name: Build
+        run: pnpm --filter @qably/landing run build
