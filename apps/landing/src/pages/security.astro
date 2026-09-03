@@ -1,0 +1,108 @@
+---
+import Landing from "../layouts/Landing.astro";
+import Footer from "../features/navigation/components/Footer.astro";
+import { ShieldCheck, LockKey, Key, Database, Cpu, FileText } from "@phosphor-icons/react";
+
+import { getAuthUrl } from "../lib/auth-config";
+
+const locale = "es";
+const authUrl = getAuthUrl('/projects');
+---
+
+<Landing locale={locale} title="Seguridad & Cumplimiento SOC 2 — Qably" description="Estándares de seguridad de nivel empresarial, cifrado en reposo y tránsito, control de acceso RBAC y cumplimiento SOC 2 de Qably.">
+  {/* Header */}
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/85 backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/" class="flex items-center gap-2 group" aria-label="Volver a la landing">
+          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
+        </a>
+        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Seguridad</span>
+      </div>
+
+      <div class="flex items-center gap-3 font-sans">
+        <a
+          href="/en/security"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
+        >
+          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
+          <span>EN</span>
+        </a>
+        <a href="/" class="text-xs text-zinc-400 hover:text-white transition-colors">Volver</a>
+        <a href={authUrl}>
+          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
+            Ir a la App
+          </button>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {/* Main Security Content */}
+  <main id="main-content" class="max-w-4xl mx-auto px-6 py-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
+    <header class="space-y-3 pb-8 border-b border-white/[0.08]">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Arquitectura de Confianza Zero-Trust</p>
+      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Seguridad & Cumplimiento SOC 2</h1>
+      <p class="text-base text-zinc-400">
+        Diseñado para cumplir con los requisitos más estrictos de seguridad de la información para equipos de ingeniería modernos.
+      </p>
+    </header>
+
+    {/* Security Pillar Cards */}
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="p-5 rounded-xl border border-white/[0.08] bg-zinc-950 space-y-2">
+        <LockKey size={22} className="text-white" weight="bold" />
+        <h3 class="text-sm font-semibold text-white">Cifrado de Extremo a Extremo</h3>
+        <p class="text-xs text-zinc-400 leading-relaxed">
+          TLS 1.3 en tránsito con HSTS estricto y cifrado AES-256 en reposo en volúmenes PostgreSQL y backups.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-xl border border-white/[0.08] bg-zinc-950 space-y-2">
+        <ShieldCheck size={22} className="text-white" weight="bold" />
+        <h3 class="text-sm font-semibold text-white">SOC 2 Tipo II & ISO 27001</h3>
+        <p class="text-xs text-zinc-400 leading-relaxed">
+          Controles auditados de forma continua para disponibilidad, confidencialidad e integridad del procesamiento.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-xl border border-white/[0.08] bg-zinc-950 space-y-2">
+        <Key size={22} className="text-white" weight="bold" />
+        <h3 class="text-sm font-semibold text-white">Control RBAC & Tokens</h3>
+        <p class="text-xs text-zinc-400 leading-relaxed">
+          Tokens de API prefijados <code class="text-white font-mono">qbly_live_*</code> con hashing SHA-256 y roles granulares por organización.
+        </p>
+      </div>
+    </div>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">1. Aislamiento de Código y Cero Entrenamiento</h2>
+      <p class="text-sm text-zinc-400">
+        Qably está diseñado bajo el principio de menor privilegio. Nunca clonamos ni retenemos repositorios completos en disco persistente. Cuando el motor de IA analiza un pull request o diff, la operación se realiza en memoria volátil en contenedores aislados y se descarta inmediatamente tras la generación de las aserciones de prueba.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">2. Auditoría y Registro de Actividad</h2>
+      <p class="text-sm text-zinc-400">
+        Cada acción administrativa dentro de <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/web</code> y cada llamada autenticada en <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/api</code> genera un registro inmutable de auditoría con marca temporal, IP de origen, usuario y acción ejecutada.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">3. Gestión de Vulnerabilidades y Monitoreo Continuo</h2>
+      <p class="text-sm text-zinc-400">
+        Realizamos análisis automatizados de dependencias con auditorías continuas (<code class="text-white font-mono">pnpm audit</code>), pruebas de penetración periódicas realizadas por terceros independientes y escaneo estático de código en cada commit.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">4. Solicitud del Reporte SOC 2</h2>
+      <p class="text-sm text-zinc-400">
+        Los clientes de planes de Equipo y Empresa pueden solicitar nuestro reporte oficial SOC 2 Tipo II completo bajo un acuerdo de confidencialidad (NDA) escribiendo a <code class="text-white">security@qably.com</code>.
+      </p>
+    </section>
+  </main>
+
+  <Footer locale={locale} />
+</Landing>

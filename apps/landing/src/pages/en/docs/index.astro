@@ -1,0 +1,237 @@
+---
+import Landing from "../../../layouts/Landing.astro";
+import Footer from "../../../features/navigation/components/Footer.astro";
+import { ArrowLeft, Key, Terminal, GitBranch, Cpu, ShieldCheck, Database } from "@phosphor-icons/react";
+
+import { getAuthUrl } from "../../../lib/auth-config";
+
+const locale = "en";
+const authUrl = getAuthUrl('/projects');
+---
+
+<Landing locale={locale} title="Official Documentation — Qably" description="Technical architecture guide, CI/CD telemetry ingestion, AI test generation, and API keys at Qably.">
+  {/* Header */}
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/80 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/en" class="flex items-center gap-2 group" aria-label="Return to landing">
+          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
+        </a>
+        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Official Docs</span>
+      </div>
+
+      <div class="flex items-center gap-3 font-sans">
+        <a
+          href="/docs"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
+        >
+          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
+          <span>ES</span>
+        </a>
+        <a href="/en" class="text-xs text-zinc-400 hover:text-white transition-colors">Back</a>
+        <a href={authUrl}>
+          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
+            Go to App
+          </button>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {/* Main Docs Content */}
+  <main id="main-content" class="max-w-7xl mx-auto px-6 py-12 flex-grow grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-12 font-sans">
+    {/* Sidebar navigation */}
+    <aside class="hidden lg:block space-y-6 sticky top-24 self-start border-r border-white/[0.08] pr-6">
+      <div class="space-y-2">
+        <h4 class="text-xs uppercase tracking-wider text-zinc-200 font-semibold">Getting Started</h4>
+        <ul class="space-y-1.5 text-xs text-zinc-400">
+          <li><a href="#architecture" class="hover:text-white transition-colors block py-0.5">Monorepo Architecture</a></li>
+          <li><a href="#api-keys" class="hover:text-white transition-colors block py-0.5">API Keys & Auth</a></li>
+          <li><a href="#ingest-runs" class="hover:text-white transition-colors block py-0.5">CI Run Ingestion</a></li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="text-xs uppercase tracking-wider text-zinc-200 font-semibold">CI/CD Pipelines</h4>
+        <ul class="space-y-1.5 text-xs text-zinc-400">
+          <li><a href="#github-actions" class="hover:text-white transition-colors block py-0.5">GitHub Actions CI</a></li>
+          <li><a href="#playwright-jest" class="hover:text-white transition-colors block py-0.5">Playwright & Jest SDKs</a></li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="text-xs uppercase tracking-wider text-zinc-200 font-semibold">AI Capabilities</h4>
+        <ul class="space-y-1.5 text-xs text-zinc-400">
+          <li><a href="#ai-extraction" class="hover:text-white transition-colors block py-0.5">ai-prompt & ai-review</a></li>
+          <li><a href="#review-inbox" class="hover:text-white transition-colors block py-0.5">Review Inbox Triage</a></li>
+        </ul>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="text-xs uppercase tracking-wider text-zinc-200 font-semibold">Infrastructure</h4>
+        <ul class="space-y-1.5 text-xs text-zinc-400">
+          <li><a href="#backend-setup" class="hover:text-white transition-colors block py-0.5">apps/api Setup</a></li>
+          <li><a href="#env-vars" class="hover:text-white transition-colors block py-0.5">Environment Variables</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    {/* Content Area */}
+    <article class="space-y-16 max-w-3xl text-zinc-300 leading-relaxed">
+      {/* Title */}
+      <section class="space-y-3 pb-8 border-b border-white/[0.08]">
+        <div class="inline-flex items-center gap-2 text-xs text-zinc-400">
+          <span>Docs</span>
+          <span>/</span>
+          <span class="text-white">Official Integration Guide</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-white">
+          Qably Architecture & Telemetry Integration Guide
+        </h1>
+        <p class="text-base text-zinc-400">
+          Learn how to connect your CI/CD test runners, ingest automated execution telemetry, and leverage Qably's AI-native test generator across your engineering organization.
+        </p>
+      </section>
+
+      {/* 1. Architecture */}
+      <section id="architecture" class="space-y-4">
+        <h2 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <Cpu size={22} className="text-white" />
+          1. Monorepo Architecture
+        </h2>
+        <p class="text-sm text-zinc-400">
+          Qably is engineered as a pnpm + Turborepo workspace, built with strict boundary isolation and shared TypeScript domain contracts:
+        </p>
+        <ul class="space-y-2 text-xs text-zinc-300 list-disc pl-5">
+          <li><strong><code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/web</code></strong>: Next.js 16 (App Router), React 19, Better Auth, Zustand, and Tailwind CSS v4 dashboard.</li>
+          <li><strong><code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/api</code></strong>: NestJS 11 enterprise backend with Prisma ORM, PostgreSQL, Fastify engine, and BullMQ background workers.</li>
+          <li><strong><code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">packages/types</code></strong>: Shared domain interfaces (<code class="text-zinc-400 font-mono">ProjectSummary</code>, <code class="text-zinc-400 font-mono">Run</code>, <code class="text-zinc-400 font-mono">AiCase</code>, <code class="text-zinc-400 font-mono">Suite</code>).</li>
+          <li><strong><code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/landing</code></strong>: Blazing fast marketing site built with Astro 7 and selective React 19 islands.</li>
+        </ul>
+      </section>
+
+      {/* 2. API Keys */}
+      <section id="api-keys" class="space-y-4">
+        <h2 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <Key size={22} className="text-white" />
+          2. Authentication & API Keys (`apps/api`)
+        </h2>
+        <p class="text-sm text-zinc-400">
+          All CI/CD runners authenticate against Qably's API using project-scoped tokens prefixed with <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">qbly_live_*</code>.
+        </p>
+        <div class="rounded-xl border border-white/[0.08] bg-zinc-950 p-4 font-mono text-xs text-zinc-300">
+          <div class="text-zinc-500 mb-2"># Required HTTP Header on every API request</div>
+          <code>Authorization: Bearer qbly_live_8f2a1c4d9e6b4a2f</code>
+        </div>
+        <p class="text-xs text-zinc-400">
+          You can create, inspect, and revoke tokens anytime from <strong>Settings &gt; API Keys</strong> in the web dashboard.
+        </p>
+      </section>
+
+      {/* 3. Ingest Runs */}
+      <section id="ingest-runs" class="space-y-4">
+        <h2 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <Terminal size={22} className="text-white" />
+          3. CI Run Ingestion (`POST /runs/ingest`)
+        </h2>
+        <p class="text-sm text-zinc-400">
+          The <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">POST /runs/ingest</code> endpoint in <code class="text-white font-mono">apps/api</code> processes pipeline telemetry with sub-second response times:
+        </p>
+        <div class="rounded-xl border border-white/[0.08] bg-zinc-950 p-4 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed">
+<pre>POST /runs/ingest
+Content-Type: application/json
+Authorization: Bearer qbly_live_8f2a1c4d9e6b4a2f
+
+&#123;
+  "projectId": "proj-1",
+  "suiteId": "suite-e2e-checkout",
+  "source": "github_actions",
+  "commitSha": "7a8b9c0d12e",
+  "branch": "main",
+  "cases": [
+    &#123;
+      "name": "User completes checkout with credit card",
+      "status": "pass",
+      "durationMs": 1420
+    &#125;,
+    &#123;
+      "name": "User enters expired promotional coupon",
+      "status": "fail",
+      "durationMs": 850,
+      "error": "CouponExpiredError: Code SUMMER26 has expired"
+    &#125;
+  ]
+&#125;</pre>
+        </div>
+      </section>
+
+      {/* 4. GitHub Actions */}
+      <section id="github-actions" class="space-y-4">
+        <h2 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <GitBranch size={22} className="text-white" />
+          4. GitHub Actions CI Integration
+        </h2>
+        <p class="text-sm text-zinc-400">
+          Drop the following configuration into <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">.github/workflows/qably-quality-gate.yml</code>:
+        </p>
+        <div class="rounded-xl border border-white/[0.08] bg-zinc-950 p-4 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed">
+<pre>name: Qably Quality Gate
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+      - name: Install dependencies
+        run: pnpm install
+      - name: Run Tests with Qably Telemetry
+        run: pnpm test --reporter=@qably/reporter
+        env:
+          QABLY_TOKEN: $&#123;&#123; secrets.QABLY_TOKEN &#125;&#125;
+          QABLY_PROJECT_ID: $&#123;&#123; vars.QABLY_PROJECT_ID &#125;&#125;</pre>
+        </div>
+      </section>
+
+      {/* 5. AI Module */}
+      <section id="ai-extraction" class="space-y-4">
+        <h2 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <ShieldCheck size={22} className="text-white" />
+          5. AI Test Case Extraction & Review Inbox
+        </h2>
+        <p class="text-sm text-zinc-400">
+          Qably's AI agent parses code AST and PR diffs deterministically, identifying edge cases, concurrency hazards, and missing validation assertions:
+        </p>
+        <div class="space-y-3 text-xs text-zinc-400">
+          <p>1. <strong>Deterministic Proposals</strong>: High-confidence assertions tailored to your testing framework (Playwright, Jest).</p>
+          <p>2. <strong>Human Review Gate</strong>: Proposals land in your team's Review Inbox, where QA leads review and approve diffs before merging.</p>
+          <p>3. <strong>Traceability Graph</strong>: Approved tests link bidirectionally to requirements and live dashboard health scores.</p>
+        </div>
+      </section>
+
+      {/* 6. Backend Setup */}
+      <section id="backend-setup" class="space-y-4">
+        <h2 class="text-2xl font-semibold text-white tracking-tight flex items-center gap-2.5">
+          <Database size={22} className="text-white" />
+          6. Local Development Environment (`apps/api`)
+        </h2>
+        <p class="text-sm text-zinc-400">
+          To run the backend API server locally:
+        </p>
+        <div class="rounded-xl border border-white/[0.08] bg-zinc-950 p-4 font-mono text-xs text-zinc-300 overflow-x-auto leading-relaxed">
+<pre># 1. Start PostgreSQL container
+docker compose up -d
+
+# 2. Run Prisma schema migrations
+pnpm --filter @qably/api prisma migrate dev
+
+# 3. Start development server with Fastify
+pnpm --filter @qably/api run start:dev</pre>
+        </div>
+      </section>
+    </article>
+  </main>
+
+  <Footer locale={locale} />
+</Landing>

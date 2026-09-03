@@ -1,0 +1,94 @@
+---
+import Landing from "../../layouts/Landing.astro";
+import Footer from "../../features/navigation/components/Footer.astro";
+
+import { getAuthUrl } from "../../lib/auth-config";
+
+const locale = "en";
+const authUrl = getAuthUrl('/projects');
+---
+
+<Landing locale={locale} title="Terms of Service — Qably" description="Terms of service and service level agreement (SLA) for the Qably automated QA management platform.">
+  {/* Header */}
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/85 backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/en" class="flex items-center gap-2 group" aria-label="Return to landing">
+          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
+        </a>
+        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Legal</span>
+      </div>
+
+      <div class="flex items-center gap-3 font-sans">
+        <a
+          href="/terms"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
+        >
+          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
+          <span>ES</span>
+        </a>
+        <a href="/en" class="text-xs text-zinc-400 hover:text-white transition-colors">Back</a>
+        <a href={authUrl}>
+          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
+            Go to App
+          </button>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {/* Main Terms Content */}
+  <main id="main-content" class="max-w-4xl mx-auto px-6 py-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
+    <header class="space-y-3 pb-8 border-b border-white/[0.08]">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Last updated: September 3, 2026</p>
+      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Terms of Service</h1>
+      <p class="text-base text-zinc-400">
+        Terms of use and service agreement for the Qably automated quality engineering and test telemetry platform.
+      </p>
+    </header>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">1. Service Description</h2>
+      <p class="text-sm text-zinc-400">
+        Qably provides an AI-native QA management and test execution telemetry platform, including automated CI/CD pipeline run ingestion (<code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">POST /runs/ingest</code>), heuristic flaky test isolation, bi-directional requirement traceability, and algorithmic test case proposals via <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">ai-prompt</code> and <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">review-inbox</code>.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">2. Organizations, Roles & API Keys</h2>
+      <p class="text-sm text-zinc-400">
+        Programmatic access requires project-scoped tokens prefixed with <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">qbly_live_*</code>. Customers are solely responsible for securing API tokens and assigning appropriate team privileges (<code class="text-zinc-300">owner</code>, <code class="text-zinc-300">admin</code>, <code class="text-zinc-300">engineer</code>). All activities authenticated with a valid token are deemed authorized by the account owner.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">3. Intellectual Property & Customer Code Privacy</h2>
+      <p class="text-sm text-zinc-400">
+        You retain full, exclusive ownership of all source code, test specs, and execution data transmitted to Qably. Qably <strong>claims no ownership rights</strong> over customer data. Under no circumstances is customer source code or execution telemetry used to train shared or foundation AI models.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">4. Rate Limits & Fair Usage</h2>
+      <p class="text-sm text-zinc-400">
+        Subscription tiers specify concurrent test suite and run ingestion limits. Qably enforces adaptive rate limits in <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/api</code> to ensure global platform stability. Intentional abuse or denial-of-service attempts will result in immediate API key revocation.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">5. Service Level Agreement (SLA)</h2>
+      <p class="text-sm text-zinc-400">
+        For Enterprise customers, Qably guarantees 99.9% monthly uptime for CI/CD run ingestion endpoints. Scheduled maintenance windows will be announced with at least 72 hours advance notice.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">6. Termination & Data Portability</h2>
+      <p class="text-sm text-zinc-400">
+        You may cancel your subscription at any time. Prior to account closure, you can export your entire test history, run results, and traceability graph as structured JSON documents.
+      </p>
+    </section>
+  </main>
+
+  <Footer locale={locale} />
+</Landing>

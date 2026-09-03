@@ -1,0 +1,94 @@
+---
+import Landing from "../layouts/Landing.astro";
+import Footer from "../features/navigation/components/Footer.astro";
+
+import { getAuthUrl } from "../lib/auth-config";
+
+const locale = "es";
+const authUrl = getAuthUrl('/projects');
+---
+
+<Landing locale={locale} title="Términos de Servicio — Qably" description="Términos de servicio y acuerdos de nivel de servicio (SLA) de la plataforma de gestión QA automatizada Qably.">
+  {/* Header */}
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/85 backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/" class="flex items-center gap-2 group" aria-label="Volver a la landing">
+          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
+        </a>
+        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Legal</span>
+      </div>
+
+      <div class="flex items-center gap-3 font-sans">
+        <a
+          href="/en/terms"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
+        >
+          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
+          <span>EN</span>
+        </a>
+        <a href="/" class="text-xs text-zinc-400 hover:text-white transition-colors">Volver</a>
+        <a href={authUrl}>
+          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
+            Ir a la App
+          </button>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {/* Main Terms Content */}
+  <main id="main-content" class="max-w-4xl mx-auto px-6 py-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
+    <header class="space-y-3 pb-8 border-b border-white/[0.08]">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Última actualización: 3 de septiembre de 2026</p>
+      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Términos de Servicio</h1>
+      <p class="text-base text-zinc-400">
+        Condiciones de uso y licenciamiento de la plataforma de ingeniería de calidad y pruebas automatizadas Qably.
+      </p>
+    </header>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">1. Descripción del Servicio</h2>
+      <p class="text-sm text-zinc-400">
+        Qably ofrece una solución SaaS de gestión y telemetría de calidad de software que incluye ingesta de resultados de pipelines de CI/CD (<code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">POST /runs/ingest</code>), detección automatizada de pruebas inestables (flaky tests), trazabilidad bidireccional y asistencia algorítmica para generación de casos de prueba mediante IA (<code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">ai-prompt</code> y <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">review-inbox</code>).
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">2. Cuentas, Organizaciones y API Keys</h2>
+      <p class="text-sm text-zinc-400">
+        El acceso a la API se gestiona mediante tokens con prefijo <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">qbly_live_*</code>. El cliente es el único responsable de salvaguardar las credenciales de API y de gestionar los roles de acceso en su organización (<code class="text-zinc-300">owner</code>, <code class="text-zinc-300">admin</code>, <code class="text-zinc-300">engineer</code>). Cualquier acción ejecutada con una API key válida se considerará autorizada por el titular de la cuenta.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">3. Propiedad Intelectual y Código del Cliente</h2>
+      <p class="text-sm text-zinc-400">
+        El cliente conserva la propiedad total y exclusiva de todo su código fuente, esquemas de prueba, especificaciones y metadatos transmitidos. Qably <strong>no adquiere ningún derecho de propiedad</strong> sobre los datos del cliente. Bajo ninguna circunstancia el código del cliente o los resultados de sus pruebas se utilizarán para entrenar modelos públicos de inteligencia artificial.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">4. Límites de Ingesta y Uso Justo</h2>
+      <p class="text-sm text-zinc-400">
+        Cada nivel de suscripción define cuotas de ingesta de ejecuciones de CI y suites concurrentes. Qably implementa rate limiting dinámico en <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/api</code> para garantizar la disponibilidad global. Los intentos intencionales de saturación o abuso de endpoints derivarán en la revocación inmediata de las credenciales de API.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">5. Nivel de Servicio (SLA)</h2>
+      <p class="text-sm text-zinc-400">
+        Para clientes de planes Empresa, Qably garantiza una disponibilidad mensual de servicio de al menos el 99.9% para la ingesta de telemetría de CI/CD. Los incidentes de mantenimiento planificado se notificarán con al menos 72 horas de anticipación.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">6. Cancelación y Exportación de Datos</h2>
+      <p class="text-sm text-zinc-400">
+        El cliente puede cancelar su suscripción en cualquier momento desde el panel de control. Previo a la baja, el cliente podrá exportar el histórico completo de sus suites, resultados de ejecuciones y matrices de trazabilidad en formato JSON estructurado.
+      </p>
+    </section>
+  </main>
+
+  <Footer locale={locale} />
+</Landing>

@@ -1,0 +1,85 @@
+---
+import Landing from "../layouts/Landing.astro";
+import Footer from "../features/navigation/components/Footer.astro";
+
+import { getAuthUrl } from "../lib/auth-config";
+
+const locale = "es";
+const authUrl = getAuthUrl('/projects');
+---
+
+<Landing locale={locale} title="Política de Privacidad — Qably" description="Política de privacidad y tratamiento de datos de telemetría y pruebas de software en Qably.">
+  {/* Header */}
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/85 backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/" class="flex items-center gap-2 group" aria-label="Volver a la landing">
+          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
+        </a>
+        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Privacidad</span>
+      </div>
+
+      <div class="flex items-center gap-3 font-sans">
+        <a
+          href="/en/privacy"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
+        >
+          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
+          <span>EN</span>
+        </a>
+        <a href="/" class="text-xs text-zinc-400 hover:text-white transition-colors">Volver</a>
+        <a href={authUrl}>
+          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
+            Ir a la App
+          </button>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {/* Main Privacy Content */}
+  <main id="main-content" class="max-w-4xl mx-auto px-6 py-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
+    <header class="space-y-3 pb-8 border-b border-white/[0.08]">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Última actualización: 3 de septiembre de 2026</p>
+      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Política de Privacidad</h1>
+      <p class="text-base text-zinc-400">
+        Cómo recopilamos, procesamos y protegemos los datos de telemetría de pruebas, código y credenciales en Qably.
+      </p>
+    </header>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">1. Datos que Recopilamos</h2>
+      <p class="text-sm text-zinc-400">
+        Para operar la plataforma de gestión de calidad, recopilamos únicamente los datos necesarios para el diagnóstico de pruebas y la trazabilidad:
+      </p>
+      <ul class="space-y-2 text-xs text-zinc-300 list-disc pl-5">
+        <li><strong>Metadatos de Ejecución de CI</strong>: Tiempos de respuesta, estado de aserciones (<code class="text-emerald-400 font-mono">pass</code>, <code class="text-rose-400 font-mono">fail</code>, <code class="text-zinc-400 font-mono">skip</code>), duración en milisegundos, nombres de suites y stack traces de error.</li>
+        <li><strong>Información de Contexto Git</strong>: SHA del commit, nombre de rama y referencia del pull request (por ejemplo, <code class="text-white font-mono">PR #142</code>).</li>
+        <li><strong>Datos de Usuario y Organización</strong>: Nombre, correo electrónico, identificador de organización y sesiones gestionadas mediante Better Auth.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">2. Política Estricta de Inteligencia Artificial</h2>
+      <p class="text-sm text-zinc-400">
+        El motor de IA de Qably procesa diffs de código y casos de prueba en memoria de forma aislada. <strong>Nunca almacenamos tus archivos de código fuente en bases de entrenamiento ni los compartimos con terceros para entrenamiento de modelos de lenguaje</strong>. Las propuestas generadas son propiedad exclusiva de tu organización.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">3. Seguridad y Almacenamiento</h2>
+      <p class="text-sm text-zinc-400">
+        Todos los datos se transmiten mediante protocolos seguros <strong>TLS 1.3</strong> y se almacenan en repositorios PostgreSQL con cifrado en reposo <strong>AES-256</strong>. Las claves de API se almacenan con hash criptográfico unidireccional SHA-256.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">4. Retención de Datos y Derecho al Olvido (GDPR / CCPA)</h2>
+      <p class="text-sm text-zinc-400">
+        Los resultados detallados de ejecuciones se conservan durante el periodo estipulado en tu plan (por defecto 90 días). Puedes solicitar la eliminación completa e irrevocable de los datos de tu organización en cualquier momento contactando a <code class="text-white">privacy@qably.com</code>.
+      </p>
+    </section>
+  </main>
+
+  <Footer locale={locale} />
+</Landing>

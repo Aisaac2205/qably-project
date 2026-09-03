@@ -1,0 +1,85 @@
+---
+import Landing from "../../layouts/Landing.astro";
+import Footer from "../../features/navigation/components/Footer.astro";
+
+import { getAuthUrl } from "../../lib/auth-config";
+
+const locale = "en";
+const authUrl = getAuthUrl('/projects');
+---
+
+<Landing locale={locale} title="Privacy Policy — Qably" description="Privacy policy and data governance practices for software test execution telemetry and credentials at Qably.">
+  {/* Header */}
+  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/85 backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-6">
+        <a href="/en" class="flex items-center gap-2 group" aria-label="Return to landing">
+          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
+        </a>
+        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Privacy</span>
+      </div>
+
+      <div class="flex items-center gap-3 font-sans">
+        <a
+          href="/privacy"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
+        >
+          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
+          <span>ES</span>
+        </a>
+        <a href="/en" class="text-xs text-zinc-400 hover:text-white transition-colors">Back</a>
+        <a href={authUrl}>
+          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
+            Go to App
+          </button>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  {/* Main Privacy Content */}
+  <main id="main-content" class="max-w-4xl mx-auto px-6 py-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
+    <header class="space-y-3 pb-8 border-b border-white/[0.08]">
+      <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Last updated: September 3, 2026</p>
+      <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Privacy Policy</h1>
+      <p class="text-base text-zinc-400">
+        How we collect, process, and protect your test execution telemetry, source code diffs, and credentials at Qably.
+      </p>
+    </header>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">1. Information We Collect</h2>
+      <p class="text-sm text-zinc-400">
+        We collect only the technical telemetry necessary to deliver diagnostic test insights and traceability:
+      </p>
+      <ul class="space-y-2 text-xs text-zinc-300 list-disc pl-5">
+        <li><strong>CI Execution Telemetry</strong>: Assertion statuses (<code class="text-emerald-400 font-mono">pass</code>, <code class="text-rose-400 font-mono">fail</code>, <code class="text-zinc-400 font-mono">skip</code>), run durations in milliseconds, test suite filenames, and stack trace failure logs.</li>
+        <li><strong>Git Metadata</strong>: Commit SHA, branch name, and pull request identifier (e.g., <code class="text-white font-mono">PR #142</code>).</li>
+        <li><strong>User & Organization Data</strong>: Name, business email, organization identifiers, and authenticated sessions managed via Better Auth.</li>
+      </ul>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">2. Zero-Model-Training AI Policy</h2>
+      <p class="text-sm text-zinc-400">
+        Qably's AI agents parse code diffs in volatile memory exclusively to propose structured test assertions. <strong>We never store customer source code for model training, nor do we share your code with third-party foundation model trainers</strong>. All generated test cases remain your proprietary intellectual property.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">3. Data Security & Storage</h2>
+      <p class="text-sm text-zinc-400">
+        Telemetry is transmitted over strict <strong>TLS 1.3</strong> encrypted channels and stored in PostgreSQL databases protected by <strong>AES-256</strong> encryption at rest. API tokens are cryptographically salted and hashed using SHA-256 before storage.
+      </p>
+    </section>
+
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-white tracking-tight">4. Retention & Right to be Forgotten (GDPR / CCPA)</h2>
+      <p class="text-sm text-zinc-400">
+        Execution runs are retained for the duration specified in your plan tier (90 days default). Organization owners can request complete, permanent erasure of all repository telemetry at any time by emailing <code class="text-white">privacy@qably.com</code>.
+      </p>
+    </section>
+  </main>
+
+  <Footer locale={locale} />
+</Landing>
