@@ -9,15 +9,13 @@ import {
   Info,
   CheckCircle,
   ArrowSquareOut,
-  EnvelopeSimple,
-  ChatCircleDots,
-  DeviceMobile,
   Check,
   MagnifyingGlass,
   X,
 } from '@phosphor-icons/react'
-import type { NotificationSeverity, NotificationChannel } from '@qably/types'
+import type { NotificationSeverity } from '@qably/types'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
+import { resolveNotificationLink } from '@/features/notifications/lib/resolve-notification-link'
 import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
@@ -62,18 +60,6 @@ const SEVERITY_CONFIG: Record<
   },
 }
 
-const CHANNEL_CONFIG: Record<
-  NotificationChannel,
-  {
-    Icon: typeof DeviceMobile
-    labelKey: string
-  }
-> = {
-  in_app: { Icon: DeviceMobile, labelKey: 'notifications.channelInApp' },
-  slack: { Icon: ChatCircleDots, labelKey: 'notifications.channelSlack' },
-  email: { Icon: EnvelopeSimple, labelKey: 'notifications.channelEmail' },
-}
-
 function formatDate(iso: string): string {
   try {
     return new Intl.DateTimeFormat('en-US', {
@@ -89,7 +75,7 @@ function formatDate(iso: string): string {
 
 export function NotificationsPage() {
   const { t } = useTranslation()
-  const { notifications, unreadCount, markAsRead, toggleRead, markAllAsRead } = useNotifications()
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const { projects } = useProjects()
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'read'>('all')
@@ -101,13 +87,15 @@ export function NotificationsPage() {
     return new Map(projects.map((p) => [p.id, p]))
   }, [projects])
 
-  const criticalCount = useMemo(() => {
-    return notifications.filter((n) => n.severity === 'critical' && !n.readAt).length
-  }, [notifications])
-
   const readCount = useMemo(() => {
     return notifications.filter((n) => Boolean(n.readAt)).length
   }, [notifications])
+
+  const messages = useMemo(() => {
+    return new Map(
+      notifications.map((n) => [n.id, t(`notifications.events.${n.eventType}`, n.payload)]),
+    )
+  }, [notifications, t])
 
   const filteredNotifications = useMemo(() => {
     return notifications.filter((n) => {
@@ -117,13 +105,15 @@ export function NotificationsPage() {
       if (projectFilter !== 'all' && n.projectId !== projectFilter) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
-        const matchMsg = n.message.toLowerCase().includes(q)
-        const matchProj = projectsMap.get(n.projectId)?.name.toLowerCase().includes(q)
+        const matchMsg = (messages.get(n.id) ?? '').toLowerCase().includes(q)
+        const matchProj = n.projectId
+          ? projectsMap.get(n.projectId)?.name.toLowerCase().includes(q)
+          : false
         if (!matchMsg && !matchProj) return false
       }
       return true
     })
-  }, [notifications, statusFilter, severityFilter, projectFilter, searchQuery, projectsMap])
+  }, [notifications, statusFilter, severityFilter, projectFilter, searchQuery, projectsMap, messages])
 
   const hasActiveFilters = severityFilter !== 'all' || projectFilter !== 'all' || searchQuery.trim().length > 0
 
@@ -141,27 +131,6 @@ export function NotificationsPage() {
       {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-border/80">
         <div className="space-y-1.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* KPI Stat badges */}
-            <div className="flex items-center gap-1.5">
-              {unreadCount > 0 ? (
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary border border-primary/20">
-                  {t('notifications.unreadBadge', { count: unreadCount })}
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-full bg-pass-bg px-2.5 py-0.5 text-xs font-medium text-pass border border-pass/20">
-                  <Check size={12} weight="bold" className="mr-1" aria-hidden="true" />
-                  {t('notifications.filterAll')}
-                </span>
-              )}
-
-              {criticalCount > 0 && (
-                <span className="inline-flex items-center rounded-full bg-fail-bg px-2 py-0.5 text-[11px] font-semibold text-fail border border-fail/20">
-                  {t('notifications.kpiCritical')}: {criticalCount}
-                </span>
-              )}
-            </div>
-          </div>
           <p className="text-xs text-muted max-w-2xl">
             {t('notifications.subtitle')}
           </p>
@@ -326,11 +295,11 @@ export function NotificationsPage() {
         <div className="divide-y divide-border/60 rounded-xl border border-border bg-surface shadow-2xs overflow-hidden">
           {filteredNotifications.map((n) => {
             const severity = SEVERITY_CONFIG[n.severity] ?? SEVERITY_CONFIG.medium
-            const channel = CHANNEL_CONFIG[n.channel] ?? CHANNEL_CONFIG.in_app
-            const project = projectsMap.get(n.projectId)
+            const project = n.projectId ? projectsMap.get(n.projectId) : undefined
             const isUnread = !n.readAt
             const SeverityIcon = severity.Icon
-            const ChannelIcon = channel.Icon
+            const link = resolveNotificationLink(n)
+            const message = messages.get(n.id) ?? ''
 
             return (
               <article
@@ -363,11 +332,6 @@ export function NotificationsPage() {
                         </span>
                       )}
 
-                      <span className="inline-flex items-center gap-1 text-[11px] text-muted">
-                        <ChannelIcon size={12} aria-hidden="true" />
-                        <span>{t(channel.labelKey)}</span>
-                      </span>
-
                       <span className="text-muted/60 text-xs">·</span>
                       <time className="text-[11px] text-muted" dateTime={n.createdAt}>
                         {formatDate(n.createdAt)}
@@ -383,38 +347,35 @@ export function NotificationsPage() {
                         isUnread ? 'font-semibold text-default' : 'font-normal text-muted'
                       }`}
                     >
-                      {n.message}
+                      {message}
                     </p>
                   </div>
                 </div>
 
-                {/* Actions: View Run & Read/Unread Toggle */}
+                {/* Actions: view target & mark as read */}
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                  {n.runId && n.projectId && (
+                  {link && (
                     <Link
-                      href={`/projects/${n.projectId}/runs/${n.runId}`}
-                      onClick={() => markAsRead(n.id)}
+                      href={link}
+                      onClick={() => isUnread && markAsRead(n.id)}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-canvas/40 px-3 py-1.5 text-xs font-semibold text-default hover:bg-surface hover:border-border transition-colors active:scale-[0.98]"
                     >
-                      <span>{t('notifications.viewRun')}</span>
+                      <span>{t('notifications.viewDetails')}</span>
                       <ArrowSquareOut size={13} aria-hidden="true" />
                     </Link>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => toggleRead(n.id)}
-                    className="inline-flex size-7 items-center justify-center rounded-lg border border-border/70 bg-canvas/20 text-muted hover:text-default hover:bg-surface hover:border-border transition-all cursor-pointer active:scale-[0.98]"
-                    title={isUnread ? t('notifications.markAsRead') : t('notifications.markAsUnread')}
-                    aria-label={isUnread ? t('notifications.markAsRead') : t('notifications.markAsUnread')}
-                  >
-                    <Check
-                      size={14}
-                      weight={isUnread ? 'regular' : 'bold'}
-                      className={isUnread ? 'text-muted' : 'text-primary'}
-                      aria-hidden="true"
-                    />
-                  </button>
+                  {isUnread && (
+                    <button
+                      type="button"
+                      onClick={() => markAsRead(n.id)}
+                      className="inline-flex size-7 items-center justify-center rounded-lg border border-border/70 bg-canvas/20 text-muted hover:text-default hover:bg-surface hover:border-border transition-all cursor-pointer active:scale-[0.98]"
+                      title={t('notifications.markAsRead')}
+                      aria-label={t('notifications.markAsRead')}
+                    >
+                      <Check size={14} weight="regular" className="text-muted" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               </article>
             )

@@ -126,10 +126,10 @@
     "emptyTitle": "No notifications",
     "emptyDescription": "You are all caught up. Critical alerts and events will appear here.",
     "viewRun": "View run",
+    "viewDetails": "View details",
     "markAsRead": "Mark as read",
     "markAsUnread": "Mark as unread",
     "channelInApp": "In-app",
-    "channelSlack": "Slack",
     "channelEmail": "Email",
     "searchPlaceholder": "Search notifications...",
     "clearFilters": "Clear filters",
@@ -138,8 +138,6 @@
     "kpiTotal": "Total",
     "kpiUnread": "Unread",
     "kpiCritical": "Critical",
-    "temporaryTitle": "This area is not yet available",
-    "temporaryDescription": "Notifications will appear here as delivery is integrated.",
     "events": {
       "run_failed": "The run \"{{runName}}\" in {{suiteName}} failed.",
       "run_completed": "The run \"{{runName}}\" in {{suiteName}} passed.",
@@ -623,7 +621,7 @@
       "general": "General",
       "members": "Members",
       "apiKeys": "API Keys",
-      "integrations": "Integrations",
+      "notifications": "Notifications",
       "billing": "Billing"
     },
     "language": {
@@ -665,15 +663,35 @@
       "featureTrace": "Bidirectional case traceability & audit trail",
       "featureIntegrations": "Unlimited integration channels (Slack, Jira, Discord)"
     },
-    "integrationsGovernance": {
-      "title": "Integration credentials",
-      "description": "Notification channels and governed connections for this organization.",
-      "synced": "Synched recently",
-      "add": "Add integration",
-      "slackDesc": "Instant automated QA channel alerts",
-      "discordDesc": "Build alerts and suite dispatch notifications",
-      "jiraDesc": "Defect synchronization and traceability",
-      "qablyAlertsDesc": "Native webhook for automated execution events"
+    "notifications": {
+      "title": "Notification preferences",
+      "description": "Choose which events reach you, and on which channel.",
+      "turnAllOff": "Turn everything off",
+      "columnEvent": "Event",
+      "columnInApp": "In-app",
+      "columnEmail": "Email",
+      "saving": "Saving…",
+      "groups": {
+        "runs": {
+          "title": "Runs",
+          "description": "Alerts about test run outcomes and regressions."
+        },
+        "ingestion": {
+          "title": "Ingestion",
+          "description": "Alerts when a repository ingestion fails to process."
+        },
+        "security": {
+          "title": "Security",
+          "description": "Alerts about changes to your connection credentials."
+        }
+      },
+      "events": {
+        "run_failed": "Run failed",
+        "run_completed": "Run completed",
+        "case_regressed": "Case regressed",
+        "ingestion_failed": "Ingestion failed",
+        "connection_security": "Connection security"
+      }
     },
     "org": {
       "inviteMembers": "Invite members",

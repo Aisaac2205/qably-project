@@ -126,10 +126,10 @@
     "emptyTitle": "No hay notificaciones",
     "emptyDescription": "Estás al día. Las alertas y eventos críticos aparecerán aquí.",
     "viewRun": "Ver ejecución",
+    "viewDetails": "Ver detalles",
     "markAsRead": "Marcar como leída",
     "markAsUnread": "Marcar como no leída",
     "channelInApp": "En la app",
-    "channelSlack": "Slack",
     "channelEmail": "Correo",
     "searchPlaceholder": "Buscar en notificaciones...",
     "clearFilters": "Limpiar filtros",
@@ -138,8 +138,6 @@
     "kpiTotal": "Total",
     "kpiUnread": "Sin leer",
     "kpiCritical": "Críticas",
-    "temporaryTitle": "Esta área todavía no está disponible",
-    "temporaryDescription": "Las notificaciones aparecerán aquí cuando se incorpore su entrega.",
     "events": {
       "run_failed": "La ejecución \"{{runName}}\" en {{suiteName}} falló.",
       "run_completed": "La ejecución \"{{runName}}\" en {{suiteName}} pasó.",
@@ -623,7 +621,7 @@
       "general": "General",
       "members": "Miembros",
       "apiKeys": "Claves API",
-      "integrations": "Integraciones",
+      "notifications": "Notificaciones",
       "billing": "Facturación"
     },
     "language": {
@@ -665,15 +663,35 @@
       "featureTrace": "Trazabilidad y auditoría bidireccional",
       "featureIntegrations": "Integraciones ilimitadas (Slack, Jira, Discord)"
     },
-    "integrationsGovernance": {
-      "title": "Credenciales de integraciones",
-      "description": "Canales de notificación y conexiones gobernadas de esta organización.",
-      "synced": "Sincronizado recientemente",
-      "add": "Agregar integración",
-      "slackDesc": "Notificaciones automáticas en canales de QA",
-      "discordDesc": "Alertas de builds y despachos de suites",
-      "jiraDesc": "Sincronización de defectos y trazabilidad",
-      "qablyAlertsDesc": "Webhook nativo para eventos de ejecución"
+    "notifications": {
+      "title": "Preferencias de notificaciones",
+      "description": "Elegí qué eventos te llegan y por qué canal.",
+      "turnAllOff": "Desactivar todo",
+      "columnEvent": "Evento",
+      "columnInApp": "En la app",
+      "columnEmail": "Correo",
+      "saving": "Guardando…",
+      "groups": {
+        "runs": {
+          "title": "Ejecuciones",
+          "description": "Alertas sobre resultados de ejecuciones y regresiones."
+        },
+        "ingestion": {
+          "title": "Ingesta",
+          "description": "Alertas cuando falla el procesamiento de una ingesta del repositorio."
+        },
+        "security": {
+          "title": "Seguridad",
+          "description": "Alertas sobre cambios en las credenciales de tus conexiones."
+        }
+      },
+      "events": {
+        "run_failed": "Ejecución fallida",
+        "run_completed": "Ejecución completada",
+        "case_regressed": "Caso con regresión",
+        "ingestion_failed": "Ingesta fallida",
+        "connection_security": "Seguridad de la conexión"
+      }
     },
     "org": {
       "inviteMembers": "Invitar miembros",

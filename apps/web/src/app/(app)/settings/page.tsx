@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { LanguageSection } from '@/features/settings/components/language-section'
 import { AccountPlanSection } from '@/features/settings/components/account-plan-section'
-import { IntegrationsGovernanceSection } from '@/features/settings/components/integrations-governance-section'
+import { NotificationPreferencesPanel } from '@/features/notifications/components/notification-preferences-panel'
 import { useTranslation } from '@/lib/i18n'
 
-type SettingsTab = 'all' | 'integrations' | 'plan' | 'language'
+type SettingsTab = 'all' | 'notifications' | 'plan' | 'language'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
@@ -14,7 +14,7 @@ export default function SettingsPage() {
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'all', label: t('settings.tabs.general') },
-    { id: 'integrations', label: t('settings.tabs.integrations') },
+    { id: 'notifications', label: t('settings.tabs.notifications') },
     { id: 'plan', label: t('settings.tabs.billing') },
     { id: 'language', label: t('settings.language.title') },
   ]
@@ -58,7 +58,7 @@ export default function SettingsPage() {
 
       <div className="space-y-6 px-4 sm:px-6 lg:px-8 py-6">
         {(activeTab === 'all' || activeTab === 'plan') && <AccountPlanSection />}
-        {(activeTab === 'all' || activeTab === 'integrations') && <IntegrationsGovernanceSection />}
+        {(activeTab === 'all' || activeTab === 'notifications') && <NotificationPreferencesPanel />}
         {(activeTab === 'all' || activeTab === 'language') && <LanguageSection />}
       </div>
     </div>

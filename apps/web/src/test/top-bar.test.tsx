@@ -1,6 +1,11 @@
-import { render, screen, act } from '@testing-library/react'
+import { render as rtlRender, screen, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import type { ProjectSummary } from '@qably/types'
+import { QueryProvider } from '@/providers/query-provider'
+
+function render(ui: React.ReactElement) {
+  return rtlRender(ui, { wrapper: QueryProvider })
+}
 
 const mockPathname = vi.fn(() => '/dashboard')
 

@@ -1,7 +1,12 @@
-import { render, screen, act } from '@testing-library/react'
+import { render as rtlRender, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { AppShell } from '@/components/shell/app-shell'
+import { QueryProvider } from '@/providers/query-provider'
+
+function render(ui: React.ReactElement) {
+  return rtlRender(ui, { wrapper: QueryProvider })
+}
 
 vi.mock('@/features/projects/hooks/use-project', async () => {
   const { getProject } = await import('@/lib/mock-store')

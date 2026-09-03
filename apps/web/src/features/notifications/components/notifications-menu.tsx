@@ -10,6 +10,7 @@ import {
 import type { Notification, NotificationSeverity } from '@qably/types'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
+import { useTranslation } from '@/lib/i18n'
 
 const severityConfig: Record<NotificationSeverity, {
   Icon: typeof WarningOctagon
@@ -26,8 +27,10 @@ function NotificationItem({ notification, onRead }: {
   notification: Notification
   onRead: (id: string) => void
 }) {
+  const { t } = useTranslation()
   const { Icon, label, className } = severityConfig[notification.severity]
   const isUnread = !notification.readAt
+  const message = t(`notifications.events.${notification.eventType}`, notification.payload)
 
   return (
     <MenuItem onClick={() => onRead(notification.id)} className="items-start gap-2.5 rounded-none px-3 py-2.5">
@@ -37,7 +40,7 @@ function NotificationItem({ notification, onRead }: {
           {label}
           {isUnread && <span className="size-1.5 rounded-full bg-running" aria-label="Unread" />}
         </span>
-        <span className="mt-0.5 block text-xs leading-relaxed text-muted">{notification.message}</span>
+        <span className="mt-0.5 block text-xs leading-relaxed text-muted">{message}</span>
       </span>
     </MenuItem>
   )
