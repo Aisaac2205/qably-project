@@ -1,0 +1,47 @@
+---
+import { getDictionary } from '../../i18n/get-dictionary';
+import { getAuthUrl } from '../../../lib/auth-config';
+import type { Locale } from '../../i18n/types';
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = 'es' } = Astro.props;
+const dict = getDictionary(locale);
+const isEn = locale === 'en';
+const authUrl = getAuthUrl('/projects');
+---
+
+<section class="py-24 px-6 max-w-5xl mx-auto" aria-label="Llamada a la acción">
+  <div class="relative rounded-2xl border border-white/10 bg-zinc-950 p-10 sm:p-16 text-center overflow-hidden shadow-2xl">
+    {/* Subtle white radial glow */}
+    <div class="absolute -top-24 left-1/2 -translate-x-1/2 size-96 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06),transparent_70%)] pointer-events-none"></div>
+
+    <div class="relative z-10 max-w-2xl mx-auto space-y-6">
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-white leading-tight font-sans">
+        {isEn ? 'Start elevating your software quality today' : 'Comienza a elevar la calidad de tu software hoy'}
+      </h2>
+      <p class="text-sm sm:text-base text-zinc-400 font-sans">
+        {isEn
+          ? 'Connect your GitHub repository in less than 2 minutes. Free for individual developers and open source.'
+          : 'Conecta tu repositorio de GitHub en menos de 2 minutos. Gratuito para desarrolladores y código abierto.'}
+      </p>
+
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-3 font-sans">
+        <a
+          href={authUrl}
+          class="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 active:scale-[0.98] transition-all shadow-md"
+        >
+          {dict.hero.ctaPrimary}
+        </a>
+        <a
+          href={isEn ? "/en/docs" : "/docs"}
+          class="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-zinc-900 border border-white/10 text-white font-medium text-xs hover:bg-zinc-800 active:scale-[0.98] transition-all"
+        >
+          {dict.hero.ctaSecondary}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>

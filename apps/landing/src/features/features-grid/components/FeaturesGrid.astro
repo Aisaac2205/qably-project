@@ -1,0 +1,134 @@
+---
+import { getDictionary } from '../../i18n/get-dictionary';
+import type { Locale } from '../../i18n/types';
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = 'es' } = Astro.props;
+const dict = getDictionary(locale);
+const f = dict.features;
+---
+
+<section id="features" class="py-24 px-6 max-w-7xl mx-auto" aria-labelledby="features-heading">
+  {/* Section Header - Clean, No decorative pill badge */}
+  <div class="text-center max-w-3xl mx-auto mb-16">
+    <h2 id="features-heading" class="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-white mb-4 font-sans">
+      {f.title}
+    </h2>
+    <p class="text-base text-zinc-400 leading-relaxed font-sans">
+      {f.subtitle}
+    </p>
+  </div>
+
+  {/* Flat Bento Grid (No nested cards on cards, clean B&W) */}
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    {/* Feature 1: AI Test Generation (2-column) */}
+    <div id="ai-review" class="md:col-span-2 rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
+      <div>
+        <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature1Title}</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature1Desc}</p>
+      </div>
+
+      {/* Code Preview - Flat container with high-visibility typography */}
+      <div class="rounded-xl border border-white/10 bg-black p-5 text-sm font-mono text-zinc-200">
+        <div class="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-3.5 text-xs sm:text-sm text-zinc-300 font-sans">
+          <span class="flex items-center gap-2">
+            <span class="size-2 rounded-full bg-emerald-400"></span>
+            ai-review: PR #142 Diff Analysis
+          </span>
+          <span class="text-white font-semibold">96% Confianza</span>
+        </div>
+        <pre class="text-xs sm:text-sm text-zinc-300 overflow-x-auto leading-relaxed">
+<span class="text-white font-semibold">+ test</span>(<span class="text-zinc-200">'should retry webhook with exponential backoff on 429'</span>, <span class="text-white font-semibold">async</span> (&#123; request &#125;) =&gt; &#123;
+    <span class="text-zinc-400">const res = await triggerWebhookRetry(&#123; delay: '2s', maxAttempts: 3 &#125;);</span>
+    <span class="text-white font-semibold">expect</span>(res.status).<span class="text-zinc-200">toBe</span>(200);
+&#125;);</pre>
+      </div>
+    </div>
+
+    {/* Feature 2: Review Inbox (1-column) */}
+    <div id="review-inbox" class="rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
+      <div>
+        <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature2Title}</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature2Desc}</p>
+      </div>
+
+      <div class="space-y-2 text-xs border-t border-white/[0.06] pt-4 font-sans">
+        <div class="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
+          <span class="text-zinc-300">Token Expiration Guard</span>
+          <span class="text-emerald-400 font-medium">Aprobado</span>
+        </div>
+        <div class="flex items-center justify-between py-1.5">
+          <span class="text-zinc-300">Stripe Idempotency Key</span>
+          <span class="text-emerald-400 font-medium">Aprobado</span>
+        </div>
+      </div>
+    </div>
+
+    {/* Feature 3: Real-Time CI Runs */}
+    <div id="runs-telemetry" class="rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
+      <div>
+        <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="6 3 20 12 6 21 6 3"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature3Title}</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature3Desc}</p>
+      </div>
+
+      <div class="border-t border-white/[0.06] pt-4 text-xs flex items-center justify-between font-sans">
+        <span class="text-zinc-400">Velocidad de ingesta</span>
+        <span class="text-white font-medium tabular-nums">&lt; 40ms / run</span>
+      </div>
+    </div>
+
+    {/* Feature 4: Flaky Test Detection */}
+    <div class="rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
+      <div>
+        <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature4Title}</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature4Desc}</p>
+      </div>
+
+      <div class="border-t border-white/[0.06] pt-4 text-xs text-zinc-300 flex items-center gap-2 font-sans">
+        <span class="size-1.5 rounded-full bg-amber-400"></span>
+        <span>Aislamiento automático de suites inestables</span>
+      </div>
+    </div>
+
+    {/* Feature 5: Bi-Directional Traceability */}
+    <div id="traceability" class="rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
+      <div>
+        <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
+          <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature5Title}</h3>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature5Desc}</p>
+      </div>
+
+      <div class="border-t border-white/[0.06] pt-4 text-xs flex items-center justify-between font-sans">
+        <span class="text-zinc-400">Requisitos vinculados</span>
+        <span class="text-white font-medium">100% Cobertura</span>
+      </div>
+    </div>
+  </div>
+</section>

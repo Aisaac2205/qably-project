@@ -1,0 +1,74 @@
+---
+import { getDictionary } from '../../i18n/get-dictionary';
+import type { Locale } from '../../i18n/types';
+
+interface Props {
+  locale?: Locale;
+}
+
+const { locale = 'es' } = Astro.props;
+const dict = getDictionary(locale);
+const footer = dict.footer;
+const isEn = locale === 'en';
+---
+
+<footer class="border-t border-white/[0.08] bg-black py-16 px-6 font-sans" aria-labelledby="footer-heading">
+  <h2 id="footer-heading" class="sr-only">Footer</h2>
+  <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 mb-14">
+    {/* Official Brand Logo */}
+    <div class="md:col-span-1 space-y-4">
+      <a href={isEn ? '/en' : '/'} class="flex items-center gap-2" aria-label="Qably Home">
+        <img
+          src="/qably-sidebar.svg"
+          alt="Qably"
+          class="h-6 w-auto brightness-0 invert object-contain"
+        />
+      </a>
+      <p class="text-sm text-zinc-400 leading-relaxed max-w-xs">
+        {footer.tagline}
+      </p>
+    </div>
+
+    {/* Product Links - Sentence case headings, comfortable text size, 100% i18n */}
+    <div class="space-y-4">
+      <h3 class="text-sm font-semibold text-white">{footer.product}</h3>
+      <ul class="space-y-2.5 text-sm text-zinc-400">
+        <li><a href="#ai-review" class="hover:text-white transition-colors">{footer.productLinks.aiPrompt}</a></li>
+        <li><a href="#review-inbox" class="hover:text-white transition-colors">{footer.productLinks.reviewInbox}</a></li>
+        <li><a href="#runs-telemetry" class="hover:text-white transition-colors">{footer.productLinks.runsTelemetry}</a></li>
+        <li><a href="#traceability" class="hover:text-white transition-colors">{footer.productLinks.traceabilityGraph}</a></li>
+      </ul>
+    </div>
+
+    {/* Resources Links - 100% i18n */}
+    <div class="space-y-4">
+      <h3 class="text-sm font-semibold text-white">{footer.resources}</h3>
+      <ul class="space-y-2.5 text-sm text-zinc-400">
+        <li><a href={isEn ? "/en/docs" : "/docs"} class="hover:text-white transition-colors">{footer.resourceLinks.docs}</a></li>
+        <li><a href={isEn ? "/en/docs#api-keys" : "/docs#api-keys"} class="hover:text-white transition-colors">{footer.resourceLinks.apiKeys}</a></li>
+        <li><a href={isEn ? "/en/docs#github-actions" : "/docs#github-actions"} class="hover:text-white transition-colors">{footer.resourceLinks.githubActions}</a></li>
+        <li><a href="https://github.com/Aisaac2205/qably-project" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">{footer.resourceLinks.githubRepo}</a></li>
+      </ul>
+    </div>
+
+    {/* Company & Language */}
+    <div class="space-y-4">
+      <h3 class="text-sm font-semibold text-white">{footer.company}</h3>
+      <ul class="space-y-2.5 text-sm text-zinc-400">
+        <li><a href="#pricing" class="hover:text-white transition-colors">{dict.nav.pricing}</a></li>
+        <li><a href={isEn ? "/en/terms" : "/terms"} class="hover:text-white transition-colors">Terms of Service</a></li>
+        <li><a href={isEn ? "/en/privacy" : "/privacy"} class="hover:text-white transition-colors">Privacy Policy</a></li>
+        <li><a href={isEn ? "/en/security" : "/security"} class="hover:text-white transition-colors">SOC2 Security</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="max-w-7xl mx-auto pt-8 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-zinc-500">
+    <p>© {new Date().getFullYear()} Qably Inc. {footer.rightsReserved}</p>
+    <div class="flex items-center gap-6 text-sm">
+      <a href={isEn ? "/en/terms" : "/terms"} class="hover:text-zinc-300 transition-colors">Terms of Service</a>
+      <a href={isEn ? "/en/privacy" : "/privacy"} class="hover:text-zinc-300 transition-colors">Privacy Policy</a>
+      <a href={isEn ? "/en/security" : "/security"} class="hover:text-zinc-300 transition-colors">SOC2 Security</a>
+    </div>
+  </div>
+</footer>

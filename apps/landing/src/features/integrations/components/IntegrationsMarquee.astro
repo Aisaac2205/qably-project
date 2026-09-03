@@ -1,0 +1,127 @@
+---
+interface Props {
+  locale?: "es" | "en";
+}
+
+const { locale = "es" } = Astro.props;
+const isEn = locale === "en";
+
+const technologies = [
+  { name: "Playwright", icon: "/tech-icons/playwright.svg", invert: false },
+  { name: "Jest", icon: "/tech-icons/jest-icon.svg", invert: false },
+  { name: "TypeScript", icon: "/tech-icons/typescript.svg", invert: false },
+  { name: "Next.js", icon: "/tech-icons/nextjs.svg", invert: true },
+  { name: "React", icon: "/tech-icons/react.svg", invert: false },
+  { name: "Docker", icon: "/tech-icons/docker.svg", invert: false },
+  { name: "NestJS", icon: "/tech-icons/nestjs.svg", invert: false },
+  { name: "Python", icon: "/tech-icons/python.svg", invert: false },
+  { name: "Golang", icon: "/tech-icons/go.svg", invert: false },
+  {
+    name: "PostgreSQL",
+    icon: "/tech-icons/postgresql-icon.svg",
+    invert: false,
+  },
+  { name: "FastAPI", icon: "/tech-icons/fastapi-icon.svg", invert: false },
+  {
+    name: "Spring Boot",
+    icon: "/tech-icons/spring-boot-icon.svg",
+    invert: false,
+  },
+];
+---
+
+<section
+  class="py-16 border-y border-white/[0.08] bg-black overflow-hidden select-none"
+  aria-label="Tecnologías integradas"
+>
+  <div class="max-w-7xl mx-auto px-6 mb-10 text-center">
+    <p class="text-sm font-medium text-zinc-400 font-sans">
+      {
+        isEn
+          ? "Native Integrations with your Programming Languages and Developer Tooling"
+          : "Integraciones Nativas con tus Lenguajes y Herramientas de Desarrollo"
+      }
+    </p>
+  </div>
+
+  {
+    /* Dual-track seamless marquee: mathematically eliminates jumps, cuts, or stutter */
+  }
+  <div
+    class="marquee-wrapper relative w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)]"
+  >
+    <div class="marquee-track flex items-center py-2 shrink-0">
+      {
+        technologies.map((tech) => (
+          <div class="flex items-center gap-3.5 mx-6 group cursor-default transition-all duration-200 shrink-0">
+            <img
+              src={tech.icon}
+              alt={tech.name}
+              class={`size-8 sm:size-9 object-contain opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all ${
+                tech.invert ? "brightness-0 invert" : ""
+              }`}
+              loading="lazy"
+            />
+            <span class="text-sm font-medium text-zinc-300 group-hover:text-white transition-colors font-sans whitespace-nowrap">
+              {tech.name}
+            </span>
+          </div>
+        ))
+      }
+    </div>
+
+    <div
+      class="marquee-track flex items-center py-2 shrink-0"
+      aria-hidden="true"
+    >
+      {
+        technologies.map((tech) => (
+          <div class="flex items-center gap-3.5 mx-6 group cursor-default transition-all duration-200 shrink-0">
+            <img
+              src={tech.icon}
+              alt={tech.name}
+              class={`size-8 sm:size-9 object-contain opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all ${
+                tech.invert ? "brightness-0 invert" : ""
+              }`}
+              loading="lazy"
+            />
+            <span class="text-sm font-medium text-zinc-300 group-hover:text-white transition-colors font-sans whitespace-nowrap">
+              {tech.name}
+            </span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<style>
+  .marquee-wrapper {
+    display: flex;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .marquee-track {
+    display: flex;
+    flex-shrink: 0;
+    min-width: 100%;
+    animation: scroll-seamless 28s linear infinite;
+    will-change: transform;
+  }
+
+  @keyframes scroll-seamless {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(-100%, 0, 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-track {
+      animation: none !important;
+    }
+  }
+</style>
