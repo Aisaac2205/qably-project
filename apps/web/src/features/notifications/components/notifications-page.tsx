@@ -352,7 +352,6 @@ export function NotificationsPage() {
                   </div>
                 </div>
 
-                {/* Actions: view target & mark as read */}
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                   {link && (
                     <Link
