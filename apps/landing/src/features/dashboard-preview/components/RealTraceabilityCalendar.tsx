@@ -77,21 +77,21 @@ function generateHeatmap() {
 
 const { cells: CELLS, total: TRACEABILITY_TOTAL } = generateHeatmap();
 
-export const TRACEABILITY_EVENT_TOTAL = TRACEABILITY_TOTAL;
-
-function groupThousands(value: number): string {
+function groupThousands(value: number, separator: string): string {
   const digits = String(value);
   let grouped = '';
 
   for (let index = 0; index < digits.length; index += 1) {
-    if (index > 0 && (digits.length - index) % 3 === 0) grouped += '.';
+    if (index > 0 && (digits.length - index) % 3 === 0) grouped += separator;
     grouped += digits[index];
   }
 
   return grouped;
 }
 
-export const TRACEABILITY_EVENT_TOTAL_LABEL = groupThousands(TRACEABILITY_TOTAL);
+export function traceabilityTotalLabel(isEn: boolean): string {
+  return groupThousands(TRACEABILITY_TOTAL, isEn ? ',' : '.');
+}
 
 export function RealTraceabilityCalendar({ isEn = false }: RealTraceabilityCalendarProps) {
   const months = isEn ? MONTHS_EN : MONTHS_ES;
@@ -107,7 +107,7 @@ export function RealTraceabilityCalendar({ isEn = false }: RealTraceabilityCalen
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
           className="w-full min-w-[700px] select-none"
           role="img"
-          aria-label="Calendario de trazabilidad y gobernanza"
+          aria-label={isEn ? 'Traceability and governance calendar' : 'Calendario de trazabilidad y gobernanza'}
         >
           {months.map((month, index) => (
             <text

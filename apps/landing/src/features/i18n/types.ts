@@ -30,12 +30,21 @@ export interface HeroTranslations {
 }
 
 export interface DashboardTranslations {
+  navDashboard: string;
+  navProjects: string;
+  navReviewInbox: string;
+  navNotifications: string;
+  navSettings: string;
+  toggleSidebar: string;
+  accountRole: string;
   runsKpi: string;
   passRateKpi: string;
   pendingAiKpi: string;
   coverageGapsKpi: string;
   vsPrior7d: string;
   viewDetails: string;
+  traceabilityHeading: string;
+  allStages: string;
   projectHealth: string;
   viewAll: string;
   thProject: string;
@@ -44,10 +53,13 @@ export interface DashboardTranslations {
   thSuites: string;
   thAiPending: string;
   passRateTrend: string;
-  recentActivity: string;
+  trendPeriod: string;
+  recentRuns: string;
+  recentPipelines: string;
   pendingProposals: string;
-  qualityRisks: string;
-  traceabilityMatrix: string;
+  pendingProposalsCount: string;
+  pendingProposalsSubtitle: string;
+  reviewAction: string;
   statusPass: string;
   statusFail: string;
   statusRunning: string;

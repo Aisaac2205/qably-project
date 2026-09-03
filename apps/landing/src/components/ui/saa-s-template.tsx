@@ -253,7 +253,7 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
   return (
     <section
       id="getting-started"
-      className="relative min-h-screen flex flex-col items-center justify-start px-4 sm:px-6 pt-32 pb-20 md:pt-40 md:pb-24 overflow-hidden"
+      className="relative min-h-screen flex flex-col items-center justify-start px-4 sm:px-6 lg:px-8 pt-32 pb-20 md:pt-40 md:pb-24 overflow-hidden"
     >
       {/* Subtle white radial aura background */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.08),transparent_70%)] pointer-events-none -z-10" />
@@ -311,12 +311,11 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
         </a>
       </motion.div>
 
-      {/* Hero Dashboard Preview Window - Expanded Width (max-w-[1360px]) */}
       <motion.div
         initial={{ opacity: 0, y: 25 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
-        className="w-full max-w-[1360px] relative pb-10"
+        className="w-full max-w-[1680px] relative pb-10"
       >
         <div className="relative z-10">
           {/* Mobile view (< md): Dedicated iPhone 16 Pro mockup */}
@@ -326,7 +325,7 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
 
           {/* Desktop view (>= md): Full Desktop MacBook Window (Direct, no extra card) */}
           <div className="hidden md:block">
-            <DashboardWindowFrame tDashboard={dashboard} tHero={hero} />
+            <DashboardWindowFrame tDashboard={dashboard} tHero={hero} locale={locale} />
           </div>
         </div>
       </motion.div>

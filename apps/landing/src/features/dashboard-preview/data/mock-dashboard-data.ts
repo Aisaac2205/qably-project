@@ -54,7 +54,7 @@ export const MOCK_PROJECTS: MockProject[] = [
     name: 'Ecommerce App',
     healthScore: 90,
     lastRunStatus: 'pass',
-    lastRunAt: '12m ago',
+    lastRunAt: '12m',
     suiteCount: 12,
     aiPendingCount: 3,
     technologies: ['React', 'TypeScript', 'Vite'],
@@ -64,7 +64,7 @@ export const MOCK_PROJECTS: MockProject[] = [
     name: 'Mobile App',
     healthScore: 45,
     lastRunStatus: 'fail',
-    lastRunAt: '1h ago',
+    lastRunAt: '1h',
     suiteCount: 8,
     aiPendingCount: 0,
     technologies: ['Flutter', 'Dart'],
@@ -74,7 +74,7 @@ export const MOCK_PROJECTS: MockProject[] = [
     name: 'API Backend',
     healthScore: 88,
     lastRunStatus: 'running',
-    lastRunAt: 'Just now',
+    lastRunAt: '<1m',
     suiteCount: 6,
     aiPendingCount: 0,
     technologies: ['Java', 'Spring Boot', 'PostgreSQL'],
@@ -84,7 +84,7 @@ export const MOCK_PROJECTS: MockProject[] = [
     name: 'Billing Service',
     healthScore: 94,
     lastRunStatus: 'pass',
-    lastRunAt: '3h ago',
+    lastRunAt: '3h',
     suiteCount: 14,
     aiPendingCount: 1,
     technologies: ['Node.js', 'NestJS', 'Stripe'],
@@ -196,7 +196,7 @@ export const MOCK_TRACEABILITY_ITEMS = [
   { req: 'REQ-105: Role-based Access Control (RBAC)', tests: 12, coverage: '100%', status: 'pass' },
 ];
 
-export type MockRunStatus = 'pass' | 'fail' | 'running' | 'skip' | 'blocked' | 'pending';
+export type MockRunStatus = 'pass' | 'fail' | 'running';
 
 export interface MockDashboardRun {
   id: string;
@@ -212,13 +212,10 @@ export interface MockCiPipeline {
   timeAgo: string;
 }
 
-export interface MockRiskSignal {
-  id: string;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  projectName: string;
-  evidenceCount: number;
-  criteria: string[];
-}
+export const MOCK_DEMO_USER = {
+  name: 'Demo',
+  initials: 'D',
+} as const;
 
 export const MOCK_DASHBOARD_RUNS: MockDashboardRun[] = [
   { id: 'dr-1', name: 'Checkout · Regression', suiteName: 'Ecommerce App', status: 'pass' },
@@ -228,38 +225,8 @@ export const MOCK_DASHBOARD_RUNS: MockDashboardRun[] = [
 ];
 
 export const MOCK_CI_PIPELINES: MockCiPipeline[] = [
-  { id: 'ci-1', commitMessage: 'fix(checkout): guard against duplicate intents', commitSha: 'a41f9c2', timeAgo: 'hace 4 min' },
-  { id: 'ci-2', commitMessage: 'feat(billing): idempotent webhook replay', commitSha: '7be0d13', timeAgo: 'hace 38 min' },
-  { id: 'ci-3', commitMessage: 'chore(ci): cache playwright browsers', commitSha: 'c92aa07', timeAgo: 'hace 2 h' },
-  { id: 'ci-4', commitMessage: 'refactor(auth): extract token verifier', commitSha: '1d47e8b', timeAgo: 'hace 5 h' },
+  { id: 'ci-1', commitMessage: 'fix(checkout): guard against duplicate intents', commitSha: 'a41f9c2', timeAgo: '4m' },
+  { id: 'ci-2', commitMessage: 'feat(billing): idempotent webhook replay', commitSha: '7be0d13', timeAgo: '38m' },
+  { id: 'ci-3', commitMessage: 'chore(ci): cache playwright browsers', commitSha: 'c92aa07', timeAgo: '2h' },
+  { id: 'ci-4', commitMessage: 'refactor(auth): extract token verifier', commitSha: '1d47e8b', timeAgo: '5h' },
 ];
-
-export const MOCK_RISK_SIGNALS: MockRiskSignal[] = [
-  {
-    id: 'sig-1',
-    severity: 'critical',
-    projectName: 'Ecommerce App',
-    evidenceCount: 4,
-    criteria: ['checkout-modal.spec.ts inestable', '14% de flake en las últimas 50 ejecuciones'],
-  },
-  {
-    id: 'sig-2',
-    severity: 'high',
-    projectName: 'Billing Service',
-    evidenceCount: 3,
-    criteria: ['Índice de riesgo 82/100', '3 commits recientes con cambios incompatibles'],
-  },
-  {
-    id: 'sig-3',
-    severity: 'medium',
-    projectName: 'API Backend',
-    evidenceCount: 2,
-    criteria: ['Sin pruebas para el desajuste de state en OAuth2', 'Brecha de cobertura en callbacks'],
-  },
-];
-
-export const MOCK_DEMO_USER = {
-  name: 'Usuario demo',
-  initials: 'UD',
-  role: 'Administrador',
-} as const;

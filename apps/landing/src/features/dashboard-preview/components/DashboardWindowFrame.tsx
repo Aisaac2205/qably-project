@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ArrowSquareOut,
   ArrowUp,
   BellSimple,
   CalendarBlank,
@@ -11,7 +10,6 @@ import {
   CircleNotch,
   ChartBar,
   Code,
-  FileText,
   FolderSimple,
   GearSix,
   LockSimple,
@@ -21,11 +19,10 @@ import {
   SquaresFour,
   Target,
   Tray,
-  WarningCircle,
   XCircle,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
-import { RealTraceabilityCalendar, TRACEABILITY_EVENT_TOTAL_LABEL } from './RealTraceabilityCalendar';
+import { RealTraceabilityCalendar, traceabilityTotalLabel } from './RealTraceabilityCalendar';
 import {
   MOCK_AI_PROPOSALS,
   MOCK_CI_PIPELINES,
@@ -33,57 +30,41 @@ import {
   MOCK_DASHBOARD_STATS,
   MOCK_DEMO_USER,
   MOCK_PROJECTS,
-  MOCK_RISK_SIGNALS,
-  type MockRiskSignal,
   type MockRunStatus,
 } from '../data/mock-dashboard-data';
-import type { DashboardTranslations, HeroTranslations } from '../../i18n/types';
+import type { DashboardTranslations, HeroTranslations, Locale } from '../../i18n/types';
+
+const PREVIEW_YEAR = 2026;
 
 interface DashboardWindowFrameProps {
   tDashboard: DashboardTranslations;
   tHero: HeroTranslations;
+  locale?: Locale;
 }
 
 type NavSection = 'dashboard' | 'projects' | 'review-inbox' | 'notifications' | 'settings';
 
-interface NavItem {
-  id: NavSection;
-  label: string;
-  icon: Icon;
+function fill(template: string, values: Record<string, string | number>): string {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.split(`{${key}}`).join(String(value)),
+    template,
+  );
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: SquaresFour },
-  { id: 'projects', label: 'Proyectos', icon: FolderSimple },
-  { id: 'review-inbox', label: 'Bandeja de revisión', icon: Tray },
-  { id: 'notifications', label: 'Notificaciones', icon: BellSimple },
-  { id: 'settings', label: 'Configuración', icon: GearSix },
-];
+function statusPresentation(status: MockRunStatus, t: DashboardTranslations) {
+  if (status === 'pass') {
+    return { label: t.statusPass, icon: CheckCircle, tone: 'bg-app-pass-bg text-app-pass', animated: false };
+  }
 
-const STATUS_PRESENTATION: Record<
-  MockRunStatus,
-  { label: string; icon: Icon; tone: string; animated?: boolean }
-> = {
-  pass: { label: 'Aprobado', icon: CheckCircle, tone: 'bg-app-pass-bg text-app-pass' },
-  fail: { label: 'Fallido', icon: XCircle, tone: 'bg-app-fail-bg text-app-fail' },
-  running: { label: 'En ejecución', icon: CircleNotch, tone: 'bg-app-running-bg text-app-running', animated: true },
-  skip: { label: 'Omitido', icon: XCircle, tone: 'bg-app-skip-bg text-app-muted' },
-  blocked: { label: 'Bloqueado', icon: XCircle, tone: 'bg-app-blocked-bg text-app-blocked' },
-  pending: { label: 'Pendiente', icon: CircleNotch, tone: 'bg-app-skip-bg text-app-muted' },
-};
+  if (status === 'fail') {
+    return { label: t.statusFail, icon: XCircle, tone: 'bg-app-fail-bg text-app-fail', animated: false };
+  }
 
-const SEVERITY_PRESENTATION: Record<
-  MockRiskSignal['severity'],
-  { label: string; color: string; badge: string }
-> = {
-  critical: { label: 'Critical', color: 'text-app-fail', badge: 'bg-app-fail-bg text-app-fail' },
-  high: { label: 'High', color: 'text-app-warn', badge: 'bg-app-warn-bg text-app-warn' },
-  medium: { label: 'Medium', color: 'text-app-running', badge: 'bg-app-running-bg text-app-running' },
-  low: { label: 'Low', color: 'text-app-muted', badge: 'bg-app-canvas text-app-muted' },
-};
+  return { label: t.statusRunning, icon: CircleNotch, tone: 'bg-app-running-bg text-app-running', animated: true };
+}
 
-function StatusChip({ status }: { status: MockRunStatus }) {
-  const presentation = STATUS_PRESENTATION[status];
+function StatusChip({ status, tDashboard }: { status: MockRunStatus; tDashboard: DashboardTranslations }) {
+  const presentation = statusPresentation(status, tDashboard);
   const StatusIcon = presentation.icon;
 
   return (
@@ -185,16 +166,17 @@ const AREA_PATH = `${LINE_PATH} L ${xPosition(CHART_DATA.length - 1)} ${PLOT_BOT
 
 interface QueueSectionProps {
   title: string;
+  viewAllLabel: string;
   children: React.ReactNode;
 }
 
-function QueueSection({ title, children }: QueueSectionProps) {
+function QueueSection({ title, viewAllLabel, children }: QueueSectionProps) {
   return (
     <section className="flex h-full min-w-0 flex-col p-5 md:p-6">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold tracking-[-0.01em] text-app-default">{title}</h2>
         <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-app-primary">
-          Ver todo
+          {viewAllLabel}
           <CaretRight size={11} weight="bold" aria-hidden="true" />
         </span>
       </div>
@@ -203,8 +185,18 @@ function QueueSection({ title, children }: QueueSectionProps) {
   );
 }
 
-export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) {
+export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWindowFrameProps) {
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard');
+
+  const isEn = locale === 'en';
+
+  const navItems: { id: NavSection; label: string; icon: Icon }[] = [
+    { id: 'dashboard', label: tDashboard.navDashboard, icon: SquaresFour },
+    { id: 'projects', label: tDashboard.navProjects, icon: FolderSimple },
+    { id: 'review-inbox', label: tDashboard.navReviewInbox, icon: Tray },
+    { id: 'notifications', label: tDashboard.navNotifications, icon: BellSimple },
+    { id: 'settings', label: tDashboard.navSettings, icon: GearSix },
+  ];
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-app-border-sidebar bg-app-sidebar font-sans text-app-default shadow-[0_25px_80px_rgba(0,0,0,0.85)]">
@@ -237,7 +229,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
               </span>
               <button
                 type="button"
-                aria-label="Toggle sidebar"
+                aria-label={tDashboard.toggleSidebar}
                 className="flex size-9 shrink-0 items-center justify-center rounded-lg text-app-sidebar-fg transition-colors hover:bg-app-surface-hover hover:text-app-default"
               >
                 <SidebarSimple size={20} weight="bold" aria-hidden="true" />
@@ -247,7 +239,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
 
           <nav aria-label="Sidebar preview" className="flex min-h-0 flex-1 flex-col p-2">
             <ul className="flex w-full min-w-0 flex-col gap-0">
-              {NAV_ITEMS.map((item) => {
+              {navItems.map((item) => {
                 const isActive = activeNav === item.id;
                 return (
                   <li key={item.id} className="relative">
@@ -280,7 +272,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium leading-tight text-app-sidebar-fg">{MOCK_DEMO_USER.name}</span>
-                <span className="block truncate text-xs leading-normal text-app-sidebar-fg-muted">{MOCK_DEMO_USER.role}</span>
+                <span className="block truncate text-xs leading-normal text-app-sidebar-fg-muted">{tDashboard.accountRole}</span>
               </span>
               <CaretUpDown size={16} aria-hidden="true" className="shrink-0 text-app-sidebar-fg-muted" />
             </span>
@@ -290,7 +282,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
         <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-app-sidebar">
           <header className="flex h-14 shrink-0 items-center justify-between bg-app-sidebar px-4 md:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <h1 className="text-base font-semibold tracking-[-0.015em] text-app-default md:text-lg">Dashboard</h1>
+              <h1 className="text-base font-semibold tracking-[-0.015em] text-app-default md:text-lg">{tDashboard.navDashboard}</h1>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
@@ -340,7 +332,10 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
               <section className="rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
-                    {TRACEABILITY_EVENT_TOTAL_LABEL} eventos de trazabilidad en 2026
+                    {fill(tDashboard.traceabilityHeading, {
+                      count: traceabilityTotalLabel(isEn),
+                      year: PREVIEW_YEAR,
+                    })}
                   </h2>
 
                   <div className="flex flex-wrap items-center gap-2.5">
@@ -349,23 +344,23 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                         <span className="shrink-0 text-app-muted">
                           <CalendarBlank size={14} weight="bold" aria-hidden="true" />
                         </span>
-                        <span>Todas las etapas</span>
+                        <span>{tDashboard.allStages}</span>
                         <span className="inline-flex items-center justify-center rounded-full bg-app-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-app-muted">
-                          {TRACEABILITY_EVENT_TOTAL_LABEL}
+                          {traceabilityTotalLabel(isEn)}
                         </span>
                       </span>
                       <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />
                     </span>
 
                     <span className="flex h-9 min-w-[84px] items-center justify-between gap-2.5 rounded-lg border border-app-border bg-app-canvas px-3 py-1.5 text-xs font-semibold text-app-default shadow-xs">
-                      <span>2026</span>
+                      <span>{PREVIEW_YEAR}</span>
                       <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />
                     </span>
                   </div>
                 </div>
 
                 <div className="mt-4">
-                  <RealTraceabilityCalendar />
+                  <RealTraceabilityCalendar isEn={isEn} />
                 </div>
               </section>
 
@@ -400,7 +395,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                               </td>
                               <td className="px-3 py-3.5">
                                 <div className="flex items-center gap-2">
-                                  <StatusChip status={project.lastRunStatus} />
+                                  <StatusChip status={project.lastRunStatus} tDashboard={tDashboard} />
                                   <span className="font-mono text-xs font-semibold tabular-nums text-app-default">
                                     {project.healthScore}%
                                   </span>
@@ -429,7 +424,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                   <div className="flex flex-row items-center justify-between p-5 pb-2">
                     <h3 className="text-sm font-semibold text-app-default">{tDashboard.passRateTrend}</h3>
                     <span className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-canvas px-2 py-1 text-xs font-semibold text-app-muted">
-                      <span>7 days</span>
+                      <span>{tDashboard.trendPeriod}</span>
                       <CaretDown size={10} aria-hidden="true" />
                     </span>
                   </div>
@@ -507,7 +502,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                   className="flex h-full flex-col overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-xs"
                 >
                   <div className="grid flex-1 grid-cols-1 divide-y divide-app-border md:grid-cols-2 md:divide-x md:divide-y-0">
-                    <QueueSection title="Ejecuciones recientes">
+                    <QueueSection title={tDashboard.recentRuns} viewAllLabel={tDashboard.viewAll}>
                       {MOCK_DASHBOARD_RUNS.map((run) => (
                         <div key={run.id} className="flex min-h-14 items-center justify-between gap-3 py-3">
                           <div className="flex min-w-0 items-center gap-3">
@@ -519,12 +514,12 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                               <p className="truncate text-xs text-app-muted">{run.suiteName}</p>
                             </div>
                           </div>
-                          <StatusChip status={run.status} />
+                          <StatusChip status={run.status} tDashboard={tDashboard} />
                         </div>
                       ))}
                     </QueueSection>
 
-                    <QueueSection title="Pipelines recientes">
+                    <QueueSection title={tDashboard.recentPipelines} viewAllLabel={tDashboard.viewAll}>
                       {MOCK_CI_PIPELINES.map((pipeline) => (
                         <div key={pipeline.id} className="flex min-h-14 items-center justify-between gap-3 py-3">
                           <div className="flex min-w-0 items-center gap-3">
@@ -552,16 +547,16 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                             {tDashboard.pendingProposals}
                           </h2>
                           <span className="inline-flex shrink-0 items-center rounded-md border border-app-border bg-app-canvas px-2 py-0.5 text-xs font-medium text-app-muted">
-                            {MOCK_AI_PROPOSALS.length} pendientes
+                            {fill(tDashboard.pendingProposalsCount, { count: MOCK_AI_PROPOSALS.length })}
                           </span>
                         </div>
                         <p className="mt-0.5 text-xs text-app-muted">
-                          Propuestas de prueba generadas por IA en espera de verificación humana
+                          {tDashboard.pendingProposalsSubtitle}
                         </p>
                       </div>
 
                       <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-app-default">
-                        Bandeja de revisión
+                        {tDashboard.navReviewInbox}
                         <CaretRight size={12} weight="bold" aria-hidden="true" />
                       </span>
                     </div>
@@ -582,7 +577,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                           </div>
 
                           <span className="inline-flex shrink-0 items-center gap-1 self-end rounded border border-app-border/80 bg-app-canvas/60 px-2.5 py-1.5 text-xs font-medium text-app-default sm:self-center">
-                            Revisar
+                            {tDashboard.reviewAction}
                             <CaretRight size={11} weight="bold" aria-hidden="true" />
                           </span>
                         </div>
@@ -592,67 +587,6 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                 </section>
               </div>
 
-              <section className="rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
-                      Riesgos de calidad y vigencia
-                    </h2>
-                    <p className="mt-0.5 text-xs text-app-muted">
-                      Señales de pruebas desactualizadas, brechas de cobertura y estabilidad
-                    </p>
-                  </div>
-                  <span className="inline-flex shrink-0 items-center rounded-md border border-app-border bg-app-canvas px-2.5 py-1 text-xs font-medium text-app-muted">
-                    {MOCK_RISK_SIGNALS.length} señales activas
-                  </span>
-                </div>
-
-                <div className="mt-4 divide-y divide-app-border/60">
-                  {MOCK_RISK_SIGNALS.map((risk) => {
-                    const severity = SEVERITY_PRESENTATION[risk.severity];
-
-                    return (
-                      <div
-                        key={risk.id}
-                        className="flex flex-col justify-between gap-3 py-3.5 first:pt-1 last:pb-0 sm:flex-row sm:items-center"
-                      >
-                        <div className="flex min-w-0 flex-1 items-start gap-3">
-                          <WarningCircle
-                            size={18}
-                            weight="fill"
-                            aria-hidden="true"
-                            className={`mt-0.5 shrink-0 ${severity.color}`}
-                          />
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={`inline-flex items-center rounded border px-2 py-0.5 text-[11px] font-semibold ${severity.badge}`}
-                              >
-                                {severity.label}
-                              </span>
-                              <span className="inline-flex items-center rounded border border-app-border bg-app-canvas px-2 py-0.5 text-[11px] font-medium text-app-muted">
-                                {risk.projectName}
-                              </span>
-                              <span className="inline-flex items-center gap-1 text-[11px] text-app-muted">
-                                <FileText size={12} aria-hidden="true" />
-                                <span>{risk.evidenceCount} evidencias</span>
-                              </span>
-                            </div>
-                            <p className="text-xs leading-relaxed text-app-default">{risk.criteria.join(' · ')}</p>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 self-end sm:self-center">
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-app-primary">
-                            <span>Ver repositorio</span>
-                            <ArrowSquareOut size={12} aria-hidden="true" />
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
             </section>
           </main>
         </div>
