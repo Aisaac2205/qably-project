@@ -1,18 +1,15 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { CheckCircle, Info, X } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '@/lib/use-mock-store'
 import { approveProposal, rejectProposal } from '@/lib/mock-store'
 import { useTranslation } from '@/lib/i18n'
-import { ReviewKpiRow } from './review-kpi-row'
-import { ReviewGovernanceBanner } from './review-governance-banner'
+import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue, type ReviewQueueStatusFilter } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
-import { RecentReviewDecisions } from './recent-review-decisions'
-import { ProjectReviewDistribution } from './project-review-distribution'
 
 export function ReviewInboxPage() {
   const { t } = useTranslation()
@@ -25,7 +22,6 @@ export function ReviewInboxPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
 
-  // Compute active filtered proposals to resolve default selected proposal
   const filteredProposals = useMemo(() => {
     return proposals.filter((p) => {
       if (selectedProjectId !== 'all' && p.projectId !== selectedProjectId) return false
@@ -39,88 +35,111 @@ export function ReviewInboxPage() {
     })
   }, [proposals, selectedProjectId, statusFilter, duplicateOnly, searchQuery])
 
-  // Active selected proposal
   const activeSelectedId = selectedId || (filteredProposals.length > 0 ? filteredProposals[0].id : undefined)
   const selectedProposal = proposals.find((p) => p.id === activeSelectedId)
 
-  const handleApprove = (proposalId: string) => {
-    const res = approveProposal(proposalId, {
-      actorId: 'QA Reviewer',
-      comment: 'Approved for suite publication from Review Inbox',
-    })
-    if (res.ok) {
-      setFeedbackToast({
-        message: t('reviewInbox.approvedSuccess'),
-        type: 'success',
+  const handleApprove = useCallback(
+    (proposalId: string) => {
+      const res = approveProposal(proposalId, {
+        actorId: 'QA Reviewer',
+        comment: 'Approved for suite publication from Review Inbox',
       })
-      // Move to next pending if available
-      const remainingPending = filteredProposals.filter((p) => p.id !== proposalId && p.status === 'in_review')
-      if (remainingPending.length > 0) {
-        setSelectedId(remainingPending[0].id)
+      if (res.ok) {
+        setFeedbackToast({
+          message: t('reviewInbox.approvedSuccess'),
+          type: 'success',
+        })
+        const remainingPending = filteredProposals.filter((p) => p.id !== proposalId && p.status === 'in_review')
+        if (remainingPending.length > 0) {
+          setSelectedId(remainingPending[0].id)
+        }
       }
-    }
-  }
+    },
+    [filteredProposals, t],
+  )
 
-  const handleReject = (proposalId: string) => {
-    const res = rejectProposal(proposalId, {
-      actorId: 'QA Reviewer',
-      comment: 'Rejected from Review Inbox',
-    })
-    if (res.ok) {
+  const handleReject = useCallback(
+    (proposalId: string) => {
+      const res = rejectProposal(proposalId, {
+        actorId: 'QA Reviewer',
+        comment: 'Rejected from Review Inbox',
+      })
+      if (res.ok) {
+        setFeedbackToast({
+          message: t('reviewInbox.rejectedSuccess'),
+          type: 'info',
+        })
+        const remainingPending = filteredProposals.filter((p) => p.id !== proposalId && p.status === 'in_review')
+        if (remainingPending.length > 0) {
+          setSelectedId(remainingPending[0].id)
+        }
+      }
+    },
+    [filteredProposals, t],
+  )
+
+  const toggleDuplicateOnly = useCallback(() => {
+    setDuplicateOnly((prev) => {
+      const next = !prev
       setFeedbackToast({
-        message: t('reviewInbox.rejectedSuccess'),
+        message: next ? t('reviewInbox.duplicateFilterEnabled') : t('reviewInbox.duplicateFilterDisabled'),
         type: 'info',
       })
-      const remainingPending = filteredProposals.filter((p) => p.id !== proposalId && p.status === 'in_review')
-      if (remainingPending.length > 0) {
-        setSelectedId(remainingPending[0].id)
-      }
-    }
-  }
+      return next
+    })
+  }, [t])
+
+  useKeyboardShortcuts({
+    a: () => {
+      if (selectedProposal?.status === 'in_review') handleApprove(selectedProposal.id)
+    },
+    r: () => {
+      if (selectedProposal?.status === 'in_review') handleReject(selectedProposal.id)
+    },
+    d: () => toggleDuplicateOnly(),
+  })
 
   return (
     <section
-      aria-label={t('reviewInbox.title')}
-      className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
+      aria-labelledby="page-title"
+      className="flex h-full min-h-0 w-full flex-col gap-4 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
-      <h1 className="sr-only">{t('reviewInbox.title')}</h1>
+      <div className="shrink-0 space-y-4">
+        <p className="max-w-3xl text-xs text-muted sm:text-sm text-wrap-pretty">
+          <span className="font-medium text-default">{t('reviewInbox.governanceTitle')}.</span>{' '}
+          {t('reviewInbox.governanceSubtitle')}
+        </p>
 
-      <ReviewGovernanceBanner />
-
-      {/* Optional feedback banner */}
-      {feedbackToast && (
-        <div
-          role="status"
-          className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs font-medium transition-all duration-200 ${
-            feedbackToast.type === 'success'
-              ? 'border-pass/40 bg-pass-bg/20 text-pass'
-              : 'border-border bg-surface text-default'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {feedbackToast.type === 'success' ? (
-              <CheckCircle size={16} weight="fill" aria-hidden="true" />
-            ) : (
-              <Info size={16} weight="fill" aria-hidden="true" />
-            )}
-            <span>{feedbackToast.message}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFeedbackToast(null)}
-            aria-label={t('common.cancel')}
-            className="rounded p-1 hover:bg-canvas text-muted hover:text-default transition-colors"
+        {feedbackToast && (
+          <div
+            role="status"
+            className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs font-medium transition-all duration-200 ${
+              feedbackToast.type === 'success'
+                ? 'border-pass/40 bg-pass-bg/20 text-pass'
+                : 'border-border bg-surface text-default'
+            }`}
           >
-            <X size={14} aria-hidden="true" />
-          </button>
-        </div>
-      )}
+            <div className="flex items-center gap-2">
+              {feedbackToast.type === 'success' ? (
+                <CheckCircle size={16} weight="fill" aria-hidden="true" />
+              ) : (
+                <Info size={16} weight="fill" aria-hidden="true" />
+              )}
+              <span>{feedbackToast.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFeedbackToast(null)}
+              aria-label={t('common.cancel')}
+              className="rounded p-1 hover:bg-canvas text-muted hover:text-default transition-colors"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* KPI Overview Row */}
-      <ReviewKpiRow />
-
-      {/* Main Review Workspace Split */}
-      <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden min-h-[600px] h-[720px] max-h-[85vh]">
+      <div className="min-h-0 flex-1">
         <ResizableSplit
           storageKey="review-inbox-split"
           defaultWidth={340}
@@ -128,7 +147,10 @@ export function ReviewInboxPage() {
           maxRatio={0.55}
           className="h-full"
           first={
-            <div className="h-full flex flex-col min-h-0 bg-surface">
+            <section
+              aria-label={t('reviewInbox.queueTitle')}
+              className="flex h-full min-h-0 flex-col bg-surface"
+            >
               <ReviewInboxQueue
                 proposals={proposals}
                 selectedId={activeSelectedId}
@@ -138,14 +160,17 @@ export function ReviewInboxPage() {
                 statusFilter={statusFilter}
                 onStatusFilterChange={(s) => setStatusFilter(s)}
                 duplicateOnly={duplicateOnly}
-                onToggleDuplicateOnly={() => setDuplicateOnly((prev) => !prev)}
+                onToggleDuplicateOnly={toggleDuplicateOnly}
                 searchQuery={searchQuery}
                 onSearchQueryChange={(q) => setSearchQuery(q)}
               />
-            </div>
+            </section>
           }
           second={
-            <div className="h-full flex flex-col min-h-0 bg-surface">
+            <section
+              aria-label={t('reviewInbox.inspectorTitle')}
+              className="flex h-full min-h-0 flex-col border-t border-border bg-surface md:border-t-0"
+            >
               {selectedProposal ? (
                 <ReviewProposalInspector
                   proposal={selectedProposal}
@@ -161,20 +186,9 @@ export function ReviewInboxPage() {
                   />
                 </div>
               )}
-            </div>
+            </section>
           }
         />
-      </div>
-
-      {/* Secondary Analytics: Distribution & Audit History */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(21rem,0.9fr)]">
-        <ProjectReviewDistribution
-          onSelectProject={(projectId) => {
-            setSelectedProjectId(projectId)
-            setStatusFilter('in_review')
-          }}
-        />
-        <RecentReviewDecisions />
       </div>
     </section>
   )

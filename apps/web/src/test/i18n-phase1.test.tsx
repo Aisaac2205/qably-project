@@ -47,12 +47,16 @@ describe('Phase 1 i18n', () => {
     expect(screen.getByText('Alertas de ejecuciones críticas, propuestas de revisión y riesgos de calidad.')).toBeInTheDocument()
   })
 
-  it('renders the Review Inbox page in Spanish', () => {
+  it('renders the Review Inbox page in Spanish without a duplicate page heading', () => {
     useI18nStore.setState({ locale: 'es' })
     renderWithQuery(<ReviewInboxPage />)
 
-    expect(screen.getByRole('heading', { level: 1, name: /Bandeja de revisión/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: /Autoridad humana requerida para la publicación/i })).toBeInTheDocument()
+    // The shell owns the single h1 for this route; the page itself renders none.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(screen.getByText(/^Autoridad humana requerida para la publicación\.$/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/La IA extrae propuestas estructuradas desde el código del repositorio/i),
+    ).toBeInTheDocument()
   })
 })
 

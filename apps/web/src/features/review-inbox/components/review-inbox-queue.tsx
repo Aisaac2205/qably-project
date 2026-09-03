@@ -57,15 +57,15 @@ function ReviewProposalQueueRow({
         type="button"
         aria-current={isSelected ? 'true' : undefined}
         onClick={() => onSelect(proposal.id)}
-        className={`w-full text-left p-3.5 sm:p-4 transition-all duration-150 border-b border-border/70 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        className={`w-full text-left px-3.5 py-2.5 transition-colors duration-150 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary ${
           isSelected
-            ? 'bg-surface-hover/90 border-l-4 border-l-primary shadow-xs'
+            ? 'bg-surface-hover/90 border-l-4 border-l-primary'
             : 'border-l-4 border-l-transparent'
         }`}
       >
-        <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="flex items-start justify-between gap-2 mb-1">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5 mb-1">
+            <div className="flex items-center gap-1.5 mb-0.5">
               {projectName && (
                 <span className="truncate rounded bg-canvas px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted">
                   {projectName}
@@ -97,7 +97,7 @@ function ReviewProposalQueueRow({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted mt-2">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted mt-1.5">
           {proposal.targetOfficialTestCaseId && (
             <Badge variant="warn" className="text-[10px] px-1.5 py-0.5 font-medium">
               <CopySimple size={10} weight="bold" aria-hidden="true" />
@@ -133,21 +133,13 @@ export function ReviewInboxQueue({
 
   const projectMap = new Map(projects.map((p) => [p.id, p.name]))
 
-  // Apply filters
-  const filteredProposals = proposals.filter((p) => {
-    // Project filter
+  const scopedProposals = proposals.filter((p) => {
     if (selectedProjectId !== 'all' && p.projectId !== selectedProjectId) {
       return false
     }
-    // Status filter
-    if (statusFilter !== 'all' && p.status !== statusFilter) {
-      return false
-    }
-    // Duplicate filter
     if (duplicateOnly && !p.targetOfficialTestCaseId) {
       return false
     }
-    // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim()
       const titleMatch = p.title.toLowerCase().includes(q)
@@ -157,6 +149,15 @@ export function ReviewInboxQueue({
     }
     return true
   })
+
+  const statusCounts: Record<ReviewQueueStatusFilter, number> = {
+    all: scopedProposals.length,
+    in_review: scopedProposals.filter((p) => p.status === 'in_review').length,
+    approved: scopedProposals.filter((p) => p.status === 'approved').length,
+    rejected: scopedProposals.filter((p) => p.status === 'rejected').length,
+  }
+
+  const filteredProposals = scopedProposals.filter((p) => statusFilter === 'all' || p.status === statusFilter)
 
   return (
     <Card className="rounded-none border-0 h-full flex flex-col justify-between overflow-hidden bg-surface">
@@ -212,7 +213,7 @@ export function ReviewInboxQueue({
           </button>
         </div>
 
-        {/* Status filter tabs */}
+        {/* Status filter tabs, counts inline per status */}
         <div className="flex items-center gap-1 overflow-x-auto pt-0.5">
           {(['in_review', 'all', 'approved', 'rejected'] as const).map((status) => {
             const isCurrent = statusFilter === status
@@ -231,25 +232,18 @@ export function ReviewInboxQueue({
                 type="button"
                 aria-pressed={isCurrent}
                 onClick={() => onStatusFilterChange(status)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 ${
+                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 ${
                   isCurrent
                     ? 'bg-primary/10 text-primary border border-primary/20'
                     : 'text-muted hover:text-default hover:bg-surface-hover'
                 }`}
               >
-                {label}
+                <span>{label}</span>{' '}
+                <span className="font-mono tabular-nums text-[10px] text-muted">{statusCounts[status]}</span>
               </button>
             )
           })}
         </div>
-      </div>
-
-      {/* Queue count summary */}
-      <div className="px-4 py-2 border-b border-border/60 bg-canvas/10 text-[11px] text-muted flex items-center justify-between">
-        <span className="font-medium">{t('reviewInbox.queueTitle')}</span>
-        <span className="tabular-nums font-mono">
-          {t('reviewInbox.proposalsCount', { count: filteredProposals.length })}
-        </span>
       </div>
 
       {/* Proposals List */}
@@ -275,6 +269,25 @@ export function ReviewInboxQueue({
           </EntityList>
         )}
       </CardContent>
+
+      {/* Keyboard shortcut hints */}
+      <div
+        aria-label={t('reviewInbox.keyboardShortcuts')}
+        className="hidden shrink-0 items-center gap-3 border-t border-border bg-canvas/30 px-3.5 py-1.5 text-[11px] text-muted sm:flex"
+      >
+        {[
+          { key: 'A', label: t('reviewInbox.shortcutApprove') },
+          { key: 'R', label: t('reviewInbox.shortcutReject') },
+          { key: 'D', label: t('reviewInbox.shortcutDuplicates') },
+        ].map((s) => (
+          <span key={s.key} className="inline-flex items-center gap-1">
+            <kbd className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded border border-border bg-surface text-default">
+              {s.key}
+            </kbd>
+            <span>{s.label}</span>
+          </span>
+        ))}
+      </div>
     </Card>
   )
 }

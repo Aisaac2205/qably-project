@@ -1,7 +1,3 @@
 export { ReviewInboxPage } from './components/review-inbox-page'
-export { ReviewKpiRow } from './components/review-kpi-row'
-export { ReviewGovernanceBanner } from './components/review-governance-banner'
 export { ReviewInboxQueue } from './components/review-inbox-queue'
 export { ReviewProposalInspector } from './components/review-proposal-inspector'
-export { RecentReviewDecisions } from './components/recent-review-decisions'
-export { ProjectReviewDistribution } from './components/project-review-distribution'

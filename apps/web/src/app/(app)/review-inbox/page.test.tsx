@@ -11,13 +11,20 @@ describe('ReviewInboxPage route', () => {
     useI18nStore.setState({ locale: 'en' })
   })
 
-  it('renders the real review inbox workstation with KPIs and governance', () => {
-    renderWithQuery(<ReviewInboxPage />)
+  it('renders the real review inbox workstation without a duplicate page heading', () => {
+    const { container } = renderWithQuery(<ReviewInboxPage />)
 
-    expect(screen.getByRole('heading', { level: 1, name: /Review Inbox/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: /Human authority required for publication/i })).toBeInTheDocument()
-    expect(screen.getAllByText(/Pending review/i).length).toBeGreaterThan(0)
+    // The app shell's TopBar owns the single document h1 for this route
+    // (id="page-title"); the page itself must not render a competing one,
+    // and instead borrows that heading's accessible name via aria-labelledby.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-labelledby="page-title"]')).toBeInTheDocument()
+
+    expect(screen.getByText(/^Human authority required for publication\.$/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI extracts test proposals from repository changes/i),
+    ).toBeInTheDocument()
+
     expect(screen.getByRole('searchbox', { name: /Search by title/i })).toBeInTheDocument()
   })
 })
-

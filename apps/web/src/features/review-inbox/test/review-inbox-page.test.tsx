@@ -12,26 +12,38 @@ describe('ReviewInboxPage', () => {
     useI18nStore.setState({ locale: 'en' })
   })
 
-  it('renders page header, KPIs, queue, inspector, and analytics', () => {
-    renderWithQuery(<ReviewInboxPage />)
+  it('renders the governance statement, queue, and inspector without a local page heading', () => {
+    const { container } = renderWithQuery(<ReviewInboxPage />)
 
-    // Header & Breadcrumb
-    expect(screen.getByRole('heading', { level: 1, name: /Review Inbox/i })).toBeInTheDocument()
+    // No local h1: the app shell owns the single document heading for this route.
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-labelledby="page-title"]')).toBeInTheDocument()
 
-    // KPIs
-    expect(screen.getAllByText(/Pending review/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Approved & published/i)).toBeInTheDocument()
-    expect(screen.getByText(/Potential duplicates/i)).toBeInTheDocument()
-    expect(screen.getByText(/Active projects/i)).toBeInTheDocument()
+    expect(screen.getByText(/^Human authority required for publication\.$/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/AI extracts test proposals from repository changes/i),
+    ).toBeInTheDocument()
+
+    // No hero-metric KPI row.
+    expect(screen.queryByText(/Approved & published/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Active projects/i)).not.toBeInTheDocument()
 
     // Queue & Inspector
     expect(screen.getByRole('searchbox', { name: /Search by title/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Approve & publish' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument()
 
-    // Secondary Analytics
-    expect(screen.getByRole('heading', { level: 3, name: /Review distribution/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: /Recent review decisions/i })).toBeInTheDocument()
+    // Analytics panels moved to the reports page, not rendered here.
+    expect(screen.queryByRole('heading', { name: /Review distribution/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Recent review decisions/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a count inline on each status filter tab', () => {
+    renderWithQuery(<ReviewInboxPage />)
+
+    const inReviewTab = screen.getByRole('button', { name: /^In review/i })
+    expect(inReviewTab).toBeInTheDocument()
+    expect(inReviewTab.textContent).toMatch(/In review\s*\d+/)
   })
 
   it('allows filtering proposals by project', async () => {
@@ -41,7 +53,6 @@ describe('ReviewInboxPage', () => {
     const projectSelect = screen.getByRole('combobox', { name: /Project/i })
     expect(projectSelect).toBeInTheDocument()
 
-    // Filter to Ecommerce App (proj-1)
     await user.selectOptions(projectSelect, 'proj-1')
     expect(projectSelect).toHaveValue('proj-1')
   })
@@ -55,6 +66,7 @@ describe('ReviewInboxPage', () => {
 
     await user.click(duplicateButton)
     expect(duplicateButton).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('status')).toHaveTextContent(/Showing duplicates only/i)
   })
 
   it('allows searching proposals by text query', async () => {
@@ -74,7 +86,6 @@ describe('ReviewInboxPage', () => {
     const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
     await user.click(approveButton)
 
-    // Success toast banner appears
     expect(screen.getByRole('status')).toHaveTextContent(/Proposal approved and published/i)
   })
 
@@ -85,7 +96,6 @@ describe('ReviewInboxPage', () => {
     const rejectButton = screen.getByRole('button', { name: 'Reject' })
     await user.click(rejectButton)
 
-    // Feedback banner appears
     expect(screen.getByRole('status')).toHaveTextContent(/Proposal rejected/i)
   })
 
@@ -93,16 +103,46 @@ describe('ReviewInboxPage', () => {
     const user = userEvent.setup()
     renderWithQuery(<ReviewInboxPage />)
 
-    const allButton = screen.getByRole('button', { name: 'All' })
+    const allButton = screen.getByRole('button', { name: /^All/i })
     await user.click(allButton)
     expect(allButton).toHaveAttribute('aria-pressed', 'true')
 
-    const approvedButton = screen.getByRole('button', { name: 'Approved' })
+    const approvedButton = screen.getByRole('button', { name: /^Approved/i })
     await user.click(approvedButton)
     expect(approvedButton).toHaveAttribute('aria-pressed', 'true')
 
-    const rejectedButton = screen.getByRole('button', { name: 'Rejected' })
+    const rejectedButton = screen.getByRole('button', { name: /^Rejected/i })
     await user.click(rejectedButton)
     expect(rejectedButton).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('approves the selected proposal with the "a" keyboard shortcut', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(<ReviewInboxPage />)
+
+    await user.keyboard('a')
+
+    expect(screen.getByRole('status')).toHaveTextContent(/Proposal approved and published/i)
+  })
+
+  it('rejects the selected proposal with the "r" keyboard shortcut', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(<ReviewInboxPage />)
+
+    await user.keyboard('r')
+
+    expect(screen.getByRole('status')).toHaveTextContent(/Proposal rejected/i)
+  })
+
+  it('toggles the duplicate-only filter with the "d" keyboard shortcut', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(<ReviewInboxPage />)
+
+    const duplicateButton = screen.getByRole('button', { name: /Duplicates only/i })
+    expect(duplicateButton).toHaveAttribute('aria-pressed', 'false')
+
+    await user.keyboard('d')
+
+    expect(duplicateButton).toHaveAttribute('aria-pressed', 'true')
   })
 })
