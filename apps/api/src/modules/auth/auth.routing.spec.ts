@@ -2,6 +2,7 @@ import { All, Controller, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import type { App } from 'supertest/types';
 
 @Controller()
 class WildcardController {
@@ -15,7 +16,7 @@ class WildcardController {
 class WildcardModule {}
 
 describe('better-auth catch-all route', () => {
-  let app: INestApplication;
+  let app: INestApplication<App>;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
