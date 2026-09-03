@@ -3,6 +3,7 @@ import { Copy, Check, Terminal, FileCode, ArrowRight } from '@phosphor-icons/rea
 import type { Icon } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { DocumentationTranslations } from '../../i18n/types';
+import { highlight, type CodeLanguage, type TokenKind } from '../lib/highlight';
 
 interface DocumentationSectionProps {
   t: DocumentationTranslations;
@@ -74,6 +75,22 @@ await fetch('https://api.qably.dev/runs/ingest', {
     cases,
   }),
 });`,
+};
+
+const LANGUAGES: Record<TabId, CodeLanguage> = {
+  rest: 'shell',
+  githubAction: 'yaml',
+  playwright: 'typescript',
+};
+
+const TOKEN_CLASSES: Record<TokenKind, string> = {
+  plain: 'text-code-plain',
+  comment: 'text-code-comment italic',
+  keyword: 'text-code-keyword',
+  string: 'text-code-string',
+  number: 'text-code-number',
+  property: 'text-code-property',
+  punctuation: 'text-code-punctuation',
 };
 
 const TABS: { id: TabId; icon: Icon; labelKey: keyof DocumentationTranslations }[] = [
@@ -153,7 +170,7 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
           </button>
         </div>
 
-        <div className="min-h-[200px] overflow-x-auto bg-black p-4 font-mono text-[11px] leading-relaxed text-zinc-300 sm:p-5 sm:text-sm">
+        <div className="min-h-[200px] overflow-x-auto bg-black p-4 font-mono text-[11px] leading-relaxed text-code-plain sm:p-5 sm:text-sm">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -163,7 +180,13 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
               transition={{ duration: 0.15 }}
             >
               <pre>
-                <code>{currentSnippet}</code>
+                <code>
+                  {highlight(currentSnippet, LANGUAGES[activeTab]).map((token, index) => (
+                    <span key={index} className={TOKEN_CLASSES[token.kind]}>
+                      {token.value}
+                    </span>
+                  ))}
+                </code>
               </pre>
             </motion.div>
           </AnimatePresence>

@@ -29,6 +29,15 @@
   --landing-border:        rgba(255, 255, 255, 0.08);
   --landing-border-strong: rgba(255, 255, 255, 0.16);
 
+  /* Syntax highlighting — restrained palette for the dark code blocks */
+  --code-plain:       #e4e4e7;
+  --code-comment:     #71717a;
+  --code-keyword:     #a5b4fc;
+  --code-string:      #86efac;
+  --code-number:      #fcd34d;
+  --code-property:    #7dd3fc;
+  --code-punctuation: #a1a1aa;
+
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -107,6 +116,14 @@
   --color-fail:        var(--status-fail);
   --color-warn:        var(--status-warn);
   --color-running:     var(--status-running);
+
+  --color-code-plain:       var(--code-plain);
+  --color-code-comment:     var(--code-comment);
+  --color-code-keyword:     var(--code-keyword);
+  --color-code-string:      var(--code-string);
+  --color-code-number:      var(--code-number);
+  --color-code-property:    var(--code-property);
+  --color-code-punctuation: var(--code-punctuation);
 
   --color-border:        var(--landing-border);
   --color-border-strong: var(--landing-border-strong);
