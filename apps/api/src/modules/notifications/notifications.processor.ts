@@ -69,8 +69,9 @@ export class NotificationsProcessor extends WorkerHost {
     if (inAppEnabled) {
       await this.prisma.notification.upsert({
         where: {
-          userId_dedupeKey: {
+          userId_organizationId_dedupeKey: {
             userId: recipient.userId,
+            organizationId: event.organizationId,
             dedupeKey: event.dedupeKey,
           },
         },

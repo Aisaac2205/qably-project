@@ -143,7 +143,7 @@ describe('NotificationsProcessor preference resolution', () => {
 });
 
 describe('NotificationsProcessor dedupe upsert', () => {
-  it('upserts on userId + dedupeKey so a retried job does not duplicate the row', async () => {
+  it('upserts on userId + organizationId + dedupeKey so a retried job does not duplicate the row', async () => {
     const prisma = createPrisma([ownerMember]);
     const mailer = createMailer();
 
@@ -152,12 +152,37 @@ describe('NotificationsProcessor dedupe upsert', () => {
     expect(prisma.notification.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          userId_dedupeKey: {
+          userId_organizationId_dedupeKey: {
             userId: 'user-owner',
+            organizationId: 'org-1',
             dedupeKey: 'run_failed:run-1',
           },
         },
       }),
+    );
+  });
+
+  it('scopes the unique constraint by organization so the same dedupeKey in two orgs never collides', async () => {
+    const prisma = createPrisma([ownerMember]);
+    const mailer = createMailer();
+    const sameKeyOtherOrg: NotificationJobData = {
+      ...runFailedEvent,
+      organizationId: 'org-2',
+    };
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+    await build(prisma, mailer).process(job(sameKeyOtherOrg));
+
+    const [firstCall, secondCall] = prisma.notification.upsert.mock
+      .calls as [
+      [{ where: { userId_organizationId_dedupeKey: { organizationId: string } } }],
+      [{ where: { userId_organizationId_dedupeKey: { organizationId: string } } }],
+    ];
+    expect(firstCall[0].where.userId_organizationId_dedupeKey.organizationId).toBe(
+      'org-1',
+    );
+    expect(secondCall[0].where.userId_organizationId_dedupeKey.organizationId).toBe(
+      'org-2',
     );
   });
 });

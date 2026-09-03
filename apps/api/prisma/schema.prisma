@@ -461,7 +461,7 @@ model Notification {
   createdAt        DateTime              @default(now())
   readAt           DateTime?
 
-  @@unique([userId, dedupeKey])
+  @@unique([userId, organizationId, dedupeKey])
   @@index([userId, readAt])
   @@index([organizationId, createdAt])
   @@map("notification")
