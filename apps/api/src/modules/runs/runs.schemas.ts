@@ -76,3 +76,18 @@ export type CreateManualRunInput = z.infer<typeof createManualRunSchema>;
 export type UpdateRunCaseStatusInput = z.infer<
   typeof updateRunCaseStatusSchema
 >;
+
+export const ingestJunitQuerySchema = z.object({
+  externalId,
+  source: runSource.default('api'),
+  suiteId: z.string().min(1).optional(),
+  suiteName: suiteName.optional(),
+  name: runName.optional(),
+  startedAt: isoDateTime.optional(),
+  finishedAt: isoDateTime.optional(),
+  commitSha: commitSha.optional(),
+  commitMessage: commitMessage.optional(),
+  commitAuthor: commitAuthor.optional(),
+});
+
+export type IngestJunitQuery = z.infer<typeof ingestJunitQuerySchema>;

@@ -19,6 +19,12 @@ async function bootstrap(): Promise<void> {
   });
   const env = app.get<Env>(ENV);
 
+  const xmlParser = express.text({
+    type: ['application/xml', 'text/xml'],
+    limit: '10mb',
+  });
+  app.use(xmlParser);
+
   const jsonParser = jsonWithRawBody();
   app.use(
     (

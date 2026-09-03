@@ -1,5 +1,6 @@
 import {
   createManualRunSchema,
+  ingestJunitQuerySchema,
   ingestRunSchema,
   listRunsQuerySchema,
   updateRunCaseStatusSchema,
@@ -204,5 +205,38 @@ describe('updateRunCaseStatusSchema', () => {
     const result = updateRunCaseStatusSchema.safeParse({});
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('ingestJunitQuerySchema', () => {
+  it('accepts a minimal query and defaults source to api', () => {
+    const result = ingestJunitQuerySchema.safeParse({ externalId: 'ci-42' });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.source).toBe('api');
+  });
+
+  it('rejects a missing externalId', () => {
+    expect(ingestJunitQuerySchema.safeParse({}).success).toBe(false);
+  });
+
+  it('rejects a source the api key may not use', () => {
+    const result = ingestJunitQuerySchema.safeParse({
+      externalId: 'ci-42',
+      source: 'manual',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('carries the commit metadata through', () => {
+    const result = ingestJunitQuerySchema.safeParse({
+      externalId: 'ci-42',
+      commitSha: 'a41f9c2',
+      commitAuthor: 'ci-bot',
+    });
+
+    expect(result.success && result.data.commitSha).toBe('a41f9c2');
+    expect(result.success && result.data.commitAuthor).toBe('ci-bot');
   });
 });
