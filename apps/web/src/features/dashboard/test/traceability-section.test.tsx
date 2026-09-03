@@ -29,17 +29,26 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     __resetStore()
   })
 
-  it('renders the traceability calendar header and clean toolbar', async () => {
+  it('summarises the year in a single heading line', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const heading = screen.getByRole('heading', { name: /traceability events in 2026/i })
+
+    expect(heading).toBeInTheDocument()
+    expect(heading.textContent).toMatch(/^[0-9,]+ /)
+  })
+
+  it('drops the subtitle and the duplicated review inbox link from the header', async () => {
     await act(async () => {
       renderWithQuery(<TraceabilitySection />)
     })
 
     expect(
-      screen.getByRole('heading', { name: 'Governance pipeline' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/Live traceability across repositories/i),
-    ).toBeInTheDocument()
+      screen.queryByText(/Live traceability across repositories/i),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Review inbox/i })).not.toBeInTheDocument()
   })
 
   it('renders the SVG contribution grid with 53 weeks and month labels', async () => {

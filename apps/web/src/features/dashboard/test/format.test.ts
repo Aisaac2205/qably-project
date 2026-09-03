@@ -3,6 +3,7 @@ import {
   formatRelativeTime,
   formatPassRate,
   formatNumber,
+  formatEventCount,
 } from '@/features/dashboard/lib/format'
 
 describe('formatRelativeTime', () => {
@@ -81,5 +82,29 @@ describe('formatNumber', () => {
   it('handles large numbers', () => {
     const result = formatNumber(1000000)
     expect(result.length).toBeGreaterThanOrEqual(7) // "1,000,000"
+  })
+})
+
+describe('formatEventCount', () => {
+  it('groups thousands with a dot in Spanish', () => {
+    expect(formatEventCount(2226, 'es')).toBe('2.226')
+  })
+
+  it('groups thousands with a comma in English', () => {
+    expect(formatEventCount(2226, 'en')).toBe('2,226')
+  })
+
+  it('leaves values below one thousand untouched', () => {
+    expect(formatEventCount(930, 'es')).toBe('930')
+    expect(formatEventCount(0, 'en')).toBe('0')
+  })
+
+  it('groups every three digits in long numbers', () => {
+    expect(formatEventCount(1234567, 'en')).toBe('1,234,567')
+  })
+
+  it('does not depend on the runtime ICU data', () => {
+    const withoutIntl = formatEventCount(1000, 'es')
+    expect(withoutIntl).toBe('1.000')
   })
 })

@@ -14,6 +14,7 @@ const STEP = CELL_SIZE + CELL_GAP;
 const LEFT_OFFSET = 30;
 const TOP_OFFSET = 20;
 const WEEK_COUNT = 52;
+const QUIET_DAY_RATE = 0.12;
 
 const COLOR_LEVELS = [
   'var(--app-heatmap-l0)',
@@ -23,29 +24,74 @@ const COLOR_LEVELS = [
   'var(--app-heatmap-l4)',
 ] as const;
 
-function generateHeatmapCells() {
-  const cells: { week: number; day: number; level: number }[] = [];
+function pseudoRandom(seed: number): number {
+  const value = Math.sin(seed) * 10000;
+  return value - Math.floor(value);
+}
+
+function activityLevel(count: number): number {
+  if (count <= 0) return 0;
+  if (count <= 3) return 1;
+  if (count <= 7) return 2;
+  if (count <= 12) return 3;
+  return 4;
+}
+
+interface HeatmapCell {
+  week: number;
+  day: number;
+  count: number;
+  level: number;
+}
+
+function generateHeatmap() {
+  const cells: HeatmapCell[] = [];
+  let total = 0;
 
   for (let week = 0; week < WEEK_COUNT; week += 1) {
     for (let day = 0; day < 7; day += 1) {
-      let level = 0;
+      const seed = week * 7 + day + 1;
+      const isWeekend = day === 0 || day === 6;
+      const isSprintDay = week % 2 === 0 && !isWeekend;
+      const isQuietDay = pseudoRandom(seed + 53) < (isWeekend ? QUIET_DAY_RATE * 2.2 : QUIET_DAY_RATE);
 
-      if (week < 26) {
-        const pseudo = (week * 17 + day * 31 + 7) % 100;
-        if (pseudo > 80) level = 4;
-        else if (pseudo > 55) level = 3;
-        else if (pseudo > 30) level = 2;
-        else if (pseudo > 10) level = 1;
+      let count = 0;
+
+      if (!isQuietDay) {
+        const scm = Math.floor(pseudoRandom(seed) > 0.6 ? pseudoRandom(seed) * 3 : 0);
+        const proposals = Math.floor(pseudoRandom(seed + 977) > 0.4 ? pseudoRandom(seed + 977) * 5 : 0);
+        const official = Math.floor(pseudoRandom(seed + 1613) > 0.7 ? pseudoRandom(seed + 1613) * 2 : 0);
+        const runs = Math.floor(pseudoRandom(seed + 2749) > 0.3 ? pseudoRandom(seed + 2749) * 8 : 0);
+
+        const raw = (scm + proposals + official + runs) * (isSprintDay ? 2 : 1);
+        count = Math.round(raw * (isWeekend ? 0.3 : 1));
       }
 
-      cells.push({ week, day, level });
+      total += count;
+      cells.push({ week, day, count, level: activityLevel(count) });
     }
   }
 
-  return cells;
+  return { cells, total };
 }
 
-const CELLS = generateHeatmapCells();
+const { cells: CELLS, total: TRACEABILITY_TOTAL } = generateHeatmap();
+
+export const TRACEABILITY_EVENT_TOTAL = TRACEABILITY_TOTAL;
+
+function groupThousands(value: number): string {
+  const digits = String(value);
+  let grouped = '';
+
+  for (let index = 0; index < digits.length; index += 1) {
+    if (index > 0 && (digits.length - index) % 3 === 0) grouped += '.';
+    grouped += digits[index];
+  }
+
+  return grouped;
+}
+
+export const TRACEABILITY_EVENT_TOTAL_LABEL = groupThousands(TRACEABILITY_TOTAL);
 
 export function RealTraceabilityCalendar({ isEn = false }: RealTraceabilityCalendarProps) {
   const months = isEn ? MONTHS_EN : MONTHS_ES;

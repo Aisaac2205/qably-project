@@ -30,3 +30,11 @@ export function formatPassRate(rate: number): string {
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat('en-US').format(n)
 }
+
+export function formatEventCount(value: number, locale: 'es' | 'en'): string {
+  const separator = locale === 'es' ? '.' : ','
+  const sign = value < 0 ? '-' : ''
+  const digits = Math.trunc(Math.abs(value)).toString()
+
+  return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator)
+}

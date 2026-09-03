@@ -25,7 +25,7 @@ import {
   XCircle,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
-import { RealTraceabilityCalendar } from './RealTraceabilityCalendar';
+import { RealTraceabilityCalendar, TRACEABILITY_EVENT_TOTAL_LABEL } from './RealTraceabilityCalendar';
 import {
   MOCK_AI_PROPOSALS,
   MOCK_CI_PIPELINES,
@@ -337,19 +337,10 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
               </section>
 
               <section className="rounded-xl border border-app-border bg-app-surface p-5 shadow-xs md:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">Trazabilidad</h2>
-                    <p className="mt-0.5 text-xs text-app-muted">
-                      Trazabilidad en vivo entre repositorios, propuestas, casos oficiales y ejecuciones
-                    </p>
-                    <div className="mt-1.5">
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold text-app-default">
-                        Bandeja de revisión
-                        <CaretRight size={11} weight="bold" aria-hidden="true" />
-                      </span>
-                    </div>
-                  </div>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
+                    {TRACEABILITY_EVENT_TOTAL_LABEL} eventos de trazabilidad en 2026
+                  </h2>
 
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span className="flex h-9 min-w-[175px] items-center justify-between gap-2.5 rounded-lg border border-app-border bg-app-canvas px-3 py-1.5 text-xs font-medium text-app-default shadow-xs">
@@ -359,7 +350,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                         </span>
                         <span>Todas las etapas</span>
                         <span className="inline-flex items-center justify-center rounded-full bg-app-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-app-muted">
-                          922
+                          {TRACEABILITY_EVENT_TOTAL_LABEL}
                         </span>
                       </span>
                       <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />

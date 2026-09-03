@@ -70,11 +70,13 @@ describe('DashboardPage', () => {
     expect(workspace).not.toHaveClass('max-w-[1440px]')
   })
 
-  it('renders governance pipeline section with live stages', async () => {
+  it('renders the traceability section with its yearly event summary', async () => {
     await act(async () => {
       renderWithQuery(<DashboardPage />)
     })
-    expect(screen.getByRole('heading', { name: 'Governance pipeline' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /traceability events in 2026/i }),
+    ).toBeInTheDocument()
   })
 
   it('renders quality & freshness risks section with active signals', async () => {

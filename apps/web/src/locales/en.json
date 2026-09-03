@@ -1,6 +1,6 @@
 {
   "common": {
-    "loading": "Loading\u2026",
+    "loading": "Loading…",
     "viewAll": "View all",
     "none": "None",
     "total": "Total",
@@ -36,7 +36,6 @@
     "actions": "Actions",
     "skipToMain": "Skip to main content"
   },
-
   "sidebar": {
     "brand": "Qably",
     "dashboard": "Dashboard",
@@ -60,7 +59,6 @@
     "signOut": "Sign out",
     "signingOut": "Signing out…"
   },
-
   "reviewInbox": {
     "title": "Review Inbox",
     "subtitle": "Global inbox for human governance and publication of AI-extracted test proposals.",
@@ -112,7 +110,6 @@
     "temporaryTitle": "This area is not available yet",
     "temporaryDescription": "Review items will appear here when the review workflow is introduced."
   },
-
   "notifications": {
     "title": "Notifications",
     "subtitle": "Alerts for critical runs, review proposals, and quality risks.",
@@ -144,7 +141,6 @@
     "temporaryTitle": "This area is not yet available",
     "temporaryDescription": "Notifications will appear here as delivery is integrated."
   },
-
   "repository": {
     "title": "Repository",
     "subtitle": "Connected code repository and change synchronization.",
@@ -180,7 +176,6 @@
     "emptyBatchTitle": "No ingested changes yet",
     "emptyBatchDescription": "Push to this repository and the changes will appear here."
   },
-
   "status": {
     "execution": {
       "pass": "Pass",
@@ -206,10 +201,9 @@
       "cancelled": "Cancelled"
     }
   },
-
   "dashboard": {
     "greeting": "Good morning",
-    "subtitle": "Here\u2019s what\u2019s happening with your QA platform today.",
+    "subtitle": "Here’s what’s happening with your QA platform today.",
     "projectHealth": "Project health",
     "passRateTrend": "Pass rate trend",
     "recentRuns": "Recent runs",
@@ -234,8 +228,7 @@
     "thAiPending": "AI pending",
     "vsPrior7d": "vs prior 7d",
     "readyForReview": "Ready for review",
-    "governancePipeline": "Governance pipeline",
-    "governanceSubtitle": "Live traceability across repositories, proposals, official cases, and executions",
+    "traceabilityHeading": "{{count}} traceability events in {{year}}",
     "viewChain": "Review inbox",
     "stageScm": "Code Ingestion",
     "stageScmDesc": "Tracked test files in Git",
@@ -265,7 +258,6 @@
     "qualityRisksEmptyTitle": "No active risk signals yet",
     "qualityRisksEmptyDesc": "Risk detection will populate here once execution history and coverage evidence are available for this project."
   },
-
   "reports": {
     "passRateOverTime": "Pass Rate Over Time",
     "passFailDistribution": "Pass / Fail Distribution",
@@ -278,7 +270,6 @@
     "ariaDistributionChart": "Donut chart showing pass/fail distribution",
     "ariaProposalReviewChart": "Bar chart showing proposal review status"
   },
-
   "projects": {
     "title": "Projects",
     "newButton": "New",
@@ -319,7 +310,7 @@
     "repoPickerNoMatch": "No repositories match “{{query}}”.",
     "repoConnectionFailed": "GitHub rejected the connection for that repository. Try again.",
     "techStackLabel": "Tech stack",
-    "creating": "Creating\u2026",
+    "creating": "Creating…",
     "createProject": "Create project",
     "nameRequired": "Project name is required",
     "editTechStackTitle": "Edit tech stack",
@@ -331,7 +322,6 @@
     "deleteProjectDescription": "This permanently deletes {{name}} with all its suites and test cases. This action cannot be undone.",
     "projectActions": "Project actions"
   },
-
   "aiReview": {
     "title": "AI Review",
     "connected": " connected",
@@ -346,11 +336,11 @@
     "statusPending": "Pending",
     "statusConfirmed": "Confirmed",
     "statusRejected": "Rejected",
-    "chatPlaceholder": "Ask about this project or request a new test case\u2026",
+    "chatPlaceholder": "Ask about this project or request a new test case…",
     "sendMessage": "Send message",
     "draftCaseCreated": "Draft case created",
     "viewInReviewQueue": "View in Review Queue",
-    "chatEmptyHint": "Ask anything about this project\u2019s suites, cases, or coverage.",
+    "chatEmptyHint": "Ask anything about this project’s suites, cases, or coverage.",
     "newChat": "New chat",
     "chatGreeting": "Hello, how can I help you today?",
     "deleteChatTitle": "Delete conversation",
@@ -369,7 +359,7 @@
     "coverageGaps": "Coverage gaps",
     "draftWithAi": "Draft with AI",
     "possibleDuplicate": "Possible duplicate",
-    "duplicateDescription": "This looks similar to an existing case in this project\u2019s suites.",
+    "duplicateDescription": "This looks similar to an existing case in this project’s suites.",
     "duplicateNotFound": "The original matching case could not be located (it may have been removed).",
     "connectProviderTitle": "AI chat is unavailable",
     "connectProviderDesc": "No AI provider is connected. You can continue reviewing the existing queue.",
@@ -400,7 +390,6 @@
     "suggestCases": "Suggest test cases for: {{area}}",
     "coverageGapSuggestion": "Suggested from coverage gap"
   },
-
   "reviewFlow": {
     "provenance": "Provenance",
     "source": "Source",
@@ -430,7 +419,6 @@
       "quality_risk": "Quality risk"
     }
   },
-
   "runs": {
     "title": "Runs",
     "subtitle": "Test execution history, statuses, and CI simulation for this project.",
@@ -445,7 +433,7 @@
     "selectSuite": "Select a suite",
     "runNameLabel": "Run name",
     "runNamePlaceholder": "e.g. Smoke Test",
-    "starting": "Starting\u2026",
+    "starting": "Starting…",
     "startRun": "Start run",
     "shortcutPass": "Pass",
     "shortcutFail": "Fail",
@@ -481,7 +469,6 @@
     "versionSnapshot": "Version {{version}}",
     "viewInLibrary": "View in Test Library"
   },
-
   "suites": {
     "versionBadge": "v{{version}}",
     "versionHistory": "Version history",
@@ -525,7 +512,7 @@
     "filterNeedsAttention": "Needs attention",
     "filterNeverRun": "Never run",
     "sortMostRecent": "Most recent",
-    "sortName": "Name (A\u2192Z)",
+    "sortName": "Name (A→Z)",
     "sortHighestPassRate": "Highest pass rate",
     "sortMostCases": "Most cases",
     "ariaFilterSuites": "Filter suites",
@@ -576,7 +563,7 @@
     "deleteCase": "Delete case",
     "caseActions": "Case actions",
     "deleteCaseTitle": "Delete test case?",
-    "deleteCaseDescription": "This permanently deletes \u201C{{name}}\u201D. This action cannot be undone.",
+    "deleteCaseDescription": "This permanently deletes “{{name}}”. This action cannot be undone.",
     "caseNameLabel": "Title",
     "caseNamePlaceholder": "e.g. Valid login redirects to dashboard",
     "priorityLabel": "Priority",
@@ -589,7 +576,6 @@
     "caseNameRequired": "A case title is required",
     "noCasesCta": "Add the first test case to start documenting this suite."
   },
-
   "apiKeys": {
     "title": "API Keys",
     "subtitle": "Programmatic credentials that let an external CI agent push run results into this project.",
@@ -623,7 +609,6 @@
     "copied": "Copied",
     "done": "Done"
   },
-
   "settings": {
     "title": "Settings",
     "subtitle": "Manage your organization, members, integrations and notifications",
@@ -769,7 +754,6 @@
       "apiKeyLabel": "{{name}} API key"
     }
   },
-
   "modules": {
     "integrations": {
       "title": "Integrations",
