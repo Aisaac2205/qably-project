@@ -259,7 +259,7 @@ export const MOCK_RISK_SIGNALS: MockRiskSignal[] = [
 ];
 
 export const MOCK_DEMO_USER = {
-  name: 'Ana Morales',
-  initials: 'AM',
+  name: 'Usuario demo',
+  initials: 'UD',
   role: 'Administrador',
 } as const;
