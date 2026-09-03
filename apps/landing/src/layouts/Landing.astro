@@ -10,9 +10,7 @@ interface Props {
 
 const {
   locale = "es",
-  title = locale === "es"
-    ? "Qably — Gestión QA para Ingenieros, Automatizada con IA"
-    : "Qably — QA Management for Engineers, Automated by AI",
+  title = "Qably",
   description = locale === "es"
     ? "Plataforma de QA automatizada nativa con IA, telemetría de CI/CD en tiempo real y trazabilidad bidireccional desde el commit hasta el caso de prueba."
     : "AI-native automated QA management, real-time CI/CD telemetry, and bi-directional traceability from git commit to test execution.",
@@ -103,6 +101,13 @@ const siteUrl = Astro.site ? Astro.site.toString() : "https://qably.app";
     >
       {isEn ? "Skip to main content" : "Saltar al contenido principal"}
     </a>
+
+    <!-- Screen reader & search engine hidden headline -->
+    <h1 class="sr-only">
+      {title === "Qably"
+        ? (isEn ? "Qably — QA Management for Engineers, Automated by AI" : "Qably — Gestión QA para Ingenieros, Automatizada con IA")
+        : title}
+    </h1>
 
     <div class="relative min-h-screen flex flex-col justify-between">
       <slot />
