@@ -257,3 +257,9 @@ export const MOCK_RISK_SIGNALS: MockRiskSignal[] = [
     criteria: ['Sin pruebas para el desajuste de state en OAuth2', 'Brecha de cobertura en callbacks'],
   },
 ];
+
+export const MOCK_DEMO_USER = {
+  name: 'Ana Morales',
+  initials: 'AM',
+  role: 'Administrador',
+} as const;

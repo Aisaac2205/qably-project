@@ -12,7 +12,7 @@ import {
   CheckCircle,
 } from '@phosphor-icons/react';
 import { Iphone16Pro } from '@/components/ui/iphone-16-pro';
-import { MOCK_DASHBOARD_STATS, MOCK_PROJECTS, MOCK_RECENT_RUNS } from '@/features/dashboard-preview/data/mock-dashboard-data';
+import { MOCK_DASHBOARD_STATS, MOCK_DEMO_USER, MOCK_PROJECTS, MOCK_RECENT_RUNS } from '@/features/dashboard-preview/data/mock-dashboard-data';
 import type { DashboardTranslations } from '@/features/i18n/types';
 
 interface MobileDashboardIphoneProps {
@@ -64,7 +64,7 @@ export function MobileDashboardIphone({ tDashboard }: MobileDashboardIphoneProps
                 <span className="absolute top-0 right-0 size-2 bg-rose-500 rounded-full" />
               </div>
               <div className="size-5 rounded-full bg-black text-white font-bold text-[9px] flex items-center justify-center">
-                IF
+                {MOCK_DEMO_USER.initials}
               </div>
             </div>
           </div>

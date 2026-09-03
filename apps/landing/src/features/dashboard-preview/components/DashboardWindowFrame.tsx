@@ -31,6 +31,7 @@ import {
   MOCK_CI_PIPELINES,
   MOCK_DASHBOARD_RUNS,
   MOCK_DASHBOARD_STATS,
+  MOCK_DEMO_USER,
   MOCK_PROJECTS,
   MOCK_RISK_SIGNALS,
   type MockRiskSignal,
@@ -275,11 +276,11 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                 aria-hidden="true"
                 className="flex size-8 shrink-0 items-center justify-center rounded-full bg-app-primary text-xs font-semibold text-app-primary-fg"
               >
-                IF
+                {MOCK_DEMO_USER.initials}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium leading-tight text-app-sidebar-fg">Isaac F.</span>
-                <span className="block truncate text-xs leading-normal text-app-sidebar-fg-muted">Administrador</span>
+                <span className="block truncate text-sm font-medium leading-tight text-app-sidebar-fg">{MOCK_DEMO_USER.name}</span>
+                <span className="block truncate text-xs leading-normal text-app-sidebar-fg-muted">{MOCK_DEMO_USER.role}</span>
               </span>
               <CaretUpDown size={16} aria-hidden="true" className="shrink-0 text-app-sidebar-fg-muted" />
             </span>
@@ -304,7 +305,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
               </span>
 
               <span className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-app-primary text-xs font-bold text-app-primary-fg">
-                IF
+                {MOCK_DEMO_USER.initials}
               </span>
             </div>
           </header>
