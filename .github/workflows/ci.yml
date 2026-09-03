@@ -49,13 +49,13 @@ jobs:
         env:
           JEST_JUNIT_OUTPUT_DIR: ./reports
           JEST_JUNIT_OUTPUT_NAME: junit-unit.xml
-        run: pnpm --filter @qably/api run test -- --reporters=default --reporters=jest-junit
+        run: pnpm --filter @qably/api run test:ci
 
       - name: E2E tests
         env:
           JEST_JUNIT_OUTPUT_DIR: ./reports
           JEST_JUNIT_OUTPUT_NAME: junit-e2e.xml
-        run: pnpm --filter @qably/api run test:e2e -- --reporters=default --reporters=jest-junit
+        run: pnpm --filter @qably/api run test:e2e:ci
 
       - name: Report unit results to Qably
         if: always()
@@ -114,7 +114,7 @@ jobs:
         run: pnpm --filter @qably/web run build
 
       - name: Tests
-        run: pnpm --filter @qably/web run test:run -- --reporter=default --reporter=junit --outputFile=./reports/junit.xml
+        run: pnpm --filter @qably/web run test:ci
 
       - name: Report results to Qably
         if: always()
