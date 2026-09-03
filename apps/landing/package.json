@@ -11,7 +11,8 @@
     "astro": "astro",
     "type-check": "astro sync && tsc --noEmit",
     "test": "vitest",
-    "test:run": "vitest run --maxWorkers=2 --no-file-parallelism"
+    "test:run": "vitest run --maxWorkers=2 --no-file-parallelism",
+    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml --maxWorkers=2 --no-file-parallelism"
   },
   "dependencies": {
     "@astrojs/react": "^6.0.5",

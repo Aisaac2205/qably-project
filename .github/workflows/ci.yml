@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -155,7 +156,23 @@ jobs:
         run: pnpm --filter @qably/landing run type-check
 
       - name: Tests
-        run: pnpm --filter @qably/landing run test:run
+        run: pnpm --filter @qably/landing run test:ci
+
+      - name: Report results to Qably
+        if: always()
+        env:
+          QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
+          QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
+        run: node scripts/qably-report.mjs apps/landing/reports/junit.xml
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-junit-report
+          path: apps/landing/reports/junit.xml
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Build
         run: pnpm --filter @qably/landing run build
