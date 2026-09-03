@@ -168,3 +168,14 @@ export function RealTraceabilityCalendar({ isEn = false }: RealTraceabilityCalen
     </div>
   );
 }
+
+export const TRACEABILITY_LEVEL_COLORS = COLOR_LEVELS;
+
+export function recentTraceabilityWeeks(weekCount: number): HeatmapCell[] {
+  const firstWeek = WEEK_COUNT - weekCount;
+
+  return CELLS.filter((cell) => cell.week >= firstWeek).map((cell) => ({
+    ...cell,
+    week: cell.week - firstWeek,
+  }));
+}

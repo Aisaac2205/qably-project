@@ -320,7 +320,7 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
         <div className="relative z-10">
           {/* Mobile view (< md): Dedicated iPhone 16 Pro mockup */}
           <div className="block md:hidden">
-            <MobileDashboardIphone tDashboard={dashboard} />
+            <MobileDashboardIphone tDashboard={dashboard} locale={locale} />
           </div>
 
           {/* Desktop view (>= md): Full Desktop MacBook Window (Direct, no extra card) */}

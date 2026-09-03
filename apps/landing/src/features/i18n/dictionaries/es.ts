@@ -38,6 +38,7 @@ export const es: Dictionary = {
     vsPrior7d: 'vs. los 7 días anteriores',
     viewDetails: 'Ver detalles',
     traceabilityHeading: '{count} eventos de trazabilidad en {year}',
+    traceabilityEventsShort: '{count} eventos',
     allStages: 'Todas las etapas',
     projectHealth: 'Salud de proyectos',
     viewAll: 'Ver todo',

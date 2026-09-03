@@ -44,6 +44,7 @@ export interface DashboardTranslations {
   vsPrior7d: string;
   viewDetails: string;
   traceabilityHeading: string;
+  traceabilityEventsShort: string;
   allStages: string;
   projectHealth: string;
   viewAll: string;
