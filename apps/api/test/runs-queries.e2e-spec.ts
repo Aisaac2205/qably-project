@@ -15,6 +15,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RunsModule } from '../src/modules/runs/runs.module';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -117,15 +118,17 @@ describe('Runs queries (e2e)', () => {
     prisma.runCase.update.mockResolvedValue(runCaseRow({ status: 'pass' }));
     prisma.suite.findFirst.mockResolvedValue(suiteWithCases);
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        RunsModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          RunsModule,
+        ],
+      }),
+    )
       .overrideProvider(ENV)
       .useValue(testEnv)
       .overrideProvider(PrismaService)

@@ -15,6 +15,7 @@ import { DashboardModule } from '../src/modules/dashboard/dashboard.module';
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -73,15 +74,17 @@ describe('Dashboard (e2e)', () => {
       { runId: 'run-1', status: 'pass', _count: { _all: 1 } },
     ]);
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        DashboardModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          DashboardModule,
+        ],
+      }),
+    )
       .overrideProvider(ENV)
       .useValue(testEnv)
       .overrideProvider(PrismaService)

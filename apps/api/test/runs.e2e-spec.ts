@@ -20,6 +20,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RunsModule } from '../src/modules/runs/runs.module';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -145,16 +146,18 @@ describe('Runs ingestion (e2e)', () => {
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        ApiKeysModule,
-        RunsModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          ApiKeysModule,
+          RunsModule,
+        ],
+      }),
+    )
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(AUTH_INSTANCE)

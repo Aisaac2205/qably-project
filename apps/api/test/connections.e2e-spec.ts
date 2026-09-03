@@ -16,6 +16,7 @@ import { REPO_DIRECTORY } from '../src/modules/connections/connections.contracts
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -82,15 +83,17 @@ describe('Connections (e2e)', () => {
     prisma.connection.create.mockResolvedValue(connectionRow);
     prisma.connection.update.mockResolvedValue(connectionRow);
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        ConnectionsModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          ConnectionsModule,
+        ],
+      }),
+    )
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(AUTH_INSTANCE)

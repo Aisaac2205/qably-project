@@ -20,6 +20,7 @@ import { IngestionProcessor } from '../src/modules/ingestion/ingestion.processor
 import { INGESTION_QUEUE } from '../src/modules/ingestion/ingestion.tokens';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -65,9 +66,11 @@ describe('SCM webhook ingestion (e2e)', () => {
     queue.add.mockResolvedValue({ id: 'job-1' });
     prisma.scmEvent.create.mockResolvedValue({ id: 'event-1' });
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [ConfigModule, PrismaModule, AuthModule, IngestionModule],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [ConfigModule, PrismaModule, AuthModule, IngestionModule],
+      }),
+    )
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(getQueueToken(INGESTION_QUEUE))
