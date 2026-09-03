@@ -4,8 +4,7 @@ import NotificationsPage from '@/app/(app)/notifications/page'
 import ReviewInboxPage from '@/app/(app)/review-inbox/page'
 import { useI18nStore } from '@/lib/i18n'
 import { renderWithQuery } from '@/lib/query-test-utils'
-import en from '@/locales/en.json'
-import es from '@/locales/es.json'
+import { en, es } from '@qably/i18n'
 
 function keyPaths(value: Record<string, unknown>, prefix = ''): string[] {
   return Object.entries(value).flatMap(([key, nested]) => {

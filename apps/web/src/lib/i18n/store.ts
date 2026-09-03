@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import en from '@/locales/en.json'
-import es from '@/locales/es.json'
+import { en, es, DEFAULT_LOCALE, type Locale } from '@qably/i18n'
 
-export type Locale = 'en' | 'es'
+export type { Locale }
+
+export { DEFAULT_LOCALE }
 
 export const SUPPORTED_LOCALES: readonly Locale[] = ['en', 'es']
-export const DEFAULT_LOCALE: Locale = 'en'
 export const LOCALE_STORAGE_KEY = 'qably-locale'
 
 export function matchLocale(languageTags: readonly string[]): Locale {

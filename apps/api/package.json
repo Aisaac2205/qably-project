@@ -30,6 +30,7 @@
     "@nestjs/platform-express": "^11.0.1",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.6.0",
+    "@qably/i18n": "workspace:*",
     "@qably/types": "workspace:*",
     "better-auth": "^1.6.0",
     "bullmq": "^5.73.0",
