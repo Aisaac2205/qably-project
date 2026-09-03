@@ -73,10 +73,10 @@ export const en: Dictionary = {
   docs: {
     sectionBadge: 'Direct integration',
     title: 'Engineered to drop into your existing pipeline',
-    subtitle: 'Qably ingests results over an authenticated REST API keyed per project. No agents, no proprietary plugins and no changes to your test runner.',
-    tabRest: 'REST API',
+    subtitle: 'Qably reads the JUnit XML your runner already writes: Vitest, Jest, Playwright, pytest or anything else. No agents, no proprietary plugins and no changes to your tests.',
+    tabJunit: 'JUnit XML',
     tabGithubAction: 'GitHub Actions',
-    tabPlaywright: 'Playwright',
+    tabRest: 'REST API',
     copyCode: 'Copy code',
     copied: 'Copied!',
   },

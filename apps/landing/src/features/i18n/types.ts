@@ -82,9 +82,9 @@ export interface DocumentationTranslations {
   sectionBadge: string;
   title: string;
   subtitle: string;
-  tabRest: string;
+  tabJunit: string;
   tabGithubAction: string;
-  tabPlaywright: string;
+  tabRest: string;
   copyCode: string;
   copied: string;
 }

@@ -24,13 +24,13 @@ const TOKEN_CLASSES: Record<TokenKind, string> = {
 };
 
 const TABS: { id: TabId; icon: Icon; labelKey: keyof DocumentationTranslations }[] = [
-  { id: 'rest', icon: Terminal, labelKey: 'tabRest' },
+  { id: 'junit', icon: FileCode, labelKey: 'tabJunit' },
   { id: 'githubAction', icon: FileCode, labelKey: 'tabGithubAction' },
-  { id: 'playwright', icon: FileCode, labelKey: 'tabPlaywright' },
+  { id: 'rest', icon: Terminal, labelKey: 'tabRest' },
 ];
 
 export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('rest');
+  const [activeTab, setActiveTab] = useState<TabId>('junit');
   const [copied, setCopied] = useState(false);
   const isEn = locale === 'en';
 
