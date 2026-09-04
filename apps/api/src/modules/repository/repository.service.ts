@@ -5,10 +5,15 @@ import type {
   IngestionBatch,
   RepoConnectionProvider,
 } from '@qably/types';
-import { err, ok, type Result } from '../../common/result';
+import { err, isErr, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { RepositoryError, RepositoryView } from './repository.contracts';
+import { ConnectionsService } from '../connections/connections.service';
+import type {
+  RepositoryError,
+  RepositoryView,
+  RotatedWebhookSecret,
+} from './repository.contracts';
 
 const BATCH_SOURCE = {
   REPOSITORY: 'repository',
@@ -136,7 +141,10 @@ function toBatch(row: BatchRow, projectId: string): IngestionBatch {
 
 @Injectable()
 export class RepositoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly connections: ConnectionsService,
+  ) {}
 
   async findOne(
     org: OrgContext,
@@ -171,5 +179,28 @@ export class RepositoryService {
         batch?.codeChanges.map((row) => toEvidence(row.evidence, projectId)) ??
         [],
     });
+  }
+
+  async rotateWebhookSecret(
+    org: OrgContext,
+    projectId: string,
+  ): Promise<Result<RotatedWebhookSecret, RepositoryError>> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId: org.organizationId },
+      select: { connectionId: true },
+    });
+
+    if (project === null) return err('not-found');
+    if (project.connectionId === null) return err('no-connection');
+
+    const rotated = await this.connections.rotateWebhookSecret(
+      org,
+      project.connectionId,
+    );
+
+    if (!isErr(rotated))
+      return ok({ webhookSecret: rotated.value.webhookSecret });
+
+    return err(rotated.error === 'forbidden' ? 'forbidden' : 'not-found');
   }
 }

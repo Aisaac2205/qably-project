@@ -1,3 +1,4 @@
+import { err, ok } from '../../common/result';
 import { RepositoryService } from './repository.service';
 
 interface FakePrisma {
@@ -48,8 +49,19 @@ function createPrisma(
   };
 }
 
-function build(prisma: FakePrisma): RepositoryService {
-  return new RepositoryService(prisma as never);
+function createConnections() {
+  return {
+    rotateWebhookSecret: jest
+      .fn()
+      .mockResolvedValue(ok({ webhookSecret: 'f'.repeat(64) })),
+  };
+}
+
+function build(
+  prisma: FakePrisma,
+  connections: ReturnType<typeof createConnections> = createConnections(),
+): RepositoryService {
+  return new RepositoryService(prisma as never, connections as never);
 }
 
 describe('RepositoryService.findOne', () => {
@@ -157,5 +169,74 @@ describe('RepositoryService.findOne', () => {
       ok: true,
       value: { batch: null, codeChanges: [], evidence: [] },
     });
+  });
+});
+
+describe('RepositoryService.rotateWebhookSecret', () => {
+  it('rotates the secret of the connection behind the project', async () => {
+    const connections = createConnections();
+    const prisma = createPrisma({ connectionId: 'connection-1' });
+
+    const result = await build(prisma, connections).rotateWebhookSecret(
+      org,
+      'proj-1',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { webhookSecret: 'f'.repeat(64) },
+    });
+    expect(connections.rotateWebhookSecret).toHaveBeenCalledWith(
+      org,
+      'connection-1',
+    );
+  });
+
+  it('scopes the project lookup to the acting organization', async () => {
+    const prisma = createPrisma({ connectionId: 'connection-1' });
+
+    await build(prisma).rotateWebhookSecret(org, 'proj-1');
+
+    expect(prisma.project.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'proj-1', organizationId: 'org-1' },
+      }),
+    );
+  });
+
+  it('fails when the project does not belong to the organization', async () => {
+    const connections = createConnections();
+
+    const result = await build(
+      createPrisma(null),
+      connections,
+    ).rotateWebhookSecret(org, 'proj-1');
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(connections.rotateWebhookSecret).not.toHaveBeenCalled();
+  });
+
+  it('fails when the project has no repository connected', async () => {
+    const connections = createConnections();
+
+    const result = await build(
+      createPrisma({ connectionId: null }),
+      connections,
+    ).rotateWebhookSecret(org, 'proj-1');
+
+    expect(result).toEqual({ ok: false, error: 'no-connection' });
+    expect(connections.rotateWebhookSecret).not.toHaveBeenCalled();
+  });
+
+  it('propagates a role that cannot rotate', async () => {
+    const connections = createConnections();
+    connections.rotateWebhookSecret.mockResolvedValue(err('forbidden'));
+
+    const result = await build(
+      createPrisma({ connectionId: 'connection-1' }),
+      connections,
+    ).rotateWebhookSecret(org, 'proj-1');
+
+    expect(result).toEqual({ ok: false, error: 'forbidden' });
   });
 });

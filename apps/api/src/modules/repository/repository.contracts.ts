@@ -1,5 +1,7 @@
-import type { ProjectRepositoryView } from '@qably/types';
+import type { ProjectRepositoryView, WebhookSecretView } from '@qably/types';
 
 export type RepositoryView = ProjectRepositoryView;
 
-export type RepositoryError = 'not-found';
+export type RotatedWebhookSecret = WebhookSecretView;
+
+export type RepositoryError = 'not-found' | 'no-connection' | 'forbidden';

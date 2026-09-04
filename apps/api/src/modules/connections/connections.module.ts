@@ -16,5 +16,6 @@ import { ConnectionsService } from './connections.service';
     EncryptionService,
     { provide: REPO_DIRECTORY, useClass: GithubRepoDirectory },
   ],
+  exports: [ConnectionsService],
 })
 export class ConnectionsModule {}
