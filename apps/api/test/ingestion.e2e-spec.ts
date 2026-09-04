@@ -57,7 +57,7 @@ describe('SCM webhook ingestion (e2e)', () => {
   const queue = { add: jest.fn() };
   const prisma = {
     connection: { findMany: jest.fn() },
-    scmEvent: { create: jest.fn() },
+    scmEvent: { create: jest.fn(), findUnique: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -65,6 +65,10 @@ describe('SCM webhook ingestion (e2e)', () => {
     read.mockResolvedValue(session);
     queue.add.mockResolvedValue({ id: 'job-1' });
     prisma.scmEvent.create.mockResolvedValue({ id: 'event-1' });
+    prisma.scmEvent.findUnique.mockResolvedValue({
+      id: 'event-1',
+      status: 'PROCESSED',
+    });
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -177,6 +181,26 @@ describe('SCM webhook ingestion (e2e)', () => {
       .expect(202);
 
     expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('requeues a replayed delivery whose stored event was never queued', async () => {
+    prisma.scmEvent.create.mockRejectedValue({ code: 'P2002' });
+    prisma.scmEvent.findUnique.mockResolvedValue({
+      id: 'event-1',
+      status: 'PENDING',
+    });
+    const body = JSON.stringify(pushPayload);
+
+    await request(app.getHttpServer())
+      .post('/webhooks/scm/github')
+      .set('content-type', 'application/json')
+      .set('x-github-event', 'push')
+      .set('x-github-delivery', 'delivery-1')
+      .set('x-hub-signature-256', signed(body))
+      .send(body)
+      .expect(202);
+
+    expect(queue.add).toHaveBeenCalled();
   });
 
   it('answers 202 without persisting an event type it does not handle', async () => {
