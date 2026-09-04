@@ -69,7 +69,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   listConnectionsMock.mockResolvedValue([connection])
   listAvailableReposMock.mockResolvedValue([availableRepo])
-  createConnectionMock.mockResolvedValue({ ...connection, id: 'conn-new' })
+  createConnectionMock.mockResolvedValue({
+    ...connection,
+    id: 'conn-new',
+    webhookSecret: 'f'.repeat(64),
+  })
   detectStackMock.mockResolvedValue({ technologies: [] })
   create.mockResolvedValue({
     id: 'p1',
@@ -271,11 +275,31 @@ describe('NewProjectForm against the api', () => {
         repo: 'acme/checkout',
       })
     })
+    expect(create).not.toHaveBeenCalled()
+
+    await user.click(await screen.findByRole('button', { name: /Continue/ }))
+
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith(
         expect.objectContaining({ connectionId: 'conn-new' }),
       )
     })
+  })
+
+  it('shows the webhook setup panel with the one-time secret before creating the project', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderForm() })
+
+    await user.type(screen.getByLabelText(/Project name/), 'Checkout')
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: /acme\/checkout/ })).toBeInTheDocument()
+    })
+    await user.click(screen.getByRole('radio', { name: /acme\/checkout/ }))
+    await user.click(screen.getByRole('button', { name: /Create project/ }))
+
+    expect(await screen.findByText('f'.repeat(64))).toBeInTheDocument()
+    expect(screen.getByText(/webhooks\/scm\/github/)).toBeInTheDocument()
+    expect(create).not.toHaveBeenCalled()
   })
 
   it('fills the stack from the package.json of the chosen repository', async () => {
@@ -299,6 +323,7 @@ describe('NewProjectForm against the api', () => {
     })
 
     await user.click(screen.getByRole('button', { name: /Create project/ }))
+    await user.click(await screen.findByRole('button', { name: /Continue/ }))
 
     await waitFor(() => {
       expect(create).toHaveBeenCalledWith(

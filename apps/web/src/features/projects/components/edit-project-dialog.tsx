@@ -9,6 +9,7 @@
  * destructive actions get their own confirmation dialog.
  */
 import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import type { Project } from '@qably/types'
 import {
   Dialog,
@@ -24,6 +25,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { TechSelector } from './tech-selector'
 import { useUpdateProject } from '../hooks/use-update-project'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
+import { rotateConnectionWebhookSecret } from '@/features/integrations/api/connections.api'
+import { WebhookSetupPanel } from '@/features/integrations'
 import { useTranslation } from '@/lib/i18n'
 
 interface EditProjectDialogProps {
@@ -53,6 +56,23 @@ function EditProjectDialogContent({
   const [connectionId, setConnectionId] = useState(project.connectionId ?? '')
   const [technologies, setTechnologies] = useState<string[]>(project.technologies ?? [])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [setupExpanded, setSetupExpanded] = useState(false)
+  const [confirmingRotate, setConfirmingRotate] = useState(false)
+  const [revealedSecret, setRevealedSecret] = useState<string | undefined>(undefined)
+
+  const selectedConnection = connections.find((c) => c.id === connectionId)
+
+  const rotateMutation = useMutation({
+    mutationFn: (id: string) => rotateConnectionWebhookSecret(id),
+  })
+
+  function handleConfirmRotate() {
+    if (!selectedConnection) return
+    setConfirmingRotate(false)
+    rotateMutation.mutate(selectedConnection.id, {
+      onSuccess: (result) => setRevealedSecret(result.webhookSecret),
+    })
+  }
 
   function clearError(field: string) {
     setErrors((prev) => {
@@ -140,6 +160,79 @@ function EditProjectDialogContent({
             </p>
           )}
         </div>
+
+        {selectedConnection && (
+          <div className="grid gap-2 rounded-lg border border-border bg-canvas/40 p-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-fit justify-start"
+              aria-expanded={setupExpanded}
+              onClick={() => setSetupExpanded((prev) => !prev)}
+            >
+              {setupExpanded ? t('webhookSetup.hideSetup') : t('webhookSetup.viewSetup')}
+            </Button>
+
+            {setupExpanded && (
+              <div className="space-y-3">
+                <WebhookSetupPanel provider={selectedConnection.provider} secret={revealedSecret} />
+
+                {revealedSecret !== undefined ? (
+                  <Button type="button" size="sm" onClick={() => setRevealedSecret(undefined)}>
+                    {t('repository.done')}
+                  </Button>
+                ) : confirmingRotate ? (
+                  <div className="space-y-2 rounded-lg border border-warn/30 bg-warn-bg p-3">
+                    <p className="text-xs font-semibold text-warn">
+                      {t('webhookSetup.regenerateConfirmTitle')}
+                    </p>
+                    <p className="text-xs text-warn">
+                      {t('webhookSetup.regenerateConfirmDescription')}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setConfirmingRotate(false)}
+                      >
+                        {t('common.cancel')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleConfirmRotate}
+                        autoFocus
+                      >
+                        {t('webhookSetup.regenerateConfirmAction')}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setConfirmingRotate(true)}
+                    disabled={rotateMutation.isPending}
+                  >
+                    {rotateMutation.isPending
+                      ? t('repository.rotating')
+                      : t('webhookSetup.regenerateSecret')}
+                  </Button>
+                )}
+
+                {rotateMutation.isError && (
+                  <p role="alert" className="text-xs text-fail">
+                    {t('webhookSetup.regenerateError')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="grid gap-2">
           <p className="text-sm font-medium leading-none text-foreground">

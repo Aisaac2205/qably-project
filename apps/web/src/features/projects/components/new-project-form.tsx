@@ -2,15 +2,34 @@
 
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import type { RepoConnectionProvider } from '@qably/types'
 import { useCreateProject } from '../hooks/use-create-project'
+import type { CreateProjectPayload } from '../api/projects.api'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { useAvailableRepos } from '@/features/integrations/hooks/use-available-repos'
 import { RepoPicker } from '@/features/integrations/components/repo-picker'
 import { createConnection } from '@/features/integrations/api/connections.api'
 import { useDetectedStack } from '@/features/integrations/hooks/use-detected-stack'
+import { WebhookSetupPanel } from '@/features/integrations'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { REPO_OPTION_PREFIX, buildRepoOptions } from '../lib/repo-options'
 import { DetectedStack } from './detected-stack'
 import { useTranslation } from '@/lib/i18n'
+
+interface PendingWebhookSetup {
+  connectionId: string
+  provider: RepoConnectionProvider
+  secret: string
+  payload: CreateProjectPayload
+}
 
 export function NewProjectForm() {
   const { mutate: createProject, isPending, error } = useCreateProject()
@@ -24,6 +43,7 @@ export function NewProjectForm() {
   const [connectionId, setConnectionId] = useState('')
   const [dropped, setDropped] = useState<string[]>([])
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [pendingSetup, setPendingSetup] = useState<PendingWebhookSetup | null>(null)
 
   const selectedRepo =
     repoOptions.find((option) => option.value === connectionId)?.repo ?? null
@@ -37,20 +57,6 @@ export function NewProjectForm() {
     return errs
   }
 
-  async function resolveConnectionId(): Promise<string | undefined> {
-    if (connectionId === '') return undefined
-    if (!connectionId.startsWith(REPO_OPTION_PREFIX)) return connectionId
-
-    const repo = connectionId.slice(REPO_OPTION_PREFIX.length)
-    const connection = await createConnection({
-      provider: 'GITHUB',
-      name: repo,
-      repo,
-    })
-
-    return connection.id
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const errs = validate()
@@ -59,21 +65,47 @@ export function NewProjectForm() {
 
     setErrors({})
 
-    try {
-      const resolved = await resolveConnectionId()
+    const payload: CreateProjectPayload = {
+      name: name.trim(),
+      description: description.trim() || undefined,
+      connectionId: connectionId === '' ? undefined : connectionId,
+      technologies,
+    }
 
-      createProject({
-        name: name.trim(),
-        description: description.trim() || undefined,
-        connectionId: resolved,
-        technologies,
+    if (connectionId === '' || !connectionId.startsWith(REPO_OPTION_PREFIX)) {
+      createProject(payload)
+      return
+    }
+
+    const repo = connectionId.slice(REPO_OPTION_PREFIX.length)
+
+    try {
+      const connection = await createConnection({
+        provider: 'GITHUB',
+        name: repo,
+        repo,
+      })
+
+      setPendingSetup({
+        connectionId: connection.id,
+        provider: connection.provider,
+        secret: connection.webhookSecret,
+        payload,
       })
     } catch {
       setErrors({ connectionId: t('projects.repoConnectionFailed') })
     }
   }
 
+  function handleContinueSetup() {
+    if (pendingSetup === null) return
+    const { connectionId: resolvedConnectionId, payload } = pendingSetup
+    setPendingSetup(null)
+    createProject({ ...payload, connectionId: resolvedConnectionId })
+  }
+
   return (
+    <>
     <form onSubmit={handleSubmit} className="max-w-lg mx-auto space-y-4">
       <h1 className="text-lg font-semibold text-default">{t('projects.newProject')}</h1>
 
@@ -174,5 +206,30 @@ export function NewProjectForm() {
         </button>
       </div>
     </form>
+
+    <Dialog
+      open={pendingSetup !== null}
+      onOpenChange={(open) => {
+        if (!open) setPendingSetup(null)
+      }}
+    >
+      {pendingSetup !== null && (
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('webhookSetup.heading')}</DialogTitle>
+            <DialogDescription>{t('webhookSetup.introCreated')}</DialogDescription>
+          </DialogHeader>
+
+          <WebhookSetupPanel provider={pendingSetup.provider} secret={pendingSetup.secret} />
+
+          <DialogFooter>
+            <Button type="button" onClick={handleContinueSetup}>
+              {t('webhookSetup.continue')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      )}
+    </Dialog>
+    </>
   )
 }

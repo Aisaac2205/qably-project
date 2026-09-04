@@ -15,6 +15,7 @@ vi.mock('@/features/projects/suites/api/suites.api', async () =>
 
 vi.mock('@/features/integrations/api/connections.api', () => ({
   listConnections: vi.fn().mockResolvedValue([]),
+  rotateConnectionWebhookSecret: vi.fn(),
 }))
 
 function withQueryClient(ui: ReactElement) {

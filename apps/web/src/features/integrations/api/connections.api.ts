@@ -2,6 +2,8 @@ import type {
   AvailableRepo,
   DetectedStack,
   RepoConnection,
+  RepoConnectionWithSecret,
+  WebhookSecretView,
 } from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
@@ -35,9 +37,18 @@ export function detectStack(
 
 export function createConnection(
   payload: CreateConnectionPayload,
-): Promise<RepoConnection> {
-  return apiRequest<RepoConnection>('/connections', {
+): Promise<RepoConnectionWithSecret> {
+  return apiRequest<RepoConnectionWithSecret>('/connections', {
     method: 'POST',
     body: payload,
   })
+}
+
+export function rotateConnectionWebhookSecret(
+  connectionId: string,
+): Promise<WebhookSecretView> {
+  return apiRequest<WebhookSecretView>(
+    `/connections/${connectionId}/webhook-secret`,
+    { method: 'POST' },
+  )
 }

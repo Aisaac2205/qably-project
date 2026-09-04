@@ -228,7 +228,7 @@ describe('ProjectRepositoryPage', () => {
     expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 
-  it('invites a first push when the connected repository has no batch yet', async () => {
+  it('states the setup requirement instead of asserting a push is enough when no batch exists yet', async () => {
     readRepository.mockResolvedValue({
       source: view.source,
       batch: null,
@@ -240,6 +240,27 @@ describe('ProjectRepositoryPage', () => {
 
     expect(screen.getByText('No ingested changes yet')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { level: 2, name: 'Ingestion' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Push to this repository/)).not.toBeInTheDocument()
+    expect(screen.getByText(/Confirm that the webhook is configured/)).toBeInTheDocument()
+  })
+
+  it('links the empty state to the webhook setup panel with the payload URL and steps', async () => {
+    const user = userEvent.setup()
+    readRepository.mockResolvedValue({
+      source: view.source,
+      batch: null,
+      codeChanges: [],
+      evidence: [],
+    })
+
+    await renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'View webhook setup' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText(/webhooks\/scm\/github/)).toBeInTheDocument()
+    expect(within(dialog).getByText('application/json')).toBeInTheDocument()
+    expect(within(dialog).getByRole('list').tagName).toBe('OL')
   })
 
   it('surfaces an error state when the repository cannot be read', async () => {

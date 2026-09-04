@@ -13,8 +13,17 @@ import type { CodeChange, Evidence } from '@qably/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { InspectorPanel } from '@/components/ui/inspector-panel'
 import { StateView } from '@/components/ui/state-view'
+import { WebhookSetupPanel } from '@/features/integrations'
 import { useTranslation } from '@/lib/i18n'
 import { useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
 import { useProjectRepository } from '../hooks/use-project-repository'
@@ -107,6 +116,7 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   const { repository, isLoading, isError } = useProjectRepository(projectId)
   const [patternFilter, setPatternFilter] = useState<string>('all')
   const [rotateOpen, setRotateOpen] = useState(false)
+  const [setupOpen, setSetupOpen] = useState(false)
   const [revealedSecret, setRevealedSecret] = useState<string | undefined>(undefined)
   const rotateMutation = useRotateWebhookSecret(projectId)
   const source = repository?.source ?? undefined
@@ -316,7 +326,14 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
         <StateView
           kind="empty"
           title={t('repository.emptyBatchTitle')}
-          description={t('repository.emptyBatchDescription')}
+          description={t('repository.emptyBatchDescription', {
+            provider: PROVIDER_LABEL[source.provider],
+          })}
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={() => setSetupOpen(true)}>
+              {t('repository.viewWebhookSetup')}
+            </Button>
+          }
           className="rounded-2xl border border-dashed border-border/70 bg-surface/50 p-8 sm:p-12 text-center"
         />
       ) : null}
@@ -341,6 +358,23 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
         secret={revealedSecret}
         onDismiss={() => setRevealedSecret(undefined)}
       />
+
+      <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('webhookSetup.heading')}</DialogTitle>
+            <DialogDescription>{t('webhookSetup.introManage')}</DialogDescription>
+          </DialogHeader>
+
+          {source ? <WebhookSetupPanel provider={source.provider} /> : null}
+
+          <DialogFooter>
+            <Button type="button" onClick={() => setSetupOpen(false)}>
+              {t('repository.done')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
