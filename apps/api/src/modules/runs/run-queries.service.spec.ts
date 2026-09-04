@@ -464,9 +464,14 @@ describe('RunQueriesService.updateCaseStatus', () => {
       source: 'github_actions',
     });
 
-    const result = await build(prisma).updateCaseStatus(org, 'run-1', 'case-1', {
-      status: 'pass',
-    });
+    const result = await build(prisma).updateCaseStatus(
+      org,
+      'run-1',
+      'case-1',
+      {
+        status: 'pass',
+      },
+    );
 
     expect(result).toEqual({ ok: false, error: 'source-not-editable' });
     expect(prisma.runCase.update).not.toHaveBeenCalled();
@@ -476,9 +481,14 @@ describe('RunQueriesService.updateCaseStatus', () => {
     const prisma = createPrisma();
     prisma.run.findFirst.mockResolvedValue({ ...runRow, source: 'api' });
 
-    const result = await build(prisma).updateCaseStatus(org, 'run-1', 'case-1', {
-      status: 'pass',
-    });
+    const result = await build(prisma).updateCaseStatus(
+      org,
+      'run-1',
+      'case-1',
+      {
+        status: 'pass',
+      },
+    );
 
     expect(result).toEqual({ ok: false, error: 'source-not-editable' });
     expect(prisma.runCase.update).not.toHaveBeenCalled();
@@ -488,9 +498,14 @@ describe('RunQueriesService.updateCaseStatus', () => {
     const prisma = createPrisma();
     prisma.run.findFirst.mockResolvedValue({ ...runRow, source: 'manual' });
 
-    const result = await build(prisma).updateCaseStatus(org, 'run-1', 'run-case-1', {
-      status: 'pass',
-    });
+    const result = await build(prisma).updateCaseStatus(
+      org,
+      'run-1',
+      'run-case-1',
+      {
+        status: 'pass',
+      },
+    );
 
     expect(result.ok).toBe(true);
     expect(prisma.runCase.update).toHaveBeenCalled();
