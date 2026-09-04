@@ -22,7 +22,9 @@ function createPrisma(event: unknown = defaultEvent): FakePrisma {
       findUnique: jest.fn().mockResolvedValue(event),
       update: jest.fn().mockResolvedValue({}),
     },
-    ingestionBatch: { create: jest.fn().mockResolvedValue({}) },
+    ingestionBatch: {
+      create: jest.fn().mockResolvedValue({ codeChanges: [] }),
+    },
   };
 }
 
@@ -57,6 +59,10 @@ function createNotifications() {
   return { publish: jest.fn().mockResolvedValue(undefined) };
 }
 
+function createExtraction() {
+  return { seed: jest.fn().mockResolvedValue(0) };
+}
+
 describe('IngestionProcessor', () => {
   it('marks the event processed once the job completes', async () => {
     const prisma = createPrisma();
@@ -64,6 +70,7 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       createNotifications() as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     expect(prisma.scmEvent.update).toHaveBeenCalledWith({
@@ -86,6 +93,7 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       createNotifications() as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     expect(prisma.ingestionBatch.create).toHaveBeenCalledTimes(2);
@@ -100,6 +108,7 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       createNotifications() as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     const [{ data }] = batchCalls(prisma);
@@ -126,6 +135,7 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       createNotifications() as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     const [{ data }] = batchCalls(prisma);
@@ -144,6 +154,7 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       createNotifications() as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     expect(prisma.ingestionBatch.create).not.toHaveBeenCalled();
@@ -162,6 +173,7 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       createNotifications() as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     expect(prisma.ingestionBatch.create).not.toHaveBeenCalled();
@@ -174,9 +186,11 @@ describe('IngestionProcessor', () => {
     prisma.ingestionBatch.create.mockRejectedValueOnce(failure);
 
     await expect(
-      new IngestionProcessor(prisma as never, notifications as never).process(
-        job('event-2'),
-      ),
+      new IngestionProcessor(
+        prisma as never,
+        notifications as never,
+        createExtraction() as never,
+      ).process(job('event-2')),
     ).rejects.toThrow(failure);
 
     expect(prisma.scmEvent.update).toHaveBeenLastCalledWith({
@@ -196,9 +210,11 @@ describe('IngestionProcessor', () => {
     prisma.ingestionBatch.create.mockRejectedValueOnce(failure);
 
     await expect(
-      new IngestionProcessor(prisma as never, notifications as never).process(
-        job('event-2'),
-      ),
+      new IngestionProcessor(
+        prisma as never,
+        notifications as never,
+        createExtraction() as never,
+      ).process(job('event-2')),
     ).rejects.toThrow(failure);
 
     expect(notifications.publish).toHaveBeenCalledWith(
@@ -219,8 +235,57 @@ describe('IngestionProcessor', () => {
     await new IngestionProcessor(
       prisma as never,
       notifications as never,
+      createExtraction() as never,
     ).process(job('event-1'));
 
     expect(notifications.publish).not.toHaveBeenCalled();
+  });
+
+  it('seeds review proposals from the code changes it just recorded', async () => {
+    const prisma = createPrisma();
+    const extraction = createExtraction();
+    const codeChanges = [
+      {
+        id: 'change-1',
+        projectId: 'proj-1',
+        filePath: 'src/cart.spec.ts',
+        detectedPattern: '*.spec.ts',
+        evidenceId: 'evidence-1',
+      },
+      {
+        id: 'change-2',
+        projectId: 'proj-1',
+        filePath: 'src/cart.ts',
+        detectedPattern: null,
+        evidenceId: 'evidence-2',
+      },
+    ];
+    prisma.ingestionBatch.create.mockResolvedValue({ codeChanges });
+
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+      extraction as never,
+    ).process(job('event-1'));
+
+    expect(extraction.seed).toHaveBeenCalledWith(codeChanges);
+  });
+
+  it('marks the event processed even when nothing was worth extracting', async () => {
+    const prisma = createPrisma();
+    const extraction = createExtraction();
+    prisma.ingestionBatch.create.mockResolvedValue({ codeChanges: [] });
+
+    await new IngestionProcessor(
+      prisma as never,
+      createNotifications() as never,
+      extraction as never,
+    ).process(job('event-1'));
+
+    expect(extraction.seed).toHaveBeenCalledWith([]);
+    expect(prisma.scmEvent.update).toHaveBeenCalledWith({
+      where: { id: 'event-1' },
+      data: { status: 'PROCESSED' },
+    });
   });
 });

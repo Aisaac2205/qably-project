@@ -6,6 +6,7 @@ import type { Env } from '../../config/env';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ReviewModule } from '../review/review.module';
 import { BitbucketAdapter } from './adapters/bitbucket.adapter';
 import { GithubAdapter } from './adapters/github.adapter';
 import { IngestionController } from './ingestion.controller';
@@ -18,6 +19,7 @@ import { INGESTION_QUEUE, SCM_ADAPTERS } from './ingestion.tokens';
     PrismaModule,
     ConfigModule,
     NotificationsModule,
+    ReviewModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ENV],

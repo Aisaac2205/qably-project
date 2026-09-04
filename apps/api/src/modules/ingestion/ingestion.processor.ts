@@ -7,6 +7,7 @@ import {
 } from '@qably/types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
+import { ExtractionService } from '../review/extraction.service';
 import type { ScmEventJob } from './ingestion.contracts';
 import { INGESTION_QUEUE } from './ingestion.tokens';
 
@@ -36,6 +37,7 @@ export class IngestionProcessor extends WorkerHost {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsPublisher,
+    private readonly extraction: ExtractionService,
   ) {
     super();
   }
@@ -103,7 +105,18 @@ export class IngestionProcessor extends WorkerHost {
     if (event.changedFiles.length === 0) return;
 
     for (const project of event.connection.projects) {
-      await this.prisma.ingestionBatch.create({
+      const batch = await this.prisma.ingestionBatch.create({
+        select: {
+          codeChanges: {
+            select: {
+              id: true,
+              projectId: true,
+              filePath: true,
+              detectedPattern: true,
+              evidenceId: true,
+            },
+          },
+        },
         data: {
           project: { connect: { id: project.id } },
           scmEvent: { connect: { id: event.id } },
@@ -133,6 +146,8 @@ export class IngestionProcessor extends WorkerHost {
           },
         },
       });
+
+      await this.extraction.seed(batch.codeChanges);
     }
   }
 }
