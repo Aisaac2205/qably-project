@@ -41,6 +41,7 @@ const VIEW_SELECT = {
   priority: true,
   evidenceId: true,
   targetTestCaseId: true,
+  evidence: { select: { title: true } },
 } as const;
 
 interface ViewRow {
@@ -55,6 +56,7 @@ interface ViewRow {
   priority: ProposalView['priority'];
   evidenceId: string;
   targetTestCaseId: string | null;
+  evidence: { title: string } | null;
 }
 
 interface EvidenceRow {
@@ -88,6 +90,7 @@ function toView(row: ViewRow): ProposalView {
     expectedResult: row.expectedResult,
     priority: row.priority,
     evidenceId: row.evidenceId,
+    evidenceTitle: row.evidence === null ? '' : row.evidence.title,
     ...(row.targetTestCaseId === null
       ? {}
       : { targetOfficialTestCaseId: row.targetTestCaseId }),

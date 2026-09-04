@@ -1,10 +1,28 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { ReviewInboxPage } from '../components/review-inbox-page'
 import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import { renderWithQuery } from '@/lib/query-test-utils'
+
+vi.mock('@/features/review-inbox/api/review.api', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/features/review-inbox/api/review.api')
+  >('@/features/review-inbox/api/review.api')
+
+  return {
+    ...actual,
+    approveProposal: vi.fn().mockResolvedValue({
+      createdNewCase: true,
+      testCaseId: 'case-1',
+      versionId: 'version-1',
+      version: 1,
+      decisionId: 'decision-1',
+    }),
+    rejectProposal: vi.fn().mockResolvedValue({ decisionId: 'decision-1' }),
+  }
+})
 
 describe('ReviewInboxPage', () => {
   beforeEach(() => {
@@ -83,7 +101,7 @@ describe('ReviewInboxPage', () => {
     const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
     await user.click(approveButton)
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Proposal approved and published/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Proposal approved and published/i)
   })
 
   it('rejects a proposal when clicking Reject', async () => {
@@ -93,7 +111,7 @@ describe('ReviewInboxPage', () => {
     const rejectButton = screen.getByRole('button', { name: 'Reject' })
     await user.click(rejectButton)
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Proposal rejected/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Proposal rejected/i)
   })
 
   it('switches status filter between in_review, approved, rejected, and all', async () => {
@@ -119,7 +137,7 @@ describe('ReviewInboxPage', () => {
 
     await user.keyboard('a')
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Proposal approved and published/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Proposal approved and published/i)
   })
 
   it('rejects the selected proposal with the "r" keyboard shortcut', async () => {
@@ -128,7 +146,7 @@ describe('ReviewInboxPage', () => {
 
     await user.keyboard('r')
 
-    expect(screen.getByRole('status')).toHaveTextContent(/Proposal rejected/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Proposal rejected/i)
   })
 
   it('toggles the duplicate-only filter with the "d" keyboard shortcut', async () => {

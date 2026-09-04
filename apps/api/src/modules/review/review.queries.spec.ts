@@ -19,6 +19,7 @@ const row = {
   priority: 'high',
   evidenceId: 'evidence-1',
   targetTestCaseId: null,
+  evidence: { title: 'src/cart.spec.ts' },
 };
 
 interface FakePrisma {
@@ -70,7 +71,19 @@ describe('ReviewService.list', () => {
       expectedResult: 'The cart shows zero items',
       priority: 'high',
       evidenceId: 'evidence-1',
+      evidenceTitle: 'src/cart.spec.ts',
     });
+  });
+
+  it('carries the evidence title so the queue never fetches it per row', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).list(org, {});
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ select: { evidence: unknown } }],
+    ];
+    expect(call[0].select.evidence).toEqual({ select: { title: true } });
   });
 
   it('exposes the duplicate target when the proposal has one', async () => {

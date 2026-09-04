@@ -14,7 +14,8 @@ import { CodeSnippet } from '@/features/ai-review/components/code-snippet'
 import { DuplicateComparison } from '@/features/ai-review/components/duplicate-comparison'
 import { EvidenceList } from '@/components/ui/evidence-list'
 import { TraceabilityTrail } from '@/components/ui/traceability-trail'
-import { useEvidence, useProject, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
+import { useProposal } from '../hooks/use-proposals'
 import { useTranslation } from '@/lib/i18n'
 
 interface ReviewProposalInspectorProps {
@@ -43,9 +44,10 @@ export function ReviewProposalInspector({
   isSubmitting = false,
 }: ReviewProposalInspectorProps) {
   const { t } = useTranslation()
-  const project = useProject(proposal.projectId)
-  const evidence = useEvidence(proposal.evidenceId)
-  const links = useTraceabilityLinks(proposal.id)
+  const { project } = useProject(proposal.projectId)
+  const { proposal: detail } = useProposal(proposal.id)
+  const evidence = detail?.evidence ?? undefined
+  const links = detail?.links ?? []
 
   const isPending = proposal.status === 'in_review'
   const isApproved = proposal.status === 'approved'

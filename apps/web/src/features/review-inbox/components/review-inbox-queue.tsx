@@ -8,19 +8,18 @@ import {
   XCircle,
   Clock,
 } from '@phosphor-icons/react'
-import type { ExtractedProposal } from '@qably/types'
+import type { ProposalListItem } from '../api/review.api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
-import { useEvidence } from '@/lib/use-mock-store'
 import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 
 export type ReviewQueueStatusFilter = 'in_review' | 'all' | 'approved' | 'rejected'
 
 export interface ReviewInboxQueueProps {
-  proposals: ExtractedProposal[]
+  proposals: ProposalListItem[]
   selectedId?: string
   onSelect: (id: string) => void
   selectedProjectId: string
@@ -39,13 +38,12 @@ function ReviewProposalQueueRow({
   onSelect,
   projectName,
 }: {
-  proposal: ExtractedProposal
+  proposal: ProposalListItem
   isSelected: boolean
   onSelect: (id: string) => void
   projectName?: string
 }) {
   const { t } = useTranslation()
-  const evidence = useEvidence(proposal.evidenceId)
 
   const isPending = proposal.status === 'in_review'
   const isApproved = proposal.status === 'approved'
@@ -104,9 +102,9 @@ function ReviewProposalQueueRow({
               {t('reviewInbox.possibleDuplicate')}
             </Badge>
           )}
-          {evidence?.title && (
+          {proposal.evidenceTitle && (
             <span className="font-mono text-[11px] text-muted truncate max-w-56">
-              {evidence.title}
+              {proposal.evidenceTitle}
             </span>
           )}
         </div>

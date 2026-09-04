@@ -15,6 +15,11 @@ import {
 } from '@/test/dashboard-api-stub'
 import { projectKeys } from '@/features/projects/lib/query-keys'
 import { organizationKeys } from '@/features/organizations/lib/query-keys'
+import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
+import {
+  proposalDetailFixtures,
+  proposalListFixtures,
+} from '@/test/review-api-stub'
 
 /**
  * Suites and runs used to come from a synchronous store, so component tests
@@ -115,6 +120,14 @@ function seedTraceability(client: QueryClient): void {
   )
 }
 
+function seedProposals(client: QueryClient): void {
+  client.setQueryData(reviewKeys.list, proposalListFixtures())
+
+  for (const detail of proposalDetailFixtures()) {
+    client.setQueryData(reviewKeys.detail(detail.id), detail)
+  }
+}
+
 export function createTestQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
@@ -129,6 +142,7 @@ export function createTestQueryClient(): QueryClient {
   seedOrganizations(client)
   seedDashboardSummary(client)
   seedTraceability(client)
+  seedProposals(client)
 
   return client
 }

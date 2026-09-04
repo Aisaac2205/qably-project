@@ -4,8 +4,8 @@ import { useState, useMemo, useCallback } from 'react'
 import { CheckCircle, Info, X } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
-import { useProposals } from '@/lib/use-mock-store'
-import { approveProposal, rejectProposal } from '@/lib/mock-store'
+import { useProposals } from '../hooks/use-proposals'
+import { useProposalDecision } from '../hooks/use-proposal-decision'
 import { useTranslation } from '@/lib/i18n'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue, type ReviewQueueStatusFilter } from './review-inbox-queue'
@@ -13,7 +13,7 @@ import { ReviewProposalInspector } from './review-proposal-inspector'
 
 export function ReviewInboxPage() {
   const { t } = useTranslation()
-  const proposals = useProposals()
+  const { proposals } = useProposals()
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<ReviewQueueStatusFilter>('in_review')
@@ -38,44 +38,44 @@ export function ReviewInboxPage() {
   const activeSelectedId = selectedId || (filteredProposals.length > 0 ? filteredProposals[0].id : undefined)
   const selectedProposal = proposals.find((p) => p.id === activeSelectedId)
 
+  const selectNextPending = useCallback(() => {
+    const remainingPending = filteredProposals.filter(
+      (p) => p.id !== activeSelectedId && p.status === 'in_review',
+    )
+    if (remainingPending.length > 0) {
+      setSelectedId(remainingPending[0].id)
+    }
+  }, [activeSelectedId, filteredProposals])
+
+  const { approve, reject } = useProposalDecision({
+    onApproved: () => {
+      setFeedbackToast({
+        message: t('reviewInbox.approvedSuccess'),
+        type: 'success',
+      })
+      selectNextPending()
+    },
+    onRejected: () => {
+      setFeedbackToast({
+        message: t('reviewInbox.rejectedSuccess'),
+        type: 'info',
+      })
+      selectNextPending()
+    },
+  })
+
   const handleApprove = useCallback(
     (proposalId: string) => {
-      const res = approveProposal(proposalId, {
-        actorId: 'QA Reviewer',
-        comment: 'Approved for suite publication from Review Inbox',
-      })
-      if (res.ok) {
-        setFeedbackToast({
-          message: t('reviewInbox.approvedSuccess'),
-          type: 'success',
-        })
-        const remainingPending = filteredProposals.filter((p) => p.id !== proposalId && p.status === 'in_review')
-        if (remainingPending.length > 0) {
-          setSelectedId(remainingPending[0].id)
-        }
-      }
+      approve(proposalId)
     },
-    [filteredProposals, t],
+    [approve],
   )
 
   const handleReject = useCallback(
     (proposalId: string) => {
-      const res = rejectProposal(proposalId, {
-        actorId: 'QA Reviewer',
-        comment: 'Rejected from Review Inbox',
-      })
-      if (res.ok) {
-        setFeedbackToast({
-          message: t('reviewInbox.rejectedSuccess'),
-          type: 'info',
-        })
-        const remainingPending = filteredProposals.filter((p) => p.id !== proposalId && p.status === 'in_review')
-        if (remainingPending.length > 0) {
-          setSelectedId(remainingPending[0].id)
-        }
-      }
+      reject(proposalId)
     },
-    [filteredProposals, t],
+    [reject],
   )
 
   const toggleDuplicateOnly = useCallback(() => {

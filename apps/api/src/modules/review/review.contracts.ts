@@ -5,7 +5,9 @@ import type {
   TraceabilityLink,
 } from '@qably/types';
 
-export type ProposalView = ExtractedProposal;
+export interface ProposalView extends ExtractedProposal {
+  evidenceTitle: string;
+}
 
 export interface ProposalDetailView extends ProposalView {
   evidence: Evidence | null;
