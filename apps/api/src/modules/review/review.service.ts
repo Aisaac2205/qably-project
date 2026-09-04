@@ -330,7 +330,13 @@ export class ReviewService {
 
       await tx.testCase.update({
         where: { id: testCaseId },
-        data: { currentVersionId: version.id },
+        data: {
+          currentVersionId: version.id,
+          name: proposal.title,
+          steps: proposal.steps,
+          expectedResult: proposal.expectedResult,
+          priority: proposal.priority,
+        },
       });
 
       await tx.traceabilityLink.createMany({

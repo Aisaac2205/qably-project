@@ -149,7 +149,40 @@ describe('ReviewService.approve', () => {
 
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-new' },
-      data: { currentVersionId: 'version-1' },
+      data: {
+        currentVersionId: 'version-1',
+        name: 'Empties the cart',
+        steps: ['Open the cart', 'Remove every item'],
+        expectedResult: 'The cart shows zero items',
+        priority: 'high',
+      },
+    });
+  });
+
+  it('refreshes the official case content when publishing over an existing case', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      title: 'Empties the cart from the mini basket',
+      steps: ['Open the mini basket', 'Remove every item'],
+      expectedResult: 'The mini basket shows zero items',
+    });
+    prisma.testCaseVersion.count.mockResolvedValue(1);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-2',
+      version: 2,
+    });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-existing' },
+      data: {
+        currentVersionId: 'version-2',
+        name: 'Empties the cart from the mini basket',
+        steps: ['Open the mini basket', 'Remove every item'],
+        expectedResult: 'The mini basket shows zero items',
+        priority: 'high',
+      },
     });
   });
 
