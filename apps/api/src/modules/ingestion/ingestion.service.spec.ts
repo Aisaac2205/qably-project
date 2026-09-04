@@ -210,3 +210,58 @@ describe('IngestionService.ingest', () => {
     expect(queue.add).not.toHaveBeenCalled();
   });
 });
+
+describe('IngestionService.ingest with an unreadable connection secret', () => {
+  it('answers unverified instead of throwing when the stored secret cannot be decrypted', async () => {
+    const prisma = createPrisma();
+    const queue = createQueue();
+    const encryption = createEncryption();
+    encryption.decrypt.mockImplementation(() => {
+      throw new Error('Unsupported state or unable to authenticate data');
+    });
+
+    const result = await build(prisma, encryption, queue).ingest(
+      'github',
+      rawBody,
+      githubHeaders(),
+    );
+
+    expect(result).toEqual({ ok: false, error: 'unverified' });
+    expect(prisma.scmEvent.create).not.toHaveBeenCalled();
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('still verifies a later candidate when an earlier one cannot be decrypted', async () => {
+    const prisma = createPrisma();
+    const queue = createQueue();
+    const encryption = createEncryption();
+
+    prisma.connection.findMany.mockResolvedValue([
+      {
+        id: 'connection-stale',
+        organizationId: 'org-1',
+        encryptedWebhookSecret: 'stale',
+      },
+      connectionRow,
+    ]);
+    encryption.decrypt.mockImplementation((packed: string) => {
+      if (packed === 'stale') {
+        throw new Error('Unsupported state or unable to authenticate data');
+      }
+
+      return packed.slice(4, -1);
+    });
+
+    const result = await build(prisma, encryption, queue).ingest(
+      'github',
+      rawBody,
+      githubHeaders(),
+    );
+
+    expect(result).toEqual({ ok: true, value: 'accepted' });
+    const [call] = prisma.scmEvent.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data.connectionId).toBe('connection-1');
+  });
+});

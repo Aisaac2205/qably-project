@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { RepoConnectionProvider } from '@qably/types';
@@ -47,6 +47,8 @@ function parseJson(rawBody: string): unknown {
 
 @Injectable()
 export class IngestionService {
+  private readonly logger = new Logger(IngestionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
@@ -107,12 +109,26 @@ export class IngestionService {
     );
 
     for (const candidate of candidates) {
-      const secret = this.encryption.decrypt(candidate.encryptedWebhookSecret);
+      const secret = this.readSecret(candidate);
+
+      if (secret === null) continue;
 
       if (adapter.verifySignature(rawBody, headers, secret)) return candidate;
     }
 
     return null;
+  }
+
+  private readSecret(candidate: SecretCandidate): string | null {
+    try {
+      return this.encryption.decrypt(candidate.encryptedWebhookSecret);
+    } catch {
+      this.logger.warn(
+        `Connection ${candidate.id} holds a webhook secret this ENCRYPTION_KEY cannot decrypt`,
+      );
+
+      return null;
+    }
   }
 
   private async store(
