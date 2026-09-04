@@ -36,7 +36,30 @@
 | S6 | "Run this suite" stays enabled on a suite with zero cases. | `suite-detail.tsx:139` |
 | S8 | `formatRelative` hardcodes the `en` locale and the string `'Never'`. | `suite-detail.tsx:25-28` |
 
-**Out of scope:** closing the ingestion → AI → `ExtractedProposal` chain, and exposing the `review` module over HTTP. Those are one separate subsystem and belong in their own plan; Task 6 here is written so it does not depend on them.
+| P1 | Seeded proposals publish as official cases named after a file path with zero steps, because `toDraft()` fills `title` with `candidate.filePath` and leaves `steps` empty. A second producer of the empty-case problem Task 6 addresses. | `review/lib/proposal-draft.ts:22-36` |
+
+## Repo state at planning time
+
+Verified against `main` at commit `523883c`. Read this before starting — it corrects assumptions an earlier draft of this plan made.
+
+**Already done, do not redo:**
+- `6e4fb23` exposes the review module over HTTP: `review.controller.ts` (`GET /review/proposals`, `GET /review/proposals/:id`, `POST :id/approve`, `POST :id/reject`), `review.module.ts`, `review.schemas.ts`, wired into `app.module.ts`, with `test/review.e2e-spec.ts`.
+- `1a8ed9c` connects ingestion to `ExtractedProposal` via `ExtractionService.seed()`, filtering on `detectedPattern !== null`.
+- `0ffc783` maps the `TestCase` `@@unique([suiteId, name])` collision on approval to HTTP 409 instead of a 500.
+- `523883c` moves `apps/web/src/features/review-inbox/**` onto the real API. **Do not reintroduce `use-mock-store` there.**
+
+**Still missing, and this plan does not close it:**
+- The AI step. `proposal-draft.ts` builds a deterministic placeholder — `title` is the file path, `objective`, `steps`, `preconditions` and `expectedResult` are empty. CONTEXT 4.7.2 step 4 ("el contenido del archivo se envía al proveedor de inteligencia artificial") has no implementation. That is a separate plan.
+- `apps/web/src/features/ai-review/**` (5 components) and `apps/web/src/features/projects/test-generation/**` are still entirely on `use-mock-store`. They are a different feature from `review-inbox`; do not assume the migration covered them.
+
+**Not available yet, despite `ReviewService` writing the rows:**
+- No endpoint returns `TraceabilityLink` rows for a `test_case`. The only exposure is inside `GET /review/proposals/:id`, filtered to `fromType`/`toType` = `proposal`.
+- `CASE_SELECT` in `suites.service.ts` does not select `currentVersion`, and `TestCase` in `packages/types` has no `version` field.
+- `RunCaseRecord` has no `officialCase` field.
+
+Tasks 2 and 6 add exactly those three projections. They are still required in full.
+
+**Migrations:** no task in this plan edits `apps/api/prisma/schema.prisma` or runs a migration. Tasks 2 and 6 only widen Prisma `select` clauses over relations that already exist. The Railway database is shared, so if a future task does need a migration, only one agent touches `schema.prisma` and runs migrations at a time — and `prisma migrate` does not regenerate the client, so run `npx prisma generate` after it or `tsc` will lie.
 
 ---
 
@@ -990,6 +1013,7 @@ A suite with no active cases cannot start a run; the server already says so and 
 
 **Files:**
 - Modify: `apps/web/src/features/runs/hooks/use-create-run.ts:11-28`
+- Modify: `apps/web/src/features/runs/components/new-run-form.tsx:36-84` (consumes the new `{ start, error }` shape — **also touched by Task 7**, so run these two in sequence, never in parallel)
 - Modify: `apps/web/src/features/projects/suites/components/suite-detail.tsx:25-38,136-146`
 - Modify: `packages/i18n/src/en.json`, `packages/i18n/src/es.json`
 - Test: `apps/web/src/features/projects/suites/test/suite-detail.test.tsx`
