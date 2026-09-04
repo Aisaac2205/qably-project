@@ -136,6 +136,10 @@ jobs:
   landing:
     name: Landing
     runs-on: ubuntu-latest
+    env:
+      PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL || 'https://qably.dev' }}
+      PUBLIC_WEB_URL: ${{ vars.PUBLIC_WEB_URL || 'https://app.qably.dev' }}
+      PUBLIC_API_URL: ${{ vars.PUBLIC_API_URL || 'https://api.qably.dev' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
