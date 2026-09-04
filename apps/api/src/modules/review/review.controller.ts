@@ -48,6 +48,10 @@ function unwrap<T>(result: Result<T, ReviewError>): T {
       throw new UnprocessableEntityException(
         'This project has no suite to publish the official case into',
       );
+    case 'name-taken':
+      throw new ConflictException(
+        'Another official case in this suite already uses that title',
+      );
   }
 }
 

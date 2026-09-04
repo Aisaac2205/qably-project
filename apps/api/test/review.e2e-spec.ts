@@ -214,6 +214,15 @@ describe('Review (e2e)', () => {
       .expect(422);
   });
 
+  it('answers 409 when the title collides with another case in the suite', async () => {
+    prisma.testCase.create.mockRejectedValue({ code: 'P2002' });
+
+    await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({})
+      .expect(409);
+  });
+
   it('records a rejection without publishing an official case', async () => {
     await request(app.getHttpServer())
       .post('/review/proposals/proposal-1/reject')

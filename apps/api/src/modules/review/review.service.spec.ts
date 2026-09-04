@@ -262,6 +262,38 @@ describe('ReviewService.approve', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('returns name-taken when the title collides with another case in the suite', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.create.mockRejectedValue({ code: 'P2002' });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'name-taken' });
+  });
+
+  it('returns name-taken when refreshing an existing case collides', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    prisma.testCase.update.mockRejectedValue({ code: 'P2002' });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'name-taken' });
+    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+  });
+
+  it('never swallows a failure that is not a unique violation', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.create.mockRejectedValue(new Error('connection lost'));
+
+    await expect(
+      build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' }),
+    ).rejects.toThrow('connection lost');
+  });
+
   it('never flips the proposal status when publishing the version fails', async () => {
     const prisma = createPrisma();
     prisma.testCaseVersion.create.mockRejectedValue(new Error('insert failed'));

@@ -13,6 +13,15 @@ import type {
 } from './review.contracts';
 
 const PENDING_STATUS = 'in_review';
+const UNIQUE_VIOLATION = 'P2002';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === UNIQUE_VIOLATION
+  );
+}
 
 const EVIDENCE_KIND: Record<string, 'source_excerpt' | 'artifact' | 'url'> = {
   SOURCE_EXCERPT: 'source_excerpt',
@@ -225,7 +234,12 @@ export class ReviewService {
 
     if (target === null && suiteId === null) return err('missing-suite');
 
-    return ok(await this.publish(proposal.value, suiteId, input));
+    try {
+      return ok(await this.publish(proposal.value, suiteId, input));
+    } catch (error) {
+      if (isUniqueViolation(error)) return err('name-taken');
+      throw error;
+    }
   }
 
   async reject(

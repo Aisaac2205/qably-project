@@ -23,7 +23,8 @@ export type ReviewError =
   | 'not-found'
   | 'invalid-transition'
   | 'missing-evidence'
-  | 'missing-suite';
+  | 'missing-suite'
+  | 'name-taken';
 
 export interface DecisionInput {
   actorId: string;
