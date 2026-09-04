@@ -40,7 +40,7 @@ function runSummary(
 interface FakePrisma {
   project: { findFirst: jest.Mock; count: jest.Mock };
   suite: { count: jest.Mock };
-  run: { count: jest.Mock };
+  run: { count: jest.Mock; groupBy: jest.Mock; findMany: jest.Mock };
   runCase: { groupBy: jest.Mock };
 }
 
@@ -51,8 +51,23 @@ function createPrisma(): FakePrisma {
       count: jest.fn().mockResolvedValue(3),
     },
     suite: { count: jest.fn().mockResolvedValue(5) },
-    run: { count: jest.fn().mockResolvedValue(10) },
+    run: {
+      count: jest.fn().mockResolvedValue(10),
+      groupBy: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     runCase: { groupBy: jest.fn().mockResolvedValue([]) },
+  };
+}
+
+function ciRunRow(overrides: Record<string, unknown> = {}) {
+  return {
+    commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+    commitMessage: 'fix(ci): retry throttled run reports',
+    commitAuthor: 'Aisaac2205',
+    status: 'pass',
+    startedAt: new Date('2026-06-16T10:00:00.000Z'),
+    ...overrides,
   };
 }
 
@@ -283,24 +298,89 @@ describe('DashboardService.summary recent runs', () => {
     expect(result.ok && result.value.recentRuns[0].id).toBe('run-0');
   });
 
-  it('filters recent CI runs by github_actions source', async () => {
-    const runs = [
-      runSummary({ id: 'run-manual', source: 'manual' }),
-      runSummary({ id: 'run-ci-1', source: 'github_actions' }),
-      runSummary({ id: 'run-ci-2', source: 'github_actions' }),
-    ];
+  it('collapses the runs of one commit into a single CI entry', async () => {
     const prisma = createPrisma();
-    const runQueries = createRunQueries(runs);
+    prisma.run.groupBy.mockResolvedValue([
+      { commitSha: 'd2f363de80e51157947e36f40d2965404e162b21' },
+    ]);
+    prisma.run.findMany.mockResolvedValue([
+      ciRunRow(),
+      ciRunRow({ startedAt: new Date('2026-06-16T10:02:00.000Z') }),
+      ciRunRow({ status: 'fail' }),
+    ]);
+    const runQueries = createRunQueries();
 
     const result = await build(prisma, runQueries).summary(org);
 
     expect(result.ok).toBe(true);
-    expect(
-      result.ok &&
-        result.value.recentCiRuns.every(
-          (run) => run.source === 'github_actions',
-        ),
-    ).toBe(true);
-    expect(result.ok && result.value.recentCiRuns).toHaveLength(2);
+    expect(result.ok && result.value.recentCiCommits).toHaveLength(1);
+    expect(result.ok && result.value.recentCiCommits[0]).toMatchObject({
+      shortSha: 'd2f363d',
+      status: 'fail',
+      runCount: 3,
+      passedRunCount: 2,
+    });
+  });
+
+  it('counts every run of the commit rather than a page of them', async () => {
+    const prisma = createPrisma();
+    prisma.run.groupBy.mockResolvedValue([
+      { commitSha: 'd2f363de80e51157947e36f40d2965404e162b21' },
+    ]);
+    const runQueries = createRunQueries();
+
+    await build(prisma, runQueries).summary(org);
+
+    const [findManyArgs] = prisma.run.findMany.mock.calls[0] as [
+      Record<string, unknown>,
+    ];
+
+    expect(findManyArgs).not.toHaveProperty('take');
+    expect(findManyArgs).not.toHaveProperty('skip');
+  });
+
+  it('asks only for CI runs that carry a commit', async () => {
+    const prisma = createPrisma();
+    const runQueries = createRunQueries();
+
+    await build(prisma, runQueries).summary(org);
+
+    const [groupByArgs] = prisma.run.groupBy.mock.calls[0] as [
+      { where: Record<string, unknown>; take: number },
+    ];
+
+    expect(groupByArgs.where).toMatchObject({
+      organizationId: 'org-1',
+      source: 'github_actions',
+      commitSha: { not: null },
+    });
+    expect(groupByArgs.take).toBe(4);
+  });
+
+  it('scopes the CI commits to the requested project', async () => {
+    const prisma = createPrisma();
+    const runQueries = createRunQueries();
+
+    await build(prisma, runQueries).summary(org, 'project-1');
+
+    const [groupByArgs] = prisma.run.groupBy.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ];
+
+    expect(groupByArgs.where).toMatchObject({
+      organizationId: 'org-1',
+      projectId: 'project-1',
+    });
+  });
+
+  it('does not go looking for runs when no commit has reached CI', async () => {
+    const prisma = createPrisma();
+    const runQueries = createRunQueries();
+
+    const result = await build(prisma, runQueries).summary(org);
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.recentCiCommits).toEqual([]);
+    expect(prisma.run.findMany).not.toHaveBeenCalled();
   });
 });

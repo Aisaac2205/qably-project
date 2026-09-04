@@ -44,7 +44,7 @@ Response shape (`DashboardSummaryRecord` in `packages/types`):
   "defectsDetected": 3,
   "windowDays": 7,
   "recentRuns": [ /* RunSummaryRecord, newest first, up to 5 */ ],
-  "recentCiRuns": [ /* RunSummaryRecord, source == "github_actions", newest first, up to 5 */ ]
+  "recentCiCommits": [ /* CiCommitActivityRecord, newest first, up to 4 */ ]
 }
 ```
 
@@ -62,7 +62,7 @@ Response shape (`DashboardSummaryRecord` in `packages/types`):
 | `defectsDetected` | Count of `RunCase` rows with `status: "fail"` inside the current window — the thesis's "number of defects detected." Read directly off the same current-window tally used for `passRate`, no extra query. |
 | `windowDays` | The window length in days, always `7` in this slice (see below). Present so the client is never tempted to hardcode or guess it. |
 | `recentRuns` | The `RECENT_RUNS_LIMIT` (5) most recent runs in scope, reusing `RunQueriesService.list()` — the exact same list, sort and `caseCounts`/`passRate` computation `GET /runs` already returns, sliced to the first 5. No duplicate run-summarizing logic. |
-| `recentCiRuns` | The 5 most recent runs in scope with `source: "github_actions"`, filtered from the same list before slicing. |
+| `recentCiCommits` | The `RECENT_CI_COMMITS_LIMIT` (4) most recently active commits in scope that reached CI, one entry each. See "Why CI activity is grouped by commit" below. |
 
 ### Why the window is fixed at 7 days, not a query parameter
 
@@ -82,8 +82,33 @@ Per request, the summary is built from a fixed number of queries regardless of h
 scope: two `count`s for `totalSuites`/`totalRuns`, one `count` for `runsInWindow`, one `count` for
 `activeRuns`, one `count` (or a constant `1`) for `totalProjects`, two `runCase.groupBy` calls (one
 per window) for the pass-rate/defects tally, and one call into `RunQueriesService.list()` (itself
-already N+1-free, see `docs/RUN_QUERIES.md`) for `recentRuns`/`recentCiRuns`. All of it runs inside
-one `Promise.all`.
+already N+1-free, see `docs/RUN_QUERIES.md`) for `recentRuns`, and two more for `recentCiCommits`
+(one `run.groupBy` to pick the most recent commits, one `run.findMany` to load their runs). All of
+it runs inside one `Promise.all`.
+
+### Why CI activity is grouped by commit
+
+`scripts/qably-report.mjs` posts one run per JUnit `<testsuite>`, which means one per test file. A
+single GitHub Actions workflow run over this repository therefore arrives as dozens of runs that
+share a `commitSha`, a `commitMessage` and a run number. Listing raw CI runs showed the same commit
+message repeated on every row while saying nothing new.
+
+`recentCiCommits` folds those runs back into the commit that produced them. Each
+`CiCommitActivityRecord` carries the rolled-up `status` (a single failing run fails the commit;
+`fail` outranks `running`, which outranks `pending`, which outranks `pass`), `runCount`,
+`passedRunCount` and `lastRunAt`.
+
+The grouping is deliberately **server-side**. The client only ever receives a page of runs, so
+grouping there would report a run count and a status derived from that page: a commit with 214 runs
+whose 88th failed would render as "passed" with a count of 5. The service instead selects the most
+recent commits first (`run.groupBy` on the indexed `commitSha`), then loads **every** run of those
+commits, so both the count and the rolled-up status describe the whole commit.
+
+Grouping key is `commitSha`, not the CI workflow run id. The workflow run id is only recoverable by
+parsing `externalId` (`gha-<runId>-<jobId>-...`), which would mean regex-in-SQL against an unindexed
+expression; `commitSha` is already indexed on `Run`. The trade-off is that re-running CI on the same
+commit merges into one entry, which is the more useful reading for a dashboard: "what is the state
+of this change?" rather than "how many times did we retry it?".
 
 ## `activity` on `GET /projects`
 

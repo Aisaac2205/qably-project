@@ -41,9 +41,9 @@ const runRow = {
   startedAt: new Date('2026-06-16T10:00:00.000Z'),
   finishedAt: null,
   executedById: null,
-  commitSha: null,
-  commitMessage: null,
-  commitAuthor: null,
+  commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+  commitMessage: 'fix(ci): retry throttled run reports',
+  commitAuthor: 'Aisaac2205',
 };
 
 describe('Dashboard (e2e)', () => {
@@ -53,7 +53,7 @@ describe('Dashboard (e2e)', () => {
     orgMember: { findFirst: jest.fn() },
     project: { findFirst: jest.fn(), count: jest.fn() },
     suite: { count: jest.fn() },
-    run: { count: jest.fn(), findMany: jest.fn() },
+    run: { count: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
     runCase: { groupBy: jest.fn() },
   };
 
@@ -70,6 +70,7 @@ describe('Dashboard (e2e)', () => {
     prisma.suite.count.mockResolvedValue(3);
     prisma.run.count.mockResolvedValue(4);
     prisma.run.findMany.mockResolvedValue([runRow]);
+    prisma.run.groupBy.mockResolvedValue([{ commitSha: runRow.commitSha }]);
     prisma.runCase.groupBy.mockResolvedValue([
       { runId: 'run-1', status: 'pass', _count: { _all: 1 } },
     ]);
@@ -139,7 +140,7 @@ describe('Dashboard (e2e)', () => {
       windowDays: number;
       passRate: number;
       recentRuns: unknown[];
-      recentCiRuns: unknown[];
+      recentCiCommits: { shortSha: string; runCount: number }[];
     };
 
     expect(body.totalProjects).toBe(2);
@@ -148,7 +149,11 @@ describe('Dashboard (e2e)', () => {
     expect(body.windowDays).toBe(7);
     expect(body.passRate).toBeCloseTo(1);
     expect(body.recentRuns).toHaveLength(1);
-    expect(body.recentCiRuns).toHaveLength(1);
+    expect(body.recentCiCommits).toHaveLength(1);
+    expect(body.recentCiCommits[0]).toMatchObject({
+      shortSha: 'd2f363d',
+      runCount: 1,
+    });
   });
 
   it('scopes the summary to a single project when projectId is given', async () => {

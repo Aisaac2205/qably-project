@@ -155,9 +155,7 @@ export interface SelectSimpleProps<T = string | number | null> {
 }
 
 /**
- * Shorthand declarative Select component for option lists with circular badge support.
- * Set `badgeInTrigger` to false when the surrounding layout already states the active
- * option's count, so the trigger does not repeat it.
+ * Shorthand declarative Select component for option lists with circular badge support
  */
 function SelectSimple<T extends string | number | null>({
   options,

@@ -1,4 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { CiCommitActivityRecord } from '@qably/types';
+import {
+  RECENT_CI_COMMITS_LIMIT,
+  buildCiCommitActivity,
+  type CiCommitRunRow,
+} from '../../common/metrics/ci-commit-activity';
 import {
   DASHBOARD_WINDOW_DAYS,
   RECENT_RUNS_LIMIT,
@@ -35,6 +41,41 @@ export class DashboardService {
     private readonly runQueries: RunQueriesService,
   ) {}
 
+  private async recentCiCommits(
+    scope: RunScope,
+  ): Promise<CiCommitActivityRecord[]> {
+    const ciScope = { ...scope, source: 'github_actions' as const };
+
+    const recentCommits = await this.prisma.run.groupBy({
+      by: ['commitSha'],
+      where: { ...ciScope, commitSha: { not: null } },
+      _max: { startedAt: true },
+      orderBy: { _max: { startedAt: 'desc' } },
+      take: RECENT_CI_COMMITS_LIMIT,
+    });
+
+    const commitShas = recentCommits
+      .map((group) => group.commitSha)
+      .filter((sha): sha is string => sha !== null);
+
+    if (commitShas.length === 0) return [];
+
+    const runs = await this.prisma.run.findMany({
+      where: { ...ciScope, commitSha: { in: commitShas } },
+      select: {
+        commitSha: true,
+        commitMessage: true,
+        commitAuthor: true,
+        status: true,
+        startedAt: true,
+      },
+    });
+
+    return buildCiCommitActivity(
+      runs.filter((run): run is CiCommitRunRow => run.commitSha !== null),
+    );
+  }
+
   async summary(
     org: OrgContext,
     projectId?: string,
@@ -60,6 +101,7 @@ export class DashboardService {
       currentGroups,
       previousGroups,
       runSummaries,
+      recentCiCommits,
     ] = await Promise.all([
       projectId === undefined
         ? this.prisma.project.count({
@@ -96,6 +138,7 @@ export class DashboardService {
         _count: { _all: true },
       }),
       this.runQueries.list(org, projectId),
+      this.recentCiCommits(scope),
     ]);
 
     const currentCounts = tallyCaseStatuses(currentGroups);
@@ -117,9 +160,7 @@ export class DashboardService {
       defectsDetected: currentCounts.fail,
       windowDays: DASHBOARD_WINDOW_DAYS,
       recentRuns: runSummaries.slice(0, RECENT_RUNS_LIMIT),
-      recentCiRuns: runSummaries
-        .filter((run) => run.source === 'github_actions')
-        .slice(0, RECENT_RUNS_LIMIT),
+      recentCiCommits,
     });
   }
 }

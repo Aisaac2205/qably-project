@@ -228,6 +228,17 @@ export interface RunSummaryRecord {
   passRate: number
 }
 
+export interface CiCommitActivityRecord {
+  commitSha: string
+  shortSha: string
+  status: RunStatus
+  lastRunAt: string
+  runCount: number
+  passedRunCount: number
+  commitMessage?: string
+  commitAuthor?: string
+}
+
 /**
  * Server-computed quality snapshot for an organization, optionally scoped to
  * one project via `?projectId=`. The server owns the clock: `windowDays` is
@@ -246,7 +257,7 @@ export interface DashboardSummaryRecord {
   defectsDetected: number
   windowDays: number
   recentRuns: RunSummaryRecord[]
-  recentCiRuns: RunSummaryRecord[]
+  recentCiCommits: CiCommitActivityRecord[]
 }
 
 

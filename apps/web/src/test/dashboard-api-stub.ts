@@ -1,4 +1,8 @@
-import type { DashboardSummaryRecord, RunSummaryRecord } from '@qably/types'
+import type {
+  CiCommitActivityRecord,
+  DashboardSummaryRecord,
+  RunSummaryRecord,
+} from '@qably/types'
 import { runFixtures } from './runs-api-stub'
 
 function countCases(cases: { status: string }[]) {
@@ -43,6 +47,40 @@ const sortedRuns = [...runFixtures].sort(
   (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
 )
 
+function buildCiCommits(): CiCommitActivityRecord[] {
+  const byCommit = new Map<string, CiCommitActivityRecord>()
+
+  for (const run of sortedRuns) {
+    if (run.source !== 'github_actions' || !run.commitSha) continue
+
+    const existing = byCommit.get(run.commitSha)
+    const passed = run.status === 'pass' ? 1 : 0
+
+    if (existing === undefined) {
+      byCommit.set(run.commitSha, {
+        commitSha: run.commitSha,
+        shortSha: run.commitSha.slice(0, 7),
+        status: run.status,
+        lastRunAt: run.startedAt,
+        runCount: 1,
+        passedRunCount: passed,
+        ...(run.commitMessage === undefined ? {} : { commitMessage: run.commitMessage }),
+        ...(run.commitAuthor === undefined ? {} : { commitAuthor: run.commitAuthor }),
+      })
+      continue
+    }
+
+    byCommit.set(run.commitSha, {
+      ...existing,
+      status: run.status === 'fail' ? 'fail' : existing.status,
+      runCount: existing.runCount + 1,
+      passedRunCount: existing.passedRunCount + passed,
+    })
+  }
+
+  return [...byCommit.values()]
+}
+
 export const dashboardSummaryFixture: DashboardSummaryRecord = {
   totalProjects: 4,
   totalSuites: 3,
@@ -54,10 +92,7 @@ export const dashboardSummaryFixture: DashboardSummaryRecord = {
   defectsDetected: 2,
   windowDays: 7,
   recentRuns: sortedRuns.slice(0, 5).map(toSummary),
-  recentCiRuns: sortedRuns
-    .filter((run) => run.source === 'github_actions')
-    .slice(0, 5)
-    .map(toSummary),
+  recentCiCommits: buildCiCommits(),
 }
 
 export function getDashboardSummary(): Promise<DashboardSummaryRecord> {

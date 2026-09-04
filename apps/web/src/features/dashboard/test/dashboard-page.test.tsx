@@ -47,9 +47,9 @@ describe('DashboardPage', () => {
     await act(async () => {
       renderWithQuery(<DashboardPage />)
     })
-    expect(screen.getByText('Recent runs')).toBeInTheDocument()
+    expect(screen.getByText('Test runs')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Pending proposals' })).toBeInTheDocument()
-    expect(screen.getByText('Recent pipelines')).toBeInTheDocument()
+    expect(screen.getByText('Commits in CI')).toBeInTheDocument()
   })
 
   it('does not end the workspace with a decorative operational footer', async () => {

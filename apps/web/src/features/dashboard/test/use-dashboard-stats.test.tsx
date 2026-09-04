@@ -25,7 +25,7 @@ describe('useDashboardStats — pure derivation', () => {
       'projectsByHealth',
       'recentRuns',
       'recentProposals',
-      'recentCiRuns',
+      'recentCiCommits',
     ]
     expect(expectedKeys.length).toBe(11)
   })
@@ -43,7 +43,9 @@ describe('useDashboardStats — pure derivation', () => {
     // Seeded fixture (runs-api-stub) has 4 org-wide runs.
     expect(result.current.totalRuns).toBe(4)
     expect(result.current.recentRuns.length).toBeGreaterThan(0)
-    expect(result.current.recentCiRuns.every((r) => r.source === 'github_actions')).toBe(true)
+    expect(
+      result.current.recentCiCommits.every((commit) => commit.runCount > 0),
+    ).toBe(true)
   })
 
   it('derives project totals from the api-backed projects list, not the mock store', () => {
@@ -75,7 +77,7 @@ describe('useDashboardStats — pure derivation', () => {
       defectsDetected: 5,
       windowDays: 7,
       recentRuns: [],
-      recentCiRuns: [],
+      recentCiCommits: [],
     })
 
     const { result } = renderHook(() => useDashboardStats(), {

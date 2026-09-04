@@ -8,6 +8,7 @@ import {
 import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useDashboardSummary } from './use-dashboard-summary'
 import type {
+  CiCommitActivityRecord,
   ProjectListItem,
   RunSummaryRecord,
   ExtractedProposal,
@@ -26,7 +27,7 @@ export interface DashboardStats {
   projectsByHealth: Array<{ project: ProjectListItem }>
   recentRuns: RunSummaryRecord[]
   recentProposals: ExtractedProposal[]
-  recentCiRuns: RunSummaryRecord[]
+  recentCiCommits: CiCommitActivityRecord[]
 }
 
 export function useDashboardStats(): DashboardStats {
@@ -63,7 +64,7 @@ export function useDashboardStats(): DashboardStats {
       projectsByHealth,
       recentRuns: summary?.recentRuns ?? [],
       recentProposals,
-      recentCiRuns: summary?.recentCiRuns ?? [],
+      recentCiCommits: summary?.recentCiCommits ?? [],
     }
   }, [projects, summary, proposals, coverageGaps])
 }
