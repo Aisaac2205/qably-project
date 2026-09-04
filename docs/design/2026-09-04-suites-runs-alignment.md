@@ -17,7 +17,7 @@
 - No inline code comments. Rationale belongs in `docs/`.
 - All user-facing strings come from `packages/i18n`. Add keys to **both** `en.json` and `es.json`.
 - `packages/i18n` must be rebuilt (`pnpm --filter @qably/i18n build`) after editing `src/*.json`, or the web app keeps serving stale `dist` output.
-- Test runners must be capped: `npx jest --maxWorkers=2` (API), `npx vitest run --poolOptions.threads.maxThreads=2` (web).
+- Test runners must be capped: `npx jest --maxWorkers=2` (API), `npx vitest run --maxWorkers=2` (web — this is what `pnpm test:run` already does; vitest 4 rejects `--poolOptions` on the CLI).
 - Every task ends in its own conventional commit. Never absorb unrelated worktree changes into a commit.
 - Commit locally only. Do not push.
 
@@ -173,7 +173,7 @@ Task 5 of the UI work needs the real version number and suite of the case a `Run
 
 **Files:**
 - Modify: `packages/types/src/index.ts:172-182`
-- Modify: `apps/api/src/modules/runs/lib/run-view.ts:21-31`
+- Modify: `apps/api/src/modules/runs/lib/run-view.ts:21-31` (add a **separate** `CASE_READ_SELECT`; do not widen `CASE_SELECT`, which two `createManyAndReturn` calls share and which cannot select nested relations)
 - Test: `apps/api/src/modules/runs/run-queries.service.spec.ts`
 
 **Interfaces:**
@@ -388,7 +388,7 @@ it('keeps the shortcut bar on a manual run', () => {
 - [ ] **Step 4: Run the test to verify it fails**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/runs/test/run-detail.test.tsx
+cd apps/web && npx vitest run --maxWorkers=2 src/features/runs/test/run-detail.test.tsx
 ```
 
 Expected: FAIL — the shortcut bar renders for every source.
@@ -460,7 +460,7 @@ Add `LockSimple` to the existing `@phosphor-icons/react` import.
 - [ ] **Step 6: Run the web tests and typecheck**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/runs && npx tsc --noEmit
+cd apps/web && npx vitest run --maxWorkers=2 src/features/runs && npx tsc --noEmit
 ```
 
 Expected: all pass.
@@ -535,7 +535,7 @@ it('never renders a hardcoded environment', () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/runs/test/case-detail.test.tsx
+cd apps/web && npx vitest run --maxWorkers=2 src/features/runs/test/case-detail.test.tsx
 ```
 
 Expected: FAIL on all three.
@@ -590,7 +590,7 @@ Replace the Steps and Expected result blocks with:
 - [ ] **Step 6: Run the web tests**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/runs && npx tsc --noEmit
+cd apps/web && npx vitest run --maxWorkers=2 src/features/runs && npx tsc --noEmit
 ```
 
 - [ ] **Step 7: Commit**
@@ -653,7 +653,7 @@ it('hides the version badge and library link when the case is unlinked', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/runs/test/case-detail.test.tsx
+cd apps/web && npx vitest run --maxWorkers=2 src/features/runs/test/case-detail.test.tsx
 ```
 
 Expected: FAIL — the badge always reads `Version 1`.
@@ -713,7 +713,7 @@ Delete the whole `{links.length > 0 && ( ... )}` traceability block and the now-
 - [ ] **Step 5: Run the web tests and typecheck**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/runs && npx tsc --noEmit
+cd apps/web && npx vitest run --maxWorkers=2 src/features/runs && npx tsc --noEmit
 ```
 
 - [ ] **Step 6: Commit**
@@ -784,7 +784,7 @@ it('keeps the steps disclosure when the case has steps', () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/projects/suites/test/case-card.test.tsx
+cd apps/web && npx vitest run --maxWorkers=2 src/features/projects/suites/test/case-card.test.tsx
 ```
 
 Expected: FAIL — the "0 steps" disclosure still renders.
@@ -864,7 +864,7 @@ In `apps/web/src/features/projects/suites/components/case-card.tsx`, wrap the ex
 
 ```bash
 cd apps/api && npx jest --maxWorkers=2 && npx tsc --noEmit
-cd ../web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/projects/suites && npx tsc --noEmit
+cd ../web && npx vitest run --maxWorkers=2 src/features/projects/suites && npx tsc --noEmit
 ```
 
 - [ ] **Step 8: Commit**
@@ -916,7 +916,7 @@ it('renders the label of the selected item, not the raw value', () => {
 - [ ] **Step 2: Run the test to verify it fails**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/test/select.test.tsx
+cd apps/web && npx vitest run --maxWorkers=2 src/test/select.test.tsx
 ```
 
 Expected: FAIL — the trigger renders `recent`.
@@ -995,7 +995,7 @@ and pass `items={PRIORITY_OPTIONS}` / `items={STATE_OPTIONS}` to their respectiv
 - [ ] **Step 5: Run the full web suite and typecheck**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 && npx tsc --noEmit
+cd apps/web && npx vitest run --maxWorkers=2 && npx tsc --noEmit
 ```
 
 - [ ] **Step 6: Commit**
@@ -1063,7 +1063,7 @@ it('formats the last run time in the active locale', () => {
 - [ ] **Step 3: Run the test to verify it fails**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 src/features/projects/suites/test/suite-detail.test.tsx
+cd apps/web && npx vitest run --maxWorkers=2 src/features/projects/suites/test/suite-detail.test.tsx
 ```
 
 Expected: FAIL — the button is always enabled.
@@ -1147,7 +1147,7 @@ Update `new-run-form.tsx` to consume the new shape and render `error` in the exi
 - [ ] **Step 7: Run the full web suite and typecheck**
 
 ```bash
-cd apps/web && npx vitest run --poolOptions.threads.maxThreads=2 && npx tsc --noEmit
+cd apps/web && npx vitest run --maxWorkers=2 && npx tsc --noEmit
 ```
 
 - [ ] **Step 8: Commit**
@@ -1200,7 +1200,7 @@ After the last task:
 
 ```bash
 cd apps/api && npx jest --maxWorkers=2 && npx tsc --noEmit
-cd ../web && npx vitest run --poolOptions.threads.maxThreads=2 && npx tsc --noEmit
+cd ../web && npx vitest run --maxWorkers=2 && npx tsc --noEmit
 ```
 
 Manual check, in order:
