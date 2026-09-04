@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { getProjectRepository } from './repository.api'
+import { getProjectRepository, rotateWebhookSecret } from './repository.api'
 
 const fetchMock = vi.fn()
 
@@ -37,5 +37,31 @@ describe('getProjectRepository', () => {
       expect.any(String),
       expect.objectContaining({ signal: controller.signal }),
     )
+  })
+})
+
+describe('rotateWebhookSecret', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock)
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ webhookSecret: 'f'.repeat(64) }),
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    fetchMock.mockReset()
+  })
+
+  it('posts to the project webhook-secret route', async () => {
+    const rotated = await rotateWebhookSecret('proj-1')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/projects/proj-1/repository/webhook-secret'),
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
+    expect(rotated).toEqual({ webhookSecret: 'f'.repeat(64) })
   })
 })

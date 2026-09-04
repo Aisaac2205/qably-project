@@ -11,11 +11,15 @@ import {
 } from '@phosphor-icons/react'
 import type { CodeChange, Evidence } from '@qably/types'
 import { PageHeader } from '@/components/ui/page-header'
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { InspectorPanel } from '@/components/ui/inspector-panel'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 import { useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
 import { useProjectRepository } from '../hooks/use-project-repository'
+import { useRotateWebhookSecret } from '../hooks/use-rotate-webhook-secret'
+import { WebhookSecretDialog } from './webhook-secret-dialog'
 import { selectDetectedTestChanges } from '../lib/test-file-patterns'
 
 function DetectedTestItem({
@@ -102,6 +106,9 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   const { t, locale } = useTranslation()
   const { repository, isLoading, isError } = useProjectRepository(projectId)
   const [patternFilter, setPatternFilter] = useState<string>('all')
+  const [rotateOpen, setRotateOpen] = useState(false)
+  const [revealedSecret, setRevealedSecret] = useState<string | undefined>(undefined)
+  const rotateMutation = useRotateWebhookSecret(projectId)
   const source = repository?.source ?? undefined
   const batch = repository?.batch ?? undefined
   const batchChanges = repository?.codeChanges ?? []
@@ -156,19 +163,37 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 <span className="relative flex size-2">
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
                 </span>
-                <span>{locale === 'es' ? 'Sincronización activa' : 'Active sync'}</span>
+                <span>{t('repository.activeSync')}</span>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRotateOpen(true)}
+                disabled={rotateMutation.isPending}
+              >
+                {rotateMutation.isPending
+                  ? t('repository.rotating')
+                  : t('repository.rotateSecret')}
+              </Button>
             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-border/50 text-xs sm:text-sm text-muted">
-            <p>{t('repository.sourceDescription')}</p>
+            <div className="space-y-1.5">
+              <p>{t('repository.sourceDescription')}</p>
+              {rotateMutation.isError ? (
+                <p role="alert" className="text-destructive font-medium">
+                  {t('repository.rotateError')}
+                </p>
+              ) : null}
+            </div>
             {source.testFilePatterns?.length ? (
               <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                 {source.testFilePatterns.map((pat) => (
@@ -295,6 +320,27 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
           className="rounded-2xl border border-dashed border-border/70 bg-surface/50 p-8 sm:p-12 text-center"
         />
       ) : null}
+
+      <ConfirmDialog
+        open={rotateOpen}
+        onOpenChange={setRotateOpen}
+        title={t('repository.rotateConfirmTitle')}
+        description={t('repository.rotateConfirmDescription')}
+        confirmLabel={t('repository.rotateConfirmAction')}
+        onConfirm={() => {
+          rotateMutation.mutate(undefined, {
+            onSuccess: (rotated) => {
+              setRotateOpen(false)
+              setRevealedSecret(rotated.webhookSecret)
+            },
+          })
+        }}
+      />
+
+      <WebhookSecretDialog
+        secret={revealedSecret}
+        onDismiss={() => setRevealedSecret(undefined)}
+      />
     </div>
   )
 }

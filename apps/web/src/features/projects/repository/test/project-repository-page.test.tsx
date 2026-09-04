@@ -5,12 +5,16 @@ import type { ProjectRepositoryView } from '@qably/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useI18nStore } from '@/lib/i18n'
 import { __resetStore } from '@/lib/mock-store'
-import { getProjectRepository } from '../api/repository.api'
+import { getProjectRepository, rotateWebhookSecret } from '../api/repository.api'
 import { ProjectRepositoryPage } from '../components/project-repository-page'
 
-vi.mock('../api/repository.api', () => ({ getProjectRepository: vi.fn() }))
+vi.mock('../api/repository.api', () => ({
+  getProjectRepository: vi.fn(),
+  rotateWebhookSecret: vi.fn(),
+}))
 
 const readRepository = vi.mocked(getProjectRepository)
+const rotateSecret = vi.mocked(rotateWebhookSecret)
 
 const view: ProjectRepositoryView = {
   source: {
@@ -96,6 +100,7 @@ async function renderPage(projectId = 'proj-1') {
 describe('ProjectRepositoryPage', () => {
   beforeEach(() => {
     readRepository.mockResolvedValue(structuredClone(view))
+    rotateSecret.mockResolvedValue({ webhookSecret: 'f'.repeat(64) })
   })
 
   afterEach(() => {
@@ -104,6 +109,7 @@ describe('ProjectRepositoryPage', () => {
       __resetStore()
     })
     readRepository.mockReset()
+    rotateSecret.mockReset()
   })
 
   it('renders the connected GitHub source in project context', async () => {
@@ -242,5 +248,44 @@ describe('ProjectRepositoryPage', () => {
     await renderPage()
 
     expect(screen.getByRole('alert')).toHaveTextContent('Repository unavailable')
+  })
+
+  it('offers rotating the webhook secret from the connected source card', async () => {
+    await renderPage()
+
+    expect(screen.getByRole('button', { name: 'Rotate secret' })).toBeInTheDocument()
+    expect(rotateSecret).not.toHaveBeenCalled()
+  })
+
+  it('warns before rotating and reveals the new secret once confirmed', async () => {
+    const user = userEvent.setup()
+    await renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Rotate secret' }))
+
+    const confirm = await screen.findByRole('alertdialog').catch(() => screen.getByRole('dialog'))
+    expect(within(confirm).getByText(/stops being valid immediately/i)).toBeInTheDocument()
+
+    await user.click(within(confirm).getByRole('button', { name: 'Rotate secret' }))
+
+    await waitFor(() => {
+      expect(rotateSecret).toHaveBeenCalledWith('proj-1')
+    })
+    expect(await screen.findByText('f'.repeat(64))).toBeInTheDocument()
+  })
+
+  it('reports a rotation that fails without revealing a secret', async () => {
+    const user = userEvent.setup()
+    rotateSecret.mockRejectedValue(new Error('nope'))
+    await renderPage()
+
+    await user.click(screen.getByRole('button', { name: 'Rotate secret' }))
+    const confirm = await screen.findByRole('alertdialog').catch(() => screen.getByRole('dialog'))
+    await user.click(within(confirm).getByRole('button', { name: 'Rotate secret' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The secret could not be rotated. Try again.',
+    )
+    expect(screen.queryByText('f'.repeat(64))).not.toBeInTheDocument()
   })
 })

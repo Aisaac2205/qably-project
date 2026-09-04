@@ -149,6 +149,20 @@
   "repository": {
     "title": "Repositorio",
     "subtitle": "Repositorio de código conectado y sincronización de cambios.",
+    "activeSync": "Sincronización activa",
+    "webhookSecretHeading": "Secreto del webhook",
+    "rotateSecret": "Rotar secreto",
+    "rotating": "Rotando…",
+    "rotateConfirmTitle": "¿Rotar el secreto del webhook?",
+    "rotateConfirmDescription": "El secreto actual dejará de ser válido de inmediato. Las entregas del proveedor fallarán hasta que el nuevo valor quede registrado en la configuración del webhook del repositorio.",
+    "rotateConfirmAction": "Rotar secreto",
+    "rotateError": "No fue posible rotar el secreto. Vuelva a intentarlo.",
+    "secretRevealTitle": "Nuevo secreto del webhook",
+    "secretRevealWarning": "Este valor se muestra una sola vez. Cópielo y regístrelo en la configuración del webhook del repositorio antes de cerrar esta ventana.",
+    "secretLabel": "Secreto",
+    "copySecret": "Copiar secreto",
+    "copied": "Secreto copiado",
+    "done": "Listo",
     "sourceHeading": "Repositorio conectado",
     "ingestionHeading": "Ingesta",
     "inspectorHeading": "Inspector de cambios",
@@ -177,9 +191,9 @@
     "ingestionErrorDescription": "Este lote de ingesta no pudo procesarse, por lo que no se extrajeron cambios de prueba.",
     "loadingTitle": "Cargando repositorio…",
     "loadErrorTitle": "Repositorio no disponible",
-    "loadErrorDescription": "No se pudieron cargar los datos del repositorio de este proyecto. Probá de nuevo.",
+    "loadErrorDescription": "No fue posible cargar los datos del repositorio de este proyecto. Vuelva a intentarlo.",
     "emptyBatchTitle": "Todavía no hay cambios ingeridos",
-    "emptyBatchDescription": "Hacé un envío a este repositorio y los cambios van a aparecer acá."
+    "emptyBatchDescription": "Realice un envío a este repositorio y los cambios aparecerán aquí."
   },
   "status": {
     "execution": {
