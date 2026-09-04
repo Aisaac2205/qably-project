@@ -620,6 +620,30 @@ response.raise_for_status()`,
           type: 'paragraph',
           text: 'Límite de 60 peticiones cada 60 segundos por instancia. Los eventos aceptados se encolan y se procesan de forma asíncrona — la respuesta confirma la recepción, no que el procesamiento haya terminado.',
         },
+        {
+          type: 'subheading',
+          text: 'Rotación del secreto',
+        },
+        {
+          type: 'paragraph',
+          text: 'Cada conexión guarda su propio secreto HMAC. Cuando el secreto registrado en el proveedor deja de coincidir con el que guarda Qably, todas las entregas responden 401 hasta que ambos valores vuelvan a coincidir. La rotación genera un secreto nuevo, lo guarda cifrado y lo devuelve una sola vez.',
+        },
+        {
+          type: 'table',
+          headers: ['Acción', 'Endpoint', 'Rol requerido'],
+          rows: [
+            ['Rotar el secreto del webhook', 'POST /projects/:projectId/repository/webhook-secret', 'owner o admin'],
+          ],
+        },
+        {
+          type: 'paragraph',
+          text: 'La respuesta 201 contiene { "webhookSecret": "<64 caracteres hexadecimales>" }. Ese valor no se puede volver a consultar, así que debe copiarse en la configuración del webhook del repositorio antes de descartar la respuesta. El secreto anterior deja de ser válido en el momento de la rotación. Un proyecto sin repositorio conectado responde 404.',
+        },
+        {
+          type: 'callout',
+          tone: 'warning',
+          text: 'La rotación también está disponible en la interfaz, dentro de la pestaña Repositorio de cada proyecto. Entre la rotación y el registro del nuevo valor en el proveedor, las entregas fallan con 401 y deben reenviarse desde el historial de entregas del proveedor.',
+        },
       ],
     },
     {
