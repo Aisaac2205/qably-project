@@ -189,11 +189,11 @@ describe('Dashboard (e2e)', () => {
     expect(body.year).toBe(2026);
     expect(body.timeZone).toBe('America/Guatemala');
     expect(body.days).toEqual([
-      { date: '2026-06-16', scm: 3, proposals: 0, official: 3, runs: 3 },
+      { date: '2026-06-16', scm: 3, proposals: 3, official: 3, runs: 3 },
     ]);
     expect(body.totals).toEqual({
       scm: 3,
-      proposals: 0,
+      proposals: 3,
       official: 3,
       runs: 3,
     });

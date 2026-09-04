@@ -123,6 +123,10 @@ export class DashboardService {
       projectId === undefined
         ? Prisma.empty
         : Prisma.sql`AND b."projectId" = ${projectId}`;
+    const proposalsProject =
+      projectId === undefined
+        ? Prisma.empty
+        : Prisma.sql`AND ep."projectId" = ${projectId}`;
     const officialProject =
       projectId === undefined
         ? Prisma.empty
@@ -132,11 +136,17 @@ export class DashboardService {
         ? Prisma.empty
         : Prisma.sql`AND r."projectId" = ${projectId}`;
 
-    const [scm, official, runs] = await Promise.all([
+    const [scm, proposals, official, runs] = await Promise.all([
       this.stageCounts(
         Prisma.sql`b."createdAt"`,
         Prisma.sql`"ingestion_batch" b JOIN "project" p ON p."id" = b."projectId"`,
         Prisma.sql`p."organizationId" = ${organizationId} ${scmProject}`,
+        year,
+      ),
+      this.stageCounts(
+        Prisma.sql`ep."createdAt"`,
+        Prisma.sql`"extracted_proposal" ep JOIN "project" p ON p."id" = ep."projectId"`,
+        Prisma.sql`p."organizationId" = ${organizationId} ${proposalsProject}`,
         year,
       ),
       this.stageCounts(
@@ -153,7 +163,9 @@ export class DashboardService {
       ),
     ]);
 
-    return ok(buildTraceabilityCalendar(year, { scm, official, runs }));
+    return ok(
+      buildTraceabilityCalendar(year, { scm, proposals, official, runs }),
+    );
   }
 
   async summary(

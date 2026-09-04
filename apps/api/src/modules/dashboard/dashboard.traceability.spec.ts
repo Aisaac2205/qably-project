@@ -41,13 +41,14 @@ describe('DashboardService.traceability', () => {
 
     await build(prisma).traceability(org, 2026);
 
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(4);
   });
 
   it('merges the per-stage day counts into one calendar', async () => {
     const prisma = createPrisma();
     prisma.$queryRaw
       .mockResolvedValueOnce([{ day: '2026-06-16', count: 2 }])
+      .mockResolvedValueOnce([{ day: '2026-06-16', count: 7 }])
       .mockResolvedValueOnce([{ day: '2026-06-16', count: 5 }])
       .mockResolvedValueOnce([{ day: '2026-06-16', count: 214 }]);
 
@@ -55,14 +56,22 @@ describe('DashboardService.traceability', () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.days).toEqual([
-      { date: '2026-06-16', scm: 2, proposals: 0, official: 5, runs: 214 },
+      { date: '2026-06-16', scm: 2, proposals: 7, official: 5, runs: 214 },
     ]);
     expect(result.ok && result.value.totals).toEqual({
       scm: 2,
-      proposals: 0,
+      proposals: 7,
       official: 5,
       runs: 214,
     });
+  });
+
+  it('counts the proposals stage from the review domain table', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).traceability(org, 2026);
+
+    expect(statementOf(prisma, 1)).toContain('extracted_proposal');
   });
 
   it('scopes every stage to the caller organization', async () => {
@@ -70,7 +79,7 @@ describe('DashboardService.traceability', () => {
 
     await build(prisma).traceability(org, 2026);
 
-    for (let call = 0; call < 3; call += 1) {
+    for (let call = 0; call < 4; call += 1) {
       expect(paramsOf(prisma, call)).toContain('org-1');
     }
   });
@@ -80,7 +89,7 @@ describe('DashboardService.traceability', () => {
 
     await build(prisma).traceability(org, 2026, 'project-1');
 
-    for (let call = 0; call < 3; call += 1) {
+    for (let call = 0; call < 4; call += 1) {
       expect(paramsOf(prisma, call)).toContain('project-1');
     }
   });
@@ -90,7 +99,7 @@ describe('DashboardService.traceability', () => {
 
     await build(prisma).traceability(org, 2026);
 
-    for (let call = 0; call < 3; call += 1) {
+    for (let call = 0; call < 4; call += 1) {
       const params = paramsOf(prisma, call);
 
       expect(params).toContain('2026-01-01');
@@ -112,7 +121,7 @@ describe('DashboardService.traceability', () => {
 
     await build(prisma).traceability(org, 2026);
 
-    for (let call = 0; call < 3; call += 1) {
+    for (let call = 0; call < 4; call += 1) {
       expect(statementOf(prisma, call)).not.toMatch(
         /WHERE[\s\S]*date_trunc|WHERE[\s\S]*to_char[\s\S]*>=/,
       );
@@ -124,7 +133,7 @@ describe('DashboardService.traceability', () => {
 
     await build(prisma).traceability(org, 2026);
 
-    for (let call = 0; call < 3; call += 1) {
+    for (let call = 0; call < 4; call += 1) {
       expect(statementOf(prisma, call)).toContain('COUNT(*)::int');
     }
   });

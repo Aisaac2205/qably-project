@@ -9,6 +9,7 @@ function rows(
 ): TraceabilityStageRows {
   return {
     scm: [],
+    proposals: [],
     official: [],
     runs: [],
     ...overrides,
@@ -53,7 +54,26 @@ describe('buildTraceabilityCalendar', () => {
     });
   });
 
-  it('reports the proposals stage as zero while the Review/AI domain has no model', () => {
+  it('counts the proposals stage alongside the other three', () => {
+    const calendar = buildTraceabilityCalendar(
+      2026,
+      rows({
+        proposals: [
+          { day: '2026-06-16', count: 4 },
+          { day: '2026-06-17', count: 1 },
+        ],
+        runs: [{ day: '2026-06-16', count: 3 }],
+      }),
+    );
+
+    expect(calendar.totals.proposals).toBe(5);
+    expect(calendar.days).toEqual([
+      { date: '2026-06-16', scm: 0, proposals: 4, official: 0, runs: 3 },
+      { date: '2026-06-17', scm: 0, proposals: 1, official: 0, runs: 0 },
+    ]);
+  });
+
+  it('still reports zero proposals on a day that had none', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
       rows({ runs: [{ day: '2026-06-16', count: 3 }] }),

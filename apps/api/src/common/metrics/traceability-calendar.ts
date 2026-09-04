@@ -7,7 +7,7 @@ import type {
 
 export const TRACEABILITY_TIME_ZONE = 'America/Guatemala';
 
-export type QueriedTraceabilityStage = Exclude<TraceabilityStage, 'proposals'>;
+export type QueriedTraceabilityStage = TraceabilityStage;
 
 export interface TraceabilityDayCountRow {
   day: string;
@@ -21,6 +21,7 @@ export type TraceabilityStageRows = Record<
 
 const QUERIED_STAGES: readonly QueriedTraceabilityStage[] = [
   'scm',
+  'proposals',
   'official',
   'runs',
 ];
