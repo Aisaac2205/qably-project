@@ -13,6 +13,7 @@ import { NotificationsPublisher } from '../notifications/notifications.publisher
 import { PrismaService } from '../../prisma/prisma.service';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
+  CASE_READ_SELECT,
   CASE_SELECT,
   RUN_SELECT,
   toRunView,
@@ -295,7 +296,7 @@ export class RunQueriesService {
   private loadCases(runId: string): Promise<RunCaseRow[]> {
     return this.prisma.runCase.findMany({
       where: { runId },
-      select: CASE_SELECT,
+      select: CASE_READ_SELECT,
       orderBy: { position: 'asc' },
     });
   }

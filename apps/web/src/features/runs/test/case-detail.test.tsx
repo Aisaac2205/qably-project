@@ -6,6 +6,7 @@ import type { RunCaseRecord } from '@qably/types'
 const mockCase: RunCaseRecord = {
   id: 'tc-1',
   testCaseId: 'tc-1',
+  officialCase: null,
   name: 'Valid login redirects to dashboard',
   suiteName: 'Authentication',
   steps: ['Navigate to /login', 'Enter valid email', 'Click Sign in'],

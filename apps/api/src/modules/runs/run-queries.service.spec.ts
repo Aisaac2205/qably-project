@@ -222,6 +222,69 @@ describe('RunQueriesService.findOne', () => {
       'run-case-2',
     ]);
   });
+
+  it('projects the linked official case onto the run case', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({
+        testCaseId: 'case-9',
+        testCase: {
+          id: 'case-9',
+          suiteId: 'suite-1',
+          steps: ['Open the cart'],
+          expectedResult: 'The cart is empty',
+          currentVersion: { version: 3 },
+        },
+      }),
+    ]);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].officialCase).toEqual({
+      id: 'case-9',
+      suiteId: 'suite-1',
+      version: 3,
+      steps: ['Open the cart'],
+      expectedResult: 'The cart is empty',
+    });
+  });
+
+  it('reports version 1 when the official case has no published version', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({
+        testCaseId: 'case-9',
+        testCase: {
+          id: 'case-9',
+          suiteId: 'suite-1',
+          steps: [],
+          expectedResult: '',
+          currentVersion: null,
+        },
+      }),
+    ]);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].officialCase?.version).toBe(1);
+  });
+
+  it('leaves officialCase null when the run case is not linked', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({ testCaseId: null, testCase: null }),
+    ]);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].officialCase).toBeNull();
+  });
 });
 
 describe('RunQueriesService.createManual', () => {

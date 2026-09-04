@@ -20,9 +20,9 @@ const mockRun: RunRecord = {
   startedAt: '2026-06-16T10:00:00Z',
   finishedAt: '2026-06-16T10:05:00Z',
   cases: [
-    { id: 'tc-1', testCaseId: 'tc-1', name: 'a', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pass', position: 0 },
-    { id: 'tc-2', testCaseId: 'tc-2', name: 'b', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pending', position: 1 },
-    { id: 'tc-3', testCaseId: 'tc-3', name: 'c', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pending', position: 2 },
+    { id: 'tc-1', testCaseId: 'tc-1', officialCase: null, name: 'a', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pass', position: 0 },
+    { id: 'tc-2', testCaseId: 'tc-2', officialCase: null, name: 'b', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pending', position: 1 },
+    { id: 'tc-3', testCaseId: 'tc-3', officialCase: null, name: 'c', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pending', position: 2 },
   ],
 }
 

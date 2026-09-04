@@ -169,9 +169,18 @@ export interface Suite {
   updatedAt: string
 }
 
+export interface RunCaseOfficialCase {
+  id: string
+  suiteId: string
+  version: number
+  steps: string[]
+  expectedResult: string
+}
+
 export interface RunCaseRecord {
   id: string
   testCaseId: string | null
+  officialCase: RunCaseOfficialCase | null
   name: string
   suiteName: string
   steps: string[]

@@ -35,6 +35,7 @@ function caseRecord(
   return {
     id,
     testCaseId: id,
+    officialCase: null,
     name,
     suiteName,
     steps: [],

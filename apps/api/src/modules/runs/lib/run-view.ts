@@ -30,6 +30,19 @@ export const CASE_SELECT = {
   recordedAt: true,
 } as const;
 
+export const CASE_READ_SELECT = {
+  ...CASE_SELECT,
+  testCase: {
+    select: {
+      id: true,
+      suiteId: true,
+      steps: true,
+      expectedResult: true,
+      currentVersion: { select: { version: true } },
+    },
+  },
+} as const;
+
 export interface RunRow {
   id: string;
   projectId: string;
@@ -57,6 +70,13 @@ export interface RunCaseRow {
   status: CaseStatus;
   position: number;
   recordedAt: Date | null;
+  testCase?: {
+    id: string;
+    suiteId: string;
+    steps: string[];
+    expectedResult: string;
+    currentVersion: { version: number } | null;
+  } | null;
 }
 
 export function toRunView(run: RunRow, cases: RunCaseRow[]): RunView {
@@ -83,6 +103,16 @@ export function toRunView(run: RunRow, cases: RunCaseRow[]): RunView {
       .map((row) => ({
         id: row.id,
         testCaseId: row.testCaseId,
+        officialCase:
+          row.testCase === undefined || row.testCase === null
+            ? null
+            : {
+                id: row.testCase.id,
+                suiteId: row.testCase.suiteId,
+                version: row.testCase.currentVersion?.version ?? 1,
+                steps: row.testCase.steps,
+                expectedResult: row.testCase.expectedResult,
+              },
         name: row.name,
         suiteName: row.suiteName,
         steps: row.steps,

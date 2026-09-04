@@ -6,15 +6,15 @@ import type { RunCaseRecord } from '@qably/types'
 
 const mockCases: RunCaseRecord[] = [
   {
-    id: 'tc-1', testCaseId: 'tc-1', name: 'Login redirects', suiteName: 'Auth',
+    id: 'tc-1', testCaseId: 'tc-1', officialCase: null, name: 'Login redirects', suiteName: 'Auth',
     steps: [], expectedResult: '', status: 'pass', position: 0,
   },
   {
-    id: 'tc-2', testCaseId: 'tc-2', name: 'Invalid credentials', suiteName: 'Auth',
+    id: 'tc-2', testCaseId: 'tc-2', officialCase: null, name: 'Invalid credentials', suiteName: 'Auth',
     steps: [], expectedResult: '', status: 'fail', position: 1,
   },
   {
-    id: 'tc-3', testCaseId: 'tc-3', name: 'Reset password', suiteName: 'Auth',
+    id: 'tc-3', testCaseId: 'tc-3', officialCase: null, name: 'Reset password', suiteName: 'Auth',
     steps: [], expectedResult: '', status: 'pending', position: 2,
   },
 ]
