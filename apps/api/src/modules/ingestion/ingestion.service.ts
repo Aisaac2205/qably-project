@@ -164,7 +164,7 @@ export class IngestionService {
       JOB_NAME,
       { scmEventId: stored.id },
       {
-        jobId: `${event.provider}:${event.eventId}`,
+        jobId: `${event.provider}-${event.eventId}`,
         removeOnComplete: true,
         attempts: 3,
         backoff: { type: 'exponential', delay: 1000 },

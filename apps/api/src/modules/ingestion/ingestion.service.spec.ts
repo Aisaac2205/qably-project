@@ -57,7 +57,23 @@ function createEncryption() {
 }
 
 function createQueue() {
-  return { add: jest.fn().mockResolvedValue({ id: 'job-1' }) };
+  return {
+    add: jest.fn(
+      (_name: string, _data: unknown, options?: { jobId?: string }) => {
+        const jobId = options?.jobId;
+
+        if (
+          jobId !== undefined &&
+          jobId.includes(':') &&
+          jobId.split(':').length !== 3
+        ) {
+          throw new Error('Custom Id cannot contain :');
+        }
+
+        return Promise.resolve({ id: 'job-1' });
+      },
+    ),
+  };
 }
 
 function build(
@@ -191,7 +207,7 @@ describe('IngestionService.ingest', () => {
     expect(queue.add).toHaveBeenCalledWith(
       'scm-event',
       { scmEventId: 'event-1' },
-      expect.objectContaining({ jobId: 'GITHUB:delivery-1' }),
+      expect.objectContaining({ jobId: 'GITHUB-delivery-1' }),
     );
   });
 
