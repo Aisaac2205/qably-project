@@ -1,0 +1,115 @@
+---
+import type { DocBlock } from '../content/types';
+import { highlight, type TokenKind } from '../lib/highlight';
+import DocsBlocks from './DocsBlocks.astro';
+
+interface Props {
+  blocks: DocBlock[];
+}
+
+const { blocks } = Astro.props;
+
+const TOKEN_CLASSES: Record<TokenKind, string> = {
+  plain: 'text-code-plain',
+  comment: 'text-code-comment italic',
+  keyword: 'text-code-keyword',
+  string: 'text-code-string',
+  number: 'text-code-number',
+  property: 'text-code-property',
+  punctuation: 'text-code-punctuation',
+};
+
+const calloutClasses = {
+  info: 'border-border bg-bg-elevated text-fg-muted',
+  warning: 'border-warn/30 bg-warn/[0.06] text-fg-muted',
+};
+---
+
+{
+  blocks.map((block) => (
+    <Fragment>
+      {block.type === 'paragraph' && (
+        <p class="text-sm sm:text-base text-fg-muted leading-relaxed">{block.text}</p>
+      )}
+
+      {block.type === 'subheading' && (
+        <h3 class="text-base sm:text-lg font-semibold text-fg pt-2">{block.text}</h3>
+      )}
+
+      {block.type === 'list' && !block.ordered && (
+        <ul class="list-disc space-y-2 pl-5 text-sm sm:text-base text-fg-muted leading-relaxed">
+          {block.items.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ul>
+      )}
+
+      {block.type === 'list' && block.ordered && (
+        <ol class="list-decimal space-y-2 pl-5 text-sm sm:text-base text-fg-muted leading-relaxed">
+          {block.items.map((item) => (
+            <li>{item}</li>
+          ))}
+        </ol>
+      )}
+
+      {block.type === 'code' && (
+        <div class="rounded-xl border border-border bg-bg-subtle overflow-hidden">
+          {block.label && (
+            <div class="border-b border-border px-4 py-2 text-xs font-mono text-fg-subtle">
+              {block.label}
+            </div>
+          )}
+          <pre class="overflow-x-auto p-4 font-mono text-xs sm:text-sm leading-relaxed">
+            <code>
+              {highlight(block.code, block.language).map((token) => (
+                <span class={TOKEN_CLASSES[token.kind]}>{token.value}</span>
+              ))}
+            </code>
+          </pre>
+        </div>
+      )}
+
+      {block.type === 'table' && (
+        <div class="overflow-x-auto rounded-xl border border-border">
+          <table class="w-full text-left text-sm sm:text-base">
+            <thead>
+              <tr class="border-b border-border bg-bg-elevated">
+                {block.headers.map((header) => (
+                  <th class="px-4 py-2.5 font-semibold text-fg">{header}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row) => (
+                <tr class="border-b border-border last:border-b-0">
+                  {row.map((cell) => (
+                    <td class="px-4 py-2.5 align-top text-fg-muted">{cell}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {block.type === 'callout' && (
+        <div class={`rounded-xl border px-4 py-3 text-sm sm:text-base leading-relaxed ${calloutClasses[block.tone]}`}>
+          {block.text}
+        </div>
+      )}
+
+      {block.type === 'faq' && (
+        <dl class="space-y-6">
+          {block.items.map((item) => (
+            <div>
+              <dt class="text-base font-semibold text-fg">{item.question}</dt>
+              <dd class="mt-2 space-y-3">
+                <DocsBlocks blocks={item.answer} />
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </Fragment>
+  ))
+}

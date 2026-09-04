@@ -1,0 +1,78 @@
+import type { CodeLanguage } from '../lib/highlight';
+
+export interface ParagraphBlock {
+  type: 'paragraph';
+  text: string;
+}
+
+export interface SubheadingBlock {
+  type: 'subheading';
+  text: string;
+}
+
+export interface ListBlock {
+  type: 'list';
+  ordered?: boolean;
+  items: string[];
+}
+
+export interface CodeBlock {
+  type: 'code';
+  language: CodeLanguage;
+  code: string;
+  label?: string;
+}
+
+export interface TableBlock {
+  type: 'table';
+  headers: string[];
+  rows: string[][];
+}
+
+export interface CalloutBlock {
+  type: 'callout';
+  tone: 'info' | 'warning';
+  text: string;
+}
+
+export type FaqAnswerBlock = ParagraphBlock | ListBlock | CodeBlock;
+
+export interface FaqBlock {
+  type: 'faq';
+  items: {
+    question: string;
+    answer: FaqAnswerBlock[];
+  }[];
+}
+
+export type DocBlock =
+  | ParagraphBlock
+  | SubheadingBlock
+  | ListBlock
+  | CodeBlock
+  | TableBlock
+  | CalloutBlock
+  | FaqBlock;
+
+export interface DocSection {
+  id: string;
+  navLabel: string;
+  title: string;
+  blocks: DocBlock[];
+}
+
+export interface DocNavGroup {
+  label: string;
+  sectionIds: string[];
+}
+
+export interface DocContent {
+  pageTitle: string;
+  pageDescription: string;
+  breadcrumbLabel: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  tocLabel: string;
+  navGroups: DocNavGroup[];
+  sections: DocSection[];
+}
