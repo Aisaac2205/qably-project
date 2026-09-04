@@ -54,7 +54,7 @@ const authUrl = getAuthUrl('/projects');
         <LockKey size={22} className="text-white" weight="bold" />
         <h3 class="text-sm font-semibold text-white">End-to-End Encryption</h3>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          TLS 1.3 in transit with strict HSTS and AES-256 encryption at rest across all PostgreSQL databases and backups.
+          TLS 1.3 in transit with strict HSTS and AES-256 encryption at rest across all storage volumes and backups.
         </p>
       </div>
 
@@ -85,14 +85,14 @@ const authUrl = getAuthUrl('/projects');
     <section class="space-y-4">
       <h2 class="text-xl font-semibold text-white tracking-tight">2. Audit Logging & Access Tracking</h2>
       <p class="text-sm text-zinc-400">
-        All administrative actions in <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/web</code> and authenticated API queries in <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/api</code> generate immutable audit trails with timestamps, IP addresses, user identities, and affected resources.
+        All administrative actions in the web application and authenticated queries to the API generate immutable audit trails with timestamps, IP addresses, user identities, and affected resources.
       </p>
     </section>
 
     <section class="space-y-4">
       <h2 class="text-xl font-semibold text-white tracking-tight">3. Continuous Vulnerability Management</h2>
       <p class="text-sm text-zinc-400">
-        We execute automated continuous dependency auditing (<code class="text-white font-mono">pnpm audit</code>), periodic third-party penetration tests, and static analysis scanning on every release.
+        We execute automated continuous dependency auditing, periodic third-party penetration tests, and static analysis scanning on every release.
       </p>
     </section>
 

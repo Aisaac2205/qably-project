@@ -43,7 +43,7 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Qably is a QA management platform for engineering teams. It does not run your tests — an external agent does that (your CI pipeline, today) and pushes the results to Qably over HTTP. Qably receives, stores, and gives your team one place to see what ran, what changed in the repository, and what still needs coverage.',
+          text: 'Qably is a QA management platform for engineering teams. It does not run the tests; an external agent does that (the CI pipeline, today) and pushes the results to Qably over HTTP. Qably receives, stores, and provides one place to see what ran, what changed in the repository, and what still needs coverage.',
         },
         { type: 'subheading', text: 'Two independent pipelines' },
         {
@@ -71,7 +71,7 @@ export const en: DocContent = {
         {
           type: 'callout',
           tone: 'warning',
-          text: 'A CI reporter that sends test results never populates the Repository page, and connecting a repository never reports a single test result. If a screen looks empty, check which pipeline is supposed to fill it — see the FAQ at the end of this guide.',
+          text: 'A CI reporter that sends test results never populates the Repository page, and connecting a repository never reports a single test result. When a screen looks empty, it helps to check which pipeline is supposed to fill it; the FAQ at the end of this guide covers the most common causes.',
         },
         { type: 'subheading', text: 'Prerequisites' },
         {
@@ -79,7 +79,7 @@ export const en: DocContent = {
           items: [
             'A Qably account with at least one organization',
             'A repository on GitHub or Bitbucket — the only two providers Qably supports today',
-            "A CI pipeline that can run a script or send an HTTP request after your tests finish",
+            'A CI pipeline that can run a script or send an HTTP request after the tests finish',
           ],
         },
       ],
@@ -91,24 +91,24 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Every project belongs to one organization. Create one from Projects > New project in the web app.',
+          text: 'Every project belongs to one organization and is created from Projects > New project in the web app.',
         },
         {
           type: 'list',
           items: [
             'Name — required, up to 80 characters',
             'Description — optional, up to 500 characters',
-            'Technologies — optional; filled in automatically once you connect a repository, in the next step',
+            'Technologies — optional; filled in automatically once a repository is connected, in the next step',
           ],
         },
         {
           type: 'paragraph',
-          text: 'You do not need a repository to create a project. Connecting one, issuing an API key, and reporting from CI are three independent steps, and you can do them in any order.',
+          text: 'A repository is not required to create a project. Connecting one, issuing an API key, and reporting from CI are three independent steps, and they can be done in any order.',
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'What to expect: the new project opens with empty suites, no runs, and a repository-not-connected notice. That is correct — nothing has reported to it yet.',
+          text: 'The new project opens with empty suites, no runs, and a repository-not-connected notice. This is the expected behavior, since nothing has reported to it yet.',
         },
       ],
     },
@@ -119,33 +119,34 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'This wires the second pipeline: code changes reaching Qably through your provider\'s webhook. It has nothing to do with the API key from step 3.',
+          text: 'This step wires the second pipeline. Code changes reach Qably through the webhook of the repository provider, and it has nothing to do with the API key from step 3.',
         },
-        { type: 'subheading', text: 'Pick the repository' },
+        { type: 'subheading', text: 'Repository selection' },
         {
           type: 'list',
           ordered: true,
           items: [
-            'Sign in with GitHub (or Bitbucket) if you have not already. Qably reads that OAuth token to list the repositories you can reach, across your account and your organizations.',
-            "In the project's Integrations settings, pick a repository from the combined list of already-connected and available repositories, sorted by most recent push.",
-            'Picking an unconnected repository creates a connection scoped to your organization and generates a webhook secret for it. Picking an already-connected one reuses its existing connection.',
+            'Signing in with GitHub (or Bitbucket) happens once, if not done already. Qably reads that OAuth token to list the reachable repositories, across the account and its organizations.',
+            "In the project's Integrations settings, a repository is selected from the combined list of already-connected and available repositories, sorted by most recent push.",
+            'Picking an unconnected repository creates a connection scoped to the organization and generates a webhook secret for it. Picking an already-connected one reuses its existing connection.',
           ],
         },
-        { type: 'subheading', text: 'Register the webhook on your provider' },
+        { type: 'subheading', text: 'Webhook registration on the provider' },
         {
           type: 'paragraph',
-          text: "Qably never registers the webhook for you — add it once, in the repository's own settings.",
+          text: "Qably never registers the webhook automatically; it is added once, in the repository's own settings.",
         },
         {
           type: 'list',
           ordered: true,
           items: [
-            'Retrieve the secret: call POST /connections/:id/webhook-secret from the connection\'s settings. The response contains the raw secret exactly once — on creation, and again each time you rotate it. Copy it immediately.',
-            'On GitHub: open Settings > Webhooks > Add webhook on the repository.',
+            "The secret is retrieved by calling POST /connections/:id/webhook-secret from the connection's settings. The response contains the raw secret exactly once, on creation and again each time it is rotated, so it should be copied immediately.",
+            'On GitHub, the webhook is added from Settings > Webhooks > Add webhook, on the repository.',
             'Payload URL: https://api.qably.dev/webhooks/scm/github',
             'Content type: application/json',
             'Secret: the value from the previous step',
-            'Events: at minimum push; add pull request events too if you want Qably to see PR activity',
+            'Events: at minimum push.',
+            'Pull request events are also worth adding, so Qably can see that activity.',
           ],
         },
         {
@@ -160,7 +161,7 @@ export const en: DocContent = {
         {
           type: 'callout',
           tone: 'info',
-          text: "What to expect: your provider shows a successful delivery on the webhook's history. On the project's Repository page, the latest ingestion batch, its code changes, and their evidence appear after the next push or pull request.",
+          text: "A successful delivery appears in the webhook's history, on the provider's side. On the project's Repository page, the latest ingestion batch, its code changes, and their evidence appear after the next push or pull request.",
         },
       ],
     },
@@ -171,24 +172,24 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'This wires the first pipeline: an identity your CI can use to report test results, with no session and no user behind it.',
+          text: 'This step wires the first pipeline, an identity the CI can use to report test results, with no session and no user behind it.',
         },
         {
           type: 'list',
           ordered: true,
           items: [
-            'From the project\'s API Keys settings, create a key with a descriptive name such as "CI/CD Pipeline". You need the owner or admin role in the organization.',
-            'Copy the token immediately — it has the shape qbly_<lookupId>_<secret> and is shown once, in the creation response. Qably stores only its SHA-256 hash and cannot show it to you again.',
-            'Store it as a secret in your CI provider, for example a GitHub Actions repository secret named QABLY_API_KEY. Never commit it to the repository.',
+            'From the project\'s API Keys settings, a key is created with a descriptive name such as "CI/CD Pipeline"; the owner or admin role is required in the organization.',
+            'The token has the shape qbly_<lookupId>_<secret> and is shown once, in the creation response, so it should be copied immediately. Qably stores only its SHA-256 hash and cannot show it again.',
+            'It is stored as a secret in the CI provider, for example a GitHub Actions repository secret named QABLY_API_KEY, and should never be committed to the repository.',
           ],
         },
         {
           type: 'paragraph',
-          text: 'A key is scoped to exactly one project: it can write execution results for that project and nothing else. It cannot read other projects, list suites, or touch the organization — the project is always derived from the key, never from anything the request sends.',
+          text: 'A key is scoped to exactly one project and can only write execution results for that project. It cannot read other projects, list suites, or touch the organization; the project is always derived from the key, never from anything the request sends.',
         },
         {
           type: 'paragraph',
-          text: 'Revoking a key, from the same screen, marks it revoked without deleting it, so past runs stay attributed to it. A project can hold several active keys at once, which lets you rotate one without ever locking CI out.',
+          text: 'Revoking a key, from the same screen, marks it revoked without deleting it, so past runs stay attributed to it. A project can hold several active keys at once, which allows rotating one without ever locking CI out.',
         },
       ],
     },
@@ -199,17 +200,17 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'The reporter is scripts/qably-report.mjs, a small script already in this repository. It reads a JUnit XML file, converts each <testsuite> into one POST /runs/ingest call, and needs only one environment variable: QABLY_API_KEY.',
+          text: "The reporter is a small reference script that is added to the integration's repository, for example as scripts/qably-report.mjs. It reads a JUnit XML file, converts each <testsuite> into one POST /runs/ingest call, and needs only one environment variable: QABLY_API_KEY.",
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Without QABLY_API_KEY set, the script logs a message and exits 0 — it never fails your build over a missing or not-yet-configured integration.',
+          text: 'Without QABLY_API_KEY set, the script logs a message and exits 0; it never fails the build over a missing or not-yet-configured integration.',
         },
         { type: 'subheading', text: 'Jest projects' },
         {
           type: 'paragraph',
-          text: 'Add jest-junit as a dev dependency, then point it at a report file with two environment variables before invoking the reporter.',
+          text: 'jest-junit is added as a dev dependency and configured to write to a report file using two environment variables, before invoking the reporter.',
         },
         {
           type: 'code',
@@ -218,7 +219,7 @@ export const en: DocContent = {
   env:
     JEST_JUNIT_OUTPUT_DIR: ./reports
     JEST_JUNIT_OUTPUT_NAME: junit.xml
-  run: pnpm jest --ci --reporters=default --reporters=jest-junit
+  run: npx jest --ci --reporters=default --reporters=jest-junit
 
 - name: Report results to Qably
   if: always()
@@ -235,7 +236,7 @@ export const en: DocContent = {
           type: 'code',
           language: 'yaml',
           code: `- name: Unit tests
-  run: pnpm vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml
+  run: npx vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml
 
 - name: Report results to Qably
   if: always()
@@ -246,11 +247,11 @@ export const en: DocContent = {
         {
           type: 'callout',
           tone: 'warning',
-          text: "Both steps use if: always(). Reporting to Qably never gates your build — a Qably outage or a revoked key is Qably's problem, not your pull request's. The test step itself, not the reporting step, is what should fail your CI.",
+          text: "Both steps use if: always(). Reporting to Qably never gates the build. A Qably outage or a revoked key is Qably's problem, not the pull request's. The test step itself, not the reporting step, is what should fail the CI.",
         },
         {
           type: 'paragraph',
-          text: 'A JUnit file with several <testsuite> elements — one per test file, which is how both jest-junit and Vitest write them — becomes one POST /runs/ingest call per suite, sent in sequence. The first report for a suite name creates that suite in Qably automatically; you never have to pre-create it.',
+          text: 'A JUnit file with several <testsuite> elements — one per test file, which is how both jest-junit and Vitest write them — becomes one POST /runs/ingest call per suite, sent in sequence. The first report for a suite name creates that suite in Qably automatically; it never has to be pre-created.',
         },
       ],
     },
@@ -261,19 +262,19 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Confirm each pipeline independently — one can succeed while the other still needs attention.',
+          text: 'Each pipeline is confirmed independently, since one can succeed while the other still needs attention.',
         },
         {
           type: 'list',
           items: [
-            "Test results: open the project and look for the run your CI just reported. Its status is derived from the cases you sent — any failing case fails the run, otherwise any pending or running case keeps it running, and it only passes once at least one case has settled to pass or skip (a run where every case is blocked still counts as fail, since nothing in it was actually verified).",
-            "Code changes: only relevant once you've completed step 2. Open the project's Repository page and confirm the latest ingestion batch reflects your most recent push or pull request.",
+            'Test results are confirmed by opening the project and locating the run the CI just reported. That status is derived from the cases sent: any failing case fails the run, otherwise any pending or running case keeps it running, and it only passes once at least one case has settled to pass or skip (a run where every case is blocked still counts as fail, since nothing in it was actually verified).',
+            "Code changes are only relevant once step 2 is complete. The project's Repository page should show that the latest ingestion batch reflects the most recent push or pull request.",
           ],
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Something missing? See the FAQ below — the two most common causes are a webhook that was never registered, and a CI reporter running without QABLY_API_KEY set.',
+          text: 'If something is missing, the FAQ below covers the two most common causes: a webhook that was never registered, and a CI reporter running without QABLY_API_KEY set.',
         },
       ],
     },
@@ -284,7 +285,7 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'scripts/qably-report.mjs does not care which language produced the report. It reads any file with a <testsuite>/<testcase> structure and derives each case\'s status from a <failure>, <error>, or <skipped> child element, the same way for every ecosystem below. Generate JUnit XML with your framework\'s own tooling, then point the reporter at the resulting file.',
+          text: "The reporter does not care which language produced the report. It reads any file with a <testsuite>/<testcase> structure and derives each case's status from a <failure>, <error>, or <skipped> child element, the same way for every ecosystem below. JUnit XML is generated with each framework's own tooling, and the reporter is then pointed at the resulting file.",
         },
         { type: 'subheading', text: 'JavaScript and TypeScript' },
         {
@@ -294,7 +295,7 @@ export const en: DocContent = {
         { type: 'subheading', text: 'Playwright' },
         {
           type: 'paragraph',
-          text: 'The built-in JUnit reporter writes to standard output unless you give it a file, either through an environment variable or the config file.',
+          text: 'The built-in JUnit reporter writes to standard output unless a file is specified, either through an environment variable or the config file.',
         },
         {
           type: 'code',
@@ -307,7 +308,7 @@ node scripts/qably-report.mjs results.xml`,
         },
         {
           type: 'paragraph',
-          text: "Or configure it once in playwright.config.ts: reporter: [['junit', { outputFile: 'results.xml' }]].",
+          text: "It can also be configured once in playwright.config.ts: reporter: [['junit', { outputFile: 'results.xml' }]].",
         },
         { type: 'subheading', text: 'pytest' },
         {
@@ -345,7 +346,7 @@ done`,
         { type: 'subheading', text: 'PHPUnit' },
         {
           type: 'paragraph',
-          text: 'PHPUnit 9 and earlier accept a direct CLI flag. PHPUnit 10 and later removed it — configure the output file in phpunit.xml instead.',
+          text: 'PHPUnit 9 and earlier accept a direct CLI flag. PHPUnit 10 and later removed it, so the output file is configured in phpunit.xml instead.',
         },
         {
           type: 'code',
@@ -372,7 +373,7 @@ node scripts/qably-report.mjs junit.xml`,
         { type: 'subheading', text: '.NET' },
         {
           type: 'paragraph',
-          text: 'Add the JunitXml.TestLogger NuGet package, then pass the logger on the command line.',
+          text: 'The JunitXml.TestLogger NuGet package is added as a dependency, and the logger is passed on the command line.',
         },
         {
           type: 'code',
@@ -384,7 +385,7 @@ node scripts/qably-report.mjs test-result.xml`,
         {
           type: 'callout',
           tone: 'warning',
-          text: 'The exact invocation below was not verified against current documentation — no indexed documentation for go-junit-report was available while writing this guide. Check the tool\'s own repository before relying on it.',
+          text: "The exact invocation below was not verified against current documentation — no indexed documentation for go-junit-report was available while writing this guide. It is worth checking the tool's own repository before relying on it.",
         },
         {
           type: 'code',
@@ -395,12 +396,12 @@ node scripts/qably-report.mjs report.xml`,
         {
           type: 'callout',
           tone: 'warning',
-          text: 'Case identity in Qably is scoped to a suite by the exact <testcase name="..."> attribute — never by class or module. scripts/qably-report.mjs reads only that attribute; it does not fall back to classname. Two tests named test_login in different classes report under the same name, and Qably links them to the same test case.',
+          text: 'Case identity is scoped to a suite by the exact name attribute of <testcase>; classname is ignored. Two tests named test_login in different classes therefore resolve to the same test case.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'pytest emits a single <testsuite name="pytest"> for an entire run, while Jest and Vitest emit one per test file. Everything in a pytest run lands in one Qably suite by default. Set junit_suite_name in your pytest configuration (or split the run) if you want a granularity closer to Jest and Vitest — this is a deliberate difference in defaults, not a bug.',
+          text: 'pytest emits a single <testsuite name="pytest"> for an entire run, while Jest and Vitest emit one per test file. Everything in a pytest run lands in one Qably suite by default. For a granularity closer to Jest and Vitest, junit_suite_name can be set in the pytest configuration, or the run can be split; this is a deliberate difference in defaults, not a bug.',
         },
       ],
     },
@@ -411,7 +412,7 @@ node scripts/qably-report.mjs report.xml`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'Reports one suite\'s execution results. Authenticated with Authorization: Bearer <project API key>. The project and organization come from the key; nothing in the body can override them.',
+          text: "Reports one suite's execution results. Authenticated with Authorization: Bearer <project API key>. The project and organization come from the key; nothing in the body can override them.",
         },
         {
           type: 'code',
@@ -479,7 +480,7 @@ node scripts/qably-report.mjs report.xml`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'An alternative to running scripts/qably-report.mjs yourself: send the raw JUnit XML report directly and let Qably parse it server-side. Same authentication as POST /runs/ingest.',
+          text: 'Instead of running a custom reporter script, the raw JUnit XML report can be sent directly for Qably to parse server-side. Same authentication as POST /runs/ingest.',
         },
         {
           type: 'paragraph',
@@ -569,7 +570,7 @@ node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'paragraph',
-          text: 'A revoked key is never deleted, so every past run stays attributed to it. Use it in requests as Authorization: Bearer qbly_<lookupId>_<secret>.',
+          text: 'A revoked key is never deleted, so every past run stays attributed to it. It is used in requests as Authorization: Bearer qbly_<lookupId>_<secret>.',
         },
       ],
     },
@@ -580,14 +581,14 @@ node scripts/qably-report.mjs report.xml`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'These are the variables you set on your own CI, not Qably\'s deployment configuration — this guide is written for integrators sending data to a hosted Qably, not for people running the platform itself.',
+          text: "These are the variables set on the integration's own CI, not Qably's deployment configuration; this guide is written for integrators sending data to a hosted Qably, not for people running the platform itself.",
         },
         {
           type: 'table',
           headers: ['Variable', 'Required', 'Notes'],
           rows: [
-            ['QABLY_API_KEY', 'yes, to report anything', 'Read by scripts/qably-report.mjs. If unset, the script logs a message and exits 0 without sending anything — it never fails your build.'],
-            ['QABLY_API_BASE_URL', 'no', 'Defaults to https://api.qably.dev. Set it for a self-hosted deployment or a local run against http://localhost:3001.'],
+            ['QABLY_API_KEY', 'yes, to report anything', 'Read by the reporter. If unset, the script logs a message and exits 0 without sending anything; it never fails the build.'],
+            ['QABLY_API_BASE_URL', 'no', 'Defaults to https://api.qably.dev, and is set for a self-hosted deployment or a local run against http://localhost:3001.'],
           ],
         },
       ],
@@ -599,14 +600,14 @@ node scripts/qably-report.mjs report.xml`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'apps/api is a NestJS service organized by feature module, backed by PostgreSQL through Prisma and Redis-backed queues through BullMQ. apps/web is the Next.js dashboard your team actually looks at.',
+          text: 'The backend exposes the API described in this guide and is organized by business domain, with persistent storage and background processing queues for asynchronous work. The web dashboard is the interface where the team reviews that state.',
         },
-        { type: 'subheading', text: 'apps/api modules' },
+        { type: 'subheading', text: 'Backend areas' },
         {
           type: 'table',
           headers: ['Module', 'Responsibility'],
           rows: [
-            ['auth', 'Sessions and GitHub OAuth sign-in, backed by better-auth'],
+            ['auth', 'Sessions and GitHub OAuth sign-in'],
             ['organizations', 'Organization membership and per-request scoping'],
             ['projects', 'Projects, plan limits, and their connection to a repository'],
             ['connections', 'Repository connections, webhook secrets, and stack detection from repository manifests'],
@@ -622,9 +623,9 @@ node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'paragraph',
-          text: 'A BullMQ queue sits between webhook ingestion and everything that happens afterward: an accepted event is stored and queued immediately, and the response confirms receipt, not that the event has been fully processed. Every domain operation that can fail for an expected reason (not found, name already taken, plan limit reached) returns a typed result instead of throwing, so the boundary between an expected business rule and an actual server error stays explicit.',
+          text: 'Processing is asynchronous: an accepted event is stored and queued immediately, and the response confirms receipt, not that the event has been fully processed. Every domain operation that can fail for an expected reason (not found, name already taken, plan limit reached) returns a typed result instead of throwing, so the boundary between an expected business rule and an actual server error stays explicit.',
         },
-        { type: 'subheading', text: 'apps/web surfaces' },
+        { type: 'subheading', text: 'Web dashboard surfaces' },
         {
           type: 'list',
           items: [
@@ -658,7 +659,7 @@ node scripts/qably-report.mjs report.xml`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'By design: a reporting failure is logged as a warning and never fails your build. Check your workflow logs for a ::warning:: line from qably-report, and confirm QABLY_API_KEY is actually set as a secret on the job that ran the reporting step.',
+                  text: 'This is intentional: a reporting failure is logged as a warning and never fails the build. It helps to check the workflow logs for a ::warning:: line from qably-report, and confirm that QABLY_API_KEY is actually set as a secret on the job that ran the reporting step.',
                 },
               ],
             },
@@ -667,7 +668,7 @@ node scripts/qably-report.mjs report.xml`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'An unresolvable suiteId is treated as a client error on purpose: an explicit id is a claim that something already exists, and the endpoint never creates a suite from one. Send suiteName instead — an unresolved name is adopted automatically, creating the suite on the spot.',
+                  text: 'An unresolvable suiteId is treated as a client error on purpose: an explicit id is a claim that something already exists, and the endpoint never creates a suite from one. suiteName can be sent instead — an unresolved name is adopted automatically, creating the suite on the spot.',
                 },
               ],
             },
@@ -676,7 +677,7 @@ node scripts/qably-report.mjs report.xml`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'Expected when the report came from JUnit XML: the format carries neither field, so scripts/qably-report.mjs and POST /runs/ingest/junit both send an empty array and an empty string for them. The API accepts both fields if your own reporter posts JSON directly to POST /runs/ingest with steps and expectedResult filled in.',
+                  text: 'Expected when the report came from JUnit XML: the format carries neither field, so both the reporter and POST /runs/ingest/junit send an empty array and an empty string for them. The API accepts both fields if a custom reporter posts JSON directly to POST /runs/ingest with steps and expectedResult filled in.',
                 },
               ],
             },
@@ -685,7 +686,7 @@ node scripts/qably-report.mjs report.xml`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'The SCM webhook was never configured for that project — see step 2. Reporting test results from CI never feeds the Repository page; only the webhook does.',
+                  text: 'The SCM webhook was never configured for that project; step 2 covers how to do it. Reporting test results from CI never feeds the Repository page; only the webhook does.',
                 },
               ],
             },

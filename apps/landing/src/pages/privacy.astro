@@ -55,7 +55,7 @@ const authUrl = getAuthUrl('/projects');
       <ul class="space-y-2 text-xs text-zinc-300 list-disc pl-5">
         <li><strong>Metadatos de Ejecución de CI</strong>: Tiempos de respuesta, estado de aserciones (<code class="text-emerald-400 font-mono">pass</code>, <code class="text-rose-400 font-mono">fail</code>, <code class="text-zinc-400 font-mono">skip</code>), duración en milisegundos, nombres de suites y stack traces de error.</li>
         <li><strong>Información de Contexto Git</strong>: SHA del commit, nombre de rama y referencia del pull request (por ejemplo, <code class="text-white font-mono">PR #142</code>).</li>
-        <li><strong>Datos de Usuario y Organización</strong>: Nombre, correo electrónico, identificador de organización y sesiones gestionadas mediante Better Auth.</li>
+        <li><strong>Datos de Usuario y Organización</strong>: Nombre, correo electrónico, identificador de organización y datos de sesión autenticada.</li>
       </ul>
     </section>
 
@@ -69,7 +69,7 @@ const authUrl = getAuthUrl('/projects');
     <section class="space-y-4">
       <h2 class="text-xl font-semibold text-white tracking-tight">3. Seguridad y Almacenamiento</h2>
       <p class="text-sm text-zinc-400">
-        Todos los datos se transmiten mediante protocolos seguros <strong>TLS 1.3</strong> y se almacenan en repositorios PostgreSQL con cifrado en reposo <strong>AES-256</strong>. Las claves de API se almacenan con hash criptográfico unidireccional SHA-256.
+        Todos los datos se transmiten mediante protocolos seguros <strong>TLS 1.3</strong> y se almacenan en volúmenes de almacenamiento cifrados en reposo con <strong>AES-256</strong>. Las claves de API se almacenan con hash criptográfico unidireccional SHA-256.
       </p>
     </section>
 

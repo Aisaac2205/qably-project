@@ -54,7 +54,7 @@ const authUrl = getAuthUrl('/projects');
         <LockKey size={22} className="text-white" weight="bold" />
         <h3 class="text-sm font-semibold text-white">Cifrado de Extremo a Extremo</h3>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          TLS 1.3 en tránsito con HSTS estricto y cifrado AES-256 en reposo en volúmenes PostgreSQL y backups.
+          TLS 1.3 en tránsito con HSTS estricto y cifrado AES-256 en reposo en los volúmenes de almacenamiento y las copias de seguridad.
         </p>
       </div>
 
@@ -85,14 +85,14 @@ const authUrl = getAuthUrl('/projects');
     <section class="space-y-4">
       <h2 class="text-xl font-semibold text-white tracking-tight">2. Auditoría y Registro de Actividad</h2>
       <p class="text-sm text-zinc-400">
-        Cada acción administrativa dentro de <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/web</code> y cada llamada autenticada en <code class="text-white font-mono bg-zinc-900 px-1.5 py-0.5 rounded">apps/api</code> genera un registro inmutable de auditoría con marca temporal, IP de origen, usuario y acción ejecutada.
+        Cada acción administrativa dentro de la aplicación web y cada llamada autenticada a la API genera un registro inmutable de auditoría con marca temporal, IP de origen, usuario y acción ejecutada.
       </p>
     </section>
 
     <section class="space-y-4">
       <h2 class="text-xl font-semibold text-white tracking-tight">3. Gestión de Vulnerabilidades y Monitoreo Continuo</h2>
       <p class="text-sm text-zinc-400">
-        Realizamos análisis automatizados de dependencias con auditorías continuas (<code class="text-white font-mono">pnpm audit</code>), pruebas de penetración periódicas realizadas por terceros independientes y escaneo estático de código en cada commit.
+        Realizamos análisis automatizados de dependencias con auditorías continuas, pruebas de penetración periódicas realizadas por terceros independientes y escaneo estático de código en cada commit.
       </p>
     </section>
 
