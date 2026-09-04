@@ -533,7 +533,9 @@
     "versionSnapshot": "Version {{version}}",
     "viewInLibrary": "View in Test Library",
     "readOnlyRun": "Recorded by {{source}}",
-    "readOnlyRunHint": "Statuses in an automated run come from the reporting tool and cannot be edited here."
+    "readOnlyRunHint": "Statuses in an automated run come from the reporting tool and cannot be edited here.",
+    "undocumentedCase": "Discovered from the test report",
+    "undocumentedCaseHint": "This case was created from the name the reporting tool sent. It has no documented steps yet."
   },
   "suites": {
     "versionBadge": "v{{version}}",

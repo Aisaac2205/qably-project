@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { RunCaseRecord, RunRecord } from '@qably/types'
+import type { RunCaseRecord } from '@qably/types'
 import { ArrowSquareOut, GitCommit } from '@phosphor-icons/react'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
@@ -11,11 +11,9 @@ import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 export function CaseDetail({
   c,
   projectId,
-  run,
 }: {
   c: RunCaseRecord
   projectId?: string
-  run?: RunRecord
 }) {
   const { t } = useTranslation()
   const officialCaseId = `case-${c.id}`
@@ -32,11 +30,6 @@ export function CaseDetail({
           <span className="rounded bg-canvas border border-border px-2 py-0.5 font-mono text-xs font-semibold text-muted">
             {t('runs.versionSnapshot', { version: version?.version ?? 1 })}
           </span>
-          {run && (
-            <span className="rounded bg-canvas border border-border px-2 py-0.5 text-xs font-medium text-muted">
-              {t('runs.environment')}: <span className="text-default font-medium">Staging</span>
-            </span>
-          )}
           {projectId && officialCase && (
             <Link
               href={`/projects/${projectId}/suites/${officialCase.suiteId}`}
@@ -54,29 +47,42 @@ export function CaseDetail({
         </div>
       </div>
 
-      {/* Steps */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-muted">
-          {t('runs.steps')}
-        </h4>
-        <ol className="space-y-1.5 list-decimal list-inside text-xs sm:text-sm text-default leading-relaxed bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4">
-          {c.steps.map((step, i) => (
-            <li key={i} className="pl-1">
-              {step}
-            </li>
-          ))}
-        </ol>
-      </div>
+      {c.steps.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-muted">
+            {t('runs.steps')}
+          </h4>
+          <ol className="space-y-1.5 list-decimal list-inside text-xs sm:text-sm text-default leading-relaxed bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4">
+            {c.steps.map((step, i) => (
+              <li key={i} className="pl-1">
+                {step}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
-      {/* Expected Result */}
-      <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-muted">
-          {t('runs.expectedResult')}
-        </h4>
-        <p className="text-xs sm:text-sm text-default bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4 leading-relaxed">
-          {c.expectedResult}
-        </p>
-      </div>
+      {c.expectedResult !== '' && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-muted">
+            {t('runs.expectedResult')}
+          </h4>
+          <p className="text-xs sm:text-sm text-default bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4 leading-relaxed">
+            {c.expectedResult}
+          </p>
+        </div>
+      )}
+
+      {c.steps.length === 0 && c.expectedResult === '' && (
+        <div className="space-y-1 rounded-lg border border-dashed border-border bg-canvas/40 p-3 sm:p-4">
+          <p className="text-xs font-semibold text-default">
+            {t('runs.undocumentedCase')}
+          </p>
+          <p className="text-xs text-muted leading-relaxed">
+            {t('runs.undocumentedCaseHint')}
+          </p>
+        </div>
+      )}
 
       {/* Bidirectional Traceability Trail */}
       {links.length > 0 && (

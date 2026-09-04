@@ -533,7 +533,9 @@
     "versionSnapshot": "Versión {{version}}",
     "viewInLibrary": "Ver en biblioteca de pruebas",
     "readOnlyRun": "Registrado por {{source}}",
-    "readOnlyRunHint": "Los estados de una ejecución automatizada provienen de la herramienta que los reportó y no pueden editarse aquí."
+    "readOnlyRunHint": "Los estados de una ejecución automatizada provienen de la herramienta que los reportó y no pueden editarse aquí.",
+    "undocumentedCase": "Descubierto desde el reporte de pruebas",
+    "undocumentedCaseHint": "Este caso se creó a partir del nombre que envió la herramienta. Todavía no tiene pasos documentados."
   },
   "suites": {
     "versionBadge": "v{{version}}",

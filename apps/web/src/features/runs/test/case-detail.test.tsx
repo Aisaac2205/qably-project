@@ -16,6 +16,31 @@ const mockCase: RunCaseRecord = {
 }
 
 describe('CaseDetail', () => {
+  it('does not render a steps section when the case has no steps', async () => {
+    await act(async () => {
+      render(<CaseDetail c={{ ...mockCase, steps: [], expectedResult: '' }} />)
+    })
+    expect(screen.queryByText('Steps')).not.toBeInTheDocument()
+    expect(screen.queryByText('Expected result')).not.toBeInTheDocument()
+    expect(screen.getByText(/no documented steps yet/i)).toBeInTheDocument()
+  })
+
+  it('does not render an expected result section when it is empty', async () => {
+    await act(async () => {
+      render(<CaseDetail c={{ ...mockCase, expectedResult: '' }} />)
+    })
+    expect(screen.getByText('Steps')).toBeInTheDocument()
+    expect(screen.queryByText('Expected result')).not.toBeInTheDocument()
+  })
+
+  it('never renders a hardcoded environment', async () => {
+    await act(async () => {
+      render(<CaseDetail c={mockCase} projectId="proj-1" />)
+    })
+    expect(screen.queryByText(/staging/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/environment/i)).not.toBeInTheDocument()
+  })
+
   it('renders case name', async () => {
     await act(async () => {
       render(<CaseDetail c={mockCase} />)
