@@ -46,10 +46,10 @@ export interface DashboardTranslations {
   traceabilityHeading: string;
   traceabilityEventsShort: string;
   allStages: string;
-  projectHealth: string;
+  projectStatus: string;
   viewAll: string;
   thProject: string;
-  thHealth: string;
+  thPassRate: string;
   thLastRun: string;
   thSuites: string;
   thAiPending: string;

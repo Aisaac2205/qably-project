@@ -342,7 +342,7 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
               <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,1fr)] @md:gap-6">
                 <div className="col-span-1 flex flex-col justify-between rounded-xl border border-app-border/80 bg-app-surface shadow-app-card">
                   <div className="flex flex-row items-center justify-between p-5 pb-4">
-                    <h3 className="text-sm font-semibold text-app-default">{tDashboard.projectHealth}</h3>
+                    <h3 className="text-sm font-semibold text-app-default">{tDashboard.projectStatus}</h3>
                     <span className="text-xs font-semibold text-app-primary">{tDashboard.viewAll}</span>
                   </div>
 
@@ -352,7 +352,7 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
                         <thead>
                           <tr className="border-b border-app-border bg-app-canvas/40">
                             <th className="px-5 py-3 text-xs font-medium text-app-muted">{tDashboard.thProject}</th>
-                            <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thHealth}</th>
+                            <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thPassRate}</th>
                             <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thLastRun}</th>
                             <th className="px-3 py-3 text-center text-xs font-medium text-app-muted">
                               {tDashboard.thSuites}

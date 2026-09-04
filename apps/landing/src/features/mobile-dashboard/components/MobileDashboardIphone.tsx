@@ -186,7 +186,7 @@ export function MobileDashboardIphone({ tDashboard, locale = 'es' }: MobileDashb
 
             <div className="space-y-1.5 rounded-lg border border-app-border bg-app-surface p-2.5 shadow-app-card">
               <div className="flex items-center justify-between gap-2 text-[10px] font-semibold">
-                <span className="truncate">{tDashboard.projectHealth}</span>
+                <span className="truncate">{tDashboard.projectStatus}</span>
                 <span className="shrink-0 text-[9px] font-normal text-app-muted">{tDashboard.viewAll}</span>
               </div>
               <div className="space-y-1.5">
