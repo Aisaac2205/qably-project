@@ -4,7 +4,9 @@ import type { Icon } from '@phosphor-icons/react';
 import { motion, AnimatePresence } from 'motion/react';
 import type { DocumentationTranslations } from '../../i18n/types';
 import { highlight, type TokenKind } from '../lib/highlight';
+import { API_BASE_URL_TOKEN } from '../content/types';
 import { SNIPPETS, SNIPPET_LANGUAGES, type SnippetId } from './snippets';
+import { getApiBaseUrl } from '@/lib/api-config';
 
 interface DocumentationSectionProps {
   t: DocumentationTranslations;
@@ -23,6 +25,8 @@ const TOKEN_CLASSES: Record<TokenKind, string> = {
   punctuation: 'text-code-punctuation',
 };
 
+const API_BASE_URL = getApiBaseUrl();
+
 const TABS: { id: TabId; icon: Icon; labelKey: keyof DocumentationTranslations }[] = [
   { id: 'junit', icon: FileCode, labelKey: 'tabJunit' },
   { id: 'githubAction', icon: FileCode, labelKey: 'tabGithubAction' },
@@ -34,7 +38,7 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
   const [copied, setCopied] = useState(false);
   const isEn = locale === 'en';
 
-  const currentSnippet = SNIPPETS[activeTab];
+  const currentSnippet = SNIPPETS[activeTab].split(API_BASE_URL_TOKEN).join(API_BASE_URL);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(currentSnippet);

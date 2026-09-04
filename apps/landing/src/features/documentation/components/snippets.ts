@@ -1,4 +1,5 @@
 import type { CodeLanguage } from '../lib/highlight';
+import { API_BASE_URL_TOKEN } from '../content/types';
 
 export type SnippetId = 'junit' | 'githubAction' | 'rest';
 
@@ -15,7 +16,7 @@ export const SNIPPETS: Record<SnippetId, string> = {
 #   playwright test --reporter=junit
 #   pytest --junitxml=junit.xml
 
-URL=https://api.qably.dev/runs/ingest/junit
+URL=${API_BASE_URL_TOKEN}/runs/ingest/junit
 
 curl -X POST "$URL?externalId=$RUN_ID" \\
   -H "Authorization: Bearer $QABLY_API_KEY" \\
@@ -26,7 +27,7 @@ curl -X POST "$URL?externalId=$RUN_ID" \\
 on: [push, pull_request]
 
 env:
-  QABLY: https://api.qably.dev/runs/ingest/junit
+  QABLY: ${API_BASE_URL_TOKEN}/runs/ingest/junit
 
 jobs:
   tests:
@@ -50,7 +51,7 @@ jobs:
   rest: `# For a harness that emits no JUnit report.
 
 curl -X POST \\
-  https://api.qably.dev/runs/ingest \\
+  ${API_BASE_URL_TOKEN}/runs/ingest \\
   -H "Authorization: Bearer $QABLY_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{

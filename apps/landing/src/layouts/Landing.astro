@@ -17,8 +17,14 @@ const {
 } = Astro.props;
 
 const isEn = locale === "en";
-const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://qably.app");
-const siteUrl = Astro.site ? Astro.site.toString() : "https://qably.app";
+const site = Astro.site;
+
+if (!site) {
+  throw new Error('Astro "site" is not configured: set PUBLIC_SITE_URL so astro.config.mjs can read it.');
+}
+
+const canonicalUrl = new URL(Astro.url.pathname, site);
+const siteUrl = site.toString();
 ---
 
 <!doctype html>

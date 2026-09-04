@@ -3,6 +3,7 @@ import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
+  site: process.env.PUBLIC_SITE_URL || undefined,
   output: 'static',
   integrations: [react()],
   server: {
