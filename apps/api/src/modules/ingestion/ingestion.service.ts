@@ -156,13 +156,43 @@ export class IngestionService {
         select: { id: true },
       });
     } catch (error) {
-      if (isUniqueViolation(error)) return ok('duplicate');
+      if (isUniqueViolation(error)) return await this.recoverReplay(event);
       throw error;
     }
 
+    await this.enqueue(event, stored.id);
+
+    return ok('accepted');
+  }
+
+  private async recoverReplay(
+    event: NormalizedScmEvent,
+  ): Promise<Result<IngestOutcome, IngestError>> {
+    const existing = await this.prisma.scmEvent.findUnique({
+      where: {
+        provider_eventId: { provider: event.provider, eventId: event.eventId },
+      },
+      select: { id: true, status: true },
+    });
+
+    if (existing === null || existing.status !== 'PENDING')
+      return ok('duplicate');
+
+    this.logger.warn(
+      `Replaying delivery ${event.eventId}: event ${existing.id} was stored but never queued`,
+    );
+    await this.enqueue(event, existing.id);
+
+    return ok('accepted');
+  }
+
+  private async enqueue(
+    event: NormalizedScmEvent,
+    scmEventId: string,
+  ): Promise<void> {
     await this.queue.add(
       JOB_NAME,
-      { scmEventId: stored.id },
+      { scmEventId },
       {
         jobId: `${event.provider}-${event.eventId}`,
         removeOnComplete: true,
@@ -170,7 +200,5 @@ export class IngestionService {
         backoff: { type: 'exponential', delay: 1000 },
       },
     );
-
-    return ok('accepted');
   }
 }

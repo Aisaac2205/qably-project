@@ -36,7 +36,7 @@ const connectionRow = {
 
 interface FakePrisma {
   connection: { findMany: jest.Mock };
-  scmEvent: { create: jest.Mock };
+  scmEvent: { create: jest.Mock; findUnique: jest.Mock };
 }
 
 function createPrisma(): FakePrisma {
@@ -44,6 +44,9 @@ function createPrisma(): FakePrisma {
     connection: { findMany: jest.fn().mockResolvedValue([connectionRow]) },
     scmEvent: {
       create: jest.fn().mockResolvedValue({ id: 'event-1' }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ id: 'event-1', status: 'PROCESSED' }),
     },
   };
 }
@@ -211,7 +214,7 @@ describe('IngestionService.ingest', () => {
     );
   });
 
-  it('treats a replayed delivery as a duplicate without queueing it twice', async () => {
+  it('treats a replayed delivery of an already processed event as a duplicate', async () => {
     const prisma = createPrisma();
     const queue = createQueue();
     prisma.scmEvent.create.mockRejectedValue({ code: 'P2002' });
@@ -224,6 +227,68 @@ describe('IngestionService.ingest', () => {
 
     expect(result).toEqual({ ok: true, value: 'duplicate' });
     expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('queues a replayed delivery whose stored event was never handed to the queue', async () => {
+    const prisma = createPrisma();
+    const queue = createQueue();
+    prisma.scmEvent.create.mockRejectedValue({ code: 'P2002' });
+    prisma.scmEvent.findUnique.mockResolvedValue({
+      id: 'orphan-1',
+      status: 'PENDING',
+    });
+
+    const result = await build(prisma, createEncryption(), queue).ingest(
+      'github',
+      rawBody,
+      githubHeaders(),
+    );
+
+    expect(result).toEqual({ ok: true, value: 'accepted' });
+    expect(queue.add).toHaveBeenCalledWith(
+      'scm-event',
+      { scmEventId: 'orphan-1' },
+      expect.objectContaining({ jobId: 'GITHUB-delivery-1' }),
+    );
+  });
+
+  it('reports a duplicate when the replayed event vanished before it could be read', async () => {
+    const prisma = createPrisma();
+    const queue = createQueue();
+    prisma.scmEvent.create.mockRejectedValue({ code: 'P2002' });
+    prisma.scmEvent.findUnique.mockResolvedValue(null);
+
+    const result = await build(prisma, createEncryption(), queue).ingest(
+      'github',
+      rawBody,
+      githubHeaders(),
+    );
+
+    expect(result).toEqual({ ok: true, value: 'duplicate' });
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('does not leave a stored event unqueued when the queue rejects the job', async () => {
+    const prisma = createPrisma();
+    const queue = createQueue();
+    queue.add.mockRejectedValueOnce(new Error('redis unavailable'));
+
+    const service = build(prisma, createEncryption(), queue);
+
+    await expect(
+      service.ingest('github', rawBody, githubHeaders()),
+    ).rejects.toThrow('redis unavailable');
+
+    prisma.scmEvent.create.mockRejectedValue({ code: 'P2002' });
+    prisma.scmEvent.findUnique.mockResolvedValue({
+      id: 'event-1',
+      status: 'PENDING',
+    });
+
+    const replay = await service.ingest('github', rawBody, githubHeaders());
+
+    expect(replay).toEqual({ ok: true, value: 'accepted' });
+    expect(queue.add).toHaveBeenCalledTimes(2);
   });
 });
 
