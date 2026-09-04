@@ -18,8 +18,8 @@ describe('KpiRow', () => {
     await act(async () => {
       renderWithQuery(<KpiRow />)
     })
-    expect(screen.getByText('Runs · 7 days')).toBeInTheDocument()
-    expect(screen.getByText('Pass Rate · 7 days')).toBeInTheDocument()
+    expect(screen.getByText('Runs · 7d')).toBeInTheDocument()
+    expect(screen.getByText('Pass rate · 7d')).toBeInTheDocument()
     expect(screen.getByText('Pending AI')).toBeInTheDocument()
     expect(screen.getByText('Coverage Gaps')).toBeInTheDocument()
   })

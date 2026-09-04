@@ -1,7 +1,7 @@
 'use client'
 
 import { KpiRow } from './kpi-row'
-import { ProjectHealthTable } from './project-health-table'
+import { ProjectStatusTable } from './project-status-table'
 import { PassRateTrend } from './pass-rate-trend'
 import { PendingProposals } from './pending-ai-cases'
 import { RecentActivity } from './recent-activity'
@@ -16,7 +16,7 @@ export function DashboardPage() {
       <TraceabilitySection />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)]">
-        <ProjectHealthTable />
+        <ProjectStatusTable />
         <PassRateTrend />
       </div>
 

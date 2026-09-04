@@ -24,6 +24,9 @@ A label states what the panel lists, never a category the reader has to decode.
 | `dashboard.ciCommits` | Commits en CI | Commits in CI | Each row is a commit, not a pipeline. See "Two queues, two granularities" below. |
 | `dashboard.ciRunsPassed` | {{passed}}/{{total}} aprobadas | {{passed}}/{{total}} passed | Counts the commit's test runs. Server-computed over every run, see `docs/DASHBOARD_METRICS.md`. |
 | `dashboard.workQueue` | Cola de trabajo | Work queue | Landmark name for the two-queue panel. Was hardcoded English. |
+| `dashboard.projectStatus` | Estado de los proyectos | Project status | "Salud" is a project-management health-check metaphor, not a QA metric, and the table reports status. |
+| `dashboard.thPassRate` | Tasa de aprobación | Pass rate | Microsoft Learn's Spanish Azure Test Plans term for this exact metric. |
+| `common.viewDetails` / `common.noRecentChange` | Ver detalles / Sin cambios recientes | View details / No recent change | `KpiCard` hardcoded the Spanish strings while its screen-reader affordance hardcoded English, so both rendered at once. |
 
 ## Two queues, two granularities
 
@@ -71,3 +74,40 @@ locale.
 rather than going through `Intl.RelativeTimeFormat`, because the dashboard's number formatting is
 already deliberately ICU-independent (see `formatEventCount`) and the compact form suits dense
 operational rows. Beyond 30 days it falls back to a locale-appropriate absolute date.
+
+## The project table reports status, and orders by what needs attention
+
+`ProjectActivity.healthScore` is not a health score. `computeHealthScore` in
+`apps/api/src/common/metrics/run-case-metrics.ts` returns `round(passRate * 100)` over the trailing
+window: it is the pass rate, under a different name. The dashboard was showing that same number in
+three places under three labels — the KPI card ("Aprobación · 7 días"), the trend card ("Tendencia
+de aprobación") and the table's "Salud" column — which read as three metrics instead of one.
+
+The UI now calls it the pass rate everywhere. The API field keeps its `healthScore` name because
+renaming a contract field consumed by the projects page as well is a separate change; the
+presentation layer is what the reader sees.
+
+Two columns replace the old "Salud" column, because it was conflating two different facts:
+
+- **Última ejecución** pairs the status chip of the most recent run with when that run started. A
+  chip alone did not say whether it was from an hour ago or a month ago.
+- **Tasa de aprobación** carries the windowed percentage, or "Aún sin medir" when the project has
+  run but has nothing inside the window. `null` there means "not measured in this window" and is
+  rendered differently from a real `0`.
+
+Rows are ordered by how much attention they need rather than by insertion order: failing first,
+then runs in flight, then measured projects by weakest pass rate, then projects whose window holds
+no runs, then projects that have never run. The tie-break is the most recent run, then the name.
+`CONTEXT.md` 4.1.4b states the table's job as giving the QA lead immediate visibility of each
+project's real state without opening every suite, and an unordered list of every project does not
+do that job.
+
+## Columns appear when they have something to report
+
+The Review/AI domain has no API module, and `projects.service.ts` deliberately omits
+`aiPendingCount` rather than inventing a zero. The table therefore rendered a column of em dashes on
+every row.
+
+The AI column is now conditional: it is absent while no project reports a count, and appears on its
+own as soon as one does. This keeps the surface honest today without discarding the contract, so
+landing the Review/AI module requires no change here.

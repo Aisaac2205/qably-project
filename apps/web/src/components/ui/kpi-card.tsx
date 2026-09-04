@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { ElementType } from 'react'
 import { ArrowDown, ArrowUp, CaretRight } from '@phosphor-icons/react'
+import { useTranslation } from '@/lib/i18n'
 
 export type KpiAccent = 'default' | 'primary' | 'running' | 'fail' | 'pass' | 'ai' | 'warn'
 
@@ -12,7 +13,6 @@ export interface KpiCardProps {
   icon: ElementType
   accent?: KpiAccent
   href?: string
-  detailLabel?: string
   subtext?: string
   trend?: {
     value: number
@@ -34,10 +34,10 @@ export function KpiCard({
   icon: Icon,
   accent = 'default',
   href,
-  detailLabel = 'View details',
   subtext,
   trend,
 }: KpiCardProps) {
+  const { t } = useTranslation()
   const showPercent = trend?.isPercentage !== false
 
   const cardContent = (
@@ -93,7 +93,7 @@ export function KpiCard({
           </span>
         ) : (
           <span className="text-[11px] text-muted/70 transition-colors duration-150 group-hover:text-muted">
-            {href ? 'Ver detalles' : 'Sin cambios recientes'}
+            {href ? t('common.viewDetails') : t('common.noRecentChange')}
           </span>
         )}
 
@@ -108,8 +108,6 @@ export function KpiCard({
         ) : null}
       </div>
 
-      {/* Screen-reader accessible affordance if card is a link */}
-      {href ? <span className="sr-only">{detailLabel}</span> : null}
     </div>
   )
 

@@ -25,16 +25,16 @@ describe('DashboardPage', () => {
     const summary = screen.getByLabelText('Quality overview')
     expect(summary).toBeInTheDocument()
     expect(summary).toHaveTextContent('Runs')
-    expect(summary).toHaveTextContent('Pass Rate')
+    expect(summary).toHaveTextContent('Pass rate')
     expect(summary).toHaveTextContent('Pending AI')
     expect(summary).toHaveTextContent('Coverage Gaps')
   })
 
-  it('renders project health section', async () => {
+  it('renders the project status section', async () => {
     await act(async () => {
       renderWithQuery(<DashboardPage />)
     })
-    const table = screen.getByRole('table', { name: 'Project health' })
+    const table = screen.getByRole('table', { name: 'Project status' })
     expect(table).toBeInTheDocument()
     // Should show all 4 projects
     expect(within(table).getByText('Ecommerce App')).toBeInTheDocument()
