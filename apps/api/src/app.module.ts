@@ -14,6 +14,7 @@ import { OrganizationsModule } from './modules/organizations/organizations.modul
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { RepositoryModule } from './modules/repository/repository.module';
+import { ReviewModule } from './modules/review/review.module';
 import { RunsModule } from './modules/runs/runs.module';
 import { SuitesModule } from './modules/suites/suites.module';
 
@@ -35,6 +36,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     NotificationsModule,
     IngestionModule,
     RunsModule,
+    ReviewModule,
     DashboardModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: CredentialThrottlerGuard }],
