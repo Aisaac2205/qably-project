@@ -5,11 +5,112 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type {
   ApprovalView,
   DecisionInput,
+  ListProposalsFilters,
+  ProposalDetailView,
+  ProposalView,
   RejectionView,
   ReviewError,
 } from './review.contracts';
 
 const PENDING_STATUS = 'in_review';
+
+const EVIDENCE_KIND: Record<string, 'source_excerpt' | 'artifact' | 'url'> = {
+  SOURCE_EXCERPT: 'source_excerpt',
+  ARTIFACT: 'artifact',
+  URL: 'url',
+};
+
+const VIEW_SELECT = {
+  id: true,
+  projectId: true,
+  status: true,
+  title: true,
+  objective: true,
+  preconditions: true,
+  steps: true,
+  expectedResult: true,
+  priority: true,
+  evidenceId: true,
+  targetTestCaseId: true,
+} as const;
+
+interface ViewRow {
+  id: string;
+  projectId: string;
+  status: ProposalView['status'];
+  title: string;
+  objective: string;
+  preconditions: string[];
+  steps: string[];
+  expectedResult: string;
+  priority: ProposalView['priority'];
+  evidenceId: string;
+  targetTestCaseId: string | null;
+}
+
+interface EvidenceRow {
+  id: string;
+  projectId: string;
+  kind: string;
+  title: string;
+  uri: string;
+  excerpt: string | null;
+  createdAt: Date;
+}
+
+interface LinkRow {
+  id: string;
+  fromType: string;
+  fromId: string;
+  toType: string;
+  toId: string;
+  relation: string;
+}
+
+function toView(row: ViewRow): ProposalView {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    status: row.status,
+    title: row.title,
+    objective: row.objective,
+    preconditions: row.preconditions,
+    steps: row.steps,
+    expectedResult: row.expectedResult,
+    priority: row.priority,
+    evidenceId: row.evidenceId,
+    ...(row.targetTestCaseId === null
+      ? {}
+      : { targetOfficialTestCaseId: row.targetTestCaseId }),
+  };
+}
+
+function toEvidence(row: EvidenceRow): ProposalDetailView['evidence'] {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    kind: EVIDENCE_KIND[row.kind],
+    title: row.title,
+    uri: row.uri,
+    ...(row.excerpt === null ? {} : { excerpt: row.excerpt }),
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function toLink(row: LinkRow): ProposalDetailView['links'][number] {
+  return {
+    id: row.id,
+    from: {
+      type: row.fromType as ProposalDetailView['links'][number]['from']['type'],
+      id: row.fromId,
+    },
+    to: {
+      type: row.toType as ProposalDetailView['links'][number]['to']['type'],
+      id: row.toId,
+    },
+    relation: row.relation as ProposalDetailView['links'][number]['relation'],
+  };
+}
 
 const PROPOSAL_SELECT = {
   id: true,
@@ -44,6 +145,69 @@ interface ProposalRow {
 @Injectable()
 export class ReviewService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async list(
+    org: OrgContext,
+    filters: ListProposalsFilters,
+  ): Promise<ProposalView[]> {
+    const rows = (await this.prisma.extractedProposal.findMany({
+      where: {
+        project: { organizationId: org.organizationId },
+        ...(filters.projectId === undefined
+          ? {}
+          : { projectId: filters.projectId }),
+        ...(filters.status === undefined ? {} : { status: filters.status }),
+        ...(filters.duplicatesOnly === true
+          ? { targetTestCaseId: { not: null } }
+          : {}),
+        ...(filters.search === undefined
+          ? {}
+          : {
+              OR: [
+                { title: { contains: filters.search, mode: 'insensitive' } },
+                {
+                  objective: { contains: filters.search, mode: 'insensitive' },
+                },
+              ],
+            }),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: VIEW_SELECT,
+    })) as ViewRow[];
+
+    return rows.map(toView);
+  }
+
+  async findOne(
+    org: OrgContext,
+    proposalId: string,
+  ): Promise<Result<ProposalDetailView, ReviewError>> {
+    const row = (await this.prisma.extractedProposal.findFirst({
+      where: {
+        id: proposalId,
+        project: { organizationId: org.organizationId },
+      },
+      select: { ...VIEW_SELECT, evidence: true },
+    })) as (ViewRow & { evidence: EvidenceRow | null }) | null;
+
+    if (row === null) return err('not-found');
+
+    const links = (await this.prisma.traceabilityLink.findMany({
+      where: {
+        projectId: row.projectId,
+        OR: [
+          { fromType: 'proposal', fromId: row.id },
+          { toType: 'proposal', toId: row.id },
+        ],
+      },
+    })) as LinkRow[];
+
+    return ok({
+      ...toView(row),
+      evidence: row.evidence === null ? null : toEvidence(row.evidence),
+      links: links.map(toLink),
+    });
+  }
 
   async approve(
     org: OrgContext,

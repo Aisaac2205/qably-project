@@ -1,3 +1,24 @@
+import type {
+  Evidence,
+  ExtractedProposal,
+  ProposalStatus,
+  TraceabilityLink,
+} from '@qably/types';
+
+export type ProposalView = ExtractedProposal;
+
+export interface ProposalDetailView extends ProposalView {
+  evidence: Evidence | null;
+  links: TraceabilityLink[];
+}
+
+export interface ListProposalsFilters {
+  projectId?: string;
+  status?: ProposalStatus;
+  duplicatesOnly?: boolean;
+  search?: string;
+}
+
 export type ReviewError =
   | 'not-found'
   | 'invalid-transition'
