@@ -45,6 +45,36 @@ describe('RunDetail', () => {
     expect(hints.textContent).toContain('Blocked')
   })
 
+  it('hides the shortcut bar on a run reported by CI', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+    expect(screen.queryByLabelText('Keyboard shortcuts')).not.toBeInTheDocument()
+    expect(screen.getByText(/cannot be edited here/i)).toBeInTheDocument()
+  })
+
+  it('does not change a case status on keypress in a run reported by CI', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+    const api = await import('@/features/runs/api/runs.api')
+    const spy = vi.spyOn(api, 'updateRunCase')
+    await userEvent.keyboard('p')
+    expect(spy).not.toHaveBeenCalled()
+    expect(screen.getByRole('status').textContent).toBe('')
+  })
+
+  it('keeps the shortcut bar on a manual run', async () => {
+    const run = { ...getFreshRun(), source: 'manual' as const }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+    expect(screen.getByLabelText('Keyboard shortcuts')).toBeInTheDocument()
+    expect(screen.queryByText(/cannot be edited here/i)).not.toBeInTheDocument()
+  })
+
   it('renders case list with all cases', async () => {
     const run = getFreshRun()
     await act(async () => {

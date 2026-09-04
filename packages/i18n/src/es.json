@@ -531,7 +531,9 @@
     "executionEvidence": "Evidencia de ejecución",
     "traceability": "Trazabilidad y procedencia",
     "versionSnapshot": "Versión {{version}}",
-    "viewInLibrary": "Ver en biblioteca de pruebas"
+    "viewInLibrary": "Ver en biblioteca de pruebas",
+    "readOnlyRun": "Registrado por {{source}}",
+    "readOnlyRunHint": "Los estados de una ejecución automatizada provienen de la herramienta que los reportó y no pueden editarse aquí."
   },
   "suites": {
     "versionBadge": "v{{version}}",

@@ -18,6 +18,8 @@
 - All user-facing strings come from `packages/i18n`. Add keys to **both** `en.json` and `es.json`.
 - `packages/i18n` must be rebuilt (`pnpm --filter @qably/i18n build`) after editing `src/*.json`, or the web app keeps serving stale `dist` output.
 - Test runners must be capped: `npx jest --maxWorkers=2` (API), `npx vitest run --maxWorkers=2` (web — this is what `pnpm test:run` already does; vitest 4 rejects `--poolOptions` on the CLI).
+- **Every task's verification runs `npx eslint src/` in the app it touched, not just tests and `tsc`.** ESLint here is type-aware (`recommendedTypeChecked` + `projectService`) and also enforces prettier, so `tsc` passing proves nothing about it.
+- After `npx prisma generate`, an already-open editor keeps the stale client types and reports phantom `no-unsafe-assignment` errors. Verify against the CLI before chasing one; the fix is restarting the editor's TS server.
 - Every task ends in its own conventional commit. Never absorb unrelated worktree changes into a commit.
 - Commit locally only. Do not push.
 

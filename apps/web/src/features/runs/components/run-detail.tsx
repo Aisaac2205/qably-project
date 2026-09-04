@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import { LockSimple } from '@phosphor-icons/react'
 import type { RunRecord, CaseStatus } from '@qably/types'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
@@ -18,6 +19,7 @@ export function RunDetail({
 }) {
   const { t } = useTranslation()
   const updateStatus = useUpdateRunCase(run.id)
+  const isEditable = run.source === 'manual'
 
   const sortedCases = useMemo(() => run.cases, [run.cases])
 
@@ -78,15 +80,24 @@ export function RunDetail({
     }
   }, [selectedIndex, sortedCases, updateStatus, t])
 
-  useKeyboardShortcuts({
-    p: () => setStatus('pass'),
-    f: () => setStatus('fail'),
-    s: () => setStatus('skip'),
-    b: () => setStatus('blocked'),
-    ArrowRight: () => goNext(),
-    ArrowLeft: () => goPrev(),
-    r: () => runNext(),
-  })
+  useKeyboardShortcuts(
+    {
+      p: () => setStatus('pass'),
+      f: () => setStatus('fail'),
+      s: () => setStatus('skip'),
+      b: () => setStatus('blocked'),
+      ArrowRight: () => goNext(),
+      ArrowLeft: () => goPrev(),
+      r: () => runNext(),
+    },
+    { enabled: isEditable },
+  )
+
+  const SOURCE_LABELS: Record<string, string> = {
+    manual: 'runs.sourceManual',
+    api: 'runs.sourceApi',
+    github_actions: 'runs.sourceCi',
+  }
 
   const SHORTCUT_LABELS: Array<{ key: string; label: string }> = [
     { key: 'P', label: t('runs.shortcutPass') },
@@ -101,23 +112,41 @@ export function RunDetail({
     <div className="space-y-6">
       <RunProgressHeader run={run} />
 
-      {/* Keyboard shortcut hints — rounded card with surface tokens */}
-      <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl border border-border bg-surface shadow-xs text-xs"
-        aria-label={t('runs.keyboardShortcuts')}
-      >
-        <span className="text-xs font-semibold text-muted">
-          {t('runs.shortcuts')}
-        </span>
-        {SHORTCUT_LABELS.map((s) => (
-          <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-default">
-            <kbd className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded border border-border bg-surface-hover text-default shadow-sm min-w-[20px] text-center">
-              {s.key}
-            </kbd>
-            <span className="text-muted">{s.label}</span>
+      {isEditable ? (
+        <div
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl border border-border bg-surface shadow-xs text-xs"
+          aria-label={t('runs.keyboardShortcuts')}
+        >
+          <span className="text-xs font-semibold text-muted">
+            {t('runs.shortcuts')}
           </span>
-        ))}
-      </div>
+          {SHORTCUT_LABELS.map((s) => (
+            <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-default">
+              <kbd className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded border border-border bg-surface-hover text-default shadow-sm min-w-[20px] text-center">
+                {s.key}
+              </kbd>
+              <span className="text-muted">{s.label}</span>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 px-4 py-2.5 rounded-xl border border-border bg-canvas/60 text-xs">
+          <LockSimple
+            size={14}
+            weight="bold"
+            className="mt-0.5 shrink-0 text-muted"
+            aria-hidden="true"
+          />
+          <div className="space-y-0.5">
+            <p className="font-semibold text-default">
+              {t('runs.readOnlyRun', {
+                source: t(SOURCE_LABELS[run.source] ?? 'runs.sourceApi'),
+              })}
+            </p>
+            <p className="text-muted">{t('runs.readOnlyRunHint')}</p>
+          </div>
+        </div>
+      )}
 
       {/* Screen reader announcement region */}
       <div

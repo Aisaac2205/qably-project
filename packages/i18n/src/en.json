@@ -531,7 +531,9 @@
     "executionEvidence": "Execution evidence",
     "traceability": "Traceability & Provenance",
     "versionSnapshot": "Version {{version}}",
-    "viewInLibrary": "View in Test Library"
+    "viewInLibrary": "View in Test Library",
+    "readOnlyRun": "Recorded by {{source}}",
+    "readOnlyRunHint": "Statuses in an automated run come from the reporting tool and cannot be edited here."
   },
   "suites": {
     "versionBadge": "v{{version}}",
