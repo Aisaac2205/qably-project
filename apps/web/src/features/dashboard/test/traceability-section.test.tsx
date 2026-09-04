@@ -4,6 +4,7 @@ import { TraceabilitySection } from '@/features/dashboard/components/traceabilit
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import { useI18nStore } from '@/lib/i18n'
+import { traceabilityCalendarFixture } from '@/test/dashboard-api-stub'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -105,5 +106,26 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
 
     const heading = screen.getByRole('heading', { name: /eventos de trazabilidad en 2026/i })
     expect(heading.textContent).toMatch(/^\d{1,3}(\.\d{3})*\s/)
+  })
+
+  it('reports the total the traceability endpoint returned, not a generated one', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const { totals } = traceabilityCalendarFixture
+    const expected = totals.scm + totals.proposals + totals.official + totals.runs
+
+    const heading = screen.getByRole('heading', { name: /traceability events in/i })
+    expect(heading.textContent).toContain(String(expected))
+  })
+
+  it('offers the current year rather than a year frozen in mock data', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const [, yearTrigger] = screen.getAllByRole('combobox')
+    expect(yearTrigger).toHaveTextContent(String(new Date().getFullYear()))
   })
 })

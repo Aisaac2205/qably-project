@@ -9,7 +9,6 @@ import {
   CalendarBlank,
 } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
-import { MOCK_NOW } from '@/lib/mock-data'
 import { SelectSimple } from '@/components/ui/select'
 import { formatEventCount } from '../lib/format'
 import { useTraceabilityCalendar } from '../hooks/use-traceability-calendar'
@@ -19,7 +18,7 @@ import type { TraceabilityFilter } from '../types/traceability-calendar'
 export function TraceabilitySection() {
   const { t, locale } = useTranslation()
 
-  const currentYear = useMemo(() => new Date(MOCK_NOW).getFullYear(), [])
+  const currentYear = useMemo(() => new Date().getFullYear(), [])
   const availableYears = useMemo(() => [currentYear, currentYear - 1], [currentYear])
 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)

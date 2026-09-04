@@ -1,4 +1,7 @@
-import type { DashboardSummaryRecord } from '@qably/types'
+import type {
+  DashboardSummaryRecord,
+  TraceabilityCalendarRecord,
+} from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
 export function getDashboardSummary(
@@ -13,4 +16,18 @@ export function getDashboardSummary(
   return apiRequest<DashboardSummaryRecord>(`/dashboard/summary${query}`, {
     signal,
   })
+}
+
+export function getTraceabilityCalendar(
+  year: number,
+  projectId?: string,
+  signal?: AbortSignal,
+): Promise<TraceabilityCalendarRecord> {
+  const params = new URLSearchParams({ year: String(year) })
+  if (projectId !== undefined) params.set('projectId', projectId)
+
+  return apiRequest<TraceabilityCalendarRecord>(
+    `/dashboard/traceability?${params.toString()}`,
+    { signal },
+  )
 }

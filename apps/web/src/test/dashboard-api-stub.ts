@@ -2,6 +2,7 @@ import type {
   CiCommitActivityRecord,
   DashboardSummaryRecord,
   RunSummaryRecord,
+  TraceabilityCalendarRecord,
 } from '@qably/types'
 import { runFixtures } from './runs-api-stub'
 
@@ -100,3 +101,31 @@ export function getDashboardSummary(): Promise<DashboardSummaryRecord> {
 }
 
 export function __resetDashboardStub(): void {}
+
+const traceabilityYear = new Date().getFullYear()
+
+export const traceabilityCalendarFixture: TraceabilityCalendarRecord = {
+  year: traceabilityYear,
+  timeZone: 'America/Guatemala',
+  totals: { scm: 4, proposals: 0, official: 9, runs: 217 },
+  days: [
+    {
+      date: `${traceabilityYear}-06-15`,
+      scm: 2,
+      proposals: 0,
+      official: 4,
+      runs: 3,
+    },
+    {
+      date: `${traceabilityYear}-06-16`,
+      scm: 2,
+      proposals: 0,
+      official: 5,
+      runs: 214,
+    },
+  ],
+}
+
+export function getTraceabilityCalendar(): Promise<TraceabilityCalendarRecord> {
+  return Promise.resolve(traceabilityCalendarFixture)
+}

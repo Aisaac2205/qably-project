@@ -111,3 +111,24 @@ every row.
 The AI column is now conditional: it is absent while no project reports a count, and appears on its
 own as soon as one does. This keeps the surface honest today without discarding the contract, so
 landing the Review/AI module requires no change here.
+
+## The traceability calendar reads the database
+
+`useTraceabilityCalendar` used to fabricate the whole year with `Math.sin()`-seeded
+pseudo-randomness, overlay live store counts onto the single `MOCK_NOW` day, and take the displayed
+year from `MOCK_NOW` rather than the clock. That is why one cell reported thousands of events and
+why the calendar stopped in June.
+
+It now fetches `GET /dashboard/traceability` (see `docs/DASHBOARD_METRICS.md`) and hands the record
+to `buildTraceabilityGrid`, a pure function that lays the year out into week columns, pads the
+first and last week with nulls rather than foreign days, and fills the days the server omitted with
+zero. Handling the leap year and the month labels there keeps the component free of date logic.
+
+### Intensity levels come from the data, not fixed cut points
+
+The old thresholds were hardcoded at 3, 7 and 12 events. Real CI activity here is one run per test
+file, so an ordinary day clears the top bucket and the whole year renders as one flat colour.
+
+`computeLevelThresholds` takes the quartiles of the days that actually had activity, so the five
+steps always describe the distribution being shown. The scale is recomputed per stage filter,
+because a stage's volume is not comparable to the total.

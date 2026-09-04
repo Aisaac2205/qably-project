@@ -88,4 +88,5 @@ export interface UseTraceabilityCalendarOptions {
   readonly year?: number
   readonly activeFilter?: TraceabilityFilter
   readonly locale?: 'es' | 'en'
+  readonly projectId?: string
 }
