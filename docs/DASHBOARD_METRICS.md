@@ -181,3 +181,66 @@ instead of keeping its own private copy — there was previously a second, near-
 `buildCaseCounts`/`ZERO_COUNTS`/inline-`passRate` implementation local to that service. There is now
 exactly one definition of "pass rate" and "case tally" in the codebase, used by `GET /runs`,
 `GET /dashboard/summary`, and `GET /projects`.
+
+## `GET /dashboard/traceability`
+
+`?year=<YYYY>` is required; `?projectId=` narrows the scope the same way the summary route does.
+The response is a `TraceabilityCalendarRecord`: the year, the time zone the days were bucketed in,
+per-stage totals, and one entry per day that had activity.
+
+```json
+{
+  "year": 2026,
+  "timeZone": "America/Guatemala",
+  "totals": { "scm": 41, "proposals": 0, "official": 213, "runs": 5122 },
+  "days": [{ "date": "2026-06-16", "scm": 2, "proposals": 0, "official": 5, "runs": 214 }]
+}
+```
+
+Days with no activity are omitted rather than padded, and the client fills the gaps: a full year of
+zeros is payload nobody reads.
+
+### Stage sources
+
+| Stage | Source | Scope path |
+| --- | --- | --- |
+| `scm` | `IngestionBatch.createdAt` | `ingestion_batch` joined to `project` for `organizationId` |
+| `official` | `TestCase.createdAt` | `test_case` joined to `suite`, which carries both `organizationId` and `projectId` |
+| `runs` | `Run.startedAt` | `run` directly |
+| `proposals` | none | Always `0` |
+
+`proposals` has no Prisma model: the Review/AI domain is not built. The stage stays in the contract
+and reports `0` so the client needs no change when that domain lands.
+
+### Why the aggregation is raw SQL
+
+Prisma's typed API cannot group by a date truncation, so the alternative was `findMany` over every
+row of the year and bucketing in JS. The CI reporter produces one run per test file, which for this
+repository is over two hundred runs per push, so a year reaches six figures. Both approaches read
+the same rows from the same index; only one ships them all to Node. Postgres aggregates and returns
+at most 366 rows per stage.
+
+The queries are `Prisma.sql` tagged templates, so every interpolation is a bind parameter. There are
+no dynamic identifiers: table and column names are literals, and only the organization id, the
+project id, the year bounds and the time zone are interpolated. `$queryRawUnsafe` and `Prisma.raw`
+are not used.
+
+The `WHERE` clause filters on the raw timestamp column, never on the truncated expression:
+`date_trunc`/`to_char` are not sargable, so filtering on them would discard the index. The
+truncation runs only over the already-filtered rows. `COUNT(*)` is cast to `int` so the driver
+returns a number rather than a bigint.
+
+### Time zone
+
+Days are bucketed with `AT TIME ZONE 'America/Guatemala'` (`TRACEABILITY_TIME_ZONE`), and the year
+bounds are converted in the same zone. Truncating in UTC would push an event logged at 19:00 local
+onto the next day's cell, which is wrong on a calendar the user reads in local time. The zone is a
+constant rather than a per-organization setting because the product targets Guatemalan software
+factories; making it configurable is additive.
+
+### Index
+
+`Run` gained `@@index([organizationId, startedAt])`. The existing indexes covered
+`(projectId, startedAt)` and `(organizationId)` alone, so an organization-wide query bounded by year
+scanned every run of the organization before filtering by date. The new index also covers the
+`runsInWindow` count in the summary route.

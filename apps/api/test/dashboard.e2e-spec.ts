@@ -54,6 +54,7 @@ describe('Dashboard (e2e)', () => {
     project: { findFirst: jest.fn(), count: jest.fn() },
     suite: { count: jest.fn() },
     run: { count: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
+    $queryRaw: jest.fn(),
     runCase: { groupBy: jest.fn() },
   };
 
@@ -71,6 +72,7 @@ describe('Dashboard (e2e)', () => {
     prisma.run.count.mockResolvedValue(4);
     prisma.run.findMany.mockResolvedValue([runRow]);
     prisma.run.groupBy.mockResolvedValue([{ commitSha: runRow.commitSha }]);
+    prisma.$queryRaw.mockResolvedValue([{ day: '2026-06-16', count: 3 }]);
     prisma.runCase.groupBy.mockResolvedValue([
       { runId: 'run-1', status: 'pass', _count: { _all: 1 } },
     ]);
@@ -170,5 +172,58 @@ describe('Dashboard (e2e)', () => {
     await request(app.getHttpServer())
       .get('/dashboard/summary?projectId=')
       .expect(400);
+  });
+
+  it('returns a traceability calendar for the requested year', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026')
+      .expect(200);
+
+    const body = response.body as {
+      year: number;
+      timeZone: string;
+      totals: Record<string, number>;
+      days: { date: string; runs: number }[];
+    };
+
+    expect(body.year).toBe(2026);
+    expect(body.timeZone).toBe('America/Guatemala');
+    expect(body.days).toEqual([
+      { date: '2026-06-16', scm: 3, proposals: 0, official: 3, runs: 3 },
+    ]);
+    expect(body.totals).toEqual({
+      scm: 3,
+      proposals: 0,
+      official: 3,
+      runs: 3,
+    });
+  });
+
+  it('rejects a traceability request without a year', async () => {
+    await request(app.getHttpServer())
+      .get('/dashboard/traceability')
+      .expect(400);
+  });
+
+  it('rejects a traceability year outside the supported range', async () => {
+    await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=1999')
+      .expect(400);
+  });
+
+  it('answers 404 when the traceability project is outside the organization', async () => {
+    prisma.project.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026&projectId=project-x')
+      .expect(404);
+  });
+
+  it('refuses the traceability route without a session', async () => {
+    read.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026')
+      .expect(401);
   });
 });

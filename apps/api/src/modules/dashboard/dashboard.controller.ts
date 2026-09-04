@@ -10,13 +10,16 @@ import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import type { TraceabilityCalendarRecord } from '@qably/types';
 import type {
   DashboardError,
   DashboardSummaryView,
 } from './dashboard.contracts';
 import {
   dashboardSummaryQuerySchema,
+  dashboardTraceabilityQuerySchema,
   type DashboardSummaryQuery,
+  type DashboardTraceabilityQuery,
 } from './dashboard.schemas';
 import { DashboardService } from './dashboard.service';
 
@@ -41,5 +44,16 @@ export class DashboardController {
     query: DashboardSummaryQuery,
   ): Promise<DashboardSummaryView> {
     return unwrap(await this.dashboard.summary(org, query.projectId));
+  }
+
+  @Get('traceability')
+  async traceability(
+    @CurrentOrg() org: OrgContext,
+    @Query(new ZodValidationPipe(dashboardTraceabilityQuerySchema))
+    query: DashboardTraceabilityQuery,
+  ): Promise<TraceabilityCalendarRecord> {
+    return unwrap(
+      await this.dashboard.traceability(org, query.year, query.projectId),
+    );
   }
 }

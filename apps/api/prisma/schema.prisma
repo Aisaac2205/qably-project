@@ -400,6 +400,7 @@ model Run {
   @@unique([projectId, source, externalId])
   @@index([projectId, startedAt])
   @@index([organizationId])
+  @@index([organizationId, startedAt])
   @@index([commitSha])
   @@map("run")
 }

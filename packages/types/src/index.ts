@@ -261,6 +261,21 @@ export interface DashboardSummaryRecord {
 }
 
 
+export type TraceabilityStage = 'scm' | 'proposals' | 'official' | 'runs'
+
+export type TraceabilityStageTotals = Record<TraceabilityStage, number>
+
+export interface TraceabilityDayRecord extends TraceabilityStageTotals {
+  date: string
+}
+
+export interface TraceabilityCalendarRecord {
+  year: number
+  timeZone: string
+  totals: TraceabilityStageTotals
+  days: TraceabilityDayRecord[]
+}
+
 export interface Notification {
   id: string
   organizationId: string
