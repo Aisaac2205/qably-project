@@ -33,10 +33,10 @@ const isEn = locale === 'en';
     <div class="space-y-4">
       <h3 class="text-sm font-semibold text-white">{footer.product}</h3>
       <ul class="space-y-2.5 text-sm text-zinc-400">
-        <li><a href="#ai-review" class="hover:text-white transition-colors">{footer.productLinks.aiPrompt}</a></li>
-        <li><a href="#review-inbox" class="hover:text-white transition-colors">{footer.productLinks.reviewInbox}</a></li>
-        <li><a href="#runs-telemetry" class="hover:text-white transition-colors">{footer.productLinks.runsTelemetry}</a></li>
-        <li><a href="#traceability" class="hover:text-white transition-colors">{footer.productLinks.traceabilityGraph}</a></li>
+        <li><a href={isEn ? '/en#ai-review' : '/#ai-review'} class="hover:text-white transition-colors">{footer.productLinks.aiPrompt}</a></li>
+        <li><a href={isEn ? '/en#review-inbox' : '/#review-inbox'} class="hover:text-white transition-colors">{footer.productLinks.reviewInbox}</a></li>
+        <li><a href={isEn ? '/en#runs-telemetry' : '/#runs-telemetry'} class="hover:text-white transition-colors">{footer.productLinks.runsTelemetry}</a></li>
+        <li><a href={isEn ? '/en#traceability' : '/#traceability'} class="hover:text-white transition-colors">{footer.productLinks.traceabilityGraph}</a></li>
       </ul>
     </div>
 
@@ -55,7 +55,7 @@ const isEn = locale === 'en';
     <div class="space-y-4">
       <h3 class="text-sm font-semibold text-white">{footer.company}</h3>
       <ul class="space-y-2.5 text-sm text-zinc-400">
-        <li><a href="#pricing" class="hover:text-white transition-colors">{dict.nav.pricing}</a></li>
+        <li><a href={isEn ? '/en#pricing' : '/#pricing'} class="hover:text-white transition-colors">{dict.nav.pricing}</a></li>
         <li><a href={isEn ? "/en/terms" : "/terms"} class="hover:text-white transition-colors">Terms of Service</a></li>
         <li><a href={isEn ? "/en/privacy" : "/privacy"} class="hover:text-white transition-colors">Privacy Policy</a></li>
         <li><a href={isEn ? "/en/security" : "/security"} class="hover:text-white transition-colors">SOC2 Security</a></li>
