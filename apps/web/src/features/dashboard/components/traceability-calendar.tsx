@@ -137,25 +137,29 @@ export function TraceabilityCalendar({
     <div className="relative" ref={containerRef}>
       <TraceabilityTooltip day={active} position={position} />
 
-      <div className="overflow-x-auto pb-1 pt-1 scrollbar-thin">
+      <div className="overflow-x-auto pb-1 scrollbar-thin">
         <table
           role="grid"
-          className="min-w-[700px] border-separate border-spacing-[3px]"
+          className="w-full min-w-[620px] table-fixed border-separate border-spacing-[3px]"
           aria-labelledby={captionId}
         >
           <caption id={captionId} className="sr-only">
             {caption}
           </caption>
+          <colgroup>
+            <col className="w-7" />
+            <col span={weeks.length} />
+          </colgroup>
           <thead>
             <tr role="row">
-              <td role="gridcell" className="w-8" />
+              <td role="gridcell" />
               {spans.map(({ label, span }) => (
                 <th
                   key={`${label.monthIndex}-${label.weekIndex}`}
                   role="columnheader"
                   scope="col"
                   colSpan={span}
-                  className="pb-1 text-left text-[10px] font-medium text-muted"
+                  className="pb-1.5 text-left text-[10px] font-medium whitespace-nowrap text-muted"
                 >
                   {label.name}
                 </th>
@@ -168,7 +172,7 @@ export function TraceabilityCalendar({
                 <th
                   role="rowheader"
                   scope="row"
-                  className="w-8 pr-1 text-left align-middle text-[9px] font-medium text-muted"
+                  className="pr-1.5 text-left align-middle text-[10px] font-medium whitespace-nowrap text-muted"
                 >
                   {VISIBLE_WEEKDAY_ROWS.includes(dayIndex) ? (
                     names[dayIndex]
@@ -185,9 +189,11 @@ export function TraceabilityCalendar({
                       <td
                         key={week.weekIndex}
                         role="gridcell"
-                        className="size-2.5 p-0"
+                        className="p-0"
                         aria-hidden="true"
-                      />
+                      >
+                        <div className="aspect-square w-full" />
+                      </td>
                     )
                   }
 
@@ -211,8 +217,12 @@ export function TraceabilityCalendar({
                       onBlur={hide}
                       onMouseEnter={(event) => show(day, event.currentTarget)}
                       onMouseLeave={hide}
-                      className={`size-2.5 rounded-[2px] p-0 transition-opacity duration-100 hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${LEVEL_CLASSES[day.level]}`}
-                    />
+                      className="rounded-[3px] p-0 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+                    >
+                      <div
+                        className={`aspect-square w-full rounded-[3px] transition-opacity duration-100 hover:opacity-85 ${LEVEL_CLASSES[day.level]}`}
+                      />
+                    </td>
                   )
                 })}
               </tr>
@@ -221,18 +231,16 @@ export function TraceabilityCalendar({
         </table>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-end">
-        <div className="flex items-center gap-1.5 text-[11px]">
-          <span>{lessLabel}</span>
-          {LEVEL_CLASSES.map((levelClass) => (
-            <span
-              key={levelClass}
-              className={`inline-block size-2.5 rounded-[2px] border border-border/40 ${levelClass}`}
-              aria-hidden="true"
-            />
-          ))}
-          <span>{moreLabel}</span>
-        </div>
+      <div className="mt-3 flex items-center justify-end gap-1.5 text-[11px] text-muted">
+        <span>{lessLabel}</span>
+        {LEVEL_CLASSES.map((levelClass) => (
+          <span
+            key={levelClass}
+            className={`inline-block size-2.5 rounded-[2px] border border-border/40 ${levelClass}`}
+            aria-hidden="true"
+          />
+        ))}
+        <span>{moreLabel}</span>
       </div>
     </div>
   )

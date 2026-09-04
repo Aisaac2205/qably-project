@@ -89,10 +89,10 @@
   --app-status-warn-bg:    oklch(0.97 0.05 80);
 
   --app-heatmap-l0:        oklch(0.930 0.004 85);
-  --app-heatmap-l1:        oklch(0.800 0.006 85);
-  --app-heatmap-l2:        oklch(0.640 0.008 85);
-  --app-heatmap-l3:        oklch(0.460 0.007 85);
-  --app-heatmap-l4:        oklch(0.285 0.005 85);
+  --app-heatmap-l1:        oklch(0.850 0.090 145);
+  --app-heatmap-l2:        oklch(0.700 0.150 145);
+  --app-heatmap-l3:        oklch(0.560 0.180 145);
+  --app-heatmap-l4:        oklch(0.440 0.200 145);
 }
 
 @theme inline {

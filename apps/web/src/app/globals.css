@@ -49,14 +49,13 @@
      --fg-muted: that token is a TEXT color, this one is a BACKGROUND. */
   --surface-hover:     oklch(0.930 0.004 85);
 
-  /* Traceability heatmap — encodes event VOLUME, never quality. Deliberately
-     the brand ink ramp rather than the pass green: a day of failing runs must
-     not read as a good day. */
+  /* Traceability heatmap — encodes event VOLUME, not quality. Shares hue 145
+     with --status-pass; see docs/DASHBOARD_UI.md. */
   --heatmap-l0:        oklch(0.930 0.004 85);
-  --heatmap-l1:        oklch(0.800 0.006 85);
-  --heatmap-l2:        oklch(0.640 0.008 85);
-  --heatmap-l3:        oklch(0.460 0.007 85);
-  --heatmap-l4:        oklch(0.285 0.005 85);
+  --heatmap-l1:        oklch(0.850 0.090 145);
+  --heatmap-l2:        oklch(0.700 0.150 145);
+  --heatmap-l3:        oklch(0.560 0.180 145);
+  --heatmap-l4:        oklch(0.440 0.200 145);
 
   /* Auth mesh — decorative panel only, never for content or status.
      The shader's colour-dodge grain doubles each channel, so these stay

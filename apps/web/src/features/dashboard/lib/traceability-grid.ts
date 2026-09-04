@@ -37,7 +37,13 @@ export interface TraceabilityGrid {
 }
 
 function quantile(sorted: readonly number[], fraction: number): number {
-  return sorted[Math.floor((sorted.length - 1) * fraction)]
+  const position = (sorted.length - 1) * fraction
+  const lower = Math.floor(position)
+  const upper = Math.ceil(position)
+
+  if (lower === upper) return sorted[lower]
+
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower)
 }
 
 export function computeLevelThresholds(counts: readonly number[]): LevelThresholds {
@@ -52,8 +58,11 @@ export function computeLevelThresholds(counts: readonly number[]): LevelThreshol
   ]
 }
 
+const UNIFORM_LEVEL: TraceabilityLevel = 3
+
 function levelFor(count: number, thresholds: LevelThresholds): TraceabilityLevel {
   if (count <= 0) return 0
+  if (thresholds[0] === thresholds[2]) return UNIFORM_LEVEL
   if (count <= thresholds[0]) return 1
   if (count <= thresholds[1]) return 2
   if (count <= thresholds[2]) return 3

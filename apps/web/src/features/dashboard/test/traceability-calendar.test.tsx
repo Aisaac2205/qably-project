@@ -135,8 +135,11 @@ describe('TraceabilityCalendar accessibility', () => {
       name: '214 events on 2026-06-16',
     })
 
-    expect(busiest.className).toContain('bg-heatmap-l')
-    expect(busiest.getAttribute('style')).toBeNull()
+    const swatch = busiest.firstElementChild as HTMLElement
+
+    expect(swatch.className).toContain('bg-heatmap-l')
+    expect(swatch.className).toContain('aspect-square')
+    expect(swatch.getAttribute('style')).toBeNull()
   })
 
   it('keeps the legend out of the accessibility tree', () => {
@@ -146,5 +149,15 @@ describe('TraceabilityCalendar accessibility', () => {
     expect(
       legend?.querySelectorAll('[aria-hidden="true"]').length,
     ).toBeGreaterThan(0)
+  })
+
+  it('lets the grid share the available width instead of fixed cells', () => {
+    renderCalendar()
+
+    const grid = screen.getByRole('grid', { name: '2026 traceability calendar' })
+
+    expect(grid.className).toContain('table-fixed')
+    expect(grid.className).toContain('w-full')
+    expect(grid.querySelector('colgroup')).not.toBeNull()
   })
 })

@@ -55,6 +55,44 @@ describe('computeLevelThresholds', () => {
     expect(thresholds).toEqual([...thresholds].sort((a, b) => a - b))
   })
 
+  it('does not sink a uniformly busy year to the faintest level', () => {
+    const grid = buildTraceabilityGrid(
+      record(
+        Array.from({ length: 40 }, (_, index) =>
+          day(`2026-02-${String(index + 1).padStart(2, '0')}`, { runs: 214 }),
+        ).slice(0, 28),
+      ),
+      'all',
+      MONTHS,
+    )
+
+    const active = grid.weeks
+      .flatMap((week) => week.days)
+      .filter((cell) => cell !== null && cell.count > 0)
+
+    expect(active.length).toBeGreaterThan(0)
+    expect(active.every((cell) => cell?.level === 3)).toBe(true)
+  })
+
+  it('still separates levels as soon as the days differ', () => {
+    const grid = buildTraceabilityGrid(
+      record([
+        day('2026-02-01', { runs: 1 }),
+        day('2026-02-02', { runs: 50 }),
+        day('2026-02-03', { runs: 400 }),
+      ]),
+      'all',
+      MONTHS,
+    )
+
+    const levels = grid.weeks
+      .flatMap((week) => week.days)
+      .filter((cell) => cell !== null && cell.count > 0)
+      .map((cell) => cell?.level)
+
+    expect(new Set(levels).size).toBeGreaterThan(1)
+  })
+
   it('keeps a busy day at the top level regardless of the volume', () => {
     const counts = [1, 2, 3, 400]
     const thresholds = computeLevelThresholds(counts)

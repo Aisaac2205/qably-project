@@ -133,20 +133,45 @@ file, so an ordinary day clears the top bucket and the whole year renders as one
 steps always describe the distribution being shown. The scale is recomputed per stage filter,
 because a stage's volume is not comparable to the total.
 
-## The heatmap encodes volume, so it uses the brand ink ramp
+The quantile interpolates between neighbouring values rather than snapping to an index. Without
+that, a year with only a handful of active days collapsed all three thresholds onto the same number
+and every active day fell into the faintest bucket. Interpolating spreads them, so two days of 309
+and 2048 events land on levels 1 and 4 rather than sharing one.
+
+When every active day genuinely holds the same count there is no distribution to encode, and the
+three thresholds legitimately coincide. That case renders at a solid mid level instead of the
+faintest one, so a uniformly busy year does not read as an empty one.
+
+Levels are not rescaled to flatter sparse data. A day at 15% of the year's peak belongs in the
+lowest bucket, and pushing it up would overstate the activity.
+
+## The calendar grid uses the width it is given
+
+Cells were a fixed 10px, so on a wide card the grid stopped short and the whole section read as
+shrunken. The table is now `table-fixed` with a `colgroup`: the weekday column takes a fixed track
+and the 53 week columns split the remainder evenly, while each cell holds a child with
+`aspect-ratio: 1` so it grows with the card and stays square.
+
+A `min-width` keeps the cells legible on narrow screens; below that the grid scrolls inside its own
+container rather than pushing the page sideways.
+
+The card itself carries no padding. The heading and the stage and year selectors sit in a top bar
+with the `--canvas` background and a bottom border, and the grid gets its own padding underneath,
+so the calendar reaches the card's edges instead of floating inside a frame.
+
+## The heatmap ramp lives in tokens
 
 `--heatmap-l0` through `--heatmap-l4` did not exist. The calendar referenced them with a fallback,
-so it always rendered the hardcoded `oklch()` literals in the fallback position, against the
-project's tokens-only rule.
+so it always rendered the hardcoded `oklch()` literals sitting in the fallback position, against
+the project's tokens-only rule. The same five values are now real tokens, and intensity is applied
+through `bg-heatmap-l*` utilities rather than inline styles, so the palette lives in one place.
 
-Those literals were GitHub's green, hue 145, which is also the hue of `--status-pass`. The heatmap
-encodes event **volume**, not quality, so a day of thirty failing runs was painting itself in the
-colour the rest of the product uses for "passed". The tokens now define a neutral ink ramp on the
-brand's own hue, stepping about 0.15 in lightness between levels so adjacent cells stay
-distinguishable.
-
-Intensity is applied through `bg-heatmap-l*` utilities rather than inline styles, so the cells stay
-inspectable and the palette lives in one place.
+The ramp is green on hue 145, which is also the hue of `--status-pass`. That overlap is a
+deliberate, owner-approved choice: the calendar reads as a contribution graph, and the familiar
+green is what makes it legible at a glance. The trade-off worth knowing is that the heatmap encodes
+event **volume**, not quality, so a day of thirty failing runs still renders dark green. If the two
+ever need separating, shifting the ramp's hue to about 160 keeps it reading as green while pulling
+it off the status colour.
 
 ## The calendar is a real grid, not a picture
 
