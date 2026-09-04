@@ -48,7 +48,7 @@ export function ProjectHealthCard({
           </span>
         </div>
         <p className="text-xs text-muted">
-          Last run {formatRelativeTime(lastRunAt)}
+          Last run {formatRelativeTime(lastRunAt, 'en')}
         </p>
       </CardContent>
       <CardFooter className="flex items-center gap-3 text-xs text-muted">

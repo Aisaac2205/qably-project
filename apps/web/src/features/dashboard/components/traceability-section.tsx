@@ -32,35 +32,38 @@ export function TraceabilitySection() {
       locale: locale === 'en' ? 'en' : 'es',
     })
 
+  const numberLocale = locale === 'en' ? 'en' : 'es'
+  const count = (value: number) => formatEventCount(value, numberLocale)
+
   const stageOptions = [
     {
       label: t('dashboard.allStages'),
       value: 'all' as const,
-      badge: totalEvents,
+      badge: count(totalEvents),
       icon: <CalendarBlank size={14} weight="bold" />,
     },
     {
       label: t('dashboard.stageScm'),
       value: 'scm' as const,
-      badge: breakdownTotals.scm,
+      badge: count(breakdownTotals.scm),
       icon: <GitBranch size={14} weight="bold" />,
     },
     {
       label: t('dashboard.stageProposals'),
       value: 'proposals' as const,
-      badge: breakdownTotals.proposals,
+      badge: count(breakdownTotals.proposals),
       icon: <Sparkle size={14} weight="bold" />,
     },
     {
       label: t('dashboard.stageOfficial'),
       value: 'official' as const,
-      badge: breakdownTotals.official,
+      badge: count(breakdownTotals.official),
       icon: <Stack size={14} weight="bold" />,
     },
     {
       label: t('dashboard.stageRuns'),
       value: 'runs' as const,
-      badge: breakdownTotals.runs,
+      badge: count(breakdownTotals.runs),
       icon: <Play size={14} weight="bold" />,
     },
   ] as const
@@ -76,7 +79,7 @@ export function TraceabilitySection() {
           className="text-base font-semibold tracking-[-0.015em] text-default"
         >
           {t('dashboard.traceabilityHeading', {
-            count: formatEventCount(totalEvents, locale === 'en' ? 'en' : 'es'),
+            count: count(totalEvents),
             year: selectedYear,
           })}
         </h2>
@@ -87,6 +90,7 @@ export function TraceabilitySection() {
             value={activeFilter}
             onValueChange={(val) => val && setActiveFilter(val as TraceabilityFilter)}
             triggerClassName="h-9 min-w-[175px] px-3 text-xs font-medium"
+            badgeInTrigger={false}
           />
 
           <SelectSimple

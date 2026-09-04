@@ -9,42 +9,48 @@ import {
 describe('formatRelativeTime', () => {
   const now = new Date('2026-06-19T12:00:00Z').getTime()
 
-  it('returns "just now" for less than 1 minute', () => {
-    expect(formatRelativeTime('2026-06-19T11:59:50Z', now)).toBe('just now')
+  describe('in English', () => {
+    it('returns "just now" for less than 1 minute', () => {
+      expect(formatRelativeTime('2026-06-19T11:59:50Z', 'en', now)).toBe('just now')
+    })
+
+    it('returns compact minute, hour and day forms', () => {
+      expect(formatRelativeTime('2026-06-19T11:55:00Z', 'en', now)).toBe('5m ago')
+      expect(formatRelativeTime('2026-06-19T11:00:00Z', 'en', now)).toBe('1h ago')
+      expect(formatRelativeTime('2026-06-19T10:00:00Z', 'en', now)).toBe('2h ago')
+      expect(formatRelativeTime('2026-06-18T12:00:00Z', 'en', now)).toBe('1d ago')
+      expect(formatRelativeTime('2026-06-16T12:00:00Z', 'en', now)).toBe('3d ago')
+    })
+
+    it('returns a full date beyond 30 days', () => {
+      const result = formatRelativeTime('2026-05-01T12:00:00Z', 'en', now)
+      expect(result).toContain('2026')
+      expect(result).not.toBe('just now')
+    })
+
+    it('treats future dates as just now', () => {
+      expect(formatRelativeTime('2026-06-19T12:05:00Z', 'en', now)).toBe('just now')
+    })
   })
 
-  it('returns "5m ago" for 5 minutes', () => {
-    expect(formatRelativeTime('2026-06-19T11:55:00Z', now)).toBe('5m ago')
+  describe('in Spanish', () => {
+    it('never leaks English wording into the Spanish UI', () => {
+      expect(formatRelativeTime('2026-06-19T11:59:50Z', 'es', now)).toBe('ahora')
+      expect(formatRelativeTime('2026-06-19T11:55:00Z', 'es', now)).toBe('hace 5 min')
+      expect(formatRelativeTime('2026-06-19T11:00:00Z', 'es', now)).toBe('hace 1 h')
+      expect(formatRelativeTime('2026-06-18T12:00:00Z', 'es', now)).toBe('hace 1 d')
+      expect(formatRelativeTime('2026-06-16T12:00:00Z', 'es', now)).toBe('hace 3 d')
+    })
+
+    it('returns a Spanish full date beyond 30 days', () => {
+      const result = formatRelativeTime('2026-05-01T12:00:00Z', 'es', now)
+      expect(result).toContain('2026')
+      expect(result).not.toMatch(/ago|just now/i)
+    })
   })
 
-  it('returns "1h ago" for 1 hour', () => {
-    expect(formatRelativeTime('2026-06-19T11:00:00Z', now)).toBe('1h ago')
-  })
-
-  it('returns "2h ago" for 2 hours', () => {
-    expect(formatRelativeTime('2026-06-19T10:00:00Z', now)).toBe('2h ago')
-  })
-
-  it('returns "1d ago" for 1 day', () => {
-    expect(formatRelativeTime('2026-06-18T12:00:00Z', now)).toBe('1d ago')
-  })
-
-  it('returns "3d ago" for 3 days', () => {
-    expect(formatRelativeTime('2026-06-16T12:00:00Z', now)).toBe('3d ago')
-  })
-
-  it('returns full date for more than 30 days', () => {
-    const result = formatRelativeTime('2026-05-01T12:00:00Z', now)
-    expect(result).toContain('2026')
-    expect(result).not.toBe('just now')
-  })
-
-  it('handles future dates', () => {
-    expect(formatRelativeTime('2026-06-19T12:05:00Z', now)).toBe('just now')
-  })
-
-  it('works without explicit now parameter', () => {
-    const result = formatRelativeTime('2020-01-01T00:00:00Z')
+  it('works without an explicit now parameter', () => {
+    const result = formatRelativeTime('2020-01-01T00:00:00Z', 'en')
     expect(typeof result).toBe('string')
     expect(result.length).toBeGreaterThan(0)
   })

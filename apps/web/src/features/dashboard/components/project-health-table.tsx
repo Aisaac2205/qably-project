@@ -10,7 +10,8 @@ import { DataTable } from '@/components/ui/data-table'
 
 export function ProjectHealthTable() {
   const stats = useDashboardStats()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const timeLocale = locale === 'en' ? 'en' : 'es'
 
   return (
     <Card className="col-span-1 border border-border/80 flex flex-col justify-between">
@@ -70,7 +71,7 @@ export function ProjectHealthTable() {
                     )}
                   </td>
                   <td className="px-3 py-3.5 text-xs text-muted-foreground">
-                    {activity ? formatRelativeTime(activity.lastRunAt) : '—'}
+                    {activity ? formatRelativeTime(activity.lastRunAt, timeLocale) : '—'}
                   </td>
                   <td className="px-3 py-3.5 text-xs font-medium text-default text-center tabular-nums font-mono">
                     {project.suiteCount}

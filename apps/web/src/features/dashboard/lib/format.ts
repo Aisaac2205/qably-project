@@ -2,21 +2,44 @@
  * Dashboard formatting helpers. Pure functions — no React.
  */
 
-export function formatRelativeTime(iso: string, now?: number): string {
+export type FormatLocale = 'es' | 'en'
+
+const RELATIVE_TIME_COPY = {
+  en: {
+    justNow: 'just now',
+    minutes: (n: number) => `${n}m ago`,
+    hours: (n: number) => `${n}h ago`,
+    days: (n: number) => `${n}d ago`,
+    dateTag: 'en-US',
+  },
+  es: {
+    justNow: 'ahora',
+    minutes: (n: number) => `hace ${n} min`,
+    hours: (n: number) => `hace ${n} h`,
+    days: (n: number) => `hace ${n} d`,
+    dateTag: 'es-ES',
+  },
+} as const
+
+export function formatRelativeTime(
+  iso: string,
+  locale: FormatLocale,
+  now?: number,
+): string {
+  const copy = RELATIVE_TIME_COPY[locale] ?? RELATIVE_TIME_COPY.en
   const then = new Date(iso).getTime()
   const current = now ?? Date.now()
-  const diffMs = current - then
-  const diffSeconds = Math.floor(diffMs / 1000)
+  const diffSeconds = Math.floor((current - then) / 1000)
   const diffMinutes = Math.floor(diffSeconds / 60)
   const diffHours = Math.floor(diffMinutes / 60)
   const diffDays = Math.floor(diffHours / 24)
 
-  if (diffSeconds < 60) return 'just now'
-  if (diffMinutes < 60) return `${diffMinutes}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 30) return `${diffDays}d ago`
+  if (diffSeconds < 60) return copy.justNow
+  if (diffMinutes < 60) return copy.minutes(diffMinutes)
+  if (diffHours < 24) return copy.hours(diffHours)
+  if (diffDays < 30) return copy.days(diffDays)
 
-  return new Date(iso).toLocaleDateString('en-US', {
+  return new Date(iso).toLocaleDateString(copy.dateTag, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

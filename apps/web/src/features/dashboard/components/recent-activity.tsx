@@ -10,11 +10,12 @@ import { useTranslation } from '@/lib/i18n'
 
 interface QueueSectionProps {
   title: string
+  viewAllLabel: string
   href?: string
   children: React.ReactNode
 }
 
-function QueueSection({ title, href = '/projects', children }: QueueSectionProps) {
+function QueueSection({ title, viewAllLabel, href = '/projects', children }: QueueSectionProps) {
   return (
     <section className="flex h-full min-w-0 flex-col p-5 md:p-6 md:border-r md:border-border md:last:border-r-0">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -23,7 +24,7 @@ function QueueSection({ title, href = '/projects', children }: QueueSectionProps
           href={href}
           className="inline-flex items-center gap-0.5 text-xs font-semibold text-primary hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary transition-colors"
         >
-          View all
+          {viewAllLabel}
           <CaretRight size={11} weight="bold" aria-hidden="true" />
         </Link>
       </div>
@@ -35,7 +36,9 @@ function QueueSection({ title, href = '/projects', children }: QueueSectionProps
 export function RecentActivity() {
   const stats = useDashboardStats()
   const { suites } = useSuites()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
+  const timeLocale = locale === 'en' ? 'en' : 'es'
+  const viewAllLabel = t('common.viewAll')
 
   const suiteNameById = new Map(suites.map((suite) => [suite.id, suite.name]))
   const runs = stats.recentRuns.slice(0, 4)
@@ -44,7 +47,7 @@ export function RecentActivity() {
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xs" aria-label="Operational work queue">
       <div className="grid flex-1 grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
-        <QueueSection title={t('dashboard.recentRuns')}>
+        <QueueSection title={t('dashboard.recentRuns')} viewAllLabel={viewAllLabel}>
           {runs.length === 0 ? (
             <p className="py-3 text-xs text-muted">{t('dashboard.noRuns')}</p>
           ) : (
@@ -69,7 +72,7 @@ export function RecentActivity() {
           )}
         </QueueSection>
 
-        <QueueSection title={t('dashboard.recentPipelines')}>
+        <QueueSection title={t('dashboard.recentPipelines')} viewAllLabel={viewAllLabel}>
           {ciRuns.length === 0 ? (
             <p className="py-3 text-xs text-muted">{t('dashboard.noPipelines')}</p>
           ) : (
@@ -92,7 +95,7 @@ export function RecentActivity() {
                     </p>
                   </div>
                 </div>
-                <span className="shrink-0 text-xs tabular-nums text-muted">{formatRelativeTime(run.startedAt)}</span>
+                <span className="shrink-0 text-xs tabular-nums text-muted">{formatRelativeTime(run.startedAt, timeLocale)}</span>
               </Link>
             ))
           )}

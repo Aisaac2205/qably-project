@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TraceabilitySection } from '@/features/dashboard/components/traceability-section'
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { useI18nStore } from '@/lib/i18n'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -27,6 +28,7 @@ vi.mock('next/link', () => ({
 describe('TraceabilitySection (Contribution Calendar)', () => {
   beforeEach(() => {
     __resetStore()
+    useI18nStore.setState({ locale: 'en' })
   })
 
   it('summarises the year in a single heading line', async () => {
@@ -80,5 +82,28 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
 
     // Year selector
     expect(comboboxes[1]).toHaveTextContent('2026')
+  })
+
+  it('states the yearly total once instead of repeating it in the stage selector', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const heading = screen.getByRole('heading', { name: /traceability events in 2026/i })
+    const total = heading.textContent?.match(/^[\d.,]+/)?.[0]
+    expect(total).toBeTruthy()
+
+    const [stageTrigger] = screen.getAllByRole('combobox')
+    expect(stageTrigger.textContent).not.toContain(total)
+  })
+
+  it('groups the per-stage counts with the separator of the active locale', async () => {
+    useI18nStore.setState({ locale: 'es' })
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const heading = screen.getByRole('heading', { name: /eventos de trazabilidad en 2026/i })
+    expect(heading.textContent).toMatch(/^\d{1,3}(\.\d{3})*\s/)
   })
 })

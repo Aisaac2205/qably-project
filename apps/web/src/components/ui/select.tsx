@@ -151,10 +151,13 @@ export interface SelectSimpleProps<T = string | number | null> {
   readonly placeholder?: string
   readonly className?: string
   readonly triggerClassName?: string
+  readonly badgeInTrigger?: boolean
 }
 
 /**
- * Shorthand declarative Select component for option lists with circular badge support
+ * Shorthand declarative Select component for option lists with circular badge support.
+ * Set `badgeInTrigger` to false when the surrounding layout already states the active
+ * option's count, so the trigger does not repeat it.
  */
 function SelectSimple<T extends string | number | null>({
   options,
@@ -162,6 +165,7 @@ function SelectSimple<T extends string | number | null>({
   onValueChange,
   placeholder,
   triggerClassName,
+  badgeInTrigger = true,
 }: SelectSimpleProps<T>) {
   const activeOption = options.find((o) => o.value === value)
 
@@ -178,7 +182,7 @@ function SelectSimple<T extends string | number | null>({
                 <span className="shrink-0 text-muted">{activeOption.icon}</span>
               )}
               <span>{activeOption.label}</span>
-              {activeOption.badge !== undefined && activeOption.badge !== null && (
+              {badgeInTrigger && activeOption.badge !== undefined && activeOption.badge !== null && (
                 <span className="inline-flex items-center justify-center rounded-full bg-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted">
                   {typeof activeOption.badge === 'number'
                     ? activeOption.badge.toLocaleString()

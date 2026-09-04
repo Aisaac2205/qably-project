@@ -6,6 +6,7 @@ import { renderWithQuery } from '@/lib/query-test-utils'
 import { projectKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
 import { projectFixtures } from '@/test/projects-api-stub'
+import { useI18nStore } from '@/lib/i18n'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -17,6 +18,7 @@ import { ProjectHealthTable } from '@/features/dashboard/components/project-heal
 describe('ProjectHealthTable', () => {
   beforeEach(() => {
     __resetStore()
+    useI18nStore.setState({ locale: 'en' })
   })
 
   it('renders the title "Project health"', async () => {
@@ -132,6 +134,37 @@ describe('ProjectHealthTable', () => {
 
     expect(screen.queryByText(/%/)).not.toBeInTheDocument()
     expect(screen.getByText('Not measured yet')).toBeInTheDocument()
+  })
+
+  it('renders the last run time in the active locale', async () => {
+    useI18nStore.setState({ locale: 'es' })
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    })
+    client.setQueryData(projectKeys.all, [
+      {
+        ...projectFixtures[0],
+        activity: {
+          healthScore: 90,
+          lastRunStatus: 'pass',
+          lastRunAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          activeRunCount: 0,
+          aiPendingCount: 3,
+        },
+      },
+    ])
+    client.setQueryData(runKeys.list('all'), [])
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <ProjectHealthTable />
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(screen.getByText('hace 2 h')).toBeInTheDocument()
+    expect(screen.queryByText(/ago/i)).not.toBeInTheDocument()
   })
 
   it('shows a dash instead of a fabricated AI-pending count for the Review/AI domain gap', async () => {
