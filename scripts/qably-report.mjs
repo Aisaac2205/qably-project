@@ -4,6 +4,11 @@ import { createHash } from 'node:crypto';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 
+const MAX_THROTTLE_RETRIES = 5;
+const FALLBACK_RETRY_SECONDS = 10;
+const MAX_RETRY_SECONDS = 90;
+const RETRY_JITTER_MS = 250;
+
 const XML_ENTITIES = {
   amp: '&',
   lt: '<',
@@ -155,6 +160,19 @@ function buildRunPayload(suite, context) {
   };
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function throttleWaitMs(retrySeconds, attempt) {
+  const seconds =
+    retrySeconds ?? Math.min(FALLBACK_RETRY_SECONDS * 2 ** attempt, MAX_RETRY_SECONDS);
+
+  return Math.min(seconds, MAX_RETRY_SECONDS) * 1000 + RETRY_JITTER_MS;
+}
+
 async function postRun(baseUrl, apiKey, payload) {
   const url = new URL('/runs/ingest', baseUrl).toString();
   const response = await fetch(url, {
@@ -170,7 +188,16 @@ async function postRun(baseUrl, apiKey, payload) {
 
   if (response.ok) {
     console.log(`[qably-report] reported "${payload.suiteName}" -> ${response.status}`);
-    return true;
+    return { outcome: 'ok' };
+  }
+
+  if (response.status === 429) {
+    const header = Number(response.headers.get('retry-after'));
+
+    return {
+      outcome: 'throttled',
+      retrySeconds: Number.isFinite(header) && header > 0 ? header : null,
+    };
   }
 
   if (response.status === 404) {
@@ -180,13 +207,38 @@ async function postRun(baseUrl, apiKey, payload) {
         'implicitly; create one with this exact name in the Qably UI, then re-run this ' +
         `workflow. Raw response: ${text}`,
     );
-    return false;
+    return { outcome: 'failed' };
   }
 
   console.error(
     `::warning title=Qably report failed::POST /runs/ingest for "${payload.suiteName}" ` +
       `returned ${response.status}. Raw response: ${text}`,
   );
+  return { outcome: 'failed' };
+}
+
+async function reportSuite(baseUrl, apiKey, payload) {
+  for (let attempt = 0; attempt <= MAX_THROTTLE_RETRIES; attempt += 1) {
+    const result = await postRun(baseUrl, apiKey, payload);
+
+    if (result.outcome !== 'throttled') return result.outcome === 'ok';
+
+    if (attempt === MAX_THROTTLE_RETRIES) {
+      console.error(
+        `::warning title=Qably report failed::POST /runs/ingest for "${payload.suiteName}" ` +
+          `stayed rate limited after ${MAX_THROTTLE_RETRIES + 1} attempts.`,
+      );
+      return false;
+    }
+
+    const waitMs = throttleWaitMs(result.retrySeconds, attempt);
+    console.log(
+      `[qably-report] rate limited on "${payload.suiteName}", ` +
+        `retrying in ${Math.round(waitMs / 1000)}s.`,
+    );
+    await sleep(waitMs);
+  }
+
   return false;
 }
 
@@ -244,7 +296,7 @@ async function main() {
     }
 
     try {
-      const ok = await postRun(baseUrl, apiKey, payload);
+      const ok = await reportSuite(baseUrl, apiKey, payload);
       if (ok) succeeded += 1;
       else failed += 1;
     } catch (error) {

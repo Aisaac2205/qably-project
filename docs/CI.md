@@ -102,6 +102,23 @@ supplies a key and nothing else — the tool knows its own address, the same way
 do. The project-scoped API key already identifies the organization and project, so the origin
 carries no information the key does not.
 
+### Rate limits and retries
+
+`POST /runs/ingest` is throttled at **30 requests per minute per credential**
+(`runs.controller.ts`), and the throttler buckets by API key rather than by IP, so every job in a
+workflow run shares one budget. The script posts **one request per `<testsuite>`**, so a repository
+with more than 30 suites will exhaust the window partway through a run.
+
+When the API answers `429`, the script waits and retries instead of dropping the suite. It honours
+the `Retry-After` header the throttler sends (in seconds); when that header is missing it falls
+back to exponential backoff starting at 10s, capped at 90s per wait, for up to
+`MAX_THROTTLE_RETRIES` retries. A suite is only reported as failed once every retry is exhausted.
+
+The trade-off is wall-clock time: a run with many suites can spend minutes waiting for throttle
+windows to reopen. That is deliberate — losing results silently is worse than a slower reporting
+step. If this becomes painful, the fix is a batch endpoint that accepts a whole run in one request,
+not a higher limit.
+
 ### Enabling it
 
 Once the API is deployed and reachable:
@@ -203,7 +220,9 @@ inspect either way.
 - No new runtime dependency was added for XML parsing — the format jest-junit and vitest emit is
   narrow and stable enough that a small hand-written parser is a better trade-off than a general
   XML library for a single internal script.
-- Reporting has not been exercised against a deployed API — there is nothing to deploy to yet. The
-  script was validated locally against real JUnit files (generated from `apps/api`'s and
-  `apps/web`'s own test suites) posted to a throwaway local HTTP server, covering the success,
-  `404` and network-error paths.
+- The script posts one request per suite. Against a deployed API this hits the `/runs/ingest`
+  throttle on any repository with more than 30 suites; the `429` retry path above keeps the results
+  from being lost, but the real fix is a batch endpoint. See **Rate limits and retries**.
+- The success, `404`, `429` and network-error paths were validated locally against real JUnit files
+  (generated from `apps/api`'s and `apps/web`'s own test suites) posted to a throwaway local HTTP
+  server.
