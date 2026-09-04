@@ -132,3 +132,40 @@ file, so an ordinary day clears the top bucket and the whole year renders as one
 `computeLevelThresholds` takes the quartiles of the days that actually had activity, so the five
 steps always describe the distribution being shown. The scale is recomputed per stage filter,
 because a stage's volume is not comparable to the total.
+
+## The heatmap encodes volume, so it uses the brand ink ramp
+
+`--heatmap-l0` through `--heatmap-l4` did not exist. The calendar referenced them with a fallback,
+so it always rendered the hardcoded `oklch()` literals in the fallback position, against the
+project's tokens-only rule.
+
+Those literals were GitHub's green, hue 145, which is also the hue of `--status-pass`. The heatmap
+encodes event **volume**, not quality, so a day of thirty failing runs was painting itself in the
+colour the rest of the product uses for "passed". The tokens now define a neutral ink ramp on the
+brand's own hue, stepping about 0.15 in lightness between levels so adjacent cells stay
+distinguishable.
+
+Intensity is applied through `bg-heatmap-l*` utilities rather than inline styles, so the cells stay
+inspectable and the palette lives in one place.
+
+## The calendar is a real grid, not a picture
+
+The calendar was an `<svg role="img">` whose `<rect>` children each carried `role="gridcell"`.
+`role="img"` makes its entire subtree presentational, so those 365 cells did not exist for a screen
+reader at all; and `gridcell` outside a `grid`/`row` is invalid ARIA regardless. The tooltip was
+bound to `onMouseEnter` alone, so a keyboard user could not reach any of the per-day figures, and
+the cell labels were hardcoded Spanish with no pluralisation ("1 eventos").
+
+It is now a `<table role="grid">`: one row per weekday, one column per week, month names as
+`columnheader`s spanning their weeks, and weekday names as `rowheader`s. All seven weekday headers
+exist for assistive technology; only three are shown visually, the rest are `sr-only`, so the sparse
+look survives without costing the row headers.
+
+Keyboard access follows the APG grid pattern: one tab stop into the grid, then the arrow keys move
+between days. Focus and hover both open the day summary, satisfying the requirement that
+hover-revealed content also be reachable by keyboard. The tooltip itself is `aria-hidden`, because
+the focused cell's own label already carries the same sentence and announcing it twice is worse
+than not announcing it.
+
+Day labels come from `describeDay`, shared by the tooltip and the cell labels, which picks the
+singular, plural or empty phrasing from the active locale instead of formatting "1 eventos".

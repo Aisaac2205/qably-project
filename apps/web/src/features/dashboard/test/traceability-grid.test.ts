@@ -3,6 +3,7 @@ import type { TraceabilityCalendarRecord } from '@qably/types'
 import {
   buildTraceabilityGrid,
   computeLevelThresholds,
+  weekdayNames,
 } from '@/features/dashboard/lib/traceability-grid'
 
 const MONTHS = [
@@ -193,5 +194,18 @@ describe('buildTraceabilityGrid', () => {
       .filter((cell) => cell !== null && cell.count > 0)
 
     expect(active).toHaveLength(1)
+  })
+})
+
+describe('weekdayNames', () => {
+  it('starts on Sunday to match the grid rows', () => {
+    expect(weekdayNames('en')[0].toLowerCase()).toContain('sun')
+    expect(weekdayNames('es')[0].toLowerCase()).toContain('dom')
+  })
+
+  it('returns one name per weekday in the active locale', () => {
+    expect(weekdayNames('es')).toHaveLength(7)
+    expect(weekdayNames('en')).toHaveLength(7)
+    expect(weekdayNames('es')).not.toEqual(weekdayNames('en'))
   })
 })

@@ -13,6 +13,7 @@ import { SelectSimple } from '@/components/ui/select'
 import { formatEventCount } from '../lib/format'
 import { useTraceabilityCalendar } from '../hooks/use-traceability-calendar'
 import { TraceabilityCalendar } from './traceability-calendar'
+import { describeDay } from './traceability-tooltip'
 import type { TraceabilityFilter } from '../types/traceability-calendar'
 
 export function TraceabilitySection() {
@@ -108,8 +109,9 @@ export function TraceabilitySection() {
         <TraceabilityCalendar
           weeks={weeks}
           monthLabels={monthLabels}
-          year={selectedYear}
           locale={locale === 'en' ? 'en' : 'es'}
+          caption={t('dashboard.traceabilityCalendarLabel', { year: selectedYear })}
+          dayLabel={(day) => describeDay(t, day)}
           lessLabel={t('dashboard.less')}
           moreLabel={t('dashboard.more')}
         />

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useId } from 'react'
 import { TraceabilityTooltip } from './traceability-tooltip'
+import { weekdayNames } from '../lib/traceability-grid'
 import type {
   CalendarDayData,
   CalendarWeekData,
@@ -9,192 +10,224 @@ import type {
   TooltipCoordinate,
 } from '../types/traceability-calendar'
 
-// SVG Grid Geometry (Exact GitHub Specifications)
-const CELL_SIZE = 10
-const CELL_GAP = 3
-const CELL_RADIUS = 2
-const STEP = CELL_SIZE + CELL_GAP // 13px
-const LEFT_OFFSET = 30 // Space for Day labels (Lun, Mié, Vie)
-const TOP_OFFSET = 20 // Space for Month labels (Ene, Feb, etc.)
+const DAYS_IN_WEEK = 7
+const VISIBLE_WEEKDAY_ROWS = [1, 3, 5]
 
-// GitHub Contribution Palette (OKLCH tokens aligned with Qably design system)
-const COLOR_LEVELS = [
-  'var(--heatmap-l0, oklch(0.93 0.004 85))',
-  'var(--heatmap-l1, oklch(0.85 0.09 145))',
-  'var(--heatmap-l2, oklch(0.70 0.15 145))',
-  'var(--heatmap-l3, oklch(0.56 0.18 145))',
-  'var(--heatmap-l4, oklch(0.44 0.20 145))',
+const LEVEL_CLASSES = [
+  'bg-heatmap-l0',
+  'bg-heatmap-l1',
+  'bg-heatmap-l2',
+  'bg-heatmap-l3',
+  'bg-heatmap-l4',
 ] as const
 
 export interface TraceabilityCalendarProps {
   readonly weeks: readonly CalendarWeekData[]
   readonly monthLabels: readonly CalendarMonthLabel[]
-  readonly year: number
   readonly locale?: 'es' | 'en'
+  readonly caption: string
   readonly lessLabel?: string
   readonly moreLabel?: string
-  readonly footerNote?: string
+  readonly dayLabel: (day: CalendarDayData) => string
 }
 
-interface HoveredState {
-  readonly day: CalendarDayData
-  readonly position: TooltipCoordinate
+interface FocusPosition {
+  readonly week: number
+  readonly day: number
+}
+
+function firstFocusable(weeks: readonly CalendarWeekData[]): FocusPosition {
+  for (const week of weeks) {
+    const day = week.days.findIndex((cell) => cell !== null)
+    if (day !== -1) return { week: week.weekIndex, day }
+  }
+
+  return { week: 0, day: 0 }
+}
+
+function monthSpans(
+  labels: readonly CalendarMonthLabel[],
+  weekCount: number,
+): { label: CalendarMonthLabel; span: number }[] {
+  return labels.map((label, index) => ({
+    label,
+    span: (labels[index + 1]?.weekIndex ?? weekCount) - label.weekIndex,
+  }))
 }
 
 export function TraceabilityCalendar({
   weeks,
   monthLabels,
-  year,
   locale = 'es',
+  caption,
   lessLabel = 'Menos',
   moreLabel = 'Más',
-  footerNote,
+  dayLabel,
 }: TraceabilityCalendarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const [hoveredState, setHoveredState] = useState<HoveredState | null>(null)
+  const captionId = useId()
+  const [active, setActive] = useState<CalendarDayData | null>(null)
+  const [position, setPosition] = useState<TooltipCoordinate | null>(null)
+  const [focus, setFocus] = useState<FocusPosition>(() => firstFocusable(weeks))
 
-  const svgWidth = LEFT_OFFSET + weeks.length * STEP + 10
-  const svgHeight = TOP_OFFSET + 7 * STEP + 4
+  const names = weekdayNames(locale)
+  const spans = monthSpans(monthLabels, weeks.length)
 
-  const handleCellMouseEnter = useCallback(
-    (day: CalendarDayData, event: React.MouseEvent<SVGRectElement>) => {
-      const rect = event.currentTarget.getBoundingClientRect()
-      const containerRect = containerRef.current?.getBoundingClientRect()
+  const show = useCallback((day: CalendarDayData, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect()
+    const container = containerRef.current?.getBoundingClientRect()
 
-      if (containerRect) {
-        setHoveredState({
-          day,
-          position: {
-            x: rect.left - containerRect.left + rect.width / 2,
-            y: rect.top - containerRect.top,
-          },
-        })
+    if (!container) return
+
+    setActive(day)
+    setPosition({
+      x: rect.left - container.left + rect.width / 2,
+      y: rect.top - container.top,
+    })
+  }, [])
+
+  const hide = useCallback(() => {
+    setActive(null)
+    setPosition(null)
+  }, [])
+
+  const moveFocus = useCallback(
+    (from: FocusPosition, weekDelta: number, dayDelta: number) => {
+      let week = from.week + weekDelta
+      let day = from.day + dayDelta
+
+      if (day < 0) {
+        day = DAYS_IN_WEEK - 1
+        week -= 1
+      } else if (day >= DAYS_IN_WEEK) {
+        day = 0
+        week += 1
       }
+
+      if (week < 0 || week >= weeks.length) return
+      if (weeks[week].days[day] === null) return
+
+      setFocus({ week, day })
+      containerRef.current
+        ?.querySelector<HTMLElement>(`[data-cell="${week}-${day}"]`)
+        ?.focus()
     },
-    [],
+    [weeks],
   )
 
-  const handleCellMouseLeave = useCallback(() => {
-    setHoveredState(null)
-  }, [])
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableCellElement>, at: FocusPosition) => {
+      const moves: Record<string, [number, number]> = {
+        ArrowRight: [1, 0],
+        ArrowLeft: [-1, 0],
+        ArrowDown: [0, 1],
+        ArrowUp: [0, -1],
+      }
+      const move = moves[event.key]
+
+      if (move === undefined) return
+
+      event.preventDefault()
+      moveFocus(at, move[0], move[1])
+    },
+    [moveFocus],
+  )
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Tooltip Overlay without card movement */}
-      <TraceabilityTooltip
-        day={hoveredState?.day ?? null}
-        position={hoveredState?.position ?? null}
-      />
+      <TraceabilityTooltip day={active} position={position} />
 
-      {/* SVG Container with horizontal scroll on small devices */}
       <div className="overflow-x-auto pb-1 pt-1 scrollbar-thin">
-        <svg
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          className="min-w-[700px] w-full select-none"
-          role="img"
-          aria-label={`Calendario de trazabilidad y gobernanza de ${year}`}
+        <table
+          role="grid"
+          className="min-w-[700px] border-separate border-spacing-[3px]"
+          aria-labelledby={captionId}
         >
-          {/* Month Labels */}
-          {monthLabels.map((month) => {
-            const x = LEFT_OFFSET + month.weekIndex * STEP
-            return (
-              <text
-                key={`${month.monthIndex}-${month.weekIndex}`}
-                x={x}
-                y={12}
-                fontSize={10}
-                fill="var(--color-muted)"
-                className="font-medium"
-              >
-                {month.name}
-              </text>
-            )
-          })}
+          <caption id={captionId} className="sr-only">
+            {caption}
+          </caption>
+          <thead>
+            <tr role="row">
+              <td role="gridcell" className="w-8" />
+              {spans.map(({ label, span }) => (
+                <th
+                  key={`${label.monthIndex}-${label.weekIndex}`}
+                  role="columnheader"
+                  scope="col"
+                  colSpan={span}
+                  className="pb-1 text-left text-[10px] font-medium text-muted"
+                >
+                  {label.name}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: DAYS_IN_WEEK }, (_, dayIndex) => (
+              <tr key={dayIndex} role="row">
+                <th
+                  role="rowheader"
+                  scope="row"
+                  className="w-8 pr-1 text-left align-middle text-[9px] font-medium text-muted"
+                >
+                  {VISIBLE_WEEKDAY_ROWS.includes(dayIndex) ? (
+                    names[dayIndex]
+                  ) : (
+                    <span className="sr-only">{names[dayIndex]}</span>
+                  )}
+                </th>
 
-          {/* Day of Week Labels (Mon, Wed, Fri) */}
-          <text
-            x={0}
-            y={TOP_OFFSET + 1 * STEP + 8}
-            fontSize={9}
-            fill="var(--color-muted)"
-            className="font-medium"
-          >
-            {locale === 'es' ? 'Lun' : 'Mon'}
-          </text>
-          <text
-            x={0}
-            y={TOP_OFFSET + 3 * STEP + 8}
-            fontSize={9}
-            fill="var(--color-muted)"
-            className="font-medium"
-          >
-            {locale === 'es' ? 'Mié' : 'Wed'}
-          </text>
-          <text
-            x={0}
-            y={TOP_OFFSET + 5 * STEP + 8}
-            fontSize={9}
-            fill="var(--color-muted)"
-            className="font-medium"
-          >
-            {locale === 'es' ? 'Vie' : 'Fri'}
-          </text>
+                {weeks.map((week) => {
+                  const day = week.days[dayIndex]
 
-          {/* Contribution Cells */}
-          {weeks.map((week) => {
-            const colX = LEFT_OFFSET + week.weekIndex * STEP
+                  if (!day) {
+                    return (
+                      <td
+                        key={week.weekIndex}
+                        role="gridcell"
+                        className="size-2.5 p-0"
+                        aria-hidden="true"
+                      />
+                    )
+                  }
 
-            return (
-              <g key={week.weekIndex} transform={`translate(${colX}, ${TOP_OFFSET})`}>
-                {week.days.map((day, dayIndex) => {
-                  if (!day) return null
-
-                  const cellY = dayIndex * STEP
-                  const fillColor = COLOR_LEVELS[day.level]
-                  const isHovered = hoveredState?.day.date === day.date
+                  const at = { week: week.weekIndex, day: dayIndex }
+                  const isFocusTarget =
+                    focus.week === week.weekIndex && focus.day === dayIndex
 
                   return (
-                    <rect
-                      key={day.date}
-                      x={0}
-                      y={cellY}
-                      width={CELL_SIZE}
-                      height={CELL_SIZE}
-                      rx={CELL_RADIUS}
-                      ry={CELL_RADIUS}
-                      fill={fillColor}
-                      stroke={isHovered ? 'var(--color-primary)' : 'transparent'}
-                      strokeWidth={1.5}
-                      className="cursor-pointer transition-all duration-100 hover:opacity-85"
-                      onMouseEnter={(e) => handleCellMouseEnter(day, e)}
-                      onMouseLeave={handleCellMouseLeave}
+                    <td
+                      key={week.weekIndex}
                       role="gridcell"
-                      aria-label={`${day.count} eventos de trazabilidad el ${day.formattedDate}`}
+                      data-cell={`${week.weekIndex}-${dayIndex}`}
+                      data-level={day.level}
+                      tabIndex={isFocusTarget ? 0 : -1}
+                      aria-label={dayLabel(day)}
+                      onKeyDown={(event) => onKeyDown(event, at)}
+                      onFocus={(event) => {
+                        setFocus(at)
+                        show(day, event.currentTarget)
+                      }}
+                      onBlur={hide}
+                      onMouseEnter={(event) => show(day, event.currentTarget)}
+                      onMouseLeave={hide}
+                      className={`size-2.5 rounded-[2px] p-0 transition-opacity duration-100 hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary ${LEVEL_CLASSES[day.level]}`}
                     />
                   )
                 })}
-              </g>
-            )
-          })}
-        </svg>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Legend & Footer */}
-      <div className={`mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 text-xs text-muted sm:flex-row sm:items-center ${footerNote ? 'sm:justify-between' : 'sm:justify-end'}`}>
-        {footerNote && (
-          <span className="inline-flex items-center gap-1.5 text-[11px]">
-            <span className="size-1.5 rounded-full bg-pass" />
-            {footerNote}
-          </span>
-        )}
-
+      <div className="mt-3 flex flex-col gap-2 border-t border-border/40 pt-3 text-xs text-muted sm:flex-row sm:items-center sm:justify-end">
         <div className="flex items-center gap-1.5 text-[11px]">
           <span>{lessLabel}</span>
-          {COLOR_LEVELS.map((color, i) => (
+          {LEVEL_CLASSES.map((levelClass) => (
             <span
-              key={i}
-              className="inline-block size-2.5 rounded-[2px] border border-border/40"
-              style={{ backgroundColor: color }}
+              key={levelClass}
+              className={`inline-block size-2.5 rounded-[2px] border border-border/40 ${levelClass}`}
               aria-hidden="true"
             />
           ))}

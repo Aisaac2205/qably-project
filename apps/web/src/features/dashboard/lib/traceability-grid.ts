@@ -13,6 +13,18 @@ import type {
 } from '../types/traceability-calendar'
 
 const DAYS_IN_WEEK = 7
+const REFERENCE_SUNDAY = new Date(2024, 0, 7)
+
+export function weekdayNames(locale: 'es' | 'en'): string[] {
+  const intlLocale = locale === 'es' ? 'es-ES' : 'en-US'
+
+  return Array.from({ length: DAYS_IN_WEEK }, (_, offset) => {
+    const day = new Date(REFERENCE_SUNDAY)
+    day.setDate(day.getDate() + offset)
+
+    return day.toLocaleDateString(intlLocale, { weekday: 'short' })
+  })
+}
 
 export type LevelThresholds = readonly [number, number, number]
 

@@ -311,6 +311,8 @@
     "more": "Más",
     "traceabilityFooter": "Trazabilidad inmutable verificada bidireccionalmente",
     "traceabilityDayEvents": "{{count}} eventos de trazabilidad el {{date}}.",
+    "traceabilityDayEvent": "1 evento de trazabilidad el {{date}}.",
+    "traceabilityCalendarLabel": "Calendario de trazabilidad de {{year}}",
     "traceabilityDayEmpty": "Sin eventos el {{date}}.",
     "governanceHumanAuthority": "Se requiere autoridad humana para toda publicación",
     "governanceTraceability": "Trazabilidad bidireccional por diseño",

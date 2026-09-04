@@ -54,20 +54,23 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     expect(screen.queryByRole('link', { name: /Review inbox/i })).not.toBeInTheDocument()
   })
 
-  it('renders the SVG contribution grid with 53 weeks and month labels', async () => {
+  it('exposes the calendar as a table labelled in the active locale', async () => {
     await act(async () => {
       renderWithQuery(<TraceabilitySection />)
     })
 
-    const svg = screen.getByRole('img', {
-      name: /Calendario de trazabilidad y gobernanza de 2026/i,
-    })
-    expect(svg).toBeInTheDocument()
+    const year = new Date().getFullYear()
+    expect(
+      screen.getByRole('grid', { name: new RegExp(`${year} traceability calendar`, 'i') }),
+    ).toBeInTheDocument()
+  })
 
-    // Day labels
-    expect(screen.getByText(/Mon|Lun/)).toBeInTheDocument()
-    expect(screen.getByText(/Wed|Mié/)).toBeInTheDocument()
-    expect(screen.getByText(/Fri|Vie/)).toBeInTheDocument()
+  it('gives every weekday a row header, not only the three it shows', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    expect(screen.getAllByRole('rowheader')).toHaveLength(7)
   })
 
   it('renders clean dropdown selectors for stage filtering and year in the header', async () => {

@@ -49,6 +49,15 @@
      --fg-muted: that token is a TEXT color, this one is a BACKGROUND. */
   --surface-hover:     oklch(0.930 0.004 85);
 
+  /* Traceability heatmap — encodes event VOLUME, never quality. Deliberately
+     the brand ink ramp rather than the pass green: a day of failing runs must
+     not read as a good day. */
+  --heatmap-l0:        oklch(0.930 0.004 85);
+  --heatmap-l1:        oklch(0.800 0.006 85);
+  --heatmap-l2:        oklch(0.640 0.008 85);
+  --heatmap-l3:        oklch(0.460 0.007 85);
+  --heatmap-l4:        oklch(0.285 0.005 85);
+
   /* Auth mesh — decorative panel only, never for content or status.
      The shader's colour-dodge grain doubles each channel, so these stay
      dark enough that the doubled result never reaches white. */
@@ -115,6 +124,12 @@
   --color-fail-bg:            var(--status-fail-bg);
   --color-destructive:        var(--status-fail);
   --color-surface-hover:      var(--surface-hover);
+
+  --color-heatmap-l0:         var(--heatmap-l0);
+  --color-heatmap-l1:         var(--heatmap-l1);
+  --color-heatmap-l2:         var(--heatmap-l2);
+  --color-heatmap-l3:         var(--heatmap-l3);
+  --color-heatmap-l4:         var(--heatmap-l4);
 
   /* Elevation tokens — tinted to the ink hue, never pure black.
      shadow-card: resting cards. shadow-pop: dialogs, menus, popovers. */
