@@ -193,7 +193,12 @@ export class SuitesService {
 
     const row = await this.prisma.$transaction(async (tx) => {
       await tx.testCase.create({
-        data: { ...input, suiteId, position: existing.cases.length },
+        data: {
+          ...input,
+          suiteId,
+          projectId: existing.projectId,
+          position: existing.cases.length,
+        },
       });
 
       return tx.suite.findUniqueOrThrow({

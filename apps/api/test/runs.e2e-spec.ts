@@ -290,7 +290,12 @@ describe('Runs ingestion (e2e)', () => {
     expect(prisma.testCase.createMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: [
-          { suiteId: 'suite-adopted', name: 'Adds to cart', state: 'draft' },
+          {
+            suiteId: 'suite-adopted',
+            projectId: 'project-1',
+            name: 'Adds to cart',
+            state: 'draft',
+          },
         ],
       }),
     );

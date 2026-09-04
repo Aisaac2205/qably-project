@@ -317,7 +317,14 @@ describe('RunsService.ingest test case linking', () => {
     });
 
     expect(prisma.testCase.createMany).toHaveBeenCalledWith({
-      data: [{ suiteId: 'suite-1', name: 'Unmatched case', state: 'draft' }],
+      data: [
+        {
+          suiteId: 'suite-1',
+          projectId: 'project-1',
+          name: 'Unmatched case',
+          state: 'draft',
+        },
+      ],
       skipDuplicates: true,
     });
 
@@ -366,7 +373,14 @@ describe('RunsService.ingest known suite with unregistered cases', () => {
     });
 
     expect(prisma.testCase.createMany).toHaveBeenCalledWith({
-      data: [{ suiteId: 'suite-1', name: 'A brand new case', state: 'draft' }],
+      data: [
+        {
+          suiteId: 'suite-1',
+          projectId: 'project-1',
+          name: 'A brand new case',
+          state: 'draft',
+        },
+      ],
       skipDuplicates: true,
     });
   });

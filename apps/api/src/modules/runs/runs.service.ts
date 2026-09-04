@@ -86,6 +86,7 @@ export class RunsService {
       const testCaseIdByName = await this.ensureOfficialCases(
         tx,
         suite.id,
+        apiKey.projectId,
         input.cases.map((testCase) => testCase.name),
       );
 
@@ -207,6 +208,7 @@ export class RunsService {
   private async ensureOfficialCases(
     tx: AdoptionTx,
     suiteId: string,
+    projectId: string,
     caseNames: string[],
   ): Promise<Map<string, string>> {
     const uniqueNames = [...new Set(caseNames)];
@@ -225,6 +227,7 @@ export class RunsService {
     await tx.testCase.createMany({
       data: missingNames.map((name) => ({
         suiteId,
+        projectId,
         name,
         state: 'draft' as const,
       })),

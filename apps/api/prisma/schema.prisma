@@ -56,6 +56,7 @@ model User {
   runs                    Run[]
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  reviewDecisions         ReviewDecision[]
 
   @@unique([email])
   @@map("user")
@@ -147,23 +148,26 @@ model OrgMember {
 }
 
 model Project {
-  id               String           @id @default(cuid())
-  organizationId   String
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name             String
-  description      String?
-  connectionId     String?
-  connection       Connection?      @relation(fields: [connectionId], references: [id], onDelete: SetNull)
-  technologies     String[]         @default([])
-  testFilePatterns String[]         @default(["*.spec.ts", "*.test.ts"])
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  suites           Suite[]
-  apiKeys          ApiKey[]
-  runs             Run[]
-  ingestionBatches IngestionBatch[]
-  codeChanges      CodeChange[]
-  evidence         Evidence[]
+  id                String              @id @default(cuid())
+  organizationId    String
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  connectionId      String?
+  connection        Connection?         @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  technologies      String[]            @default([])
+  testFilePatterns  String[]            @default(["*.spec.ts", "*.test.ts"])
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  suites            Suite[]
+  apiKeys           ApiKey[]
+  runs              Run[]
+  ingestionBatches  IngestionBatch[]
+  codeChanges       CodeChange[]
+  evidence          Evidence[]
+  testCases         TestCase[]
+  proposals         ExtractedProposal[]
+  traceabilityLinks TraceabilityLink[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -212,22 +216,29 @@ model Suite {
 }
 
 model TestCase {
-  id             String       @id @default(cuid())
-  suiteId        String
-  suite          Suite        @relation(fields: [suiteId], references: [id], onDelete: Cascade)
-  name           String
-  steps          String[]     @default([])
-  expectedResult String       @default("")
-  priority       CasePriority @default(medium)
-  state          CaseState    @default(active)
-  position       Int          @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  runCases       RunCase[]
+  id               String              @id @default(cuid())
+  suiteId          String
+  suite            Suite               @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  projectId        String
+  project          Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  steps            String[]            @default([])
+  expectedResult   String              @default("")
+  priority         CasePriority        @default(medium)
+  state            CaseState           @default(active)
+  position         Int                 @default(0)
+  currentVersionId String?             @unique
+  currentVersion   TestCaseVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  runCases         RunCase[]
+  versions         TestCaseVersion[]   @relation("TestCaseVersions")
+  proposals        ExtractedProposal[]
 
   @@unique([suiteId, name])
   @@index([suiteId])
   @@index([suiteId, position])
+  @@index([projectId])
   @@map("test_case")
 }
 
@@ -303,15 +314,16 @@ enum IngestionBatchStatus {
 }
 
 model Evidence {
-  id          String       @id @default(cuid())
+  id          String              @id @default(cuid())
   projectId   String
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   kind        EvidenceKind
   title       String
   uri         String
   excerpt     String?
-  createdAt   DateTime     @default(now())
+  createdAt   DateTime            @default(now())
   codeChanges CodeChange[]
+  proposals   ExtractedProposal[]
 
   @@index([projectId])
   @@map("evidence")
@@ -334,24 +346,136 @@ model IngestionBatch {
 }
 
 model CodeChange {
-  id                String         @id @default(cuid())
+  id                String             @id @default(cuid())
   projectId         String
-  project           Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
   batchId           String
-  batch             IngestionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batch             IngestionBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
   evidenceId        String
-  evidence          Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  evidence          Evidence           @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   pullRequestNumber Int?
   commitSha         String
   filePath          String
-  diff              String         @default("")
+  diff              String             @default("")
   detectedPattern   String?
-  createdAt         DateTime       @default(now())
+  createdAt         DateTime           @default(now())
+  proposal          ExtractedProposal?
 
   @@unique([batchId, filePath])
   @@index([projectId])
   @@index([batchId])
   @@map("code_change")
+}
+
+enum ProposalStatus {
+  in_review
+  approved
+  rejected
+  changes_requested
+}
+
+enum ReviewDecisionAction {
+  approved
+  rejected
+  changes_requested
+}
+
+enum TraceabilityEntityType {
+  code_change
+  evidence
+  proposal
+  test_case
+  test_case_version
+  run
+  run_case
+  quality_risk
+}
+
+enum TraceabilityRelation {
+  evidence_for
+  produced
+  version_of
+  executed_as
+  signals
+}
+
+model ExtractedProposal {
+  id               String           @id @default(cuid())
+  projectId        String
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evidenceId       String
+  evidence         Evidence         @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  codeChangeId     String?          @unique
+  codeChange       CodeChange?      @relation(fields: [codeChangeId], references: [id], onDelete: SetNull)
+  targetTestCaseId String?
+  targetTestCase   TestCase?        @relation(fields: [targetTestCaseId], references: [id], onDelete: SetNull)
+  status           ProposalStatus   @default(in_review)
+  title            String
+  objective        String           @default("")
+  preconditions    String[]         @default([])
+  steps            String[]         @default([])
+  expectedResult   String           @default("")
+  priority         CasePriority     @default(medium)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  decisions        ReviewDecision[]
+
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([targetTestCaseId])
+  @@map("extracted_proposal")
+}
+
+model ReviewDecision {
+  id         String               @id @default(cuid())
+  proposalId String
+  proposal   ExtractedProposal    @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  actorId    String
+  actor      User                 @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  action     ReviewDecisionAction
+  comment    String?
+  decidedAt  DateTime             @default(now())
+
+  @@index([proposalId])
+  @@index([actorId])
+  @@map("review_decision")
+}
+
+model TestCaseVersion {
+  id             String       @id @default(cuid())
+  testCaseId     String
+  testCase       TestCase     @relation("TestCaseVersions", fields: [testCaseId], references: [id], onDelete: Cascade)
+  currentFor     TestCase?    @relation("CurrentVersion")
+  version        Int
+  title          String
+  objective      String       @default("")
+  preconditions  String[]     @default([])
+  steps          String[]     @default([])
+  expectedResult String       @default("")
+  priority       CasePriority @default(medium)
+  publishedAt    DateTime     @default(now())
+
+  @@unique([testCaseId, version])
+  @@index([testCaseId])
+  @@map("test_case_version")
+}
+
+model TraceabilityLink {
+  id        String                 @id @default(cuid())
+  projectId String
+  project   Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromType  TraceabilityEntityType
+  fromId    String
+  toType    TraceabilityEntityType
+  toId      String
+  relation  TraceabilityRelation
+  createdAt DateTime               @default(now())
+
+  @@unique([fromType, fromId, toType, toId, relation])
+  @@index([projectId])
+  @@index([fromType, fromId])
+  @@index([toType, toId])
+  @@map("traceability_link")
 }
 
 enum RunStatus {
@@ -491,16 +615,16 @@ model NotificationPreference {
 }
 
 model NotificationWebhook {
-  id             String                   @id @default(cuid())
+  id             String                  @id @default(cuid())
   organizationId String
-  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   type           NotificationWebhookType
   name           String
   encryptedUrl   String
-  enabled        Boolean                  @default(true)
+  enabled        Boolean                 @default(true)
   eventTypes     NotificationEventType[]
-  createdAt      DateTime                 @default(now())
-  updatedAt      DateTime                 @updatedAt
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   @@index([organizationId])
   @@map("notification_webhook")
