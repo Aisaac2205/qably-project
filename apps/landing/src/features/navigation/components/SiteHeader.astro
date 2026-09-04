@@ -1,0 +1,196 @@
+---
+import { List, X } from '@phosphor-icons/react';
+import { getDictionary } from '../../i18n/get-dictionary';
+import { getAuthUrl } from '../../../lib/auth-config';
+import type { Locale } from '../../i18n/types';
+
+interface Props {
+  locale: Locale;
+  altHref?: string;
+}
+
+const { locale, altHref } = Astro.props;
+const dict = getDictionary(locale);
+const nav = dict.nav;
+const isEn = locale === 'en';
+const homeHref = isEn ? '/en' : '/';
+const docsHref = isEn ? '/en/docs' : '/docs';
+const languageHref = altHref ?? (isEn ? '/' : '/en');
+const authUrl = getAuthUrl('/projects');
+const navLink = 'text-xs font-medium text-fg-muted hover:text-fg transition-colors font-sans';
+---
+
+<header
+  data-site-header
+  class="fixed top-0 left-0 right-0 w-full z-50 border-b border-border bg-bg/85 backdrop-blur-xl"
+>
+  <nav class="max-w-7xl w-full mx-auto px-6 py-3.5 flex items-center justify-between">
+    <a href={homeHref} class="flex items-center gap-2 group" aria-label="Qably Home">
+      <img
+        src="/qably-icon.svg"
+        alt="Qably"
+        class="h-6 w-auto brightness-0 invert object-contain transition-opacity group-hover:opacity-90"
+      />
+    </a>
+
+    <div class="hidden md:flex items-center justify-center gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+      <a href={`${homeHref}#getting-started`} class={navLink}>{nav.gettingStarted}</a>
+      <a href={`${homeHref}#features`} class={navLink}>{nav.features}</a>
+      <a href={docsHref} class={navLink}>{nav.documentation}</a>
+      <a href={`${homeHref}#pricing`} class={navLink}>{nav.pricing}</a>
+    </div>
+
+    <div class="hidden md:flex items-center gap-2">
+      <a
+        href={languageHref}
+        class="flex items-center gap-1.5 px-2 py-1.5 text-xs text-fg-muted hover:text-fg transition-colors cursor-pointer select-none"
+        title={isEn ? 'Cambiar a Español' : 'Switch to English'}
+        aria-label={isEn ? 'Cambiar a Español' : 'Switch to English'}
+      >
+        <img src="/traducir.png" alt="" aria-hidden="true" class="size-4 brightness-0 invert object-contain" />
+        <span class="font-medium text-[11px]">{isEn ? 'ES' : 'EN'}</span>
+      </a>
+
+      <a href={authUrl} rel="noopener noreferrer">
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-all cursor-pointer font-sans h-9 px-4 text-xs hover:bg-bg-hover text-fg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {nav.signIn}
+        </button>
+      </a>
+
+      <a href={authUrl} rel="noopener noreferrer">
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-all cursor-pointer font-sans h-9 px-4 text-xs bg-primary text-primary-fg hover:bg-primary-hover active:scale-[0.98] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        >
+          {nav.signUp}
+        </button>
+      </a>
+    </div>
+
+    <div class="flex md:hidden items-center gap-1">
+      <a
+        href={languageHref}
+        class="flex items-center gap-1.5 px-2 py-1.5 text-xs text-fg-muted hover:text-fg transition-colors cursor-pointer select-none"
+        title={isEn ? 'Cambiar a Español' : 'Switch to English'}
+        aria-label={isEn ? 'Cambiar a Español' : 'Switch to English'}
+      >
+        <img src="/traducir.png" alt="" aria-hidden="true" class="size-4 brightness-0 invert object-contain" />
+        <span class="font-medium text-[11px]">{isEn ? 'ES' : 'EN'}</span>
+      </a>
+
+      <button
+        type="button"
+        data-menu-toggle
+        data-open-label={isEn ? 'Open menu' : 'Abrir menú'}
+        data-close-label={isEn ? 'Close menu' : 'Cerrar menú'}
+        class="flex items-center justify-center p-2 rounded-lg text-fg-muted hover:text-fg hover:bg-bg-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary cursor-pointer"
+        aria-label={isEn ? 'Open menu' : 'Abrir menú'}
+        aria-expanded="false"
+        aria-controls="site-header-drawer"
+      >
+        <span data-menu-icon-open aria-hidden="true"><List size={24} /></span>
+        <span data-menu-icon-close aria-hidden="true" hidden><X size={24} /></span>
+      </button>
+    </div>
+  </nav>
+
+  <div
+    id="site-header-drawer"
+    data-menu-drawer
+    hidden
+    class="md:hidden flex flex-col justify-between p-6 h-[calc(100dvh-64px)] overflow-y-auto bg-bg"
+  >
+    <div class="flex flex-col gap-4 font-sans text-left pt-2">
+      <a href={`${homeHref}#getting-started`} data-menu-link class="text-xl font-medium text-fg hover:text-fg transition-colors py-3 border-b border-border">
+        {nav.gettingStarted}
+      </a>
+      <a href={`${homeHref}#features`} data-menu-link class="text-xl font-medium text-fg hover:text-fg transition-colors py-3 border-b border-border">
+        {nav.features}
+      </a>
+      <a href={docsHref} data-menu-link class="text-xl font-medium text-fg hover:text-fg transition-colors py-3 border-b border-border">
+        {nav.documentation}
+      </a>
+      <a href={`${homeHref}#pricing`} data-menu-link class="text-xl font-medium text-fg hover:text-fg transition-colors py-3 border-b border-border">
+        {nav.pricing}
+      </a>
+    </div>
+
+    <div class="flex flex-col gap-3 pt-6 pb-6">
+      <a href={authUrl} class="w-full">
+        <button type="button" class="w-full inline-flex items-center justify-center rounded-lg font-medium transition-all cursor-pointer font-sans h-11 px-6 text-sm bg-bg-elevated border border-border text-fg">
+          {nav.signIn}
+        </button>
+      </a>
+      <a href={authUrl} class="w-full">
+        <button type="button" class="w-full inline-flex items-center justify-center rounded-lg font-medium transition-all cursor-pointer font-sans h-11 px-6 text-sm bg-primary text-primary-fg">
+          {nav.signUp}
+        </button>
+      </a>
+    </div>
+  </div>
+</header>
+
+<script>
+  function closeMenu(header: HTMLElement): void {
+    const toggle = header.querySelector<HTMLElement>('[data-menu-toggle]');
+    const drawer = header.querySelector<HTMLElement>('[data-menu-drawer]');
+    const iconOpen = header.querySelector<HTMLElement>('[data-menu-icon-open]');
+    const iconClose = header.querySelector<HTMLElement>('[data-menu-icon-close]');
+
+    if (drawer) drawer.hidden = true;
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.setAttribute('aria-label', toggle.dataset.openLabel ?? '');
+    }
+    if (iconOpen) iconOpen.hidden = false;
+    if (iconClose) iconClose.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function openMenu(header: HTMLElement): void {
+    const toggle = header.querySelector<HTMLElement>('[data-menu-toggle]');
+    const drawer = header.querySelector<HTMLElement>('[data-menu-drawer]');
+    const iconOpen = header.querySelector<HTMLElement>('[data-menu-icon-open]');
+    const iconClose = header.querySelector<HTMLElement>('[data-menu-icon-close]');
+
+    if (drawer) drawer.hidden = false;
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('aria-label', toggle.dataset.closeLabel ?? '');
+    }
+    if (iconOpen) iconOpen.hidden = true;
+    if (iconClose) iconClose.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const header = target.closest<HTMLElement>('[data-site-header]');
+
+    const toggle = target.closest<HTMLElement>('[data-menu-toggle]');
+    if (toggle) {
+      const currentHeader = toggle.closest<HTMLElement>('[data-site-header]');
+      if (!currentHeader) return;
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      if (isOpen) closeMenu(currentHeader);
+      else openMenu(currentHeader);
+      return;
+    }
+
+    if (target.closest('[data-menu-link]') && header) {
+      closeMenu(header);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const header = document.querySelector<HTMLElement>('[data-site-header]');
+    const toggle = header?.querySelector<HTMLElement>('[data-menu-toggle]');
+    if (header && toggle?.getAttribute('aria-expanded') === 'true') closeMenu(header);
+  });
+</script>

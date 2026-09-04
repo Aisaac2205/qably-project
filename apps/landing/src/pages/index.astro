@@ -1,6 +1,7 @@
 ---
 import Landing from "../layouts/Landing.astro";
 import Component from "../components/ui/saa-s-template";
+import SiteHeader from "../features/navigation/components/SiteHeader.astro";
 import IntegrationsMarquee from "../features/integrations/components/IntegrationsMarquee.astro";
 import FeaturesGrid from "../features/features-grid/components/FeaturesGrid.astro";
 import { DocumentationSection } from "../features/documentation/components/DocumentationSection";
@@ -14,6 +15,8 @@ const dict = getDictionary(locale);
 ---
 
 <Landing locale={locale}>
+  <SiteHeader locale={locale} />
+
   <div id="main-content" class="flex-grow">
     {/* Hero with live Qably Dashboard preview */}
     <Component client:load locale={locale} />

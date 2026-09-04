@@ -1,44 +1,16 @@
 ---
 import Landing from "../layouts/Landing.astro";
 import Footer from "../features/navigation/components/Footer.astro";
-
-import { getAuthUrl } from "../lib/auth-config";
+import SiteHeader from "../features/navigation/components/SiteHeader.astro";
 
 const locale = "es";
-const authUrl = getAuthUrl('/projects');
 ---
 
 <Landing locale={locale} title="Términos de Servicio — Qably" description="Términos de servicio y acuerdos de nivel de servicio (SLA) de la plataforma de gestión QA automatizada Qably.">
-  {/* Header */}
-  <header class="sticky top-0 z-50 border-b border-white/[0.08] bg-black/85 backdrop-blur-xl">
-    <div class="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
-      <div class="flex items-center gap-6">
-        <a href="/" class="flex items-center gap-2 group" aria-label="Volver a la landing">
-          <img src="/qably-sidebar.svg" alt="Qably" class="h-6 w-auto brightness-0 invert object-contain" />
-        </a>
-        <span class="text-xs text-zinc-500 font-sans hidden sm:inline">Legal</span>
-      </div>
-
-      <div class="flex items-center gap-3 font-sans">
-        <a
-          href="/en/terms"
-          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-zinc-900/60 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white"
-        >
-          <img src="/traducir.png" alt="Traducir" class="size-3.5 brightness-0 invert object-contain" />
-          <span>EN</span>
-        </a>
-        <a href="/" class="text-xs text-zinc-400 hover:text-white transition-colors">Volver</a>
-        <a href={authUrl}>
-          <button class="px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-zinc-200 transition-colors cursor-pointer">
-            Ir a la App
-          </button>
-        </a>
-      </div>
-    </div>
-  </header>
+  <SiteHeader locale={locale} altHref="/en/terms" />
 
   {/* Main Terms Content */}
-  <main id="main-content" class="max-w-4xl mx-auto px-6 py-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
+  <main id="main-content" class="max-w-4xl mx-auto px-6 pt-28 pb-16 flex-grow font-sans text-zinc-300 leading-relaxed space-y-12">
     <header class="space-y-3 pb-8 border-b border-white/[0.08]">
       <p class="text-xs text-zinc-500 uppercase tracking-wider font-medium">Última actualización: 3 de septiembre de 2026</p>
       <h1 class="text-3xl sm:text-5xl font-semibold tracking-tight text-white">Términos de Servicio</h1>
