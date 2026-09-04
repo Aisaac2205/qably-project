@@ -32,23 +32,22 @@ const view: ProjectRepositoryView = {
   },
   codeChanges: [
     {
-      id: 'change-1', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+      id: 'change-1', projectId: 'proj-1', commitSha: '8f3c2a1d4e5f',
       filePath: 'tests/checkout/empty-cart.spec.ts',
-      diff: '+  await expect(checkoutButton).toBeDisabled()',
-      detectedPattern: '*.spec.ts', evidenceId: 'evidence-1',
+      diff: '', detectedPattern: '*.spec.ts', evidenceId: 'evidence-1',
     },
     {
-      id: 'change-2', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
+      id: 'change-2', projectId: 'proj-1', commitSha: '8f3c2a1d4e5f',
       filePath: 'tests/checkout/cart-total.test.ts',
-      diff: '+  expect(total).toBe(42)', detectedPattern: '*.test.ts', evidenceId: 'evidence-2',
+      diff: '', detectedPattern: '*.test.ts', evidenceId: 'evidence-2',
     },
     {
-      id: 'change-3', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-      filePath: 'src/checkout/cart-service.ts', diff: '+  return total', evidenceId: 'evidence-3',
+      id: 'change-3', projectId: 'proj-1', commitSha: '8f3c2a1d4e5f',
+      filePath: 'src/checkout/cart-service.ts', diff: '', evidenceId: 'evidence-3',
     },
     {
-      id: 'change-4', projectId: 'proj-1', pullRequestNumber: 184, commitSha: '8f3c2a1d4e5f',
-      filePath: 'docs/checkout.md', diff: '+ Updated checkout guidance', evidenceId: 'evidence-4',
+      id: 'change-4', projectId: 'proj-1', commitSha: '8f3c2a1d4e5f',
+      filePath: 'docs/checkout.md', diff: '', evidenceId: 'evidence-4',
     },
   ],
   evidence: [
@@ -77,6 +76,19 @@ const view: ProjectRepositoryView = {
       createdAt: '2026-06-16T10:45:00Z',
     },
   ],
+}
+
+const docsOnlyView: ProjectRepositoryView = {
+  ...view,
+  batch: { ...view.batch!, codeChangeIds: ['change-4'] },
+  codeChanges: [view.codeChanges[3]],
+  evidence: [view.evidence[3]],
+}
+
+function localTimestamp(iso: string, locale: 'en' | 'es') {
+  return new Intl.DateTimeFormat(locale === 'es' ? 'es-ES' : 'en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(iso))
 }
 
 async function renderPage(projectId = 'proj-1') {
@@ -122,62 +134,124 @@ describe('ProjectRepositoryPage', () => {
     expect(readRepository).toHaveBeenCalledWith('proj-1', expect.anything())
   })
 
-  it('presents the completed ingestion with inspectable evidence', async () => {
+  it('formats the ingestion timestamp in the local zone instead of forcing UTC', async () => {
+    const OriginalFormat = Intl.DateTimeFormat
+    const spy = vi
+      .spyOn(Intl, 'DateTimeFormat')
+      .mockImplementation(function (locales?: unknown, options?: unknown) {
+        return new (OriginalFormat as unknown as new (
+          locales?: unknown,
+          options?: unknown,
+        ) => Intl.DateTimeFormat)(locales, options)
+      } as never)
+
+    await renderPage()
+
+    const usedUtc = spy.mock.calls.some(
+      ([, options]) => (options as Intl.DateTimeFormatOptions | undefined)?.timeZone === 'UTC',
+    )
+    spy.mockRestore()
+
+    expect(usedUtc).toBe(false)
+    expect(screen.getByText(localTimestamp('2026-06-16T10:45:00Z', 'en'))).toBeInTheDocument()
+  })
+
+  it('presents the ingestion metadata with the commit that produced it', async () => {
     await renderPage()
 
     expect(screen.getByRole('heading', { level: 2, name: 'Ingestion' })).toBeInTheDocument()
     expect(screen.getByText('Completed')).toBeInTheDocument()
     expect(screen.getByText('Webhook')).toBeInTheDocument()
-    expect(screen.getByText('Jun 16, 2026, 10:45 AM')).toBeInTheDocument()
-    expect(screen.getByText('PR #184')).toBeInTheDocument()
     expect(screen.getByText('8f3c2a1')).toBeInTheDocument()
-    expect(screen.getAllByText('tests/checkout/empty-cart.spec.ts')).toHaveLength(2)
-    expect(screen.getByText(/checkoutButton\)\.toBeDisabled/)).toBeInTheDocument()
-    expect(
-      screen.getAllByText('https://github.com/acme/ecommerce-app/blob/8f3c2a1d4e5f/tests/checkout/empty-cart.spec.ts'),
-    ).toHaveLength(2)
   })
 
-  it('presents only pattern-matched tests from the ingested batch', async () => {
+  it('never renders a diff row or a pull request number the webhook does not provide', async () => {
     await renderPage()
 
-    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
-    expect(detectedTests).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
-    expect(detectedTests).toHaveTextContent('tests/checkout/cart-total.test.ts')
-    expect(detectedTests).toHaveTextContent('*.spec.ts')
-    expect(detectedTests).toHaveTextContent('*.test.ts')
-    expect(detectedTests).not.toHaveTextContent('src/checkout/cart-service.ts')
-    expect(detectedTests).not.toHaveTextContent('docs/checkout.md')
+    expect(screen.queryByText('Diff')).not.toBeInTheDocument()
+    expect(screen.queryByText(/PR #/)).not.toBeInTheDocument()
+    expect(screen.queryByText('undefined')).not.toBeInTheDocument()
   })
 
-  it('filters detected tests by pattern', async () => {
+  it('lists every changed file in the batch, not only the first one', async () => {
+    await renderPage()
+
+    const files = screen.getByRole('region', { name: 'Changed files' })
+    expect(within(files).getAllByRole('listitem')).toHaveLength(4)
+    expect(files).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+    expect(files).toHaveTextContent('tests/checkout/cart-total.test.ts')
+    expect(files).toHaveTextContent('src/checkout/cart-service.ts')
+    expect(files).toHaveTextContent('docs/checkout.md')
+  })
+
+  it('marks which changed files matched a declared test pattern', async () => {
+    await renderPage()
+
+    const files = screen.getByRole('region', { name: 'Changed files' })
+    const specItem = within(files).getByText('tests/checkout/empty-cart.spec.ts').closest('li')
+    const docsItem = within(files).getByText('docs/checkout.md').closest('li')
+
+    expect(within(specItem!).getByText('*.spec.ts')).toBeInTheDocument()
+    expect(within(docsItem!).queryByText(/\*\./)).not.toBeInTheDocument()
+    expect(files).toHaveTextContent('4 files')
+    expect(files).toHaveTextContent('2 detected tests')
+  })
+
+  it('opens each changed file at its origin instead of printing a raw URL', async () => {
+    await renderPage()
+
+    const files = screen.getByRole('region', { name: 'Changed files' })
+    const cartTotalItem = within(files).getByText('tests/checkout/cart-total.test.ts').closest('li')
+    const link = within(cartTotalItem!).getByRole('link')
+
+    expect(link).toHaveAttribute(
+      'href',
+      'https://github.com/acme/ecommerce-app/blob/8f3c2a1d4e5f/tests/checkout/cart-total.test.ts',
+    )
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'))
+  })
+
+  it('filters changed files by declared pattern', async () => {
     const user = userEvent.setup()
     await renderPage()
 
-    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
-    await user.click(within(detectedTests).getByRole('button', { name: '*.test.ts' }))
+    const files = screen.getByRole('region', { name: 'Changed files' })
+    await user.click(within(files).getByRole('button', { name: '*.test.ts' }))
 
-    expect(detectedTests).toHaveTextContent('tests/checkout/cart-total.test.ts')
-    expect(detectedTests).not.toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+    expect(files).toHaveTextContent('tests/checkout/cart-total.test.ts')
+    expect(files).not.toHaveTextContent('tests/checkout/empty-cart.spec.ts')
+    expect(files).not.toHaveTextContent('docs/checkout.md')
 
-    await user.click(within(detectedTests).getByRole('button', { name: '*.spec.ts' }))
-    expect(detectedTests).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
-    expect(detectedTests).not.toHaveTextContent('tests/checkout/cart-total.test.ts')
-
-    await user.click(within(detectedTests).getByRole('button', { name: 'All' }))
-    expect(detectedTests).toHaveTextContent('tests/checkout/empty-cart.spec.ts')
-    expect(detectedTests).toHaveTextContent('tests/checkout/cart-total.test.ts')
+    await user.click(within(files).getByRole('button', { name: 'All' }))
+    expect(files).toHaveTextContent('docs/checkout.md')
   })
 
-  it('shows the origin evidence of every detected file, not only the first one', async () => {
+  it('explains why no tests were detected instead of showing an empty list', async () => {
+    readRepository.mockResolvedValue(structuredClone(docsOnlyView))
+
     await renderPage()
 
-    const detectedTests = screen.getByRole('region', { name: 'Detected tests' })
-    const cartTotalItem = within(detectedTests).getByText('tests/checkout/cart-total.test.ts').closest('li')
-    expect(cartTotalItem).not.toBeNull()
-    expect(
-      within(cartTotalItem!).getByText('https://github.com/acme/ecommerce-app/blob/8f3c2a1d4e5f/tests/checkout/cart-total.test.ts'),
-    ).toBeInTheDocument()
+    const files = screen.getByRole('region', { name: 'Changed files' })
+    expect(files).toHaveTextContent('This change did not touch any test file')
+    expect(files).toHaveTextContent('*.spec.ts')
+    expect(files).toHaveTextContent('*.test.ts')
+    expect(within(files).queryByRole('button', { name: '*.spec.ts' })).not.toBeInTheDocument()
+    expect(within(files).queryByRole('button', { name: 'All' })).not.toBeInTheDocument()
+    expect(files).toHaveTextContent('docs/checkout.md')
+  })
+
+  it('uses the logo of the connected provider rather than a hardcoded one', async () => {
+    readRepository.mockResolvedValue({
+      ...structuredClone(view),
+      source: { ...view.source!, provider: 'BITBUCKET', repo: 'acme/api' },
+    })
+
+    await renderPage()
+
+    expect(screen.getByText('Bitbucket')).toBeInTheDocument()
+    const logo = document.querySelector('img[src*="bitbucket"]')
+    expect(logo).not.toBeNull()
+    expect(document.querySelector('img[src*="github"]')).toBeNull()
   })
 
   it('shows an accessible error state when the ingestion batch failed, without a fabricated detection result', async () => {
@@ -193,7 +267,7 @@ describe('ProjectRepositoryPage', () => {
     expect(screen.getByText('Failed')).toBeInTheDocument()
     const alert = screen.getByRole('alert')
     expect(alert).toHaveTextContent('Extraction failed')
-    expect(screen.queryByRole('region', { name: 'Detected tests' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Changed files' })).not.toBeInTheDocument()
   })
 
   it('translates ingestion labels in Spanish', async () => {
@@ -205,12 +279,12 @@ describe('ProjectRepositoryPage', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: 'Ingesta' })).toBeInTheDocument()
     expect(screen.getByText('Completado')).toBeInTheDocument()
-    expect(screen.getByText('Solicitud de extracción')).toBeInTheDocument()
     expect(screen.getByText('Confirmación')).toBeInTheDocument()
-    expect(screen.getByText('Archivo')).toBeInTheDocument()
-    expect(screen.getByText('Diferencia')).toBeInTheDocument()
-    expect(screen.getByText('Origen')).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Pruebas detectadas' })).toHaveTextContent('Patrón')
+    expect(screen.queryByText('Diferencia')).not.toBeInTheDocument()
+    expect(screen.queryByText('Solicitud de extracción')).not.toBeInTheDocument()
+    const archivos = screen.getByRole('region', { name: 'Archivos del cambio' })
+    expect(within(archivos).getByRole('group', { name: 'Patrón' })).toBeInTheDocument()
+    expect(archivos).toHaveTextContent('4 archivos · 2 pruebas detectadas')
   })
 
   it('renders a localized no-source state without a fabricated connect action', async () => {
