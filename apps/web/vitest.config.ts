@@ -11,9 +11,12 @@ export default defineConfig({
       NEXT_PUBLIC_API_URL: 'http://localhost:3001',
     },
     setupFiles: ['./src/test/setup.ts'],
-    server: {
-      deps: {
-        inline: ['@phosphor-icons/react'],
+    deps: {
+      optimizer: {
+        web: {
+          enabled: true,
+          include: ['@phosphor-icons/react'],
+        },
       },
     },
   },
