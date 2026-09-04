@@ -250,4 +250,23 @@ describe('documentation content', () => {
       expect(new Set(labels).size).toBe(labels.length);
     }
   });
+
+  it.each(locales)(
+    '$name other-languages section never stacks a standalone code block directly after a framework subheading',
+    ({ content }) => {
+      const section = content.sections.find((candidate) => candidate.id === 'other-languages');
+      expect(section).toBeDefined();
+
+      const blocks = section!.blocks;
+      for (let i = 0; i < blocks.length - 1; i += 1) {
+        const current = blocks[i];
+        const next = blocks[i + 1];
+        const isSubheadingFollowedByCode = current.type === 'subheading' && next.type === 'code';
+        expect(
+          isSubheadingFollowedByCode,
+          `subheading "${current.type === 'subheading' ? current.text : ''}" is directly followed by a standalone code block`,
+        ).toBe(false);
+      }
+    },
+  );
 });

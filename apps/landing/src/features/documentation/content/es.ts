@@ -294,106 +294,102 @@ export const es: DocContent = {
           type: 'paragraph',
           text: 'Jest y Vitest ya están cubiertos en el paso anterior; aquí no cambia nada.',
         },
-        { type: 'subheading', text: 'Playwright' },
         {
-          type: 'paragraph',
-          text: 'El reporter de JUnit incorporado escribe a la salida estándar a menos que se indique un archivo, ya sea mediante una variable de entorno o en el archivo de configuración.',
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `# Variable de entorno
+          type: 'codeGroup',
+          label: 'Reportar JUnit XML desde cualquier lenguaje',
+          variants: [
+            {
+              language: 'shell',
+              label: 'Playwright',
+              code: `# Variable de entorno
 PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml npx playwright test --reporter=junit
 
 # Reportarlo
 node scripts/qably-report.mjs results.xml`,
-        },
-        {
-          type: 'paragraph',
-          text: "También puede configurarse una vez en playwright.config.ts: reporter: [['junit', { outputFile: 'results.xml' }]].",
-        },
-        { type: 'subheading', text: 'pytest' },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `pytest --junitxml=report.xml
+            },
+            {
+              language: 'shell',
+              label: 'pytest',
+              code: `pytest --junitxml=report.xml
 node scripts/qably-report.mjs report.xml`,
-        },
-        { type: 'subheading', text: 'Java — Maven (Surefire)' },
-        {
-          type: 'paragraph',
-          text: 'mvn test escribe un reporte por clase de prueba sin ninguna bandera extra; el plugin Surefire lo hace por defecto.',
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `mvn test
+            },
+            {
+              language: 'shell',
+              label: 'Java — Maven (Surefire)',
+              code: `mvn test
 # escribe target/surefire-reports/TEST-*.xml, un archivo por clase de prueba
 
 for f in target/surefire-reports/TEST-*.xml; do
   node scripts/qably-report.mjs "$f"
 done`,
-        },
-        { type: 'subheading', text: 'Java — Gradle' },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `./gradlew test
+            },
+            {
+              language: 'shell',
+              label: 'Java — Gradle',
+              code: `./gradlew test
 # escribe build/test-results/test/TEST-*.xml, un archivo por clase de prueba
 
 for f in build/test-results/test/TEST-*.xml; do
   node scripts/qably-report.mjs "$f"
 done`,
+            },
+            {
+              language: 'shell',
+              label: 'PHPUnit 9 y anteriores',
+              code: `# PHPUnit 9 y anteriores
+phpunit --log-junit junit.xml
+node scripts/qably-report.mjs junit.xml`,
+            },
+            {
+              language: 'shell',
+              label: 'PHPUnit 10+',
+              code: `<!-- PHPUnit 10+, en phpunit.xml -->
+<logging>
+    <junit outputFile="junit.xml"/>
+</logging>
+
+# PHPUnit 10+
+phpunit -c phpunit.xml
+node scripts/qably-report.mjs junit.xml`,
+            },
+            {
+              language: 'shell',
+              label: '.NET',
+              code: `dotnet test --logger:"junit;LogFilePath=test-result.xml"
+node scripts/qably-report.mjs test-result.xml`,
+            },
+            {
+              language: 'shell',
+              label: 'Go',
+              code: `go test -v ./... 2>&1 | go-junit-report > report.xml
+node scripts/qably-report.mjs report.xml`,
+            },
+          ],
         },
-        { type: 'subheading', text: 'PHPUnit' },
+        {
+          type: 'paragraph',
+          text: 'El reporter de JUnit incorporado en Playwright escribe a la salida estándar a menos que se indique un archivo, ya sea mediante una variable de entorno o en el archivo de configuración.',
+        },
+        {
+          type: 'paragraph',
+          text: "También puede configurarse una vez en playwright.config.ts: reporter: [['junit', { outputFile: 'results.xml' }]].",
+        },
+        {
+          type: 'paragraph',
+          text: 'mvn test escribe un reporte por clase de prueba sin ninguna bandera extra; el plugin Surefire lo hace por defecto.',
+        },
         {
           type: 'paragraph',
           text: 'PHPUnit 9 y anteriores aceptan una bandera directa por línea de comandos. PHPUnit 10 en adelante la eliminó, por lo que el archivo de salida se configura en phpunit.xml.',
         },
         {
-          type: 'code',
-          language: 'shell',
-          code: `# PHPUnit 9 y anteriores
-phpunit --log-junit junit.xml
-node scripts/qably-report.mjs junit.xml`,
-        },
-        {
-          type: 'code',
-          language: 'yaml',
-          code: `<!-- PHPUnit 10+, en phpunit.xml -->
-<logging>
-    <junit outputFile="junit.xml"/>
-</logging>`,
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `# PHPUnit 10+
-phpunit -c phpunit.xml
-node scripts/qably-report.mjs junit.xml`,
-        },
-        { type: 'subheading', text: '.NET' },
-        {
           type: 'paragraph',
           text: 'El paquete NuGet JunitXml.TestLogger se agrega como dependencia, y el logger se pasa por línea de comandos.',
         },
         {
-          type: 'code',
-          language: 'shell',
-          code: `dotnet test --logger:"junit;LogFilePath=test-result.xml"
-node scripts/qably-report.mjs test-result.xml`,
-        },
-        { type: 'subheading', text: 'Go' },
-        {
           type: 'callout',
           tone: 'warning',
           text: 'La invocación de abajo no fue verificada contra documentación actual — no había documentación indexada para go-junit-report al momento de escribir esta guía. Conviene revisar el propio repositorio de la herramienta antes de confiar en ella.',
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `go test -v ./... 2>&1 | go-junit-report > report.xml
-node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'callout',

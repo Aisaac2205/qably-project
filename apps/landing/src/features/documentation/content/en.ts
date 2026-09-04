@@ -294,106 +294,102 @@ export const en: DocContent = {
           type: 'paragraph',
           text: 'Jest and Vitest are covered in the previous step — nothing changes here.',
         },
-        { type: 'subheading', text: 'Playwright' },
         {
-          type: 'paragraph',
-          text: 'The built-in JUnit reporter writes to standard output unless a file is specified, either through an environment variable or the config file.',
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `# Environment variable
+          type: 'codeGroup',
+          label: 'Reporting JUnit XML from any language',
+          variants: [
+            {
+              language: 'shell',
+              label: 'Playwright',
+              code: `# Environment variable
 PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml npx playwright test --reporter=junit
 
 # Report it
 node scripts/qably-report.mjs results.xml`,
-        },
-        {
-          type: 'paragraph',
-          text: "It can also be configured once in playwright.config.ts: reporter: [['junit', { outputFile: 'results.xml' }]].",
-        },
-        { type: 'subheading', text: 'pytest' },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `pytest --junitxml=report.xml
+            },
+            {
+              language: 'shell',
+              label: 'pytest',
+              code: `pytest --junitxml=report.xml
 node scripts/qably-report.mjs report.xml`,
-        },
-        { type: 'subheading', text: 'Java — Maven (Surefire)' },
-        {
-          type: 'paragraph',
-          text: 'mvn test writes one report per test class with no extra flag; the Surefire plugin does this by default.',
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `mvn test
+            },
+            {
+              language: 'shell',
+              label: 'Java — Maven (Surefire)',
+              code: `mvn test
 # writes target/surefire-reports/TEST-*.xml, one file per test class
 
 for f in target/surefire-reports/TEST-*.xml; do
   node scripts/qably-report.mjs "$f"
 done`,
-        },
-        { type: 'subheading', text: 'Java — Gradle' },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `./gradlew test
+            },
+            {
+              language: 'shell',
+              label: 'Java — Gradle',
+              code: `./gradlew test
 # writes build/test-results/test/TEST-*.xml, one file per test class
 
 for f in build/test-results/test/TEST-*.xml; do
   node scripts/qably-report.mjs "$f"
 done`,
+            },
+            {
+              language: 'shell',
+              label: 'PHPUnit 9 and earlier',
+              code: `# PHPUnit 9 and earlier
+phpunit --log-junit junit.xml
+node scripts/qably-report.mjs junit.xml`,
+            },
+            {
+              language: 'shell',
+              label: 'PHPUnit 10+',
+              code: `<!-- PHPUnit 10+, in phpunit.xml -->
+<logging>
+    <junit outputFile="junit.xml"/>
+</logging>
+
+# PHPUnit 10+
+phpunit -c phpunit.xml
+node scripts/qably-report.mjs junit.xml`,
+            },
+            {
+              language: 'shell',
+              label: '.NET',
+              code: `dotnet test --logger:"junit;LogFilePath=test-result.xml"
+node scripts/qably-report.mjs test-result.xml`,
+            },
+            {
+              language: 'shell',
+              label: 'Go',
+              code: `go test -v ./... 2>&1 | go-junit-report > report.xml
+node scripts/qably-report.mjs report.xml`,
+            },
+          ],
         },
-        { type: 'subheading', text: 'PHPUnit' },
+        {
+          type: 'paragraph',
+          text: "Playwright's built-in JUnit reporter writes to standard output unless a file is specified, either through an environment variable or the config file.",
+        },
+        {
+          type: 'paragraph',
+          text: "It can also be configured once in playwright.config.ts: reporter: [['junit', { outputFile: 'results.xml' }]].",
+        },
+        {
+          type: 'paragraph',
+          text: 'mvn test writes one report per test class with no extra flag; the Surefire plugin does this by default.',
+        },
         {
           type: 'paragraph',
           text: 'PHPUnit 9 and earlier accept a direct CLI flag. PHPUnit 10 and later removed it, so the output file is configured in phpunit.xml instead.',
         },
         {
-          type: 'code',
-          language: 'shell',
-          code: `# PHPUnit 9 and earlier
-phpunit --log-junit junit.xml
-node scripts/qably-report.mjs junit.xml`,
-        },
-        {
-          type: 'code',
-          language: 'yaml',
-          code: `<!-- PHPUnit 10+, in phpunit.xml -->
-<logging>
-    <junit outputFile="junit.xml"/>
-</logging>`,
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `# PHPUnit 10+
-phpunit -c phpunit.xml
-node scripts/qably-report.mjs junit.xml`,
-        },
-        { type: 'subheading', text: '.NET' },
-        {
           type: 'paragraph',
           text: 'The JunitXml.TestLogger NuGet package is added as a dependency, and the logger is passed on the command line.',
         },
         {
-          type: 'code',
-          language: 'shell',
-          code: `dotnet test --logger:"junit;LogFilePath=test-result.xml"
-node scripts/qably-report.mjs test-result.xml`,
-        },
-        { type: 'subheading', text: 'Go' },
-        {
           type: 'callout',
           tone: 'warning',
           text: "The exact invocation below was not verified against current documentation — no indexed documentation for go-junit-report was available while writing this guide. It is worth checking the tool's own repository before relying on it.",
-        },
-        {
-          type: 'code',
-          language: 'shell',
-          code: `go test -v ./... 2>&1 | go-junit-report > report.xml
-node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'callout',
