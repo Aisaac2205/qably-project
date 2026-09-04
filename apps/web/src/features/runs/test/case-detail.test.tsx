@@ -41,6 +41,45 @@ describe('CaseDetail', () => {
     expect(screen.queryByText(/environment/i)).not.toBeInTheDocument()
   })
 
+  it('shows the real version of the linked official case', async () => {
+    await act(async () => {
+      render(
+        <CaseDetail
+          c={{
+            ...mockCase,
+            testCaseId: 'case-9',
+            officialCase: {
+              id: 'case-9',
+              suiteId: 'suite-1',
+              version: 4,
+              steps: [],
+              expectedResult: '',
+            },
+          }}
+          projectId="proj-1"
+        />,
+      )
+    })
+    expect(screen.getByText('Version 4')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /library/i })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/suites/suite-1',
+    )
+  })
+
+  it('hides the version badge and library link when the case is unlinked', async () => {
+    await act(async () => {
+      render(
+        <CaseDetail
+          c={{ ...mockCase, testCaseId: null, officialCase: null }}
+          projectId="proj-1"
+        />,
+      )
+    })
+    expect(screen.queryByText(/^Version /)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /library/i })).not.toBeInTheDocument()
+  })
+
   it('renders case name', async () => {
     await act(async () => {
       render(<CaseDetail c={mockCase} />)
