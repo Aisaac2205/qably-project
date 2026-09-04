@@ -1,4 +1,4 @@
-export type CodeLanguage = 'shell' | 'yaml' | 'typescript';
+export type CodeLanguage = 'shell' | 'yaml' | 'typescript' | 'python';
 
 export type TokenKind =
   | 'plain'
@@ -14,6 +14,16 @@ export interface CodeToken {
   kind: TokenKind;
 }
 
+export const TOKEN_CLASSES: Record<TokenKind, string> = {
+  plain: 'text-code-plain',
+  comment: 'text-code-comment italic',
+  keyword: 'text-code-keyword',
+  string: 'text-code-string',
+  number: 'text-code-number',
+  property: 'text-code-property',
+  punctuation: 'text-code-punctuation',
+};
+
 interface Rule {
   kind: TokenKind;
   pattern?: RegExp;
@@ -22,6 +32,9 @@ interface Rule {
 
 const TS_KEYWORDS =
   /^(?:import|from|export|const|let|await|async|function|return|new|typeof|null|undefined|true|false|method|headers|body)\b/;
+
+const PYTHON_KEYWORDS =
+  /^(?:import|from|as|def|return|with|raise|if|else|elif|True|False|None|and|or|not|in)\b/;
 
 const PUNCTUATION = '{}[]().,:;=>';
 
@@ -48,6 +61,14 @@ const RULES: Record<CodeLanguage, Rule[]> = {
     { kind: 'string', pattern: /^'[^'\n]*'|^"[^"\n]*"|^`[^`]*`/ },
     { kind: 'keyword', pattern: TS_KEYWORDS },
     { kind: 'property', pattern: /^[A-Za-z_$][\w$]*(?=\s*:)/ },
+    { kind: 'number', pattern: /^\b\d+(?:\.\d+)?\b/ },
+    { kind: 'punctuation', chars: PUNCTUATION },
+  ],
+  python: [
+    { kind: 'comment', pattern: /^#[^\n]*/ },
+    { kind: 'string', pattern: /^f'[^'\n]*'|^f"[^"\n]*"|^'[^'\n]*'|^"[^"\n]*"/ },
+    { kind: 'keyword', pattern: PYTHON_KEYWORDS },
+    { kind: 'property', pattern: /^[A-Za-z_][\w]*(?=\s*[:=](?!=))/ },
     { kind: 'number', pattern: /^\b\d+(?:\.\d+)?\b/ },
     { kind: 'punctuation', chars: PUNCTUATION },
   ],

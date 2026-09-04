@@ -1,6 +1,7 @@
 ---
 import type { DocContent } from '../content/types';
 import DocsBlocks from './DocsBlocks.astro';
+import DocsInteractions from './DocsInteractions.astro';
 
 interface Props {
   content: DocContent;
@@ -8,6 +9,8 @@ interface Props {
 
 const { content } = Astro.props;
 ---
+
+<DocsInteractions />
 
 <article class="space-y-14 max-w-3xl text-fg-muted">
   <section class="space-y-3 pb-8 border-b border-border">
@@ -25,7 +28,7 @@ const { content } = Astro.props;
       <section id={section.id} class="space-y-4 scroll-mt-24">
         <h2 class="text-2xl font-semibold tracking-tight text-fg">{section.title}</h2>
         <div class="space-y-4">
-          <DocsBlocks blocks={section.blocks} />
+          <DocsBlocks blocks={section.blocks} copyLabel={content.copyCodeLabel} copiedLabel={content.copiedLabel} />
         </div>
       </section>
     ))

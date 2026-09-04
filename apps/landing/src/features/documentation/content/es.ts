@@ -1,4 +1,4 @@
-import type { DocContent } from './types';
+import { API_BASE_URL_TOKEN, type DocContent } from './types';
 
 export const es: DocContent = {
   pageTitle: 'Documentación — Qably',
@@ -9,6 +9,8 @@ export const es: DocContent = {
   heroTitle: 'Documentación',
   heroSubtitle:
     'Todo lo que aparece aquí coincide con la API tal como existe hoy. Si una capacidad no está documentada, todavía no existe.',
+  copyCodeLabel: 'Copiar código',
+  copiedLabel: '¡Copiado!',
   navGroups: [
     { label: 'Primeros pasos', sectionIds: ['getting-started'] },
     {
@@ -142,7 +144,7 @@ export const es: DocContent = {
           items: [
             'El secreto se obtiene llamando a POST /connections/:id/webhook-secret desde la configuración de la conexión. La respuesta contiene el secreto en texto plano exactamente una vez, al crearlo y de nuevo cada vez que se rota, por lo que conviene copiarlo de inmediato.',
             'En GitHub, el webhook se agrega desde Settings > Webhooks > Add webhook, dentro del repositorio.',
-            'Payload URL: https://api.qably.dev/webhooks/scm/github',
+            `Payload URL: ${API_BASE_URL_TOKEN}/webhooks/scm/github`,
             'Content type: application/json',
             'Secret: el valor del paso anterior',
             'Events: como mínimo push.',
@@ -207,15 +209,18 @@ export const es: DocContent = {
           tone: 'info',
           text: 'Sin QABLY_API_KEY configurada, el script registra un mensaje y termina con código 0; nunca hace fallar el build por una integración ausente o todavía no configurada.',
         },
-        { type: 'subheading', text: 'Proyectos con Jest' },
         {
           type: 'paragraph',
-          text: 'jest-junit se agrega como dependencia de desarrollo y se configura para escribir en un archivo de reporte mediante dos variables de entorno, antes de invocar el reporter.',
+          text: 'jest-junit se agrega como dependencia de desarrollo y se configura para escribir en un archivo de reporte mediante dos variables de entorno, antes de invocar el reporter. Vitest escribe JUnit XML de forma nativa, sin dependencia extra.',
         },
         {
-          type: 'code',
-          language: 'yaml',
-          code: `- name: Unit tests
+          type: 'codeGroup',
+          label: 'Reportar resultados desde CI',
+          variants: [
+            {
+              language: 'yaml',
+              label: 'Jest',
+              code: `- name: Unit tests
   env:
     JEST_JUNIT_OUTPUT_DIR: ./reports
     JEST_JUNIT_OUTPUT_NAME: junit.xml
@@ -226,16 +231,11 @@ export const es: DocContent = {
   env:
     QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
   run: node scripts/qably-report.mjs ./reports/junit.xml`,
-        },
-        { type: 'subheading', text: 'Proyectos con Vitest' },
-        {
-          type: 'paragraph',
-          text: 'Vitest escribe JUnit XML de forma nativa — sin dependencia extra.',
-        },
-        {
-          type: 'code',
-          language: 'yaml',
-          code: `- name: Unit tests
+            },
+            {
+              language: 'yaml',
+              label: 'Vitest',
+              code: `- name: Unit tests
   run: npx vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml
 
 - name: Report results to Qably
@@ -243,6 +243,8 @@ export const es: DocContent = {
   env:
     QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
   run: node scripts/qably-report.mjs ./reports/junit.xml`,
+            },
+          ],
         },
         {
           type: 'callout',
@@ -415,28 +417,102 @@ node scripts/qably-report.mjs report.xml`,
           text: 'Reporta los resultados de ejecución de una suite. Se autentica con Authorization: Bearer <API key del proyecto>. El proyecto y la organización vienen de la key; nada en el cuerpo puede sobrescribirlos.',
         },
         {
-          type: 'code',
-          language: 'typescript',
-          code: `{
-  "externalId": "gh-run-482913",
-  "source": "github_actions",
-  "suiteId": "suite_123",
-  "name": "Checkout regression - main",
-  "startedAt": "2026-09-01T10:00:00Z",
-  "finishedAt": "2026-09-01T10:04:12Z",
-  "commitSha": "a1b2c3d",
-  "commitMessage": "fix: checkout rounding",
-  "commitAuthor": "Ada Lovelace",
-  "cases": [
-    { "name": "Adds an item to the cart", "status": "pass" },
-    {
-      "name": "Applies a discount code",
-      "steps": ["open cart", "apply code SAVE10"],
-      "expectedResult": "total is reduced by 10%",
-      "status": "fail"
-    }
-  ]
-}`,
+          type: 'codeGroup',
+          label: 'POST /runs/ingest',
+          variants: [
+            {
+              language: 'shell',
+              label: 'cURL',
+              code: `curl --fail --silent \\
+  --request POST \\
+  "${API_BASE_URL_TOKEN}/runs/ingest" \\
+  --header "Authorization: Bearer $QABLY_API_KEY" \\
+  --header "Content-Type: application/json" \\
+  --data '{
+    "externalId": "gh-run-482913",
+    "source": "github_actions",
+    "suiteId": "suite_123",
+    "name": "Checkout regression - main",
+    "startedAt": "2026-09-01T10:00:00Z",
+    "finishedAt": "2026-09-01T10:04:12Z",
+    "commitSha": "a1b2c3d",
+    "commitMessage": "fix: checkout rounding",
+    "commitAuthor": "Ada Lovelace",
+    "cases": [
+      { "name": "Adds an item to the cart", "status": "pass" },
+      {
+        "name": "Applies a discount code",
+        "steps": ["open cart", "apply code SAVE10"],
+        "expectedResult": "total is reduced by 10%",
+        "status": "fail"
+      }
+    ]
+  }'`,
+            },
+            {
+              language: 'typescript',
+              label: 'Node',
+              code: `const response = await fetch('${API_BASE_URL_TOKEN}/runs/ingest', {
+  method: 'POST',
+  headers: {
+    Authorization: \`Bearer \${process.env.QABLY_API_KEY}\`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    externalId: 'gh-run-482913',
+    source: 'github_actions',
+    suiteId: 'suite_123',
+    name: 'Checkout regression - main',
+    startedAt: '2026-09-01T10:00:00Z',
+    finishedAt: '2026-09-01T10:04:12Z',
+    commitSha: 'a1b2c3d',
+    commitMessage: 'fix: checkout rounding',
+    commitAuthor: 'Ada Lovelace',
+    cases: [
+      { name: 'Adds an item to the cart', status: 'pass' },
+      {
+        name: 'Applies a discount code',
+        steps: ['open cart', 'apply code SAVE10'],
+        expectedResult: 'total is reduced by 10%',
+        status: 'fail',
+      },
+    ],
+  }),
+});`,
+            },
+            {
+              language: 'python',
+              label: 'Python',
+              code: `import os
+import requests
+
+response = requests.post(
+    "${API_BASE_URL_TOKEN}/runs/ingest",
+    headers={"Authorization": f"Bearer {os.environ['QABLY_API_KEY']}"},
+    json={
+        "externalId": "gh-run-482913",
+        "source": "github_actions",
+        "suiteId": "suite_123",
+        "name": "Checkout regression - main",
+        "startedAt": "2026-09-01T10:00:00Z",
+        "finishedAt": "2026-09-01T10:04:12Z",
+        "commitSha": "a1b2c3d",
+        "commitMessage": "fix: checkout rounding",
+        "commitAuthor": "Ada Lovelace",
+        "cases": [
+            {"name": "Adds an item to the cart", "status": "pass"},
+            {
+                "name": "Applies a discount code",
+                "steps": ["open cart", "apply code SAVE10"],
+                "expectedResult": "total is reduced by 10%",
+                "status": "fail",
+            },
+        ],
+    },
+)
+response.raise_for_status()`,
+            },
+          ],
         },
         {
           type: 'table',
@@ -502,7 +578,7 @@ node scripts/qably-report.mjs report.xml`,
           language: 'shell',
           code: `curl --fail --silent \\
   --request POST \\
-  "https://api.qably.dev/runs/ingest/junit?externalId=ci-42" \\
+  "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=ci-42" \\
   --header "Authorization: Bearer $QABLY_API_KEY" \\
   --header "Content-Type: application/xml" \\
   --data-binary @junit.xml`,
@@ -588,7 +664,7 @@ node scripts/qably-report.mjs report.xml`,
           headers: ['Variable', 'Obligatoria', 'Notas'],
           rows: [
             ['QABLY_API_KEY', 'sí, para reportar algo', 'La lee el reporter. Si no está configurada, el script registra un mensaje y termina con código 0 sin enviar nada; nunca hace fallar el build.'],
-            ['QABLY_API_BASE_URL', 'no', 'Por defecto usa https://api.qably.dev. Se configura para un despliegue propio o una corrida local contra http://localhost:3001.'],
+            ['QABLY_API_BASE_URL', 'no', `Por defecto usa ${API_BASE_URL_TOKEN}. Se configura para un despliegue propio o una corrida local contra http://localhost:3001.`],
           ],
         },
       ],

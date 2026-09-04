@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { en } from './en';
 import { es } from './es';
-import type { DocBlock, DocContent } from './types';
+import type { CodeGroupBlock, DocBlock, DocContent } from './types';
 
 const locales: { name: string; content: DocContent }[] = [
   { name: 'en', content: en },
@@ -21,6 +21,10 @@ function collectBlockText(block: DocBlock, parts: string[]): void {
     case 'code':
       parts.push(block.code);
       break;
+    case 'codeGroup':
+      parts.push(block.label);
+      for (const variant of block.variants) parts.push(variant.label, variant.code);
+      break;
     case 'table':
       parts.push(...block.headers);
       for (const row of block.rows) parts.push(...row);
@@ -32,6 +36,25 @@ function collectBlockText(block: DocBlock, parts: string[]): void {
       }
       break;
   }
+}
+
+function collectCodeGroups(block: DocBlock, groups: CodeGroupBlock[]): void {
+  if (block.type === 'codeGroup') groups.push(block);
+  if (block.type === 'faq') {
+    for (const item of block.items) {
+      for (const answerBlock of item.answer) collectCodeGroups(answerBlock, groups);
+    }
+  }
+}
+
+function collectAllCodeGroups(content: DocContent): CodeGroupBlock[] {
+  const groups: CodeGroupBlock[] = [];
+
+  for (const section of content.sections) {
+    for (const block of section.blocks) collectCodeGroups(block, groups);
+  }
+
+  return groups;
 }
 
 function flattenContent(content: DocContent): string {
@@ -208,6 +231,23 @@ describe('documentation content', () => {
     for (const marker of VOSEO_MARKERS) {
       const match = findAccentAwareMatch(text, marker);
       expect(match, `found voseo marker "${marker}"`).toBeUndefined();
+    }
+  });
+
+  it.each(locales)('$name has at least one codeGroup block', ({ content }) => {
+    expect(collectAllCodeGroups(content).length).toBeGreaterThan(0);
+  });
+
+  it.each(locales)('$name codeGroup blocks each have at least two variants', ({ content }) => {
+    for (const group of collectAllCodeGroups(content)) {
+      expect(group.variants.length).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it.each(locales)('$name codeGroup blocks never repeat a variant label', ({ content }) => {
+    for (const group of collectAllCodeGroups(content)) {
+      const labels = group.variants.map((variant) => variant.label);
+      expect(new Set(labels).size).toBe(labels.length);
     }
   });
 });

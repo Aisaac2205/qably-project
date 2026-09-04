@@ -23,6 +23,18 @@ export interface CodeBlock {
   label?: string;
 }
 
+export interface CodeGroupVariant {
+  language: CodeLanguage;
+  label: string;
+  code: string;
+}
+
+export interface CodeGroupBlock {
+  type: 'codeGroup';
+  label: string;
+  variants: CodeGroupVariant[];
+}
+
 export interface TableBlock {
   type: 'table';
   headers: string[];
@@ -50,9 +62,12 @@ export type DocBlock =
   | SubheadingBlock
   | ListBlock
   | CodeBlock
+  | CodeGroupBlock
   | TableBlock
   | CalloutBlock
   | FaqBlock;
+
+export const API_BASE_URL_TOKEN = '{{API_BASE_URL}}';
 
 export interface DocSection {
   id: string;
@@ -73,6 +88,8 @@ export interface DocContent {
   heroTitle: string;
   heroSubtitle: string;
   tocLabel: string;
+  copyCodeLabel: string;
+  copiedLabel: string;
   navGroups: DocNavGroup[];
   sections: DocSection[];
 }
