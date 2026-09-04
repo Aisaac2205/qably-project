@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Get,
   HttpCode,
@@ -43,6 +44,10 @@ function unwrap<T>(result: Result<T, RunQueryError>): T {
     case 'empty-suite':
       throw new BadRequestException(
         'Cannot start a run from a suite with no cases',
+      );
+    case 'source-not-editable':
+      throw new ConflictException(
+        'Case statuses in an automated run are recorded by the reporting tool and cannot be edited',
       );
   }
 }

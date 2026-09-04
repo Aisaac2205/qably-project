@@ -10,4 +10,5 @@ export type RunQueryError =
   | 'not-found'
   | 'suite-not-found'
   | 'empty-suite'
-  | 'case-not-found';
+  | 'case-not-found'
+  | 'source-not-editable';

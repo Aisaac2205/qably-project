@@ -394,6 +394,45 @@ describe('RunQueriesService.createManual', () => {
 });
 
 describe('RunQueriesService.updateCaseStatus', () => {
+  it('refuses to edit a case in a run reported by CI', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst.mockResolvedValue({
+      ...runRow,
+      source: 'github_actions',
+    });
+
+    const result = await build(prisma).updateCaseStatus(org, 'run-1', 'case-1', {
+      status: 'pass',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'source-not-editable' });
+    expect(prisma.runCase.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses to edit a case in a run ingested through the api', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst.mockResolvedValue({ ...runRow, source: 'api' });
+
+    const result = await build(prisma).updateCaseStatus(org, 'run-1', 'case-1', {
+      status: 'pass',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'source-not-editable' });
+    expect(prisma.runCase.update).not.toHaveBeenCalled();
+  });
+
+  it('still edits a case in a manual run', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst.mockResolvedValue({ ...runRow, source: 'manual' });
+
+    const result = await build(prisma).updateCaseStatus(org, 'run-1', 'run-case-1', {
+      status: 'pass',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.runCase.update).toHaveBeenCalled();
+  });
+
   it('returns not-found when the run belongs to another organization', async () => {
     const prisma = createPrisma();
     prisma.run.findFirst.mockResolvedValue(null);

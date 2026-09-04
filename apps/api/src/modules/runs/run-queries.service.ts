@@ -172,6 +172,7 @@ export class RunQueriesService {
     const run = await this.scoped(org, runId);
 
     if (run === null) return err('not-found');
+    if (run.source !== 'manual') return err('source-not-editable');
 
     const cases = await this.loadCases(runId);
     const targetCase = cases.find((row) => row.id === caseId);
