@@ -64,7 +64,11 @@ export function NewRunForm({
         <label htmlFor="suite-select" className="text-xs font-medium text-default">
           {t('runs.suiteLabel')}
         </label>
-        <Select value={suiteId} onValueChange={handleSuiteChange}>
+        <Select
+          value={suiteId}
+          items={suites.map((s) => ({ value: s.id, label: s.name }))}
+          onValueChange={handleSuiteChange}
+        >
           <SelectTrigger id="suite-select">
             <SelectValue placeholder={t('runs.selectSuite')} />
           </SelectTrigger>

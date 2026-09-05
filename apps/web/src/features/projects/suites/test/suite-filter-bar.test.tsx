@@ -27,6 +27,23 @@ function ControlledHarness({ initial = '' }: { initial?: string }) {
 }
 
 describe('SuiteFilterBar', () => {
+  it('shows filter labels on the triggers, not the raw values', async () => {
+    await act(async () => { render(<ControlledHarness />) })
+
+    expect(screen.getByLabelText('Status filter').textContent).toContain('All statuses')
+    expect(screen.getByLabelText('Tag filter').textContent).toContain('All tags')
+    expect(screen.getByLabelText('Sort suites').textContent).toContain('Most recent')
+  })
+
+  it('never renders a bare option value on a trigger', async () => {
+    await act(async () => { render(<ControlledHarness />) })
+
+    for (const label of ['Status filter', 'Tag filter', 'Sort suites']) {
+      expect(screen.getByLabelText(label).textContent?.trim()).not.toBe('all')
+      expect(screen.getByLabelText(label).textContent?.trim()).not.toBe('recent')
+    }
+  })
+
   it('renders a search input with placeholder', async () => {
     await act(async () => {
       render(<ControlledHarness />)

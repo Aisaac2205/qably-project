@@ -117,6 +117,10 @@ function CreateNotificationWebhookDialogContent({
           <Label htmlFor="webhook-type">{t('settings.webhooks.typeLabel')}</Label>
           <Select
             value={type}
+            items={[
+              { value: 'slack', label: t('settings.webhooks.typeSlack') },
+              { value: 'discord', label: t('settings.webhooks.typeDiscord') },
+            ]}
             onValueChange={(value) => setType(value as NotificationWebhookType)}
           >
             <SelectTrigger id="webhook-type" disabled={isSubmitting}>

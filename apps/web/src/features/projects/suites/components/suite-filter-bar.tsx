@@ -62,6 +62,11 @@ export function SuiteFilterBar({
     { value: 'cases', label: t('suites.sortMostCases') },
   ]
 
+  const TAG_OPTIONS: Array<{ value: string; label: string }> = [
+    { value: 'all', label: t('suites.allTags') },
+    ...availableTags.map((tagItem) => ({ value: tagItem, label: tagItem })),
+  ]
+
   return (
     <FilterBar label={t('suites.ariaFilterSuites')}>
       <div className="relative col-span-2 md:flex-1">
@@ -84,6 +89,7 @@ export function SuiteFilterBar({
       </div>
       <Select
         value={status}
+        items={STATUS_OPTIONS}
         onValueChange={(v) => onStatusChange(v as SuiteRunStatus | 'all')}
       >
         <SelectTrigger className="h-8 text-xs w-full md:w-36" aria-label={t('suites.ariaStatusFilter')}>
@@ -97,7 +103,7 @@ export function SuiteFilterBar({
           ))}
         </SelectContent>
       </Select>
-      <Select value={tag} onValueChange={(v) => onTagChange(String(v))}>
+      <Select value={tag} items={TAG_OPTIONS} onValueChange={(v) => onTagChange(String(v))}>
         <SelectTrigger className="h-8 text-xs w-full md:w-36" aria-label={t('suites.ariaTagFilter')}>
           <SelectValue />
         </SelectTrigger>
@@ -110,7 +116,7 @@ export function SuiteFilterBar({
           ))}
         </SelectContent>
       </Select>
-      <Select value={sort} onValueChange={(v) => onSortChange(v as SortKey)}>
+      <Select value={sort} items={SORT_OPTIONS} onValueChange={(v) => onSortChange(v as SortKey)}>
         <SelectTrigger className="h-8 text-xs w-full md:w-36" aria-label={t('suites.ariaSortSuites')}>
           <SelectValue />
         </SelectTrigger>

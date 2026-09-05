@@ -85,6 +85,9 @@ function CaseFormDialogContent({
   const [expectedResult, setExpectedResult] = useState(testCase?.expectedResult ?? '')
   const [nameError, setNameError] = useState(false)
 
+  const PRIORITY_OPTIONS = PRIORITIES.map((p) => ({ value: p, label: t(PRIORITY_LABEL[p]) }))
+  const STATE_OPTIONS = STATES.map((s) => ({ value: s, label: t(STATE_LABEL[s]) }))
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const trimmed = name.trim()
@@ -145,6 +148,7 @@ function CaseFormDialogContent({
               <Label htmlFor="case-priority">{t('suites.priorityLabel')}</Label>
               <Select
                 value={priority}
+                items={PRIORITY_OPTIONS}
                 onValueChange={(value) => setPriority(value as CasePriority)}
               >
                 <SelectTrigger id="case-priority">
@@ -163,6 +167,7 @@ function CaseFormDialogContent({
               <Label htmlFor="case-state">{t('suites.stateLabel')}</Label>
               <Select
                 value={state}
+                items={STATE_OPTIONS}
                 onValueChange={(value) => setState(value as CaseState)}
               >
                 <SelectTrigger id="case-state">
