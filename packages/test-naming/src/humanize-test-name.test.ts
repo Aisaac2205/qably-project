@@ -91,6 +91,50 @@ describe('humanizeTestName', () => {
       expect(result.title).toBe('Should reject empty cart');
     });
 
+    it('keeps a package with an underscore as java, not pytest', () => {
+      const result = humanizeTestName({
+        name: 'shouldRejectEmptyCart',
+        className: 'com.acme.my_service.PaymentServiceTest',
+      });
+
+      expect(result.convention).toBe<Convention>('junit-java');
+      expect(result.path).toEqual(['PaymentServiceTest']);
+      expect(result.title).toBe('Should reject empty cart');
+    });
+
+    it('extracts the argument list of a JUnit 5 parameterized method as the parameter', () => {
+      const result = humanizeTestName({
+        name: 'shouldValidate(String, int)',
+        className: 'com.acme.api.ValidatorTest',
+      });
+
+      expect(result.convention).toBe<Convention>('junit-java');
+      expect(result.path).toEqual(['ValidatorTest']);
+      expect(result.title).toBe('Should validate');
+      expect(result.parameter).toBe('String, int');
+    });
+
+    it('extracts the invocation index of a JUnit 5 display name as the parameter', () => {
+      const result = humanizeTestName({
+        name: '[1] apple, 1',
+        className: 'com.acme.api.FruitTest',
+      });
+
+      expect(result.convention).toBe<Convention>('junit-java');
+      expect(result.path).toEqual(['FruitTest']);
+      expect(result.title).toBe('Apple, 1');
+      expect(result.parameter).toBe('1');
+    });
+
+    it('leaves a natural sentence ending in parentheses untouched', () => {
+      const result = humanizeTestName({
+        name: 'Cart > rejects an empty cart (regression)',
+      });
+
+      expect(result.title).toBe('Rejects an empty cart (regression)');
+      expect(result.parameter).toBeUndefined();
+    });
+
     it('strips the test prefix of a method name and preserves acronyms', () => {
       const result = humanizeTestName({
         name: 'testParsesJSONPayload',

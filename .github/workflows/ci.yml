@@ -105,6 +105,9 @@ jobs:
       - name: Build workspace packages
         run: pnpm --filter @qably/types --filter @qably/i18n --filter @qably/test-naming run build
 
+      - name: Test workspace packages
+        run: pnpm --filter @qably/test-naming run type-check && pnpm --filter @qably/test-naming run test
+
       - name: Type-check
         run: pnpm --filter @qably/web run type-check
 

@@ -31,6 +31,32 @@ const IDENTIFIER = /^[\p{L}\p{N}_$]+$/u;
 const PASCAL_IDENTIFIER = /^\p{Lu}[\p{L}\p{N}_]*$/u;
 const DOTTED_IDENTIFIER = /^[\p{L}_$][\p{L}\p{N}_$]*(\.[\p{L}_$][\p{L}\p{N}_$]*)+$/u;
 const PYTHON_TEST_FUNCTION = /^test_/u;
+const JUNIT5_INDEXED_DISPLAY_NAME = /^\[\d+\] \S/u;
+
+export interface CallSuffixSplit {
+  readonly base: string;
+  readonly args?: string;
+}
+
+export function splitCallSuffix(name: string): CallSuffixSplit {
+  if (!name.endsWith(')')) {
+    return { base: name };
+  }
+  const open = name.lastIndexOf('(');
+  if (open <= 0) {
+    return { base: name };
+  }
+  const base = name.slice(0, open).trim();
+  if (!IDENTIFIER.test(base)) {
+    return { base: name };
+  }
+  const args = name.slice(open + 1, -1).trim();
+  return args.length === 0 ? { base } : { base, args };
+}
+
+export function isJunit5IndexedDisplayName(name: string): boolean {
+  return JUNIT5_INDEXED_DISPLAY_NAME.test(name);
+}
 
 export const separators = {
   vitest: VITEST_SEPARATOR,
@@ -63,8 +89,11 @@ function isPytestClassName(className: string, name: string): boolean {
   if (!isDottedIdentifier(className)) {
     return false;
   }
+  if (PYTHON_TEST_FUNCTION.test(name)) {
+    return true;
+  }
   const hasSnakeSegment = className.split('.').some((segment) => segment.includes('_'));
-  return hasSnakeSegment || PYTHON_TEST_FUNCTION.test(name);
+  return hasSnakeSegment && name.includes('_');
 }
 
 function isJavaClassName(className: string): boolean {
@@ -96,7 +125,11 @@ export function detectConvention(name: string, className: string | undefined, fi
   if (className !== undefined && isPytestClassName(className, name)) {
     return 'pytest';
   }
-  if (className !== undefined && isJavaClassName(className) && isIdentifier(name)) {
+  if (
+    className !== undefined &&
+    isJavaClassName(className) &&
+    (isIdentifier(splitCallSuffix(name).base) || isJunit5IndexedDisplayName(name))
+  ) {
     return 'junit-java';
   }
   if (isGtestPair(name)) {

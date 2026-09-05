@@ -18,7 +18,7 @@ export function RouteSkeleton({ variant, labelKey }: RouteSkeletonProps) {
 
   return (
     <div
-      className="w-full space-y-6 px-5 py-6 sm:px-7 lg:px-9 lg:py-6"
+      className="w-full space-y-6 px-5 py-6 sm:px-7 lg:px-9 lg:py-6 animate-page-enter"
       aria-busy="true"
     >
       <span role="status" className="sr-only">

@@ -4,6 +4,7 @@ import {
   isPathLike,
   lastDottedSegment,
   separators,
+  splitCallSuffix,
   type Convention,
   type HumanizedTest,
   type TestNameInput,
@@ -26,6 +27,7 @@ const ACRONYM_TO_WORD_BOUNDARY = /(\p{Lu}+)(\p{Lu}\p{Ll})/gu;
 const IDENTIFIER_SEPARATORS = /[_\-.$]+/gu;
 const ACRONYM = /^[\p{Lu}\p{N}]{2,}$/u;
 const MAX_PARAMETER_LENGTH = 120;
+const LEADING_INVOCATION_INDEX = /^\[(\d+)\] (\S.*)$/u;
 
 function splitOnSeparator(name: string, separator: string, dropPathLikeHead: boolean): SplitName {
   const segments = name
@@ -99,20 +101,44 @@ function splitName(name: string, className: string | undefined, convention: Conv
   }
 }
 
-function extractParameter(leaf: string): ParameterizedLeaf {
-  if (!leaf.endsWith(']')) {
+function withParameter(leaf: string, parameter: string): ParameterizedLeaf {
+  if (parameter.length === 0 || parameter.length > MAX_PARAMETER_LENGTH || leaf.length === 0) {
     return { leaf };
+  }
+  return { leaf, parameter };
+}
+
+function extractBracketSuffix(leaf: string): ParameterizedLeaf | undefined {
+  if (!leaf.endsWith(']')) {
+    return undefined;
   }
   const open = leaf.lastIndexOf('[');
   if (open <= 0) {
-    return { leaf };
+    return undefined;
   }
-  const parameter = leaf.slice(open + 1, -1).trim();
-  const base = leaf.slice(0, open).trim();
-  if (parameter.length === 0 || parameter.length > MAX_PARAMETER_LENGTH || base.length === 0) {
-    return { leaf };
+  return withParameter(leaf.slice(0, open).trim(), leaf.slice(open + 1, -1).trim());
+}
+
+function extractCallSuffix(leaf: string): ParameterizedLeaf | undefined {
+  const { base, args } = splitCallSuffix(leaf);
+  if (args === undefined) {
+    return undefined;
   }
-  return { leaf: base, parameter };
+  return withParameter(base, args);
+}
+
+function extractLeadingIndex(leaf: string): ParameterizedLeaf | undefined {
+  const match = LEADING_INVOCATION_INDEX.exec(leaf);
+  const index = match?.[1];
+  const rest = match?.[2];
+  if (index === undefined || rest === undefined) {
+    return undefined;
+  }
+  return withParameter(rest.trim(), index);
+}
+
+function extractParameter(leaf: string): ParameterizedLeaf {
+  return extractBracketSuffix(leaf) ?? extractCallSuffix(leaf) ?? extractLeadingIndex(leaf) ?? { leaf };
 }
 
 function splitIdentifier(identifier: string): string[] {
