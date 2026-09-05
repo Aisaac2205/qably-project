@@ -26,6 +26,15 @@ const SHORTCUT_KEYS: Array<{ key: string; labelKey: string }> = [
   { key: '←→', labelKey: 'runs.shortcutNavigate' },
 ]
 
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  pass: 'runs.statusPass',
+  fail: 'runs.statusFail',
+  skip: 'runs.statusSkip',
+  blocked: 'runs.statusBlocked',
+  running: 'runs.statusRunning',
+  pending: 'runs.statusPending',
+}
+
 export function RunDetail({
   projectId,
   run,
@@ -76,15 +85,10 @@ export function RunDetail({
     (status: CaseStatus) => {
       if (!activeCaseId) return
       updateStatus(activeCaseId, status)
-      const config: Record<string, string> = {
-        pass: t('runs.statusPass'),
-        fail: t('runs.statusFail'),
-        skip: t('runs.statusSkip'),
-        blocked: t('runs.statusBlocked'),
-        running: t('runs.statusRunning'),
-        pending: t('runs.statusPending'),
-      }
-      setAnnouncement(t('runs.statusAnnouncement', { status: config[status] ?? status }))
+      const labelKey = STATUS_LABEL_KEYS[status]
+      setAnnouncement(
+        t('runs.statusAnnouncement', { status: labelKey ? t(labelKey) : status }),
+      )
     },
     [activeCaseId, updateStatus, t],
   )
