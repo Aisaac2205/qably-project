@@ -82,7 +82,7 @@ function toView(row: SuiteRow): SuiteView {
     cases: row.cases.map((testCase) => ({
       id: testCase.id,
       suiteId: testCase.suiteId,
-      version: testCase.currentVersion?.version ?? 1,
+      version: testCase.currentVersion?.version ?? null,
       name: testCase.name,
       steps: testCase.steps,
       expectedResult: testCase.expectedResult,

@@ -7,6 +7,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
+  CASE_READ_SELECT,
   CASE_SELECT,
   RUN_SELECT,
   toRunView,
@@ -78,7 +79,7 @@ export class RunsService {
     const finishedAt =
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
 
-    const { run, cases } = await this.prisma.$transaction(async (tx) => {
+    const { run } = await this.prisma.$transaction(async (tx) => {
       const suite =
         knownSuite ??
         (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
@@ -139,7 +140,7 @@ export class RunsService {
 
       await tx.runCase.deleteMany({ where: { runId: run.id } });
 
-      const cases = (await tx.runCase.createManyAndReturn({
+      await tx.runCase.createManyAndReturn({
         data: input.cases.map((testCase: IngestCaseInput, index: number) => ({
           runId: run.id,
           testCaseId: testCaseIdByName.get(testCase.name) ?? null,
@@ -154,10 +155,16 @@ export class RunsService {
             : { recordedAt: new Date(testCase.recordedAt) }),
         })),
         select: CASE_SELECT,
-      })) as RunCaseRow[];
+      });
 
-      return { run, cases };
+      return { run };
     });
+
+    const cases = (await this.prisma.runCase.findMany({
+      where: { runId: run.id },
+      select: CASE_READ_SELECT,
+      orderBy: { position: 'asc' },
+    })) as RunCaseRow[];
 
     if (status === 'fail' || status === 'pass') {
       await this.notifications.publish({

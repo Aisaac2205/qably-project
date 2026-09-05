@@ -92,7 +92,7 @@ describe('SuitesService case versions', () => {
     expect(suites[0].cases[0].version).toBe(3);
   });
 
-  it('reports version 1 when the case has no published version', async () => {
+  it('reports a null version when the case has no published version', async () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([
       {
@@ -103,7 +103,7 @@ describe('SuitesService case versions', () => {
 
     const suites = await build(prisma).list(owner);
 
-    expect(suites[0].cases[0].version).toBe(1);
+    expect(suites[0].cases[0].version).toBeNull();
   });
 });
 

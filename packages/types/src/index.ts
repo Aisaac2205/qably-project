@@ -149,7 +149,7 @@ export interface OrganizationContext {
 export interface TestCase {
   id: string
   suiteId: string
-  version: number
+  version: number | null
   name: string
   steps: string[]
   expectedResult: string
@@ -173,7 +173,7 @@ export interface Suite {
 export interface RunCaseOfficialCase {
   id: string
   suiteId: string
-  version: number
+  version: number | null
   steps: string[]
   expectedResult: string
 }

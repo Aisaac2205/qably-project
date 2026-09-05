@@ -251,7 +251,7 @@ describe('RunQueriesService.findOne', () => {
     });
   });
 
-  it('reports version 1 when the official case has no published version', async () => {
+  it('reports a null version when the official case has no published version', async () => {
     const prisma = createPrisma();
     prisma.runCase.findMany.mockResolvedValue([
       runCaseRow({
@@ -270,7 +270,7 @@ describe('RunQueriesService.findOne', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.cases[0].officialCase?.version).toBe(1);
+    expect(result.value.cases[0].officialCase?.version).toBeNull();
   });
 
   it('leaves officialCase null when the run case is not linked', async () => {
@@ -431,6 +431,30 @@ describe('RunQueriesService.createManual', () => {
         position: 1,
       }),
     ]);
+  });
+
+  it('projects the linked official case onto the response, since createManyAndReturn cannot select nested relations', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({
+        testCaseId: 'case-1',
+        testCase: {
+          id: 'case-1',
+          suiteId: 'suite-1',
+          steps: ['open', 'add'],
+          expectedResult: 'cart has one item',
+          currentVersion: null,
+        },
+      }),
+    ]);
+
+    const result = await build(prisma).createManual(org, user, input);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].officialCase).not.toBeNull();
+    expect(result.value.cases[0].officialCase?.id).toBe('case-1');
+    expect(result.value.cases[0].officialCase?.version).toBeNull();
   });
 
   it('creates two manual runs for the same project without colliding on the null externalId', async () => {

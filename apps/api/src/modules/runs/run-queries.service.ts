@@ -129,7 +129,7 @@ export class RunQueriesService {
     if (suite === null) return err('suite-not-found');
     if (suite.cases.length === 0) return err('empty-suite');
 
-    const { run, cases } = await this.prisma.$transaction(async (tx) => {
+    const { run } = await this.prisma.$transaction(async (tx) => {
       const run = await tx.run.create({
         data: {
           projectId: input.projectId,
@@ -144,7 +144,7 @@ export class RunQueriesService {
         select: RUN_SELECT,
       });
 
-      const cases = (await tx.runCase.createManyAndReturn({
+      await tx.runCase.createManyAndReturn({
         data: suite.cases.map((testCase, index) => ({
           runId: run.id,
           testCaseId: testCase.id,
@@ -156,10 +156,12 @@ export class RunQueriesService {
           position: index,
         })),
         select: CASE_SELECT,
-      })) as RunCaseRow[];
+      });
 
-      return { run, cases };
+      return { run };
     });
+
+    const cases = await this.loadCases(run.id);
 
     return ok(toRunView(run, cases));
   }

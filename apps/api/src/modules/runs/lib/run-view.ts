@@ -109,7 +109,7 @@ export function toRunView(run: RunRow, cases: RunCaseRow[]): RunView {
             : {
                 id: row.testCase.id,
                 suiteId: row.testCase.suiteId,
-                version: row.testCase.currentVersion?.version ?? 1,
+                version: row.testCase.currentVersion?.version ?? null,
                 steps: row.testCase.steps,
                 expectedResult: row.testCase.expectedResult,
               },

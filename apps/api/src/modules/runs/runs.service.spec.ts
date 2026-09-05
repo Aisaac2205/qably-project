@@ -53,7 +53,11 @@ interface FakePrisma {
   };
   testCase: { findMany: jest.Mock; createMany: jest.Mock };
   run: { upsert: jest.Mock };
-  runCase: { deleteMany: jest.Mock; createManyAndReturn: jest.Mock };
+  runCase: {
+    deleteMany: jest.Mock;
+    createManyAndReturn: jest.Mock;
+    findMany: jest.Mock;
+  };
   $transaction: jest.Mock;
 }
 
@@ -76,6 +80,7 @@ function createPrisma(): FakePrisma {
     runCase: {
       deleteMany: jest.fn(),
       createManyAndReturn: jest.fn().mockResolvedValue([caseRow({})]),
+      findMany: jest.fn().mockResolvedValue([caseRow({})]),
     },
     $transaction: jest.fn(),
   };
@@ -383,6 +388,32 @@ describe('RunsService.ingest known suite with unregistered cases', () => {
       ],
       skipDuplicates: true,
     });
+  });
+});
+
+describe('RunsService.ingest official case linkage', () => {
+  it('projects the linked official case onto the response, since createManyAndReturn cannot select nested relations', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      caseRow({
+        testCaseId: 'case-1',
+        testCase: {
+          id: 'case-1',
+          suiteId: 'suite-1',
+          steps: ['open', 'add'],
+          expectedResult: 'cart has one item',
+          currentVersion: null,
+        },
+      }),
+    ]);
+
+    const result = await build(prisma).ingest(apiKey, baseInput);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].officialCase).not.toBeNull();
+    expect(result.value.cases[0].officialCase?.id).toBe('case-1');
+    expect(result.value.cases[0].officialCase?.version).toBeNull();
   });
 });
 
