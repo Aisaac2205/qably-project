@@ -66,9 +66,21 @@ describe('buildSuiteMetrics', () => {
 
   it('builds the trend oldest-first from the descending-ordered rows', () => {
     const rows = [
-      row({ id: 'run-3', status: 'pass', startedAt: new Date('2026-01-03T00:00:00.000Z') }),
-      row({ id: 'run-2', status: 'fail', startedAt: new Date('2026-01-02T00:00:00.000Z') }),
-      row({ id: 'run-1', status: 'pass', startedAt: new Date('2026-01-01T00:00:00.000Z') }),
+      row({
+        id: 'run-3',
+        status: 'pass',
+        startedAt: new Date('2026-01-03T00:00:00.000Z'),
+      }),
+      row({
+        id: 'run-2',
+        status: 'fail',
+        startedAt: new Date('2026-01-02T00:00:00.000Z'),
+      }),
+      row({
+        id: 'run-1',
+        status: 'pass',
+        startedAt: new Date('2026-01-01T00:00:00.000Z'),
+      }),
     ];
 
     const [entry] = buildSuiteMetrics(['suite-1'], rows, new Map());
