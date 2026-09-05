@@ -32,7 +32,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
-        run: pnpm --filter @qably/types --filter @qably/i18n run build
+        run: pnpm --filter @qably/types --filter @qably/i18n --filter @qably/test-naming run build
 
       - name: Generate Prisma client
         run: pnpm --filter @qably/api exec prisma generate
@@ -103,7 +103,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build workspace packages
-        run: pnpm --filter @qably/types --filter @qably/i18n run build
+        run: pnpm --filter @qably/types --filter @qably/i18n --filter @qably/test-naming run build
 
       - name: Type-check
         run: pnpm --filter @qably/web run type-check

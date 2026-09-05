@@ -1,0 +1,26 @@
+{
+    "name": "@qably/test-naming",
+    "version": "0.0.1",
+    "private": true,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc -p tsconfig.build.json",
+        "type-check": "tsc -p tsconfig.json --noEmit",
+        "test": "vitest run --maxWorkers=2"
+    },
+    "devDependencies": {
+        "@qably/config": "workspace:*",
+        "typescript": "^5.4.0",
+        "vitest": "^4.1.9"
+    }
+}
