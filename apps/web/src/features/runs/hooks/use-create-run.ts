@@ -20,10 +20,12 @@ export function useCreateRun(projectId: string) {
     },
   })
 
-  return useCallback(
+  const start = useCallback(
     (suiteId: string, name?: string) => {
       mutation.mutate({ suiteId, name })
     },
     [mutation],
   )
+
+  return { start, error: mutation.error }
 }

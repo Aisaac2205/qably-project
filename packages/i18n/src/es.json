@@ -644,6 +644,7 @@
     "caseNameRequired": "El título del caso es requerido",
     "undocumentedCase": "Sin pasos documentados",
     "documentCase": "Documentar este caso",
+    "cannotRunEmptySuite": "Agregue al menos un caso de prueba antes de ejecutar esta suite",
     "noCasesCta": "Agregue el primer caso de prueba para comenzar a documentar esta suite."
   },
   "apiKeys": {

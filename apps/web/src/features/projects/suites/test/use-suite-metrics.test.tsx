@@ -16,11 +16,12 @@ vi.mock('@/features/runs/api/runs.api', async () =>
 describe('useSuiteMetrics', () => {
   it('returns one entry per suite in the project', () => {
     const { result } = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
-    expect(result.current.perSuite).toHaveLength(3)
+    expect(result.current.perSuite).toHaveLength(4)
     expect(result.current.perSuite.map((m) => m.suite.id)).toEqual([
       'suite-1',
       'suite-2',
       'suite-3',
+      'suite-4',
     ])
   })
 
@@ -33,7 +34,7 @@ describe('useSuiteMetrics', () => {
 
   it('returns aggregated project metrics', () => {
     const { result } = renderHook(() => useSuiteMetrics('proj-1'), { wrapper: ({ children }) => withQueryClient(children) })
-    expect(result.current.projectMetrics.totalSuites).toBe(3)
+    expect(result.current.projectMetrics.totalSuites).toBe(4)
     expect(result.current.projectMetrics.totalCases).toBe(3 + 3 + 1)
   })
 

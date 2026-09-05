@@ -644,7 +644,8 @@
     "caseNameRequired": "A case title is required",
     "noCasesCta": "Add the first test case to start documenting this suite.",
     "undocumentedCase": "No documented steps",
-    "documentCase": "Document this case"
+    "documentCase": "Document this case",
+    "cannotRunEmptySuite": "Add at least one test case before running this suite"
   },
   "apiKeys": {
     "title": "API Keys",

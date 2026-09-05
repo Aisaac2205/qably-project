@@ -27,10 +27,7 @@ describe('SuiteKpiRow', () => {
     await act(async () => {
       renderWithQuery(<SuiteKpiRow projectId="proj-1" />)
     })
-    // proj-1 has 3 suites with 3+3+1 = 7 cases
-    // "3" should appear at least once (Suites value) — use getAllByText since the digit
-    // may also appear in other contexts like relative time strings.
-    expect(screen.getAllByText('3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('4').length).toBeGreaterThan(0)
     expect(screen.getByText('7')).toBeInTheDocument()
   })
 

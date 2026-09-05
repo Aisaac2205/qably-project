@@ -267,6 +267,18 @@ export const mockSuites: Suite[] = [
       },
     ],
   },
+  {
+    id: 'suite-4',
+    projectId: 'proj-1',
+    organizationId: 'org-1',
+    name: 'Payments',
+    createdAt: '2026-02-10T00:00:00Z',
+    description: 'Discovered from CI, not documented yet.',
+    tags: ['payments'],
+    isDefault: false,
+    updatedAt: '2026-02-10T00:00:00Z',
+    cases: [],
+  },
 ]
 
 // ─── AI Cases ─────────────────────────────────────────────────────────────────

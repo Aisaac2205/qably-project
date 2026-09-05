@@ -22,7 +22,7 @@ export function NewRunForm({
   initialSuiteId?: string
 }) {
   const { suites } = useSuites(projectId)
-  const createRun = useCreateRun(projectId)
+  const { start: createRun, error: createError } = useCreateRun(projectId)
   const { t } = useTranslation()
   const [suiteId, setSuiteId] = useState(initialSuiteId ?? '')
   const [name, setName] = useState('')
@@ -82,9 +82,9 @@ export function NewRunForm({
             </SelectGroup>
           </SelectContent>
         </Select>
-        {error && (
+        {(error || createError) && (
           <span className="text-xs text-fail" role="alert">
-            {error}
+            {error || createError?.message}
           </span>
         )}
       </div>

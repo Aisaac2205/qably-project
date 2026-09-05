@@ -21,26 +21,12 @@ import { SuiteFormDialog } from './suite-form-dialog'
 import { CaseFormDialog } from './case-form-dialog'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
+import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-
-function formatRelative(iso: string | undefined): string {
-  if (!iso) return 'Never'
-  const then = new Date(iso).getTime()
-  const now = Date.now()
-  const diffSec = Math.round((then - now) / 1000)
-  const abs = Math.abs(diffSec)
-  if (abs < 60) return rtf.format(diffSec, 'second')
-  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute')
-  if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), 'hour')
-  if (abs < 2592000) return rtf.format(Math.round(diffSec / 86400), 'day')
-  if (abs < 31536000) return rtf.format(Math.round(diffSec / 2592000), 'month')
-  return rtf.format(Math.round(diffSec / 31536000), 'year')
-}
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const { suite } = useSuite(suiteId)
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
@@ -135,6 +121,12 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           <div className="flex items-center gap-2 shrink-0">
             <Button
               type="button"
+              disabled={suite.cases.length === 0}
+              title={
+                suite.cases.length === 0
+                  ? t('suites.cannotRunEmptySuite')
+                  : undefined
+              }
               onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
               className="text-sm font-semibold"
               size="default"
@@ -199,7 +191,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted">{t('suites.lastRun')}</span>
-              <span className="text-sm font-medium text-default">{formatRelative(metrics.lastRun?.startedAt)}</span>
+              <span className="text-sm font-medium text-default">
+                {formatRelative(metrics.lastRun?.startedAt, locale, t('suites.never'))}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-muted">{t('suites.casesLabel')}</span>

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 import { __resetStore } from '@/lib/mock-store'
+
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
@@ -29,6 +30,19 @@ describe('SuiteDetail (redesigned)', () => {
   beforeEach(() => {
     __resetStore()
     mockPush.mockClear()
+  })
+
+  it('disables the run button on a suite with no cases', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
+
+    expect(screen.getByText(/no test cases in this suite yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /run this suite/i })).toBeDisabled()
+  })
+
+  it('enables the run button when the suite has cases', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    expect(screen.getByRole('button', { name: /run this suite/i })).toBeEnabled()
   })
 
   it('renders the suite name as h1', async () => {
