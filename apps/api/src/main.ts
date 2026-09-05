@@ -5,6 +5,10 @@ import express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import {
+  createAccessLogMiddleware,
+  createStdoutSink,
+} from './common/http/access-log.middleware';
 import { jsonWithRawBody } from './common/http/raw-body';
 import { ENV } from './config/config.tokens';
 import { buildCorsOptions } from './config/cors';
@@ -18,6 +22,12 @@ async function bootstrap(): Promise<void> {
     bodyParser: false,
   });
   const env = app.get<Env>(ENV);
+
+  app.use(
+    createAccessLogMiddleware({
+      sink: createStdoutSink(env.NODE_ENV === 'production' ? 'json' : 'pretty'),
+    }),
+  );
 
   const xmlParser = express.text({
     type: ['application/xml', 'text/xml'],
