@@ -3,6 +3,7 @@ import type {
   RunRecord,
   RunsPageRecord,
   RunSource,
+  SuiteMetricsRecord,
 } from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
@@ -37,6 +38,16 @@ export function listRuns(
   const query = search.size === 0 ? '' : `?${search.toString()}`
 
   return apiRequest<RunsPageRecord>(`/runs${query}`, { signal })
+}
+
+export function getSuiteMetrics(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<SuiteMetricsRecord> {
+  return apiRequest<SuiteMetricsRecord>(
+    `/runs/suite-metrics?projectId=${encodeURIComponent(projectId)}`,
+    { signal },
+  )
 }
 
 export function getRun(id: string, signal?: AbortSignal): Promise<RunRecord> {

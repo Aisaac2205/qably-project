@@ -4,4 +4,6 @@ export const runKeys = {
   page: (projectId: string, source: string) =>
     ['runs', 'page', projectId, source] as const,
   detail: (id: string) => ['runs', id] as const,
+  suiteMetrics: (projectId: string) =>
+    ['runs', 'suite-metrics', projectId] as const,
 }

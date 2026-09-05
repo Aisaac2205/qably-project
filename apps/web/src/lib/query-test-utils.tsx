@@ -6,7 +6,7 @@ import { mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
-import { runFixtures, suiteNameById } from '@/test/runs-api-stub'
+import { computeSuiteMetrics, runFixtures, suiteNameById } from '@/test/runs-api-stub'
 import { projectFixtures } from '@/test/projects-api-stub'
 import { organizationFixtures } from '@/test/organizations-api-stub'
 import {
@@ -107,6 +107,15 @@ function seedRuns(client: QueryClient): void {
   }
 }
 
+function seedSuiteMetrics(client: QueryClient): void {
+  for (const projectId of new Set(mockSuites.map((suite) => suite.projectId))) {
+    client.setQueryData(
+      runKeys.suiteMetrics(projectId),
+      structuredClone(computeSuiteMetrics(projectId)),
+    )
+  }
+}
+
 function seedProjects(client: QueryClient): void {
   client.setQueryData(projectKeys.all, structuredClone(projectFixtures))
 }
@@ -149,6 +158,7 @@ export function createTestQueryClient(): QueryClient {
 
   seedSuites(client)
   seedRuns(client)
+  seedSuiteMetrics(client)
   seedProjects(client)
   seedOrganizations(client)
   seedDashboardSummary(client)

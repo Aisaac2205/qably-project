@@ -70,7 +70,7 @@ function applyFilters(
 }
 
 export function SuiteList({ projectId }: SuiteListProps) {
-  const { perSuite } = useSuiteMetrics(projectId)
+  const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
   const { t } = useTranslation()
 
   const [search, setSearch] = useState('')
@@ -93,6 +93,14 @@ export function SuiteList({ projectId }: SuiteListProps) {
   )
 
   const sorted = useMemo(() => applySort(filtered, sort), [filtered, sort])
+
+  if (isLoading) {
+    return <StateView kind="loading" title={t('common.loading')} />
+  }
+
+  if (isError) {
+    return <StateView kind="error" title={t('suites.loadError')} focusOnMount />
+  }
 
   // Empty state 1: project has no suites at all
   if (perSuite.length === 0) {

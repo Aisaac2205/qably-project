@@ -4,10 +4,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+vi.mock('@/features/runs/api/runs.api', async () =>
+  await import('@/test/runs-api-stub'),
+)
+vi.mock('@/features/projects/suites/hooks/use-suite-metrics', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/features/projects/suites/hooks/use-suite-metrics')>()
+  return { ...actual, useSuiteMetrics: vi.fn(actual.useSuiteMetrics) }
+})
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -35,6 +44,9 @@ describe('SuiteList', () => {
   it('shows "No suites yet" empty state for a project with no suites', async () => {
     await act(async () => {
       renderWithQuery(<SuiteList projectId="proj-empty" />)
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
     })
     expect(screen.getByText('No suites yet')).toBeInTheDocument()
   })
@@ -104,5 +116,43 @@ describe('SuiteList', () => {
     })
     const link = screen.getByText('Authentication').closest('a')
     expect(link?.getAttribute('href')).toBe('/projects/proj-1/suites/suite-1')
+  })
+
+  it('shows a loading state while suites are loading, not the empty state', async () => {
+    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
+      perSuite: [],
+      isLoading: true,
+      isError: false,
+    })
+    await act(async () => {
+      renderWithQuery(<SuiteListForTest />)
+    })
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
+  })
+
+  it('shows an error state when suite metrics fail to load', async () => {
+    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
+      perSuite: [],
+      isLoading: false,
+      isError: true,
+    })
+    await act(async () => {
+      renderWithQuery(<SuiteListForTest />)
+    })
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
+  })
+
+  it('shows the empty state only once loading has finished with zero suites', async () => {
+    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
+      perSuite: [],
+      isLoading: false,
+      isError: false,
+    })
+    await act(async () => {
+      renderWithQuery(<SuiteListForTest />)
+    })
+    expect(screen.getByText('No suites yet')).toBeInTheDocument()
   })
 })

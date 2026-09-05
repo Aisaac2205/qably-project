@@ -1,60 +1,46 @@
 'use client'
 
-/**
- * Hook that aggregates per-suite execution metrics for a project.
- *
- * Reads suites and runs from the api, then derives:
- * - perSuite: one entry per suite with lastRun, passRate7d, sparkline, status
- * - projectMetrics: project-wide aggregate via aggregateForProject
- *
- * All derivations are memoized on the runs reference + suite ids so that
- * re-renders with unchanged data do not recompute the metrics.
- */
 import { useMemo } from 'react'
-import type { RunSummaryRecord, Suite, SuiteRunStatus } from '@qably/types'
-import { useRuns } from '@/features/runs/hooks/use-runs'
+import { useQuery } from '@tanstack/react-query'
+import type { SuiteMetricsEntry } from '@qably/types'
+import { getSuiteMetrics } from '@/features/runs/api/runs.api'
+import { runKeys } from '@/features/runs/lib/query-keys'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
-import {
-  aggregateForProject,
-  getLastRun,
-  getPassRateLastNDays,
-  getSparklineData,
-  getSuiteRunStatus,
-} from '@/lib/execution-metrics'
+import { deriveSuiteMetrics, type DerivedSuiteMetrics } from '@/features/projects/suites/lib/derive-suite-metrics'
 
-export interface SuiteMetrics {
-  suite: Suite
-  lastRun: RunSummaryRecord | undefined
-  passRate7d: number
-  sparkline: Array<{ date: string; passRate: number; runCount: number }>
-  status: SuiteRunStatus
-}
+export type SuiteMetrics = DerivedSuiteMetrics
 
 export interface UseSuiteMetricsResult {
   perSuite: SuiteMetrics[]
-  projectMetrics: {
-    totalSuites: number
-    totalCases: number
-    passRate7d: number
-    lastRunAt?: string
-  }
+  isLoading: boolean
+  isError: boolean
 }
 
 export function useSuiteMetrics(projectId: string): UseSuiteMetricsResult {
-  const { suites } = useSuites(projectId)
-  const { runs } = useRuns(projectId)
+  const { suites, isLoading: suitesLoading, isError: suitesError } = useSuites(projectId)
 
-  return useMemo<UseSuiteMetricsResult>(() => {
-    const perSuite: SuiteMetrics[] = suites.map((suite) => ({
-      suite,
-      lastRun: getLastRun(runs, suite.id),
-      passRate7d: getPassRateLastNDays(runs, suite.id, 7),
-      sparkline: getSparklineData(runs, suite.id),
-      status: getSuiteRunStatus(runs, suite.id),
-    }))
+  const metricsQuery = useQuery({
+    queryKey: runKeys.suiteMetrics(projectId),
+    queryFn: ({ signal }) => getSuiteMetrics(projectId, signal),
+    enabled: !suitesLoading && suites.length > 0,
+  })
 
-    const projectMetrics = aggregateForProject(runs, suites)
+  const entriesBySuiteId = useMemo(() => {
+    const map = new Map<string, SuiteMetricsEntry>()
+    for (const entry of metricsQuery.data?.items ?? []) {
+      map.set(entry.suiteId, entry)
+    }
+    return map
+  }, [metricsQuery.data])
 
-    return { perSuite, projectMetrics }
-  }, [suites, runs])
+  const perSuite = useMemo(
+    () => suites.map((suite) => deriveSuiteMetrics(suite, entriesBySuiteId.get(suite.id))),
+    [suites, entriesBySuiteId],
+  )
+
+  return {
+    perSuite,
+    isLoading: suitesLoading || metricsQuery.isLoading,
+    isError: suitesError || metricsQuery.isError,
+  }
 }
