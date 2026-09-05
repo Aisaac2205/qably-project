@@ -81,6 +81,7 @@ interface FakePrisma {
     update: jest.Mock;
   };
   suite: { findFirst: jest.Mock };
+  txRunCaseFindMany: jest.Mock;
   $transaction: jest.Mock;
 }
 
@@ -103,11 +104,21 @@ function createPrisma(): FakePrisma {
       update: jest.fn().mockResolvedValue(runCaseRow({ status: 'pass' })),
     },
     suite: { findFirst: jest.fn().mockResolvedValue(suiteWithCases) },
+    txRunCaseFindMany: jest.fn().mockResolvedValue([runCaseRow()]),
     $transaction: jest.fn(),
   };
 
-  prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
-    run(prisma),
+  prisma.$transaction.mockImplementation((run: (tx: unknown) => unknown) =>
+    run({
+      run: prisma.run,
+      runCase: {
+        findMany: prisma.txRunCaseFindMany,
+        groupBy: prisma.runCase.groupBy,
+        createManyAndReturn: prisma.runCase.createManyAndReturn,
+        update: prisma.runCase.update,
+      },
+      suite: prisma.suite,
+    }),
   );
 
   return prisma;
@@ -435,7 +446,7 @@ describe('RunQueriesService.createManual', () => {
 
   it('projects the linked official case onto the response, since createManyAndReturn cannot select nested relations', async () => {
     const prisma = createPrisma();
-    prisma.runCase.findMany.mockResolvedValue([
+    prisma.txRunCaseFindMany.mockResolvedValue([
       runCaseRow({
         testCaseId: 'case-1',
         testCase: {
@@ -455,6 +466,17 @@ describe('RunQueriesService.createManual', () => {
     expect(result.value.cases[0].officialCase).not.toBeNull();
     expect(result.value.cases[0].officialCase?.id).toBe('case-1');
     expect(result.value.cases[0].officialCase?.version).toBeNull();
+  });
+
+  it('reloads the created run cases from the transaction client, not the outer prisma client', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).createManual(org, user, input);
+
+    expect(prisma.txRunCaseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { runId: 'run-1' } }),
+    );
+    expect(prisma.runCase.findMany).not.toHaveBeenCalled();
   });
 
   it('creates two manual runs for the same project without colliding on the null externalId', async () => {

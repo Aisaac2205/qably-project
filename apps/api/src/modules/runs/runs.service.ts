@@ -47,6 +47,12 @@ interface AdoptionTx {
   };
 }
 
+interface CaseReloadTx {
+  runCase: {
+    findMany: PrismaService['runCase']['findMany'];
+  };
+}
+
 @Injectable()
 export class RunsService {
   constructor(
@@ -79,7 +85,7 @@ export class RunsService {
     const finishedAt =
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
 
-    const { run } = await this.prisma.$transaction(async (tx) => {
+    const { run, cases } = await this.prisma.$transaction(async (tx) => {
       const suite =
         knownSuite ??
         (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
@@ -157,14 +163,10 @@ export class RunsService {
         select: CASE_SELECT,
       });
 
-      return { run };
-    });
+      const cases = await this.reloadCases(tx, run.id);
 
-    const cases = (await this.prisma.runCase.findMany({
-      where: { runId: run.id },
-      select: CASE_READ_SELECT,
-      orderBy: { position: 'asc' },
-    })) as RunCaseRow[];
+      return { run, cases };
+    });
 
     if (status === 'fail' || status === 'pass') {
       await this.notifications.publish({
@@ -179,6 +181,17 @@ export class RunsService {
     }
 
     return ok(toRunView(run, cases));
+  }
+
+  private async reloadCases(
+    tx: CaseReloadTx,
+    runId: string,
+  ): Promise<RunCaseRow[]> {
+    return await tx.runCase.findMany({
+      where: { runId },
+      select: CASE_READ_SELECT,
+      orderBy: { position: 'asc' },
+    });
   }
 
   private async adoptSuiteByName(

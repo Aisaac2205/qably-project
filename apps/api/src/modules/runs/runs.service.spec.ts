@@ -58,6 +58,7 @@ interface FakePrisma {
     createManyAndReturn: jest.Mock;
     findMany: jest.Mock;
   };
+  txRunCaseFindMany: jest.Mock;
   $transaction: jest.Mock;
 }
 
@@ -82,11 +83,21 @@ function createPrisma(): FakePrisma {
       createManyAndReturn: jest.fn().mockResolvedValue([caseRow({})]),
       findMany: jest.fn().mockResolvedValue([caseRow({})]),
     },
+    txRunCaseFindMany: jest.fn().mockResolvedValue([caseRow({})]),
     $transaction: jest.fn(),
   };
 
-  prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
-    run(prisma),
+  prisma.$transaction.mockImplementation((run: (tx: unknown) => unknown) =>
+    run({
+      suite: prisma.suite,
+      testCase: prisma.testCase,
+      run: prisma.run,
+      runCase: {
+        deleteMany: prisma.runCase.deleteMany,
+        createManyAndReturn: prisma.runCase.createManyAndReturn,
+        findMany: prisma.txRunCaseFindMany,
+      },
+    }),
   );
 
   return prisma;
@@ -394,7 +405,7 @@ describe('RunsService.ingest known suite with unregistered cases', () => {
 describe('RunsService.ingest official case linkage', () => {
   it('projects the linked official case onto the response, since createManyAndReturn cannot select nested relations', async () => {
     const prisma = createPrisma();
-    prisma.runCase.findMany.mockResolvedValue([
+    prisma.txRunCaseFindMany.mockResolvedValue([
       caseRow({
         testCaseId: 'case-1',
         testCase: {
@@ -414,6 +425,19 @@ describe('RunsService.ingest official case linkage', () => {
     expect(result.value.cases[0].officialCase).not.toBeNull();
     expect(result.value.cases[0].officialCase?.id).toBe('case-1');
     expect(result.value.cases[0].officialCase?.version).toBeNull();
+  });
+});
+
+describe('RunsService.ingest case reload transaction scoping', () => {
+  it('reloads the case set from the transaction client, not the outer prisma client, so a concurrent retry cannot leak in', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.txRunCaseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { runId: 'run-1' } }),
+    );
+    expect(prisma.runCase.findMany).not.toHaveBeenCalled();
   });
 });
 

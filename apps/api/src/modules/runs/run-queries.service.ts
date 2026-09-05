@@ -28,6 +28,12 @@ import type {
 
 const OPEN_CASE_STATUSES: readonly CaseStatus[] = ['pending', 'running'];
 
+interface CaseReloadTx {
+  runCase: {
+    findMany: PrismaService['runCase']['findMany'];
+  };
+}
+
 function toSummaryView(run: RunRow, counts: RunCaseCounts): RunSummaryView {
   const passRate = computePassRate(counts);
 
@@ -99,7 +105,7 @@ export class RunQueriesService {
 
     if (run === null) return err('not-found');
 
-    const cases = await this.loadCases(id);
+    const cases = await this.loadCases(this.prisma, id);
 
     return ok(toRunView(run, cases));
   }
@@ -129,7 +135,7 @@ export class RunQueriesService {
     if (suite === null) return err('suite-not-found');
     if (suite.cases.length === 0) return err('empty-suite');
 
-    const { run } = await this.prisma.$transaction(async (tx) => {
+    const { run, cases } = await this.prisma.$transaction(async (tx) => {
       const run = await tx.run.create({
         data: {
           projectId: input.projectId,
@@ -158,10 +164,10 @@ export class RunQueriesService {
         select: CASE_SELECT,
       });
 
-      return { run };
-    });
+      const cases = await this.loadCases(tx, run.id);
 
-    const cases = await this.loadCases(run.id);
+      return { run, cases };
+    });
 
     return ok(toRunView(run, cases));
   }
@@ -177,7 +183,7 @@ export class RunQueriesService {
     if (run === null) return err('not-found');
     if (run.source !== 'manual') return err('source-not-editable');
 
-    const cases = await this.loadCases(runId);
+    const cases = await this.loadCases(this.prisma, runId);
     const targetCase = cases.find((row) => row.id === caseId);
 
     if (targetCase === undefined) return err('case-not-found');
@@ -191,7 +197,7 @@ export class RunQueriesService {
       await this.checkRegression(org, run, targetCase);
     }
 
-    const updatedCases = await this.loadCases(runId);
+    const updatedCases = await this.loadCases(this.prisma, runId);
     const status = deriveRunStatus(updatedCases.map((row) => row.status));
     const stillOpen = updatedCases.some((row) =>
       OPEN_CASE_STATUSES.includes(row.status),
@@ -295,8 +301,11 @@ export class RunQueriesService {
     });
   }
 
-  private loadCases(runId: string): Promise<RunCaseRow[]> {
-    return this.prisma.runCase.findMany({
+  private loadCases(
+    client: CaseReloadTx,
+    runId: string,
+  ): Promise<RunCaseRow[]> {
+    return client.runCase.findMany({
       where: { runId },
       select: CASE_READ_SELECT,
       orderBy: { position: 'asc' },
