@@ -20,13 +20,20 @@ import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { RunQueryError, RunsPageView, RunView } from './runs.contracts';
+import type {
+  RunQueryError,
+  RunsPageView,
+  RunView,
+  SuiteMetricsView,
+} from './runs.contracts';
 import {
   createManualRunSchema,
   listRunsQuerySchema,
+  suiteMetricsQuerySchema,
   updateRunCaseStatusSchema,
   type CreateManualRunInput,
   type ListRunsQuery,
+  type SuiteMetricsQuery,
   type UpdateRunCaseStatusInput,
 } from './runs.schemas';
 import { RunQueriesService } from './run-queries.service';
@@ -63,6 +70,15 @@ export class RunQueriesController {
     @Query(new ZodValidationPipe(listRunsQuerySchema)) query: ListRunsQuery,
   ): Promise<RunsPageView> {
     return this.runs.list(org, query);
+  }
+
+  @Get('suite-metrics')
+  suiteMetrics(
+    @CurrentOrg() org: OrgContext,
+    @Query(new ZodValidationPipe(suiteMetricsQuerySchema))
+    query: SuiteMetricsQuery,
+  ): Promise<SuiteMetricsView> {
+    return this.runs.suiteMetrics(org, query.projectId);
   }
 
   @Get(':id')

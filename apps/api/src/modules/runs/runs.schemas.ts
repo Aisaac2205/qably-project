@@ -55,6 +55,12 @@ export const ingestRunSchema = z
 export type IngestCaseInput = z.infer<typeof ingestCaseSchema>;
 export type IngestRunInput = z.infer<typeof ingestRunSchema>;
 
+export const suiteMetricsQuerySchema = z.object({
+  projectId: z.string().min(1),
+});
+
+export type SuiteMetricsQuery = z.infer<typeof suiteMetricsQuerySchema>;
+
 export const listRunsQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
   source: z.enum(['manual', 'api', 'github_actions']).optional(),

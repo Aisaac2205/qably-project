@@ -244,6 +244,32 @@ export interface RunsPageRecord {
   nextCursor?: string
 }
 
+/**
+ * Bounded last-run summary used by the suite metrics endpoint. Deliberately
+ * narrower than RunSummaryRecord: the metrics query never loads full case
+ * lists, only the aggregate passRate for the suite's most recent run.
+ */
+export interface SuiteMetricsLastRun {
+  id: string
+  status: RunStatus
+  source: RunSource
+  startedAt: string
+  finishedAt?: string
+  /** Fraction 0–1, consistent with RunSummaryRecord.passRate. */
+  passRate: number
+}
+
+export interface SuiteMetricsEntry {
+  suiteId: string
+  lastRun: SuiteMetricsLastRun | null
+  /** Up to 10 most recent run statuses for the suite, oldest first. */
+  trend: RunStatus[]
+}
+
+export interface SuiteMetricsRecord {
+  items: SuiteMetricsEntry[]
+}
+
 export interface CiCommitActivityRecord {
   commitSha: string
   shortSha: string

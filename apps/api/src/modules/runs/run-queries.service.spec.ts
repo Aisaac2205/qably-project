@@ -81,7 +81,8 @@ interface FakePrisma {
     createManyAndReturn: jest.Mock;
     update: jest.Mock;
   };
-  suite: { findFirst: jest.Mock };
+  suite: { findFirst: jest.Mock; findMany: jest.Mock };
+  $queryRaw: jest.Mock;
   txRunCaseFindMany: jest.Mock;
   $transaction: jest.Mock;
 }
@@ -104,7 +105,11 @@ function createPrisma(): FakePrisma {
       createManyAndReturn: jest.fn().mockResolvedValue([runCaseRow()]),
       update: jest.fn().mockResolvedValue(runCaseRow({ status: 'pass' })),
     },
-    suite: { findFirst: jest.fn().mockResolvedValue(suiteWithCases) },
+    suite: {
+      findFirst: jest.fn().mockResolvedValue(suiteWithCases),
+      findMany: jest.fn().mockResolvedValue([{ id: 'suite-1' }]),
+    },
+    $queryRaw: jest.fn().mockResolvedValue([]),
     txRunCaseFindMany: jest.fn().mockResolvedValue([runCaseRow()]),
     $transaction: jest.fn(),
   };
@@ -310,6 +315,115 @@ describe('RunQueriesService.list', () => {
 
     expect(summary.caseCounts.total).toBe(0);
     expect(summary.passRate).toBe(0);
+  });
+});
+
+describe('RunQueriesService.suiteMetrics', () => {
+  it('returns an empty item list when the project has no suites', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([]);
+
+    const result = await build(prisma).suiteMetrics(org, 'project-1');
+
+    expect(result).toEqual({ items: [] });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('scopes the suite lookup to the project and organization', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).suiteMetrics(org, 'project-1');
+
+    expect(prisma.suite.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { projectId: 'project-1', organizationId: 'org-1' },
+      }),
+    );
+  });
+
+  it('returns a null lastRun and empty trend for a suite with no runs', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const result = await build(prisma).suiteMetrics(org, 'project-1');
+
+    expect(result.items).toEqual([
+      { suiteId: 'suite-1', lastRun: null, trend: [] },
+    ]);
+  });
+
+  it('builds the lastRun and trend from the ranked runs, with passRate from the case counts', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        status: 'pass',
+        source: 'manual',
+        startedAt: new Date('2026-01-02T00:00:00.000Z'),
+        finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+      },
+      {
+        id: 'run-1',
+        suiteId: 'suite-1',
+        status: 'fail',
+        source: 'manual',
+        startedAt: new Date('2026-01-01T00:00:00.000Z'),
+        finishedAt: new Date('2026-01-01T00:05:00.000Z'),
+      },
+    ]);
+    prisma.runCase.groupBy.mockResolvedValue([
+      { runId: 'run-2', status: 'pass', _count: { _all: 3 } },
+      { runId: 'run-2', status: 'fail', _count: { _all: 1 } },
+    ]);
+
+    const result = await build(prisma).suiteMetrics(org, 'project-1');
+
+    expect(result.items).toEqual([
+      {
+        suiteId: 'suite-1',
+        lastRun: {
+          id: 'run-2',
+          status: 'pass',
+          source: 'manual',
+          startedAt: '2026-01-02T00:00:00.000Z',
+          finishedAt: '2026-01-02T00:05:00.000Z',
+          passRate: 0.75,
+        },
+        trend: ['fail', 'pass'],
+      },
+    ]);
+  });
+
+  it('only counts cases for the most recent run per suite, not every trend run', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        status: 'pass',
+        source: 'manual',
+        startedAt: new Date('2026-01-02T00:00:00.000Z'),
+        finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+      },
+      {
+        id: 'run-1',
+        suiteId: 'suite-1',
+        status: 'fail',
+        source: 'manual',
+        startedAt: new Date('2026-01-01T00:00:00.000Z'),
+        finishedAt: new Date('2026-01-01T00:05:00.000Z'),
+      },
+    ]);
+
+    await build(prisma).suiteMetrics(org, 'project-1');
+
+    expect(prisma.runCase.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { runId: { in: ['run-2'] } } }),
+    );
   });
 });
 
