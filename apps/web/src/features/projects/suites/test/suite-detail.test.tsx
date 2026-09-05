@@ -32,11 +32,25 @@ describe('SuiteDetail (redesigned)', () => {
     mockPush.mockClear()
   })
 
-  it('disables the run button on a suite with no cases', async () => {
+  it('disables the run button on a suite with no cases, while keeping it focusable', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
 
     expect(screen.getByText(/no test cases in this suite yet/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /run this suite/i })).toBeDisabled()
+    const button = screen.getByRole('button', { name: /run this suite/i })
+    expect(button).toHaveAttribute('aria-disabled', 'true')
+    expect(button).toHaveAttribute('tabindex', '0')
+  })
+
+  it('explains the disabled run button with a visible hint linked via aria-describedby', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
+
+    const button = screen.getByRole('button', { name: /run this suite/i })
+    const describedBy = button.getAttribute('aria-describedby')
+    expect(describedBy).toBeTruthy()
+
+    const hint = document.getElementById(describedBy as string)
+    expect(hint).not.toBeNull()
+    expect(hint).toHaveTextContent(/add at least one test case/i)
   })
 
   it('enables the run button when the suite has cases', async () => {

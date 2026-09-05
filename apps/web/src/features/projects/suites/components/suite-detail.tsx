@@ -119,21 +119,27 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button
-              type="button"
-              disabled={suite.cases.length === 0}
-              title={
-                suite.cases.length === 0
-                  ? t('suites.cannotRunEmptySuite')
-                  : undefined
-              }
-              onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
-              className="text-sm font-semibold"
-              size="default"
-            >
-              <Play size={14} weight="bold" aria-hidden="true" />
-              {t('suites.runThisSuite')}
-            </Button>
+            <div className="flex flex-col items-end gap-1">
+              <Button
+                type="button"
+                disabled={suite.cases.length === 0}
+                focusableWhenDisabled={suite.cases.length === 0}
+                aria-describedby={
+                  suite.cases.length === 0 ? 'run-suite-empty-hint' : undefined
+                }
+                onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
+                className="text-sm font-semibold"
+                size="default"
+              >
+                <Play size={14} weight="bold" aria-hidden="true" />
+                {t('suites.runThisSuite')}
+              </Button>
+              {suite.cases.length === 0 && (
+                <p id="run-suite-empty-hint" className="text-xs text-muted">
+                  {t('suites.cannotRunEmptySuite')}
+                </p>
+              )}
+            </div>
 
             {/* Suite actions */}
             <Menu>
