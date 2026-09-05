@@ -3,10 +3,17 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SuiteKpiRow } from '@/features/projects/suites/components/suite-kpi-row'
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery, withQueryClient } from '@/lib/query-test-utils'
+import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+
+vi.mock('@/features/projects/suites/hooks/use-suite-metrics', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/features/projects/suites/hooks/use-suite-metrics')>()
+  return { ...actual, useSuiteMetrics: vi.fn(actual.useSuiteMetrics) }
+})
 
 describe('SuiteKpiRow', () => {
   beforeEach(() => {
@@ -62,5 +69,21 @@ describe('SuiteKpiRow', () => {
     const grid = container.querySelector('[role="group"]')
     expect(grid).toBeInTheDocument()
     expect(grid?.className).toContain('grid-cols-2')
+  })
+
+  it('renders the fallback instead of throwing when lastRunAt is invalid', async () => {
+    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
+      perSuite: [],
+      projectMetrics: {
+        totalSuites: 1,
+        totalCases: 1,
+        passRate7d: 0,
+        lastRunAt: 'not-a-date',
+      },
+    })
+    await act(async () => {
+      renderWithQuery(<SuiteKpiRow projectId="proj-1" />)
+    })
+    expect(screen.getByText('—')).toBeInTheDocument()
   })
 })

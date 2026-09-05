@@ -17,22 +17,7 @@ import { InlineEditableText } from './inline-editable-text'
 import { useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
-
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-
-function formatRelative(iso: string | undefined): string {
-  if (!iso) return 'Never'
-  const then = new Date(iso).getTime()
-  const now = Date.now()
-  const diffSec = Math.round((then - now) / 1000)
-  const abs = Math.abs(diffSec)
-  if (abs < 60) return rtf.format(diffSec, 'second')
-  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute')
-  if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), 'hour')
-  if (abs < 2592000) return rtf.format(Math.round(diffSec / 86400), 'day')
-  if (abs < 31536000) return rtf.format(Math.round(diffSec / 2592000), 'month')
-  return rtf.format(Math.round(diffSec / 31536000), 'year')
-}
+import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
 const STATUS_TONE: Record<string, 'text-pass' | 'text-fail' | 'text-warn' | 'text-running' | 'text-muted'> = {
   pass: 'text-pass',
@@ -50,7 +35,7 @@ interface SuiteRowProps {
 function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
   const { lastRun, passRate7d, sparkline, status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const updateSuiteMutation = useUpdateSuite()
 
   function handleSave(newName: string) {
@@ -113,7 +98,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
       {/* Col 4: last run reference (hidden on mobile) */}
       <div className="hidden md:flex flex-col items-end shrink-0 w-24">
         <span className="text-xs font-medium text-default">
-          {formatRelative(lastRun?.startedAt)}
+          {formatRelative(lastRun?.startedAt, locale, t('suites.never'))}
         </span>
         <span className="text-xs text-muted mt-0.5">
           {lastRun?.source === 'github_actions' ? t('suites.sourceCi') : lastRun ? t('suites.sourceManual') : ''}

@@ -10,27 +10,12 @@ import { TestTube, ListChecks, ChartBar, Clock } from '@phosphor-icons/react'
 import { KpiCard } from '@/components/ui/kpi-card'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
-
-const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
-
-function formatRelative(iso: string | undefined): string {
-  if (!iso) return '—'
-  const then = new Date(iso).getTime()
-  const now = Date.now()
-  const diffSec = Math.round((then - now) / 1000)
-  const abs = Math.abs(diffSec)
-  if (abs < 60) return rtf.format(diffSec, 'second')
-  if (abs < 3600) return rtf.format(Math.round(diffSec / 60), 'minute')
-  if (abs < 86400) return rtf.format(Math.round(diffSec / 3600), 'hour')
-  if (abs < 2592000) return rtf.format(Math.round(diffSec / 86400), 'day')
-  if (abs < 31536000) return rtf.format(Math.round(diffSec / 2592000), 'month')
-  return rtf.format(Math.round(diffSec / 31536000), 'year')
-}
+import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
 export function SuiteKpiRow({ projectId }: { projectId: string }) {
   const { projectMetrics } = useSuiteMetrics(projectId)
   const { totalSuites, totalCases, passRate7d, lastRunAt } = projectMetrics
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   return (
     <div
@@ -61,7 +46,7 @@ export function SuiteKpiRow({ projectId }: { projectId: string }) {
       />
       <KpiCard
         label={t('suites.lastRunLabel')}
-        value={formatRelative(lastRunAt)}
+        value={formatRelative(lastRunAt, locale, '—')}
         icon={Clock}
         accent="default"
         subtext={lastRunAt ? undefined : t('suites.noRunsSubtext')}

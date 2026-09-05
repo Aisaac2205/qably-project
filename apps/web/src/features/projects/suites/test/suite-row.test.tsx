@@ -139,6 +139,17 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.getByText('Never')).toBeInTheDocument()
   })
 
+  it('renders the fallback instead of throwing when startedAt is invalid', async () => {
+    const invalidRunMetrics = {
+      ...metrics,
+      lastRun: { ...mockRun, startedAt: 'not-a-date' },
+    }
+    await act(async () => {
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={invalidRunMetrics} />)
+    })
+    expect(screen.getByText('Never')).toBeInTheDocument()
+  })
+
   it('renders the pass rate percentage', async () => {
     await act(async () => {
       renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
