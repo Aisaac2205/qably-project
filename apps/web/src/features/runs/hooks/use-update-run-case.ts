@@ -20,11 +20,12 @@ export function useUpdateRunCase(
     },
     onError,
   })
+  const { mutate } = mutation
 
   return useCallback(
     (caseId: string, status: CaseStatus) => {
-      mutation.mutate({ caseId, status })
+      mutate({ caseId, status })
     },
-    [mutation],
+    [mutate],
   )
 }

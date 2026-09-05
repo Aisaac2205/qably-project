@@ -19,12 +19,13 @@ export function useCreateRun(projectId: string) {
       router.push(`/projects/${projectId}/runs/${run.id}`)
     },
   })
+  const { mutate } = mutation
 
   const start = useCallback(
     (suiteId: string, name?: string) => {
-      mutation.mutate({ suiteId, name })
+      mutate({ suiteId, name })
     },
-    [mutation],
+    [mutate],
   )
 
   return useMemo(

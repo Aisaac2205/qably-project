@@ -61,4 +61,18 @@ describe('useUpdateRunCase', () => {
       expect(result.current.run?.cases.find((c) => c.id === 'tc-2')?.status).toBe('pass')
     })
   })
+
+  it('keeps the same update callback across a re-render with no state change', () => {
+    const client = createTestQueryClient()
+    const { result, rerender } = renderHook(() => useUpdateRunCase('run-12'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+    const firstUpdate = result.current
+
+    rerender()
+
+    expect(result.current).toBe(firstUpdate)
+  })
 })
