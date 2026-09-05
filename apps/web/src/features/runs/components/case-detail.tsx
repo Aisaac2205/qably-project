@@ -21,7 +21,7 @@ export function CaseDetail({
       {/* Header with name, version snapshot, and status */}
       <div className="space-y-2 pb-4 border-b border-border">
         <div className="flex items-center gap-2 flex-wrap">
-          {officialCase && (
+          {officialCase && officialCase.version !== null && (
             <span className="rounded bg-canvas border border-border px-2 py-0.5 font-mono text-xs font-semibold text-muted">
               {t('runs.versionSnapshot', { version: officialCase.version })}
             </span>

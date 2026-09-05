@@ -25,9 +25,11 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
         <span className="text-sm font-semibold text-default truncate flex-1 min-w-[200px]">
           {testCase.name}
         </span>
-        <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
-          v{testCase.version}
-        </span>
+        {testCase.version !== null && (
+          <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
+            v{testCase.version}
+          </span>
+        )}
         <PriorityBadge priority={testCase.priority} />
         <StatusChip status={testCase.state} scope="lifecycle" />
 

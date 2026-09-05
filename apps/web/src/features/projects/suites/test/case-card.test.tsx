@@ -23,6 +23,13 @@ describe('CaseCard', () => {
     expect(screen.getByText('v2')).toBeInTheDocument()
   })
 
+  it('hides the version badge when the case has never been published', async () => {
+    await act(async () => {
+      render(<CaseCard testCase={{ ...mockCase, version: null }} onEdit={noop} onDelete={noop} />)
+    })
+    expect(screen.queryByText(/^v\d/)).not.toBeInTheDocument()
+  })
+
   it('offers to document a case that has no steps', async () => {
     const user = userEvent.setup()
     const onEdit = vi.fn()

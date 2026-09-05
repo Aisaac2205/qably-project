@@ -67,6 +67,32 @@ describe('CaseDetail', () => {
     )
   })
 
+  it('hides the version badge but keeps the library link for an unpublished linked case', async () => {
+    await act(async () => {
+      render(
+        <CaseDetail
+          c={{
+            ...mockCase,
+            testCaseId: 'case-9',
+            officialCase: {
+              id: 'case-9',
+              suiteId: 'suite-1',
+              version: null,
+              steps: [],
+              expectedResult: '',
+            },
+          }}
+          projectId="proj-1"
+        />,
+      )
+    })
+    expect(screen.queryByText(/^Version /)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /library/i })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/suites/suite-1',
+    )
+  })
+
   it('hides the version badge and library link when the case is unlinked', async () => {
     await act(async () => {
       render(
