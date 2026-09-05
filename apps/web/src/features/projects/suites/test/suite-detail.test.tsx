@@ -41,6 +41,14 @@ describe('SuiteDetail (redesigned)', () => {
     expect(button).toHaveAttribute('tabindex', '0')
   })
 
+  it('renders the empty-suite run button with the disabled-looking class contract', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
+
+    const button = screen.getByRole('button', { name: /run this suite/i })
+    expect(button.className).toContain('aria-disabled:opacity-50')
+    expect(button.className).toContain('aria-disabled:pointer-events-none')
+  })
+
   it('explains the disabled run button with a visible hint linked via aria-describedby', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
 
