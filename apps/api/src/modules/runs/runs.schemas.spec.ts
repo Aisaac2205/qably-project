@@ -131,6 +131,90 @@ describe('ingestRunSchema', () => {
 
     expect(result.success).toBe(false);
   });
+
+  it('accepts the optional JUnit result detail fields on a case', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [
+        {
+          ...baseCase,
+          status: 'fail',
+          className: 'checkout.spec',
+          filePath: 'e2e/checkout.spec.ts',
+          durationMs: 500,
+          failureType: 'AssertionError',
+          failureMessage: 'expected 200',
+          failureDetails: 'at checkout.spec.ts:12',
+        },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.cases[0].className).toBe(
+      'checkout.spec',
+    );
+    expect(result.success && result.data.cases[0].durationMs).toBe(500);
+    expect(result.success && result.data.cases[0].failureMessage).toBe(
+      'expected 200',
+    );
+  });
+
+  it('accepts a skipReason on a skipped case', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, status: 'skip', skipReason: 'requires network' }],
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.cases[0].skipReason).toBe(
+      'requires network',
+    );
+  });
+
+  it('rejects a negative durationMs', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, durationMs: -1 }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a non-integer durationMs', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, durationMs: 12.5 }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a failureMessage over 1000 characters', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, failureMessage: 'm'.repeat(1001) }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a failureDetails over 4000 characters', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, failureDetails: 'd'.repeat(4001) }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a skipReason over 500 characters', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, skipReason: 'r'.repeat(501) }],
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('listRunsQuerySchema', () => {

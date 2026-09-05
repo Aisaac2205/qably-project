@@ -189,6 +189,13 @@ export interface RunCaseRecord {
   status: CaseStatus
   position: number
   recordedAt?: string
+  className?: string
+  filePath?: string
+  durationMs?: number
+  failureType?: string
+  failureMessage?: string
+  failureDetails?: string
+  skipReason?: string
 }
 
 export interface RunRecord {

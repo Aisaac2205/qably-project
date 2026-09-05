@@ -19,6 +19,13 @@ const isoDateTime = z.iso.datetime({ offset: true });
 const commitSha = z.string().trim().min(1).max(64);
 const commitMessage = z.string().trim().max(2000);
 const commitAuthor = z.string().trim().max(200);
+const className = z.string().trim().min(1).max(250);
+const filePath = z.string().trim().min(1).max(500);
+const durationMs = z.number().int().min(0);
+const failureType = z.string().trim().min(1).max(250);
+const failureMessage = z.string().trim().min(1).max(1000);
+const failureDetails = z.string().trim().min(1).max(4000);
+const skipReason = z.string().trim().min(1).max(500);
 
 const ingestCaseSchema = z.object({
   name: caseName,
@@ -27,6 +34,13 @@ const ingestCaseSchema = z.object({
   expectedResult: expectedResult.default(''),
   status: caseStatus,
   recordedAt: isoDateTime.optional(),
+  className: className.optional(),
+  filePath: filePath.optional(),
+  durationMs: durationMs.optional(),
+  failureType: failureType.optional(),
+  failureMessage: failureMessage.optional(),
+  failureDetails: failureDetails.optional(),
+  skipReason: skipReason.optional(),
 });
 
 export const ingestRunSchema = z
