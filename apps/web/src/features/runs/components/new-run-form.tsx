@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { useCreateRun } from '@/features/runs/hooks/use-create-run'
+import { ApiError } from '@/lib/api-client'
 import {
   Select,
   SelectGroup,
@@ -13,6 +14,13 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
+
+function translateCreateRunError(error: unknown, t: (key: string) => string): string {
+  if (error instanceof ApiError && error.status === 400) {
+    return t('suites.cannotRunEmptySuite')
+  }
+  return t('runs.createRunError')
+}
 
 export function NewRunForm({
   projectId,
@@ -84,7 +92,7 @@ export function NewRunForm({
         </Select>
         {(error || createError) && (
           <span className="text-xs text-fail" role="alert">
-            {error || createError?.message}
+            {error || translateCreateRunError(createError, t)}
           </span>
         )}
       </div>
