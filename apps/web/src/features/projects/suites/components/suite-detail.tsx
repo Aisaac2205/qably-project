@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { projectRootPath, projectSuitesPath } from '../../lib/routes'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { Sparkline } from './sparkline'
 import { CaseCard } from './case-card'
@@ -56,14 +57,14 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         <Breadcrumbs
           items={[
             { label: t('suites.breadcrumbProjects'), href: '/projects' },
-            ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
+            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
             { label: t('common.notFound') },
           ]}
         />
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <p className="text-sm text-muted">{t('suites.suiteNotFound')}</p>
           <Link
-            href={`/projects/${projectId}`}
+            href={projectRootPath(projectId)}
             className="text-sm text-primary font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-primary inline-flex items-center gap-1"
           >
             <ArrowLeft size={14} weight="bold" aria-hidden="true" />
@@ -79,8 +80,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
-          { label: t('suites.breadcrumbSuites'), href: `/projects/${projectId}` },
+          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+          { label: t('suites.breadcrumbSuites'), href: projectSuitesPath(projectId) },
           { label: suite.name },
         ]}
       />
@@ -272,7 +273,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         })}
         onConfirm={() => {
           removeSuite.mutate(suite.id, {
-            onSuccess: () => router.push(`/projects/${projectId}`),
+            onSuccess: () => router.push(projectSuitesPath(projectId)),
           })
         }}
       />

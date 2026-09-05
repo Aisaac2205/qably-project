@@ -135,6 +135,37 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />) })
     expect(screen.getByText('Suite not found')).toBeInTheDocument()
     const back = screen.getByRole('link', { name: /Back to project/i })
-    expect(back.getAttribute('href')).toBe('/projects/proj-1')
+    expect(back.getAttribute('href')).toBe('/projects/proj-1/repository')
+  })
+
+  it('points the project breadcrumb at the canonical project root', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    const nav = screen.getByRole('navigation', { name: /breadcrumb/i })
+    expect(within(nav).getByText('Ecommerce App').closest('a')).toHaveAttribute(
+      'href',
+      '/projects/proj-1/repository',
+    )
+  })
+
+  it('points the Suites breadcrumb at the test library, not the project root', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    const nav = screen.getByRole('navigation', { name: /breadcrumb/i })
+    expect(within(nav).getByText('Suites').closest('a')).toHaveAttribute(
+      'href',
+      '/projects/proj-1/suites',
+    )
+  })
+
+  it('returns to the test library after deleting the suite', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    await user.click(screen.getByRole('button', { name: /suite actions/i }))
+    await user.click(await screen.findByText('Delete suite'))
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }))
+
+    await vi.waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites')
+    })
   })
 })

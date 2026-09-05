@@ -33,6 +33,7 @@ import type { Icon } from '@phosphor-icons/react'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
+import { projectRootPath, projectSuitesPath } from '@/features/projects/lib/routes'
 import { useTranslation } from '@/lib/i18n'
 
 interface NavItem {
@@ -40,7 +41,6 @@ interface NavItem {
   href: string
   icon: Icon
   exact?: boolean
-  aliasHref?: string
 }
 
 export function Sidebar() {
@@ -63,15 +63,9 @@ export function Sidebar() {
 
   const projectSubItems: NavItem[] = projectContext
     ? [
-        { label: t('sidebar.repository'), href: `/projects/${projectContext}/repository`, icon: FolderSimple },
+        { label: t('sidebar.repository'), href: projectRootPath(projectContext), icon: FolderSimple },
         { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Sparkle },
-        {
-          label: t('sidebar.testLibrary'),
-          href: `/projects/${projectContext}/suites`,
-          icon: Stack,
-          // The project root renders the same suite list, so it counts as this item too.
-          aliasHref: `/projects/${projectContext}`,
-        },
+        { label: t('sidebar.testLibrary'), href: projectSuitesPath(projectContext), icon: Stack },
         { label: t('sidebar.runs'), href: `/projects/${projectContext}/runs`, icon: Play },
         { label: t('sidebar.quality'), href: `/projects/${projectContext}/reports`, icon: ChartLine },
         { label: t('sidebar.apiKeys'), href: `/projects/${projectContext}/api-keys`, icon: Key },
@@ -124,7 +118,6 @@ export function Sidebar() {
                 {projectSubItems.map(item => {
                   const isActive =
                     pathname === item.href ||
-                    pathname === item.aliasHref ||
                     (!item.exact && pathname.startsWith(item.href + '/'))
                   return (
                     <SidebarMenuItem key={item.label}>

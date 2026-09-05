@@ -60,7 +60,7 @@ describe('ProjectCard', () => {
   it('links to project detail page', async () => {
     await act(async () => { render(<ProjectCard project={mockProject} />) })
     const link = screen.getByRole('link')
-    expect(link).toHaveAttribute('href', '/projects/proj-1')
+    expect(link).toHaveAttribute('href', '/projects/proj-1/repository')
   })
 
   it('shows tech icons for provided technologies', async () => {

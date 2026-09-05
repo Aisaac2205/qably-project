@@ -12,6 +12,7 @@ import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } 
 import { useDeleteProject } from '../hooks/use-delete-project'
 import { TECH_ICONS, type TechKey } from '../lib/tech-icons'
 import { useTranslation } from '@/lib/i18n'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 const MAX_ICONS = 4
 
@@ -39,7 +40,7 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
   return (
     <div className="group relative flex flex-col h-52 rounded-xl bg-surface border border-border/80 p-5 hover:border-primary/40 hover:shadow-card transition-shadow duration-200 focus-within:border-primary/40">
       <Link
-        href={`/projects/${project.id}`}
+        href={projectRootPath(project.id)}
         className="absolute inset-0 rounded-xl outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2"
         aria-label={project.name}
       />

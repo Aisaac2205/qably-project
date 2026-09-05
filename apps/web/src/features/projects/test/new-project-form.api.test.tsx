@@ -110,7 +110,7 @@ describe('NewProjectForm against the api', () => {
     await user.type(screen.getByLabelText(/Project name/), 'Shop')
     await user.click(screen.getByRole('button', { name: /Create project/ }))
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/projects/p1'))
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/projects/p1/repository'))
   })
 
   it('surfaces the api error message and stays on the form', async () => {

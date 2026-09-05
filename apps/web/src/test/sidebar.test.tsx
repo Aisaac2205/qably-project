@@ -219,7 +219,7 @@ describe('Sidebar — current destinations', () => {
     ['global expanded', '/notifications', 'Notifications', '/notifications', {}],
     ['global collapsed', '/projects/new', 'Projects', '/projects', { defaultOpen: false }],
     ['global mobile', '/review-inbox', 'Review Inbox', '/review-inbox', { mobile: true }],
-    ['project root aliases to Test Library', '/projects/proj-1', 'Test Library', '/projects/proj-1/suites', {}],
+    ['project root resolves to Repository', '/projects/proj-1/repository', 'Repository', '/projects/proj-1/repository', {}],
     ['project Review nested destination', '/projects/proj-1/ai-review/case-1', 'Review', '/projects/proj-1/ai-review', {}],
     ['project Quality nested destination', '/projects/proj-1/reports/run-1', 'Quality', '/projects/proj-1/reports', {}],
     ['project collapsed', '/projects/proj-1/runs', 'Runs', '/projects/proj-1/runs', { defaultOpen: false }],

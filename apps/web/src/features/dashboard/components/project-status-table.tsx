@@ -9,6 +9,7 @@ import { formatRelativeTime, type FormatLocale } from '@/features/dashboard/lib/
 import { sortProjectsByAttention } from '@/features/dashboard/lib/project-attention'
 import { useTranslation } from '@/lib/i18n'
 import { DataTable } from '@/components/ui/data-table'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 function reportsAiPending(projects: readonly ProjectListItem[]): boolean {
   return projects.some((project) => project.activity?.aiPendingCount !== undefined)
@@ -70,7 +71,7 @@ export function ProjectStatusTable() {
                 <tr key={project.id} className="hover:bg-canvas/20 transition-colors group">
                   <td className="px-5 py-3.5">
                     <Link
-                      href={`/projects/${project.id}`}
+                      href={projectRootPath(project.id)}
                       className="text-xs font-semibold text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
                     >
                       {project.name}

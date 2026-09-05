@@ -7,6 +7,7 @@ import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { ArrowLeft } from '@phosphor-icons/react'
 import { RunDetail } from '@/features/runs/components/run-detail'
 import { useTranslation } from '@/lib/i18n'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 export function RunDetailPageClient({
   projectId,
@@ -25,7 +26,7 @@ export function RunDetailPageClient({
         <Breadcrumbs
           items={[
             { label: t('suites.breadcrumbProjects'), href: '/projects' },
-            ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
+            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
             { label: t('runs.title'), href: `/projects/${projectId}/runs` },
             { label: t('common.notFound') },
           ]}
@@ -49,7 +50,7 @@ export function RunDetailPageClient({
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
+          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
           { label: t('runs.title'), href: `/projects/${projectId}/runs` },
           { label: run.name },
         ]}

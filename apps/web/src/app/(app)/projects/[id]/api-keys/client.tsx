@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { ApiKeysManager } from '@/features/projects/api-keys/components/api-keys-manager'
 import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 export function ApiKeysPageClient({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
@@ -15,7 +16,7 @@ export function ApiKeysPageClient({ projectId }: { projectId: string }) {
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
+          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
           { label: t('apiKeys.title') },
         ]}
       />

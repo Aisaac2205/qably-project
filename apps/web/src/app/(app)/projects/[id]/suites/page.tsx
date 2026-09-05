@@ -5,6 +5,7 @@ import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 type Params = Promise<{ id: string }>
 
@@ -18,7 +19,7 @@ export default function SuitesPage({ params }: { params: Params }) {
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: `/projects/${id}` }] : []),
+          ...(project ? [{ label: project.name, href: projectRootPath(id) }] : []),
           { label: t('sidebar.testLibrary') },
         ]}
       />

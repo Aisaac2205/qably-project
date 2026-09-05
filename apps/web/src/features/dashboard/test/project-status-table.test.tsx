@@ -186,7 +186,7 @@ describe('ProjectStatusTable', () => {
 
     expect(screen.getByText('Ecommerce App').closest('a')).toHaveAttribute(
       'href',
-      '/projects/proj-1',
+      '/projects/proj-1/repository',
     )
   })
 })

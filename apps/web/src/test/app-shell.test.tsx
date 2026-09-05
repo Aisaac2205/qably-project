@@ -22,6 +22,7 @@ vi.mock('@/features/projects/hooks/use-project', async () => {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
+  useParams: () => ({}),
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
 }))
 

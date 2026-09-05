@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createProject, type CreateProjectPayload } from '../api/projects.api'
 import { projectKeys } from '../lib/query-keys'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 export function useCreateProject() {
   const router = useRouter()
@@ -13,7 +14,7 @@ export function useCreateProject() {
     mutationFn: (payload: CreateProjectPayload) => createProject(payload),
     onSuccess: async (project) => {
       await queryClient.invalidateQueries({ queryKey: projectKeys.all })
-      router.push(`/projects/${project.id}`)
+      router.push(projectRootPath(project.id))
     },
   })
 }

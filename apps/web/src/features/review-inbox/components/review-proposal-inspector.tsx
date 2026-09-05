@@ -17,6 +17,7 @@ import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProposal } from '../hooks/use-proposals'
 import { useTranslation } from '@/lib/i18n'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 interface ReviewProposalInspectorProps {
   proposal: ExtractedProposal
@@ -61,7 +62,7 @@ export function ReviewProposalInspector({
           <div className="flex flex-wrap items-center gap-2">
             {project && (
               <Link
-                href={`/projects/${project.id}`}
+                href={projectRootPath(project.id)}
                 className="inline-flex items-center rounded-md border border-border bg-canvas px-2 py-0.5 text-xs font-medium text-default transition-colors hover:border-border-strong hover:text-primary"
               >
                 {project.name}

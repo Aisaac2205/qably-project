@@ -12,6 +12,7 @@ import { ProjectChatPanel } from './project-chat-panel'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
+import { projectRootPath } from '@/features/projects/lib/routes'
 
 export function AiReviewPage({ projectId }: { projectId: string }) {
   const { project } = useProject(projectId)
@@ -44,7 +45,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
       <Breadcrumbs
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: `/projects/${projectId}` }] : []),
+          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
           { label: t('aiReview.title') },
         ]}
       />

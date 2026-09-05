@@ -79,7 +79,7 @@ describe('ProjectGrid', () => {
     renderGrid()
 
     await screen.findByText('Newer')
-    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', '/projects/proj-3')
+    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', '/projects/proj-3/repository')
   })
 
   it('falls back to updatedAt to order projects that never ran', async () => {
@@ -91,7 +91,7 @@ describe('ProjectGrid', () => {
     renderGrid()
 
     await screen.findByText('Fresh')
-    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', '/projects/proj-2')
+    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', '/projects/proj-2/repository')
   })
 
   it('shows a busy placeholder while the request is in flight', () => {
