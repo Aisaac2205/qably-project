@@ -192,7 +192,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-3',
         suiteId: 'suite-1',
-        version: 1,
+        version: null,
         name: 'Reset password flow',
         steps: ['Click Forgot password', 'Enter registered email', 'Click Send reset link'],
         expectedResult: 'Success message shown and email received within 30 seconds',

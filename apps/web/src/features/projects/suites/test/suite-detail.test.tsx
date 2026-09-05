@@ -124,6 +124,13 @@ describe('SuiteDetail (redesigned)', () => {
     expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
   })
 
+  it('hides the version badge for an unpublished case with a null version', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    const caseCard = screen.getByText('Reset password flow').closest('.group')
+    expect(caseCard).not.toBeNull()
+    expect(within(caseCard as HTMLElement).queryByText('v1')).not.toBeInTheDocument()
+  })
+
   it('shows "Suite not found" with a back link for unknown id', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />) })
     expect(screen.getByText('Suite not found')).toBeInTheDocument()
