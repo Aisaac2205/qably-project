@@ -21,6 +21,7 @@ vi.mock('next/link', () => ({
 const mockCase: TestCase = {
   id: 'tc-1',
   suiteId: 'suite-1',
+  version: 1,
   name: 'Valid login',
   steps: ['Step 1'],
   expectedResult: 'Success',

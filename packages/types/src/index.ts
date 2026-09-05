@@ -149,6 +149,7 @@ export interface OrganizationContext {
 export interface TestCase {
   id: string
   suiteId: string
+  version: number
   name: string
   steps: string[]
   expectedResult: string

@@ -3,12 +3,10 @@
 import { useState } from 'react'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash, GitCommit } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
-import { useOfficialTestCase, useTestCaseVersion, useTraceabilityLinks } from '@/lib/use-mock-store'
-import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -20,13 +18,6 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
-  const [traceOpen, setTraceOpen] = useState(false)
-
-  const officialCaseId = `case-${testCase.id}`
-  const officialCase = useOfficialTestCase(officialCaseId)
-  const currentVersionId = officialCase?.currentVersionId ?? `version-${testCase.id}-1`
-  const currentVersion = useTestCaseVersion(currentVersionId)
-  const links = useTraceabilityLinks(officialCaseId)
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
@@ -35,7 +26,7 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
           {testCase.name}
         </span>
         <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
-          v{currentVersion?.version ?? 1}
+          v{testCase.version}
         </span>
         <PriorityBadge priority={testCase.priority} />
         <StatusChip status={testCase.state} scope="lifecycle" />
@@ -70,15 +61,26 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
 
       {/* Steps, Expected result, & Traceability toggles */}
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setStepsOpen(!stepsOpen)}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-default hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/70 border border-border/70 cursor-pointer"
-          aria-expanded={stepsOpen}
-          type="button"
-        >
-          {stepsOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
-          {t('suites.stepsCount', { count: testCase.steps.length })}
-        </button>
+        {testCase.steps.length > 0 ? (
+          <button
+            onClick={() => setStepsOpen(!stepsOpen)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-default hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/70 border border-border/70 cursor-pointer"
+            aria-expanded={stepsOpen}
+            type="button"
+          >
+            {stepsOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
+            {t('suites.stepsCount', { count: testCase.steps.length })}
+          </button>
+        ) : (
+          <button
+            onClick={() => onEdit(testCase)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/40 border border-dashed border-border cursor-pointer"
+            type="button"
+          >
+            <PencilSimple size={13} weight="bold" aria-hidden="true" />
+            {t('suites.documentCase')}
+          </button>
+        )}
 
         {testCase.expectedResult && (
           <button
@@ -92,18 +94,6 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
           </button>
         )}
 
-        {links.length > 0 && (
-          <button
-            onClick={() => setTraceOpen(!traceOpen)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/50 border border-border/70 cursor-pointer"
-            aria-expanded={traceOpen}
-            type="button"
-          >
-            <GitCommit size={13} weight="bold" aria-hidden="true" />
-            {traceOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
-            {t('suites.traceability')}
-          </button>
-        )}
       </div>
 
       {/* Expanded steps */}
@@ -123,13 +113,6 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
         </div>
       )}
 
-      {/* Expanded traceability trail */}
-      {traceOpen && links.length > 0 && (
-        <div className="mt-2 p-3.5 rounded-lg bg-canvas border border-border/70 space-y-2">
-          <h5 className="text-xs font-semibold text-muted">{t('suites.traceability')}</h5>
-          <TraceabilityTrail links={links} />
-        </div>
-      )}
     </div>
   )
 }

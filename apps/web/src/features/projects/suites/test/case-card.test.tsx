@@ -7,6 +7,7 @@ import type { TestCase } from '@qably/types'
 const mockCase: TestCase = {
   id: 'tc-1',
   suiteId: 'suite-1',
+  version: 2,
   name: 'Valid login redirects to dashboard',
   steps: ['Navigate to /login', 'Enter valid email', 'Click Sign in'],
   expectedResult: 'Redirected to /dashboard within 1 second',
@@ -17,6 +18,28 @@ const mockCase: TestCase = {
 const noop = () => {}
 
 describe('CaseCard', () => {
+  it('shows the published version of the case', async () => {
+    await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.getByText('v2')).toBeInTheDocument()
+  })
+
+  it('offers to document a case that has no steps', async () => {
+    const user = userEvent.setup()
+    const onEdit = vi.fn()
+    await act(async () => {
+      render(<CaseCard testCase={{ ...mockCase, steps: [] }} onEdit={onEdit} onDelete={noop} />)
+    })
+    expect(screen.queryByText('0 steps')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /document this case/i }))
+    expect(onEdit).toHaveBeenCalled()
+  })
+
+  it('keeps the steps disclosure when the case has steps', async () => {
+    await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.getByText('3 steps')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /document this case/i })).not.toBeInTheDocument()
+  })
+
   it('renders case name', async () => {
     await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
     expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()

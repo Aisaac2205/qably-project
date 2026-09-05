@@ -20,6 +20,7 @@ const CASE_SELECT = {
   expectedResult: true,
   priority: true,
   state: true,
+  currentVersion: { select: { version: true } },
 } as const;
 
 const SUITE_SELECT = {
@@ -43,6 +44,7 @@ interface CaseRow {
   expectedResult: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
   state: 'active' | 'draft' | 'deprecated';
+  currentVersion: { version: number } | null;
 }
 
 interface SuiteRow {
@@ -77,7 +79,16 @@ function toView(row: SuiteRow): SuiteView {
     isDefault: row.isDefault,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    cases: row.cases,
+    cases: row.cases.map((testCase) => ({
+      id: testCase.id,
+      suiteId: testCase.suiteId,
+      version: testCase.currentVersion?.version ?? 1,
+      name: testCase.name,
+      steps: testCase.steps,
+      expectedResult: testCase.expectedResult,
+      priority: testCase.priority,
+      state: testCase.state,
+    })),
   };
 }
 

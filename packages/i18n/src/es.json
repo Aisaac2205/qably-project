@@ -642,6 +642,8 @@
     "expectedResultLabel": "Resultado esperado",
     "expectedResultPlaceholder": "¿Qué debería pasar cuando los pasos tienen éxito?",
     "caseNameRequired": "El título del caso es requerido",
+    "undocumentedCase": "Sin pasos documentados",
+    "documentCase": "Documentar este caso",
     "noCasesCta": "Agregue el primer caso de prueba para comenzar a documentar esta suite."
   },
   "apiKeys": {

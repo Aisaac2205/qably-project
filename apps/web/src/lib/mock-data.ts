@@ -172,6 +172,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-1',
         suiteId: 'suite-1',
+        version: 1,
         name: 'Valid login redirects to dashboard',
         steps: ['Navigate to /login', 'Enter valid email and password', 'Click Sign in'],
         expectedResult: 'Redirected to /dashboard within 1 second',
@@ -181,6 +182,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-2',
         suiteId: 'suite-1',
+        version: 1,
         name: 'Invalid credentials shows error',
         steps: ['Navigate to /login', 'Enter invalid credentials', 'Click Sign in'],
         expectedResult: 'Error message "Invalid email or password" is visible',
@@ -190,6 +192,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-3',
         suiteId: 'suite-1',
+        version: 1,
         name: 'Reset password flow',
         steps: ['Click Forgot password', 'Enter registered email', 'Click Send reset link'],
         expectedResult: 'Success message shown and email received within 30 seconds',
@@ -212,6 +215,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-4',
         suiteId: 'suite-2',
+        version: 1,
         name: 'Checkout with empty cart blocked',
         steps: ['Navigate to /checkout with empty cart', 'Observe checkout button state'],
         expectedResult: 'Checkout button is disabled, "Your cart is empty" message shown',
@@ -221,6 +225,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-5',
         suiteId: 'suite-2',
+        version: 1,
         name: 'Discount code applied correctly',
         steps: ['Add item to cart', 'Go to checkout', 'Enter code SAVE20', 'Observe total'],
         expectedResult: 'Total is reduced by 20%, discount line visible in summary',
@@ -230,6 +235,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-6',
         suiteId: 'suite-2',
+        version: 1,
         name: 'Out of stock prevents add to cart',
         steps: ['Find out-of-stock product', 'Attempt to add to cart'],
         expectedResult: '"Out of stock" label shown, add button disabled',
@@ -252,6 +258,7 @@ export const mockSuites: Suite[] = [
       {
         id: 'tc-7',
         suiteId: 'suite-3',
+        version: 1,
         name: 'Profile update saves correctly',
         steps: ['Go to /account', 'Update display name', 'Click Save'],
         expectedResult: 'Success toast shown, name updated in header',

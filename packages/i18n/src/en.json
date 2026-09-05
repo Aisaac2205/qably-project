@@ -642,7 +642,9 @@
     "expectedResultLabel": "Expected result",
     "expectedResultPlaceholder": "What should happen when the steps succeed?",
     "caseNameRequired": "A case title is required",
-    "noCasesCta": "Add the first test case to start documenting this suite."
+    "noCasesCta": "Add the first test case to start documenting this suite.",
+    "undocumentedCase": "No documented steps",
+    "documentCase": "Document this case"
   },
   "apiKeys": {
     "title": "API Keys",

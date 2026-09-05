@@ -27,6 +27,7 @@ const suiteRow = {
       expectedResult: 'cart has one item',
       priority: 'medium' as const,
       state: 'active' as const,
+      currentVersion: { version: 3 },
     },
   ],
 };
@@ -80,6 +81,31 @@ const baseSuiteInput = {
   tags: [],
   isDefault: false,
 };
+
+describe('SuitesService case versions', () => {
+  it('projects the published version onto each case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const suites = await build(prisma).list(owner);
+
+    expect(suites[0].cases[0].version).toBe(3);
+  });
+
+  it('reports version 1 when the case has no published version', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [{ ...suiteRow.cases[0], currentVersion: null }],
+      },
+    ]);
+
+    const suites = await build(prisma).list(owner);
+
+    expect(suites[0].cases[0].version).toBe(1);
+  });
+});
 
 describe('SuitesService.list', () => {
   it('scopes every read to the caller organization', async () => {

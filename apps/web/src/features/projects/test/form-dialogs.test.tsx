@@ -45,6 +45,7 @@ const project: ProjectSummary = {
 const testCase: TestCase = {
   id: 'case-1',
   suiteId: 'suite-1',
+  version: 1,
   name: 'Original case',
   priority: 'high',
   state: 'active',
