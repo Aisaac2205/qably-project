@@ -9,8 +9,21 @@ function render(ui: React.ReactElement) {
 
 const mockPathname = vi.fn(() => '/dashboard')
 
+const { useProjectSpy } = vi.hoisted(() => ({ useProjectSpy: vi.fn<(id: string) => void>() }))
+
+const STATIC_PROJECT_SEGMENTS = new Set(['new'])
+
+function routeParamsFor(pathname: string): Record<string, string> {
+  const parts = pathname.split('/').filter(Boolean)
+  if (parts[0] !== 'projects') return {}
+  const candidate = parts[1]
+  if (!candidate || STATIC_PROJECT_SEGMENTS.has(candidate)) return {}
+  return { id: candidate }
+}
+
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
+  useParams: () => routeParamsFor(mockPathname()),
 }))
 
 vi.mock('next/link', () => ({
@@ -53,11 +66,10 @@ import { TopBar } from '@/components/shell/top-bar'
 vi.mock('@/features/projects/hooks/use-project', async () => {
   const { getProject } = await import('@/lib/mock-store')
   return {
-    useProject: (id: string) => ({
-      project: getProject(id),
-      isLoading: false,
-      isError: false,
-    }),
+    useProject: (id: string) => {
+      useProjectSpy(id)
+      return { project: getProject(id), isLoading: false, isError: false }
+    },
   }
 })
 
@@ -116,5 +128,27 @@ describe('TopBar', () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<TopBar />) })
     expect(screen.getByText('IF')).toBeInTheDocument()
+  })
+})
+
+describe('TopBar — static sibling routes under /projects', () => {
+  it('never requests a project for /projects/new', async () => {
+    useProjectSpy.mockClear()
+    mockPathname.mockReturnValue('/projects/new')
+
+    await act(async () => { render(<TopBar />) })
+
+    expect(useProjectSpy).toHaveBeenCalled()
+    expect(useProjectSpy).not.toHaveBeenCalledWith('new')
+    expect(useProjectSpy.mock.calls.every(([id]) => id === '')).toBe(true)
+  })
+
+  it('still requests the project on a dynamic project route', async () => {
+    useProjectSpy.mockClear()
+    mockPathname.mockReturnValue('/projects/proj-1/runs')
+
+    await act(async () => { render(<TopBar />) })
+
+    expect(useProjectSpy).toHaveBeenCalledWith('proj-1')
   })
 })

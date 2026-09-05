@@ -6,6 +6,18 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 const mockPathname = vi.fn(() => '/dashboard')
 let isMobileViewport = false
 
+const { useProjectSpy } = vi.hoisted(() => ({ useProjectSpy: vi.fn<(id: string) => void>() }))
+
+const STATIC_PROJECT_SEGMENTS = new Set(['new'])
+
+function routeParamsFor(pathname: string): Record<string, string> {
+  const parts = pathname.split('/').filter(Boolean)
+  if (parts[0] !== 'projects') return {}
+  const candidate = parts[1]
+  if (!candidate || STATIC_PROJECT_SEGMENTS.has(candidate)) return {}
+  return { id: candidate }
+}
+
 // jsdom doesn't implement matchMedia. SidebarProvider uses it via
 // use-mobile to detect viewport size for the collapsible sidebar.
 if (typeof window !== 'undefined' && !window.matchMedia) {
@@ -26,7 +38,7 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
 
 vi.mock('next/navigation', () => ({
   usePathname: () => mockPathname(),
-  useParams: () => ({}),
+  useParams: () => routeParamsFor(mockPathname()),
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn(), push: vi.fn() }),
 }))
 
@@ -74,11 +86,10 @@ import { Sidebar } from '@/components/shell/sidebar'
 vi.mock('@/features/projects/hooks/use-project', async () => {
   const { getProject } = await import('@/lib/mock-store')
   return {
-    useProject: (id: string) => ({
-      project: getProject(id),
-      isLoading: false,
-      isError: false,
-    }),
+    useProject: (id: string) => {
+      useProjectSpy(id)
+      return { project: getProject(id), isLoading: false, isError: false }
+    },
   }
 })
 
@@ -227,5 +238,36 @@ describe('Sidebar — current destinations', () => {
 
     expect(links.getAllByRole('link', { current: 'page' })).toHaveLength(1)
     expect(links.getByRole('link', { name, current: 'page' })).toHaveAttribute('href', href)
+  })
+})
+
+describe('Sidebar — static sibling routes under /projects', () => {
+  it('never requests a project for /projects/new', async () => {
+    useProjectSpy.mockClear()
+    mockPathname.mockReturnValue('/projects/new')
+
+    await act(async () => { renderSidebar() })
+
+    expect(useProjectSpy).toHaveBeenCalled()
+    expect(useProjectSpy).not.toHaveBeenCalledWith('new')
+    expect(useProjectSpy.mock.calls.every(([id]) => id === '')).toBe(true)
+  })
+
+  it('keeps global navigation on /projects/new', async () => {
+    mockPathname.mockReturnValue('/projects/new')
+
+    await act(async () => { renderSidebar() })
+
+    expect(screen.getByText('Projects').closest('a')).toHaveAttribute('href', '/projects')
+    expect(screen.queryByText('Repository')).not.toBeInTheDocument()
+  })
+
+  it('still requests the project on a dynamic project route', async () => {
+    useProjectSpy.mockClear()
+    mockPathname.mockReturnValue('/projects/proj-1/runs')
+
+    await act(async () => { renderSidebar() })
+
+    expect(useProjectSpy).toHaveBeenCalledWith('proj-1')
   })
 })

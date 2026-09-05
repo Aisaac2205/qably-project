@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import type { Project } from '@qably/types'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { NotificationsMenu } from '@/features/notifications'
 import { useTranslation } from '@/lib/i18n'
@@ -34,8 +35,7 @@ function getPageTitle(pathname: string, project: Project | undefined, t: (key: s
 export function TopBar() {
   const pathname = usePathname()
   const { t } = useTranslation()
-  const segments = pathname.split('/').filter(Boolean)
-  const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
+  const projectId = useProjectRouteId()
   const { project } = useProject(projectId ?? '')
   const title = getPageTitle(pathname, project, t)
 

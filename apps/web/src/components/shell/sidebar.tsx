@@ -32,6 +32,7 @@ import {
 import type { Icon } from '@phosphor-icons/react'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
 import { useTranslation } from '@/lib/i18n'
 
 interface NavItem {
@@ -48,9 +49,7 @@ export function Sidebar() {
   const { state } = useSidebar()
   const isCollapsed = state === 'collapsed'
 
-  // Project routes replace, rather than append to, global navigation.
-  const segments = pathname.split('/').filter(Boolean)
-  const projectId = segments[0] === 'projects' && segments.length >= 2 ? segments[1] : null
+  const projectId = useProjectRouteId()
   const { project } = useProject(projectId ?? '')
   const projectContext = project ? projectId : null
 
