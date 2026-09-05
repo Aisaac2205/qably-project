@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createRun } from '../api/runs.api'
@@ -27,5 +27,8 @@ export function useCreateRun(projectId: string) {
     [mutation],
   )
 
-  return { start, error: mutation.error }
+  return useMemo(
+    () => ({ start, error: mutation.error }),
+    [start, mutation.error],
+  )
 }

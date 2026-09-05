@@ -6,7 +6,10 @@ import type { CaseStatus } from '@qably/types'
 import { updateRunCase } from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
 
-export function useUpdateRunCase(runId: string) {
+export function useUpdateRunCase(
+  runId: string,
+  onError?: (error: unknown) => void,
+) {
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -15,6 +18,7 @@ export function useUpdateRunCase(runId: string) {
     onSuccess: (run) => {
       queryClient.setQueryData(runKeys.detail(runId), run)
     },
+    onError,
   })
 
   return useCallback(

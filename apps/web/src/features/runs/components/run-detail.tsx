@@ -5,10 +5,26 @@ import { LockSimple } from '@phosphor-icons/react'
 import type { RunRecord, CaseStatus } from '@qably/types'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
+import { ApiError } from '@/lib/api-client'
 import { RunProgressHeader } from './run-progress-header'
 import { CaseList } from './case-list'
 import { CaseDetail } from './case-detail'
 import { useTranslation } from '@/lib/i18n'
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual: 'runs.sourceManual',
+  api: 'runs.sourceApi',
+  github_actions: 'runs.sourceCi',
+}
+
+const SHORTCUT_KEYS: Array<{ key: string; labelKey: string }> = [
+  { key: 'P', labelKey: 'runs.shortcutPass' },
+  { key: 'F', labelKey: 'runs.shortcutFail' },
+  { key: 'S', labelKey: 'runs.shortcutSkip' },
+  { key: 'B', labelKey: 'runs.shortcutBlocked' },
+  { key: 'R', labelKey: 'runs.shortcutRunNext' },
+  { key: '←→', labelKey: 'runs.shortcutNavigate' },
+]
 
 export function RunDetail({
   projectId,
@@ -18,13 +34,25 @@ export function RunDetail({
   run: RunRecord
 }) {
   const { t } = useTranslation()
-  const updateStatus = useUpdateRunCase(run.id)
+  const [announcement, setAnnouncement] = useState('')
+
+  const handleUpdateError = useCallback(
+    (error: unknown) => {
+      const message =
+        error instanceof ApiError && error.status === 409
+          ? t('runs.updateCaseConflict')
+          : t('runs.updateCaseError')
+      setAnnouncement(message)
+    },
+    [t],
+  )
+
+  const updateStatus = useUpdateRunCase(run.id, handleUpdateError)
   const isEditable = run.source === 'manual'
 
   const sortedCases = useMemo(() => run.cases, [run.cases])
 
   const [selectedId, setSelectedId] = useState<string>(sortedCases[0]?.id ?? '')
-  const [announcement, setAnnouncement] = useState('')
 
   const selectedCase = sortedCases.find((c) => c.id === selectedId) ?? sortedCases[0]
   const activeCaseId = selectedCase?.id ?? ''
@@ -93,21 +121,6 @@ export function RunDetail({
     { enabled: isEditable },
   )
 
-  const SOURCE_LABELS: Record<string, string> = {
-    manual: 'runs.sourceManual',
-    api: 'runs.sourceApi',
-    github_actions: 'runs.sourceCi',
-  }
-
-  const SHORTCUT_LABELS: Array<{ key: string; label: string }> = [
-    { key: 'P', label: t('runs.shortcutPass') },
-    { key: 'F', label: t('runs.shortcutFail') },
-    { key: 'S', label: t('runs.shortcutSkip') },
-    { key: 'B', label: t('runs.shortcutBlocked') },
-    { key: 'R', label: t('runs.shortcutRunNext') },
-    { key: '←→', label: t('runs.shortcutNavigate') },
-  ]
-
   return (
     <div className="space-y-6">
       <RunProgressHeader run={run} />
@@ -120,12 +133,12 @@ export function RunDetail({
           <span className="text-xs font-semibold text-muted">
             {t('runs.shortcuts')}
           </span>
-          {SHORTCUT_LABELS.map((s) => (
+          {SHORTCUT_KEYS.map((s) => (
             <span key={s.key} className="inline-flex items-center gap-1.5 text-xs text-default">
               <kbd className="font-mono text-xs font-semibold px-1.5 py-0.5 rounded border border-border bg-surface-hover text-default shadow-sm min-w-[20px] text-center">
                 {s.key}
               </kbd>
-              <span className="text-muted">{s.label}</span>
+              <span className="text-muted">{t(s.labelKey)}</span>
             </span>
           ))}
         </div>

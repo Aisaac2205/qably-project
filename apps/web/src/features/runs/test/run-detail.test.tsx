@@ -1,9 +1,10 @@
-import { screen, act, fireEvent } from '@testing-library/react'
+import { screen, act, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { RunDetail } from '@/features/runs/components/run-detail'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import { runFixtures } from '@/test/runs-api-stub'
+import { ApiError } from '@/lib/api-client'
 import type { RunRecord } from '@qably/types'
 
 vi.mock('@/features/runs/api/runs.api', async () =>
@@ -200,6 +201,46 @@ describe('RunDetail', () => {
     })
     const liveRegion = document.querySelector('[aria-live="polite"]')
     expect(liveRegion?.textContent).toBe('Status: Running')
+  })
+
+  it('announces a conflict when the case status update is rejected as not editable', async () => {
+    const run = getFreshRun()
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+    const api = await import('@/features/runs/api/runs.api')
+    vi.spyOn(api, 'updateRunCase').mockRejectedValueOnce(
+      new ApiError(409, 'source-not-editable'),
+    )
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'p' })
+    })
+
+    await waitFor(() => {
+      const liveRegion = document.querySelector('[aria-live="polite"]')
+      expect(liveRegion?.textContent).toBe(
+        'This case belongs to an automated run and cannot be edited.',
+      )
+    })
+  })
+
+  it('announces a generic error when the case status update fails unexpectedly', async () => {
+    const run = getFreshRun()
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+    const api = await import('@/features/runs/api/runs.api')
+    vi.spyOn(api, 'updateRunCase').mockRejectedValueOnce(new Error('network down'))
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'p' })
+    })
+
+    await waitFor(() => {
+      const liveRegion = document.querySelector('[aria-live="polite"]')
+      expect(liveRegion?.textContent).toBe('Could not save this case status. Please try again.')
+    })
   })
 
   it('announces status change via aria-live region', async () => {
