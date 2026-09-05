@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { basename } from 'node:path';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 
@@ -8,78 +9,7 @@ const MAX_THROTTLE_RETRIES = 5;
 const FALLBACK_RETRY_SECONDS = 10;
 const MAX_RETRY_SECONDS = 90;
 const RETRY_JITTER_MS = 250;
-
-const XML_ENTITIES = {
-  amp: '&',
-  lt: '<',
-  gt: '>',
-  quot: '"',
-  apos: "'",
-};
-
-function decodeXmlEntities(value) {
-  return value.replace(
-    /&(amp|lt|gt|quot|apos|#x[0-9a-fA-F]+|#\d+);/g,
-    (match, entity) => {
-      if (entity in XML_ENTITIES) return XML_ENTITIES[entity];
-      if (entity.startsWith('#x')) {
-        return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
-      }
-      if (entity.startsWith('#')) {
-        return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
-      }
-      return match;
-    },
-  );
-}
-
-function parseAttributes(raw) {
-  const attributes = {};
-  const pattern = /([a-zA-Z_:][-\w:.]*)\s*=\s*"([^"]*)"/g;
-  let match = pattern.exec(raw);
-  while (match !== null) {
-    attributes[match[1]] = decodeXmlEntities(match[2]);
-    match = pattern.exec(raw);
-  }
-  return attributes;
-}
-
-function extractElements(xml, tagName) {
-  const elements = [];
-  const pattern = new RegExp(
-    `<${tagName}\\b([^>]*?)(\\/>|>([\\s\\S]*?)<\\/${tagName}>)`,
-    'g',
-  );
-  let match = pattern.exec(xml);
-  while (match !== null) {
-    elements.push({
-      attributes: parseAttributes(match[1]),
-      body: match[3] ?? '',
-    });
-    match = pattern.exec(xml);
-  }
-  return elements;
-}
-
-function deriveCaseStatus(caseBody) {
-  if (/<failure\b/.test(caseBody) || /<error\b/.test(caseBody)) return 'fail';
-  if (/<skipped\b/.test(caseBody)) return 'skip';
-  return 'pass';
-}
-
-function toIsoDateTime(timestamp) {
-  if (!timestamp) return undefined;
-  const hasOffset = /(Z|[+-]\d{2}:?\d{2})$/.test(timestamp);
-  const candidate = hasOffset ? timestamp : `${timestamp}Z`;
-  const parsed = new Date(candidate);
-  if (Number.isNaN(parsed.getTime())) return undefined;
-  return parsed.toISOString();
-}
-
-function addSeconds(isoTimestamp, seconds) {
-  if (!isoTimestamp || !Number.isFinite(seconds)) return undefined;
-  return new Date(new Date(isoTimestamp).getTime() + seconds * 1000).toISOString();
-}
+const MAX_RUN_NAME_LENGTH = 200;
 
 function slugify(value) {
   const slug = value
@@ -87,15 +17,15 @@ function slugify(value) {
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
-  return slug.length > 0 ? slug : 'suite';
+  return slug.length > 0 ? slug : 'report';
 }
 
 function shortHash(value) {
   return createHash('sha256').update(value).digest('hex').slice(0, 8);
 }
 
-function buildExternalId(suiteName, jobId, runId) {
-  return `gha-${runId}-${jobId}-${slugify(suiteName)}-${shortHash(suiteName)}`;
+function buildExternalId(filePath, jobId, runId) {
+  return `gha-${runId}-${jobId}-${slugify(basename(filePath))}-${shortHash(filePath)}`;
 }
 
 function readCommitMetadata() {
@@ -126,38 +56,46 @@ function readCommitMetadata() {
   };
 }
 
-function buildCases(suiteBody) {
-  return extractElements(suiteBody, 'testcase').map((testcase) => ({
-    name: (testcase.attributes.name ?? 'unnamed test').slice(0, 120),
-    status: deriveCaseStatus(testcase.body),
-  }));
-}
-
-function buildRunPayload(suite, context) {
-  const { attributes, body } = suite;
-  const suiteName = (attributes.name ?? 'unnamed suite').slice(0, 120);
-  const cases = buildCases(body);
-  if (cases.length === 0) return null;
-
-  const startedAt = toIsoDateTime(attributes.timestamp);
-  const finishedAt = addSeconds(startedAt, Number.parseFloat(attributes.time ?? ''));
+function buildJunitQuery(filePath, context) {
+  const name = `${context.workflowName} / ${context.jobId} (#${context.runNumber})`.slice(
+    0,
+    MAX_RUN_NAME_LENGTH,
+  );
 
   return {
-    externalId: buildExternalId(suiteName, context.jobId, context.runId),
+    externalId: buildExternalId(filePath, context.jobId, context.runId),
     source: 'github_actions',
-    suiteName,
-    name: `${context.workflowName} / ${suiteName} (#${context.runNumber})`.slice(0, 200),
-    ...(startedAt ? { startedAt } : {}),
-    ...(finishedAt ? { finishedAt } : {}),
-    ...(context.commit.commitSha ? { commitSha: context.commit.commitSha } : {}),
+    name,
+    ...(context.commit.commitSha
+      ? { commitSha: context.commit.commitSha }
+      : {}),
     ...(context.commit.commitMessage
       ? { commitMessage: context.commit.commitMessage }
       : {}),
     ...(context.commit.commitAuthor
       ? { commitAuthor: context.commit.commitAuthor }
       : {}),
-    cases,
   };
+}
+
+function buildJunitUrl(baseUrl, query) {
+  const url = new URL('/runs/ingest/junit', baseUrl);
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) url.searchParams.set(key, value);
+  }
+
+  return url.toString();
+}
+
+function parseRunIds(responseText) {
+  try {
+    const parsed = JSON.parse(responseText);
+    if (!Array.isArray(parsed.runs)) return [];
+    return parsed.runs.map((run) => run.id).filter((id) => typeof id === 'string');
+  } catch {
+    return [];
+  }
 }
 
 function sleep(ms) {
@@ -173,21 +111,25 @@ function throttleWaitMs(retrySeconds, attempt) {
   return Math.min(seconds, MAX_RETRY_SECONDS) * 1000 + RETRY_JITTER_MS;
 }
 
-async function postRun(baseUrl, apiKey, payload) {
-  const url = new URL('/runs/ingest', baseUrl).toString();
+async function postJunitReport(baseUrl, apiKey, xml, query) {
+  const url = buildJunitUrl(baseUrl, query);
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/xml',
     },
-    body: JSON.stringify(payload),
+    body: xml,
   });
 
   const text = await response.text();
 
   if (response.ok) {
-    console.log(`[qably-report] reported "${payload.suiteName}" -> ${response.status}`);
+    const runIds = parseRunIds(text);
+    console.log(
+      `[qably-report] reported "${query.name}" -> ${response.status} ` +
+        `(${runIds.length} run${runIds.length === 1 ? '' : 's'}: ${runIds.join(', ')})`,
+    );
     return { outcome: 'ok' };
   }
 
@@ -200,32 +142,22 @@ async function postRun(baseUrl, apiKey, payload) {
     };
   }
 
-  if (response.status === 404) {
-    console.error(
-      `::warning title=Qably suite not found::"${payload.suiteName}" has no matching ` +
-        'suite in the Qably project yet. The ingest endpoint never creates a suite ' +
-        'implicitly; create one with this exact name in the Qably UI, then re-run this ' +
-        `workflow. Raw response: ${text}`,
-    );
-    return { outcome: 'failed' };
-  }
-
   console.error(
-    `::warning title=Qably report failed::POST /runs/ingest for "${payload.suiteName}" ` +
+    `::warning title=Qably report failed::POST /runs/ingest/junit for "${query.name}" ` +
       `returned ${response.status}. Raw response: ${text}`,
   );
   return { outcome: 'failed' };
 }
 
-async function reportSuite(baseUrl, apiKey, payload) {
+async function reportJunitFile(baseUrl, apiKey, xml, query) {
   for (let attempt = 0; attempt <= MAX_THROTTLE_RETRIES; attempt += 1) {
-    const result = await postRun(baseUrl, apiKey, payload);
+    const result = await postJunitReport(baseUrl, apiKey, xml, query);
 
     if (result.outcome !== 'throttled') return result.outcome === 'ok';
 
     if (attempt === MAX_THROTTLE_RETRIES) {
       console.error(
-        `::warning title=Qably report failed::POST /runs/ingest for "${payload.suiteName}" ` +
+        `::warning title=Qably report failed::POST /runs/ingest/junit for "${query.name}" ` +
           `stayed rate limited after ${MAX_THROTTLE_RETRIES + 1} attempts.`,
       );
       return false;
@@ -233,7 +165,7 @@ async function reportSuite(baseUrl, apiKey, payload) {
 
     const waitMs = throttleWaitMs(result.retrySeconds, attempt);
     console.log(
-      `[qably-report] rate limited on "${payload.suiteName}", ` +
+      `[qably-report] rate limited on "${query.name}", ` +
         `retrying in ${Math.round(waitMs / 1000)}s.`,
     );
     await sleep(waitMs);
@@ -269,9 +201,8 @@ async function main() {
     return;
   }
 
-  const suites = extractElements(xml, 'testsuite');
-  if (suites.length === 0) {
-    console.log(`[qably-report] no <testsuite> elements found in ${filePath}, nothing to report.`);
+  if (xml.trim() === '') {
+    console.log(`[qably-report] ${filePath} is empty, nothing to report.`);
     return;
   }
 
@@ -283,31 +214,20 @@ async function main() {
     commit: readCommitMetadata(),
   };
 
-  let succeeded = 0;
-  let failed = 0;
+  const query = buildJunitQuery(filePath, context);
 
-  for (const suite of suites) {
-    const payload = buildRunPayload(suite, context);
-    if (!payload) {
-      console.log(
-        `[qably-report] suite "${suite.attributes.name ?? 'unnamed'}" has no cases, skipping.`,
-      );
-      continue;
-    }
-
-    try {
-      const ok = await reportSuite(baseUrl, apiKey, payload);
-      if (ok) succeeded += 1;
-      else failed += 1;
-    } catch (error) {
-      failed += 1;
-      console.error(
-        `::warning title=Qably report failed::network error reporting "${payload.suiteName}": ${error.message}`,
-      );
-    }
+  let ok = false;
+  try {
+    ok = await reportJunitFile(baseUrl, apiKey, xml, query);
+  } catch (error) {
+    console.error(
+      `::warning title=Qably report failed::network error reporting "${filePath}": ${error.message}`,
+    );
   }
 
-  console.log(`[qably-report] ${succeeded} succeeded, ${failed} failed out of ${succeeded + failed} suites.`);
+  console.log(
+    `[qably-report] ${ok ? 1 : 0} succeeded, ${ok ? 0 : 1} failed reporting ${filePath}.`,
+  );
 }
 
 main();

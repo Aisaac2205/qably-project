@@ -1,4 +1,5 @@
 import type {
+  JunitIngestRecord,
   RunCaseRecord,
   RunRecord,
   RunsPageRecord,
@@ -11,6 +12,7 @@ export type RunCaseView = RunCaseRecord;
 export type RunSummaryView = RunSummaryRecord;
 export type RunsPageView = RunsPageRecord;
 export type SuiteMetricsView = SuiteMetricsRecord;
+export type JunitIngestView = JunitIngestRecord;
 
 export type RunError = 'suite-not-found' | 'source-not-allowed';
 

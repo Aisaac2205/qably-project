@@ -18,7 +18,9 @@ function build() {
   const runs = {
     ingest: jest.fn((_key: ApiKeyIdentity, body: IngestRunInput) => {
       ingested.push(body);
-      return Promise.resolve({ value: { id: 'run-1' } as unknown as RunView });
+      return Promise.resolve({
+        value: { id: `run-${ingested.length}` } as unknown as RunView,
+      });
     }),
   };
 
@@ -27,6 +29,12 @@ function build() {
 
 const query = (extra: Record<string, unknown> = {}) =>
   ingestJunitQuerySchema.parse({ externalId: 'ci-42', ...extra });
+
+const multiSuiteReport = `<testsuites name="vitest tests">
+  <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
+  <testsuite name="src/b.test.ts"><testcase name="b1"/></testsuite>
+  <testsuite name="src/c.test.ts"><testcase name="c1"/></testsuite>
+</testsuites>`;
 
 describe('RunsController.ingestJunit', () => {
   it('turns a JUnit report into ingestion cases', async () => {
@@ -48,6 +56,7 @@ describe('RunsController.ingestJunit', () => {
         status: 'fail',
         steps: [],
         expectedResult: '',
+        failureMessage: 'boom',
       },
       {
         name: 'handles 3D Secure',
@@ -113,11 +122,127 @@ describe('RunsController.ingestJunit', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('carries the parsed className, filePath, duration and failure details through to ingestion', async () => {
+    const { controller, ingested } = build();
+    const richReport = `<testsuite name="Checkout">
+      <testcase classname="checkout.spec" name="accepts a valid card" file="e2e/checkout.spec.ts" time="0.5"/>
+      <testcase classname="checkout.spec" name="rejects an expired card" time="0.2">
+        <failure message="expected 200" type="AssertionError">at checkout.spec.ts:12</failure>
+      </testcase>
+      <testcase classname="checkout.spec" name="handles 3D Secure">
+        <skipped message="requires network"/>
+      </testcase>
+    </testsuite>`;
+
+    await controller.ingestJunit(apiKey, query(), richReport);
+
+    expect(ingested[0].cases[0]).toEqual(
+      expect.objectContaining({
+        className: 'checkout.spec',
+        filePath: 'e2e/checkout.spec.ts',
+        durationMs: 500,
+      }),
+    );
+    expect(ingested[0].cases[1]).toEqual(
+      expect.objectContaining({
+        failureType: 'AssertionError',
+        failureMessage: 'expected 200',
+        failureDetails: 'at checkout.spec.ts:12',
+      }),
+    );
+    expect(ingested[0].cases[2]).toEqual(
+      expect.objectContaining({ skipReason: 'requires network' }),
+    );
+  });
+
   it('answers 400, not 500, when the xml is not a junit report', async () => {
     const { controller } = build();
 
     await expect(
       controller.ingestJunit(apiKey, query(), '<project><target/></project>'),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('keeps the externalId unchanged when the report has exactly one suite', async () => {
+    const { controller, ingested } = build();
+
+    await controller.ingestJunit(apiKey, query(), report);
+
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0].externalId).toBe('ci-42');
+  });
+
+  it('creates one run per <testsuite> when the report has several, one per file', async () => {
+    const { controller, ingested } = build();
+
+    await controller.ingestJunit(apiKey, query(), multiSuiteReport);
+
+    expect(ingested).toHaveLength(3);
+    expect(ingested.map((body) => body.suiteName)).toEqual([
+      'src/a.test.ts',
+      'src/b.test.ts',
+      'src/c.test.ts',
+    ]);
+    expect(ingested.map((body) => body.name)).toEqual([
+      'src/a.test.ts',
+      'src/b.test.ts',
+      'src/c.test.ts',
+    ]);
+    expect(ingested[0].cases).toHaveLength(1);
+    expect(ingested[0].cases[0].name).toBe('a1');
+    expect(ingested[1].cases[0].name).toBe('b1');
+    expect(ingested[2].cases[0].name).toBe('c1');
+  });
+
+  it('derives a distinct externalId per suite when the report has several', async () => {
+    const { controller, ingested } = build();
+
+    await controller.ingestJunit(apiKey, query(), multiSuiteReport);
+
+    const externalIds = ingested.map((body) => body.externalId);
+    expect(new Set(externalIds).size).toBe(3);
+    for (const externalId of externalIds) {
+      expect(externalId).toMatch(/^ci-42-[a-z0-9-]+-[0-9a-f]{8}$/);
+    }
+  });
+
+  it('returns one run per suite group, in the same order', async () => {
+    const { controller } = build();
+
+    const result = await controller.ingestJunit(
+      apiKey,
+      query(),
+      multiSuiteReport,
+    );
+
+    expect(result.runs).toHaveLength(3);
+  });
+
+  it('does not split by suite when the caller pins an explicit suiteId', async () => {
+    const { controller, ingested } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ suiteId: 'suite-9' }),
+      multiSuiteReport,
+    );
+
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0].suiteId).toBe('suite-9');
+    expect(ingested[0].cases).toHaveLength(3);
+  });
+
+  it('does not split by suite when the caller pins an explicit suiteName', async () => {
+    const { controller, ingested } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ suiteName: 'Pinned Suite' }),
+      multiSuiteReport,
+    );
+
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0].suiteName).toBe('Pinned Suite');
+    expect(ingested[0].cases).toHaveLength(3);
   });
 });

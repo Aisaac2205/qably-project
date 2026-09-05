@@ -1,11 +1,17 @@
 # Run Ingestion — Reporting Execution Results from an External Agent
 
-`POST /runs/ingest` is how an external CI agent (GitHub Actions today, any CI runner tomorrow)
-reports the outcome of a test execution back to Qably. See `docs/API_KEYS.md` for how the credential
-used here is issued, stored and scoped.
+`POST /runs/ingest` and `POST /runs/ingest/junit` are how an external CI agent (GitHub Actions
+today, any CI runner tomorrow) reports the outcome of a test execution back to Qably. See
+`docs/API_KEYS.md` for how the credential used here is issued, stored and scoped.
 
 This is the mechanism behind Limit 4 (§1.6.2): Qably never runs tests itself, it only receives and
 records results produced elsewhere.
+
+**`POST /runs/ingest/junit` is the recommended path for any CI agent that already produces a JUnit
+XML report** (jest-junit, vitest's junit reporter, surefire, pytest, Playwright, GoogleTest, …): it
+posts the raw file, and the server parses it — the caller carries no XML parsing logic. See
+"JUnit ingestion" below. `POST /runs/ingest` stays available for callers that already hold a
+structured payload with no XML to parse.
 
 ## Authentication
 
@@ -63,6 +69,22 @@ Rejections:
 A case's `suiteName` defaults to the resolved suite's name when omitted — it exists so a case reported
 under a different label (for example a Playwright project name) still keeps that label as audit
 evidence without affecting suite resolution.
+
+Each case also accepts the following optional, bounded fields — populated automatically by
+`POST /runs/ingest/junit` from the parsed report, or settable directly on `POST /runs/ingest`:
+
+| Field            | Max length | Notes                                                                 |
+| ---------------- | ---------- | ---------------------------------------------------------------------- |
+| `className`      | 250        | JUnit `classname` attribute — the file path or fully qualified class the reporter attached to the case. |
+| `filePath`       | 500        | JUnit `file` attribute, where the reporter provides one (pytest, Playwright). |
+| `durationMs`     | —          | Non-negative integer. JUnit `time` (seconds) converted to whole milliseconds. Omitted when the reporter provides no numeric `time`. |
+| `failureType`    | 250        | The `type` attribute on a `<failure>` or `<error>` element.           |
+| `failureMessage` | 1000       | The `message` attribute on a `<failure>` or `<error>` element.        |
+| `failureDetails` | 4000       | The text body of a `<failure>` or `<error>` element (stack trace or assertion diff). |
+| `skipReason`     | 500        | The `message` attribute, or text body, of a `<skipped>` element.      |
+
+All seven are optional and independent — a case can report any subset of them. They exist purely as
+audit detail on `RunCase`; nothing in test case linking or run status derivation reads them.
 
 ## Suite adoption
 
@@ -218,6 +240,105 @@ any name with no match is drafted and linked. `testCaseId` is therefore never `n
 successful `POST /runs/ingest` — the field stays nullable in the type only because `RunCase` also backs
 manually-driven runs, and a failed ingest never gets this far.
 
+## JUnit ingestion — `POST /runs/ingest/junit`
+
+The body is the **raw JUnit XML report**, sent as-is — no JSON envelope. Everything that would be a
+body field on `POST /runs/ingest` is instead a query parameter, and `cases` is derived entirely from
+the XML by the server's own parser (`apps/api/src/modules/runs/lib/parse-junit-xml.ts`); the caller
+never parses XML itself.
+
+```
+POST /runs/ingest/junit?externalId=gha-482913-api-abcd1234&source=github_actions&name=CI%20%2F%20api%20(%23482913)&commitSha=a1b2c3d
+Authorization: Bearer qbly_<lookupId>_<secret>
+Content-Type: application/xml
+
+<testsuites name="vitest tests">
+  <testsuite name="src/features/checkout/checkout.test.ts">
+    <testcase classname="src/features/checkout/checkout.test.ts" name="Checkout > adds an item" time="0.012"/>
+  </testsuite>
+</testsuites>
+```
+
+| Query parameter | Required | Notes                                                                 |
+| ---------------- | -------- | ---------------------------------------------------------------------- |
+| `externalId`      | yes      | The idempotency key. See "One run per `<testsuite>`" below for how it behaves when a report holds several suites. |
+| `source`          | no       | `api` (default) or `github_actions`.                                  |
+| `suiteId` / `suiteName` | no | Pins the report to one existing (or adopted) suite and turns off the per-suite split — see below. Passing `suiteId` skips suite-name derivation from the XML entirely. |
+| `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
+| `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
+
+### Response
+
+`200 OK` with `{ "runs": [ <RunView>, ... ] }` — an array, not a single run, because one request can
+create several runs (see below). Each element has the same shape as the `POST /runs/ingest` response
+body. The array preserves the order suites first appeared in the XML.
+
+### One run per `<testsuite>`
+
+A JUnit file commonly holds many `<testsuite>` elements — jest-junit and vitest's junit reporter
+both emit one per test *file*, not one per run — and Qably's model ties a suite 1:1 to a source file
+(approved product rule 6: "la suite ingestada se nombra por archivo"). Collapsing every `<testsuite>`
+in a report into one run would collapse that per-file suite structure along with it, so the endpoint
+does not do that:
+
+- **The parser reads the whole file in one pass** (`apps/api/src/modules/runs/lib/parse-junit-xml.ts`),
+  recursing into nested `<testsuite>` elements exactly as described below.
+- **A second, pure step groups the parsed cases by their own `<testsuite>` name**
+  (`apps/api/src/modules/runs/lib/group-junit-report.ts`, `groupJunitReportBySuite`), preserving the
+  order each suite name first appears in the file.
+- **The controller calls `POST /runs/ingest`'s own ingestion once per group, sequentially** — each
+  group becomes its own run, its own suite resolution/adoption, and its own transaction. A three-file
+  vitest report produces three runs, three suites (adopted or resolved independently), and the
+  response's `runs` array has three entries.
+- **`externalId` per run**: when the report groups into exactly one suite, the run's `externalId` is
+  the query's `externalId` **unchanged** — a single-suite report behaves exactly as it did before this
+  split existed, so an already-running idempotent report keeps upserting the same run. When it groups
+  into several, each run's `externalId` is `${externalId}-${slug(suiteName)}-${sha256(suiteName)[0:8]}`
+  (slug lowercased, non-`[a-z0-9]` runs collapsed to `-`, trimmed, capped at 60 characters — the same
+  scheme `scripts/qably-report.mjs` used before this change, now computed server-side).
+- **A report grouping into more than 500 distinct suite names is rejected** rather than creating an
+  unbounded number of runs from one request.
+
+**Exception — pinning `suiteId` or `suiteName` turns the split off.** An explicit `suiteId` or
+`suiteName` is the caller stating "everything in this report belongs to this one suite" — that intent
+overrides the file-per-suite default. In that case the endpoint creates exactly **one** run, with
+every `<testcase>` from every `<testsuite>` in the file as its cases, `externalId` unchanged, and
+`name` defaulting to the XML root's own `name` attribute (the `<testsuites>` or top-level `<testsuite>`
+name) rather than any individual per-file suite name.
+
+### What the parser reads
+
+- Every `<testsuite>`, recursively (surefire and similar reporters nest `<testsuite>` inside
+  `<testsuite>`), up to 32 levels deep — a report nesting past that is rejected as malformed rather
+  than silently truncated.
+- Per `<testcase>`: `name` (falls back to `classname` when absent), `classname` → `className`,
+  `file` → `filePath`, `time` (seconds) → `durationMs` (whole milliseconds).
+- A `<failure>` or `<error>` child → `status: 'fail'` plus `failureType`, `failureMessage` and
+  `failureDetails` (the element's text body).
+- A `<skipped>` child → `status: 'skip'` plus `skipReason` (its `message` attribute, or its text
+  body when no attribute is present).
+- `<system-out>`, `<system-err>` and `<properties>` are never read.
+
+A report is capped at 10,000 `<testcase>` elements; beyond that the request is rejected rather than
+processed partially. The request body itself is capped at 10 MB (`main.ts`). Every string field
+above is truncated to the limit in the table in "Request body", never rejected for being long — only
+structural problems (invalid XML, no `<testcase>` elements anywhere, nesting past 32 levels, more
+than 10,000 cases, or grouping into more than 500 distinct suites) fail the request.
+
+### `scripts/qably-report.mjs`
+
+The script that reports CI results to Qably (invoked once per generated JUnit file, see
+`docs/CI.md`) posts the file's raw contents to this endpoint in a single request — it holds no XML
+parsing or per-suite splitting logic of its own; that all happens server-side, as described above.
+One file becomes one `POST /runs/ingest/junit` call, which in turn becomes one run per `<testsuite>`
+in that file. `suiteName` is left unset so the server derives and splits by it; the script only
+supplies `externalId` (built from the job, the run and the file path — see `docs/CI.md`; the server
+then re-derives a per-suite `externalId` from this base when the file holds more than one suite),
+`source`, `name` (the workflow and job name) and the commit metadata already read from `$GITHUB_SHA`
+and `git log`. On success the script reads the `runs` array from the JSON response to log how many
+runs were created and their ids. The existing `429` retry/backoff and `::warning` annotation
+behavior is unchanged.
+
 ## curl example
 
 ```bash
@@ -234,4 +355,12 @@ curl --fail --silent \
     ]
   }' \
   https://api.qably.app/runs/ingest
+```
+
+```bash
+curl --fail --silent \
+  --header "Authorization: Bearer $QABLY_API_KEY" \
+  --header "Content-Type: application/xml" \
+  --data-binary @reports/junit.xml \
+  "https://api.qably.app/runs/ingest/junit?externalId=gh-run-482913&source=github_actions"
 ```

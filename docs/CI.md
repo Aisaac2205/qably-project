@@ -104,20 +104,25 @@ carries no information the key does not.
 
 ### Rate limits and retries
 
-`POST /runs/ingest` is throttled at **30 requests per minute per credential**
+`POST /runs/ingest/junit` is throttled at **30 requests per minute per credential**
 (`runs.controller.ts`), and the throttler buckets by API key rather than by IP, so every job in a
-workflow run shares one budget. The script posts **one request per `<testsuite>`**, so a repository
-with more than 30 suites will exhaust the window partway through a run.
+workflow run shares one budget. The script posts **one request per JUnit file**, regardless of how
+many `<testsuite>` elements it contains or how many runs the server creates from it — see
+`docs/RUN_INGESTION.md`'s "One run per `<testsuite>`" for why splitting moved server-side. A
+workflow with, say, three report files (unit, e2e, web) spends three requests against the budget no
+matter how many suites are inside them.
 
-When the API answers `429`, the script waits and retries instead of dropping the suite. It honours
+When the API answers `429`, the script waits and retries instead of dropping the file. It honours
 the `Retry-After` header the throttler sends (in seconds); when that header is missing it falls
 back to exponential backoff starting at 10s, capped at 90s per wait, for up to
-`MAX_THROTTLE_RETRIES` retries. A suite is only reported as failed once every retry is exhausted.
+`MAX_THROTTLE_RETRIES` retries. A file is only reported as failed once every retry is exhausted.
 
-The trade-off is wall-clock time: a run with many suites can spend minutes waiting for throttle
-windows to reopen. That is deliberate — losing results silently is worse than a slower reporting
-step. If this becomes painful, the fix is a batch endpoint that accepts a whole run in one request,
-not a higher limit.
+Because one request already carries a whole file — the server splits it into runs internally, not
+the script — this budget is now sized against **the number of report files a workflow generates**
+(typically one to three), not the number of `<testsuite>` elements inside them. A repository would
+need more than 30 report files reported in the same minute to exhaust the window, which no job in
+this workflow comes close to. The retry path above exists for that edge case and for genuine
+transient throttling, not because chattiness is expected day to day.
 
 ### Enabling it
 
@@ -136,93 +141,69 @@ Once the API is deployed and reachable:
 The key is never committed. The workflow reads it exclusively from `secrets.*`, and the optional
 override from `vars.*`.
 
-## JUnit → `POST /runs/ingest` mapping
+## JUnit ingestion — `POST /runs/ingest/junit`
 
-For each `<testsuite>` element found in a JUnit file, the script builds and sends one
-`POST /runs/ingest` payload (see `docs/RUN_INGESTION.md` for the full contract):
+`scripts/qably-report.mjs` posts each generated JUnit file's **raw XML contents** as the request
+body, in a single `POST /runs/ingest/junit` call per file — it holds no XML parsing logic of its own.
+Everything that would be a JSON payload field is instead a query parameter the script builds from
+the environment:
 
-| JUnit | Payload field |
+| Query parameter | Built from |
 | --- | --- |
-| `<testsuite name="...">` | `suiteName` |
-| `<testcase name="...">` | `cases[].name` |
-| `<testcase>` containing a `<failure>` or `<error>` child | `cases[].status: 'fail'` |
-| `<testcase>` containing a `<skipped>` child | `cases[].status: 'skip'` |
-| `<testcase>` with none of the above | `cases[].status: 'pass'` |
-| — | `source: 'github_actions'` (fixed) |
-| `<testsuite timestamp="...">` | `startedAt` (offset added if the timestamp has none) |
-| `timestamp + time` (seconds) | `finishedAt` |
-| `$GITHUB_SHA` | `commitSha` |
-| `git log -1 --pretty=%s` / `%an` (best-effort, read locally — cheaper than parsing the event
-  payload) | `commitMessage` / `commitAuthor` |
+| `source` | fixed `github_actions` |
+| `externalId` | `gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>` — see below |
+| `name` | `<GITHUB_WORKFLOW> / <GITHUB_JOB> (#<GITHUB_RUN_NUMBER>)` |
+| `commitSha` | `$GITHUB_SHA` |
+| `commitMessage` / `commitAuthor` | `git log -1 --pretty=%s` / `%an` (best-effort, read locally — cheaper than parsing the event payload) |
 
-JUnit has no status equivalent to Qably's `blocked` case status, so the script never produces it —
-inventing one would misrepresent what the test runner actually reported.
-
-A JUnit file commonly contains many `<testsuite>` elements (jest-junit and vitest's junit reporter
-both emit one per test *file*, not one per run), and `POST /runs/ingest` accepts exactly one suite
-per request. The script therefore posts one run per `<testsuite>`, sequentially, and keeps going
-even if one of them fails.
+The server does all the parsing: reading every `<testsuite>` and `<testcase>` (including nested
+suites), deriving each case's status from a `<failure>`/`<error>`/`<skipped>` child, and — critically
+— **splitting one file into one run per `<testsuite>`** it contains. See `docs/RUN_INGESTION.md`'s
+"One run per `<testsuite>`" section for the full mapping table and the splitting rules; this file
+does not duplicate it. JUnit has no status equivalent to Qably's `blocked` case status, so the
+server never produces it — inventing one would misrepresent what the test runner actually reported.
 
 ### `externalId` scheme
 
 ```
-gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(suiteName)>-<sha256(suiteName)[0:8]>
+gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>
 ```
+
+This is the script's own, **per-file** `externalId`, passed as a query parameter. When the file
+holds more than one `<testsuite>`, the server derives a further per-suite `externalId` from this
+base (`<base>-<slug(suiteName)>-<sha256(suiteName)[0:8]>`) for each run it creates — see
+`docs/RUN_INGESTION.md`. The script itself never computes a suite-level id; it does not parse the
+file, so it does not know the suite names.
 
 - **`GITHUB_RUN_ID`** — identifies one workflow run. Deliberately **not** combined with
   `GITHUB_RUN_ATTEMPT`: re-running a failed job (a GitHub Actions "re-run failed jobs") keeps the
-  same `GITHUB_RUN_ID`, so a re-run replays the same `externalId` and upserts the existing run
-  instead of creating a duplicate — which is exactly the idempotency behavior described in
-  `docs/RUN_INGESTION.md`. A genuinely new workflow run (new push, new PR sync) gets a new run ID
-  and therefore a new `externalId` per suite.
-- **`GITHUB_JOB`** — disambiguates suites with the same name reported from different jobs in the
-  same run (`api` vs `web`).
-- **`slug(suiteName)`** — the suite name lowercased and reduced to `[a-z0-9-]`, kept for
-  readability in logs and dashboards.
-- **`sha256(suiteName)[0:8]`** — an 8-hex-character digest of the *unslugged* suite name, appended
-  so that two different suite names that happen to slugify to the same string still get distinct
+  same `GITHUB_RUN_ID`, so a re-run replays the same `externalId` and upserts the existing run(s)
+  instead of creating duplicates — which is exactly the idempotency behavior described in
+  `docs/RUN_INGESTION.md`. A genuinely new workflow run (new push, new PR sync) gets a new run ID.
+- **`GITHUB_JOB`** — disambiguates report files with the same name reported from different jobs in
+  the same run (`api` vs `web`).
+- **`slug(basename(filePath))`** — the file's own name lowercased and reduced to `[a-z0-9-]`, kept
+  for readability in logs and dashboards.
+- **`sha256(filePath)[0:8]`** — an 8-hex-character digest of the full (unslugged) file path, appended
+  so that two files whose basenames happen to slugify to the same string still get distinct
   `externalId`s.
 
 ## Suite adoption on first report
 
-`scripts/qably-report.mjs` always sends `suiteName` (the JUnit `<testsuite name="...">` value, see the
-mapping table below), never `suiteId`. `POST /runs/ingest` used to answer `404` whenever `suiteName`
-didn't already match an existing suite, which meant **the first real report for any suite name always
-404'd** until a human pre-created a suite with the exact name jest-junit or vitest assigned it. That is
-no longer true: an unrecognized `suiteName` is now adopted — the suite is created on the spot, along
-with a `draft` `TestCase` for every reported case name — and the report succeeds with `200` on its very
-first attempt. See `docs/RUN_INGESTION.md`'s "Suite adoption" section for the full behavior, including
+`scripts/qably-report.mjs` never sends `suiteId` or `suiteName` — it lets the server derive and
+split suites from the XML entirely, per `docs/RUN_INGESTION.md`. An unrecognized suite name is
+adopted on the spot — the suite is created, along with a `draft` `TestCase` for every reported case
+name — and the report succeeds with `200` on its very first attempt for every suite the file
+contains. See `docs/RUN_INGESTION.md`'s "Suite adoption" section for the full behavior, including
 why drafts are not immediately official (§4.3.4 rule b) and how a human promotes one.
-
-`scripts/qably-report.mjs` still detects a `404` specifically and prints a `::warning::` annotation
-instead of a raw HTTP error dump — that path now means an explicit `suiteId` didn't resolve, which
-this script never sends, or a genuinely revoked/misconfigured key, not the "unknown suite" case it used
-to mean.
 
 ### Does a failed report fail the CI job?
 
 **No.** `scripts/qably-report.mjs` never calls `process.exit(1)`; every failure path (missing
-secrets, a `404`, any other non-2xx response, a network error) is caught, logged as a
-`::warning::` annotation, and counted in the final `N succeeded, M failed` summary line. The job's
-actual pass/fail signal comes entirely from the test step itself (`jest` / `vitest` exiting
-non-zero on a real test failure) — reporting to Qably is a best-effort side channel, not a gate. This
-stays true even now that first reports succeed: a Qably-side outage or a revoked key is Qably's
-problem, not the pull request's. Blocking merges on the availability of an external, optional
-integration is the wrong failure mode — the uploaded JUnit artifact is still there for a human to
-inspect either way.
-
-## Limitations
-
-- The XML parser in `scripts/qably-report.mjs` is a small, purpose-built regex parser, not a
-  general-purpose XML parser. It assumes the flat `<testsuites><testsuite><testcase>` shape that
-  jest-junit and vitest's junit reporter both produce; it does not handle nested `<testsuite>`
-  elements.
-- No new runtime dependency was added for XML parsing — the format jest-junit and vitest emit is
-  narrow and stable enough that a small hand-written parser is a better trade-off than a general
-  XML library for a single internal script.
-- The script posts one request per suite. Against a deployed API this hits the `/runs/ingest`
-  throttle on any repository with more than 30 suites; the `429` retry path above keeps the results
-  from being lost, but the real fix is a batch endpoint. See **Rate limits and retries**.
-- The success, `404`, `429` and network-error paths were validated locally against real JUnit files
-  (generated from `apps/api`'s and `apps/web`'s own test suites) posted to a throwaway local HTTP
-  server.
+secrets, any non-2xx response, a network error) is caught, logged as a `::warning::` annotation, and
+counted in a `1 succeeded` / `1 failed` summary line per file. The job's actual pass/fail signal
+comes entirely from the test step itself (`jest` / `vitest` exiting non-zero on a real test failure)
+— reporting to Qably is a best-effort side channel, not a gate. A Qably-side outage or a revoked key
+is Qably's problem, not the pull request's. Blocking merges on the availability of an external,
+optional integration is the wrong failure mode — the uploaded JUnit artifact is still there for a
+human to inspect either way.

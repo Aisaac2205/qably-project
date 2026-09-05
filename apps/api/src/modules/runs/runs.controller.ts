@@ -16,7 +16,7 @@ import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
-import type { RunError, RunView } from './runs.contracts';
+import type { JunitIngestView, RunError, RunView } from './runs.contracts';
 import {
   ingestJunitQuerySchema,
   ingestRunSchema,
@@ -24,6 +24,10 @@ import {
   type IngestRunInput,
 } from './runs.schemas';
 import { parseJunitXml } from './lib/parse-junit-xml';
+import {
+  groupJunitReportBySuite,
+  type JunitSuiteGroup,
+} from './lib/group-junit-report';
 import { RunsService } from './runs.service';
 
 function parseJunitReport(xml: string) {
@@ -32,6 +36,19 @@ function parseJunitReport(xml: string) {
   } catch (error) {
     throw new BadRequestException(
       error instanceof Error ? error.message : 'invalid junit xml',
+    );
+  }
+}
+
+function groupBySuite(
+  report: ReturnType<typeof parseJunitXml>,
+  externalId: string,
+): JunitSuiteGroup[] {
+  try {
+    return groupJunitReportBySuite(report, externalId);
+  } catch (error) {
+    throw new BadRequestException(
+      error instanceof Error ? error.message : 'invalid junit report',
     );
   }
 }
@@ -73,22 +90,41 @@ export class RunsController {
     @Query(new ZodValidationPipe(ingestJunitQuerySchema))
     query: IngestJunitQuery,
     @Body() xml: unknown,
-  ): Promise<RunView> {
+  ): Promise<JunitIngestView> {
     if (typeof xml !== 'string' || xml.trim() === '') {
       throw new BadRequestException('send the JUnit report as an XML body');
     }
 
     const report = parseJunitReport(xml);
+    const suitePinned =
+      query.suiteId !== undefined || query.suiteName !== undefined;
 
-    const body = ingestRunSchema.parse({
-      ...query,
-      suiteName: query.suiteId
-        ? undefined
-        : (query.suiteName ?? report.suiteName),
-      name: query.name ?? report.suiteName,
-      cases: report.cases,
-    });
+    const groups: JunitSuiteGroup[] = suitePinned
+      ? [
+          {
+            suiteName: report.suiteName,
+            externalId: query.externalId,
+            cases: report.cases,
+          },
+        ]
+      : groupBySuite(report, query.externalId);
 
-    return unwrap(await this.runs.ingest(apiKey, body));
+    const runs: RunView[] = [];
+
+    for (const group of groups) {
+      const body = ingestRunSchema.parse({
+        ...query,
+        externalId: group.externalId,
+        suiteName: query.suiteId
+          ? undefined
+          : (query.suiteName ?? group.suiteName),
+        name: query.name ?? group.suiteName,
+        cases: group.cases,
+      });
+
+      runs.push(unwrap(await this.runs.ingest(apiKey, body)));
+    }
+
+    return { runs };
   }
 }

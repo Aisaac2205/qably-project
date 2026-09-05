@@ -216,6 +216,10 @@ export interface RunRecord {
   cases: RunCaseRecord[]
 }
 
+export interface JunitIngestRecord {
+  runs: RunRecord[]
+}
+
 export interface RunCaseCounts {
   total: number
   pending: number
