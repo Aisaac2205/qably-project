@@ -40,7 +40,7 @@ describe('useSuiteMetrics', () => {
     expect(result.current.isLoading).toBe(false)
   })
 
-  it('populates status, passRate7d, sparkline, lastRun for each suite', () => {
+  it('populates status, recentPassRate, sparkline, lastRun for each suite', () => {
     const { result } = renderHook(() => useSuiteMetrics('proj-1'), {
       wrapper: ({ children }) => withQueryClient(children),
     })
@@ -48,7 +48,7 @@ describe('useSuiteMetrics', () => {
     const m1 = result.current.perSuite.find((m) => m.suite.id === 'suite-1')
     expect(m1).toBeDefined()
     expect(typeof m1!.status).toBe('string')
-    expect(typeof m1!.passRate7d).toBe('number')
+    expect(typeof m1!.recentPassRate).toBe('number')
     expect(Array.isArray(m1!.sparkline)).toBe(true)
     expect(m1!.lastRun?.id).toBe('run-12')
   })

@@ -24,7 +24,7 @@ describe('deriveSuiteMetrics', () => {
 
     expect(result.status).toBe('never-run')
     expect(result.lastRun).toBeUndefined()
-    expect(result.passRate7d).toBe(0)
+    expect(result.recentPassRate).toBe(0)
     expect(result.sparkline).toEqual([])
   })
 
@@ -73,7 +73,7 @@ describe('deriveSuiteMetrics', () => {
     expect(result.status).toBe('running')
   })
 
-  it('computes passRate7d from the completed entries in the trend', () => {
+  it('computes recentPassRate from the completed entries in the trend', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
       lastRun: {
@@ -88,7 +88,7 @@ describe('deriveSuiteMetrics', () => {
 
     const result = deriveSuiteMetrics(suite(), entry)
 
-    expect(result.passRate7d).toBe(67)
+    expect(result.recentPassRate).toBe(67)
   })
 
   it('reports needs-attention when the completed pass rate is below 70', () => {
@@ -179,7 +179,7 @@ describe('deriveSuiteMetrics', () => {
     const result = deriveSuiteMetrics(suite(), entry)
 
     expect(result.status).toBe('needs-attention')
-    expect(result.passRate7d).toBe(0)
+    expect(result.recentPassRate).toBe(0)
   })
 
   it('keeps the suite object as-is on the result', () => {

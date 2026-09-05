@@ -50,7 +50,7 @@ export function Sparkline({
     const pts = xs.map((x, i) => ({ x, y: ys[i] }))
     const polyline = pts.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ')
     const avg = Math.round(data.reduce((acc, d) => acc + d.passRate, 0) / n)
-    return { points: pts, polylinePoints: polyline, label: t('suites.passRateTrend', { avg, days: n }) }
+    return { points: pts, polylinePoints: polyline, label: t('suites.passRateTrend', { avg, runs: n }) }
   }, [data, width, height, t])
 
   return (

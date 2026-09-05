@@ -48,7 +48,7 @@ const mockRun: RunSummaryRecord = {
 const mockMetrics: SuiteMetrics = {
   suite: {} as SuiteMetrics['suite'],
   lastRun: mockRun,
-  passRate7d: 80,
+  recentPassRate: 80,
   sparkline: [
     { date: '2026-06-10', passRate: 60, runCount: 1 },
     { date: '2026-06-11', passRate: 70, runCount: 1 },

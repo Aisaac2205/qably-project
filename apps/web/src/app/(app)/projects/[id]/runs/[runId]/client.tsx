@@ -6,6 +6,7 @@ import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { ArrowLeft } from '@phosphor-icons/react'
 import { RunDetail } from '@/features/runs/components/run-detail'
+import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 import { projectRootPath } from '@/features/projects/lib/routes'
 
@@ -17,8 +18,16 @@ export function RunDetailPageClient({
   runId: string
 }) {
   const { t } = useTranslation()
-  const { run } = useRun(runId)
+  const { run, isLoading } = useRun(runId)
   const { project } = useProject(projectId)
+
+  if (isLoading) {
+    return (
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
+        <StateView kind="loading" title={t('runs.loading')} />
+      </div>
+    )
+  }
 
   if (!run) {
     return (

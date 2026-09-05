@@ -33,7 +33,7 @@ interface SuiteRowProps {
 }
 
 function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
-  const { lastRun, passRate7d, sparkline, status } = metrics
+  const { lastRun, recentPassRate, sparkline, status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
   const { t, locale } = useTranslation()
   const updateSuiteMutation = useUpdateSuite()
@@ -108,13 +108,13 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
       {/* Col 5: pass rate 7d + sparkline (hidden on mobile) */}
       <div className="hidden md:flex items-center gap-2.5 shrink-0">
         <span
-          className={`text-sm font-mono font-semibold tabular-nums ${passRate7d >= 70 ? 'text-pass' : passRate7d > 0 ? 'text-warn' : 'text-muted'}`}
+          className={`text-sm font-mono font-semibold tabular-nums ${recentPassRate >= 70 ? 'text-pass' : recentPassRate > 0 ? 'text-warn' : 'text-muted'}`}
         >
-          {passRate7d}%
+          {recentPassRate}%
         </span>
         <Sparkline
           data={sparkline.map(({ date, passRate }) => ({ date, passRate }))}
-          tone={passRate7d >= 70 ? 'pass' : passRate7d > 0 ? 'warn' : 'muted'}
+          tone={recentPassRate >= 70 ? 'pass' : recentPassRate > 0 ? 'warn' : 'muted'}
           width={64}
           height={20}
         />

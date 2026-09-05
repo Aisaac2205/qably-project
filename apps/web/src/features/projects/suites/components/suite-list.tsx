@@ -33,7 +33,7 @@ function applySort(items: SuiteMetrics[], sort: SortKey): SuiteMetrics[] {
       arr.sort((a, b) => a.suite.name.localeCompare(b.suite.name))
       break
     case 'pass-rate':
-      arr.sort((a, b) => b.passRate7d - a.passRate7d)
+      arr.sort((a, b) => b.recentPassRate - a.recentPassRate)
       break
     case 'cases':
       arr.sort((a, b) => b.suite.cases.length - a.suite.cases.length)

@@ -12,6 +12,7 @@ import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { StateView } from '@/components/ui/state-view'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { projectRootPath, projectSuitesPath } from '../../lib/routes'
@@ -28,7 +29,7 @@ import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
   const { t, locale } = useTranslation()
-  const { suite } = useSuite(suiteId)
+  const { suite, isLoading } = useSuite(suiteId)
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
   const { project } = useProject(projectId)
@@ -49,6 +50,14 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   function handleAddCase() {
     setEditingCase(undefined)
     setCaseDialogOpen(true)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
+        <StateView kind="loading" title={t('suites.loading')} />
+      </div>
+    )
   }
 
   if (!suite) {
@@ -186,14 +195,14 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               <span className="text-xs font-medium text-muted">{t('suites.passRate7d')}</span>
               <span
                 className={`text-sm font-mono font-semibold tabular-nums ${
-                  metrics.passRate7d >= 70
+                  metrics.recentPassRate >= 70
                     ? 'text-pass'
-                    : metrics.passRate7d > 0
+                    : metrics.recentPassRate > 0
                       ? 'text-warn'
                       : 'text-muted'
                 }`}
               >
-                {metrics.passRate7d}%
+                {metrics.recentPassRate}%
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -211,7 +220,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             <div className="hidden sm:flex items-center gap-2 ml-auto">
               <Sparkline
                 data={metrics.sparkline.map(({ date, passRate }) => ({ date, passRate }))}
-                tone={metrics.passRate7d >= 70 ? 'pass' : metrics.passRate7d > 0 ? 'warn' : 'muted'}
+                tone={metrics.recentPassRate >= 70 ? 'pass' : metrics.recentPassRate > 0 ? 'warn' : 'muted'}
                 width={80}
                 height={24}
               />

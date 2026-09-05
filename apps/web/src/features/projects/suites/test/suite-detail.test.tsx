@@ -131,8 +131,26 @@ describe('SuiteDetail (redesigned)', () => {
     expect(within(caseCard as HTMLElement).queryByText('v1')).not.toBeInTheDocument()
   })
 
+  it('shows the loading state before the suite query settles', async () => {
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />)
+
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.getByText('Loading suites…')).toBeInTheDocument()
+    expect(screen.queryByText('Suite not found')).not.toBeInTheDocument()
+
+    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  })
+
   it('shows "Suite not found" with a back link for unknown id', async () => {
-    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />) })
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="nonexistent" />)
+    await act(async () => {})
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
     expect(screen.getByText('Suite not found')).toBeInTheDocument()
     const back = screen.getByRole('link', { name: /Back to project/i })
     expect(back.getAttribute('href')).toBe('/projects/proj-1/repository')
