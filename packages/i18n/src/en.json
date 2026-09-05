@@ -526,16 +526,15 @@
     "started": "Started",
     "finished": "Finished",
     "byAuthor": "by ",
-    "environment": "Environment",
-    "environmentLabel": "Environment: {{env}}",
-    "executionEvidence": "Execution evidence",
-    "traceability": "Traceability & Provenance",
     "versionSnapshot": "Version {{version}}",
     "viewInLibrary": "View in Test Library",
     "readOnlyRun": "Recorded by {{source}}",
     "readOnlyRunHint": "Statuses in an automated run come from the reporting tool and cannot be edited here.",
     "undocumentedCase": "Discovered from the test report",
-    "undocumentedCaseHint": "This case was created from the name the reporting tool sent. It has no documented steps yet."
+    "undocumentedCaseHint": "This case was created from the name the reporting tool sent. It has no documented steps yet.",
+    "createRunError": "Could not start the run. Please try again.",
+    "updateCaseError": "Could not save this case status. Please try again.",
+    "updateCaseConflict": "This case belongs to an automated run and cannot be edited."
   },
   "suites": {
     "versionBadge": "v{{version}}",
@@ -643,7 +642,6 @@
     "expectedResultPlaceholder": "What should happen when the steps succeed?",
     "caseNameRequired": "A case title is required",
     "noCasesCta": "Add the first test case to start documenting this suite.",
-    "undocumentedCase": "No documented steps",
     "documentCase": "Document this case",
     "cannotRunEmptySuite": "Add at least one test case before running this suite"
   },

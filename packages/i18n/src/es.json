@@ -526,16 +526,15 @@
     "started": "Iniciado",
     "finished": "Finalizado",
     "byAuthor": "por ",
-    "environment": "Ambiente",
-    "environmentLabel": "Ambiente: {{env}}",
-    "executionEvidence": "Evidencia de ejecución",
-    "traceability": "Trazabilidad y procedencia",
     "versionSnapshot": "Versión {{version}}",
     "viewInLibrary": "Ver en biblioteca de pruebas",
     "readOnlyRun": "Registrado por {{source}}",
     "readOnlyRunHint": "Los estados de una ejecución automatizada provienen de la herramienta que los reportó y no pueden editarse aquí.",
     "undocumentedCase": "Descubierto desde el reporte de pruebas",
-    "undocumentedCaseHint": "Este caso se creó a partir del nombre que envió la herramienta. Todavía no tiene pasos documentados."
+    "undocumentedCaseHint": "Este caso se creó a partir del nombre que envió la herramienta. Todavía no tiene pasos documentados.",
+    "createRunError": "No se pudo iniciar la ejecución. Intenta de nuevo.",
+    "updateCaseError": "No se pudo guardar el estado del caso. Intenta de nuevo.",
+    "updateCaseConflict": "Este caso pertenece a una ejecución automatizada y no puede editarse."
   },
   "suites": {
     "versionBadge": "v{{version}}",
@@ -642,7 +641,6 @@
     "expectedResultLabel": "Resultado esperado",
     "expectedResultPlaceholder": "¿Qué debería pasar cuando los pasos tienen éxito?",
     "caseNameRequired": "El título del caso es requerido",
-    "undocumentedCase": "Sin pasos documentados",
     "documentCase": "Documentar este caso",
     "cannotRunEmptySuite": "Agregue al menos un caso de prueba antes de ejecutar esta suite",
     "noCasesCta": "Agregue el primer caso de prueba para comenzar a documentar esta suite."
