@@ -148,13 +148,15 @@ export class RunQueriesService {
       SELECT id, "suiteId", status, source, "startedAt", "finishedAt"
       FROM (
         SELECT id, "suiteId", status, source, "startedAt", "finishedAt",
-          ROW_NUMBER() OVER (PARTITION BY "suiteId" ORDER BY "startedAt" DESC) AS rn
+          ROW_NUMBER() OVER (
+            PARTITION BY "suiteId" ORDER BY "startedAt" DESC, "id" DESC
+          ) AS rn
         FROM "run"
         WHERE "organizationId" = ${org.organizationId}
           AND "suiteId" IN (${Prisma.join(suiteIds)})
       ) ranked
       WHERE rn <= ${SUITE_METRICS_TREND_LIMIT}
-      ORDER BY "suiteId" ASC, "startedAt" DESC
+      ORDER BY "suiteId" ASC, "startedAt" DESC, "id" DESC
     `);
 
     const lastRunIdBySuite = new Map<string, string>();

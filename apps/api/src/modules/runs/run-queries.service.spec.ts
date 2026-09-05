@@ -397,6 +397,16 @@ describe('RunQueriesService.suiteMetrics', () => {
     ]);
   });
 
+  it('breaks startedAt ties by id, both in the window and the outer order', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).suiteMetrics(org, 'project-1');
+
+    const [[sqlArg]] = prisma.$queryRaw.mock.calls as [[{ sql: string }]];
+    const occurrences = sqlArg.sql.match(/"startedAt" DESC, "id" DESC/g) ?? [];
+    expect(occurrences).toHaveLength(2);
+  });
+
   it('only counts cases for the most recent run per suite, not every trend run', async () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
