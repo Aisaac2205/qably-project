@@ -6,10 +6,6 @@ import { renderWithQuery } from '@/lib/query-test-utils'
 vi.mock('@/features/runs/api/runs.api', async () =>
   await import('@/test/runs-api-stub'),
 )
-vi.mock('@/features/projects/suites/api/suites.api', async () =>
-  await import('@/test/suites-api-stub'),
-)
-
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
@@ -123,11 +119,22 @@ describe('RunList', () => {
     expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
   })
 
-  it('resolves the suite name through the suites api instead of the run', async () => {
+  it('reads the suite name off the run, with no suites api mocked at all', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
+
     expect(screen.getAllByText('Authentication').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Checkout').length).toBeGreaterThan(0)
+  })
+
+  it('hides the load-more control when the api reports no further page', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" />)
+    })
+
+    expect(
+      screen.queryByRole('button', { name: /load more/i }),
+    ).not.toBeInTheDocument()
   })
 })

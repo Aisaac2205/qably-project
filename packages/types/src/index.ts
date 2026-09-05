@@ -224,6 +224,7 @@ export interface RunSummaryRecord {
   projectId: string
   organizationId: string
   suiteId: string
+  suiteName: string
   name: string
   status: RunStatus
   source: RunSource
@@ -236,6 +237,11 @@ export interface RunSummaryRecord {
   commitAuthor?: string
   caseCounts: RunCaseCounts
   passRate: number
+}
+
+export interface RunsPageRecord {
+  items: RunSummaryRecord[]
+  nextCursor?: string
 }
 
 export interface CiCommitActivityRecord {

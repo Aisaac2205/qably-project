@@ -35,6 +35,7 @@ const mockRun: RunSummaryRecord = {
   organizationId: 'org-1',
   name: 'Run #99',
   suiteId: 'suite-1',
+  suiteName: 'Authentication',
   status: 'pass',
   source: 'manual',
   externalId: '',

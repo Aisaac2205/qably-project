@@ -74,13 +74,18 @@ describe('useSuiteMetrics', () => {
     expect(beforeFirst.lastRun).toBeDefined()
 
     await act(async () => {
-      const existing = client.getQueryData<Array<{ id: string }>>(runKeys.list('proj-1')) ?? []
-      client.setQueryData(runKeys.list('proj-1'), [
+      const existing =
+        client.getQueryData<{ items: Array<{ id: string }> }>(
+          runKeys.list('proj-1'),
+        )?.items ?? []
+      client.setQueryData(runKeys.list('proj-1'), {
+        items: [
         {
           id: 'run-hot',
           projectId: 'proj-1',
           organizationId: 'org-1',
           suiteId: 'suite-1',
+          suiteName: 'Authentication',
           name: 'Hot run',
           status: 'pass',
           source: 'manual',
@@ -91,7 +96,8 @@ describe('useSuiteMetrics', () => {
           passRate: 1,
         },
         ...existing,
-      ])
+        ],
+      })
     })
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 0))

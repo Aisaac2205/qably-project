@@ -6,7 +6,7 @@ import { mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
-import { runFixtures } from '@/test/runs-api-stub'
+import { runFixtures, suiteNameById } from '@/test/runs-api-stub'
 import { projectFixtures } from '@/test/projects-api-stub'
 import { organizationFixtures } from '@/test/organizations-api-stub'
 import {
@@ -60,6 +60,7 @@ function toSummary(run: (typeof runFixtures)[number]): RunSummaryRecord {
     projectId: run.projectId,
     organizationId: run.organizationId,
     suiteId: run.suiteId,
+    suiteName: suiteNameById[run.suiteId] ?? '',
     name: run.name,
     status: run.status,
     source: run.source,
@@ -82,13 +83,23 @@ function seedRuns(client: QueryClient): void {
   )
   const summaries = sorted.map(toSummary)
 
-  client.setQueryData(runKeys.list('all'), summaries)
+  client.setQueryData(runKeys.list('all'), { items: summaries })
 
   for (const projectId of new Set(runs.map((run) => run.projectId))) {
-    client.setQueryData(
-      runKeys.list(projectId),
-      summaries.filter((run) => run.projectId === projectId),
-    )
+    const forProject = summaries.filter((run) => run.projectId === projectId)
+
+    client.setQueryData(runKeys.list(projectId), { items: forProject })
+    client.setQueryData(runKeys.page(projectId, 'all'), {
+      pages: [{ items: forProject }],
+      pageParams: [undefined],
+    })
+
+    for (const source of new Set(forProject.map((run) => run.source))) {
+      client.setQueryData(runKeys.page(projectId, source), {
+        pages: [{ items: forProject.filter((run) => run.source === source) }],
+        pageParams: [undefined],
+      })
+    }
   }
 
   for (const run of runs) {

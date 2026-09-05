@@ -34,6 +34,7 @@ function makeRun(
     organizationId: 'org-1',
     name: 'Test Run',
     suiteId: 'suite-1',
+    suiteName: 'Authentication',
     status: 'pass',
     source: 'manual',
     externalId: '',

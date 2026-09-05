@@ -26,7 +26,7 @@ describe('runs.api', () => {
   })
 
   it('lists the runs of one project', async () => {
-    await listRuns('proj-1')
+    await listRuns({ projectId: 'proj-1' })
 
     const [url, init] = lastCall()
     expect(url).toContain('/runs?projectId=proj-1')
@@ -41,9 +41,36 @@ describe('runs.api', () => {
   })
 
   it('escapes a project id that would otherwise break the query string', async () => {
-    await listRuns('proj/1&x=2')
+    await listRuns({ projectId: 'proj/1&x=2' })
 
     expect(lastCall()[0]).toContain('/runs?projectId=proj%2F1%26x%3D2')
+  })
+
+  it('asks for one page when a limit is given', async () => {
+    await listRuns({ projectId: 'proj-1', limit: 25 })
+
+    expect(lastCall()[0]).toContain('projectId=proj-1&limit=25')
+  })
+
+  it('resumes from a cursor', async () => {
+    await listRuns({ projectId: 'proj-1', limit: 25, cursor: 'run-9' })
+
+    expect(lastCall()[0]).toContain('cursor=run-9')
+  })
+
+  it('narrows to one source', async () => {
+    await listRuns({ projectId: 'proj-1', source: 'github_actions' })
+
+    expect(lastCall()[0]).toContain('source=github_actions')
+  })
+
+  it('omits a filter that was not provided', async () => {
+    await listRuns({ projectId: 'proj-1' })
+
+    const [url] = lastCall()
+    expect(url).not.toContain('limit=')
+    expect(url).not.toContain('cursor=')
+    expect(url).not.toContain('source=')
   })
 
   it('reads a single run', async () => {

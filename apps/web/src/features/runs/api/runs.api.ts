@@ -1,4 +1,9 @@
-import type { CaseStatus, RunRecord, RunSummaryRecord } from '@qably/types'
+import type {
+  CaseStatus,
+  RunRecord,
+  RunsPageRecord,
+  RunSource,
+} from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
 export interface CreateRunPayload {
@@ -11,16 +16,27 @@ export interface UpdateRunCasePayload {
   status: CaseStatus
 }
 
-export function listRuns(
-  projectId?: string,
-  signal?: AbortSignal,
-): Promise<RunSummaryRecord[]> {
-  const query =
-    projectId === undefined
-      ? ''
-      : `?projectId=${encodeURIComponent(projectId)}`
+export interface ListRunsParams {
+  projectId?: string
+  source?: RunSource
+  limit?: number
+  cursor?: string
+}
 
-  return apiRequest<RunSummaryRecord[]>(`/runs${query}`, { signal })
+export function listRuns(
+  params: ListRunsParams = {},
+  signal?: AbortSignal,
+): Promise<RunsPageRecord> {
+  const search = new URLSearchParams()
+
+  if (params.projectId !== undefined) search.set('projectId', params.projectId)
+  if (params.source !== undefined) search.set('source', params.source)
+  if (params.limit !== undefined) search.set('limit', String(params.limit))
+  if (params.cursor !== undefined) search.set('cursor', params.cursor)
+
+  const query = search.size === 0 ? '' : `?${search.toString()}`
+
+  return apiRequest<RunsPageRecord>(`/runs${query}`, { signal })
 }
 
 export function getRun(id: string, signal?: AbortSignal): Promise<RunRecord> {

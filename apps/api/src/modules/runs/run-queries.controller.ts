@@ -20,7 +20,7 @@ import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { RunQueryError, RunSummaryView, RunView } from './runs.contracts';
+import type { RunQueryError, RunsPageView, RunView } from './runs.contracts';
 import {
   createManualRunSchema,
   listRunsQuerySchema,
@@ -61,8 +61,8 @@ export class RunQueriesController {
   list(
     @CurrentOrg() org: OrgContext,
     @Query(new ZodValidationPipe(listRunsQuerySchema)) query: ListRunsQuery,
-  ): Promise<RunSummaryView[]> {
-    return this.runs.list(org, query.projectId);
+  ): Promise<RunsPageView> {
+    return this.runs.list(org, query);
   }
 
   @Get(':id')

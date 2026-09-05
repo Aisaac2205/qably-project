@@ -3,6 +3,8 @@ import type {
   RunCaseCounts,
   RunCaseRecord,
   RunRecord,
+  RunsPageRecord,
+  RunSource,
   RunSummaryRecord,
 } from '@qably/types'
 
@@ -144,6 +146,11 @@ export const runFixtures: RunRecord[] = [
   },
 ]
 
+export const suiteNameById: Record<string, string> = {
+  'suite-1': 'Authentication',
+  'suite-2': 'Checkout',
+}
+
 function toSummary(run: RunRecord): RunSummaryRecord {
   const caseCounts = countCases(run.cases)
   return {
@@ -151,6 +158,7 @@ function toSummary(run: RunRecord): RunSummaryRecord {
     projectId: run.projectId,
     organizationId: run.organizationId,
     suiteId: run.suiteId,
+    suiteName: suiteNameById[run.suiteId] ?? '',
     name: run.name,
     status: run.status,
     source: run.source,
@@ -172,16 +180,37 @@ export function __resetRunsStub(): void {
   runs = structuredClone(runFixtures)
 }
 
-export function listRuns(projectId?: string): Promise<RunSummaryRecord[]> {
-  const filtered = projectId === undefined
-    ? runs
-    : runs.filter((run) => run.projectId === projectId)
+export function listRuns(
+  params: {
+    projectId?: string
+    source?: RunSource
+    limit?: number
+    cursor?: string
+  } = {},
+): Promise<RunsPageRecord> {
+  const { projectId, source, limit, cursor } = params
 
-  return Promise.resolve(
-    [...filtered]
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-      .map(toSummary),
-  )
+  const ordered = [...runs]
+    .filter((run) => projectId === undefined || run.projectId === projectId)
+    .filter((run) => source === undefined || run.source === source)
+    .sort((a, b) => {
+      const delta =
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      return delta === 0 ? b.id.localeCompare(a.id) : delta
+    })
+
+  const start =
+    cursor === undefined
+      ? 0
+      : ordered.findIndex((run) => run.id === cursor) + 1
+
+  const page = limit === undefined ? ordered.slice(start) : ordered.slice(start, start + limit)
+  const hasMore = limit !== undefined && start + limit < ordered.length
+
+  return Promise.resolve({
+    items: page.map(toSummary),
+    ...(hasMore ? { nextCursor: page[page.length - 1].id } : {}),
+  })
 }
 
 export function getRun(id: string): Promise<RunRecord> {

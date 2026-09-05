@@ -57,6 +57,9 @@ export type IngestRunInput = z.infer<typeof ingestRunSchema>;
 
 export const listRunsQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
+  source: z.enum(['manual', 'api', 'github_actions']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().min(1).optional(),
 });
 
 export const createManualRunSchema = z.object({

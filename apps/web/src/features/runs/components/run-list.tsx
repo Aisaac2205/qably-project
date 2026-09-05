@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import type { RunSource, RunSummaryRecord } from '@qably/types'
-import { useRuns } from '../hooks/use-runs'
-import { useSuites } from '@/features/projects/suites/hooks/use-suites'
+import { useRunsPage } from '../hooks/use-runs'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from './status-chip'
@@ -28,11 +28,9 @@ function formatDate(iso: string): string {
 function RunRow({
   run,
   projectId,
-  suiteName,
 }: {
   run: RunSummaryRecord
   projectId: string
-  suiteName: string
 }) {
   return (
     <Link
@@ -43,7 +41,7 @@ function RunRow({
         <StatusChip status={run.status} />
         <div className="min-w-0">
           <div className="text-sm font-semibold text-default truncate">{run.name}</div>
-          <div className="text-xs text-muted truncate mt-0.5">{suiteName}</div>
+          <div className="text-xs text-muted truncate mt-0.5">{run.suiteName}</div>
         </div>
       </div>
 
@@ -66,16 +64,13 @@ function RunRow({
 }
 
 export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
-  const { runs: allRuns } = useRuns(projectId)
-  const { suites } = useSuites(projectId)
-  const { t } = useTranslation()
-  const runs = source ? allRuns.filter((r) => r.source === source) : allRuns
-  const sorted = [...runs].sort(
-    (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+  const { runs, hasNextPage, isFetchingNextPage, fetchNextPage } = useRunsPage(
+    projectId,
+    source,
   )
-  const suiteNameById = new Map(suites.map((suite) => [suite.id, suite.name]))
+  const { t } = useTranslation()
 
-  if (sorted.length === 0) {
+  if (runs.length === 0) {
     return (
       <StateView
         kind="empty"
@@ -91,16 +86,32 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
   }
 
   return (
-    <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
-      <CardContent className="p-0">
-        <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
-        {sorted.map((r) => (
-          <li key={r.id}>
-            <RunRow run={r} projectId={projectId} suiteName={suiteNameById.get(r.suiteId) ?? ''} />
-          </li>
-        ))}
-        </EntityList>
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+        <CardContent className="p-0">
+          <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
+            {runs.map((r) => (
+              <li key={r.id}>
+                <RunRow run={r} projectId={projectId} />
+              </li>
+            ))}
+          </EntityList>
+        </CardContent>
+      </Card>
+
+      {hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void fetchNextPage()}
+            disabled={isFetchingNextPage}
+          >
+            {isFetchingNextPage ? t('runs.loadingMore') : t('runs.loadMore')}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

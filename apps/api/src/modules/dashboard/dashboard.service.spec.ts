@@ -18,6 +18,7 @@ function runSummary(
     projectId: 'project-1',
     organizationId: 'org-1',
     suiteId: 'suite-1',
+    suiteName: 'Checkout',
     name: 'Checkout regression',
     status: 'pass',
     source: 'manual',
@@ -76,7 +77,7 @@ interface FakeRunQueries {
 }
 
 function createRunQueries(runs: RunSummaryRecord[] = []): FakeRunQueries {
-  return { list: jest.fn().mockResolvedValue(runs) };
+  return { list: jest.fn().mockResolvedValue({ items: runs }) };
 }
 
 function build(prisma: FakePrisma, runQueries: FakeRunQueries) {
@@ -183,7 +184,10 @@ describe('DashboardService.summary project scope', () => {
 
     await build(prisma, runQueries).summary(org, 'project-1');
 
-    expect(runQueries.list).toHaveBeenCalledWith(org, 'project-1');
+    expect(runQueries.list).toHaveBeenCalledWith(
+      org,
+      expect.objectContaining({ projectId: 'project-1' }),
+    );
   });
 });
 
@@ -284,8 +288,8 @@ describe('DashboardService.summary pass rate and defects', () => {
 });
 
 describe('DashboardService.summary recent runs', () => {
-  it('takes the recent runs from the already-sorted run summaries', async () => {
-    const runs = Array.from({ length: 8 }, (_, index) =>
+  it('asks the query layer for the recent runs instead of slicing in memory', async () => {
+    const runs = Array.from({ length: 5 }, (_, index) =>
       runSummary({ id: `run-${index}` }),
     );
     const prisma = createPrisma();
@@ -293,6 +297,10 @@ describe('DashboardService.summary recent runs', () => {
 
     const result = await build(prisma, runQueries).summary(org);
 
+    expect(runQueries.list).toHaveBeenCalledWith(
+      org,
+      expect.objectContaining({ limit: 5 }),
+    );
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.recentRuns).toHaveLength(5);
     expect(result.ok && result.value.recentRuns[0].id).toBe('run-0');

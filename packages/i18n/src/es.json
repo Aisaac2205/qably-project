@@ -518,6 +518,8 @@
     "pickCaseHint": "Selecciona un caso de la lista para ver sus detalles.",
     "noRuns": "Sin ejecuciones aún",
     "startARun": "Iniciar una ejecución",
+    "loadMore": "Cargar más",
+    "loadingMore": "Cargando…",
     "sourceManual": "Manual",
     "sourceApi": "API",
     "sourceCi": "CI",

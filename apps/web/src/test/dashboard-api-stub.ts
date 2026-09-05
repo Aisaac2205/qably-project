@@ -29,6 +29,7 @@ function toSummary(run: (typeof runFixtures)[number]): RunSummaryRecord {
     projectId: run.projectId,
     organizationId: run.organizationId,
     suiteId: run.suiteId,
+    suiteName: '',
     name: run.name,
     status: run.status,
     source: run.source,

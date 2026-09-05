@@ -15,14 +15,22 @@ import { deriveRunStatus } from './lib/derive-run-status';
 import {
   CASE_READ_SELECT,
   CASE_SELECT,
+  RUN_LIST_SELECT,
   RUN_SELECT,
   toRunView,
   type RunCaseRow,
+  type RunListRow,
   type RunRow,
 } from './lib/run-view';
-import type { RunQueryError, RunSummaryView, RunView } from './runs.contracts';
+import type {
+  RunQueryError,
+  RunsPageView,
+  RunSummaryView,
+  RunView,
+} from './runs.contracts';
 import type {
   CreateManualRunInput,
+  ListRunsQuery,
   UpdateRunCaseStatusInput,
 } from './runs.schemas';
 
@@ -34,7 +42,7 @@ interface CaseReloadTx {
   };
 }
 
-function toSummaryView(run: RunRow, counts: RunCaseCounts): RunSummaryView {
+function toSummaryView(run: RunListRow, counts: RunCaseCounts): RunSummaryView {
   const passRate = computePassRate(counts);
 
   return {
@@ -42,6 +50,7 @@ function toSummaryView(run: RunRow, counts: RunCaseCounts): RunSummaryView {
     projectId: run.projectId,
     organizationId: run.organizationId,
     suiteId: run.suiteId,
+    suiteName: run.suite.name,
     name: run.name,
     status: run.status,
     source: run.source,
@@ -66,17 +75,25 @@ export class RunQueriesService {
     private readonly notifications: NotificationsPublisher,
   ) {}
 
-  async list(org: OrgContext, projectId?: string): Promise<RunSummaryView[]> {
-    const runs = (await this.prisma.run.findMany({
+  async list(org: OrgContext, query: ListRunsQuery): Promise<RunsPageView> {
+    const { projectId, source, limit, cursor } = query;
+
+    const rows = (await this.prisma.run.findMany({
       where: {
         organizationId: org.organizationId,
         ...(projectId === undefined ? {} : { projectId }),
+        ...(source === undefined ? {} : { source }),
       },
-      orderBy: { startedAt: 'desc' },
-      select: RUN_SELECT,
-    })) as RunRow[];
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      ...(limit === undefined ? {} : { take: limit + 1 }),
+      ...(cursor === undefined ? {} : { cursor: { id: cursor }, skip: 1 }),
+      select: RUN_LIST_SELECT,
+    })) as RunListRow[];
 
-    if (runs.length === 0) return [];
+    const hasMore = limit !== undefined && rows.length > limit;
+    const runs = hasMore ? rows.slice(0, limit) : rows;
+
+    if (runs.length === 0) return { items: [] };
 
     const groupsResult = await this.prisma.runCase.groupBy({
       by: ['runId', 'status'],
@@ -91,10 +108,13 @@ export class RunQueriesService {
     }[];
 
     const countsByRun = buildCaseCountsByRun(groups);
-
-    return runs.map((run) =>
+    const items = runs.map((run) =>
       toSummaryView(run, countsByRun.get(run.id) ?? emptyCaseCounts()),
     );
+
+    return hasMore
+      ? { items, nextCursor: runs[runs.length - 1].id }
+      : { items };
   }
 
   async findOne(

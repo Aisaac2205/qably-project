@@ -18,6 +18,11 @@ export const RUN_SELECT = {
   commitAuthor: true,
 } as const;
 
+export const RUN_LIST_SELECT = {
+  ...RUN_SELECT,
+  suite: { select: { name: true } },
+} as const;
+
 export const CASE_SELECT = {
   id: true,
   testCaseId: true,
@@ -58,6 +63,10 @@ export interface RunRow {
   commitSha: string | null;
   commitMessage: string | null;
   commitAuthor: string | null;
+}
+
+export interface RunListRow extends RunRow {
+  suite: { name: string };
 }
 
 export interface RunCaseRow {

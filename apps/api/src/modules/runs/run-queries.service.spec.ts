@@ -31,6 +31,7 @@ const runRow = {
   commitSha: null,
   commitMessage: null,
   commitAuthor: null,
+  suite: { name: 'Checkout' },
 };
 
 function runCaseRow(overrides: Record<string, unknown> = {}) {
@@ -135,7 +136,7 @@ describe('RunQueriesService.list', () => {
   it('scopes runs to the caller organization', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).list(org);
+    await build(prisma).list(org, {});
 
     expect(prisma.run.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -147,7 +148,7 @@ describe('RunQueriesService.list', () => {
   it('filters by project when a projectId is given', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).list(org, 'project-1');
+    await build(prisma).list(org, { projectId: 'project-1' });
 
     expect(prisma.run.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -156,16 +157,122 @@ describe('RunQueriesService.list', () => {
     );
   });
 
-  it('orders runs by startedAt descending', async () => {
+  it('filters by source when a source is given', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).list(org);
+    await build(prisma).list(org, { source: 'github_actions' });
 
     expect(prisma.run.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        orderBy: { startedAt: 'desc' },
+        where: { organizationId: 'org-1', source: 'github_actions' },
       }),
     );
+  });
+
+  it('orders runs by startedAt descending with id as the tiebreaker', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).list(org, {});
+
+    expect(prisma.run.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  it('carries the suite name so the client does not have to resolve it', async () => {
+    const prisma = createPrisma();
+
+    const { items } = await build(prisma).list(org, {});
+
+    expect(items[0].suiteName).toBe('Checkout');
+  });
+
+  it('reads every run when no limit is given', async () => {
+    const prisma = createPrisma();
+
+    const { items, nextCursor } = await build(prisma).list(org, {});
+
+    const calls = prisma.run.findMany.mock.calls as [Record<string, unknown>][];
+    expect(calls[0][0].take).toBeUndefined();
+    expect(items).toHaveLength(1);
+    expect(nextCursor).toBeUndefined();
+  });
+
+  it('reads one extra row to decide whether another page exists', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).list(org, { limit: 2 });
+
+    expect(prisma.run.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 3 }),
+    );
+  });
+
+  it('returns a cursor pointing at the last item of a full page', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([
+      { ...runRow, id: 'run-1' },
+      { ...runRow, id: 'run-2' },
+      { ...runRow, id: 'run-3' },
+    ]);
+
+    const { items, nextCursor } = await build(prisma).list(org, { limit: 2 });
+
+    expect(items.map((item) => item.id)).toEqual(['run-1', 'run-2']);
+    expect(nextCursor).toBe('run-2');
+  });
+
+  it('omits the cursor on the last page', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([
+      { ...runRow, id: 'run-1' },
+      { ...runRow, id: 'run-2' },
+    ]);
+
+    const { items, nextCursor } = await build(prisma).list(org, { limit: 2 });
+
+    expect(items).toHaveLength(2);
+    expect(nextCursor).toBeUndefined();
+  });
+
+  it('resumes after the cursor row instead of repeating it', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).list(org, { limit: 2, cursor: 'run-9' });
+
+    expect(prisma.run.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ cursor: { id: 'run-9' }, skip: 1 }),
+    );
+  });
+
+  it('counts cases only for the runs on the page', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([
+      { ...runRow, id: 'run-1' },
+      { ...runRow, id: 'run-2' },
+      { ...runRow, id: 'run-3' },
+    ]);
+
+    await build(prisma).list(org, { limit: 2 });
+
+    expect(prisma.runCase.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { runId: { in: ['run-1', 'run-2'] } },
+      }),
+    );
+  });
+
+  it('skips the case count query when the page is empty', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([]);
+
+    const { items, nextCursor } = await build(prisma).list(org, { limit: 2 });
+
+    expect(items).toEqual([]);
+    expect(nextCursor).toBeUndefined();
+    expect(prisma.runCase.groupBy).not.toHaveBeenCalled();
   });
 
   it('returns case counts instead of the full case list', async () => {
@@ -176,7 +283,9 @@ describe('RunQueriesService.list', () => {
       { runId: 'run-1', status: 'pending', _count: { _all: 2 } },
     ]);
 
-    const [summary] = await build(prisma).list(org);
+    const {
+      items: [summary],
+    } = await build(prisma).list(org, {});
 
     expect(summary).not.toHaveProperty('cases');
     expect(summary.caseCounts).toEqual({
@@ -195,7 +304,9 @@ describe('RunQueriesService.list', () => {
     const prisma = createPrisma();
     prisma.runCase.groupBy.mockResolvedValue([]);
 
-    const [summary] = await build(prisma).list(org);
+    const {
+      items: [summary],
+    } = await build(prisma).list(org, {});
 
     expect(summary.caseCounts.total).toBe(0);
     expect(summary.passRate).toBe(0);

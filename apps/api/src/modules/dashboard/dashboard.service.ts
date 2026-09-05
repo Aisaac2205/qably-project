@@ -229,7 +229,7 @@ export class DashboardService {
         },
         _count: { _all: true },
       }),
-      this.runQueries.list(org, projectId),
+      this.runQueries.list(org, { projectId, limit: RECENT_RUNS_LIMIT }),
       this.recentCiCommits(scope),
     ]);
 
@@ -251,7 +251,7 @@ export class DashboardService {
       passRateTrend,
       defectsDetected: currentCounts.fail,
       windowDays: DASHBOARD_WINDOW_DAYS,
-      recentRuns: runSummaries.slice(0, RECENT_RUNS_LIMIT),
+      recentRuns: runSummaries.items,
       recentCiCommits,
     });
   }
