@@ -542,6 +542,13 @@ model RunCase {
   status         RunCaseStatus @default(pending)
   position       Int           @default(0)
   recordedAt     DateTime?
+  className      String?
+  filePath       String?
+  durationMs     Int?
+  failureType    String?
+  failureMessage String?
+  failureDetails String?
+  skipReason     String?
 
   @@unique([runId, position])
   @@index([runId])

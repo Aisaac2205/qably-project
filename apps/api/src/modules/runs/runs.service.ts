@@ -159,6 +159,27 @@ export class RunsService {
           ...(testCase.recordedAt === undefined
             ? {}
             : { recordedAt: new Date(testCase.recordedAt) }),
+          ...(testCase.className === undefined
+            ? {}
+            : { className: testCase.className }),
+          ...(testCase.filePath === undefined
+            ? {}
+            : { filePath: testCase.filePath }),
+          ...(testCase.durationMs === undefined
+            ? {}
+            : { durationMs: testCase.durationMs }),
+          ...(testCase.failureType === undefined
+            ? {}
+            : { failureType: testCase.failureType }),
+          ...(testCase.failureMessage === undefined
+            ? {}
+            : { failureMessage: testCase.failureMessage }),
+          ...(testCase.failureDetails === undefined
+            ? {}
+            : { failureDetails: testCase.failureDetails }),
+          ...(testCase.skipReason === undefined
+            ? {}
+            : { skipReason: testCase.skipReason }),
         })),
         select: CASE_SELECT,
       });

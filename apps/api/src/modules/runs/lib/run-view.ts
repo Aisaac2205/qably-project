@@ -33,6 +33,13 @@ export const CASE_SELECT = {
   status: true,
   position: true,
   recordedAt: true,
+  className: true,
+  filePath: true,
+  durationMs: true,
+  failureType: true,
+  failureMessage: true,
+  failureDetails: true,
+  skipReason: true,
 } as const;
 
 export const CASE_READ_SELECT = {
@@ -79,6 +86,13 @@ export interface RunCaseRow {
   status: CaseStatus;
   position: number;
   recordedAt: Date | null;
+  className?: string | null;
+  filePath?: string | null;
+  durationMs?: number | null;
+  failureType?: string | null;
+  failureMessage?: string | null;
+  failureDetails?: string | null;
+  skipReason?: string | null;
   testCase?: {
     id: string;
     suiteId: string;
@@ -131,6 +145,27 @@ export function toRunView(run: RunRow, cases: RunCaseRow[]): RunView {
         ...(row.recordedAt === null
           ? {}
           : { recordedAt: row.recordedAt.toISOString() }),
+        ...(row.className === undefined || row.className === null
+          ? {}
+          : { className: row.className }),
+        ...(row.filePath === undefined || row.filePath === null
+          ? {}
+          : { filePath: row.filePath }),
+        ...(row.durationMs === undefined || row.durationMs === null
+          ? {}
+          : { durationMs: row.durationMs }),
+        ...(row.failureType === undefined || row.failureType === null
+          ? {}
+          : { failureType: row.failureType }),
+        ...(row.failureMessage === undefined || row.failureMessage === null
+          ? {}
+          : { failureMessage: row.failureMessage }),
+        ...(row.failureDetails === undefined || row.failureDetails === null
+          ? {}
+          : { failureDetails: row.failureDetails }),
+        ...(row.skipReason === undefined || row.skipReason === null
+          ? {}
+          : { skipReason: row.skipReason }),
       })),
   };
 }

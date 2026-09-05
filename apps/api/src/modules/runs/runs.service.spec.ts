@@ -428,6 +428,83 @@ describe('RunsService.ingest official case linkage', () => {
   });
 });
 
+describe('RunsService.ingest JUnit result details', () => {
+  it('carries the optional JUnit detail fields through to the persisted case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'Adds to cart',
+          steps: [],
+          expectedResult: '',
+          status: 'fail',
+          className: 'checkout.spec',
+          filePath: 'e2e/checkout.spec.ts',
+          durationMs: 500,
+          failureType: 'AssertionError',
+          failureMessage: 'expected 200',
+          failureDetails: 'at checkout.spec.ts:12',
+        },
+      ],
+    });
+
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: Record<string, unknown>[] }],
+    ];
+    expect(call[0].data[0]).toEqual(
+      expect.objectContaining({
+        className: 'checkout.spec',
+        filePath: 'e2e/checkout.spec.ts',
+        durationMs: 500,
+        failureType: 'AssertionError',
+        failureMessage: 'expected 200',
+        failureDetails: 'at checkout.spec.ts:12',
+      }),
+    );
+  });
+
+  it('omits the optional JUnit detail fields entirely when the case does not report them', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: Record<string, unknown>[] }],
+    ];
+    expect(call[0].data[0]).not.toHaveProperty('className');
+    expect(call[0].data[0]).not.toHaveProperty('durationMs');
+    expect(call[0].data[0]).not.toHaveProperty('failureMessage');
+  });
+
+  it('projects the JUnit detail fields from the reloaded case onto the response', async () => {
+    const prisma = createPrisma();
+    prisma.txRunCaseFindMany.mockResolvedValue([
+      caseRow({
+        status: 'skip',
+        className: 'tests.checkout.test_checkout',
+        filePath: 'tests/checkout/test_checkout.py',
+        durationMs: 30,
+        skipReason: 'requires network',
+      }),
+    ]);
+
+    const result = await build(prisma).ingest(apiKey, baseInput);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].className).toBe(
+      'tests.checkout.test_checkout',
+    );
+    expect(result.value.cases[0].filePath).toBe(
+      'tests/checkout/test_checkout.py',
+    );
+    expect(result.value.cases[0].durationMs).toBe(30);
+    expect(result.value.cases[0].skipReason).toBe('requires network');
+  });
+});
+
 describe('RunsService.ingest case reload transaction scoping', () => {
   it('reloads the case set from the transaction client, not the outer prisma client, so a concurrent retry cannot leak in', async () => {
     const prisma = createPrisma();
