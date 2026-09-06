@@ -2,7 +2,7 @@
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type { RunSource } from '@qably/types'
-import { getRun, listRuns } from '../api/runs.api'
+import { getRegressions, getRun, getSuiteMetrics, listRuns } from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
 
 export const RUNS_PAGE_SIZE = 25
@@ -39,6 +39,52 @@ export function useRunsPage(projectId: string, source?: RunSource) {
     fetchNextPage: query.fetchNextPage,
     isLoading: query.isLoading,
     isError: query.isError,
+  }
+}
+
+export function useRecentRuns(projectId: string, limit: number) {
+  const query = useQuery({
+    queryKey: runKeys.recent(projectId, limit),
+    queryFn: ({ signal }) => listRuns({ projectId, limit }, signal),
+    enabled: projectId !== '',
+  })
+
+  return {
+    runs: query.data?.items ?? [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  }
+}
+
+export function useSuiteMetricsQuery(projectId: string) {
+  const query = useQuery({
+    queryKey: runKeys.suiteMetrics(projectId),
+    queryFn: ({ signal }) => getSuiteMetrics(projectId, signal),
+    enabled: projectId !== '',
+  })
+
+  return {
+    items: query.data?.items ?? [],
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
+  }
+}
+
+export function useRegressions(projectId: string, limit = 20) {
+  const query = useQuery({
+    queryKey: runKeys.regressions(projectId, limit),
+    queryFn: ({ signal }) => getRegressions(projectId, limit, signal),
+    enabled: projectId !== '',
+  })
+
+  return {
+    regressions: query.data?.items ?? [],
+    runsScanned: query.data?.runsScanned ?? 0,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
   }
 }
 

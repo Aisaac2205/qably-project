@@ -33,7 +33,7 @@ import type { Icon } from '@phosphor-icons/react'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
-import { projectRootPath, projectSuitesPath } from '@/features/projects/lib/routes'
+import { projectQualityPath, projectRootPath, projectSuitesPath } from '@/features/projects/lib/routes'
 import { useTranslation } from '@/lib/i18n'
 
 interface NavItem {
@@ -67,7 +67,7 @@ export function Sidebar() {
         { label: t('sidebar.review'), href: `/projects/${projectContext}/ai-review`, icon: Sparkle },
         { label: t('sidebar.testLibrary'), href: projectSuitesPath(projectContext), icon: Stack },
         { label: t('sidebar.runs'), href: `/projects/${projectContext}/runs`, icon: Play },
-        { label: t('sidebar.quality'), href: `/projects/${projectContext}/reports`, icon: ChartLine },
+        { label: t('sidebar.quality'), href: projectQualityPath(projectContext), icon: ChartLine },
         { label: t('sidebar.apiKeys'), href: `/projects/${projectContext}/api-keys`, icon: Key },
       ]
     : []

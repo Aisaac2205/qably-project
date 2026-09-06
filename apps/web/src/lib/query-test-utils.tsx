@@ -141,7 +141,7 @@ function seedTraceability(client: QueryClient): void {
 }
 
 function seedProposals(client: QueryClient): void {
-  client.setQueryData(reviewKeys.list, proposalListFixtures())
+  client.setQueryData(reviewKeys.list(), proposalListFixtures())
 
   for (const detail of proposalDetailFixtures()) {
     client.setQueryData(reviewKeys.detail(detail.id), detail)

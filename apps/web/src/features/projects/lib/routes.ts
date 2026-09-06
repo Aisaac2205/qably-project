@@ -7,3 +7,7 @@ export function projectRootPath(projectId: string): string {
 export function projectSuitesPath(projectId: string): string {
   return `/projects/${projectId}/suites`
 }
+
+export function projectQualityPath(projectId: string): string {
+  return `/projects/${projectId}/quality`
+}

@@ -6,4 +6,8 @@ export const runKeys = {
   detail: (id: string) => ['runs', id] as const,
   suiteMetrics: (projectId: string) =>
     ['runs', 'suite-metrics', projectId] as const,
+  regressions: (projectId: string, limit: number) =>
+    ['runs', 'regressions', projectId, limit] as const,
+  recent: (projectId: string, limit: number) =>
+    ['runs', 'recent', projectId, limit] as const,
 }

@@ -14,5 +14,6 @@ export function useDashboardSummary(projectId?: string) {
     summary: query.data,
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
   }
 }

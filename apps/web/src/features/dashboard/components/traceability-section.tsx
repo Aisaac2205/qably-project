@@ -16,7 +16,7 @@ import { TraceabilityCalendar } from './traceability-calendar'
 import { describeDay } from './traceability-tooltip'
 import type { TraceabilityFilter } from '../types/traceability-calendar'
 
-export function TraceabilitySection() {
+export function TraceabilitySection({ projectId }: { projectId?: string } = {}) {
   const { t, locale } = useTranslation()
 
   const currentYear = useMemo(() => new Date().getFullYear(), [])
@@ -30,6 +30,7 @@ export function TraceabilitySection() {
       year: selectedYear,
       activeFilter,
       locale: locale === 'en' ? 'en' : 'es',
+      projectId,
     })
 
   const numberLocale = locale === 'en' ? 'en' : 'es'

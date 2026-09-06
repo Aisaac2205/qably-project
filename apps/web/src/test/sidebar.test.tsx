@@ -192,7 +192,7 @@ describe('Sidebar — project state (inside /projects/proj-1/...)', () => {
     expect(screen.getByText('Review').closest('a')).toHaveAttribute('href', '/projects/proj-1/ai-review')
     expect(screen.getByText('Test Library').closest('a')).toHaveAttribute('href', '/projects/proj-1/suites')
     expect(screen.getByText('Runs').closest('a')).toHaveAttribute('href', '/projects/proj-1/runs')
-    expect(screen.getByText('Quality').closest('a')).toHaveAttribute('href', '/projects/proj-1/reports')
+    expect(screen.getByText('Quality').closest('a')).toHaveAttribute('href', '/projects/proj-1/quality')
   })
 
   it('Runs sub-route link points to /projects/proj-1/runs', async () => {
@@ -221,7 +221,7 @@ describe('Sidebar — current destinations', () => {
     ['global mobile', '/review-inbox', 'Review Inbox', '/review-inbox', { mobile: true }],
     ['project root resolves to Repository', '/projects/proj-1/repository', 'Repository', '/projects/proj-1/repository', {}],
     ['project Review nested destination', '/projects/proj-1/ai-review/case-1', 'Review', '/projects/proj-1/ai-review', {}],
-    ['project Quality nested destination', '/projects/proj-1/reports/run-1', 'Quality', '/projects/proj-1/reports', {}],
+    ['project Quality nested destination', '/projects/proj-1/quality/run-1', 'Quality', '/projects/proj-1/quality', {}],
     ['project collapsed', '/projects/proj-1/runs', 'Runs', '/projects/proj-1/runs', { defaultOpen: false }],
     ['project mobile', '/projects/proj-1/repository', 'Repository', '/projects/proj-1/repository', { mobile: true }],
   ]

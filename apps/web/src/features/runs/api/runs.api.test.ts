@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRun, getRun, listRuns, updateRunCase } from './runs.api'
+import { createRun, getRegressions, getRun, listRuns, updateRunCase } from './runs.api'
 
 const fetchMock = vi.fn()
 
@@ -99,5 +99,20 @@ describe('runs.api', () => {
     expect(url).toContain('/runs/run-1/cases/case-1')
     expect(init.method).toBe('PATCH')
     expect(JSON.parse(init.body as string)).toEqual({ status: 'pass' })
+  })
+
+  it('reads the regressions for one project', async () => {
+    await getRegressions('proj-1')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/runs/regressions?projectId=proj-1')
+    expect(url).not.toContain('limit=')
+    expect(init.method).toBe('GET')
+  })
+
+  it('reads the regressions with a custom limit', async () => {
+    await getRegressions('proj-1', 5)
+
+    expect(lastCall()[0]).toContain('/runs/regressions?projectId=proj-1&limit=5')
   })
 })

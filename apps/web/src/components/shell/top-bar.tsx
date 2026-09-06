@@ -25,6 +25,7 @@ function getPageTitle(pathname: string, project: Project | undefined, t: (key: s
     if (subRoute === 'ai-review') return t('sidebar.review')
     if (subRoute === 'suites') return t('sidebar.testLibrary')
     if (subRoute === 'runs') return t('sidebar.runs')
+    if (subRoute === 'quality') return t('sidebar.quality')
     if (subRoute === 'reports') return t('sidebar.quality')
     return project?.name || t('sidebar.projects')
   }

@@ -1,13 +1,13 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { getProposal, listProposals } from '../api/review.api'
+import { getProposal, listProposals, type ProposalFilters } from '../api/review.api'
 import { reviewKeys } from '../lib/query-keys'
 
-export function useProposals() {
+export function useProposals(filters: ProposalFilters = {}) {
   const query = useQuery({
-    queryKey: reviewKeys.list,
-    queryFn: ({ signal }) => listProposals({}, signal),
+    queryKey: reviewKeys.list({ projectId: filters.projectId, status: filters.status }),
+    queryFn: ({ signal }) => listProposals(filters, signal),
   })
 
   return {

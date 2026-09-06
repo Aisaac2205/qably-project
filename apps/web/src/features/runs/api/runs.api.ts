@@ -1,5 +1,6 @@
 import type {
   CaseStatus,
+  RegressionsRecord,
   RunRecord,
   RunsPageRecord,
   RunSource,
@@ -48,6 +49,19 @@ export function getSuiteMetrics(
     `/runs/suite-metrics?projectId=${encodeURIComponent(projectId)}`,
     { signal },
   )
+}
+
+export function getRegressions(
+  projectId: string,
+  limit?: number,
+  signal?: AbortSignal,
+): Promise<RegressionsRecord> {
+  const search = new URLSearchParams({ projectId })
+  if (limit !== undefined) search.set('limit', String(limit))
+
+  return apiRequest<RegressionsRecord>(`/runs/regressions?${search.toString()}`, {
+    signal,
+  })
 }
 
 export function getRun(id: string, signal?: AbortSignal): Promise<RunRecord> {
