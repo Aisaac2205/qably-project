@@ -4,6 +4,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  documentCase,
   getSuite,
   listSuites,
   updateCase,
@@ -109,5 +110,20 @@ describe('suites.api', () => {
     const [url, init] = lastCall()
     expect(url).toContain('/suites/suite-1/cases/case-1')
     expect(init.method).toBe('DELETE')
+  })
+
+  it('queues an automated case for AI documentation', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 202,
+      json: () => Promise.resolve({ queued: true, jobId: 'job-1' }),
+    })
+
+    const result = await documentCase('suite-1', 'case-1')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/suites/suite-1/cases/case-1/document')
+    expect(init.method).toBe('POST')
+    expect(result).toEqual({ queued: true, jobId: 'job-1' })
   })
 })

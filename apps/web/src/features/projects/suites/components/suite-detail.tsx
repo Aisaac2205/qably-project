@@ -271,7 +271,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </div>
             ) : (
               suite.cases.map((tc) => (
-                <CaseCard key={tc.id} testCase={tc} onEdit={handleEditCase} onDelete={setDeletingCase} />
+                <CaseCard key={tc.id} testCase={tc} projectId={projectId} onEdit={handleEditCase} onDelete={setDeletingCase} />
               ))
             )}
           </CardContent>

@@ -1,27 +1,42 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, DotsThree, PencilSimple, Sparkle, Trash } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
+import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
+import { ApiError } from '@/lib/api-client'
+import { projectAiReviewPath } from '@/features/projects/lib/routes'
+
+function documentCaseErrorKey(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'suites.documentCaseError'
+  if (error.code === 'ai-not-enabled') return 'suites.documentCaseAiDisabled'
+  if (error.status === 404) return 'suites.documentCaseNotFound'
+  if (error.status === 409) return 'suites.documentCaseConflict'
+  if (error.status === 429) return 'suites.documentCaseThrottled'
+  return 'suites.documentCaseError'
+}
 
 interface CaseCardProps {
   testCase: TestCase
+  projectId?: string
   onEdit: (testCase: TestCase) => void
   onDelete: (testCase: TestCase) => void
 }
 
-export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
+export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
   const described = useMemo(() => describeCase(testCase), [testCase])
   const showRawName = described.raw !== described.title
+  const documentation = useDocumentCase()
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
@@ -94,6 +109,16 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
             {stepsOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
             {t('suites.stepsCount', { count: testCase.steps.length })}
           </button>
+        ) : testCase.executionMode === 'automated' ? (
+          <button
+            onClick={() => documentation.mutate({ suiteId: testCase.suiteId, caseId: testCase.id })}
+            disabled={documentation.isPending}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+            type="button"
+          >
+            <Sparkle size={13} weight="bold" aria-hidden="true" />
+            {documentation.isPending ? t('suites.documentingCase') : t('suites.documentWithAi')}
+          </button>
         ) : (
           <button
             onClick={() => onEdit(testCase)}
@@ -118,6 +143,23 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
         )}
 
       </div>
+
+      {documentation.isSuccess && (
+        <p role="status" className="text-xs text-ai flex items-center gap-1.5">
+          {t('suites.documentCaseQueued')}
+          {projectId && (
+            <Link href={projectAiReviewPath(projectId)} className="font-semibold underline hover:text-primary">
+              {t('suites.viewInAiReview')}
+            </Link>
+          )}
+        </p>
+      )}
+
+      {documentation.isError && (
+        <p role="alert" className="text-xs text-fail">
+          {t(documentCaseErrorKey(documentation.error))}
+        </p>
+      )}
 
       {/* Expanded steps */}
       {stepsOpen && (

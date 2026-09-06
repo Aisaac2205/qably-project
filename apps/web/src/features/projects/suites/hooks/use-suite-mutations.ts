@@ -7,6 +7,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  documentCase,
   updateCase,
   updateSuite,
   type CreateCasePayload,
@@ -96,5 +97,12 @@ export function useDeleteCase() {
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
       deleteCase(suiteId, caseId),
     onSuccess: invalidate,
+  })
+}
+
+export function useDocumentCase() {
+  return useMutation({
+    mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
+      documentCase(suiteId, caseId),
   })
 }

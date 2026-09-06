@@ -11,3 +11,7 @@ export function projectSuitesPath(projectId: string): string {
 export function projectQualityPath(projectId: string): string {
   return `/projects/${projectId}/quality`
 }
+
+export function projectAiReviewPath(projectId: string): string {
+  return `/projects/${projectId}/ai-review`
+}

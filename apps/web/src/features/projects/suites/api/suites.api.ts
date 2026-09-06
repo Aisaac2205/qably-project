@@ -89,3 +89,18 @@ export function deleteCase(suiteId: string, caseId: string): Promise<Suite> {
     method: 'DELETE',
   })
 }
+
+export interface DocumentCaseResult {
+  queued: true
+  jobId: string
+}
+
+export function documentCase(
+  suiteId: string,
+  caseId: string,
+): Promise<DocumentCaseResult> {
+  return apiRequest<DocumentCaseResult>(
+    `/suites/${suiteId}/cases/${caseId}/document`,
+    { method: 'POST' },
+  )
+}
