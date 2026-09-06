@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { RunSource } from '@qably/types';
+import { humanizeTestName } from '@qably/test-naming';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { err, ok, type Result } from '../../common/result';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
@@ -44,7 +45,14 @@ interface AdoptionTx {
   testCase: {
     findMany: PrismaService['testCase']['findMany'];
     createMany: PrismaService['testCase']['createMany'];
+    update: PrismaService['testCase']['update'];
   };
+}
+
+interface RawCaseRef {
+  name: string;
+  className?: string;
+  filePath?: string;
 }
 
 interface CaseReloadTx {
@@ -94,7 +102,11 @@ export class RunsService {
         tx,
         suite.id,
         apiKey.projectId,
-        input.cases.map((testCase) => testCase.name),
+        input.cases.map((testCase) => ({
+          name: testCase.name,
+          className: testCase.className,
+          filePath: testCase.filePath,
+        })),
       );
 
       const run = await tx.run.upsert({
@@ -250,36 +262,98 @@ export class RunsService {
     tx: AdoptionTx,
     suiteId: string,
     projectId: string,
-    caseNames: string[],
+    cases: RawCaseRef[],
   ): Promise<Map<string, string>> {
-    const uniqueNames = [...new Set(caseNames)];
-    const existing = await tx.testCase.findMany({
-      where: { suiteId, name: { in: uniqueNames } },
-      select: { id: true, name: true },
+    const refByKey = new Map<string, RawCaseRef>();
+    for (const testCase of cases) {
+      if (!refByKey.has(testCase.name)) refByKey.set(testCase.name, testCase);
+    }
+    const keys = [...refByKey.keys()];
+
+    const matches = await tx.testCase.findMany({
+      where: {
+        suiteId,
+        OR: [
+          { automationKey: { in: keys } },
+          { automationKey: null, name: { in: keys } },
+        ],
+      },
+      select: { id: true, name: true, automationKey: true },
     });
 
-    const existingNames = new Set(existing.map((testCase) => testCase.name));
-    const missingNames = uniqueNames.filter((name) => !existingNames.has(name));
+    const resultByKey = new Map<string, string>();
+    const legacyMatches: { id: string; name: string }[] = [];
 
-    if (missingNames.length === 0) {
-      return new Map(existing.map((testCase) => [testCase.name, testCase.id]));
+    for (const match of matches) {
+      if (match.automationKey !== null) {
+        resultByKey.set(match.automationKey, match.id);
+      } else if (keys.includes(match.name)) {
+        legacyMatches.push({ id: match.id, name: match.name });
+        resultByKey.set(match.name, match.id);
+      }
     }
 
-    await tx.testCase.createMany({
-      data: missingNames.map((name) => ({
+    if (legacyMatches.length > 0) {
+      await Promise.all(
+        legacyMatches.map((legacy) =>
+          tx.testCase.update({
+            where: { id: legacy.id },
+            data: { automationKey: legacy.name },
+          }),
+        ),
+      );
+    }
+
+    const missingKeys = keys.filter((key) => !resultByKey.has(key));
+
+    if (missingKeys.length === 0) return resultByKey;
+
+    const existingCases = await tx.testCase.findMany({
+      where: { suiteId },
+      select: { name: true },
+    });
+    const takenNames = new Set(existingCases.map((testCase) => testCase.name));
+
+    const toCreate = missingKeys.map((key) => {
+      const ref = refByKey.get(key) as RawCaseRef;
+      const humanized = humanizeTestName({
+        name: key,
+        className: ref.className,
+        filePath: ref.filePath,
+      }).title;
+      const candidateName = humanized.length > 0 ? humanized : key;
+      const name = takenNames.has(candidateName) ? key : candidateName;
+      takenNames.add(name);
+
+      return {
         suiteId,
         projectId,
         name,
         state: 'draft' as const,
-      })),
-      skipDuplicates: true,
+        executionMode: 'automated' as const,
+        automationKey: key,
+        ...(ref.className === undefined
+          ? {}
+          : { automationClassName: ref.className }),
+        ...(ref.filePath === undefined
+          ? {}
+          : { automationFilePath: ref.filePath }),
+      };
     });
 
-    const all = await tx.testCase.findMany({
-      where: { suiteId, name: { in: uniqueNames } },
-      select: { id: true, name: true },
+    await tx.testCase.createMany({ data: toCreate, skipDuplicates: true });
+
+    const created = await tx.testCase.findMany({
+      where: { suiteId, automationKey: { in: missingKeys } },
+      select: { id: true, automationKey: true },
     });
 
-    return new Map(all.map((testCase) => [testCase.name, testCase.id]));
+    for (const testCase of created) {
+      if (testCase.automationKey !== null) {
+        resultByKey.set(testCase.automationKey, testCase.id);
+      }
+    }
+
+    return resultByKey;
   }
 }

@@ -46,6 +46,44 @@ intervención manual del equipo"*, and 1.6.2.4 limits the platform to orchestrat
 Manual runs stay fully editable — that is the point of CONTEXT 4.3.2's *"ejecutar manualmente un conjunto
 de prueba […] para cubrir escenarios que todavía no están automatizados"*.
 
+## One case, two execution modes
+
+A suite is one library, not two. `test_case.execution_mode` (`manual | automated`) says how a given case
+is exercised; it does not split the suite into separate collections. A suite can mix both freely, and
+usually does.
+
+An automated case carries its technical reference alongside the human-facing `name`: `automation_key` (the
+raw name the reporter emitted — `describe > it`, `ClassName testMethod`, `test_file.py::test_case`,
+whatever the tool produced), `automation_class_name` and `automation_file_path`. `automation_key` is the
+stable matching key across ingestions; `name` is free for a QA to rewrite into something readable without
+breaking the link back to CI. `ensureOfficialCases` (`runs.service.ts`) matches incoming JUnit cases by
+`automation_key` first, and only falls back to `name` for rows created before this column existed —
+backfilling `automation_key` on that legacy row so the fallback is a one-time migration path, not a
+permanent second matching strategy.
+
+CI never creates an official case. A result with no matching `automation_key` creates a new case in
+`draft` state, titled by `@qably/test-naming`'s `humanizeTestName` from the raw name, class and file. It
+becomes official the same way any other draft does: a person reviews it and promotes it. This keeps the
+suite's vocabulary human, and keeps a QA in the loop before a CI artifact is presented as documented
+intent.
+
+Because `test_case` also has `@@unique([suiteId, name])`, a humanized title can collide with a name
+already taken in the suite — two different raw test names sometimes humanize to the same words. When that
+happens `ensureOfficialCases` keeps the raw `automation_key` as `name` instead of the humanized title
+rather than failing the ingestion; the case is still fully linked and still editable, just less pretty
+until a person renames it by hand.
+
+A manual run is a commitment a human makes to execute a specific set of cases right now, so
+`RunQueriesService.createManual` snapshots only `manual` cases into it. Automated cases in the same suite
+are shown alongside, read-only, with their latest verdict and commit — evidence, not something this run
+asks anyone to redo. A suite with no manual cases has nothing for a manual run to snapshot, so the "Run
+this suite" action does not appear for it; every case in it is already covered by CI.
+
+An ingested suite is named after the file the reporter grouped its cases under, humanized with
+`humanizeSuiteName`. The file itself lives on the case (`automation_file_path`), not the suite, because a
+suite can be renamed by a QA into a business-facing name (`"Checkout"` instead of `"checkout.spec.ts"`)
+without losing the technical trail back to where each case runs.
+
 ## `run_case.test_case_id` is the bridge
 
 The foreign key is the only link between the two surfaces, and it is what makes traceability possible.

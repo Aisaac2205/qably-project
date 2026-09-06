@@ -44,6 +44,9 @@ importers:
       '@qably/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@qably/test-naming':
+        specifier: workspace:*
+        version: link:../../packages/test-naming
       '@qably/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -232,6 +235,9 @@ importers:
       '@qably/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@qably/test-naming':
+        specifier: workspace:*
+        version: link:../../packages/test-naming
       '@qably/types':
         specifier: workspace:*
         version: link:../../packages/types

@@ -65,4 +65,16 @@ describe('updateCaseSchema', () => {
   it('rejects an empty patch', () => {
     expect(updateCaseSchema.safeParse({}).success).toBe(false);
   });
+
+  it('strips execution mode and automation fields the client should never set', () => {
+    const parsed = updateCaseSchema.parse({
+      name: 'Renamed',
+      executionMode: 'automated',
+      automationKey: 'raw name',
+      automationClassName: 'CheckoutSpec',
+      automationFilePath: 'e2e/checkout.spec.ts',
+    });
+
+    expect(parsed).toEqual({ name: 'Renamed' });
+  });
 });

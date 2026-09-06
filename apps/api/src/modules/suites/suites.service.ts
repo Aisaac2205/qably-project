@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { CaseLastResult, CaseStatus, ExecutionMode } from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { SuiteError, SuiteView } from './suites.contracts';
+import type { SuiteError, SuiteView, TestCaseView } from './suites.contracts';
 import type {
   CreateCaseInput,
   CreateSuiteInput,
@@ -20,6 +21,10 @@ const CASE_SELECT = {
   expectedResult: true,
   priority: true,
   state: true,
+  executionMode: true,
+  automationKey: true,
+  automationClassName: true,
+  automationFilePath: true,
   currentVersion: { select: { version: true } },
 } as const;
 
@@ -44,7 +49,18 @@ interface CaseRow {
   expectedResult: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
   state: 'active' | 'draft' | 'deprecated';
+  executionMode: ExecutionMode;
+  automationKey: string | null;
+  automationClassName: string | null;
+  automationFilePath: string | null;
   currentVersion: { version: number } | null;
+}
+
+interface LastResultRow {
+  testCaseId: string | null;
+  status: CaseStatus;
+  recordedAt: Date | null;
+  run: { id: string; commitSha: string | null; startedAt: Date };
 }
 
 interface SuiteRow {
@@ -68,7 +84,42 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+function toCaseView(testCase: CaseRow): TestCaseView {
+  const base = {
+    id: testCase.id,
+    suiteId: testCase.suiteId,
+    version: testCase.currentVersion?.version ?? null,
+    name: testCase.name,
+    steps: testCase.steps,
+    expectedResult: testCase.expectedResult,
+    priority: testCase.priority,
+    state: testCase.state,
+    executionMode: testCase.executionMode,
+  };
+
+  if (testCase.executionMode !== 'automated') return base;
+
+  return {
+    ...base,
+    ...(testCase.automationKey === null
+      ? {}
+      : { automationKey: testCase.automationKey }),
+    ...(testCase.automationClassName === null
+      ? {}
+      : { automationClassName: testCase.automationClassName }),
+    ...(testCase.automationFilePath === null
+      ? {}
+      : { automationFilePath: testCase.automationFilePath }),
+    lastResult: null,
+  };
+}
+
 function toView(row: SuiteRow): SuiteView {
+  const cases = row.cases.map(toCaseView);
+  const automatedCases = cases.filter(
+    (testCase) => testCase.executionMode === 'automated',
+  ).length;
+
   return {
     id: row.id,
     projectId: row.projectId,
@@ -79,16 +130,9 @@ function toView(row: SuiteRow): SuiteView {
     isDefault: row.isDefault,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    cases: row.cases.map((testCase) => ({
-      id: testCase.id,
-      suiteId: testCase.suiteId,
-      version: testCase.currentVersion?.version ?? null,
-      name: testCase.name,
-      steps: testCase.steps,
-      expectedResult: testCase.expectedResult,
-      priority: testCase.priority,
-      state: testCase.state,
-    })),
+    manualCases: cases.length - automatedCases,
+    automatedCases,
+    cases,
   };
 }
 
@@ -110,7 +154,7 @@ export class SuitesService {
       select: SUITE_SELECT,
     });
 
-    return rows.map(toView);
+    return this.withLastResults(rows.map(toView));
   }
 
   async findOne(
@@ -119,7 +163,9 @@ export class SuitesService {
   ): Promise<Result<SuiteView, SuiteError>> {
     const row = await this.scoped(org, id);
 
-    return row === null ? err('not-found') : ok(toView(row));
+    if (row === null) return err('not-found');
+
+    return ok(await this.withLastResult(toView(row)));
   }
 
   async create(
@@ -145,7 +191,7 @@ export class SuitesService {
         });
       });
 
-      return ok(toView(row));
+      return ok(await this.withLastResult(toView(row)));
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -174,7 +220,7 @@ export class SuitesService {
         });
       });
 
-      return ok(toView(row));
+      return ok(await this.withLastResult(toView(row)));
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -218,7 +264,7 @@ export class SuitesService {
       });
     });
 
-    return ok(toView(row));
+    return ok(await this.withLastResult(toView(row)));
   }
 
   async updateCase(
@@ -243,7 +289,7 @@ export class SuitesService {
       });
     });
 
-    return ok(toView(row));
+    return ok(await this.withLastResult(toView(row)));
   }
 
   async removeCase(
@@ -267,7 +313,58 @@ export class SuitesService {
       });
     });
 
-    return ok(toView(row));
+    return ok(await this.withLastResult(toView(row)));
+  }
+
+  private async withLastResult(view: SuiteView): Promise<SuiteView> {
+    const [withResult] = await this.withLastResults([view]);
+    return withResult;
+  }
+
+  private async withLastResults(views: SuiteView[]): Promise<SuiteView[]> {
+    const automatedCaseIds = views.flatMap((view) =>
+      view.cases
+        .filter((testCase) => testCase.executionMode === 'automated')
+        .map((testCase) => testCase.id),
+    );
+
+    if (automatedCaseIds.length === 0) return views;
+
+    const rows = (await this.prisma.runCase.findMany({
+      where: { testCaseId: { in: automatedCaseIds } },
+      orderBy: [{ run: { startedAt: 'desc' } }],
+      distinct: ['testCaseId'],
+      select: {
+        testCaseId: true,
+        status: true,
+        recordedAt: true,
+        run: { select: { id: true, commitSha: true, startedAt: true } },
+      },
+    })) as LastResultRow[];
+
+    const lastResultByCaseId = new Map<string, CaseLastResult>();
+    for (const row of rows) {
+      if (row.testCaseId === null) continue;
+
+      lastResultByCaseId.set(row.testCaseId, {
+        status: row.status,
+        runId: row.run.id,
+        ...(row.run.commitSha === null ? {} : { commitSha: row.run.commitSha }),
+        recordedAt: (row.recordedAt ?? row.run.startedAt).toISOString(),
+      });
+    }
+
+    return views.map((view) => ({
+      ...view,
+      cases: view.cases.map((testCase) =>
+        testCase.executionMode === 'automated'
+          ? {
+              ...testCase,
+              lastResult: lastResultByCaseId.get(testCase.id) ?? null,
+            }
+          : testCase,
+      ),
+    }));
   }
 
   private scoped(org: OrgContext, id: string): Promise<SuiteRow | null> {

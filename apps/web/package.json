@@ -16,6 +16,7 @@
     "@base-ui/react": "^1.6.0",
     "@phosphor-icons/react": "^2.1.10",
     "@qably/i18n": "workspace:*",
+    "@qably/test-naming": "workspace:*",
     "@qably/types": "workspace:*",
     "@qably/ui": "workspace:*",
     "@tanstack/react-query": "^5.96.2",

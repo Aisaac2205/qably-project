@@ -5,6 +5,7 @@ export type RunStatus = 'pass' | 'fail' | 'running' | 'pending'
 export type ReviewStatus = 'pending' | 'confirmed' | 'rejected'
 export type CasePriority = 'critical' | 'high' | 'medium' | 'low'
 export type CaseState = 'active' | 'draft' | 'deprecated'
+export type ExecutionMode = 'manual' | 'automated'
 export type OrgRole = 'owner' | 'admin' | 'member'
 export type Plan = 'gratuito' | 'equipo' | 'empresa'
 export type RunSource = 'manual' | 'api' | 'github_actions'
@@ -146,6 +147,13 @@ export interface OrganizationContext {
 }
 
 
+export interface CaseLastResult {
+  status: CaseStatus
+  runId: string
+  commitSha?: string
+  recordedAt: string
+}
+
 export interface TestCase {
   id: string
   suiteId: string
@@ -155,6 +163,11 @@ export interface TestCase {
   expectedResult: string
   priority: CasePriority
   state: CaseState
+  executionMode: ExecutionMode
+  automationKey?: string
+  automationClassName?: string
+  automationFilePath?: string
+  lastResult?: CaseLastResult | null
 }
 
 export interface Suite {
@@ -163,6 +176,8 @@ export interface Suite {
   organizationId: string
   name: string
   cases: TestCase[]
+  manualCases: number
+  automatedCases: number
   createdAt: string
   description: string
   tags: string[]
@@ -286,6 +301,28 @@ export interface SuiteMetricsEntry {
 
 export interface SuiteMetricsRecord {
   items: SuiteMetricsEntry[]
+}
+
+/**
+ * A regression is a RunCase whose status is `fail` in a scanned finished run
+ * while the same testCaseId was `pass` in the previous finished run of the
+ * same suite. `runsScanned` reports how many of the project's most recent
+ * finished runs were considered, regardless of how many regressions matched.
+ */
+export interface RegressionEntry {
+  runId: string
+  runName: string
+  suiteId: string
+  suiteName: string
+  testCaseId: string
+  caseName: string
+  previousRunId: string
+  detectedAt: string
+}
+
+export interface RegressionsRecord {
+  items: RegressionEntry[]
+  runsScanned: number
 }
 
 export interface CiCommitActivityRecord {

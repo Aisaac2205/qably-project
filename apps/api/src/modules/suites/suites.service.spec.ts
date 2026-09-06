@@ -28,6 +28,10 @@ const suiteRow = {
       priority: 'medium' as const,
       state: 'active' as const,
       currentVersion: { version: 3 },
+      executionMode: 'manual' as const,
+      automationKey: null,
+      automationClassName: null,
+      automationFilePath: null,
     },
   ],
 };
@@ -43,6 +47,7 @@ interface FakePrisma {
     delete: jest.Mock;
   };
   testCase: { create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+  runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
   $transaction: jest.Mock;
 }
@@ -59,6 +64,7 @@ function createPrisma(): FakePrisma {
       delete: jest.fn(),
     },
     testCase: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
     $transaction: jest.fn(),
   };
@@ -267,6 +273,18 @@ describe('SuitesService case mutations', () => {
     expect(call[0].data.suiteId).toBe('suite-1');
   });
 
+  it('never sets execution mode or automation fields, leaving the manual default in place', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).addCase(owner, 'suite-1', caseInput);
+
+    const [call] = prisma.testCase.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).not.toHaveProperty('executionMode');
+    expect(call[0].data).not.toHaveProperty('automationKey');
+  });
+
   it('refuses to patch a case that is not in the suite', async () => {
     const prisma = createPrisma();
 
@@ -331,5 +349,147 @@ describe('SuitesService case promotion', () => {
 
     expect(result).toEqual({ ok: false, error: 'not-found' });
     expect(prisma.testCase.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('SuitesService execution mode counts', () => {
+  it('counts manual and automated cases separately', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          suiteRow.cases[0],
+          {
+            ...suiteRow.cases[0],
+            id: 'case-2',
+            executionMode: 'automated' as const,
+            automationKey: 'checkout.spec > adds to cart',
+          },
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.manualCases).toBe(1);
+    expect(suite.automatedCases).toBe(1);
+  });
+
+  it('exposes automation metadata only for automated cases', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          {
+            ...suiteRow.cases[0],
+            id: 'case-2',
+            executionMode: 'automated' as const,
+            automationKey: 'raw case name',
+            automationClassName: 'CheckoutSpec',
+            automationFilePath: 'e2e/checkout.spec.ts',
+          },
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0]).toEqual(
+      expect.objectContaining({
+        executionMode: 'automated',
+        automationKey: 'raw case name',
+        automationClassName: 'CheckoutSpec',
+        automationFilePath: 'e2e/checkout.spec.ts',
+      }),
+    );
+  });
+
+  it('omits automation metadata for a manual case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0]).not.toHaveProperty('automationKey');
+    expect(suite.cases[0]).not.toHaveProperty('lastResult');
+  });
+});
+
+describe('SuitesService automated case last result', () => {
+  const automatedSuiteRow = {
+    ...suiteRow,
+    cases: [
+      {
+        ...suiteRow.cases[0],
+        id: 'case-2',
+        executionMode: 'automated' as const,
+        automationKey: 'raw case name',
+      },
+    ],
+  };
+
+  it('attaches the latest run outcome to an automated case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(automatedSuiteRow);
+    prisma.runCase.findMany.mockResolvedValue([
+      {
+        testCaseId: 'case-2',
+        status: 'pass' as const,
+        recordedAt: null,
+        run: {
+          id: 'run-9',
+          commitSha: 'abc123',
+          startedAt: new Date('2026-02-01T00:00:00.000Z'),
+        },
+      },
+    ]);
+
+    const result = await build(prisma).findOne(owner, 'suite-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].lastResult).toEqual({
+      status: 'pass',
+      runId: 'run-9',
+      commitSha: 'abc123',
+      recordedAt: '2026-02-01T00:00:00.000Z',
+    });
+  });
+
+  it('queries run history once for every automated case, scoped to their ids', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(automatedSuiteRow);
+
+    await build(prisma).findOne(owner, 'suite-1');
+
+    expect(prisma.runCase.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.runCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { testCaseId: { in: ['case-2'] } },
+        distinct: ['testCaseId'],
+      }),
+    );
+  });
+
+  it('reports a null lastResult for an automated case with no run history yet', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(automatedSuiteRow);
+    prisma.runCase.findMany.mockResolvedValue([]);
+
+    const result = await build(prisma).findOne(owner, 'suite-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].lastResult).toBeNull();
+  });
+
+  it('never queries run history when the suite has no automated cases', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).findOne(owner, 'suite-1');
+
+    expect(prisma.runCase.findMany).not.toHaveBeenCalled();
   });
 });

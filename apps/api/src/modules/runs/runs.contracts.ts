@@ -1,5 +1,6 @@
 import type {
   JunitIngestRecord,
+  RegressionsRecord,
   RunCaseRecord,
   RunRecord,
   RunsPageRecord,
@@ -16,6 +17,7 @@ export type RunCaseView = RunCaseRecord;
 export type RunSummaryView = RunSummaryRecord;
 export type RunsPageView = RunsPageRecord;
 export type SuiteMetricsView = SuiteMetricsRecord;
+export type RegressionsView = RegressionsRecord;
 export type JunitIngestView = JunitIngestRecord;
 
 export interface RunIngestJobData {
@@ -29,5 +31,6 @@ export type RunQueryError =
   | 'not-found'
   | 'suite-not-found'
   | 'empty-suite'
+  | 'no-manual-cases'
   | 'case-not-found'
   | 'source-not-editable';

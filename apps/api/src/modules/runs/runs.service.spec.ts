@@ -11,7 +11,9 @@ const apiKey: ApiKeyIdentity = {
 
 const suiteRow = { id: 'suite-1', name: 'Checkout' };
 
-const officialCases = [{ id: 'case-1', name: 'Adds to cart' }];
+const officialCases = [
+  { id: 'case-1', name: 'Adds to cart', automationKey: 'Adds to cart' },
+];
 
 const runRow = {
   id: 'run-1',
@@ -51,7 +53,11 @@ interface FakePrisma {
     create: jest.Mock;
     findFirstOrThrow: jest.Mock;
   };
-  testCase: { findMany: jest.Mock; createMany: jest.Mock };
+  testCase: {
+    findMany: jest.Mock;
+    createMany: jest.Mock;
+    update: jest.Mock;
+  };
   run: { upsert: jest.Mock };
   runCase: {
     deleteMany: jest.Mock;
@@ -76,6 +82,7 @@ function createPrisma(): FakePrisma {
     testCase: {
       findMany: jest.fn().mockResolvedValue(officialCases),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      update: jest.fn().mockResolvedValue({}),
     },
     run: { upsert: jest.fn().mockResolvedValue(runRow) },
     runCase: {
@@ -301,7 +308,7 @@ describe('RunsService.ingest idempotency', () => {
 });
 
 describe('RunsService.ingest test case linking', () => {
-  it('links testCaseId when the case name matches an official test case', async () => {
+  it('links testCaseId when the automationKey matches an official test case', async () => {
     const prisma = createPrisma();
 
     await build(prisma).ingest(apiKey, baseInput);
@@ -314,11 +321,14 @@ describe('RunsService.ingest test case linking', () => {
     );
   });
 
-  it('links testCaseId to a freshly created draft when no official test case matches the name', async () => {
+  it('links testCaseId to a freshly created draft when no official test case matches the automationKey', async () => {
     const prisma = createPrisma();
     prisma.testCase.findMany
       .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: 'draft-case-1', name: 'Unmatched case' }]);
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-1', automationKey: 'Unmatched case' },
+      ]);
 
     await build(prisma).ingest(apiKey, {
       ...baseInput,
@@ -339,6 +349,8 @@ describe('RunsService.ingest test case linking', () => {
           projectId: 'project-1',
           name: 'Unmatched case',
           state: 'draft',
+          executionMode: 'automated',
+          automationKey: 'Unmatched case',
         },
       ],
       skipDuplicates: true,
@@ -355,7 +367,41 @@ describe('RunsService.ingest test case linking', () => {
     );
   });
 
-  it('creates no draft and no duplicate work when every reported name already has an official case', async () => {
+  it('persists the reported className and filePath onto a freshly created draft', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-1', automationKey: 'Unmatched case' },
+      ]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'Unmatched case',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+          className: 'checkout.spec',
+          filePath: 'e2e/checkout.spec.ts',
+        },
+      ],
+    });
+
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          automationClassName: 'checkout.spec',
+          automationFilePath: 'e2e/checkout.spec.ts',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('creates no draft and no duplicate work when every reported automationKey already has an official case', async () => {
     const prisma = createPrisma();
 
     await build(prisma).ingest(apiKey, baseInput);
@@ -365,14 +411,91 @@ describe('RunsService.ingest test case linking', () => {
   });
 });
 
+describe('RunsService.ingest legacy name fallback', () => {
+  it('matches a pre-migration case by name when its automationKey is still null, and backfills the key', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValueOnce([
+      { id: 'case-1', automationKey: null, name: 'Adds to cart' },
+    ]);
+
+    const result = await build(prisma).ingest(apiKey, baseInput);
+
+    expect(result.ok).toBe(true);
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { automationKey: 'Adds to cart' },
+    });
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data[0].testCaseId).toBe('case-1');
+  });
+
+  it('stays matched to the same official case after the reporter emits the same raw name again, once renamed by QA', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-1',
+        automationKey: 'Adds to cart',
+        name: 'Adds an item to the shopping cart',
+      },
+    ]);
+
+    const result = await build(prisma).ingest(apiKey, baseInput);
+
+    expect(result.ok).toBe(true);
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data[0].testCaseId).toBe('case-1');
+    expect(prisma.testCase.createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('RunsService.ingest humanized title collisions', () => {
+  it('falls back to the raw automationKey as the case name when the humanized title already names another case in the suite', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ name: 'Renders greeting' }])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-2', automationKey: 'renders_greeting' },
+      ]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'renders_greeting',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          name: 'renders_greeting',
+          automationKey: 'renders_greeting',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+});
+
 describe('RunsService.ingest known suite with unregistered cases', () => {
   it('drafts only the case names that have no matching official test case', async () => {
     const prisma = createPrisma();
     prisma.testCase.findMany
-      .mockResolvedValueOnce([{ id: 'case-1', name: 'Adds to cart' }])
       .mockResolvedValueOnce([
-        { id: 'case-1', name: 'Adds to cart' },
-        { id: 'draft-case-2', name: 'A brand new case' },
+        { id: 'case-1', automationKey: 'Adds to cart', name: 'Adds to cart' },
+      ])
+      .mockResolvedValueOnce([{ name: 'Adds to cart' }])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-2', automationKey: 'A brand new case' },
       ]);
 
     await build(prisma).ingest(apiKey, {
@@ -395,6 +518,8 @@ describe('RunsService.ingest known suite with unregistered cases', () => {
           projectId: 'project-1',
           name: 'A brand new case',
           state: 'draft',
+          executionMode: 'automated',
+          automationKey: 'A brand new case',
         },
       ],
       skipDuplicates: true,
