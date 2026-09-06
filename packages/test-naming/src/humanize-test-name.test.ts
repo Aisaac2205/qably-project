@@ -113,6 +113,16 @@ describe('humanizeTestName', () => {
       expect(result.title).toBe('Should return when invalid');
     });
 
+    it('keeps a test_-prefixed camelCase java method as java', () => {
+      const result = humanizeTestName({
+        name: 'test_calculateTotal',
+        className: 'com.acme.order_service.OrderServiceTest',
+      });
+
+      expect(result.convention).toBe<Convention>('junit-java');
+      expect(result.title).toBe('Calculate total');
+    });
+
     it('extracts the argument list of a JUnit 5 parameterized method as the parameter', () => {
       const result = humanizeTestName({
         name: 'shouldValidate(String, int)',

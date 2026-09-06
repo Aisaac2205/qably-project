@@ -304,10 +304,6 @@ describe('RunsController.ingestJunit', () => {
 
   it('rejects the whole request with 400 and enqueues nothing when a group fails ingest validation', async () => {
     const { controller, runIngestQueue } = build();
-    // The query type only allows a name up to 200 chars through its own schema; this
-    // simulates a future drift between ingestJunitQuerySchema and ingestRunSchema by
-    // crafting a query object that bypasses that guard, so the per-group safeParse
-    // guard in the controller is the one that actually catches it.
     const invalidQuery = { ...query(), name: 'x'.repeat(300) };
 
     await expect(

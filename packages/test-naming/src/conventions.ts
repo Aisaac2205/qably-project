@@ -90,11 +90,13 @@ function isPytestClassName(className: string, name: string): boolean {
   if (!isDottedIdentifier(className)) {
     return false;
   }
+  if (!PYTHON_IDENTIFIER.test(name)) {
+    return false;
+  }
   if (PYTHON_TEST_FUNCTION.test(name)) {
     return true;
   }
-  const hasSnakeSegment = className.split('.').some((segment) => segment.includes('_'));
-  return hasSnakeSegment && PYTHON_IDENTIFIER.test(name);
+  return className.split('.').some((segment) => segment.includes('_'));
 }
 
 function isJavaClassName(className: string): boolean {
