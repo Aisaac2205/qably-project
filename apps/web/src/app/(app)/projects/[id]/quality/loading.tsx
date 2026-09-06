@@ -1,5 +1,5 @@
-import { RouteSkeleton } from '@/components/ui/route-skeleton'
+import { QualityPageSkeleton } from '@/features/projects/quality/components/quality-page-skeleton'
 
 export default function QualityLoading() {
-  return <RouteSkeleton variant="detail" labelKey="quality.loading" />
+  return <QualityPageSkeleton />
 }

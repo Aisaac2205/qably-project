@@ -51,7 +51,7 @@ export function RegressionsList({ projectId, regressions, runsScanned }: Regress
         <li key={`${regression.runId}-${regression.testCaseId}`}>
           <Link
             href={`/projects/${projectId}/runs/${regression.runId}`}
-            className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-hover/60 sm:px-5"
+            className="flex items-center justify-between gap-3 px-4 py-3 transition-[background-color,transform] duration-150 ease-out [@media(hover:hover)_and_(pointer:fine)]:hover:bg-surface-hover/60 active:translate-y-px focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 sm:px-5"
           >
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-default">{regression.caseName}</div>

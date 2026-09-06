@@ -44,8 +44,10 @@ export function SuitesHealthTable({ projectId, items }: SuitesHealthTableProps) 
         <tr className="border-b border-border text-left text-xs font-medium text-muted">
           <th scope="col" className="px-4 py-2.5">{t('quality.suitesColumnSuite')}</th>
           <th scope="col" className="px-4 py-2.5">{t('quality.suitesColumnLastRun')}</th>
-          <th scope="col" className="px-4 py-2.5">{t('quality.suitesColumnPassRate')}</th>
-          <th scope="col" className="px-4 py-2.5">{t('quality.suitesColumnTrend')}</th>
+          <th scope="col" className="px-4 py-2.5 text-right">{t('quality.suitesColumnPassRate')}</th>
+          <th scope="col" className="hidden px-4 py-2.5 text-right sm:table-cell">
+            {t('quality.suitesColumnTrend')}
+          </th>
         </tr>
       </thead>
       <tbody className="divide-y divide-border">
@@ -54,7 +56,7 @@ export function SuitesHealthTable({ projectId, items }: SuitesHealthTableProps) 
             <td className="px-4 py-3 text-sm font-medium text-default">
               <Link
                 href={`/projects/${projectId}/suites/${item.suiteId}`}
-                className="rounded transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+                className="rounded transition-colors duration-150 ease [@media(hover:hover)_and_(pointer:fine)]:hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
               >
                 {item.suiteName}
               </Link>
@@ -66,10 +68,10 @@ export function SuitesHealthTable({ projectId, items }: SuitesHealthTableProps) 
                 <span className="text-xs text-muted">{t('common.noData')}</span>
               )}
             </td>
-            <td className="px-4 py-3 font-mono text-sm tabular-nums text-default">
+            <td className="px-4 py-3 text-right font-mono text-sm tabular-nums text-default">
               {item.lastRun ? formatPassRate(item.lastRun.passRate) : '—'}
             </td>
-            <td className="px-4 py-3 font-mono text-sm tabular-nums text-muted">
+            <td className="hidden px-4 py-3 text-right font-mono text-sm tabular-nums text-muted sm:table-cell">
               {trendSummary(item.trend)}
             </td>
           </tr>

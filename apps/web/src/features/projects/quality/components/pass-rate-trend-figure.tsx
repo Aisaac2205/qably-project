@@ -104,6 +104,16 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
           stroke="currentColor"
           className={TONE_CLASSES[tone]}
         />
+        <circle
+          cx={xs[n - 1]}
+          cy={ys[n - 1]}
+          r={4}
+          fill="currentColor"
+          stroke="var(--color-surface)"
+          strokeWidth={2}
+          className={TONE_CLASSES[tone]}
+          aria-hidden="true"
+        />
       </svg>
 
       <table className="sr-only">
