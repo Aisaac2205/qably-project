@@ -37,27 +37,36 @@ describe('SuitesController.documentCase', () => {
     );
   });
 
-  it('throws NotFoundException when the case does not exist', async () => {
+  it('throws a coded NotFoundException when the case does not exist', async () => {
     const extraction = fakeExtraction({ ok: false, error: 'not-found' });
 
     await expect(
       build(extraction).documentCase(org, 'suite-1', 'case-1'),
     ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+    ).rejects.toMatchObject({ response: { code: 'not-found' } });
   });
 
-  it('throws ConflictException when the case is not automated', async () => {
+  it('throws a coded ConflictException when the case is not automated', async () => {
     const extraction = fakeExtraction({ ok: false, error: 'not-automated' });
 
     await expect(
       build(extraction).documentCase(org, 'suite-1', 'case-1'),
     ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+    ).rejects.toMatchObject({ response: { code: 'not-automated' } });
   });
 
-  it('throws ConflictException when a proposal is already pending', async () => {
+  it('throws a coded ConflictException when a proposal is already pending', async () => {
     const extraction = fakeExtraction({ ok: false, error: 'already-pending' });
 
     await expect(
       build(extraction).documentCase(org, 'suite-1', 'case-1'),
     ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+    ).rejects.toMatchObject({ response: { code: 'already-pending' } });
   });
 });

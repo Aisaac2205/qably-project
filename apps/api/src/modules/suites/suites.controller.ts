@@ -14,8 +14,10 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
+import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -56,15 +58,20 @@ function unwrapDocumentCase<T>(result: Result<T, DocumentCaseError>): T {
 
   switch (result.error) {
     case 'not-found':
-      throw new NotFoundException('Test case not found');
+      throw new NotFoundException({
+        code: result.error,
+        message: 'Test case not found',
+      });
     case 'not-automated':
-      throw new ConflictException(
-        'This case is not automated or has no automation file to read',
-      );
+      throw new ConflictException({
+        code: result.error,
+        message: 'This case is not automated or has no automation file to read',
+      });
     case 'already-pending':
-      throw new ConflictException(
-        'A proposal is already pending review for this case',
-      );
+      throw new ConflictException({
+        code: result.error,
+        message: 'A proposal is already pending review for this case',
+      });
   }
 }
 
@@ -149,6 +156,8 @@ export class SuitesController {
   }
 
   @Post(':id/cases/:caseId/document')
+  @UseGuards(AiEntitlementGuard)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(HttpStatus.ACCEPTED)
   async documentCase(
     @CurrentOrg() org: OrgContext,

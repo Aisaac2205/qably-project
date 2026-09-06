@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -11,8 +12,10 @@ import {
   UnprocessableEntityException,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
+import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
@@ -69,6 +72,16 @@ function unwrap<T>(result: Result<T, ChatError>): T {
         code: result.error,
         message: 'The AI assistant is not available right now',
       });
+    case 'ai-not-enabled':
+      throw new ForbiddenException({
+        code: result.error,
+        message: 'AI features are not enabled for this organization',
+      });
+    case 'invalid-suggested-cases':
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message: 'The stored suggested cases for this message are corrupt',
+      });
   }
 }
 
@@ -87,6 +100,7 @@ export class ChatController {
   }
 
   @Post()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async create(
     @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
@@ -107,6 +121,8 @@ export class ChatController {
   }
 
   @Post(':threadId/messages')
+  @UseGuards(AiEntitlementGuard)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   async send(
     @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,

@@ -37,21 +37,30 @@ function unwrap<T>(result: Result<T, ReviewError>): T {
 
   switch (result.error) {
     case 'not-found':
-      throw new NotFoundException('Proposal not found');
+      throw new NotFoundException({
+        code: result.error,
+        message: 'Proposal not found',
+      });
     case 'invalid-transition':
-      throw new ConflictException('This proposal was already decided');
+      throw new ConflictException({
+        code: result.error,
+        message: 'This proposal was already decided',
+      });
     case 'missing-evidence':
-      throw new UnprocessableEntityException(
-        'The evidence backing this proposal is no longer available',
-      );
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message: 'The evidence backing this proposal is no longer available',
+      });
     case 'missing-suite':
-      throw new UnprocessableEntityException(
-        'This project has no suite to publish the official case into',
-      );
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message: 'This project has no suite to publish the official case into',
+      });
     case 'name-taken':
-      throw new ConflictException(
-        'Another official case in this suite already uses that title',
-      );
+      throw new ConflictException({
+        code: result.error,
+        message: 'Another official case in this suite already uses that title',
+      });
   }
 }
 

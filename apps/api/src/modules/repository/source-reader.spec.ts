@@ -154,6 +154,62 @@ describe('SourceReader.read', () => {
     }
   });
 
+  it('url-encodes owner, repo and ref before building the request url', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonResponse('ok'));
+    const reader = new SourceReader(fetchImpl);
+
+    await reader.read(
+      baseInput({
+        owner: 'my org',
+        repo: 'repo#1',
+        ref: 'feature/x y',
+      }),
+    );
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toBe(
+      'https://raw.githubusercontent.com/my%20org/repo%231/feature%2Fx%20y/src/cart.spec.ts',
+    );
+  });
+
+  it('url-encodes owner, repo and ref for the private GitHub contents API', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonResponse('ok'));
+    const reader = new SourceReader(fetchImpl);
+
+    await reader.read(
+      baseInput({
+        owner: 'my org',
+        repo: 'repo#1',
+        ref: 'feature/x y',
+        accessToken: 'secret-token',
+      }),
+    );
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toBe(
+      'https://api.github.com/repos/my%20org/repo%231/contents/src/cart.spec.ts?ref=feature%2Fx%20y',
+    );
+  });
+
+  it('url-encodes owner, repo and ref for Bitbucket', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonResponse('ok'));
+    const reader = new SourceReader(fetchImpl);
+
+    await reader.read(
+      baseInput({
+        provider: 'BITBUCKET',
+        owner: 'my workspace',
+        repo: 'repo#1',
+        ref: 'feature/x y',
+      }),
+    );
+
+    const [url] = fetchImpl.mock.calls[0] as [string];
+    expect(url).toBe(
+      'https://api.bitbucket.org/2.0/repositories/my%20workspace/repo%231/src/feature%2Fx%20y/src/cart.spec.ts',
+    );
+  });
+
   it('url-encodes each path segment while preserving slashes', async () => {
     const fetchImpl = jest.fn().mockResolvedValue(jsonResponse('ok'));
     const reader = new SourceReader(fetchImpl);

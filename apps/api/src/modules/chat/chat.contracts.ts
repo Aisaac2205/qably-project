@@ -51,6 +51,8 @@ export type ChatError =
   | 'message-not-found'
   | 'case-not-found'
   | 'missing-suite'
-  | 'provider-unavailable';
+  | 'provider-unavailable'
+  | 'ai-not-enabled'
+  | 'invalid-suggested-cases';
 
 export const CHAT_ASSISTANT = Symbol('CHAT_ASSISTANT');

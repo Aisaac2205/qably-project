@@ -46,13 +46,16 @@ function encodePath(path: string): string {
 }
 
 function githubUrl(input: SourceReadInput): string {
+  const owner = encodeURIComponent(input.owner);
+  const repo = encodeURIComponent(input.repo);
+  const ref = encodeURIComponent(input.ref);
   const path = encodePath(input.path);
 
   if (input.accessToken === undefined) {
-    return `https://raw.githubusercontent.com/${input.owner}/${input.repo}/${input.ref}/${path}`;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`;
   }
 
-  return `https://api.github.com/repos/${input.owner}/${input.repo}/contents/${path}?ref=${input.ref}`;
+  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${ref}`;
 }
 
 function githubHeaders(input: SourceReadInput): Record<string, string> {
@@ -65,8 +68,11 @@ function githubHeaders(input: SourceReadInput): Record<string, string> {
 }
 
 function bitbucketUrl(input: SourceReadInput): string {
+  const owner = encodeURIComponent(input.owner);
+  const repo = encodeURIComponent(input.repo);
+  const ref = encodeURIComponent(input.ref);
   const path = encodePath(input.path);
-  return `https://api.bitbucket.org/2.0/repositories/${input.owner}/${input.repo}/src/${input.ref}/${path}`;
+  return `https://api.bitbucket.org/2.0/repositories/${owner}/${repo}/src/${ref}/${path}`;
 }
 
 function bitbucketHeaders(input: SourceReadInput): Record<string, string> {
