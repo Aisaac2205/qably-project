@@ -12,7 +12,11 @@ import { GithubAdapter } from './adapters/github.adapter';
 import { IngestionController } from './ingestion.controller';
 import { IngestionProcessor } from './ingestion.processor';
 import { IngestionService } from './ingestion.service';
-import { INGESTION_QUEUE, SCM_ADAPTERS } from './ingestion.tokens';
+import {
+  INGESTION_QUEUE,
+  INGESTION_QUEUE_DEFAULT_JOB_OPTIONS,
+  SCM_ADAPTERS,
+} from './ingestion.tokens';
 
 @Module({
   imports: [
@@ -25,7 +29,10 @@ import { INGESTION_QUEUE, SCM_ADAPTERS } from './ingestion.tokens';
       inject: [ENV],
       useFactory: (env: Env) => ({ connection: { url: env.REDIS_URL } }),
     }),
-    BullModule.registerQueue({ name: INGESTION_QUEUE }),
+    BullModule.registerQueue({
+      name: INGESTION_QUEUE,
+      defaultJobOptions: INGESTION_QUEUE_DEFAULT_JOB_OPTIONS,
+    }),
   ],
   controllers: [IngestionController],
   providers: [

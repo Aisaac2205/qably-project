@@ -439,6 +439,24 @@ does not (and cannot) know whether ingestion itself has finished by the time it 
 `429` retry/backoff and `::warning` annotation behavior is unchanged; reporting failures never fail
 the CI job (see `main().catch(...)` in the script).
 
+## SCM ingestion queue retry policy
+
+The webhook-driven ingestion path (`POST /webhooks/scm/:provider`, handled by `IngestionService` and
+queued on the `ingestion` BullMQ queue, `apps/api/src/modules/ingestion/ingestion.module.ts`) shares
+the same retry philosophy as `run-ingest` above but is configured independently, since the two queues
+process unrelated work (repository code-change ingestion vs. test run reporting):
+
+- **3 attempts, exponential backoff starting at 5s** (`INGESTION_QUEUE_DEFAULT_JOB_OPTIONS`,
+  `apps/api/src/modules/ingestion/ingestion.tokens.ts`) before a job is left failed.
+- **Up to 100 completed jobs are retained** (`removeOnComplete: 100`) for a short operational window,
+  rather than discarded immediately — useful for spot-checking recent webhook deliveries.
+- **Up to 500 failed jobs are retained** (`removeOnFail: 500`) for operator inspection, the same bound
+  used by `run-ingest` and `extraction`.
+
+These are the queue's `defaultJobOptions`; an individual `queue.add` call can still override any of
+them for a specific job (for example the deterministic `jobId` used for webhook idempotency), but no
+call currently needs to.
+
 ## curl example
 
 ```bash

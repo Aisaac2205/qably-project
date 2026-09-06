@@ -193,12 +193,7 @@ export class IngestionService {
     await this.queue.add(
       JOB_NAME,
       { scmEventId },
-      {
-        jobId: `${event.provider}-${event.eventId}`,
-        removeOnComplete: true,
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 1000 },
-      },
+      { jobId: `${event.provider}-${event.eventId}` },
     );
   }
 }
