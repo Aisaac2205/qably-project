@@ -102,6 +102,17 @@ supplies a key and nothing else — the tool knows its own address, the same way
 do. The project-scoped API key already identifies the organization and project, so the origin
 carries no information the key does not.
 
+### The response is `202`, not `200` — reporting is asynchronous
+
+`POST /runs/ingest/junit` answers `202 Accepted` with `{ "accepted": <count>, "runs": [{ "externalId",
+"suiteName", "jobId" }, ...] }` — see `docs/RUN_INGESTION.md`'s "Response — `202 Accepted`,
+asynchronous" for the full contract. The script logs `accepted` and each entry's `externalId` from
+that body; it does not, and cannot, know whether the run each `jobId` refers to has actually been
+written by the time the script exits, because ingestion happens on a worker after the HTTP response
+is sent. This is not a regression from an older synchronous contract — it is a deliberate design so
+that a slow ingestion (suite adoption, case linking) never adds latency to the CI job that is
+reporting it.
+
 ### Rate limits and retries
 
 `POST /runs/ingest/junit` is throttled at **30 requests per minute per credential**
@@ -192,10 +203,12 @@ file, so it does not know the suite names.
 
 `scripts/qably-report.mjs` never sends `suiteId` or `suiteName` — it lets the server derive and
 split suites from the XML entirely, per `docs/RUN_INGESTION.md`. An unrecognized suite name is
-adopted on the spot — the suite is created, along with a `draft` `TestCase` for every reported case
-name — and the report succeeds with `200` on its very first attempt for every suite the file
-contains. See `docs/RUN_INGESTION.md`'s "Suite adoption" section for the full behavior, including
-why drafts are not immediately official (§4.3.4 rule b) and how a human promotes one.
+adopted once the worker processes the corresponding queued job — the suite is created, along with a
+`draft` `TestCase` for every reported case name — and the report is accepted with `202` on its very
+first attempt for every suite the file contains, without waiting for that adoption to happen. See
+`docs/RUN_INGESTION.md`'s "Suite adoption" and "Response — `202 Accepted`, asynchronous" sections for
+the full behavior, including why drafts are not immediately official (§4.3.4 rule b) and how a human
+promotes one.
 
 ### Does a failed report fail the CI job?
 

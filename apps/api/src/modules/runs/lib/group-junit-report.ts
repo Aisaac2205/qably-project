@@ -37,8 +37,8 @@ function shortHash(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 8);
 }
 
-function suiteExternalId(externalId: string, suiteName: string): string {
-  return `${externalId}-${slugify(suiteName)}-${shortHash(suiteName)}`;
+function suiteExternalId(externalId: string, suiteKey: string): string {
+  return `${externalId}-${slugify(suiteKey)}-${shortHash(suiteKey)}`;
 }
 
 export function groupJunitReportBySuite(
@@ -49,11 +49,11 @@ export function groupJunitReportBySuite(
   const casesBySuite = new Map<string, JunitCase[]>();
 
   for (const testCase of report.cases) {
-    const bucket = casesBySuite.get(testCase.suiteName);
+    const bucket = casesBySuite.get(testCase.suiteKey);
 
     if (bucket === undefined) {
-      order.push(testCase.suiteName);
-      casesBySuite.set(testCase.suiteName, [testCase]);
+      order.push(testCase.suiteKey);
+      casesBySuite.set(testCase.suiteKey, [testCase]);
     } else {
       bucket.push(testCase);
     }
@@ -68,9 +68,13 @@ export function groupJunitReportBySuite(
 
   const single = order.length <= 1;
 
-  return order.map((suiteName) => ({
-    suiteName,
-    externalId: single ? externalId : suiteExternalId(externalId, suiteName),
-    cases: casesBySuite.get(suiteName) as JunitCase[],
-  }));
+  return order.map((suiteKey) => {
+    const cases = casesBySuite.get(suiteKey) as JunitCase[];
+
+    return {
+      suiteName: cases[0].suiteName,
+      externalId: single ? externalId : suiteExternalId(externalId, suiteKey),
+      cases,
+    };
+  });
 }

@@ -88,13 +88,19 @@ function buildJunitUrl(baseUrl, query) {
   return url.toString();
 }
 
-function parseRunIds(responseText) {
+function parseAccepted(responseText) {
   try {
     const parsed = JSON.parse(responseText);
-    if (!Array.isArray(parsed.runs)) return [];
-    return parsed.runs.map((run) => run.id).filter((id) => typeof id === 'string');
+    if (!Array.isArray(parsed.runs)) return { accepted: 0, externalIds: [] };
+
+    return {
+      accepted: typeof parsed.accepted === 'number' ? parsed.accepted : parsed.runs.length,
+      externalIds: parsed.runs
+        .map((run) => run.externalId)
+        .filter((externalId) => typeof externalId === 'string'),
+    };
   } catch {
-    return [];
+    return { accepted: 0, externalIds: [] };
   }
 }
 
@@ -125,10 +131,10 @@ async function postJunitReport(baseUrl, apiKey, xml, query) {
   const text = await response.text();
 
   if (response.ok) {
-    const runIds = parseRunIds(text);
+    const { accepted, externalIds } = parseAccepted(text);
     console.log(
       `[qably-report] reported "${query.name}" -> ${response.status} ` +
-        `(${runIds.length} run${runIds.length === 1 ? '' : 's'}: ${runIds.join(', ')})`,
+        `(${accepted} accepted: ${externalIds.join(', ')})`,
     );
     return { outcome: 'ok' };
   }
@@ -230,4 +236,9 @@ async function main() {
   );
 }
 
-main();
+main().catch((error) => {
+  console.error(
+    `::warning title=Qably report failed::unexpected error in qably-report.mjs: ${error.message}`,
+  );
+  process.exitCode = 0;
+});

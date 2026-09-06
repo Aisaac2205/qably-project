@@ -267,11 +267,63 @@ Content-Type: application/xml
 | `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
 | `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
 
-### Response
+### Response — `202 Accepted`, asynchronous
 
-`200 OK` with `{ "runs": [ <RunView>, ... ] }` — an array, not a single run, because one request can
-create several runs (see below). Each element has the same shape as the `POST /runs/ingest` response
-body. The array preserves the order suites first appeared in the XML.
+Unlike `POST /runs/ingest`, this endpoint does not write anything before it responds. Parsing and
+grouping the XML happen synchronously in the request (see "One run per `<testsuite>`" below), but the
+actual ingestion — suite resolution/adoption, the run upsert, the case delete-and-recreate, the
+notification — happens later, on a worker, off the request path:
+
+```json
+{
+  "accepted": 3,
+  "runs": [
+    { "externalId": "gha-482913-a1b2c3d4", "suiteName": "src/a.test.ts", "jobId": "project_123:github_actions:gha-482913-a1b2c3d4" },
+    { "externalId": "gha-482913-e5f6a7b8", "suiteName": "src/b.test.ts", "jobId": "project_123:github_actions:gha-482913-e5f6a7b8" },
+    { "externalId": "gha-482913-c9d0e1f2", "suiteName": "src/c.test.ts", "jobId": "project_123:github_actions:gha-482913-c9d0e1f2" }
+  ]
+}
+```
+
+- `accepted` — how many jobs were enqueued (one per suite group).
+- `runs[].externalId` — the per-run externalId, exactly as described in "One run per `<testsuite>`"
+  below.
+- `runs[].suiteName` — the run's suite name, before truncation-driven ambiguity: the first case's
+  (truncated) `suiteName` in that group.
+- `runs[].jobId` — the queue job id for that run, `${projectId}:${source}:${externalId}` with any
+  character outside `[A-Za-z0-9_.:-]` replaced by `-`. It is deterministic: replaying the same
+  `(projectId, source, externalId)` produces the same `jobId`, so a duplicate delivery of the same
+  report (a GitHub Actions re-run, a network retry) collides with the still-queued or still-processing
+  job for that run instead of enqueuing a second one.
+
+**Validation still happens synchronously, all-or-nothing.** Every group's ingest payload is built and
+validated with the same schema `POST /runs/ingest` uses (`ingestRunSchema`) *before* anything is
+enqueued. If any one group fails validation, the whole request is rejected with `400` — naming the
+offending suite and the Zod validation issue — and **nothing is enqueued**, not even the groups that
+would have validated. A caller either gets every run from a report queued, or none of them; it never
+has to reconcile a partial success.
+
+**The run is not necessarily visible the instant the request returns.** `202` means "accepted for
+processing", not "processed". A worker (`RunIngestProcessor`, `apps/api/src/modules/runs/run-ingest.processor.ts`)
+picks up each queued job and calls the same `RunsService.ingest` that backs `POST /runs/ingest`. Under
+normal load this happens within milliseconds of the response, but a caller that needs to read the run
+back immediately (rather than eventually, via `GET /runs` or the dashboard) should poll rather than
+assume it exists synchronously.
+
+**Retries and failure modes**, per job:
+
+- A **business rejection** — `suite-not-found` (an explicit `suiteId` that does not resolve) or
+  `source-not-allowed` (a `source` other than `api` or `github_actions`) — is not retried. The worker
+  throws BullMQ's `UnrecoverableError` for these; retrying the exact same payload would fail identically
+  every time, so retrying would only delay the (still-necessary) `Logger` line recording the failure.
+- Anything else — a Prisma/Postgres error, a Redis hiccup, an unexpected exception — is treated as
+  infrastructure trouble and retried automatically: **3 attempts, exponential backoff starting at 1s**
+  (BullMQ's `defaultJobOptions` on the `run-ingest` queue). A job that still fails after 3 attempts is
+  kept (`removeOnFail: 500` — the last 500 failed jobs are retained) for operator inspection; a
+  succeeded job is discarded immediately (`removeOnComplete: true`).
+- The worker logs one line per job outcome (project id, externalId, outcome) — never the payload, since
+  case names, failure messages and stack traces are user/CI-controlled content that does not belong in
+  application logs.
 
 ### One run per `<testsuite>`
 
@@ -282,29 +334,46 @@ in a report into one run would collapse that per-file suite structure along with
 does not do that:
 
 - **The parser reads the whole file in one pass** (`apps/api/src/modules/runs/lib/parse-junit-xml.ts`),
-  recursing into nested `<testsuite>` elements exactly as described below.
-- **A second, pure step groups the parsed cases by their own `<testsuite>` name**
+  recursing into nested `<testsuite>` elements exactly as described below. Each parsed case carries
+  both a `suiteName` (truncated to 120 characters, the value that ends up on `RunCase.suiteName` and in
+  the response above) and a `suiteKey` — the same value, **untruncated**, up to 500 characters.
+- **A second, pure step groups the parsed cases by `suiteKey`, not `suiteName`**
   (`apps/api/src/modules/runs/lib/group-junit-report.ts`, `groupJunitReportBySuite`), preserving the
-  order each suite name first appears in the file.
-- **The controller calls `POST /runs/ingest`'s own ingestion once per group, sequentially** — each
-  group becomes its own run, its own suite resolution/adoption, and its own transaction. A three-file
-  vitest report produces three runs, three suites (adopted or resolved independently), and the
-  response's `runs` array has three entries.
+  order each key first appears in the file. Grouping by the untruncated key means two suites whose
+  names happen to share their first 120 characters — and would therefore collapse into the same
+  `suiteName` — still stay in separate groups, separate runs, and separate suites. A group's own
+  `suiteName` is the (truncated) `suiteName` of the first case seen in that group.
+- **Two `<testsuite>` elements with the exact same full name merge into one group.** This is intended,
+  not a bug: two nodes named identically describe the same source file (or the same logical suite,
+  for a reporter that legitimately splits one file's cases across sibling `<testsuite>` elements), and
+  Qably's suite-per-file model has no way to tell those two nodes apart — nor should it try to; a
+  single suite with all of that name's cases is the correct, unambiguous outcome.
+- **The controller calls `POST /runs/ingest`'s own ingestion once per group, asynchronously** — see
+  "Response — `202 Accepted`, asynchronous" above. Each group becomes its own queued job, its own run,
+  its own suite resolution/adoption, and its own transaction, all independent of the others. A
+  three-file vitest report enqueues three jobs, three suites (adopted or resolved independently), and
+  the response's `runs` array has three entries.
 - **`externalId` per run**: when the report groups into exactly one suite, the run's `externalId` is
   the query's `externalId` **unchanged** — a single-suite report behaves exactly as it did before this
   split existed, so an already-running idempotent report keeps upserting the same run. When it groups
-  into several, each run's `externalId` is `${externalId}-${slug(suiteName)}-${sha256(suiteName)[0:8]}`
-  (slug lowercased, non-`[a-z0-9]` runs collapsed to `-`, trimmed, capped at 60 characters — the same
-  scheme `scripts/qably-report.mjs` used before this change, now computed server-side).
-- **A report grouping into more than 500 distinct suite names is rejected** rather than creating an
+  into several, each run's `externalId` is `${externalId}-${slug(suiteKey)}-${sha256(suiteKey)[0:8]}`
+  (slug lowercased, non-`[a-z0-9]` runs collapsed to `-`, trimmed, capped at 60 characters, both derived
+  from the untruncated `suiteKey` so two long suite names that only differ past character 120 still get
+  distinct externalIds).
+- **A report grouping into more than 500 distinct suite keys is rejected** rather than creating an
   unbounded number of runs from one request.
 
 **Exception — pinning `suiteId` or `suiteName` turns the split off.** An explicit `suiteId` or
 `suiteName` is the caller stating "everything in this report belongs to this one suite" — that intent
-overrides the file-per-suite default. In that case the endpoint creates exactly **one** run, with
+overrides the file-per-suite default. In that case the endpoint enqueues exactly **one** job, with
 every `<testcase>` from every `<testsuite>` in the file as its cases, `externalId` unchanged, and
 `name` defaulting to the XML root's own `name` attribute (the `<testsuites>` or top-level `<testsuite>`
 name) rather than any individual per-file suite name.
+
+**The run's `name` fallback**, applied per group before validation: the query's own `name` when given;
+otherwise the group's `suiteName` when it is non-empty; otherwise the query's `externalId`. The last
+step only matters in the pathological case of a group whose `suiteName` ends up empty — in practice
+the parser always derives a non-empty suite name, so this is a defensive fallback, not a common path.
 
 ### What the parser reads
 
@@ -325,19 +394,50 @@ above is truncated to the limit in the table in "Request body", never rejected f
 structural problems (invalid XML, no `<testcase>` elements anywhere, nesting past 32 levels, more
 than 10,000 cases, or grouping into more than 500 distinct suites) fail the request.
 
+### Security limits
+
+`fast-xml-parser` 5 **does** substitute entities declared in a `<!DOCTYPE>` block — it is not immune
+to a classic "billion laughs" entity-expansion attack by default. The protection here is not "the
+parser ignores DOCTYPE"; it is the parser's own `processEntities` limits, configured explicitly in
+`parse-junit-xml.ts`:
+
+| Limit | Value | Stops |
+| --- | --- | --- |
+| `maxEntitySize` | 1,000 | A single declared entity's raw definition from being enormous. |
+| `maxEntityCount` | 50 | A document declaring an unbounded number of entities. |
+| `maxExpansionDepth` | 20 | Entities that reference entities that reference entities, nested past a shallow, legitimate depth. |
+| `maxTotalExpansions` | 100 | The total number of substitutions performed across the whole document. |
+| `maxExpandedLength` | 100,000 | The final expanded string size, even if every individual limit above was respected. |
+
+A payload that would exceed any of these is rejected by the parser itself, before Qably's own
+application-level limits ever see it. Those application-level limits are the second, independent
+layer:
+
+- **10 MB** request body cap (`main.ts`), before the XML is even handed to the parser.
+- **32** levels of `<testsuite>` nesting (`MAX_TESTSUITE_DEPTH`).
+- **10,000** `<testcase>` elements per report (`MAX_TESTCASES`).
+- **500** distinct suite groups per report (`MAX_GROUPS`, in `group-junit-report.ts`).
+
+None of these five is a substitute for the others — `processEntities` stops entity-expansion memory
+blowups specifically, the 10 MB cap stops a merely large document, and the depth/count/group caps
+stop a well-formed-but-adversarially-shaped document from producing unbounded work downstream (one
+`Run` per group, one `RunCase` per case) even though it parsed cleanly.
+
 ### `scripts/qably-report.mjs`
 
 The script that reports CI results to Qably (invoked once per generated JUnit file, see
 `docs/CI.md`) posts the file's raw contents to this endpoint in a single request — it holds no XML
 parsing or per-suite splitting logic of its own; that all happens server-side, as described above.
-One file becomes one `POST /runs/ingest/junit` call, which in turn becomes one run per `<testsuite>`
-in that file. `suiteName` is left unset so the server derives and splits by it; the script only
-supplies `externalId` (built from the job, the run and the file path — see `docs/CI.md`; the server
-then re-derives a per-suite `externalId` from this base when the file holds more than one suite),
-`source`, `name` (the workflow and job name) and the commit metadata already read from `$GITHUB_SHA`
-and `git log`. On success the script reads the `runs` array from the JSON response to log how many
-runs were created and their ids. The existing `429` retry/backoff and `::warning` annotation
-behavior is unchanged.
+One file becomes one `POST /runs/ingest/junit` call, which in turn becomes one enqueued job per
+`<testsuite>` in that file. `suiteName` is left unset so the server derives and splits by it; the
+script only supplies `externalId` (built from the job, the run and the file path — see `docs/CI.md`;
+the server then re-derives a per-suite `externalId` from this base when the file holds more than one
+suite), `source`, `name` (the workflow and job name) and the commit metadata already read from
+`$GITHUB_SHA` and `git log`. On success the script reads `accepted` and the `runs` array's
+`externalId`s from the `202` JSON response to log how many jobs were queued and for which runs — it
+does not (and cannot) know whether ingestion itself has finished by the time it logs. The existing
+`429` retry/backoff and `::warning` annotation behavior is unchanged; reporting failures never fail
+the CI job (see `main().catch(...)` in the script).
 
 ## curl example
 

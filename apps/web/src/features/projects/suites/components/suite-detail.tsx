@@ -192,7 +192,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               <StatusChip status={metrics.status} />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted">{t('suites.passRate7d')}</span>
+              <span className="text-xs font-medium text-muted">{t('suites.passRateLabel')}</span>
               <span
                 className={`text-sm font-mono font-semibold tabular-nums ${
                   metrics.recentPassRate >= 70

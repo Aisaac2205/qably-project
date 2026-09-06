@@ -572,7 +572,7 @@
     "runThisSuite": "Run this suite",
     "ariaSuiteHealth": "Suite health",
     "statusLabel": "Status",
-    "passRate7d": "Pass rate",
+    "passRateLabel": "Pass rate",
     "lastRun": "Last run",
     "casesLabel": "Cases",
     "testCases": "Test cases",

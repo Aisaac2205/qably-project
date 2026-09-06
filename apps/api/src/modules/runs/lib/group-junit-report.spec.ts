@@ -1,19 +1,29 @@
 import type { JunitReport } from './parse-junit-xml';
+import { parseJunitXml } from './parse-junit-xml';
 import {
   groupJunitReportBySuite,
   JunitGroupingError,
 } from './group-junit-report';
 
 function report(cases: JunitReport['cases']): JunitReport {
-  return { suiteName: 'root', cases };
+  return { suiteName: 'root', suiteKey: 'root', cases };
+}
+
+function suiteCase(
+  name: string,
+  suiteName: string,
+  status: JunitReport['cases'][number]['status'],
+  suiteKey: string = suiteName,
+) {
+  return { name, suiteName, suiteKey, status };
 }
 
 describe('groupJunitReportBySuite', () => {
   it('returns a single group with the externalId unchanged when there is one suite', () => {
     const groups = groupJunitReportBySuite(
       report([
-        { name: 'a', suiteName: 'Checkout', status: 'pass' },
-        { name: 'b', suiteName: 'Checkout', status: 'fail' },
+        suiteCase('a', 'Checkout', 'pass'),
+        suiteCase('b', 'Checkout', 'fail'),
       ]),
       'gha-42',
     );
@@ -24,12 +34,12 @@ describe('groupJunitReportBySuite', () => {
     expect(groups[0].cases).toHaveLength(2);
   });
 
-  it('splits into one group per distinct suiteName, in first-seen order', () => {
+  it('splits into one group per distinct suiteKey, in first-seen order', () => {
     const groups = groupJunitReportBySuite(
       report([
-        { name: 'a', suiteName: 'src/a.test.ts', status: 'pass' },
-        { name: 'b', suiteName: 'src/b.test.ts', status: 'pass' },
-        { name: 'c', suiteName: 'src/c.test.ts', status: 'fail' },
+        suiteCase('a', 'src/a.test.ts', 'pass'),
+        suiteCase('b', 'src/b.test.ts', 'pass'),
+        suiteCase('c', 'src/c.test.ts', 'fail'),
       ]),
       'gha-42',
     );
@@ -44,9 +54,9 @@ describe('groupJunitReportBySuite', () => {
   it("keeps a later case for an already-seen suite in that suite's original group", () => {
     const groups = groupJunitReportBySuite(
       report([
-        { name: 'a1', suiteName: 'src/a.test.ts', status: 'pass' },
-        { name: 'b1', suiteName: 'src/b.test.ts', status: 'pass' },
-        { name: 'a2', suiteName: 'src/a.test.ts', status: 'fail' },
+        suiteCase('a1', 'src/a.test.ts', 'pass'),
+        suiteCase('b1', 'src/b.test.ts', 'pass'),
+        suiteCase('a2', 'src/a.test.ts', 'fail'),
       ]),
       'gha-42',
     );
@@ -62,8 +72,8 @@ describe('groupJunitReportBySuite', () => {
   it('derives a distinct, deterministic externalId suffix per suite when there are several', () => {
     const groups = groupJunitReportBySuite(
       report([
-        { name: 'a', suiteName: 'src/a.test.ts', status: 'pass' },
-        { name: 'b', suiteName: 'src/b.test.ts', status: 'pass' },
+        suiteCase('a', 'src/a.test.ts', 'pass'),
+        suiteCase('b', 'src/b.test.ts', 'pass'),
       ]),
       'gha-42',
     );
@@ -75,8 +85,8 @@ describe('groupJunitReportBySuite', () => {
 
     const again = groupJunitReportBySuite(
       report([
-        { name: 'a', suiteName: 'src/a.test.ts', status: 'pass' },
-        { name: 'b', suiteName: 'src/b.test.ts', status: 'pass' },
+        suiteCase('a', 'src/a.test.ts', 'pass'),
+        suiteCase('b', 'src/b.test.ts', 'pass'),
       ]),
       'gha-42',
     );
@@ -90,8 +100,8 @@ describe('groupJunitReportBySuite', () => {
     );
     const groups = groupJunitReportBySuite(
       report([
-        { name: 'a', suiteName: longName, status: 'pass' },
-        { name: 'b', suiteName: 'src/short.test.ts', status: 'pass' },
+        suiteCase('a', longName, 'pass'),
+        suiteCase('b', 'src/short.test.ts', 'pass'),
       ]),
       'gha-42',
     );
@@ -103,11 +113,9 @@ describe('groupJunitReportBySuite', () => {
   });
 
   it('throws a typed error when the report groups into more than 500 distinct suites', () => {
-    const cases = Array.from({ length: 501 }, (_unused, index) => ({
-      name: 'only',
-      suiteName: `suite-${index}`,
-      status: 'pass' as const,
-    }));
+    const cases = Array.from({ length: 501 }, (_unused, index) =>
+      suiteCase('only', `suite-${index}`, 'pass'),
+    );
 
     expect(() => groupJunitReportBySuite(report(cases), 'gha-42')).toThrow(
       JunitGroupingError,
@@ -120,5 +128,38 @@ describe('groupJunitReportBySuite', () => {
       expect(error).toBeInstanceOf(JunitGroupingError);
       expect((error as JunitGroupingError).code).toBe('group-limit-exceeded');
     }
+  });
+
+  it('groups by the untruncated suiteKey, keeping suites separate when only their first 120 characters match', () => {
+    const sharedPrefix = 'p'.repeat(120);
+    const keyA = `${sharedPrefix}a.test.ts`;
+    const keyB = `${sharedPrefix}b.test.ts`;
+    const truncatedName = sharedPrefix;
+
+    const groups = groupJunitReportBySuite(
+      report([
+        suiteCase('a', truncatedName, 'pass', keyA),
+        suiteCase('b', truncatedName, 'pass', keyB),
+      ]),
+      'gha-42',
+    );
+
+    expect(groups).toHaveLength(2);
+    expect(groups[0].externalId).not.toBe(groups[1].externalId);
+  });
+
+  it('merges two <testsuite> nodes sharing the identical full name into one group (intended behavior)', () => {
+    const xml = `<testsuites name="vitest tests">
+      <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
+      <testsuite name="src/a.test.ts"><testcase name="a2"/></testsuite>
+    </testsuites>`;
+
+    const groups = groupJunitReportBySuite(parseJunitXml(xml), 'gha-42');
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].cases.map((testCase) => testCase.name)).toEqual([
+      'a1',
+      'a2',
+    ]);
   });
 });

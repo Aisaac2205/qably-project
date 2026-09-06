@@ -572,7 +572,7 @@
     "runThisSuite": "Ejecutar esta suite",
     "ariaSuiteHealth": "Salud de la suite",
     "statusLabel": "Estado",
-    "passRate7d": "Tasa de aprobación",
+    "passRateLabel": "Tasa de aprobación",
     "lastRun": "Última ejecución",
     "casesLabel": "Casos",
     "testCases": "Casos de prueba",
