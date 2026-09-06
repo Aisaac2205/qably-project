@@ -81,7 +81,10 @@ interface TxClient {
     update: PrismaService['extractedProposal']['update'];
   };
   organization: { updateMany: PrismaService['organization']['updateMany'] };
+  $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
 }
+
+const PROPOSAL_SAVEPOINT = 'extraction_proposal';
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -530,6 +533,8 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
+    await tx.$executeRawUnsafe(`SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
+
     const evidence = await tx.evidence.create({
       data: {
         projectId: ctx.projectId,
@@ -551,8 +556,12 @@ export class ExtractionProcessor extends WorkerHost {
           targetTestCaseId: matchedCaseId,
         },
       });
+
+      await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
+
+      await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
 
       const winner = await tx.extractedProposal.findFirst({
         where: {

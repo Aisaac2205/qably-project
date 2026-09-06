@@ -32,6 +32,7 @@ interface FakePrisma {
     update: jest.Mock;
   };
   $transaction: jest.Mock;
+  $executeRawUnsafe: jest.Mock;
 }
 
 const connection = {
@@ -86,6 +87,7 @@ function createPrisma(): FakePrisma {
       update: jest.fn().mockResolvedValue({ id: 'proposal-updated' }),
     },
     $transaction: jest.fn(),
+    $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
   };
 
   prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
@@ -188,6 +190,22 @@ describe('ExtractionProcessor — code-change job', () => {
       title: 'Adds an item to the cart',
       promptVersion: EXTRACTION_PROMPT_VERSION,
     });
+
+    const savepointCalls = prisma.$executeRawUnsafe.mock.calls.map(
+      ([sql]: [string]) => sql,
+    );
+    expect(savepointCalls).toEqual([
+      'SAVEPOINT extraction_proposal',
+      'RELEASE SAVEPOINT extraction_proposal',
+    ]);
+    const savepointOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+    const evidenceCreateOrder = prisma.evidence.create.mock.invocationCallOrder[0];
+    const proposalCreateOrder =
+      prisma.extractedProposal.create.mock.invocationCallOrder[0];
+    const releaseOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
+    expect(savepointOrder).toBeLessThan(evidenceCreateOrder);
+    expect(evidenceCreateOrder).toBeLessThan(proposalCreateOrder);
+    expect(proposalCreateOrder).toBeLessThan(releaseOrder);
   });
 
   it('targets an existing automated test case whose automationKey matches', async () => {
@@ -465,6 +483,39 @@ describe('ExtractionProcessor — code-change job', () => {
       automationKey: 'Cart > removes an item',
       title: 'Second',
     });
+
+    expect(prisma.evidence.create).toHaveBeenCalledTimes(2);
+    const savepointCalls = prisma.$executeRawUnsafe.mock.calls.map(
+      ([sql]: [string]) => sql,
+    );
+    expect(
+      savepointCalls.filter((sql) => sql === 'SAVEPOINT extraction_proposal'),
+    ).toHaveLength(2);
+    expect(
+      savepointCalls.filter(
+        (sql) => sql === 'ROLLBACK TO SAVEPOINT extraction_proposal',
+      ),
+    ).toHaveLength(1);
+    expect(
+      savepointCalls.filter(
+        (sql) => sql === 'RELEASE SAVEPOINT extraction_proposal',
+      ),
+    ).toHaveLength(1);
+
+    const firstSavepointOrder =
+      prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+    const firstEvidenceCreateOrder =
+      prisma.evidence.create.mock.invocationCallOrder[0];
+    const firstProposalCreateOrder =
+      prisma.extractedProposal.create.mock.invocationCallOrder[0];
+    const rollbackOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
+    const findFirstOrder =
+      prisma.extractedProposal.findFirst.mock.invocationCallOrder[0];
+
+    expect(firstSavepointOrder).toBeLessThan(firstEvidenceCreateOrder);
+    expect(firstEvidenceCreateOrder).toBeLessThan(firstProposalCreateOrder);
+    expect(firstProposalCreateOrder).toBeLessThan(rollbackOrder);
+    expect(rollbackOrder).toBeLessThan(findFirstOrder);
   });
 
   it('does not mutate an already-decided proposal even when the create races and loses', async () => {
