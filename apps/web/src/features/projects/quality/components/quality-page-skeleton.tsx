@@ -1,3 +1,5 @@
+'use client'
+
 import { Skeleton } from '@/components/ui/skeleton'
 import { useTranslation } from '@/lib/i18n'
 
