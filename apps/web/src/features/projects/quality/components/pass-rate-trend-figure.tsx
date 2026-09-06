@@ -5,6 +5,7 @@ import { useTranslation } from '@/lib/i18n'
 import { StateView } from '@/components/ui/state-view'
 
 export interface TrendPoint {
+  id: string
   date: string
   passRate: number
 }
@@ -115,7 +116,7 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
         </thead>
         <tbody>
           {points.map((point) => (
-            <tr key={point.date}>
+            <tr key={point.id}>
               <td>{dateFormatter.format(new Date(point.date))}</td>
               <td>{Math.round(point.passRate)}%</td>
             </tr>

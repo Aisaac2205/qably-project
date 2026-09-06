@@ -81,7 +81,11 @@ describe('NewRunForm', () => {
     const user = userEvent.setup()
     const api = await import('@/features/runs/api/runs.api')
     vi.spyOn(api, 'createRun').mockRejectedValueOnce(
-      new ApiError(409, 'no-manual-cases'),
+      new ApiError(
+        409,
+        'This suite has no manual cases to run; automated cases are read-only here',
+        'no-manual-cases',
+      ),
     )
 
     await act(async () => {

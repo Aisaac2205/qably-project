@@ -1,7 +1,6 @@
 'use client'
 
 import { ChartLine, CircleNotch, Play, Sparkle, WarningCircle } from '@phosphor-icons/react'
-import type { RunSummaryRecord } from '@qably/types'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Button } from '@/components/ui/button'
 import { KpiCard } from '@/components/ui/kpi-card'
@@ -22,16 +21,6 @@ const SHELL_CLASSES =
   'w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter'
 const REGRESSIONS_ANCHOR = 'quality-regressions'
 const TREND_RUN_LIMIT = 30
-
-function buildSuiteNames(...sources: RunSummaryRecord[][]): Map<string, string> {
-  const names = new Map<string, string>()
-  for (const list of sources) {
-    for (const run of list) {
-      if (!names.has(run.suiteId)) names.set(run.suiteId, run.suiteName)
-    }
-  }
-  return names
-}
 
 interface RetryStateViewProps {
   title: string
@@ -95,9 +84,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
     .filter((run) => run.status === 'pass' || run.status === 'fail')
     .slice()
     .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
-    .map((run) => ({ date: run.startedAt, passRate: run.passRate * 100 }))
-
-  const suiteNames = buildSuiteNames(summary.recentRuns, recentRuns.runs)
+    .map((run) => ({ id: run.id, date: run.startedAt, passRate: run.passRate * 100 }))
 
   return (
     <div className={SHELL_CLASSES}>
@@ -214,7 +201,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
             onRetry={() => void suiteMetrics.refetch()}
           />
         ) : (
-          <SuitesHealthTable projectId={projectId} items={suiteMetrics.items} suiteNames={suiteNames} />
+          <SuitesHealthTable projectId={projectId} items={suiteMetrics.items} />
         )}
       </section>
 

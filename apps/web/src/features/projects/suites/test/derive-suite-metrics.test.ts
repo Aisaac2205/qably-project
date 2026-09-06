@@ -31,7 +31,12 @@ describe('deriveSuiteMetrics', () => {
   })
 
   it('reports never-run when the entry has a null lastRun', () => {
-    const entry: SuiteMetricsEntry = { suiteId: 'suite-1', lastRun: null, trend: [] }
+    const entry: SuiteMetricsEntry = {
+      suiteId: 'suite-1',
+      suiteName: 'Checkout',
+      lastRun: null,
+      trend: [],
+    }
 
     const result = deriveSuiteMetrics(suite(), entry)
 
@@ -41,6 +46,7 @@ describe('deriveSuiteMetrics', () => {
   it('carries the lastRun fields through unchanged', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-1',
         status: 'pass',
@@ -60,6 +66,7 @@ describe('deriveSuiteMetrics', () => {
   it('reports running when any trend entry is running, even if the last one finished', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-2',
         status: 'pass',
@@ -78,6 +85,7 @@ describe('deriveSuiteMetrics', () => {
   it('computes recentPassRate from the completed entries in the trend', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-2',
         status: 'pass',
@@ -96,6 +104,7 @@ describe('deriveSuiteMetrics', () => {
   it('reports needs-attention when the completed pass rate is below 70', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-1',
         status: 'fail',
@@ -114,6 +123,7 @@ describe('deriveSuiteMetrics', () => {
   it('reports pass when the most recent completed entry passed and the rate clears the threshold', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-1',
         status: 'pass',
@@ -132,6 +142,7 @@ describe('deriveSuiteMetrics', () => {
   it('reports fail when the most recent completed entry failed and the rate clears the threshold', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-1',
         status: 'fail',
@@ -150,6 +161,7 @@ describe('deriveSuiteMetrics', () => {
   it('builds an oldest-first sparkline from only the completed trend entries', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-3',
         status: 'pass',
@@ -168,6 +180,7 @@ describe('deriveSuiteMetrics', () => {
   it('excludes non-terminal trend statuses when computing needs-attention with zero completed runs', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-1',
         status: 'pending',

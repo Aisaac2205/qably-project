@@ -220,11 +220,9 @@ export function listRuns(
 }
 
 export function computeSuiteMetrics(projectId: string): SuiteMetricsRecord {
-  const suiteIds = mockSuites
-    .filter((suite) => suite.projectId === projectId)
-    .map((suite) => suite.id)
+  const projectSuites = mockSuites.filter((suite) => suite.projectId === projectId)
 
-  const items: SuiteMetricsEntry[] = suiteIds.map((suiteId) => {
+  const items: SuiteMetricsEntry[] = projectSuites.map(({ id: suiteId, name: suiteName }) => {
     const suiteRuns = runs
       .filter((run) => run.suiteId === suiteId)
       .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
@@ -247,7 +245,7 @@ export function computeSuiteMetrics(projectId: string): SuiteMetricsRecord {
             passRate: passRateOf(countCases(mostRecent.cases)),
           }
 
-    return { suiteId, lastRun, trend }
+    return { suiteId, suiteName, lastRun, trend }
   })
 
   return { items }

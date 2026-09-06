@@ -135,6 +135,7 @@ const suiteMetrics: SuiteMetricsRecord = {
   items: [
     {
       suiteId: 'suite-1',
+      suiteName: 'Checkout',
       lastRun: {
         id: 'run-2',
         status: 'pass',
@@ -144,6 +145,12 @@ const suiteMetrics: SuiteMetricsRecord = {
         passRate: 1,
       },
       trend: ['fail', 'pass'],
+    },
+    {
+      suiteId: 'suite-2',
+      suiteName: 'Payments',
+      lastRun: null,
+      trend: [],
     },
   ],
 }
@@ -291,6 +298,12 @@ describe('QualityPage', () => {
       const table = await screen.findByRole('table', { name: 'Suite health overview' })
       const link = within(table).getByRole('link', { name: 'Checkout' })
       expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-1')
+    })
+
+    it('renders the name of a suite with zero runs from the metrics entry itself', async () => {
+      const table = await screen.findByRole('table', { name: 'Suite health overview' })
+      const link = within(table).getByRole('link', { name: 'Payments' })
+      expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-2')
     })
 
     it('renders the pass rate trend as an accessible figure with a data table', async () => {

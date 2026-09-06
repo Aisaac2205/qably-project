@@ -10,7 +10,6 @@ import { useTranslation } from '@/lib/i18n'
 interface SuitesHealthTableProps {
   projectId: string
   items: SuiteMetricsEntry[]
-  suiteNames: ReadonlyMap<string, string>
 }
 
 function formatPassRate(passRate: number): string {
@@ -23,7 +22,7 @@ function trendSummary(trend: RunStatus[]): string {
   return `${passCount}/${trend.length}`
 }
 
-export function SuitesHealthTable({ projectId, items, suiteNames }: SuitesHealthTableProps) {
+export function SuitesHealthTable({ projectId, items }: SuitesHealthTableProps) {
   const { t } = useTranslation()
 
   if (items.length === 0) {
@@ -57,7 +56,7 @@ export function SuitesHealthTable({ projectId, items, suiteNames }: SuitesHealth
                 href={`/projects/${projectId}/suites/${item.suiteId}`}
                 className="rounded transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
               >
-                {suiteNames.get(item.suiteId) ?? item.suiteId}
+                {item.suiteName}
               </Link>
             </td>
             <td className="px-4 py-3">

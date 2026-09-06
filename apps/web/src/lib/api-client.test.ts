@@ -83,6 +83,31 @@ describe('apiRequest', () => {
     await expect(apiRequest('/projects')).rejects.toBeInstanceOf(ApiError)
   })
 
+  it('carries a machine-readable code from the error body', async () => {
+    mockFetch({
+      ok: false,
+      status: 409,
+      json: () =>
+        Promise.resolve({ statusCode: 409, code: 'no-manual-cases', message: 'no manual cases' }),
+    })
+
+    await expect(apiRequest('/runs')).rejects.toMatchObject({
+      status: 409,
+      code: 'no-manual-cases',
+      message: 'no manual cases',
+    })
+  })
+
+  it('leaves code undefined when the error body has none', async () => {
+    mockFetch({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ message: 'boom' }),
+    })
+
+    await expect(apiRequest('/runs')).rejects.toMatchObject({ code: undefined })
+  })
+
   it('forwards the organization header when one is given', async () => {
     const spy = mockFetch({ json: () => Promise.resolve([]) })
 

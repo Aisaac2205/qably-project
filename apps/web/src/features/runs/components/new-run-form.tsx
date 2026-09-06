@@ -19,7 +19,7 @@ function translateCreateRunError(error: unknown, t: (key: string) => string): st
   if (error instanceof ApiError && error.status === 400) {
     return t('suites.cannotRunEmptySuite')
   }
-  if (error instanceof ApiError && error.status === 409 && error.message === 'no-manual-cases') {
+  if (error instanceof ApiError && error.status === 409 && error.code === 'no-manual-cases') {
     return t('runs.noManualCases')
   }
   return t('runs.createRunError')

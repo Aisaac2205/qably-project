@@ -4,11 +4,13 @@ const ORGANIZATION_HEADER = 'x-organization-id'
 
 export class ApiError extends Error {
   readonly status: number
+  readonly code?: string
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -32,12 +34,18 @@ function buildHeaders(options: ApiRequestOptions): Headers {
   return headers
 }
 
-async function readMessage(response: Response, fallback: string): Promise<string> {
+async function readErrorBody(
+  response: Response,
+  fallback: string,
+): Promise<{ message: string; code?: string }> {
   try {
-    const payload = (await response.json()) as { message?: unknown }
-    return typeof payload.message === 'string' ? payload.message : fallback
+    const payload = (await response.json()) as { message?: unknown; code?: unknown }
+    const message = typeof payload.message === 'string' ? payload.message : fallback
+    return typeof payload.code === 'string'
+      ? { message, code: payload.code }
+      : { message }
   } catch {
-    return fallback
+    return { message: fallback }
   }
 }
 
@@ -54,10 +62,8 @@ export async function apiRequest<T>(
   })
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      await readMessage(response, `Request to ${path} failed`),
-    )
+    const { message, code } = await readErrorBody(response, `Request to ${path} failed`)
+    throw new ApiError(response.status, message, code)
   }
 
   if (response.status === 204) return undefined as T
