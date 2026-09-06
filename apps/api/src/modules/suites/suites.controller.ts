@@ -19,6 +19,8 @@ import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import type { DocumentCaseError } from '../review/review.contracts';
+import { ExtractionService } from '../review/extraction.service';
 import type { SuiteError, SuiteView } from './suites.contracts';
 import {
   createCaseSchema,
@@ -49,10 +51,30 @@ function unwrap<T>(result: Result<T, SuiteError>): T {
   }
 }
 
+function unwrapDocumentCase<T>(result: Result<T, DocumentCaseError>): T {
+  if (!isErr(result)) return result.value;
+
+  switch (result.error) {
+    case 'not-found':
+      throw new NotFoundException('Test case not found');
+    case 'not-automated':
+      throw new ConflictException(
+        'This case is not automated or has no automation file to read',
+      );
+    case 'already-pending':
+      throw new ConflictException(
+        'A proposal is already pending review for this case',
+      );
+  }
+}
+
 @Controller('suites')
 @UseGuards(OrgScopeGuard)
 export class SuitesController {
-  constructor(private readonly suites: SuitesService) {}
+  constructor(
+    private readonly suites: SuitesService,
+    private readonly extraction: ExtractionService,
+  ) {}
 
   @Get()
   list(
@@ -124,5 +146,17 @@ export class SuitesController {
     @Param('caseId') caseId: string,
   ): Promise<SuiteView> {
     return unwrap(await this.suites.removeCase(org, id, caseId));
+  }
+
+  @Post(':id/cases/:caseId/document')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async documentCase(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+    @Param('caseId') caseId: string,
+  ): Promise<{ queued: true; jobId: string }> {
+    const result = await this.extraction.enqueueDocumentCase(org, id, caseId);
+
+    return { queued: true, jobId: unwrapDocumentCase(result).jobId };
   }
 }

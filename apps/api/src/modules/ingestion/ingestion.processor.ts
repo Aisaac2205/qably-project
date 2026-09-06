@@ -147,7 +147,7 @@ export class IngestionProcessor extends WorkerHost {
         },
       });
 
-      await this.extraction.seed(batch.codeChanges);
+      await this.extraction.enqueueCodeChanges(batch.codeChanges);
     }
   }
 }

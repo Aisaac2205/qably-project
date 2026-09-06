@@ -21,6 +21,17 @@ export interface ListProposalsFilters {
   search?: string;
 }
 
+export const EXTRACTION_QUEUE = 'extraction';
+
+export type ExtractionJobData =
+  | { kind: 'code-change'; codeChangeId: string }
+  | { kind: 'document-case'; testCaseId: string };
+
+export type DocumentCaseError =
+  | 'not-found'
+  | 'not-automated'
+  | 'already-pending';
+
 export type ReviewError =
   | 'not-found'
   | 'invalid-transition'

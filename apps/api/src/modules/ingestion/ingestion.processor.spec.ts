@@ -60,7 +60,7 @@ function createNotifications() {
 }
 
 function createExtraction() {
-  return { seed: jest.fn().mockResolvedValue(0) };
+  return { enqueueCodeChanges: jest.fn().mockResolvedValue(0) };
 }
 
 describe('IngestionProcessor', () => {
@@ -268,7 +268,7 @@ describe('IngestionProcessor', () => {
       extraction as never,
     ).process(job('event-1'));
 
-    expect(extraction.seed).toHaveBeenCalledWith(codeChanges);
+    expect(extraction.enqueueCodeChanges).toHaveBeenCalledWith(codeChanges);
   });
 
   it('marks the event processed even when nothing was worth extracting', async () => {
@@ -282,7 +282,7 @@ describe('IngestionProcessor', () => {
       extraction as never,
     ).process(job('event-1'));
 
-    expect(extraction.seed).toHaveBeenCalledWith([]);
+    expect(extraction.enqueueCodeChanges).toHaveBeenCalledWith([]);
     expect(prisma.scmEvent.update).toHaveBeenCalledWith({
       where: { id: 'event-1' },
       data: { status: 'PROCESSED' },
