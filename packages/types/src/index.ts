@@ -216,8 +216,15 @@ export interface RunRecord {
   cases: RunCaseRecord[]
 }
 
+export interface JunitIngestAcceptedRun {
+  externalId: string
+  suiteName: string
+  jobId: string
+}
+
 export interface JunitIngestRecord {
-  runs: RunRecord[]
+  accepted: number
+  runs: JunitIngestAcceptedRun[]
 }
 
 export interface RunCaseCounts {

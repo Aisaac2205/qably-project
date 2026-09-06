@@ -9,7 +9,9 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Throttle } from '@nestjs/throttler';
+import type { Queue } from 'bullmq';
 import { CurrentApiKey } from '../api-keys/decorators/current-api-key.decorator';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
@@ -17,6 +19,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
 import type { JunitIngestView, RunError, RunView } from './runs.contracts';
+import { RUN_INGEST_QUEUE, type RunIngestJobData } from './runs.contracts';
 import {
   ingestJunitQuerySchema,
   ingestRunSchema,
@@ -29,6 +32,8 @@ import {
   type JunitSuiteGroup,
 } from './lib/group-junit-report';
 import { RunsService } from './runs.service';
+
+const UNSAFE_JOB_ID_CHARACTERS = /[^a-zA-Z0-9_.:-]/g;
 
 function parseJunitReport(xml: string) {
   try {
@@ -66,11 +71,55 @@ function unwrap<T>(result: Result<T, RunError>): T {
   }
 }
 
+function resolveRunName(
+  query: IngestJunitQuery,
+  group: JunitSuiteGroup,
+): string {
+  if (query.name !== undefined) return query.name;
+  return group.suiteName !== '' ? group.suiteName : query.externalId;
+}
+
+function jobIdFor(projectId: string, body: IngestRunInput): string {
+  const raw = `${projectId}:${body.source}:${body.externalId}`;
+  return raw.replace(UNSAFE_JOB_ID_CHARACTERS, '-');
+}
+
+function validateGroup(
+  query: IngestJunitQuery,
+  group: JunitSuiteGroup,
+): IngestRunInput {
+  const candidate = {
+    ...query,
+    externalId: group.externalId,
+    suiteName: query.suiteId ? undefined : (query.suiteName ?? group.suiteName),
+    name: resolveRunName(query, group),
+    cases: group.cases,
+  };
+
+  const result = ingestRunSchema.safeParse(candidate);
+
+  if (!result.success) {
+    throw new BadRequestException({
+      message: `Validation failed for suite "${group.suiteName}"`,
+      issues: result.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    });
+  }
+
+  return result.data;
+}
+
 @Controller('runs')
 @UseGuards(ApiKeyGuard)
 @Public()
 export class RunsController {
-  constructor(private readonly runs: RunsService) {}
+  constructor(
+    private readonly runs: RunsService,
+    @InjectQueue(RUN_INGEST_QUEUE)
+    private readonly runIngestQueue: Queue<RunIngestJobData>,
+  ) {}
 
   @Post('ingest')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
@@ -84,7 +133,7 @@ export class RunsController {
 
   @Post('ingest/junit')
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.ACCEPTED)
   async ingestJunit(
     @CurrentApiKey() apiKey: ApiKeyIdentity,
     @Query(new ZodValidationPipe(ingestJunitQuerySchema))
@@ -109,22 +158,26 @@ export class RunsController {
         ]
       : groupBySuite(report, query.externalId);
 
-    const runs: RunView[] = [];
+    const bodies = groups.map((group) => validateGroup(query, group));
 
-    for (const group of groups) {
-      const body = ingestRunSchema.parse({
-        ...query,
-        externalId: group.externalId,
-        suiteName: query.suiteId
-          ? undefined
-          : (query.suiteName ?? group.suiteName),
-        name: query.name ?? group.suiteName,
-        cases: group.cases,
-      });
+    const jobs = bodies.map((body, index) => ({
+      name: 'ingest',
+      data: { apiKey, body } satisfies RunIngestJobData,
+      opts: { jobId: jobIdFor(apiKey.projectId, body) },
+      suiteName: groups[index].suiteName,
+    }));
 
-      runs.push(unwrap(await this.runs.ingest(apiKey, body)));
-    }
+    await this.runIngestQueue.addBulk(
+      jobs.map(({ name, data, opts }) => ({ name, data, opts })),
+    );
 
-    return { runs };
+    return {
+      accepted: jobs.length,
+      runs: jobs.map((job) => ({
+        externalId: job.data.body.externalId,
+        suiteName: job.suiteName,
+        jobId: job.opts.jobId,
+      })),
+    };
   }
 }
