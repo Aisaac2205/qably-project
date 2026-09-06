@@ -31,6 +31,7 @@ A `401`/`403` from the API (invalid key) is never retried and immediately resolv
 ## Limits
 
 - Source content is capped at **60,000 characters** per file (`SourceReader`, `apps/api/src/modules/repository/source-reader.ts`); anything longer is truncated before it reaches the model.
+- `SourceReader` percent-encodes owner, repo, ref and each path segment when it builds the fetch URL, and `buildBlobUrl` does the same for the human-facing `Evidence.uri` shown to reviewers — a file path or branch name containing a space, `#` or other reserved character never breaks either link.
 - The model may return at most **20 cases** per file (`MAX_EXTRACTED_CASES`, `apps/api/src/modules/ai/extraction.contracts.ts`).
 - Each case field is length-bounded (title ≤120, objective/expectedResult ≤500, steps 1–20 × ≤300, preconditions ≤10 × ≤300, sourceExcerpt ≤600) and validated with Zod (`extractedCaseSchema`) before it is persisted. A case that violates the schema is dropped and counted, not persisted — it never fails the rest of the batch.
 
@@ -72,11 +73,13 @@ For a **code-change** job, "no test declarations found" and "no case for a speci
 
 ### Decided-proposal guard (redelivery safety)
 
-Proposals produced from a code change are keyed by `(codeChangeId, automationKey)`. Because the queue uses `removeOnComplete: true`, a completed job's id can be reused, so a redelivered or retried job could otherwise flip an already-**approved**/**rejected**/**changes_requested** proposal back into review. Before writing, `ExtractionProcessor` looks up the existing proposal by that natural key:
+Proposals produced from a code change are keyed by `(codeChangeId, automationKey)`. Because the queue uses `removeOnComplete: true`, a completed job's id can be reused, so a redelivered or retried job could otherwise flip an already-**approved**/**rejected**/**changes_requested** proposal back into review. Before writing, `ExtractionProcessor` batches a lookup of the existing proposals for every `automationKey` in the current batch (one `findMany`, not one query per case) and then, per case:
 
 - If it exists and its status is **not** `in_review`, the redelivery is skipped and logged — the decided proposal is left untouched.
 - If it exists and is still `in_review`, its **evidence row is updated in place** (title/uri/excerpt) and the proposal fields are refreshed — no new orphaned `Evidence` row is created for the same natural key.
 - If it doesn't exist, a new `Evidence` row and a new proposal are created.
+
+The batch read is a snapshot — it does not itself prevent two concurrent workers from both reading "not found" for the same natural key. The actual atomicity comes from the database: `(codeChangeId, automationKey)` is a unique constraint, so when two jobs race to `create` the same proposal, the loser gets a Prisma `P2002` unique-violation instead of a duplicate row. `ExtractionProcessor` catches that violation, re-reads the winning row, and falls through to the same in-review-status-checked update path described above — so the losing job's data is never dropped, and a decided proposal still can't be reopened by a race. `@Processor(EXTRACTION_QUEUE)` sets `lockDuration: 120_000` (2 minutes) so a normal Gemini call never causes BullMQ to consider the job stalled and redeliver it while the original is still running; the P2002 fallback is a safety net for the rare case a redelivery happens anyway.
 
 ### Deduplication within a batch
 
@@ -107,9 +110,11 @@ Every AI call — chat replies, document-case extraction, and code-change extrac
 - `isEntitled(organizationId)` — a plain read (`aiEnabled && aiCredits > 0`), used as a cheap pre-check before doing any paid work.
 - `spendCredit(organizationId)` — an atomic `updateMany` that only decrements when `aiEnabled` is true and `aiCredits > 0`; if it matches zero rows, the caller must treat the attempt as **not entitled**, even though the check moments earlier passed (a concurrent request may have spent the last credit in between).
 
-`ExtractionProcessor` checks `isEntitled` before calling the extractor at all (never call the provider for a non-entitled org — the job goes straight to the manual-review fallback with reason `ai-not-enabled`), and calls `spendCredit` right after a real provider response (`extracted` or `no-tests-found`, not `provider-unavailable`) — a `no-tests-found` response still cost tokens, but a provider failure was never a billable call. If the decrement then fails, the job falls back to manual review instead of persisting proposals nobody paid for.
+`ExtractionProcessor` checks `isEntitled` before calling the extractor at all (never call the provider for a non-entitled org — the job goes straight to the manual-review fallback with reason `ai-not-enabled`), and spends the credit right after a real provider response (`extracted` or `no-tests-found`, not `provider-unavailable`) — a `no-tests-found` response still cost tokens, but a provider failure was never a billable call.
 
-`ChatService.sendMessage` calls `spendCredit` once the assistant has actually replied; if it fails, the user's message stays persisted but the assistant turn is discarded and the request reports `ai-not-enabled` — matching the existing "provider-unavailable keeps the user message, never persists a half-formed assistant turn" rule.
+When there are cases to persist, `spendCredit` is called **inside the same `$transaction` that writes the proposals** (`ExtractionProcessor.persistExtracted`), passing the transaction client through to `AiEntitlementService.spendCredit(organizationId, tx)`. That means a credit is only ever actually spent if the proposals it paid for actually land in the database: if any write after the decrement throws, the whole transaction — decrement included — rolls back, and the job falls through to the outer `runExtraction` catch, which creates the usual `extraction-failed` manual-review proposal instead of silently keeping a spent credit with nothing to show for it. For the `no-tests-found` and no-matching-case paths (which never call `persistExtracted`), the credit is still spent outside a transaction, since there's no proposal write to keep it atomic with.
+
+`ChatService.sendMessage` follows the same pattern: `spendCredit` runs inside the `$transaction` that creates the assistant message and updates the thread, so a persistence failure after a successful provider reply rolls the credit back together with the discarded assistant turn instead of charging for output that was never saved. If the decrement itself reports no credits left, the transaction returns without writing anything and the request reports `ai-not-enabled` — the user's message (persisted before the provider call) is kept, matching the existing "provider-unavailable keeps the user message, never persists a half-formed assistant turn" rule.
 
 At the HTTP layer, `AiEntitlementGuard` (`apps/api/src/modules/ai/guards/ai-entitlement.guard.ts`) reads `request.org` (populated by `OrgScopeGuard`, which must run first) and calls `isEntitled` before letting the request reach the controller method, throwing `403 { code: 'ai-not-enabled' }` otherwise. It is applied, after `OrgScopeGuard`, to:
 

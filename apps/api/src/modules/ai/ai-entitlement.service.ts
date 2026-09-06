@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+export interface CreditSpendClient {
+  organization: { updateMany: PrismaService['organization']['updateMany'] };
+}
+
 @Injectable()
 export class AiEntitlementService {
   constructor(private readonly prisma: PrismaService) {}
@@ -18,8 +22,11 @@ export class AiEntitlementService {
     );
   }
 
-  async spendCredit(organizationId: string): Promise<boolean> {
-    const result = await this.prisma.organization.updateMany({
+  async spendCredit(
+    organizationId: string,
+    client: CreditSpendClient = this.prisma,
+  ): Promise<boolean> {
+    const result = await client.organization.updateMany({
       where: { id: organizationId, aiEnabled: true, aiCredits: { gt: 0 } },
       data: { aiCredits: { decrement: 1 } },
     });

@@ -23,6 +23,8 @@ const NOT_ENTITLED_REASON = 'ai-not-enabled';
 const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
 const NO_TESTS_FOUND_REASON = 'no-tests-found';
 const EXTRACTION_FAILED_REASON = 'extraction-failed';
+const UNIQUE_VIOLATION = 'P2002';
+const LOCK_DURATION_MS = 120_000;
 
 interface ConnectionInfo {
   provider: RepoConnectionProvider;
@@ -43,18 +45,50 @@ interface JobContext {
   fallbackEvidenceId: string | null;
 }
 
+interface ExistingProposal {
+  id: string;
+  status: string;
+  evidenceId: string;
+}
+
+interface SharedProposalFields {
+  projectId: string;
+  suiteId: string | null;
+  status: 'in_review';
+  title: string;
+  objective: string;
+  preconditions: string[];
+  steps: string[];
+  expectedResult: string;
+  priority: ExtractedCase['priority'];
+  promptVersion: string;
+}
+
 interface TxClient {
   suite: { findFirst: PrismaService['suite']['findFirst'] };
-  testCase: { findFirst: PrismaService['testCase']['findFirst'] };
+  testCase: {
+    findFirst: PrismaService['testCase']['findFirst'];
+    findMany: PrismaService['testCase']['findMany'];
+  };
   evidence: {
     create: PrismaService['evidence']['create'];
     update: PrismaService['evidence']['update'];
   };
   extractedProposal: {
     findFirst: PrismaService['extractedProposal']['findFirst'];
+    findMany: PrismaService['extractedProposal']['findMany'];
     create: PrismaService['extractedProposal']['create'];
     update: PrismaService['extractedProposal']['update'];
   };
+  organization: { updateMany: PrismaService['organization']['updateMany'] };
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === UNIQUE_VIOLATION
+  );
 }
 
 function splitRepo(full: string): { owner: string; repo: string } {
@@ -79,7 +113,10 @@ function dedupeByAutomationKey(
   return deduped;
 }
 
-@Processor(EXTRACTION_QUEUE, { concurrency: 2 })
+@Processor(EXTRACTION_QUEUE, {
+  concurrency: 2,
+  lockDuration: LOCK_DURATION_MS,
+})
 export class ExtractionProcessor extends WorkerHost {
   private readonly logger = new Logger(ExtractionProcessor.name);
 
@@ -266,13 +303,9 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const spent = await this.entitlement.spendCredit(ctx.organizationId);
-    if (!spent) {
-      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
-      return;
-    }
-
     if (outcome.kind === 'no-tests-found') {
+      if (!(await this.spendCreditOrFallback(ctx))) return;
+
       if (ctx.targetTestCaseId !== null) {
         await this.persistManualReviewFallback(ctx, NO_TESTS_FOUND_REASON);
         return;
@@ -290,6 +323,8 @@ export class ExtractionProcessor extends WorkerHost {
           );
 
     if (cases.length === 0) {
+      if (!(await this.spendCreditOrFallback(ctx))) return;
+
       if (ctx.targetTestCaseId !== null) {
         await this.persistManualReviewFallback(ctx, NO_MATCHING_CASE_REASON);
         return;
@@ -300,7 +335,18 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    await this.persistExtracted(cases, ctx);
+    const persisted = await this.persistExtracted(cases, ctx);
+    if (!persisted) {
+      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
+    }
+  }
+
+  private async spendCreditOrFallback(ctx: JobContext): Promise<boolean> {
+    const spent = await this.entitlement.spendCredit(ctx.organizationId);
+    if (!spent) {
+      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
+    }
+    return spent;
   }
 
   private async resolveLocale(organizationId: string): Promise<'es' | 'en'> {
@@ -316,37 +362,52 @@ export class ExtractionProcessor extends WorkerHost {
   private async persistExtracted(
     cases: readonly ExtractedCase[],
     ctx: JobContext,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const connection = ctx.connection as ConnectionInfo;
+    const automationKeys = cases.map((testCase) => testCase.automationKey);
 
-    await this.prisma.$transaction(async (tx: TxClient) => {
+    return this.prisma.$transaction(async (tx: TxClient) => {
+      const spent = await this.entitlement.spendCredit(
+        ctx.organizationId,
+        tx,
+      );
+      if (!spent) return false;
+
+      if (ctx.targetTestCaseId !== null) {
+        const pending = await tx.extractedProposal.findFirst({
+          where: {
+            targetTestCaseId: ctx.targetTestCaseId,
+            status: 'in_review',
+          },
+          select: { id: true },
+        });
+
+        if (pending !== null) return true;
+      }
+
       const suiteId =
         ctx.knownSuiteId ??
         (await this.resolveSuiteId(tx, ctx.projectId, ctx.filePath));
 
+      const matchedCaseByKey =
+        ctx.targetTestCaseId !== null || suiteId === null
+          ? new Map<string, string>()
+          : await this.matchCasesByAutomationKey(tx, suiteId, automationKeys);
+
+      const existingProposalByKey =
+        ctx.codeChangeId === null
+          ? new Map<string, ExistingProposal>()
+          : await this.findExistingProposalsByKey(
+              tx,
+              ctx.codeChangeId,
+              automationKeys,
+            );
+
       for (const testCase of cases) {
-        if (ctx.targetTestCaseId !== null) {
-          const pending = await tx.extractedProposal.findFirst({
-            where: {
-              targetTestCaseId: ctx.targetTestCaseId,
-              status: 'in_review',
-            },
-            select: { id: true },
-          });
-
-          if (pending !== null) continue;
-        }
-
         const matchedCaseId =
           ctx.targetTestCaseId ??
-          (suiteId === null
-            ? null
-            : ((
-                await tx.testCase.findFirst({
-                  where: { suiteId, automationKey: testCase.automationKey },
-                  select: { id: true },
-                })
-              )?.id ?? null));
+          matchedCaseByKey.get(testCase.automationKey) ??
+          null;
 
         const uri = buildBlobUrl(
           connection.provider,
@@ -369,54 +430,15 @@ export class ExtractionProcessor extends WorkerHost {
         };
 
         if (ctx.codeChangeId !== null) {
-          const existing = await tx.extractedProposal.findFirst({
-            where: {
-              codeChangeId: ctx.codeChangeId,
-              automationKey: testCase.automationKey,
-            },
-            select: { id: true, status: true, evidenceId: true },
-          });
-
-          if (existing !== null && existing.status !== 'in_review') {
-            this.logger.log(
-              `Skipping redelivered extraction for already-decided proposal ${existing.id}`,
-            );
-            continue;
-          }
-
-          if (existing !== null) {
-            await tx.evidence.update({
-              where: { id: existing.evidenceId },
-              data: { title: ctx.filePath, uri, excerpt: testCase.sourceExcerpt },
-            });
-
-            await tx.extractedProposal.update({
-              where: { id: existing.id },
-              data: { ...shared, targetTestCaseId: matchedCaseId },
-            });
-            continue;
-          }
-
-          const evidence = await tx.evidence.create({
-            data: {
-              projectId: ctx.projectId,
-              kind: 'SOURCE_EXCERPT',
-              title: ctx.filePath,
-              uri,
-              excerpt: testCase.sourceExcerpt,
-            },
-            select: { id: true },
-          });
-
-          await tx.extractedProposal.create({
-            data: {
-              ...shared,
-              evidenceId: evidence.id,
-              codeChangeId: ctx.codeChangeId,
-              automationKey: testCase.automationKey,
-              targetTestCaseId: matchedCaseId,
-            },
-          });
+          await this.upsertCodeChangeProposal(
+            tx,
+            ctx,
+            testCase,
+            existingProposalByKey.get(testCase.automationKey) ?? null,
+            matchedCaseId,
+            uri,
+            shared,
+          );
           continue;
         }
 
@@ -441,6 +463,143 @@ export class ExtractionProcessor extends WorkerHost {
           },
         });
       }
+
+      return true;
+    });
+  }
+
+  private async matchCasesByAutomationKey(
+    tx: TxClient,
+    suiteId: string,
+    automationKeys: readonly string[],
+  ): Promise<Map<string, string>> {
+    const rows = (await tx.testCase.findMany({
+      where: { suiteId, automationKey: { in: [...automationKeys] } },
+      select: { id: true, automationKey: true },
+    })) as { id: string; automationKey: string | null }[];
+
+    return new Map(
+      rows
+        .filter(
+          (row): row is { id: string; automationKey: string } =>
+            row.automationKey !== null,
+        )
+        .map((row) => [row.automationKey, row.id]),
+    );
+  }
+
+  private async findExistingProposalsByKey(
+    tx: TxClient,
+    codeChangeId: string,
+    automationKeys: readonly string[],
+  ): Promise<Map<string, ExistingProposal>> {
+    const rows = (await tx.extractedProposal.findMany({
+      where: { codeChangeId, automationKey: { in: [...automationKeys] } },
+      select: { id: true, status: true, evidenceId: true, automationKey: true },
+    })) as (ExistingProposal & { automationKey: string | null })[];
+
+    return new Map(
+      rows
+        .filter(
+          (row): row is ExistingProposal & { automationKey: string } =>
+            row.automationKey !== null,
+        )
+        .map((row) => [row.automationKey, row]),
+    );
+  }
+
+  private async upsertCodeChangeProposal(
+    tx: TxClient,
+    ctx: JobContext,
+    testCase: ExtractedCase,
+    existing: ExistingProposal | null,
+    matchedCaseId: string | null,
+    uri: string,
+    shared: SharedProposalFields,
+  ): Promise<void> {
+    if (existing !== null) {
+      await this.applyDecidedProposalGuard(
+        tx,
+        ctx,
+        testCase,
+        existing,
+        matchedCaseId,
+        uri,
+        shared,
+      );
+      return;
+    }
+
+    const evidence = await tx.evidence.create({
+      data: {
+        projectId: ctx.projectId,
+        kind: 'SOURCE_EXCERPT',
+        title: ctx.filePath,
+        uri,
+        excerpt: testCase.sourceExcerpt,
+      },
+      select: { id: true },
+    });
+
+    try {
+      await tx.extractedProposal.create({
+        data: {
+          ...shared,
+          evidenceId: evidence.id,
+          codeChangeId: ctx.codeChangeId,
+          automationKey: testCase.automationKey,
+          targetTestCaseId: matchedCaseId,
+        },
+      });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      const winner = await tx.extractedProposal.findFirst({
+        where: {
+          codeChangeId: ctx.codeChangeId,
+          automationKey: testCase.automationKey,
+        },
+        select: { id: true, status: true, evidenceId: true },
+      });
+
+      if (winner === null) throw error;
+
+      await this.applyDecidedProposalGuard(
+        tx,
+        ctx,
+        testCase,
+        winner,
+        matchedCaseId,
+        uri,
+        shared,
+      );
+    }
+  }
+
+  private async applyDecidedProposalGuard(
+    tx: TxClient,
+    ctx: JobContext,
+    testCase: ExtractedCase,
+    existing: ExistingProposal,
+    matchedCaseId: string | null,
+    uri: string,
+    shared: SharedProposalFields,
+  ): Promise<void> {
+    if (existing.status !== 'in_review') {
+      this.logger.log(
+        `Skipping redelivered extraction for already-decided proposal ${existing.id}`,
+      );
+      return;
+    }
+
+    await tx.evidence.update({
+      where: { id: existing.evidenceId },
+      data: { title: ctx.filePath, uri, excerpt: testCase.sourceExcerpt },
+    });
+
+    await tx.extractedProposal.update({
+      where: { id: existing.id },
+      data: { ...shared, targetTestCaseId: matchedCaseId },
     });
   }
 

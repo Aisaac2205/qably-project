@@ -21,12 +21,13 @@ function extractedCase(overrides: Record<string, unknown> = {}) {
 
 interface FakePrisma {
   codeChange: { findUnique: jest.Mock; findFirst: jest.Mock };
-  testCase: { findUnique: jest.Mock; findFirst: jest.Mock };
+  testCase: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
   suite: { findFirst: jest.Mock };
   orgMember: { findFirst: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
   extractedProposal: {
     findFirst: jest.Mock;
+    findMany: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
   };
@@ -63,6 +64,7 @@ function createPrisma(): FakePrisma {
             : null,
         ),
       ),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     suite: {
       findFirst: jest
@@ -79,6 +81,7 @@ function createPrisma(): FakePrisma {
     },
     extractedProposal: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: 'proposal-new' }),
       update: jest.fn().mockResolvedValue({ id: 'proposal-updated' }),
     },
@@ -189,14 +192,9 @@ describe('ExtractionProcessor — code-change job', () => {
 
   it('targets an existing automated test case whose automationKey matches', async () => {
     const prisma = createPrisma();
-    prisma.testCase.findFirst.mockImplementation(
-      (args: { where: Record<string, unknown> }) =>
-        Promise.resolve(
-          'automationFilePath' in args.where
-            ? null
-            : { id: 'case-existing' },
-        ),
-    );
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-existing', automationKey: 'Cart > adds an item' },
+    ]);
     const extractor = fakeExtractor(
       jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
     );
@@ -400,12 +398,95 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    expect(spendCredit).toHaveBeenCalledWith('org-1');
+    expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+    expect(prisma.extractedProposal.findMany).not.toHaveBeenCalled();
     const createCall = lastCall(prisma.extractedProposal.create);
     expect(createCall.data).toMatchObject({
       needsManualReview: true,
       objective: 'ai-not-enabled',
     });
+  });
+
+  it('spends the credit inside the persisting transaction so a failed persist would roll the credit back too', async () => {
+    const prisma = createPrisma();
+    prisma.evidence.create.mockRejectedValueOnce(new Error('db unavailable'));
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+    const spendCredit = jest.fn().mockResolvedValue(true);
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      fakeEntitlement(jest.fn().mockResolvedValue(true), spendCredit),
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({
+      needsManualReview: true,
+      objective: 'extraction-failed',
+    });
+  });
+
+  it('persists the case via a conditional update when a concurrent redelivery wins the create race, without losing the other cases in the batch', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.create.mockImplementationOnce(() => {
+      throw { code: 'P2002' };
+    });
+    prisma.extractedProposal.findFirst.mockResolvedValueOnce({
+      id: 'winner-proposal',
+      status: 'in_review',
+      evidenceId: 'evidence-existing',
+    });
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ title: 'First' }),
+          extractedCase({ automationKey: 'Cart > removes an item', title: 'Second' }),
+        ]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
+    const updateCall = lastCall(prisma.extractedProposal.update);
+    expect(updateCall.where).toEqual({ id: 'winner-proposal' });
+    expect(updateCall.data).toMatchObject({ title: 'First' });
+    const secondCreateCall = lastCall(prisma.extractedProposal.create);
+    expect(secondCreateCall.data).toMatchObject({
+      automationKey: 'Cart > removes an item',
+      title: 'Second',
+    });
+  });
+
+  it('does not mutate an already-decided proposal even when the create races and loses', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.create.mockImplementationOnce(() => {
+      throw { code: 'P2002' };
+    });
+    prisma.extractedProposal.findFirst.mockResolvedValueOnce({
+      id: 'winner-proposal',
+      status: 'approved',
+      evidenceId: 'evidence-existing',
+    });
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.evidence.update).not.toHaveBeenCalled();
   });
 
   it('deduplicates extracted cases sharing the same automationKey, keeping the first', async () => {
@@ -433,11 +514,14 @@ describe('ExtractionProcessor — code-change job', () => {
 
   it('does not mutate a proposal that was already decided (decided-proposal guard)', async () => {
     const prisma = createPrisma();
-    prisma.extractedProposal.findFirst.mockResolvedValue({
-      id: 'decided-proposal',
-      status: 'approved',
-      evidenceId: 'evidence-existing',
-    });
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      {
+        id: 'decided-proposal',
+        status: 'approved',
+        evidenceId: 'evidence-existing',
+        automationKey: 'Cart > adds an item',
+      },
+    ]);
     const extractor = fakeExtractor(
       jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
     );
@@ -453,11 +537,14 @@ describe('ExtractionProcessor — code-change job', () => {
 
   it('reuses the existing evidence row instead of orphaning it when a pending proposal is redelivered', async () => {
     const prisma = createPrisma();
-    prisma.extractedProposal.findFirst.mockResolvedValue({
-      id: 'pending-proposal',
-      status: 'in_review',
-      evidenceId: 'evidence-existing',
-    });
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      {
+        id: 'pending-proposal',
+        status: 'in_review',
+        evidenceId: 'evidence-existing',
+        automationKey: 'Cart > adds an item',
+      },
+    ]);
     const extractor = fakeExtractor(
       jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
     );
