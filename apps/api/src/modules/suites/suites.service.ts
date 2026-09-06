@@ -332,7 +332,7 @@ export class SuitesService {
 
     const rows = (await this.prisma.runCase.findMany({
       where: { testCaseId: { in: automatedCaseIds } },
-      orderBy: [{ run: { startedAt: 'desc' } }],
+      orderBy: [{ run: { startedAt: 'desc' } }, { id: 'desc' }],
       distinct: ['testCaseId'],
       select: {
         testCaseId: true,

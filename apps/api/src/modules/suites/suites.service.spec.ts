@@ -473,6 +473,19 @@ describe('SuitesService automated case last result', () => {
     );
   });
 
+  it('breaks a startedAt tie deterministically by run id', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(automatedSuiteRow);
+
+    await build(prisma).findOne(owner, 'suite-1');
+
+    expect(prisma.runCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ run: { startedAt: 'desc' } }, { id: 'desc' }],
+      }),
+    );
+  });
+
   it('reports a null lastResult for an automated case with no run history yet', async () => {
     const prisma = createPrisma();
     prisma.suite.findFirst.mockResolvedValue(automatedSuiteRow);

@@ -160,7 +160,7 @@ export class RunQueriesService {
   ): Promise<SuiteMetricsView> {
     const suites = await this.prisma.suite.findMany({
       where: { projectId, organizationId: org.organizationId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
 
     if (suites.length === 0) return { items: [] };
@@ -215,7 +215,7 @@ export class RunQueriesService {
       );
     }
 
-    return { items: buildSuiteMetrics(suiteIds, rankedRuns, passRateByRunId) };
+    return { items: buildSuiteMetrics(suites, rankedRuns, passRateByRunId) };
   }
 
   /**
@@ -234,6 +234,7 @@ export class RunQueriesService {
         organizationId: org.organizationId,
         projectId,
         status: { in: ['pass', 'fail'] },
+        finishedAt: { not: null },
       },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       take: limit,

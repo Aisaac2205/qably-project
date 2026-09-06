@@ -452,6 +452,60 @@ describe('RunsService.ingest legacy name fallback', () => {
   });
 });
 
+describe('RunsService.ingest legacy fallback excludes manual cases', () => {
+  it('never matches a manual case by name, even when automationKey is null', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.testCase.findMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: {
+          suiteId: 'suite-1',
+          OR: [
+            { automationKey: { in: ['Adds to cart'] } },
+            {
+              automationKey: null,
+              executionMode: 'automated',
+              name: { in: ['Adds to cart'] },
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('drafts a new automated case instead of adopting a manual case with a colliding name', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ name: 'Adds to cart' }])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-9', automationKey: 'Adds to cart' },
+      ]);
+
+    const result = await build(prisma).ingest(apiKey, baseInput);
+
+    expect(result.ok).toBe(true);
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({
+            executionMode: 'automated',
+            automationKey: 'Adds to cart',
+          }),
+        ],
+      }),
+    );
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data[0].testCaseId).toBe('draft-case-9');
+  });
+});
+
 describe('RunsService.ingest humanized title collisions', () => {
   it('falls back to the raw automationKey as the case name when the humanized title already names another case in the suite', async () => {
     const prisma = createPrisma();

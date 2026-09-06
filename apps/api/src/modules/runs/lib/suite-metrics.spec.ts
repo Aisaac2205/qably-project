@@ -18,18 +18,44 @@ function row(overrides: Partial<RankedRunRow> = {}): RankedRunRow {
 
 describe('buildSuiteMetrics', () => {
   it('returns null lastRun and an empty trend for a suite with no runs', () => {
-    const [entry] = buildSuiteMetrics(['suite-1'], [], new Map());
+    const [entry] = buildSuiteMetrics(
+      [{ id: 'suite-1', name: 'Checkout' }],
+      [],
+      new Map(),
+    );
 
-    expect(entry).toEqual({ suiteId: 'suite-1', lastRun: null, trend: [] });
+    expect(entry).toEqual({
+      suiteId: 'suite-1',
+      suiteName: 'Checkout',
+      lastRun: null,
+      trend: [],
+    });
   });
 
   it('returns one entry per suite id, in the given order', () => {
-    const entries = buildSuiteMetrics(['suite-1', 'suite-2'], [], new Map());
+    const entries = buildSuiteMetrics(
+      [
+        { id: 'suite-1', name: 'Checkout' },
+        { id: 'suite-2', name: 'Auth' },
+      ],
+      [],
+      new Map(),
+    );
 
     expect(entries.map((entry) => entry.suiteId)).toEqual([
       'suite-1',
       'suite-2',
     ]);
+  });
+
+  it('carries the suite name onto the entry so the client never resolves it', () => {
+    const [entry] = buildSuiteMetrics(
+      [{ id: 'suite-1', name: 'Checkout' }],
+      [],
+      new Map(),
+    );
+
+    expect(entry.suiteName).toBe('Checkout');
   });
 
   it('uses the most recent run (first row per suite) as lastRun', () => {
@@ -39,7 +65,7 @@ describe('buildSuiteMetrics', () => {
     ];
 
     const [entry] = buildSuiteMetrics(
-      ['suite-1'],
+      [{ id: 'suite-1', name: 'Checkout' }],
       rows,
       new Map([['run-2', 1]]),
     );
@@ -49,14 +75,18 @@ describe('buildSuiteMetrics', () => {
   });
 
   it('reports 0 passRate when the run id is missing from the map', () => {
-    const [entry] = buildSuiteMetrics(['suite-1'], [row()], new Map());
+    const [entry] = buildSuiteMetrics(
+      [{ id: 'suite-1', name: 'Checkout' }],
+      [row()],
+      new Map(),
+    );
 
     expect(entry.lastRun?.passRate).toBe(0);
   });
 
   it('omits finishedAt when the run has not finished', () => {
     const [entry] = buildSuiteMetrics(
-      ['suite-1'],
+      [{ id: 'suite-1', name: 'Checkout' }],
       [row({ finishedAt: null })],
       new Map(),
     );
@@ -83,7 +113,11 @@ describe('buildSuiteMetrics', () => {
       }),
     ];
 
-    const [entry] = buildSuiteMetrics(['suite-1'], rows, new Map());
+    const [entry] = buildSuiteMetrics(
+      [{ id: 'suite-1', name: 'Checkout' }],
+      rows,
+      new Map(),
+    );
 
     expect(entry.trend).toEqual(['pass', 'fail', 'pass']);
   });
@@ -98,7 +132,14 @@ describe('buildSuiteMetrics', () => {
       row({ id: 'run-b1', suiteId: 'suite-b', status: 'fail' }),
     ];
 
-    const entries = buildSuiteMetrics(['suite-a', 'suite-b'], rows, new Map());
+    const entries = buildSuiteMetrics(
+      [
+        { id: 'suite-a', name: 'Suite A' },
+        { id: 'suite-b', name: 'Suite B' },
+      ],
+      rows,
+      new Map(),
+    );
     const bySuite = new Map(entries.map((entry) => [entry.suiteId, entry]));
 
     expect(bySuite.get('suite-a')?.lastRun?.id).toBe('run-a1');
@@ -108,7 +149,11 @@ describe('buildSuiteMetrics', () => {
   it('ignores rows for a suite id that is not in the requested list', () => {
     const rows = [row({ id: 'run-x', suiteId: 'suite-not-requested' })];
 
-    const [entry] = buildSuiteMetrics(['suite-1'], rows, new Map());
+    const [entry] = buildSuiteMetrics(
+      [{ id: 'suite-1', name: 'Checkout' }],
+      rows,
+      new Map(),
+    );
 
     expect(entry.lastRun).toBeNull();
   });

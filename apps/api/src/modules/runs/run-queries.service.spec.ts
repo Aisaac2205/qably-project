@@ -107,7 +107,9 @@ function createPrisma(): FakePrisma {
     },
     suite: {
       findFirst: jest.fn().mockResolvedValue(suiteWithCases),
-      findMany: jest.fn().mockResolvedValue([{ id: 'suite-1' }]),
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ id: 'suite-1', name: 'Checkout' }]),
     },
     $queryRaw: jest.fn().mockResolvedValue([]),
     txRunCaseFindMany: jest.fn().mockResolvedValue([runCaseRow()]),
@@ -343,19 +345,35 @@ describe('RunQueriesService.suiteMetrics', () => {
 
   it('returns a null lastRun and empty trend for a suite with no runs', async () => {
     const prisma = createPrisma();
-    prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+    ]);
     prisma.$queryRaw.mockResolvedValue([]);
 
     const result = await build(prisma).suiteMetrics(org, 'project-1');
 
     expect(result.items).toEqual([
-      { suiteId: 'suite-1', lastRun: null, trend: [] },
+      { suiteId: 'suite-1', suiteName: 'Checkout', lastRun: null, trend: [] },
     ]);
+  });
+
+  it('carries the suite name onto the entry so a suite with zero runs still renders its name', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+    ]);
+    prisma.$queryRaw.mockResolvedValue([]);
+
+    const result = await build(prisma).suiteMetrics(org, 'project-1');
+
+    expect(result.items[0].suiteName).toBe('Checkout');
   });
 
   it('builds the lastRun and trend from the ranked runs, with passRate from the case counts', async () => {
     const prisma = createPrisma();
-    prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+    ]);
     prisma.$queryRaw.mockResolvedValue([
       {
         id: 'run-2',
@@ -384,6 +402,7 @@ describe('RunQueriesService.suiteMetrics', () => {
     expect(result.items).toEqual([
       {
         suiteId: 'suite-1',
+        suiteName: 'Checkout',
         lastRun: {
           id: 'run-2',
           status: 'pass',
@@ -409,7 +428,9 @@ describe('RunQueriesService.suiteMetrics', () => {
 
   it('only counts cases for the most recent run per suite, not every trend run', async () => {
     const prisma = createPrisma();
-    prisma.suite.findMany.mockResolvedValue([{ id: 'suite-1' }]);
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+    ]);
     prisma.$queryRaw.mockResolvedValue([
       {
         id: 'run-2',
@@ -473,6 +494,7 @@ describe('RunQueriesService.regressions', () => {
           organizationId: 'org-1',
           projectId: 'project-1',
           status: { in: ['pass', 'fail'] },
+          finishedAt: { not: null },
         },
         orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
         take: 20,

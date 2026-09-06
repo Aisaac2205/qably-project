@@ -11,12 +11,17 @@ export interface RankedRunRow {
   finishedAt: Date | null;
 }
 
+export interface SuiteRef {
+  id: string;
+  name: string;
+}
+
 export function buildSuiteMetrics(
-  suiteIds: readonly string[],
+  suites: readonly SuiteRef[],
   rankedRuns: readonly RankedRunRow[],
   passRateByRunId: ReadonlyMap<string, number>,
 ): SuiteMetricsEntry[] {
-  const requested = new Set(suiteIds);
+  const requested = new Set(suites.map((suite) => suite.id));
   const rowsBySuite = new Map<string, RankedRunRow[]>();
 
   for (const row of rankedRuns) {
@@ -27,7 +32,7 @@ export function buildSuiteMetrics(
     rowsBySuite.set(row.suiteId, rows);
   }
 
-  return suiteIds.map((suiteId) => {
+  return suites.map(({ id: suiteId, name: suiteName }) => {
     const rows = rowsBySuite.get(suiteId) ?? [];
     const mostRecent = rows[0];
     const trend = rows
@@ -37,6 +42,7 @@ export function buildSuiteMetrics(
 
     return {
       suiteId,
+      suiteName,
       lastRun:
         mostRecent === undefined
           ? null

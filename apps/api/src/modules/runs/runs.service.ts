@@ -275,7 +275,11 @@ export class RunsService {
         suiteId,
         OR: [
           { automationKey: { in: keys } },
-          { automationKey: null, name: { in: keys } },
+          {
+            automationKey: null,
+            executionMode: 'automated',
+            name: { in: keys },
+          },
         ],
       },
       select: { id: true, name: true, automationKey: true },

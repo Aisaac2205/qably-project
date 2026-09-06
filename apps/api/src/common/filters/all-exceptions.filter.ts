@@ -13,6 +13,7 @@ type ErrorBody = {
   path: string;
   timestamp: string;
   issues?: unknown;
+  code?: string;
 };
 
 @Catch()
@@ -51,9 +52,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         return { statusCode, message: payload, path, timestamp };
       }
 
-      const { message, issues } = payload as {
+      const { message, issues, code } = payload as {
         message?: string | string[];
         issues?: unknown;
+        code?: unknown;
       };
 
       return {
@@ -64,6 +66,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         path,
         timestamp,
         ...(issues === undefined ? {} : { issues }),
+        ...(typeof code === 'string' ? { code } : {}),
       };
     }
 

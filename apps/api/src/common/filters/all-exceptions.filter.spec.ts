@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
@@ -89,6 +90,38 @@ describe('AllExceptionsFilter', () => {
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'connection reset' }),
     );
+  });
+
+  it('passes through a machine-readable code from the exception response', () => {
+    const { host, json } = createHost();
+
+    new AllExceptionsFilter(false).catch(
+      new ConflictException({
+        code: 'no-manual-cases',
+        message: 'This suite has no manual cases to run',
+      }),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 409,
+        code: 'no-manual-cases',
+        message: 'This suite has no manual cases to run',
+      }),
+    );
+  });
+
+  it('omits the code field when the exception response carries none', () => {
+    const { host, json } = createHost();
+
+    new AllExceptionsFilter(false).catch(
+      new NotFoundException('Project not found'),
+      host,
+    );
+
+    const [body] = json.mock.calls[0] as [Record<string, unknown>];
+    expect(body).not.toHaveProperty('code');
   });
 
   it('includes the request path and a timestamp on every response', () => {

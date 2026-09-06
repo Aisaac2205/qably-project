@@ -46,23 +46,37 @@ function unwrap<T>(result: Result<T, RunQueryError>): T {
 
   switch (result.error) {
     case 'not-found':
-      throw new NotFoundException('Run not found');
+      throw new NotFoundException({
+        code: 'not-found',
+        message: 'Run not found',
+      });
     case 'case-not-found':
-      throw new NotFoundException('Case not found in this run');
+      throw new NotFoundException({
+        code: 'case-not-found',
+        message: 'Case not found in this run',
+      });
     case 'suite-not-found':
-      throw new NotFoundException('Suite not found for this project');
+      throw new NotFoundException({
+        code: 'suite-not-found',
+        message: 'Suite not found for this project',
+      });
     case 'empty-suite':
-      throw new BadRequestException(
-        'Cannot start a run from a suite with no cases',
-      );
+      throw new BadRequestException({
+        code: 'empty-suite',
+        message: 'Cannot start a run from a suite with no cases',
+      });
     case 'no-manual-cases':
-      throw new ConflictException(
-        'This suite has no manual cases to run; automated cases are read-only here',
-      );
+      throw new ConflictException({
+        code: 'no-manual-cases',
+        message:
+          'This suite has no manual cases to run; automated cases are read-only here',
+      });
     case 'source-not-editable':
-      throw new ConflictException(
-        'Case statuses in an automated run are recorded by the reporting tool and cannot be edited',
-      );
+      throw new ConflictException({
+        code: 'source-not-editable',
+        message:
+          'Case statuses in an automated run are recorded by the reporting tool and cannot be edited',
+      });
   }
 }
 

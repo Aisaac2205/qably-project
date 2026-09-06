@@ -57,9 +57,14 @@ raw name the reporter emitted — `describe > it`, `ClassName testMethod`, `test
 whatever the tool produced), `automation_class_name` and `automation_file_path`. `automation_key` is the
 stable matching key across ingestions; `name` is free for a QA to rewrite into something readable without
 breaking the link back to CI. `ensureOfficialCases` (`runs.service.ts`) matches incoming JUnit cases by
-`automation_key` first, and only falls back to `name` for rows created before this column existed —
-backfilling `automation_key` on that legacy row so the fallback is a one-time migration path, not a
-permanent second matching strategy.
+`automation_key` first, and only falls back to `name` for rows that are already `automated` but were
+created before this column existed — backfilling `automation_key` on that legacy row so the fallback is
+a one-time migration path, not a permanent second matching strategy. A `manual` case is never matched by
+name, so a QA's hand-written case cannot be absorbed into automation because a developer reused its title.
+
+The mode of pre-existing rows was derived per case, not per suite: a case is `automated` only if it
+appears in `run_case` rows of a non-manual run (migration `20260905195500_fix_execution_mode_backfill`
+corrects the earlier suite-level backfill). Everything else stays `manual`.
 
 CI never creates an official case. A result with no matching `automation_key` creates a new case in
 `draft` state, titled by `@qably/test-naming`'s `humanizeTestName` from the raw name, class and file. It
