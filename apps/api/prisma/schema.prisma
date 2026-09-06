@@ -438,6 +438,7 @@ model ExtractedProposal {
   automationKey     String?
   needsManualReview Boolean          @default(false)
   promptVersion     String?
+  chatCaseKey       String?          @unique @map("chat_case_key")
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   decisions         ReviewDecision[]
