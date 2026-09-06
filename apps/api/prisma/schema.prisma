@@ -200,19 +200,20 @@ model ApiKey {
 }
 
 model Suite {
-  id             String       @id @default(cuid())
+  id             String              @id @default(cuid())
   projectId      String
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name           String
-  description    String       @default("")
-  tags           String[]     @default([])
-  isDefault      Boolean      @default(false)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  description    String              @default("")
+  tags           String[]            @default([])
+  isDefault      Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
   cases          TestCase[]
   runs           Run[]
+  proposals      ExtractedProposal[]
 
   @@unique([projectId, name])
   @@index([projectId])
@@ -260,6 +261,7 @@ model Connection {
   name                   String
   repo                   String
   encryptedWebhookSecret String
+  encryptedAccessToken   String?
   events                 ScmEvent[]
   projects               Project[]
   createdAt              DateTime           @default(now())
@@ -356,20 +358,20 @@ model IngestionBatch {
 }
 
 model CodeChange {
-  id                String             @id @default(cuid())
+  id                String              @id @default(cuid())
   projectId         String
-  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project           Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
   batchId           String
-  batch             IngestionBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  batch             IngestionBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
   evidenceId        String
-  evidence          Evidence           @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  evidence          Evidence            @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   pullRequestNumber Int?
   commitSha         String
   filePath          String
-  diff              String             @default("")
+  diff              String              @default("")
   detectedPattern   String?
-  createdAt         DateTime           @default(now())
-  proposal          ExtractedProposal?
+  createdAt         DateTime            @default(now())
+  proposals         ExtractedProposal[]
 
   @@unique([batchId, filePath])
   @@index([projectId])
@@ -410,29 +412,37 @@ enum TraceabilityRelation {
 }
 
 model ExtractedProposal {
-  id               String           @id @default(cuid())
-  projectId        String
-  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  evidenceId       String
-  evidence         Evidence         @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-  codeChangeId     String?          @unique
-  codeChange       CodeChange?      @relation(fields: [codeChangeId], references: [id], onDelete: SetNull)
-  targetTestCaseId String?
-  targetTestCase   TestCase?        @relation(fields: [targetTestCaseId], references: [id], onDelete: SetNull)
-  status           ProposalStatus   @default(in_review)
-  title            String
-  objective        String           @default("")
-  preconditions    String[]         @default([])
-  steps            String[]         @default([])
-  expectedResult   String           @default("")
-  priority         CasePriority     @default(medium)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  decisions        ReviewDecision[]
+  id                String           @id @default(cuid())
+  projectId         String
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evidenceId        String
+  evidence          Evidence         @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  codeChangeId      String?
+  codeChange        CodeChange?      @relation(fields: [codeChangeId], references: [id], onDelete: SetNull)
+  targetTestCaseId  String?
+  targetTestCase    TestCase?        @relation(fields: [targetTestCaseId], references: [id], onDelete: SetNull)
+  suiteId           String?
+  suite             Suite?           @relation(fields: [suiteId], references: [id], onDelete: SetNull)
+  status            ProposalStatus   @default(in_review)
+  title             String
+  objective         String           @default("")
+  preconditions     String[]         @default([])
+  steps             String[]         @default([])
+  expectedResult    String           @default("")
+  priority          CasePriority     @default(medium)
+  automationKey     String?
+  needsManualReview Boolean          @default(false)
+  promptVersion     String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  decisions         ReviewDecision[]
 
+  @@unique([codeChangeId, automationKey])
   @@index([projectId])
   @@index([projectId, status])
   @@index([targetTestCaseId])
+  @@index([codeChangeId])
+  @@index([suiteId])
   @@map("extracted_proposal")
 }
 

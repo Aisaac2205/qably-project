@@ -294,6 +294,7 @@ export interface SuiteMetricsLastRun {
 
 export interface SuiteMetricsEntry {
   suiteId: string
+  suiteName: string
   lastRun: SuiteMetricsLastRun | null
   /** Up to 10 most recent run statuses for the suite, oldest first. */
   trend: RunStatus[]
@@ -646,6 +647,7 @@ export interface RepositorySource {
   provider: RepoConnectionProvider
   repo: string
   testFilePatterns: string[]
+  hasAccessToken: boolean
 }
 
 export interface ProjectRepositoryView {

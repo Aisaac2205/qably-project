@@ -20,6 +20,7 @@ const view: ProjectRepositoryView = {
   source: {
     provider: 'GITHUB',
     repo: 'acme/ecommerce-app',
+    hasAccessToken: false,
     testFilePatterns: ['*.spec.ts', '*.test.ts'],
   },
   batch: {

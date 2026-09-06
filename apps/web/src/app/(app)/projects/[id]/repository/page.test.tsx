@@ -14,6 +14,7 @@ describe('RepositoryPage', () => {
       source: {
         provider: 'GITHUB',
         repo: 'acme/ecommerce-app',
+        hasAccessToken: false,
         testFilePatterns: ['*.spec.ts', '*.test.ts'],
       },
       batch: null,
