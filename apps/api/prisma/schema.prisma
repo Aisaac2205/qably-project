@@ -62,6 +62,7 @@ model User {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   reviewDecisions         ReviewDecision[]
+  chatThreads             ChatThread[]
 
   @@unique([email])
   @@map("user")
@@ -133,6 +134,7 @@ model Organization {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   notificationWebhooks    NotificationWebhook[]
+  chatThreads             ChatThread[]
 
   @@unique([slug])
   @@map("organization")
@@ -173,6 +175,7 @@ model Project {
   testCases         TestCase[]
   proposals         ExtractedProposal[]
   traceabilityLinks TraceabilityLink[]
+  chatThreads       ChatThread[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -655,4 +658,42 @@ model NotificationWebhook {
 
   @@index([organizationId])
   @@map("notification_webhook")
+}
+
+enum ChatRole {
+  user
+  assistant
+}
+
+model ChatThread {
+  id             String        @id @default(cuid())
+  projectId      String
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  messages       ChatMessage[]
+
+  @@index([projectId, userId, updatedAt])
+  @@index([organizationId])
+  @@map("chat_thread")
+}
+
+model ChatMessage {
+  id             String     @id @default(cuid())
+  threadId       String
+  thread         ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role           ChatRole
+  content        String
+  suggestedCases Json?
+  promptVersion  String?
+  totalTokens    Int?
+  createdAt      DateTime   @default(now())
+
+  @@index([threadId, createdAt])
+  @@map("chat_message")
 }

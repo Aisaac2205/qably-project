@@ -656,3 +656,39 @@ export interface ProjectRepositoryView {
   codeChanges: CodeChange[]
   evidence: Evidence[]
 }
+
+export type ChatRole = 'user' | 'assistant'
+
+export interface SuggestedCaseRecord {
+  title: string
+  objective: string
+  preconditions: string[]
+  steps: string[]
+  expectedResult: string
+  priority: CasePriority
+}
+
+export interface ChatThreadRecord {
+  id: string
+  projectId: string
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessageRecord {
+  id: string
+  threadId: string
+  role: ChatRole
+  content: string
+  suggestedCases: SuggestedCaseRecord[]
+  createdAt: string
+}
+
+export interface ChatThreadDetailRecord extends ChatThreadRecord {
+  messages: ChatMessageRecord[]
+}
+
+export interface ChatSendToReviewRecord {
+  proposalId: string
+}

@@ -29,6 +29,6 @@ import { createGeminiClient, GeminiExtractor } from './gemini.extractor';
           : new GeminiExtractor(client, env),
     },
   ],
-  exports: [TEST_CASE_EXTRACTOR],
+  exports: [TEST_CASE_EXTRACTOR, GEMINI_CLIENT],
 })
 export class AiModule {}
