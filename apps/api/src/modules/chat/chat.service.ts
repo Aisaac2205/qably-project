@@ -182,7 +182,9 @@ export class ChatService {
       orderBy: { createdAt: 'desc' },
       take: MAX_HISTORY_MESSAGES,
     });
-    const isFirstMessage = history.length === 0;
+    const threadNeedsTitle = !history.some(
+      (message) => message.role === 'assistant',
+    );
 
     await this.prisma.chatMessage.create({
       data: { threadId, role: 'user', content: input.content },
@@ -208,13 +210,14 @@ export class ChatService {
       return err('provider-unavailable');
     }
 
-    const spent = await this.entitlement.spendCredit(org.organizationId);
-    if (!spent) {
-      return err('ai-not-enabled');
-    }
-
     const assistantRow = await this.prisma.$transaction(
       async (tx: TxClient) => {
+        const spent = await this.entitlement.spendCredit(
+          org.organizationId,
+          tx,
+        );
+        if (!spent) return null;
+
         const created = await tx.chatMessage.create({
           data: {
             threadId,
@@ -227,13 +230,15 @@ export class ChatService {
         });
         await tx.chatThread.update({
           where: { id: threadId },
-          data: isFirstMessage
+          data: threadNeedsTitle
             ? { title: threadTitleFrom(input.content), updatedAt: new Date() }
             : { updatedAt: new Date() },
         });
         return created;
       },
     );
+
+    if (assistantRow === null) return err('ai-not-enabled');
 
     return ok(toMessageView(assistantRow));
   }

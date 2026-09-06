@@ -345,7 +345,7 @@ describe('ChatService', () => {
       content: 'What is missing in checkout?',
     });
 
-    expect(spendCredit).toHaveBeenCalledWith('org-1');
+    expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
   });
 
   it('does not spend a credit when the provider is unavailable', async () => {
@@ -385,6 +385,78 @@ describe('ChatService', () => {
 
     expect(result).toEqual({ ok: false, error: 'ai-not-enabled' });
     expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends the credit inside the persisting transaction so a persist failure would roll the credit back too', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.create
+      .mockReset()
+      .mockResolvedValueOnce(userRow)
+      .mockRejectedValueOnce(new Error('db unavailable'));
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [suggestedCase],
+      usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+    });
+    const service = build(prisma, assistant, fakeEntitlement(spendCredit));
+
+    await expect(
+      service.sendMessage(org, user, 'project-1', 'thread-1', {
+        content: 'What is missing in checkout?',
+      }),
+    ).rejects.toThrow('db unavailable');
+
+    expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+    expect(prisma.chatThread.update).not.toHaveBeenCalled();
+  });
+
+  it('sets a real title after a first attempt that failed before any assistant reply was ever persisted', async () => {
+    const prisma = createPrisma();
+    const failedAttemptUserRow = {
+      ...userRow,
+      id: 'message-failed',
+    };
+    const retryUserRow = { ...userRow, id: 'message-retry' };
+
+    prisma.chatMessage.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([failedAttemptUserRow]);
+    prisma.chatMessage.create
+      .mockReset()
+      .mockResolvedValueOnce(failedAttemptUserRow)
+      .mockResolvedValueOnce(retryUserRow)
+      .mockResolvedValueOnce(assistantRow);
+
+    const failingService = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'no-key' }),
+    );
+    await failingService.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    expect(prisma.chatThread.update).not.toHaveBeenCalled();
+
+    const service = build(
+      prisma,
+      createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [suggestedCase],
+        usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+      }),
+    );
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    expect(prisma.chatThread.update).toHaveBeenCalledWith(
+      containing({
+        data: containing({ title: 'What is missing in checkout?' }),
+      }),
+    );
   });
 
   it('exposes an empty suggestedCases array and logs a warning when the stored JSON is corrupt', async () => {
