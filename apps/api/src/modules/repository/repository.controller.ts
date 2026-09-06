@@ -1,5 +1,7 @@
 import {
+  Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -7,8 +9,10 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
@@ -18,6 +22,10 @@ import type {
   RepositoryView,
   RotatedWebhookSecret,
 } from './repository.contracts';
+import {
+  setAccessTokenSchema,
+  type SetAccessTokenInput,
+} from './repository.schemas';
 import { RepositoryService } from './repository.service';
 
 function unwrap<T>(result: Result<T, RepositoryError>): T {
@@ -53,5 +61,25 @@ export class RepositoryController {
     @Param('projectId') projectId: string,
   ): Promise<RotatedWebhookSecret> {
     return unwrap(await this.repository.rotateWebhookSecret(org, projectId));
+  }
+
+  @Put('access-token')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async setAccessToken(
+    @CurrentOrg() org: OrgContext,
+    @Param('projectId') projectId: string,
+    @Body(new ZodValidationPipe(setAccessTokenSchema))
+    body: SetAccessTokenInput,
+  ): Promise<void> {
+    unwrap(await this.repository.setAccessToken(org, projectId, body.token));
+  }
+
+  @Delete('access-token')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async clearAccessToken(
+    @CurrentOrg() org: OrgContext,
+    @Param('projectId') projectId: string,
+  ): Promise<void> {
+    unwrap(await this.repository.clearAccessToken(org, projectId));
   }
 }

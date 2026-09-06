@@ -34,7 +34,9 @@ const EVIDENCE_KIND = {
 
 const PROJECT_SELECT = {
   testFilePatterns: true,
-  connection: { select: { provider: true, repo: true } },
+  connection: {
+    select: { provider: true, repo: true, encryptedAccessToken: true },
+  },
 } as const;
 
 const BATCH_SELECT = {
@@ -68,7 +70,11 @@ const BATCH_SELECT = {
 
 interface ProjectRow {
   testFilePatterns: string[];
-  connection: { provider: RepoConnectionProvider; repo: string } | null;
+  connection: {
+    provider: RepoConnectionProvider;
+    repo: string;
+    encryptedAccessToken: string | null;
+  } | null;
 }
 
 interface EvidenceRow {
@@ -171,6 +177,7 @@ export class RepositoryService {
               provider: project.connection.provider,
               repo: project.connection.repo,
               testFilePatterns: project.testFilePatterns,
+              hasAccessToken: Boolean(project.connection.encryptedAccessToken),
             },
       batch: batch === null ? null : toBatch(batch, projectId),
       codeChanges:
@@ -202,5 +209,58 @@ export class RepositoryService {
       return ok({ webhookSecret: rotated.value.webhookSecret });
 
     return err(rotated.error === 'forbidden' ? 'forbidden' : 'not-found');
+  }
+
+  async setAccessToken(
+    org: OrgContext,
+    projectId: string,
+    token: string,
+  ): Promise<Result<void, RepositoryError>> {
+    const connectionId = await this.connectionIdFor(org, projectId);
+
+    if (isErr(connectionId)) return connectionId;
+
+    const result = await this.connections.setAccessToken(
+      org,
+      connectionId.value,
+      token,
+    );
+
+    return isErr(result)
+      ? err(result.error === 'forbidden' ? 'forbidden' : 'not-found')
+      : ok(undefined);
+  }
+
+  async clearAccessToken(
+    org: OrgContext,
+    projectId: string,
+  ): Promise<Result<void, RepositoryError>> {
+    const connectionId = await this.connectionIdFor(org, projectId);
+
+    if (isErr(connectionId)) return connectionId;
+
+    const result = await this.connections.clearAccessToken(
+      org,
+      connectionId.value,
+    );
+
+    return isErr(result)
+      ? err(result.error === 'forbidden' ? 'forbidden' : 'not-found')
+      : ok(undefined);
+  }
+
+  private async connectionIdFor(
+    org: OrgContext,
+    projectId: string,
+  ): Promise<Result<string, RepositoryError>> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, organizationId: org.organizationId },
+      select: { connectionId: true },
+    });
+
+    if (project === null) return err('not-found');
+    if (project.connectionId === null) return err('no-connection');
+
+    return ok(project.connectionId);
   }
 }

@@ -216,6 +216,43 @@ export class ConnectionsService {
     return ok(undefined);
   }
 
+  async setAccessToken(
+    org: OrgContext,
+    id: string,
+    token: string,
+  ): Promise<Result<void, ConnectionError>> {
+    if (!canWrite(org)) return err('forbidden');
+
+    const existing = await this.scoped(org, id);
+
+    if (existing === null) return err('not-found');
+
+    await this.prisma.connection.update({
+      where: { id },
+      data: { encryptedAccessToken: this.encryption.encrypt(token) },
+    });
+
+    return ok(undefined);
+  }
+
+  async clearAccessToken(
+    org: OrgContext,
+    id: string,
+  ): Promise<Result<void, ConnectionError>> {
+    if (!canWrite(org)) return err('forbidden');
+
+    const existing = await this.scoped(org, id);
+
+    if (existing === null) return err('not-found');
+
+    await this.prisma.connection.update({
+      where: { id },
+      data: { encryptedAccessToken: null },
+    });
+
+    return ok(undefined);
+  }
+
   private scoped(org: OrgContext, id: string): Promise<ConnectionRow | null> {
     return this.prisma.connection.findFirst({
       where: { id, organizationId: org.organizationId },

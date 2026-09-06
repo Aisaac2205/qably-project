@@ -454,3 +454,83 @@ describe('ConnectionsService connection_security notifications', () => {
     expect(notifications.publish).not.toHaveBeenCalled();
   });
 });
+
+describe('ConnectionsService.setAccessToken', () => {
+  it('stores the token encrypted and never in plaintext', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    prisma.connection.findFirst.mockResolvedValue(row);
+
+    const result = await build(prisma, encryption).setAccessToken(
+      owner,
+      'connection-1',
+      'ghp_super-secret',
+    );
+
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(prisma.connection.update).toHaveBeenCalledWith({
+      where: { id: 'connection-1' },
+      data: { encryptedAccessToken: 'enc(ghp_super-secret)' },
+    });
+  });
+
+  it('refuses a plain member', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+
+    const result = await build(prisma, encryption).setAccessToken(
+      member,
+      'connection-1',
+      'ghp_super-secret',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'forbidden' });
+    expect(prisma.connection.update).not.toHaveBeenCalled();
+  });
+
+  it('returns not-found for a connection outside the organization', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    prisma.connection.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, encryption).setAccessToken(
+      owner,
+      'connection-1',
+      'ghp_super-secret',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+  });
+});
+
+describe('ConnectionsService.clearAccessToken', () => {
+  it('nulls the encrypted token', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    prisma.connection.findFirst.mockResolvedValue(row);
+
+    const result = await build(prisma, encryption).clearAccessToken(
+      owner,
+      'connection-1',
+    );
+
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(prisma.connection.update).toHaveBeenCalledWith({
+      where: { id: 'connection-1' },
+      data: { encryptedAccessToken: null },
+    });
+  });
+
+  it('refuses a plain member', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+
+    const result = await build(prisma, encryption).clearAccessToken(
+      member,
+      'connection-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'forbidden' });
+    expect(prisma.connection.update).not.toHaveBeenCalled();
+  });
+});

@@ -54,6 +54,8 @@ function createConnections() {
     rotateWebhookSecret: jest
       .fn()
       .mockResolvedValue(ok({ webhookSecret: 'f'.repeat(64) })),
+    setAccessToken: jest.fn().mockResolvedValue(ok(undefined)),
+    clearAccessToken: jest.fn().mockResolvedValue(ok(undefined)),
   };
 }
 
@@ -89,8 +91,26 @@ describe('RepositoryService.findOne', () => {
           provider: 'GITHUB',
           repo: 'acme/shop',
           testFilePatterns: ['*.spec.ts', '*.test.ts'],
+          hasAccessToken: false,
         },
       },
+    });
+  });
+
+  it('reports hasAccessToken true once a token is stored', async () => {
+    const result = await build(
+      createPrisma({
+        ...projectRow,
+        connection: {
+          ...projectRow.connection,
+          encryptedAccessToken: 'enc:token',
+        },
+      }),
+    ).findOne(org, 'proj-1');
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { source: { hasAccessToken: true } },
     });
   });
 
@@ -112,6 +132,7 @@ describe('RepositoryService.findOne', () => {
           provider: 'GITHUB',
           repo: 'acme/shop',
           testFilePatterns: ['*.spec.ts', '*.test.ts'],
+          hasAccessToken: false,
         },
         batch: {
           id: 'batch-1',
@@ -238,5 +259,67 @@ describe('RepositoryService.rotateWebhookSecret', () => {
     ).rotateWebhookSecret(org, 'proj-1');
 
     expect(result).toEqual({ ok: false, error: 'forbidden' });
+  });
+});
+
+describe('RepositoryService.setAccessToken', () => {
+  it('sets the token on the connection behind the project', async () => {
+    const connections = createConnections();
+    const prisma = createPrisma({ connectionId: 'connection-1' });
+
+    const result = await build(prisma, connections).setAccessToken(
+      org,
+      'proj-1',
+      'ghp_super-secret',
+    );
+
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(connections.setAccessToken).toHaveBeenCalledWith(
+      org,
+      'connection-1',
+      'ghp_super-secret',
+    );
+  });
+
+  it('fails when the project has no repository connected', async () => {
+    const connections = createConnections();
+
+    const result = await build(
+      createPrisma({ connectionId: null }),
+      connections,
+    ).setAccessToken(org, 'proj-1', 'ghp_super-secret');
+
+    expect(result).toEqual({ ok: false, error: 'no-connection' });
+    expect(connections.setAccessToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('RepositoryService.clearAccessToken', () => {
+  it('clears the token on the connection behind the project', async () => {
+    const connections = createConnections();
+    const prisma = createPrisma({ connectionId: 'connection-1' });
+
+    const result = await build(prisma, connections).clearAccessToken(
+      org,
+      'proj-1',
+    );
+
+    expect(result).toEqual({ ok: true, value: undefined });
+    expect(connections.clearAccessToken).toHaveBeenCalledWith(
+      org,
+      'connection-1',
+    );
+  });
+
+  it('fails when the project does not belong to the organization', async () => {
+    const connections = createConnections();
+
+    const result = await build(
+      createPrisma(null),
+      connections,
+    ).clearAccessToken(org, 'proj-1');
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(connections.clearAccessToken).not.toHaveBeenCalled();
   });
 });
