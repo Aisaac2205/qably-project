@@ -35,6 +35,8 @@ export function createSuite(payload: {
     organizationId: 'org-1',
     name: payload.name,
     cases: [],
+    manualCases: 0,
+    automatedCases: 0,
     description: payload.description ?? '',
     tags: payload.tags ?? [],
     isDefault: false,

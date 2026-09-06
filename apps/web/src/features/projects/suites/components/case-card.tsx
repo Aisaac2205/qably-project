@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
 import { CaretDown, CaretRight, DotsThree, PencilSimple, Trash } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
+import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -18,18 +20,37 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
+  const described = useMemo(() => describeCase(testCase), [testCase])
+  const showRawName = described.raw !== described.title
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
       <div className="flex items-center gap-2.5 flex-wrap">
-        <span className="text-sm font-semibold text-default truncate flex-1 min-w-[200px]">
-          {testCase.name}
-        </span>
+        <div className="flex-1 min-w-[200px] truncate">
+          <div className="flex items-center gap-1.5 min-w-0">
+            {described.path.length > 0 && (
+              <span className="text-xs font-medium text-muted shrink-0">
+                {described.path.join(' › ')} ›
+              </span>
+            )}
+            <span className="text-sm font-semibold text-default truncate">
+              {described.title}
+            </span>
+          </div>
+          {(showRawName || testCase.automationFilePath) && (
+            <p className="mt-0.5 font-mono text-xs text-muted truncate flex items-center gap-1">
+              {showRawName && <span>{described.raw}</span>}
+              {showRawName && testCase.automationFilePath && <span aria-hidden="true">·</span>}
+              {testCase.automationFilePath && <span>{testCase.automationFilePath}</span>}
+            </p>
+          )}
+        </div>
         {testCase.version !== null && (
           <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
             v{testCase.version}
           </span>
         )}
+        <ExecutionModeBadge mode={testCase.executionMode} />
         <PriorityBadge priority={testCase.priority} />
         <StatusChip status={testCase.state} scope="lifecycle" />
 

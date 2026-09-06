@@ -13,11 +13,53 @@ const mockCase: TestCase = {
   expectedResult: 'Redirected to /dashboard within 1 second',
   priority: 'critical',
   state: 'active',
+  executionMode: 'manual',
+}
+
+const automatedCase: TestCase = {
+  id: 'tc-9',
+  suiteId: 'suite-1',
+  version: null,
+  name: 'Redirects to dashboard on valid login',
+  steps: [],
+  expectedResult: '',
+  priority: 'medium',
+  state: 'draft',
+  executionMode: 'automated',
+  automationKey: 'useCreateRun > redirects to dashboard on valid login',
+  automationFilePath: 'src/features/runs/hooks/use-create-run.test.ts',
 }
 
 const noop = () => {}
 
 describe('CaseCard', () => {
+  it('shows the execution mode badge for a manual case', async () => {
+    await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.getByText('Manual')).toBeInTheDocument()
+  })
+
+  it('shows the execution mode badge for an automated case', async () => {
+    await act(async () => { render(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.getByText('Automated')).toBeInTheDocument()
+  })
+
+  it('shows the raw automation key in mono under the humanized title when it differs', async () => {
+    await act(async () => { render(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.getByText('Redirects to dashboard on valid login')).toBeInTheDocument()
+    const raw = screen.getByText('useCreateRun > redirects to dashboard on valid login')
+    expect(raw.closest('p')?.className).toContain('font-mono')
+  })
+
+  it('does not show a redundant raw name line for a manual case', async () => {
+    await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.queryByText(mockCase.name, { selector: '.font-mono' })).not.toBeInTheDocument()
+  })
+
+  it('shows the file path for an automated case', async () => {
+    await act(async () => { render(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.getByText('src/features/runs/hooks/use-create-run.test.ts')).toBeInTheDocument()
+  })
+
   it('shows the published version of the case', async () => {
     await act(async () => { render(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
     expect(screen.getByText('v2')).toBeInTheDocument()

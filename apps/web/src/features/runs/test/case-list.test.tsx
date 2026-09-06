@@ -19,7 +19,38 @@ const mockCases: RunCaseRecord[] = [
   },
 ]
 
+const automatedCase: RunCaseRecord = {
+  id: 'tc-9',
+  testCaseId: 'tc-9',
+  officialCase: null,
+  name: 'useCreateRun > redirects to dashboard on valid login',
+  suiteName: 'Auth',
+  steps: [],
+  expectedResult: '',
+  status: 'pass',
+  position: 3,
+  className: 'src/features/runs/hooks/use-create-run.test.ts',
+  filePath: 'src/features/runs/hooks/use-create-run.test.ts',
+}
+
 describe('CaseList', () => {
+  it('renders the humanized title for an automated case', async () => {
+    const onSelect = vi.fn()
+    await act(async () => {
+      render(<CaseList cases={[automatedCase]} onSelect={onSelect} />)
+    })
+    expect(screen.getByText('Redirects to dashboard on valid login')).toBeInTheDocument()
+  })
+
+  it('renders the raw name in mono under the humanized title', async () => {
+    const onSelect = vi.fn()
+    await act(async () => {
+      render(<CaseList cases={[automatedCase]} onSelect={onSelect} />)
+    })
+    const raw = screen.getByText('useCreateRun > redirects to dashboard on valid login')
+    expect(raw.className).toContain('font-mono')
+  })
+
   it('renders all cases', async () => {
     const onSelect = vi.fn()
     await act(async () => {

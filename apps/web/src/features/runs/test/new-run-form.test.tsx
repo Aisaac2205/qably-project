@@ -77,6 +77,29 @@ describe('NewRunForm', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('maps the 409 no-manual-cases error to a dedicated message instead of the generic one', async () => {
+    const user = userEvent.setup()
+    const api = await import('@/features/runs/api/runs.api')
+    vi.spyOn(api, 'createRun').mockRejectedValueOnce(
+      new ApiError(409, 'no-manual-cases'),
+    )
+
+    await act(async () => {
+      renderWithQuery(<NewRunForm projectId="proj-1" />)
+    })
+    await user.click(screen.getByRole('combobox'))
+    await user.click(await screen.findByText('Authentication'))
+    await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no manual cases to run/i),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Could not start the run. Please try again.')).not.toBeInTheDocument()
+    expect(screen.queryByText('no-manual-cases')).not.toBeInTheDocument()
+  })
+
   it('translates an unknown backend error into a generic message', async () => {
     const user = userEvent.setup()
     const api = await import('@/features/runs/api/runs.api')

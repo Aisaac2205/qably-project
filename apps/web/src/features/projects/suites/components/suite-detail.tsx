@@ -24,6 +24,7 @@ import { CaseFormDialog } from './case-form-dialog'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
 
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
@@ -129,14 +130,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <div className="flex flex-col items-end gap-1">
+            {suite.manualCases > 0 ? (
               <Button
                 type="button"
-                disabled={suite.cases.length === 0}
-                focusableWhenDisabled={suite.cases.length === 0}
-                aria-describedby={
-                  suite.cases.length === 0 ? 'run-suite-empty-hint' : undefined
-                }
                 onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
                 className="text-sm font-semibold"
                 size="default"
@@ -144,12 +140,29 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 <Play size={14} weight="bold" aria-hidden="true" />
                 {t('suites.runThisSuite')}
               </Button>
-              {suite.cases.length === 0 && (
+            ) : suite.cases.length === 0 ? (
+              <div className="flex flex-col items-end gap-1">
+                <Button
+                  type="button"
+                  disabled
+                  focusableWhenDisabled
+                  aria-describedby="run-suite-empty-hint"
+                  onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
+                  className="text-sm font-semibold"
+                  size="default"
+                >
+                  <Play size={14} weight="bold" aria-hidden="true" />
+                  {t('suites.runThisSuite')}
+                </Button>
                 <p id="run-suite-empty-hint" className="text-xs text-muted">
                   {t('suites.cannotRunEmptySuite')}
                 </p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted max-w-[220px] text-right">
+                {t('suites.allAutomatedHint')}
+              </p>
+            )}
 
             {/* Suite actions */}
             <Menu>
@@ -264,6 +277,53 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           </CardContent>
         </Card>
       </section>
+
+      {/* Covered by CI */}
+      {suite.automatedCases > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-base font-semibold text-default">{t('suites.coveredByCi')}</h2>
+            <span className="text-xs text-muted">{suite.automatedCases}</span>
+          </div>
+          <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+            <CardContent className="p-0 divide-y divide-border">
+              {suite.cases
+                .filter((tc) => tc.executionMode === 'automated')
+                .map((tc) => {
+                  const described = describeCase(tc)
+                  return (
+                    <div
+                      key={tc.id}
+                      className="py-3 px-4 sm:px-5 flex items-center gap-3 flex-wrap"
+                    >
+                      <span className="text-sm font-medium text-default truncate flex-1 min-w-[200px]">
+                        {described.title}
+                      </span>
+                      {tc.lastResult ? (
+                        <div className="flex items-center gap-2" aria-label={t('suites.lastResult')}>
+                          <StatusChip status={tc.lastResult.status} />
+                          <span className="text-xs text-muted">
+                            {formatRelative(tc.lastResult.recordedAt, locale, t('suites.never'))}
+                          </span>
+                          {tc.lastResult.commitSha && (
+                            <Link
+                              href={`/projects/${projectId}/runs/${tc.lastResult.runId}`}
+                              className="font-mono text-xs text-primary hover:underline"
+                            >
+                              {tc.lastResult.commitSha.slice(0, 7)}
+                            </Link>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted">{t('suites.never')}</span>
+                      )}
+                    </div>
+                  )
+                })}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Suite dialogs */}
       <SuiteFormDialog

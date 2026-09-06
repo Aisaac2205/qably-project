@@ -6,6 +6,7 @@ import { renderWithQuery } from '@/lib/query-test-utils'
 import { runFixtures } from '@/test/runs-api-stub'
 import { ApiError } from '@/lib/api-client'
 import type { RunRecord } from '@qably/types'
+import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
 
 vi.mock('@/features/runs/api/runs.api', async () =>
   await import('@/test/runs-api-stub'),
@@ -13,6 +14,8 @@ vi.mock('@/features/runs/api/runs.api', async () =>
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+
+import * as suitesApiStub from '@/test/suites-api-stub'
 
 function getFreshRun(): RunRecord {
   const run = runFixtures.find((r) => r.id === 'run-12')
@@ -241,6 +244,46 @@ describe('RunDetail', () => {
       const liveRegion = document.querySelector('[aria-live="polite"]')
       expect(liveRegion?.textContent).toBe('Could not save this case status. Please try again.')
     })
+  })
+
+  it('shows a read-only "Covered by CI" block for a manual run whose suite has automated cases', async () => {
+    const run = { ...getFreshRun(), suiteId: 'suite-mixed-run-detail' }
+    const mixedSuite = createMockSuite({
+      id: 'suite-mixed-run-detail',
+      manualCases: 3,
+      automatedCases: 1,
+      cases: [
+        createMockTestCase({
+          id: 'tc-auto-rd-1',
+          executionMode: 'automated',
+          name: 'Redirects to dashboard on valid login',
+          automationKey: 'useCreateRun > redirects to dashboard on valid login',
+          state: 'active',
+          lastResult: {
+            status: 'pass',
+            runId: 'run-1',
+            commitSha: 'abc1234',
+            recordedAt: '2026-06-16T10:00:00Z',
+          },
+        }),
+      ],
+    })
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(mixedSuite)
+
+    renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    await act(async () => {})
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    const heading = screen.getByRole('heading', { level: 2, name: /covered by ci/i })
+    expect(heading).toBeInTheDocument()
+  })
+
+  it('does not show the "Covered by CI" block on a CI-sourced run', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+    expect(screen.queryByRole('heading', { level: 2, name: /covered by ci/i })).not.toBeInTheDocument()
   })
 
   it('announces status change via aria-live region', async () => {

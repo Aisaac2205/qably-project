@@ -51,6 +51,7 @@ const testCase: TestCase = {
   state: 'active',
   steps: ['Open page'],
   expectedResult: 'Page opens',
+  executionMode: 'manual',
 }
 
 const suite: Suite = {
@@ -61,6 +62,8 @@ const suite: Suite = {
   description: 'Original suite description',
   tags: ['auth'],
   cases: [testCase],
+  manualCases: 1,
+  automatedCases: 0,
   isDefault: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

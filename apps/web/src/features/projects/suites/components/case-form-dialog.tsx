@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useCreateCase, useUpdateCase } from '@/features/projects/suites/hooks/use-suite-mutations'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { useTranslation } from '@/lib/i18n'
 
 const PRIORITIES: CasePriority[] = ['critical', 'high', 'medium', 'low']
@@ -78,7 +79,10 @@ function CaseFormDialogContent({
   const createCaseMutation = useCreateCase()
   const updateCaseMutation = useUpdateCase()
 
-  const [name, setName] = useState(testCase?.name ?? '')
+  const described = testCase === undefined ? undefined : describeCase(testCase)
+  const isAutomated = described?.isAutomated ?? false
+
+  const [name, setName] = useState(described?.title ?? testCase?.name ?? '')
   const [priority, setPriority] = useState<CasePriority>(testCase?.priority ?? 'medium')
   const [state, setState] = useState<CaseState>(testCase?.state ?? 'active')
   const [steps, setSteps] = useState(testCase?.steps.join('\n') ?? '')
@@ -142,6 +146,23 @@ function CaseFormDialogContent({
               </p>
             )}
           </div>
+
+          {isAutomated && described && (
+            <div className="grid gap-1.5 rounded-lg border border-border/70 bg-canvas/50 p-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs font-semibold text-muted shrink-0">{t('cases.rawName')}</span>
+                <span className="font-mono text-xs text-default truncate">{described.raw}</span>
+              </div>
+              {testCase?.automationFilePath && (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-xs font-semibold text-muted shrink-0">{t('cases.filePath')}</span>
+                  <span className="font-mono text-xs text-default truncate">
+                    {testCase.automationFilePath}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-2">

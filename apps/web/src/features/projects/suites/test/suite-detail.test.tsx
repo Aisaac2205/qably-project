@@ -3,12 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 import { __resetStore } from '@/lib/mock-store'
+import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
 
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+
+import * as suitesApiStub from '@/test/suites-api-stub'
 
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
@@ -172,6 +175,71 @@ describe('SuiteDetail (redesigned)', () => {
       'href',
       '/projects/proj-1/suites',
     )
+  })
+
+  it('hides "Run this suite" and shows an inline note when the suite has no manual cases but has automated ones', async () => {
+    const ciOnlySuite = createMockSuite({
+      id: 'suite-ci-only',
+      name: 'CI Only',
+      manualCases: 0,
+      automatedCases: 1,
+      cases: [
+        createMockTestCase({
+          id: 'tc-ci-1',
+          executionMode: 'automated',
+          name: 'Redirects to dashboard on valid login',
+          automationKey: 'useCreateRun > redirects to dashboard on valid login',
+          state: 'active',
+        }),
+      ],
+    })
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(ciOnlySuite)
+
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-ci-only" />)
+    await act(async () => {})
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect(screen.queryByRole('button', { name: /run this suite/i })).not.toBeInTheDocument()
+    expect(screen.getByText(/all cases in this suite run in ci/i)).toBeInTheDocument()
+  })
+
+  it('lists automated cases with their last result under "Covered by CI"', async () => {
+    const mixedSuite = createMockSuite({
+      id: 'suite-mixed',
+      name: 'Mixed',
+      manualCases: 1,
+      automatedCases: 1,
+      cases: [
+        createMockTestCase({ id: 'tc-manual-1', executionMode: 'manual', name: 'Manual case' }),
+        createMockTestCase({
+          id: 'tc-auto-1',
+          executionMode: 'automated',
+          name: 'Redirects to dashboard on valid login',
+          automationKey: 'useCreateRun > redirects to dashboard on valid login',
+          state: 'active',
+          lastResult: {
+            status: 'pass',
+            runId: 'run-1',
+            commitSha: 'abc1234',
+            recordedAt: '2026-06-16T10:00:00Z',
+          },
+        }),
+      ],
+    })
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(mixedSuite)
+
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-mixed" />)
+    await act(async () => {})
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect(screen.getByRole('button', { name: /run this suite/i })).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { level: 2, name: /covered by ci/i })
+    expect(heading).toBeInTheDocument()
+    const section = heading.closest('section')
+    expect(section).not.toBeNull()
+    expect(
+      within(section as HTMLElement).getByText('Redirects to dashboard on valid login'),
+    ).toBeInTheDocument()
   })
 
   it('returns to the test library after deleting the suite', async () => {

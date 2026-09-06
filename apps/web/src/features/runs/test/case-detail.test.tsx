@@ -1,4 +1,4 @@
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, within } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { CaseDetail } from '@/features/runs/components/case-detail'
 import type { RunCaseRecord } from '@qably/types'
@@ -14,6 +14,74 @@ const mockCase: RunCaseRecord = {
   status: 'pass',
   position: 0,
 }
+
+const automatedCase: RunCaseRecord = {
+  id: 'tc-9',
+  testCaseId: 'tc-9',
+  officialCase: null,
+  name: 'useCreateRun > redirects to dashboard on valid login',
+  suiteName: 'Auth',
+  steps: [],
+  expectedResult: '',
+  status: 'fail',
+  position: 0,
+  className: 'src/features/runs/hooks/use-create-run.test.ts',
+  filePath: 'src/features/runs/hooks/use-create-run.test.ts',
+  durationMs: 1234,
+  failureType: 'AssertionError',
+  failureMessage: 'expected true to be false',
+  failureDetails: 'at line 42\nat line 43',
+}
+
+describe('CaseDetail (automated)', () => {
+  it('renders the humanized title with the raw name in mono', async () => {
+    await act(async () => {
+      render(<CaseDetail c={automatedCase} />)
+    })
+    expect(screen.getByText('Redirects to dashboard on valid login')).toBeInTheDocument()
+    const raw = screen.getByText('useCreateRun > redirects to dashboard on valid login')
+    expect(raw.className).toContain('font-mono')
+  })
+
+  it('shows the file path', async () => {
+    await act(async () => {
+      render(<CaseDetail c={automatedCase} />)
+    })
+    expect(screen.getByText('src/features/runs/hooks/use-create-run.test.ts')).toBeInTheDocument()
+  })
+
+  it('shows the formatted duration', async () => {
+    await act(async () => {
+      render(<CaseDetail c={automatedCase} />)
+    })
+    expect(screen.getByText(/1[.,]23\s*s|1234\s*ms/)).toBeInTheDocument()
+  })
+
+  it('shows failure details in a native details/summary with the failure type and message as the summary', async () => {
+    await act(async () => {
+      render(<CaseDetail c={automatedCase} />)
+    })
+    const summary = screen.getByText(/AssertionError.*expected true to be false/)
+    expect(summary.closest('summary')).not.toBeNull()
+    const details = summary.closest('details')
+    expect(details).not.toBeNull()
+    expect(within(details as HTMLElement).getByText(/at line 42/)).toBeInTheDocument()
+  })
+
+  it('shows the skip reason when the case was skipped', async () => {
+    await act(async () => {
+      render(<CaseDetail c={{ ...automatedCase, status: 'skip', failureType: undefined, failureMessage: undefined, failureDetails: undefined, skipReason: 'Flaky in CI' }} />)
+    })
+    expect(screen.getByText('Flaky in CI')).toBeInTheDocument()
+  })
+
+  it('does not show technical automated fields for a manual case', async () => {
+    await act(async () => {
+      render(<CaseDetail c={mockCase} />)
+    })
+    expect(screen.queryByText(/AssertionError/)).not.toBeInTheDocument()
+  })
+})
 
 describe('CaseDetail', () => {
   it('does not render a steps section when the case has no steps', async () => {

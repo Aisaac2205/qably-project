@@ -3,6 +3,7 @@
 import type { RunCaseRecord } from '@qably/types'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
 
 export function CaseList({
   cases,
@@ -27,6 +28,8 @@ export function CaseList({
     <div className="h-full divide-y divide-border" role="listbox" aria-label={t('runs.ariaRunCases')}>
       {cases.map((c) => {
         const isSelected = c.id === selectedId
+        const described = describeCase(c)
+        const showRawName = described.raw !== described.title
         return (
           <button
             key={c.id}
@@ -42,9 +45,16 @@ export function CaseList({
             <div className="shrink-0">
               <StatusChip status={c.status} />
             </div>
-            <span className={`text-xs truncate ${isSelected ? 'text-default font-semibold' : 'text-default'}`}>
-              {c.name}
-            </span>
+            <div className="min-w-0 flex-1">
+              <span className={`block text-xs truncate ${isSelected ? 'text-default font-semibold' : 'text-default'}`}>
+                {described.title}
+              </span>
+              {showRawName && (
+                <span className="block font-mono text-[10px] text-muted truncate">
+                  {described.raw}
+                </span>
+              )}
+            </div>
           </button>
         )
       })}

@@ -27,6 +27,7 @@ const mockCase: TestCase = {
   expectedResult: 'Success',
   priority: 'critical',
   state: 'active',
+  executionMode: 'manual',
 }
 
 const mockRun: RunSummaryRecord = {
@@ -170,6 +171,18 @@ describe('SuiteRow (enriched)', () => {
       renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
     })
     expect(screen.getByText('Pass')).toBeInTheDocument()
+  })
+
+  it('shows manual and automated counts when the suite has automated cases', async () => {
+    const mixedSuite = createMockSuite({
+      ...mockSuite,
+      manualCases: 2,
+      automatedCases: 3,
+    })
+    await act(async () => {
+      renderWithQuery(<SuiteRow suite={mixedSuite} metrics={{ ...metrics, suite: mixedSuite }} />)
+    })
+    expect(screen.getByText('2 · 3')).toBeInTheDocument()
   })
 
   it('click name enters edit mode', async () => {

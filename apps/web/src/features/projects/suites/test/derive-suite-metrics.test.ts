@@ -9,6 +9,8 @@ function suite(overrides: Partial<Suite> = {}): Suite {
     organizationId: 'org-1',
     name: 'Checkout',
     cases: [],
+    manualCases: 0,
+    automatedCases: 0,
     createdAt: '2026-01-01T00:00:00Z',
     description: '',
     tags: [],

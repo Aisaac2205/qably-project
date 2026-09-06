@@ -168,6 +168,8 @@ export const mockSuites: Suite[] = [
     tags: ['auth', 'security', 'smoke'],
     isDefault: true,
     updatedAt: '2026-06-14T10:00:00Z',
+    manualCases: 3,
+    automatedCases: 0,
     cases: [
       {
         id: 'tc-1',
@@ -178,6 +180,7 @@ export const mockSuites: Suite[] = [
         expectedResult: 'Redirected to /dashboard within 1 second',
         priority: 'critical',
         state: 'active',
+        executionMode: 'manual',
       },
       {
         id: 'tc-2',
@@ -188,6 +191,7 @@ export const mockSuites: Suite[] = [
         expectedResult: 'Error message "Invalid email or password" is visible',
         priority: 'high',
         state: 'active',
+        executionMode: 'manual',
       },
       {
         id: 'tc-3',
@@ -198,6 +202,7 @@ export const mockSuites: Suite[] = [
         expectedResult: 'Success message shown and email received within 30 seconds',
         priority: 'medium',
         state: 'active',
+        executionMode: 'manual',
       },
     ],
   },
@@ -211,6 +216,8 @@ export const mockSuites: Suite[] = [
     tags: ['checkout', 'e2e', 'regression'],
     isDefault: false,
     updatedAt: '2026-06-10T14:30:00Z',
+    manualCases: 3,
+    automatedCases: 0,
     cases: [
       {
         id: 'tc-4',
@@ -221,6 +228,7 @@ export const mockSuites: Suite[] = [
         expectedResult: 'Checkout button is disabled, "Your cart is empty" message shown',
         priority: 'critical',
         state: 'active',
+        executionMode: 'manual',
       },
       {
         id: 'tc-5',
@@ -231,6 +239,7 @@ export const mockSuites: Suite[] = [
         expectedResult: 'Total is reduced by 20%, discount line visible in summary',
         priority: 'high',
         state: 'active',
+        executionMode: 'manual',
       },
       {
         id: 'tc-6',
@@ -241,6 +250,7 @@ export const mockSuites: Suite[] = [
         expectedResult: '"Out of stock" label shown, add button disabled',
         priority: 'medium',
         state: 'draft',
+        executionMode: 'manual',
       },
     ],
   },
@@ -254,6 +264,8 @@ export const mockSuites: Suite[] = [
     tags: ['account', 'profile'],
     isDefault: false,
     updatedAt: '2026-06-08T09:15:00Z',
+    manualCases: 1,
+    automatedCases: 0,
     cases: [
       {
         id: 'tc-7',
@@ -264,6 +276,7 @@ export const mockSuites: Suite[] = [
         expectedResult: 'Success toast shown, name updated in header',
         priority: 'medium',
         state: 'active',
+        executionMode: 'manual',
       },
     ],
   },
@@ -277,6 +290,8 @@ export const mockSuites: Suite[] = [
     tags: ['payments'],
     isDefault: false,
     updatedAt: '2026-02-10T00:00:00Z',
+    manualCases: 0,
+    automatedCases: 0,
     cases: [],
   },
 ]

@@ -5,6 +5,15 @@ import type { RunCaseRecord } from '@qably/types'
 import { ArrowSquareOut } from '@phosphor-icons/react'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
+
+function formatDuration(ms: number, locale: string): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)} ms`
+  }
+  const seconds = ms / 1000
+  return `${seconds.toLocaleString(locale, { maximumFractionDigits: 2 })} s`
+}
 
 export function CaseDetail({
   c,
@@ -13,8 +22,10 @@ export function CaseDetail({
   c: RunCaseRecord
   projectId?: string
 }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const officialCase = c.officialCase
+  const described = describeCase(c)
+  const showRawName = described.raw !== described.title
 
   return (
     <div className="space-y-5 p-5 sm:p-6">
@@ -38,10 +49,45 @@ export function CaseDetail({
         </div>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h3 className="text-base sm:text-lg font-semibold text-default">{c.name}</h3>
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-default">{described.title}</h3>
+            {showRawName && (
+              <p className="mt-0.5 font-mono text-xs text-muted truncate">{described.raw}</p>
+            )}
+          </div>
           <StatusChip status={c.status} />
         </div>
+        {c.filePath && (
+          <p className="font-mono text-xs text-muted truncate">{c.filePath}</p>
+        )}
+        {c.durationMs !== undefined && (
+          <p className="text-xs text-muted">
+            {t('runs.duration')}: <span className="font-mono">{formatDuration(c.durationMs, locale)}</span>
+          </p>
+        )}
       </div>
+
+      {(c.failureType || c.failureMessage || c.failureDetails) && (
+        <details className="rounded-lg border border-border/60 bg-canvas/40 p-3 sm:p-4">
+          <summary className="text-xs sm:text-sm font-semibold text-fail cursor-pointer">
+            {[c.failureType, c.failureMessage].filter(Boolean).join(': ')}
+          </summary>
+          {c.failureDetails && (
+            <pre className="mt-2 max-h-48 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-muted">
+              {c.failureDetails}
+            </pre>
+          )}
+        </details>
+      )}
+
+      {c.skipReason && (
+        <div className="space-y-1">
+          <h4 className="text-xs font-semibold text-muted">{t('runs.skipReason')}</h4>
+          <p className="text-xs sm:text-sm text-default bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4 leading-relaxed">
+            {c.skipReason}
+          </p>
+        </div>
+      )}
 
       {c.steps.length > 0 && (
         <div className="space-y-2">

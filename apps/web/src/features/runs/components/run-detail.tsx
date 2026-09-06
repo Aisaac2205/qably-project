@@ -1,15 +1,20 @@
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { LockSimple } from '@phosphor-icons/react'
 import type { RunRecord, CaseStatus } from '@qably/types'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
+import { useSuite } from '@/features/projects/suites/hooks/use-suites'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { ApiError } from '@/lib/api-client'
 import { RunProgressHeader } from './run-progress-header'
 import { CaseList } from './case-list'
 import { CaseDetail } from './case-detail'
+import { StatusChip } from '@/components/ui/status-chip'
 import { useTranslation } from '@/lib/i18n'
+import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
 const SOURCE_LABELS: Record<string, string> = {
   manual: 'runs.sourceManual',
@@ -42,7 +47,7 @@ export function RunDetail({
   projectId: string
   run: RunRecord
 }) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [announcement, setAnnouncement] = useState('')
 
   const handleUpdateError = useCallback(
@@ -58,6 +63,11 @@ export function RunDetail({
 
   const updateStatus = useUpdateRunCase(run.id, handleUpdateError)
   const isEditable = run.source === 'manual'
+  const { suite } = useSuite(isEditable ? run.suiteId : '')
+  const automatedCoverage = useMemo(
+    () => (suite ? suite.cases.filter((c) => c.executionMode === 'automated') : []),
+    [suite],
+  )
 
   const sortedCases = useMemo(() => run.cases, [run.cases])
 
@@ -195,6 +205,43 @@ export function RunDetail({
           )}
         </div>
       </div>
+
+      {/* Read-only coverage from CI, for a manual run whose suite also has automated cases */}
+      {isEditable && automatedCoverage.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-default">{t('runs.coveredByCi')}</h2>
+          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden divide-y divide-border">
+            {automatedCoverage.map((tc) => {
+              const described = describeCase(tc)
+              return (
+                <div key={tc.id} className="py-3 px-4 sm:px-5 flex items-center gap-3 flex-wrap">
+                  <span className="text-sm font-medium text-default truncate flex-1 min-w-[200px]">
+                    {described.title}
+                  </span>
+                  {tc.lastResult ? (
+                    <div className="flex items-center gap-2">
+                      <StatusChip status={tc.lastResult.status} />
+                      <span className="text-xs text-muted">
+                        {formatRelative(tc.lastResult.recordedAt, locale, t('suites.never'))}
+                      </span>
+                      {tc.lastResult.commitSha && (
+                        <Link
+                          href={`/projects/${projectId}/runs/${tc.lastResult.runId}`}
+                          className="font-mono text-xs text-primary hover:underline"
+                        >
+                          {tc.lastResult.commitSha.slice(0, 7)}
+                        </Link>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-muted">{t('suites.never')}</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

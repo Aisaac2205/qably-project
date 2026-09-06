@@ -90,9 +90,17 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
       {/* Col 3: cases count (hidden on mobile) */}
       <div className="hidden md:flex flex-col items-end shrink-0">
         <span className="text-sm font-mono font-semibold text-default tabular-nums">
-          {suite.cases.length}
+          {suite.automatedCases > 0
+            ? `${suite.manualCases} · ${suite.automatedCases}`
+            : suite.cases.length}
         </span>
-        <span className="text-xs text-muted mt-0.5">{suite.cases.length === 1 ? t('suites.caseSuffix_one') : t('suites.caseSuffix_other')}</span>
+        <span className="text-xs text-muted mt-0.5">
+          {suite.automatedCases > 0
+            ? t('suites.manualAutomatedSuffix')
+            : suite.cases.length === 1
+              ? t('suites.caseSuffix_one')
+              : t('suites.caseSuffix_other')}
+        </span>
       </div>
 
       {/* Col 4: last run reference (hidden on mobile) */}
