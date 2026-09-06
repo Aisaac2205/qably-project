@@ -4,6 +4,7 @@ import type { Job } from 'bullmq';
 import type { RepoConnectionProvider } from '@qably/types';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import { TEST_CASE_EXTRACTOR } from '../ai/ai.tokens';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import type {
@@ -14,9 +15,14 @@ import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { detectLanguage } from './lib/detect-language';
 import { EXTRACTION_QUEUE, type ExtractionJobData } from './review.contracts';
 
-const DEFAULT_LOCALE = 'es' as const;
+const FALLBACK_LOCALE = 'es' as const;
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
 const HEAD_REF = 'HEAD';
+const OWNER_ROLE = 'owner';
+const NOT_ENTITLED_REASON = 'ai-not-enabled';
+const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
+const NO_TESTS_FOUND_REASON = 'no-tests-found';
+const EXTRACTION_FAILED_REASON = 'extraction-failed';
 
 interface ConnectionInfo {
   provider: RepoConnectionProvider;
@@ -26,6 +32,7 @@ interface ConnectionInfo {
 
 interface JobContext {
   projectId: string;
+  organizationId: string;
   filePath: string;
   ref: string;
   connection: ConnectionInfo | null;
@@ -39,11 +46,14 @@ interface JobContext {
 interface TxClient {
   suite: { findFirst: PrismaService['suite']['findFirst'] };
   testCase: { findFirst: PrismaService['testCase']['findFirst'] };
-  evidence: { create: PrismaService['evidence']['create'] };
+  evidence: {
+    create: PrismaService['evidence']['create'];
+    update: PrismaService['evidence']['update'];
+  };
   extractedProposal: {
     findFirst: PrismaService['extractedProposal']['findFirst'];
     create: PrismaService['extractedProposal']['create'];
-    upsert: PrismaService['extractedProposal']['upsert'];
+    update: PrismaService['extractedProposal']['update'];
   };
 }
 
@@ -52,6 +62,21 @@ function splitRepo(full: string): { owner: string; repo: string } {
   return index === -1
     ? { owner: full, repo: full }
     : { owner: full.slice(0, index), repo: full.slice(index + 1) };
+}
+
+function dedupeByAutomationKey(
+  cases: readonly ExtractedCase[],
+): ExtractedCase[] {
+  const seen = new Set<string>();
+  const deduped: ExtractedCase[] = [];
+
+  for (const testCase of cases) {
+    if (seen.has(testCase.automationKey)) continue;
+    seen.add(testCase.automationKey);
+    deduped.push(testCase);
+  }
+
+  return deduped;
 }
 
 @Processor(EXTRACTION_QUEUE, { concurrency: 2 })
@@ -63,6 +88,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly sourceReader: SourceReader,
     @Inject(TEST_CASE_EXTRACTOR) private readonly extractor: TestCaseExtractor,
     private readonly encryption: EncryptionService,
+    private readonly entitlement: AiEntitlementService,
   ) {
     super();
   }
@@ -86,6 +112,7 @@ export class ExtractionProcessor extends WorkerHost {
         evidenceId: true,
         project: {
           select: {
+            organizationId: true,
             connection: {
               select: {
                 provider: true,
@@ -105,6 +132,7 @@ export class ExtractionProcessor extends WorkerHost {
 
     await this.runExtraction({
       projectId: codeChange.projectId,
+      organizationId: codeChange.project.organizationId,
       filePath: codeChange.filePath,
       ref: codeChange.commitSha,
       connection: codeChange.project.connection,
@@ -127,6 +155,7 @@ export class ExtractionProcessor extends WorkerHost {
         automationFilePath: true,
         project: {
           select: {
+            organizationId: true,
             connection: {
               select: {
                 provider: true,
@@ -151,6 +180,7 @@ export class ExtractionProcessor extends WorkerHost {
 
     await this.runExtraction({
       projectId: testCase.projectId,
+      organizationId: testCase.project.organizationId,
       filePath: testCase.automationFilePath,
       ref,
       connection: testCase.project.connection,
@@ -176,8 +206,26 @@ export class ExtractionProcessor extends WorkerHost {
   }
 
   private async runExtraction(ctx: JobContext): Promise<void> {
+    try {
+      await this.runExtractionUnsafe(ctx);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown-error';
+      this.logger.error(
+        `Extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
+      );
+      await this.persistManualReviewFallback(ctx, EXTRACTION_FAILED_REASON);
+    }
+  }
+
+  private async runExtractionUnsafe(ctx: JobContext): Promise<void> {
     if (ctx.connection === null) {
       await this.persistManualReviewFallback(ctx, 'no-connection');
+      return;
+    }
+
+    const entitled = await this.entitlement.isEntitled(ctx.organizationId);
+    if (!entitled) {
+      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
       return;
     }
 
@@ -201,34 +249,51 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
+    const locale = await this.resolveLocale(ctx.organizationId);
+
     const outcome = await this.extractor.extract({
       filePath: ctx.filePath,
       language: detectLanguage(ctx.filePath),
       content: source.content,
-      locale: DEFAULT_LOCALE,
+      locale,
       ...(ctx.onlyAutomationKey === null
         ? {}
         : { automationKey: ctx.onlyAutomationKey }),
     });
-
-    if (outcome.kind === 'no-tests-found') {
-      this.logger.log(`No tests found in ${ctx.filePath}`);
-      return;
-    }
 
     if (outcome.kind === 'provider-unavailable') {
       await this.persistManualReviewFallback(ctx, outcome.reason);
       return;
     }
 
+    const spent = await this.entitlement.spendCredit(ctx.organizationId);
+    if (!spent) {
+      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
+      return;
+    }
+
+    if (outcome.kind === 'no-tests-found') {
+      if (ctx.targetTestCaseId !== null) {
+        await this.persistManualReviewFallback(ctx, NO_TESTS_FOUND_REASON);
+        return;
+      }
+      this.logger.log(`No tests found in ${ctx.filePath}`);
+      return;
+    }
+
+    const deduped = dedupeByAutomationKey(outcome.cases);
     const cases =
       ctx.onlyAutomationKey === null
-        ? outcome.cases
-        : outcome.cases.filter(
+        ? deduped
+        : deduped.filter(
             (candidate) => candidate.automationKey === ctx.onlyAutomationKey,
           );
 
     if (cases.length === 0) {
+      if (ctx.targetTestCaseId !== null) {
+        await this.persistManualReviewFallback(ctx, NO_MATCHING_CASE_REASON);
+        return;
+      }
       this.logger.log(
         `Extraction for ${ctx.filePath} did not include the requested case`,
       );
@@ -236,6 +301,16 @@ export class ExtractionProcessor extends WorkerHost {
     }
 
     await this.persistExtracted(cases, ctx);
+  }
+
+  private async resolveLocale(organizationId: string): Promise<'es' | 'en'> {
+    const owner = await this.prisma.orgMember.findFirst({
+      where: { organizationId, role: OWNER_ROLE },
+      orderBy: { joinedAt: 'asc' },
+      select: { user: { select: { locale: true } } },
+    });
+
+    return owner?.user.locale === 'en' ? 'en' : FALLBACK_LOCALE;
   }
 
   private async persistExtracted(
@@ -273,25 +348,15 @@ export class ExtractionProcessor extends WorkerHost {
                 })
               )?.id ?? null));
 
-        const evidence = await tx.evidence.create({
-          data: {
-            projectId: ctx.projectId,
-            kind: 'SOURCE_EXCERPT',
-            title: ctx.filePath,
-            uri: buildBlobUrl(
-              connection.provider,
-              connection.repo,
-              ctx.ref,
-              ctx.filePath,
-            ),
-            excerpt: testCase.sourceExcerpt,
-          },
-          select: { id: true },
-        });
+        const uri = buildBlobUrl(
+          connection.provider,
+          connection.repo,
+          ctx.ref,
+          ctx.filePath,
+        );
 
         const shared = {
           projectId: ctx.projectId,
-          evidenceId: evidence.id,
           suiteId,
           status: 'in_review' as const,
           title: testCase.title,
@@ -304,34 +369,77 @@ export class ExtractionProcessor extends WorkerHost {
         };
 
         if (ctx.codeChangeId !== null) {
-          await tx.extractedProposal.upsert({
+          const existing = await tx.extractedProposal.findFirst({
             where: {
-              codeChangeId_automationKey: {
-                codeChangeId: ctx.codeChangeId,
-                automationKey: testCase.automationKey,
-              },
+              codeChangeId: ctx.codeChangeId,
+              automationKey: testCase.automationKey,
             },
-            create: {
+            select: { id: true, status: true, evidenceId: true },
+          });
+
+          if (existing !== null && existing.status !== 'in_review') {
+            this.logger.log(
+              `Skipping redelivered extraction for already-decided proposal ${existing.id}`,
+            );
+            continue;
+          }
+
+          if (existing !== null) {
+            await tx.evidence.update({
+              where: { id: existing.evidenceId },
+              data: { title: ctx.filePath, uri, excerpt: testCase.sourceExcerpt },
+            });
+
+            await tx.extractedProposal.update({
+              where: { id: existing.id },
+              data: { ...shared, targetTestCaseId: matchedCaseId },
+            });
+            continue;
+          }
+
+          const evidence = await tx.evidence.create({
+            data: {
+              projectId: ctx.projectId,
+              kind: 'SOURCE_EXCERPT',
+              title: ctx.filePath,
+              uri,
+              excerpt: testCase.sourceExcerpt,
+            },
+            select: { id: true },
+          });
+
+          await tx.extractedProposal.create({
+            data: {
               ...shared,
+              evidenceId: evidence.id,
               codeChangeId: ctx.codeChangeId,
               automationKey: testCase.automationKey,
               targetTestCaseId: matchedCaseId,
             },
-            update: {
-              ...shared,
-              targetTestCaseId: matchedCaseId,
-            },
           });
-        } else {
-          await tx.extractedProposal.create({
-            data: {
-              ...shared,
-              codeChangeId: null,
-              automationKey: testCase.automationKey,
-              targetTestCaseId: ctx.targetTestCaseId,
-            },
-          });
+          continue;
         }
+
+        const evidence = await tx.evidence.create({
+          data: {
+            projectId: ctx.projectId,
+            kind: 'SOURCE_EXCERPT',
+            title: ctx.filePath,
+            uri,
+            excerpt: testCase.sourceExcerpt,
+          },
+          select: { id: true },
+        });
+
+        await tx.extractedProposal.create({
+          data: {
+            ...shared,
+            evidenceId: evidence.id,
+            codeChangeId: null,
+            automationKey: testCase.automationKey,
+            targetTestCaseId: ctx.targetTestCaseId,
+          },
+        });
       }
     });
   }
@@ -341,6 +449,13 @@ export class ExtractionProcessor extends WorkerHost {
     projectId: string,
     filePath: string,
   ): Promise<string | null> {
+    const byAutomationPath = await tx.testCase.findFirst({
+      where: { projectId, automationFilePath: filePath },
+      select: { suiteId: true },
+    });
+
+    if (byAutomationPath !== null) return byAutomationPath.suiteId;
+
     const byFileName = await tx.suite.findFirst({
       where: { projectId, name: filePath },
       select: { id: true },
