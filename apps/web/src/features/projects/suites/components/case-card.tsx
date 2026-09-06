@@ -16,7 +16,16 @@ import { projectAiReviewPath } from '@/features/projects/lib/routes'
 
 function documentCaseErrorKey(error: unknown): string {
   if (!(error instanceof ApiError)) return 'suites.documentCaseError'
-  if (error.code === 'ai-not-enabled') return 'suites.documentCaseAiDisabled'
+  switch (error.code) {
+    case 'ai-not-enabled':
+      return 'suites.documentCaseAiDisabled'
+    case 'not-found':
+      return 'suites.documentCaseNotFound'
+    case 'not-automated':
+      return 'suites.documentCaseNotAutomated'
+    case 'already-pending':
+      return 'suites.documentCaseAlreadyPending'
+  }
   if (error.status === 404) return 'suites.documentCaseNotFound'
   if (error.status === 409) return 'suites.documentCaseConflict'
   if (error.status === 429) return 'suites.documentCaseThrottled'

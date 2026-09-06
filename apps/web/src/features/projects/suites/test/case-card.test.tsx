@@ -182,7 +182,7 @@ describe('CaseCard', () => {
       expect(suitesApi.documentCase).toHaveBeenCalledWith('suite-1', 'tc-9')
     })
 
-    it('shows a conflict message when the case is already pending or not automated', async () => {
+    it('shows a generic conflict message when the 409 has no recognized code', async () => {
       vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict'))
       const user = userEvent.setup()
       await act(async () => {
@@ -192,6 +192,30 @@ describe('CaseCard', () => {
       await user.click(screen.getByRole('button', { name: /document with ai/i }))
 
       expect(await screen.findByText(/can't be documented with ai right now/i)).toBeInTheDocument()
+    })
+
+    it('shows a not-automated message when the case has no automation file', async () => {
+      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'not-automated'))
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+
+      expect(await screen.findByText(/isn't automated or has no automation file/i)).toBeInTheDocument()
+    })
+
+    it('shows an already-pending message when a proposal is already pending review', async () => {
+      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'already-pending'))
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+
+      expect(await screen.findByText(/already a proposal pending review|already pending review for this case/i)).toBeInTheDocument()
     })
 
     it('shows a not-found message when the case no longer exists', async () => {

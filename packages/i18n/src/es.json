@@ -695,6 +695,8 @@
     "documentCaseQueued": "En cola para documentación con IA.",
     "viewInAiReview": "Ver en revisión de IA",
     "documentCaseNotFound": "Este caso ya no se pudo encontrar.",
+    "documentCaseNotAutomated": "Este caso no está automatizado o no tiene un archivo de automatización para leer.",
+    "documentCaseAlreadyPending": "Ya hay una propuesta pendiente de revisión para este caso.",
     "documentCaseConflict": "Este caso no se puede documentar con IA en este momento. Puede que ya esté pendiente de revisión o no esté vinculado a un archivo de automatización.",
     "documentCaseAiDisabled": "La documentación con IA no está habilitada para esta organización.",
     "documentCaseThrottled": "Demasiadas solicitudes de IA en este momento. Intenta de nuevo en un momento.",
