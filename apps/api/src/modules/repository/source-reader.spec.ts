@@ -235,4 +235,30 @@ describe('buildBlobUrl', () => {
       buildBlobUrl('BITBUCKET', 'qably/qably', 'abc123', 'src/cart.spec.ts'),
     ).toBe('https://bitbucket.org/qably/qably/src/abc123/src/cart.spec.ts');
   });
+
+  it('encodes owner, repo, ref and each path segment for a GitHub blob url', () => {
+    expect(
+      buildBlobUrl(
+        'GITHUB',
+        'my org/repo#1',
+        'feature/x y',
+        'src/a b/c#.spec.ts',
+      ),
+    ).toBe(
+      'https://github.com/my%20org/repo%231/blob/feature%2Fx%20y/src/a%20b/c%23.spec.ts',
+    );
+  });
+
+  it('encodes owner, repo, ref and each path segment for a Bitbucket blob url', () => {
+    expect(
+      buildBlobUrl(
+        'BITBUCKET',
+        'my workspace/repo#1',
+        'feature/x y',
+        'src/a b/c#.spec.ts',
+      ),
+    ).toBe(
+      'https://bitbucket.org/my%20workspace/repo%231/src/feature%2Fx%20y/src/a%20b/c%23.spec.ts',
+    );
+  });
 });

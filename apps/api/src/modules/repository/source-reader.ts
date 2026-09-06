@@ -29,20 +29,32 @@ const BLOB_PATH: Record<
     `https://bitbucket.org/${repo}/src/${sha}/${filePath}`,
 };
 
+function encodePath(path: string): string {
+  return path
+    .split('/')
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+}
+
+function encodeRepo(repo: string): string {
+  const index = repo.indexOf('/');
+
+  return index === -1
+    ? encodeURIComponent(repo)
+    : `${encodeURIComponent(repo.slice(0, index))}/${encodeURIComponent(repo.slice(index + 1))}`;
+}
+
 export function buildBlobUrl(
   provider: RepoConnectionProvider,
   repo: string,
   sha: string,
   filePath: string,
 ): string {
-  return BLOB_PATH[provider](repo, sha, filePath);
-}
-
-function encodePath(path: string): string {
-  return path
-    .split('/')
-    .map((segment) => encodeURIComponent(segment))
-    .join('/');
+  return BLOB_PATH[provider](
+    encodeRepo(repo),
+    encodeURIComponent(sha),
+    encodePath(filePath),
+  );
 }
 
 function githubUrl(input: SourceReadInput): string {
