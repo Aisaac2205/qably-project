@@ -73,7 +73,11 @@ interface FakePrisma {
   testCase: { findMany: jest.Mock };
   run: { findMany: jest.Mock };
   evidence: { create: jest.Mock };
-  extractedProposal: { create: jest.Mock };
+  extractedProposal: {
+    create: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+  };
   $transaction: jest.Mock;
 }
 
@@ -121,6 +125,8 @@ function createPrisma(): FakePrisma {
     evidence: { create: jest.fn().mockResolvedValue({ id: 'evidence-9' }) },
     extractedProposal: {
       create: jest.fn().mockResolvedValue({ id: 'proposal-9' }),
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     $transaction: jest.fn(),
   };
@@ -284,7 +290,7 @@ describe('ChatService', () => {
       containing({
         data: containing({
           kind: 'ARTIFACT',
-          uri: 'qably://chat/thread-1/message-2',
+          uri: 'qably://chat/thread-1/message-2/0',
           excerpt: 'What is missing in checkout?',
         }),
       }),
@@ -299,6 +305,41 @@ describe('ChatService', () => {
         }),
       }),
     );
+  });
+
+  it('returns the existing proposal and creates nothing on a second send for the same case', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      id: 'already-sent-proposal',
+    });
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      { caseIndex: 0 },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { proposalId: 'already-sent-proposal', alreadySent: true },
+    });
+    expect(prisma.extractedProposal.findFirst).toHaveBeenCalledWith(
+      containing({
+        where: {
+          projectId: 'project-1',
+          evidence: { uri: 'qably://chat/thread-1/message-2/0' },
+        },
+      }),
+    );
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
   });
 
   it('rejects a case index the assistant never suggested', async () => {
@@ -510,5 +551,42 @@ describe('ChatService', () => {
 
     expect(result).toEqual({ ok: false, error: 'invalid-suggested-cases' });
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('maps existing evidence uris back onto the thread messages as sentProposalIds', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      {
+        id: 'proposal-1',
+        evidence: { uri: 'qably://chat/thread-1/message-2/0' },
+      },
+    ]);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.getThread(org, user, 'project-1', 'thread-1');
+
+    expect(prisma.extractedProposal.findMany).toHaveBeenCalledWith(
+      containing({
+        where: {
+          projectId: 'project-1',
+          evidence: { uri: { startsWith: 'qably://chat/thread-1/' } },
+        },
+      }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: containing({
+        messages: [
+          containing({ id: 'message-1' }),
+          containing({
+            id: 'message-2',
+            sentProposalIds: { 0: 'proposal-1' },
+          }),
+        ],
+      }),
+    });
   });
 });

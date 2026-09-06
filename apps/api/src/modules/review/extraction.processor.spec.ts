@@ -500,7 +500,7 @@ describe('ExtractionProcessor — code-change job', () => {
       savepointCalls.filter(
         (sql) => sql === 'RELEASE SAVEPOINT extraction_proposal',
       ),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
 
     const firstSavepointOrder =
       prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
@@ -509,13 +509,16 @@ describe('ExtractionProcessor — code-change job', () => {
     const firstProposalCreateOrder =
       prisma.extractedProposal.create.mock.invocationCallOrder[0];
     const rollbackOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
+    const releaseAfterRollbackOrder =
+      prisma.$executeRawUnsafe.mock.invocationCallOrder[2];
     const findFirstOrder =
       prisma.extractedProposal.findFirst.mock.invocationCallOrder[0];
 
     expect(firstSavepointOrder).toBeLessThan(firstEvidenceCreateOrder);
     expect(firstEvidenceCreateOrder).toBeLessThan(firstProposalCreateOrder);
     expect(firstProposalCreateOrder).toBeLessThan(rollbackOrder);
-    expect(rollbackOrder).toBeLessThan(findFirstOrder);
+    expect(rollbackOrder).toBeLessThan(releaseAfterRollbackOrder);
+    expect(releaseAfterRollbackOrder).toBeLessThan(findFirstOrder);
   });
 
   it('does not mutate an already-decided proposal even when the create races and loses', async () => {

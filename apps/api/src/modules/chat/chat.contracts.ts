@@ -35,6 +35,7 @@ export interface ChatMessageView {
   content: string;
   suggestedCases: SuggestedCase[];
   createdAt: string;
+  sentProposalIds?: Record<number, string>;
 }
 
 export interface ChatThreadDetailView extends ChatThreadView {
@@ -43,6 +44,7 @@ export interface ChatThreadDetailView extends ChatThreadView {
 
 export interface SendToReviewView {
   proposalId: string;
+  alreadySent?: boolean;
 }
 
 export type ChatError =

@@ -562,6 +562,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (!isUniqueViolation(error)) throw error;
 
       await tx.$executeRawUnsafe(`ROLLBACK TO SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
+      await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
 
       const winner = await tx.extractedProposal.findFirst({
         where: {

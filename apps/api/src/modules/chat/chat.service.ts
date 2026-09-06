@@ -77,7 +77,10 @@ function toThreadView(row: ThreadRow): ChatThreadView {
   };
 }
 
-function toMessageView(row: MessageRow): ChatMessageView {
+function toMessageView(
+  row: MessageRow,
+  sentProposalIds?: Record<number, string>,
+): ChatMessageView {
   const read = readSuggestedCases(row.suggestedCases);
 
   if (read.kind === 'corrupt') {
@@ -91,7 +94,31 @@ function toMessageView(row: MessageRow): ChatMessageView {
     content: row.content,
     suggestedCases: read.kind === 'ok' ? read.cases : [],
     createdAt: row.createdAt.toISOString(),
+    ...(sentProposalIds !== undefined ? { sentProposalIds } : {}),
   };
+}
+
+function chatEvidenceUri(
+  threadId: string,
+  messageId: string,
+  caseIndex: number,
+): string {
+  return `qably://chat/${threadId}/${messageId}/${caseIndex}`;
+}
+
+function parseChatEvidenceUri(
+  prefix: string,
+  uri: string,
+): { messageId: string; caseIndex: number } | null {
+  if (!uri.startsWith(prefix)) return null;
+
+  const [messageId, caseIndexRaw] = uri.slice(prefix.length).split('/');
+  const caseIndex = Number(caseIndexRaw);
+  if (messageId === undefined || messageId === '' || Number.isNaN(caseIndex)) {
+    return null;
+  }
+
+  return { messageId, caseIndex };
 }
 
 function threadTitleFrom(content: string): string {
@@ -156,14 +183,19 @@ export class ChatService {
     const thread = await this.findThread(org, user, projectId, threadId);
     if (thread === null) return err('thread-not-found');
 
-    const messages = await this.prisma.chatMessage.findMany({
-      where: { threadId },
-      orderBy: { createdAt: 'asc' },
-    });
+    const [messages, sentProposalIdsByMessage] = await Promise.all([
+      this.prisma.chatMessage.findMany({
+        where: { threadId },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.loadSentProposalIds(projectId, threadId),
+    ]);
 
     return ok({
       ...toThreadView(thread),
-      messages: messages.map(toMessageView),
+      messages: messages.map((row) =>
+        toMessageView(row, sentProposalIdsByMessage.get(row.id)),
+      ),
     });
   }
 
@@ -266,6 +298,16 @@ export class ChatService {
       read.kind === 'ok' ? read.cases[input.caseIndex] : undefined;
     if (suggested === undefined) return err('case-not-found');
 
+    const evidenceUri = chatEvidenceUri(threadId, messageId, input.caseIndex);
+
+    const existingProposal = await this.prisma.extractedProposal.findFirst({
+      where: { projectId, evidence: { uri: evidenceUri } },
+      select: { id: true },
+    });
+    if (existingProposal !== null) {
+      return ok({ proposalId: existingProposal.id, alreadySent: true });
+    }
+
     const suite = await this.prisma.suite.findFirst({
       where: { projectId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
@@ -285,7 +327,7 @@ export class ChatService {
           projectId,
           kind: 'ARTIFACT',
           title: `Chat: ${thread.title}`,
-          uri: `qably://chat/${threadId}/${messageId}`,
+          uri: evidenceUri,
           excerpt: (prompt?.content ?? message.content).slice(
             0,
             MAX_EXCERPT_LENGTH,
@@ -313,6 +355,28 @@ export class ChatService {
     });
 
     return ok({ proposalId: proposal.id });
+  }
+
+  private async loadSentProposalIds(
+    projectId: string,
+    threadId: string,
+  ): Promise<Map<string, Record<number, string>>> {
+    const prefix = `qably://chat/${threadId}/`;
+    const proposals = await this.prisma.extractedProposal.findMany({
+      where: { projectId, evidence: { uri: { startsWith: prefix } } },
+      select: { id: true, evidence: { select: { uri: true } } },
+    });
+
+    const map = new Map<string, Record<number, string>>();
+    for (const proposal of proposals) {
+      const parsed = parseChatEvidenceUri(prefix, proposal.evidence.uri);
+      if (parsed === null) continue;
+
+      const existing = map.get(parsed.messageId) ?? {};
+      existing[parsed.caseIndex] = proposal.id;
+      map.set(parsed.messageId, existing);
+    }
+    return map;
   }
 
   private findProject(

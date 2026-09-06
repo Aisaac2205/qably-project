@@ -683,6 +683,7 @@ export interface ChatMessageRecord {
   content: string
   suggestedCases: SuggestedCaseRecord[]
   createdAt: string
+  sentProposalIds?: Record<number, string>
 }
 
 export interface ChatThreadDetailRecord extends ChatThreadRecord {
@@ -691,4 +692,5 @@ export interface ChatThreadDetailRecord extends ChatThreadRecord {
 
 export interface ChatSendToReviewRecord {
   proposalId: string
+  alreadySent?: boolean
 }
