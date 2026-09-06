@@ -2,9 +2,32 @@
 
 import { useCallback, useState } from 'react'
 import { useProposals } from '@/features/review-inbox/hooks/use-proposals'
-import { useProposalDecision } from '@/features/review-inbox/hooks/use-proposal-decision'
+import {
+  useProposalDecision,
+  type DecisionErrorCode,
+} from '@/features/review-inbox/hooks/use-proposal-decision'
+import { useTranslation } from '@/lib/i18n'
+
+function decisionErrorMessage(
+  code: DecisionErrorCode,
+  t: (key: string) => string,
+): string {
+  switch (code) {
+    case 'invalid-transition':
+      return t('aiReview.decisionAlreadyDecided')
+    case 'missing-evidence':
+      return t('aiReview.decisionMissingEvidence')
+    case 'missing-suite':
+      return t('aiReview.decisionMissingSuite')
+    case 'name-taken':
+      return t('aiReview.decisionNameTaken')
+    default:
+      return t('aiReview.decisionError')
+  }
+}
 
 export function useAiReview(projectId: string) {
+  const { t } = useTranslation()
   const { proposals: cases, isLoading, isError } = useProposals({
     projectId,
     status: 'in_review',
@@ -24,7 +47,7 @@ export function useAiReview(projectId: string) {
     setSelectedId(remaining[Math.min(idx, remaining.length - 1)]?.id)
   }, [cases, selectedCase])
 
-  const { approve, reject, isDeciding } = useProposalDecision({
+  const { approve, reject, isDeciding, decisionError } = useProposalDecision({
     onApproved: () => setSelectedId(undefined),
     onRejected: () => setSelectedId(undefined),
   })
@@ -43,6 +66,7 @@ export function useAiReview(projectId: string) {
     isLoading,
     isError,
     isDeciding,
+    decisionError: decisionError === null ? null : decisionErrorMessage(decisionError, t),
     selectCase,
     confirmSelected,
     rejectSelected,

@@ -254,6 +254,19 @@ describe('CaseCard', () => {
       expect(await screen.findByText(/too many ai requests/i)).toBeInTheDocument()
     })
 
+    it('hides the Document with AI button after a successful queue so a second click cannot race an already-pending error', async () => {
+      vi.spyOn(suitesApi, 'documentCase').mockResolvedValue({ queued: true, jobId: 'job-1' })
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+
+      expect(await screen.findByText(/queued for ai documentation/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /document with ai/i })).not.toBeInTheDocument()
+    })
+
     it('disables the button while the request is pending', async () => {
       let resolveRequest: (value: { queued: true; jobId: string }) => void = () => {}
       vi.spyOn(suitesApi, 'documentCase').mockReturnValue(

@@ -21,6 +21,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
     isLoading,
     isError,
     isDeciding,
+    decisionError,
     selectCase,
     confirmSelected,
     rejectSelected,
@@ -169,6 +170,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                     </div>
                     <ReviewToolbar
                       disabled={!selectedCase || isDeciding}
+                      decisionError={decisionError}
                       onConfirm={confirmSelected}
                       onReject={rejectSelected}
                       onSkip={skipSelected}

@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { approveProposal, rejectProposal } from '../api/review.api'
 import { reviewKeys } from '../lib/query-keys'
+import { ApiError } from '@/lib/api-client'
 
 interface DecisionCallbacks {
   onApproved: (proposalId: string) => void
@@ -15,15 +17,43 @@ interface DecisionVariables {
   comment?: string
 }
 
+export type DecisionErrorCode =
+  | 'invalid-transition'
+  | 'missing-evidence'
+  | 'missing-suite'
+  | 'name-taken'
+  | 'error'
+
+function classifyDecisionError(error: unknown): DecisionErrorCode {
+  if (error instanceof ApiError) {
+    switch (error.code) {
+      case 'invalid-transition':
+      case 'missing-evidence':
+      case 'missing-suite':
+      case 'name-taken':
+        return error.code
+    }
+  }
+  return 'error'
+}
+
 export function useProposalDecision({
   onApproved,
   onRejected,
   onError,
 }: DecisionCallbacks) {
   const queryClient = useQueryClient()
+  const [decisionError, setDecisionError] = useState<DecisionErrorCode | null>(null)
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+  }
+
+  const handleError = (error: unknown, proposalId: string) => {
+    const code = classifyDecisionError(error)
+    setDecisionError(code)
+    if (code === 'invalid-transition') invalidate()
+    onError?.(error, proposalId)
   }
 
   const approval = useMutation({
@@ -33,7 +63,7 @@ export function useProposalDecision({
       invalidate()
       onApproved(proposalId)
     },
-    onError: (error, { proposalId }) => onError?.(error, proposalId),
+    onError: (error, { proposalId }) => handleError(error, proposalId),
   })
 
   const rejection = useMutation({
@@ -43,14 +73,19 @@ export function useProposalDecision({
       invalidate()
       onRejected(proposalId)
     },
-    onError: (error, { proposalId }) => onError?.(error, proposalId),
+    onError: (error, { proposalId }) => handleError(error, proposalId),
   })
 
   return {
-    approve: (proposalId: string, comment?: string) =>
-      approval.mutate({ proposalId, comment }),
-    reject: (proposalId: string, comment?: string) =>
-      rejection.mutate({ proposalId, comment }),
+    approve: (proposalId: string, comment?: string) => {
+      setDecisionError(null)
+      approval.mutate({ proposalId, comment })
+    },
+    reject: (proposalId: string, comment?: string) => {
+      setDecisionError(null)
+      rejection.mutate({ proposalId, comment })
+    },
     isDeciding: approval.isPending || rejection.isPending,
+    decisionError,
   }
 }

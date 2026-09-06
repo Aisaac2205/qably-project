@@ -9,6 +9,7 @@ import { renderWithQuery } from '@/lib/query-test-utils'
 import * as reviewApi from '@/features/review-inbox/api/review.api'
 import { proposalListFixturesFor } from '@/test/review-api-stub'
 import type { ProposalFilters } from '@/features/review-inbox/api/review.api'
+import { ApiError } from '@/lib/api-client'
 
 vi.mock('@/features/review-inbox/api/review.api', async () => {
   const actual = await vi.importActual<
@@ -162,5 +163,18 @@ describe('AiReviewPage', () => {
     await user.click(rejectButton)
 
     await waitFor(() => expect(reviewApi.rejectProposal).toHaveBeenCalled())
+  })
+
+  it('shows an already-decided alert on a 409 and does not clear the selection', async () => {
+    vi.mocked(reviewApi.approveProposal).mockRejectedValueOnce(
+      new ApiError(409, 'Conflict', 'invalid-transition'),
+    )
+    const user = userEvent.setup()
+    renderWithQuery(<AiReviewPage projectId="proj-1" />)
+
+    const approveButton = screen.getByRole('button', { name: 'Approve & publish case' })
+    await user.click(approveButton)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/already decided/i)
   })
 })
