@@ -34,6 +34,8 @@ function pendingErrorCopy(
       return t('aiReview.chatAiNotEnabled')
     case 'forbidden':
       return t('aiReview.chatForbidden')
+    case 'too-long':
+      return t('aiReview.chatMessageTooLong')
     case 'throttled':
       return t('aiReview.chatThrottled')
     default:
@@ -105,12 +107,14 @@ export function ChatMessageList({
     )
   }
 
+  const lastAssistantMessage = messages.findLast((message) => message.role === 'assistant')
+
   return (
-    <div
-      className="flex flex-col p-4 sm:p-6 space-y-4 max-w-3xl mx-auto w-full"
-      aria-live="polite"
-      aria-relevant="additions"
-    >
+    <div className="flex flex-col p-4 sm:p-6 space-y-4 max-w-3xl mx-auto w-full">
+      <div key={lastAssistantMessage?.id ?? 'none'} aria-live="polite" className="sr-only">
+        {lastAssistantMessage ? t('aiReview.newAssistantReply') : ''}
+      </div>
+
       {messages.map((message) => (
         <ChatMessageBubble key={message.id} projectId={projectId} message={message} />
       ))}

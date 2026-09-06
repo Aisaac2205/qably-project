@@ -60,6 +60,25 @@ describe('ChatMessageList', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/not available right now/i)
   })
 
+  it('scopes the live region to only the newest assistant reply, not the entire history', async () => {
+    const messages: ChatMessageRecord[] = [
+      { id: 'm1', threadId: 't1', role: 'user', content: 'First question', suggestedCases: [], createdAt: '2026-01-01T00:00:00Z' },
+      { id: 'm2', threadId: 't1', role: 'assistant', content: 'First answer', suggestedCases: [], createdAt: '2026-01-01T00:01:00Z' },
+      { id: 'm3', threadId: 't1', role: 'assistant', content: 'Second answer', suggestedCases: [], createdAt: '2026-01-01T00:02:00Z' },
+    ]
+    let container: HTMLElement
+    await act(async () => {
+      ;({ container } = render(<ChatMessageList projectId="proj-1" messages={messages} />))
+    })
+
+    const liveRegions = container!.querySelectorAll('[aria-live="polite"]')
+    expect(liveRegions).toHaveLength(1)
+    expect(liveRegions[0]).not.toHaveTextContent('First question')
+    expect(liveRegions[0]).not.toHaveTextContent('First answer')
+    expect(liveRegions[0]).not.toHaveTextContent('Second answer')
+    expect(liveRegions[0]?.textContent).not.toBe('')
+  })
+
   it('shows a throttled error message', async () => {
     await act(async () => {
       render(
@@ -71,5 +90,18 @@ describe('ChatMessageList', () => {
       )
     })
     expect(screen.getByRole('alert')).toHaveTextContent(/too many messages/i)
+  })
+
+  it('shows a message-too-long error message', async () => {
+    await act(async () => {
+      render(
+        <ChatMessageList
+          projectId="proj-1"
+          messages={[]}
+          pendingMessage={{ content: 'Hi', status: 'error', errorKind: 'too-long' }}
+        />,
+      )
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent(/too long/i)
   })
 })

@@ -488,6 +488,7 @@
     "chatSendError": "Couldn't send your message. Try again.",
     "chatMessageTooLong": "Your message is too long. Keep it under 4000 characters.",
     "chatLoadingThread": "Loading the conversation…",
+    "newAssistantReply": "New reply from the assistant",
     "chatComposerLabel": "Message"
   },
   "reviewFlow": {

@@ -1,7 +1,8 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { ChatMessageBubble } from '@/features/ai-review/components/chat-message-bubble'
 import type { ChatMessageRecord } from '@qably/types'
+import { renderWithQuery } from '@/lib/query-test-utils'
 
 describe('ChatMessageBubble', () => {
   it('renders user message content', async () => {
@@ -14,7 +15,7 @@ describe('ChatMessageBubble', () => {
       createdAt: '2026-01-01T00:00:00Z',
     }
     await act(async () => {
-      render(<ChatMessageBubble projectId="proj-1" message={message} />)
+      renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
     })
     expect(screen.getByText('Hello there')).toBeInTheDocument()
   })
@@ -38,7 +39,7 @@ describe('ChatMessageBubble', () => {
       createdAt: '2026-01-01T00:00:00Z',
     }
     await act(async () => {
-      render(<ChatMessageBubble projectId="proj-1" message={message} />)
+      renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
     })
     expect(screen.getByText('Valid checkout completes order')).toBeInTheDocument()
   })

@@ -488,6 +488,7 @@
     "chatSendError": "No se pudo enviar tu mensaje. Intenta de nuevo.",
     "chatMessageTooLong": "Tu mensaje es demasiado largo. Mantenlo por debajo de 4000 caracteres.",
     "chatLoadingThread": "Cargando la conversación…",
+    "newAssistantReply": "Nueva respuesta del asistente",
     "chatComposerLabel": "Mensaje"
   },
   "reviewFlow": {

@@ -2,14 +2,16 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useQueryClient } from '@tanstack/react-query'
 import { Sparkle } from '@phosphor-icons/react'
 import type { SuggestedCaseRecord } from '@qably/types'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
 import { sendToReview } from '../api/chat.api'
+import { chatKeys } from '../lib/query-keys'
 import { projectAiReviewPath } from '@/features/projects/lib/routes'
 
-type SendState = 'idle' | 'pending' | 'sent' | 'error'
+type SendState = 'idle' | 'pending' | 'error'
 
 export function ChatGeneratedCaseCard({
   projectId,
@@ -17,21 +19,29 @@ export function ChatGeneratedCaseCard({
   messageId,
   caseIndex,
   suggestedCase,
+  sentProposalId,
 }: {
   projectId: string
   threadId: string
   messageId: string
   caseIndex: number
   suggestedCase: SuggestedCaseRecord
+  sentProposalId?: string
 }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   const [state, setState] = useState<SendState>('idle')
+  const [localProposalId, setLocalProposalId] = useState<string | null>(null)
+
+  const proposalId = sentProposalId ?? localProposalId ?? undefined
+  const isSent = proposalId !== undefined
 
   async function handleSend() {
     setState('pending')
     try {
-      await sendToReview(projectId, threadId, messageId, caseIndex)
-      setState('sent')
+      const result = await sendToReview(projectId, threadId, messageId, caseIndex)
+      setLocalProposalId(result.proposalId)
+      void queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
     } catch {
       setState('error')
     }
@@ -45,7 +55,7 @@ export function ChatGeneratedCaseCard({
       </div>
       <p className="text-xs font-medium text-default">{suggestedCase.title}</p>
 
-      {state === 'sent' ? (
+      {isSent ? (
         <Link
           href={projectAiReviewPath(projectId)}
           className="inline-flex items-center gap-1 text-xs font-semibold text-ai underline underline-offset-2"

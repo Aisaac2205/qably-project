@@ -41,6 +41,7 @@ export function ChatMessageBubble({
               messageId={message.id}
               caseIndex={index}
               suggestedCase={suggestedCase}
+              sentProposalId={message.sentProposalIds?.[index]}
             />
           </div>
         ))}

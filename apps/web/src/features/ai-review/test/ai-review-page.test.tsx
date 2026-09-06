@@ -7,6 +7,8 @@ import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import * as reviewApi from '@/features/review-inbox/api/review.api'
+import { proposalListFixturesFor } from '@/test/review-api-stub'
+import type { ProposalFilters } from '@/features/review-inbox/api/review.api'
 
 vi.mock('@/features/review-inbox/api/review.api', async () => {
   const actual = await vi.importActual<
@@ -15,6 +17,11 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
 
   return {
     ...actual,
+    listProposals: vi
+      .fn()
+      .mockImplementation((filters: ProposalFilters) =>
+        Promise.resolve(proposalListFixturesFor(filters)),
+      ),
     approveProposal: vi.fn().mockResolvedValue({
       createdNewCase: true,
       testCaseId: 'case-1',
@@ -25,6 +32,14 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
     rejectProposal: vi.fn().mockResolvedValue({ decisionId: 'decision-1' }),
   }
 })
+
+vi.mock('@/features/ai-review/api/chat.api', () => ({
+  listThreads: vi.fn().mockResolvedValue([]),
+  createThread: vi.fn(),
+  getThread: vi.fn(),
+  sendMessage: vi.fn(),
+  sendToReview: vi.fn(),
+}))
 
 function renderIsolated(projectId: string) {
   const client = new QueryClient({
@@ -41,6 +56,9 @@ describe('AiReviewPage', () => {
   beforeEach(() => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
+    vi.mocked(reviewApi.listProposals).mockImplementation((filters: ProposalFilters) =>
+      Promise.resolve(proposalListFixturesFor(filters)),
+    )
   })
 
   it('renders the Review Queue tab by default with pending cases', async () => {
@@ -82,6 +100,25 @@ describe('AiReviewPage', () => {
     })
     await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
     expect(screen.getByText('What suites have the most pending cases?')).toBeInTheDocument()
+  })
+
+  it('keeps the chat draft text when switching away from and back to the Project Chat tab', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      renderWithQuery(<AiReviewPage projectId="proj-1" />)
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
+    const textarea = screen.getByRole('textbox', { name: 'Message' })
+    await user.type(textarea, 'Draft text')
+
+    await user.click(screen.getByRole('tab', { name: 'Review Queue' }))
+    const chatPanel = document.getElementById('ai-review-panel-chat')
+    expect(chatPanel).toHaveAttribute('hidden')
+    expect(document.getElementById('ai-review-panel-review')).not.toHaveAttribute('hidden')
+
+    await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Draft text')
   })
 
   it('does not expose the prohibited mass-confirm action', async () => {

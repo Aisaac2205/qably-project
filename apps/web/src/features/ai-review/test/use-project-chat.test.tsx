@@ -167,6 +167,25 @@ describe('useProjectChat', () => {
     expect(result.current.pendingMessage).toMatchObject({ errorKind: 'forbidden' })
   })
 
+  it('classifies a 400 validation error as too-long', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    sendMessage.mockRejectedValue(new ApiError(400, 'Message too long'))
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.messages.length).toBe(2))
+
+    await act(async () => {
+      await result.current.send('A'.repeat(4001))
+    })
+
+    expect(result.current.pendingMessage).toMatchObject({ errorKind: 'too-long' })
+  })
+
   it('reports isLoadingThread while a selected thread has not resolved yet', async () => {
     listThreads.mockResolvedValue([thread])
     let resolveThread: (value: ChatThreadDetailRecord) => void = () => {}

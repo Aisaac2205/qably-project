@@ -16,6 +16,7 @@ export type ChatSendErrorKind =
   | 'ai-not-enabled'
   | 'forbidden'
   | 'throttled'
+  | 'too-long'
   | 'error'
 
 export interface PendingMessage {
@@ -34,6 +35,9 @@ function classifySendError(error: unknown): ChatSendErrorKind {
     }
     if (error.status === 403) {
       return 'forbidden'
+    }
+    if (error.status === 400) {
+      return 'too-long'
     }
     if (error.status === 429) {
       return 'throttled'

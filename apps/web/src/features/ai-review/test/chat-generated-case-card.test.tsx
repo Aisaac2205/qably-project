@@ -1,9 +1,10 @@
-import { render, screen, act } from '@testing-library/react'
+import { screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChatGeneratedCaseCard } from '@/features/ai-review/components/chat-generated-case-card'
 import type { SuggestedCaseRecord } from '@qably/types'
 import * as chatApi from '@/features/ai-review/api/chat.api'
+import { renderWithQuery } from '@/lib/query-test-utils'
 
 const suggestedCase: SuggestedCaseRecord = {
   title: 'Login with 2FA shows a verification prompt',
@@ -21,7 +22,7 @@ describe('ChatGeneratedCaseCard', () => {
 
   it('shows the suggested case title and a send-to-review action', async () => {
     await act(async () => {
-      render(
+      renderWithQuery(
         <ChatGeneratedCaseCard
           projectId="proj-1"
           threadId="thread-1"
@@ -39,7 +40,7 @@ describe('ChatGeneratedCaseCard', () => {
     vi.spyOn(chatApi, 'sendToReview').mockResolvedValue({ proposalId: 'proposal-1' })
     const user = userEvent.setup()
     await act(async () => {
-      render(
+      renderWithQuery(
         <ChatGeneratedCaseCard
           projectId="proj-1"
           threadId="thread-1"
@@ -59,11 +60,31 @@ describe('ChatGeneratedCaseCard', () => {
     )
   })
 
+  it('shows the sent state from sentProposalId without a button after a remount', async () => {
+    const sendSpy = vi.spyOn(chatApi, 'sendToReview')
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+          sentProposalId="already-sent-proposal"
+        />,
+      )
+    })
+
+    expect(screen.getByRole('link', { name: 'View in Review Queue' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Send to review' })).not.toBeInTheDocument()
+    expect(sendSpy).not.toHaveBeenCalled()
+  })
+
   it('shows an error message when sending to review fails', async () => {
     vi.spyOn(chatApi, 'sendToReview').mockRejectedValue(new Error('boom'))
     const user = userEvent.setup()
     await act(async () => {
-      render(
+      renderWithQuery(
         <ChatGeneratedCaseCard
           projectId="proj-1"
           threadId="thread-1"

@@ -55,8 +55,10 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         >
           <button
             type="button"
+            id="ai-review-tab-review"
             role="tab"
             aria-selected={tab === 'review'}
+            aria-controls="ai-review-panel-review"
             onClick={() => setTab('review')}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary cursor-pointer ${
               tab === 'review'
@@ -68,8 +70,10 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
           </button>
           <button
             type="button"
+            id="ai-review-tab-chat"
             role="tab"
             aria-selected={tab === 'chat'}
+            aria-controls="ai-review-panel-chat"
             onClick={() => setTab('chat')}
             className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary cursor-pointer ${
               tab === 'chat'
@@ -82,8 +86,14 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         </div>
       </div>
 
-      {tab === 'review' ? (
-        isLoading ? (
+      <div
+        id="ai-review-panel-review"
+        role="tabpanel"
+        aria-labelledby="ai-review-tab-review"
+        hidden={tab !== 'review'}
+        className="flex-1 min-h-0"
+      >
+        {isLoading ? (
           <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
             <StateView kind="loading" title={t('aiReview.loading')} className="p-12" />
           </div>
@@ -100,7 +110,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             />
           </div>
         ) : (
-          <div className="flex-1 flex flex-col min-h-0 space-y-4">
+          <div className="flex flex-col h-full min-h-0 space-y-4">
             <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden min-h-[580px] h-[700px] max-h-[85vh]">
               <ResizableSplit
                 storageKey="ai-review-sidebar"
@@ -168,12 +178,20 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
               />
             </div>
           </div>
-        )
-      ) : (
-        <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+        )}
+      </div>
+
+      <div
+        id="ai-review-panel-chat"
+        role="tabpanel"
+        aria-labelledby="ai-review-tab-chat"
+        hidden={tab !== 'chat'}
+        className="flex-1 min-h-0"
+      >
+        <div className="flex flex-col h-full min-h-0 rounded-xl border border-border bg-surface shadow-card overflow-hidden">
           <ProjectChatPanel projectId={projectId} />
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -55,6 +55,13 @@ describe('ChatComposer', () => {
     expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled()
   })
 
+  it('caps the textarea at 4000 characters', async () => {
+    await act(async () => {
+      render(<ChatComposer onSend={vi.fn()} />)
+    })
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveAttribute('maxLength', '4000')
+  })
+
   it('does not send an empty message', async () => {
     const onSend = vi.fn()
     const user = userEvent.setup()

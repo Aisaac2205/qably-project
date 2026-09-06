@@ -8,6 +8,7 @@ import { useTranslation } from '@/lib/i18n'
 
 const MIN_HEIGHT = 44
 const MAX_HEIGHT = 200
+const MAX_MESSAGE_LENGTH = 4000
 
 export function ChatComposer({
   onSend,
@@ -59,6 +60,7 @@ export function ChatComposer({
             onKeyDown={handleKeyDown}
             placeholder={t('aiReview.chatPlaceholder')}
             rows={1}
+            maxLength={MAX_MESSAGE_LENGTH}
             className="flex-1 resize-none bg-transparent text-sm text-default placeholder:text-muted outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           />
           <button
