@@ -44,7 +44,8 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
-  ANTHROPIC_API_KEY: optionalSecret,
+  GEMINI_API_KEY: optionalSecret,
+  GEMINI_MODEL: z.string().min(1).default('gemini-3.1-flash-lite'),
   RESEND_API_KEY: optionalSecret,
   RESEND_FROM_EMAIL: z.string().min(1).optional(),
 });

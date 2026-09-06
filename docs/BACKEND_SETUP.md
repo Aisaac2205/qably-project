@@ -34,7 +34,8 @@ On a deployed environment the platform injects the variables directly and no `.e
 | `ENCRYPTION_KEY` | yes | 64 hex chars | AES-256-GCM key for provider tokens and webhook secrets at rest. Generate with `openssl rand -hex 32`. |
 | `GITHUB_CLIENT_ID` | yes | string | GitHub OAuth application id. |
 | `GITHUB_CLIENT_SECRET` | yes | string | GitHub OAuth application secret. |
-| `ANTHROPIC_API_KEY` | no | string | Key for the AI extraction provider. Optional because extraction ships last and the provider is not yet chosen; when supplied it must be non-empty. The Unit 3 extraction service requires it at its own boundary, and this variable is renamed if a provider other than Claude is selected. |
+| `GEMINI_API_KEY` | no | string | Key for the Gemini AI extraction provider. Optional at boot because extraction degrades to a manual-review fallback without it; the `ai` module requires it at its own boundary to activate `GeminiExtractor`. See `docs/AI_EXTRACTION.md`. |
+| `GEMINI_MODEL` | no | string | Gemini model id used for extraction. Defaults to `gemini-3.1-flash-lite` (see `src/config/env.ts` for the current value). |
 | `RESEND_API_KEY` | no | string | Resend API key for run notifications. Optional because notifications ship last; when supplied it must be non-empty. The Unit 4 notification service requires it at its own boundary. |
 
 Local development values for `DATABASE_URL` and `REDIS_URL` match the `docker-compose.yml` services:

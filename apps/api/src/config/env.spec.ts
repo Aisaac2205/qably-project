@@ -11,7 +11,7 @@ const validEnv = {
   ENCRYPTION_KEY: 'a'.repeat(64),
   GITHUB_CLIENT_ID: 'gh-client-id',
   GITHUB_CLIENT_SECRET: 'gh-client-secret',
-  ANTHROPIC_API_KEY: 'sk-ant-test',
+  GEMINI_API_KEY: 'gemini-test-key',
   RESEND_API_KEY: 're_test',
 };
 
@@ -103,21 +103,31 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ NODE_ENV: 'test' })).toThrow(/REDIS_URL/);
   });
 
-  it('starts without ANTHROPIC_API_KEY because extraction ships last', () => {
+  it('starts without GEMINI_API_KEY because extraction requires it only at its own boundary', () => {
     expect(
-      parseEnv(omit(validEnv, 'ANTHROPIC_API_KEY')).ANTHROPIC_API_KEY,
+      parseEnv(omit(validEnv, 'GEMINI_API_KEY')).GEMINI_API_KEY,
     ).toBeUndefined();
   });
 
-  it('treats a blank ANTHROPIC_API_KEY as absent, matching dotenv semantics', () => {
+  it('treats a blank GEMINI_API_KEY as absent, matching dotenv semantics', () => {
     expect(
-      parseEnv({ ...validEnv, ANTHROPIC_API_KEY: '' }).ANTHROPIC_API_KEY,
+      parseEnv({ ...validEnv, GEMINI_API_KEY: '' }).GEMINI_API_KEY,
     ).toBeUndefined();
+  });
+
+  it('defaults GEMINI_MODEL when omitted', () => {
+    expect(parseEnv(validEnv).GEMINI_MODEL).toBe('gemini-3.1-flash-lite');
+  });
+
+  it('accepts an explicit GEMINI_MODEL override', () => {
+    expect(
+      parseEnv({ ...validEnv, GEMINI_MODEL: 'gemini-2.5-pro' }).GEMINI_MODEL,
+    ).toBe('gemini-2.5-pro');
   });
 
   it('starts with neither optional provider key present', () => {
     const withoutProviders = omit(
-      omit(validEnv, 'ANTHROPIC_API_KEY'),
+      omit(validEnv, 'GEMINI_API_KEY'),
       'RESEND_API_KEY',
     );
 

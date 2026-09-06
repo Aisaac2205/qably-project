@@ -11,4 +11,5 @@ export const testEnv: Env = {
   ENCRYPTION_KEY: 'a'.repeat(64),
   GITHUB_CLIENT_ID: 'gh-client-id',
   GITHUB_CLIENT_SECRET: 'gh-client-secret',
+  GEMINI_MODEL: 'gemini-3.1-flash-lite',
 };
