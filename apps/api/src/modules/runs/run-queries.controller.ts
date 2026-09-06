@@ -21,6 +21,7 @@ import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type {
+  RegressionsView,
   RunQueryError,
   RunsPageView,
   RunView,
@@ -29,10 +30,12 @@ import type {
 import {
   createManualRunSchema,
   listRunsQuerySchema,
+  regressionsQuerySchema,
   suiteMetricsQuerySchema,
   updateRunCaseStatusSchema,
   type CreateManualRunInput,
   type ListRunsQuery,
+  type RegressionsQuery,
   type SuiteMetricsQuery,
   type UpdateRunCaseStatusInput,
 } from './runs.schemas';
@@ -51,6 +54,10 @@ function unwrap<T>(result: Result<T, RunQueryError>): T {
     case 'empty-suite':
       throw new BadRequestException(
         'Cannot start a run from a suite with no cases',
+      );
+    case 'no-manual-cases':
+      throw new ConflictException(
+        'This suite has no manual cases to run; automated cases are read-only here',
       );
     case 'source-not-editable':
       throw new ConflictException(
@@ -79,6 +86,15 @@ export class RunQueriesController {
     query: SuiteMetricsQuery,
   ): Promise<SuiteMetricsView> {
     return this.runs.suiteMetrics(org, query.projectId);
+  }
+
+  @Get('regressions')
+  regressions(
+    @CurrentOrg() org: OrgContext,
+    @Query(new ZodValidationPipe(regressionsQuerySchema))
+    query: RegressionsQuery,
+  ): Promise<RegressionsView> {
+    return this.runs.regressions(org, query.projectId, query.limit);
   }
 
   @Get(':id')

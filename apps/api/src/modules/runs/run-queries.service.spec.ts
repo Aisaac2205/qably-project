@@ -437,6 +437,158 @@ describe('RunQueriesService.suiteMetrics', () => {
   });
 });
 
+function scannedRunRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'run-2',
+    name: 'Checkout regression',
+    suiteId: 'suite-1',
+    startedAt: new Date('2026-01-02T00:00:00.000Z'),
+    finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+    suite: { name: 'Checkout' },
+    ...overrides,
+  };
+}
+
+describe('RunQueriesService.regressions', () => {
+  it('returns an empty result and scans zero runs when the project has no finished runs', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([]);
+
+    const result = await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(result).toEqual({ items: [], runsScanned: 0 });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(prisma.runCase.findMany).not.toHaveBeenCalled();
+  });
+
+  it('scopes the scanned runs to finished statuses of the project and organization, ordered and bounded by limit', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+
+    await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(prisma.run.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: 'org-1',
+          projectId: 'project-1',
+          status: { in: ['pass', 'fail'] },
+        },
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+        take: 20,
+      }),
+    );
+  });
+
+  it('flags a case that passed in the previous finished run of the same suite and now fails', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-1', suiteId: 'suite-1', previousId: null },
+      { id: 'run-2', suiteId: 'suite-1', previousId: 'run-1' },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      {
+        runId: 'run-1',
+        testCaseId: 'case-1',
+        name: 'Adds to cart',
+        status: 'pass',
+      },
+      {
+        runId: 'run-2',
+        testCaseId: 'case-1',
+        name: 'Adds to cart',
+        status: 'fail',
+      },
+    ]);
+
+    const result = await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(result).toEqual({
+      items: [
+        {
+          runId: 'run-2',
+          runName: 'Checkout regression',
+          suiteId: 'suite-1',
+          suiteName: 'Checkout',
+          testCaseId: 'case-1',
+          caseName: 'Adds to cart',
+          previousRunId: 'run-1',
+          detectedAt: '2026-01-02T00:05:00.000Z',
+        },
+      ],
+      runsScanned: 1,
+    });
+  });
+
+  it('does not flag a case that was already failing in the previous run', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-1', suiteId: 'suite-1', previousId: null },
+      { id: 'run-2', suiteId: 'suite-1', previousId: 'run-1' },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      {
+        runId: 'run-1',
+        testCaseId: 'case-1',
+        name: 'Adds to cart',
+        status: 'fail',
+      },
+      {
+        runId: 'run-2',
+        testCaseId: 'case-1',
+        name: 'Adds to cart',
+        status: 'fail',
+      },
+    ]);
+
+    const result = await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(result.items).toEqual([]);
+  });
+
+  it('skips a scanned run that has no previous finished run in the same suite', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow({ id: 'run-1' })]);
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-1', suiteId: 'suite-1', previousId: null },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      {
+        runId: 'run-1',
+        testCaseId: 'case-1',
+        name: 'Adds to cart',
+        status: 'fail',
+      },
+    ]);
+
+    const result = await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(result).toEqual({ items: [], runsScanned: 1 });
+  });
+
+  it('reads the previous-run chain and the involved cases with exactly one query each', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-1', suiteId: 'suite-1', previousId: null },
+      { id: 'run-2', suiteId: 'suite-1', previousId: 'run-1' },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.runCase.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.runCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { runId: { in: ['run-2', 'run-1'] } },
+      }),
+    );
+  });
+});
+
 describe('RunQueriesService.findOne', () => {
   it('returns not-found for a run belonging to another organization', async () => {
     const prisma = createPrisma();
@@ -555,29 +707,39 @@ describe('RunQueriesService.createManual', () => {
 
     const result = await build(prisma).createManual(org, user, input);
 
-    expect(result).toEqual({ ok: false, error: 'empty-suite' });
+    expect(result).toEqual({ ok: false, error: 'no-manual-cases' });
     expect(prisma.run.create).not.toHaveBeenCalled();
   });
 
-  it('rejects a suite that has only draft cases as empty', async () => {
+  it('rejects a suite that has only draft cases as having no manual cases', async () => {
     const prisma = createPrisma();
     prisma.suite.findFirst.mockResolvedValue({ ...suiteWithCases, cases: [] });
 
     const result = await build(prisma).createManual(org, user, input);
 
-    expect(result).toEqual({ ok: false, error: 'empty-suite' });
+    expect(result).toEqual({ ok: false, error: 'no-manual-cases' });
     expect(prisma.suite.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         select: expect.objectContaining({
           cases: expect.objectContaining({
-            where: { state: 'active' },
+            where: { state: 'active', executionMode: 'manual' },
           }) as unknown,
         }) as unknown,
       }),
     );
   });
 
-  it('only snapshots active cases, excluding drafts from the official run', async () => {
+  it('rejects a suite that has only automated cases as having no manual cases', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({ ...suiteWithCases, cases: [] });
+
+    const result = await build(prisma).createManual(org, user, input);
+
+    expect(result).toEqual({ ok: false, error: 'no-manual-cases' });
+    expect(prisma.run.create).not.toHaveBeenCalled();
+  });
+
+  it('only snapshots active, manual cases, excluding drafts and automated cases from the official run', async () => {
     const prisma = createPrisma();
 
     await build(prisma).createManual(org, user, input);
@@ -586,7 +748,7 @@ describe('RunQueriesService.createManual', () => {
       expect.objectContaining({
         select: expect.objectContaining({
           cases: expect.objectContaining({
-            where: { state: 'active' },
+            where: { state: 'active', executionMode: 'manual' },
           }) as unknown,
         }) as unknown,
       }),

@@ -75,6 +75,13 @@ export const suiteMetricsQuerySchema = z.object({
 
 export type SuiteMetricsQuery = z.infer<typeof suiteMetricsQuerySchema>;
 
+export const regressionsQuerySchema = z.object({
+  projectId: z.string().min(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type RegressionsQuery = z.infer<typeof regressionsQuerySchema>;
+
 export const listRunsQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
   source: z.enum(['manual', 'api', 'github_actions']).optional(),

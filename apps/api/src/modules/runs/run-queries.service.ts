@@ -29,6 +29,7 @@ import {
   type RankedRunRow,
 } from './lib/suite-metrics';
 import type {
+  RegressionsView,
   RunQueryError,
   RunsPageView,
   RunSummaryView,
@@ -47,6 +48,28 @@ interface CaseReloadTx {
   runCase: {
     findMany: PrismaService['runCase']['findMany'];
   };
+}
+
+interface ScannedRunRow {
+  id: string;
+  name: string;
+  suiteId: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  suite: { name: string };
+}
+
+interface PreviousRunLinkRow {
+  id: string;
+  suiteId: string;
+  previousId: string | null;
+}
+
+interface RegressionCaseRow {
+  runId: string;
+  testCaseId: string | null;
+  name: string;
+  status: CaseStatus;
 }
 
 function toSummaryView(run: RunListRow, counts: RunCaseCounts): RunSummaryView {
@@ -195,6 +218,110 @@ export class RunQueriesService {
     return { items: buildSuiteMetrics(suiteIds, rankedRuns, passRateByRunId) };
   }
 
+  /**
+   * Bounded regression scan: one query for the latest `limit` finished runs
+   * of the project, one window-function query resolving each of those
+   * suites' previous-finished-run chain, and one `runCase.findMany` for
+   * every run id involved. Never issues a per-case or per-run query.
+   */
+  async regressions(
+    org: OrgContext,
+    projectId: string,
+    limit: number,
+  ): Promise<RegressionsView> {
+    const scannedRuns = (await this.prisma.run.findMany({
+      where: {
+        organizationId: org.organizationId,
+        projectId,
+        status: { in: ['pass', 'fail'] },
+      },
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        suiteId: true,
+        startedAt: true,
+        finishedAt: true,
+        suite: { select: { name: true } },
+      },
+    })) as ScannedRunRow[];
+
+    if (scannedRuns.length === 0) return { items: [], runsScanned: 0 };
+
+    const suiteIds = [...new Set(scannedRuns.map((run) => run.suiteId))];
+
+    const chain = await this.prisma.$queryRaw<PreviousRunLinkRow[]>(Prisma.sql`
+      SELECT id, "suiteId",
+        LAG(id) OVER (
+          PARTITION BY "suiteId" ORDER BY "startedAt" ASC, "id" ASC
+        ) AS "previousId"
+      FROM "run"
+      WHERE "organizationId" = ${org.organizationId}
+        AND "suiteId" IN (${Prisma.join(suiteIds)})
+        AND status IN ('pass', 'fail')
+        AND "finishedAt" IS NOT NULL
+    `);
+
+    const previousIdByRunId = new Map<string, string>();
+    for (const row of chain) {
+      if (row.previousId !== null)
+        previousIdByRunId.set(row.id, row.previousId);
+    }
+
+    const previousRunIds = scannedRuns
+      .map((run) => previousIdByRunId.get(run.id))
+      .filter((id): id is string => id !== undefined);
+
+    const involvedRunIds = [
+      ...new Set([...scannedRuns.map((run) => run.id), ...previousRunIds]),
+    ];
+
+    const cases =
+      involvedRunIds.length === 0
+        ? []
+        : ((await this.prisma.runCase.findMany({
+            where: { runId: { in: involvedRunIds } },
+            select: { runId: true, testCaseId: true, name: true, status: true },
+          })) as RegressionCaseRow[]);
+
+    const casesByRun = new Map<string, RegressionCaseRow[]>();
+    for (const row of cases) {
+      const list = casesByRun.get(row.runId) ?? [];
+      list.push(row);
+      casesByRun.set(row.runId, list);
+    }
+
+    const items: RegressionsView['items'] = [];
+
+    for (const run of scannedRuns) {
+      const previousRunId = previousIdByRunId.get(run.id);
+      if (previousRunId === undefined) continue;
+
+      const previousCases = casesByRun.get(previousRunId) ?? [];
+      const currentCases = casesByRun.get(run.id) ?? [];
+
+      for (const currentCase of currentCases) {
+        if (currentCase.status !== 'fail') continue;
+        if (currentCase.testCaseId === null) continue;
+        if (!wasRegression(currentCase.testCaseId, previousCases)) continue;
+
+        items.push({
+          runId: run.id,
+          runName: run.name,
+          suiteId: run.suiteId,
+          suiteName: run.suite.name,
+          testCaseId: currentCase.testCaseId,
+          caseName: currentCase.name,
+          previousRunId,
+          detectedAt: (run.finishedAt ?? run.startedAt).toISOString(),
+        });
+      }
+    }
+
+    return { items, runsScanned: scannedRuns.length };
+  }
+
   async findOne(
     org: OrgContext,
     id: string,
@@ -223,7 +350,7 @@ export class RunQueriesService {
         id: true,
         name: true,
         cases: {
-          where: { state: 'active' },
+          where: { state: 'active', executionMode: 'manual' },
           select: { id: true, name: true, steps: true, expectedResult: true },
           orderBy: { position: 'asc' },
         },
@@ -231,7 +358,7 @@ export class RunQueriesService {
     });
 
     if (suite === null) return err('suite-not-found');
-    if (suite.cases.length === 0) return err('empty-suite');
+    if (suite.cases.length === 0) return err('no-manual-cases');
 
     const { run, cases } = await this.prisma.$transaction(async (tx) => {
       const run = await tx.run.create({
