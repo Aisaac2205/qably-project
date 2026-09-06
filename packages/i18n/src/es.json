@@ -36,7 +36,8 @@
     "acrossProjects": "en {{count}} proyectos",
     "versioned": "Versionados",
     "actions": "Acciones",
-    "skipToMain": "Saltar al contenido principal"
+    "skipToMain": "Saltar al contenido principal",
+    "retry": "Reintentar"
   },
   "sidebar": {
     "brand": "Qably",
@@ -323,17 +324,37 @@
     "qualityRisksEmptyTitle": "Sin señales de riesgo activas todavía",
     "qualityRisksEmptyDesc": "La detección de riesgos se completará aquí cuando haya historial de ejecuciones y evidencia de cobertura disponible para este proyecto."
   },
-  "reports": {
-    "passRateOverTime": "Tasa de aprobación en el tiempo",
-    "passFailDistribution": "Distribución de aprobados y fallidos",
-    "proposalReviewStatus": "Estado de revisión de propuestas",
-    "passRateLabel": "Tasa de Aprobación",
-    "other": "Otros",
-    "confirmed": "Confirmados",
-    "rejected": "Rechazados",
-    "ariaPassRateChart": "Gráfico de línea mostrando tasa de aprobación en el tiempo",
-    "ariaDistributionChart": "Gráfico de dona mostrando distribución aprobados/fallidos",
-    "ariaProposalReviewChart": "Gráfico de barras mostrando estado de revisión de propuestas"
+  "quality": {
+    "breadcrumb": "Calidad",
+    "loading": "Cargando el panel de calidad…",
+    "loadErrorTitle": "No pudimos cargar el panel de calidad",
+    "loadErrorDescription": "Algo salió mal al cargar los datos de calidad de este proyecto.",
+    "kpiPassRate": "Tasa de aprobación",
+    "kpiRunsInWindow": "Corridas en la ventana",
+    "kpiActiveRuns": "Corridas activas",
+    "kpiRegressions": "Regresiones",
+    "kpiPendingProposals": "Propuestas pendientes",
+    "kpiPassRateTrendLabel": "vs. ventana anterior",
+    "trendHeading": "Tendencia de tasa de aprobación",
+    "trendCaption": "Tasa de aprobación en las últimas {{count}} corridas finalizadas",
+    "trendEmptyTitle": "Todavía no hay corridas finalizadas",
+    "trendEmptyDescription": "Ejecutá una suite para empezar a registrar la tendencia de tasa de aprobación.",
+    "trendDateHeader": "Fecha",
+    "trendPassRateHeader": "Tasa de aprobación",
+    "regressionsHeading": "Regresiones recientes",
+    "regressionsEmptyTitle": "Sin regresiones",
+    "regressionsEmptyDescription": "Sin regresiones en las últimas {{count}} corridas",
+    "regressionsEmptyDescriptionNoRuns": "Todavía no hay corridas finalizadas para analizar regresiones",
+    "regressionsListLabel": "Regresiones",
+    "regressionsDetectedIn": "En {{runName}} · {{suiteName}}",
+    "suitesHeading": "Salud de las suites",
+    "suitesTableCaption": "Resumen de salud de las suites",
+    "suitesColumnSuite": "Suite",
+    "suitesColumnLastRun": "Última corrida",
+    "suitesColumnPassRate": "Tasa de aprobación reciente",
+    "suitesColumnTrend": "Tendencia",
+    "suitesEmptyTitle": "Todavía no hay suites",
+    "suitesEmptyDescription": "Creá una suite para empezar a registrar su salud acá."
   },
   "projects": {
     "title": "Proyectos",
@@ -484,6 +505,14 @@
       "quality_risk": "Riesgo de calidad"
     }
   },
+  "cases": {
+    "executionMode": {
+      "manual": "Manual",
+      "automated": "Automatizado"
+    },
+    "rawName": "Nombre crudo",
+    "filePath": "Archivo"
+  },
   "runs": {
     "title": "Ejecuciones",
     "subtitle": "Historial de ejecuciones de pruebas, estados y simulación de CI de este proyecto.",
@@ -538,6 +567,10 @@
     "createRunError": "No se pudo iniciar la ejecución. Intenta de nuevo.",
     "updateCaseError": "No se pudo guardar el estado del caso. Intenta de nuevo.",
     "updateCaseConflict": "Este caso pertenece a una ejecución automatizada y no puede editarse.",
+    "noManualCases": "Esta suite no tiene casos manuales para ejecutar. Todos sus casos están cubiertos por CI.",
+    "duration": "Duración",
+    "skipReason": "Motivo de omisión",
+    "coveredByCi": "Cubiertos por CI",
     "loading": "Cargando corridas…"
   },
   "suites": {
@@ -610,6 +643,7 @@
     "defaultSuite": "Suite predeterminada",
     "caseSuffix_one": "caso",
     "caseSuffix_other": "casos",
+    "manualAutomatedSuffix": "manual · automatizado",
     "sourceCi": "CI",
     "sourceManual": "Manual",
     "newSuite": "Nueva suite",
@@ -646,6 +680,9 @@
     "caseNameRequired": "El título del caso es requerido",
     "documentCase": "Documentar este caso",
     "cannotRunEmptySuite": "Agregue al menos un caso de prueba antes de ejecutar esta suite",
+    "allAutomatedHint": "Todos los casos de esta suite se ejecutan en CI",
+    "coveredByCi": "Cubiertos por CI",
+    "lastResult": "Último resultado",
     "noCasesCta": "Agregue el primer caso de prueba para comenzar a documentar esta suite.",
     "loadError": "No se pudieron cargar las suites.",
     "loading": "Cargando suites…"
