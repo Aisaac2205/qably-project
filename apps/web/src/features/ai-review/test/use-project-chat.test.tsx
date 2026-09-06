@@ -109,10 +109,45 @@ describe('useProjectChat', () => {
     expect(result.current.pendingMessage).toBeNull()
   })
 
-  it('keeps the user message visible and marks the assistant unavailable on provider-unavailable', async () => {
+  it('clears the pending bubble and keeps only an assistant-unavailable notice once the persisted user message comes back', async () => {
+    listThreads.mockResolvedValue([thread])
+    const persistedUserMessage: ChatMessageRecord = {
+      id: 'message-3',
+      threadId: 'thread-1',
+      role: 'user',
+      content: 'Another question',
+      suggestedCases: [],
+      createdAt: '2026-01-01T00:00:02.000Z',
+    }
+    getThread.mockResolvedValue({
+      ...threadDetail,
+      messages: [...threadDetail.messages, persistedUserMessage],
+    })
+    sendMessage.mockRejectedValue(new ApiError(503, 'unavailable', 'provider-unavailable'))
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.messages.length).toBe(3))
+
+    await act(async () => {
+      await result.current.send('Another question')
+    })
+
+    expect(result.current.pendingMessage).toEqual({
+      status: 'unavailable',
+      errorKind: 'provider-unavailable',
+    })
+  })
+
+  it('classifies a coded ai-not-enabled 403 distinctly from an uncoded forbidden 403', async () => {
     listThreads.mockResolvedValue([thread])
     getThread.mockResolvedValue(threadDetail)
-    sendMessage.mockRejectedValue(new ApiError(503, 'unavailable', 'provider-unavailable'))
+    sendMessage
+      .mockRejectedValueOnce(new ApiError(403, 'Forbidden', 'ai-not-enabled'))
+      .mockRejectedValueOnce(new ApiError(403, 'Forbidden'))
     const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
     await waitFor(() => expect(result.current.threads).toEqual([thread]))
 
@@ -122,14 +157,38 @@ describe('useProjectChat', () => {
     await waitFor(() => expect(result.current.messages.length).toBe(2))
 
     await act(async () => {
-      await result.current.send('Another question')
+      await result.current.send('Question one')
+    })
+    expect(result.current.pendingMessage).toMatchObject({ errorKind: 'ai-not-enabled' })
+
+    await act(async () => {
+      await result.current.send('Question two')
+    })
+    expect(result.current.pendingMessage).toMatchObject({ errorKind: 'forbidden' })
+  })
+
+  it('reports isLoadingThread while a selected thread has not resolved yet', async () => {
+    listThreads.mockResolvedValue([thread])
+    let resolveThread: (value: ChatThreadDetailRecord) => void = () => {}
+    getThread.mockReturnValue(
+      new Promise((resolve) => {
+        resolveThread = resolve
+      }),
+    )
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
     })
 
-    expect(result.current.pendingMessage).toMatchObject({
-      content: 'Another question',
-      status: 'unavailable',
-      errorKind: 'provider-unavailable',
+    await waitFor(() => expect(result.current.isLoadingThread).toBe(true))
+
+    await act(async () => {
+      resolveThread(threadDetail)
     })
+
+    await waitFor(() => expect(result.current.isLoadingThread).toBe(false))
   })
 
   it('resets to draft state when startNewChat is called', async () => {

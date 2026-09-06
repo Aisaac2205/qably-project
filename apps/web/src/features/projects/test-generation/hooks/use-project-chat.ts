@@ -7,7 +7,6 @@ import {
   getThread,
   listThreads,
   sendMessage,
-  sendToReview as sendToReviewRequest,
 } from '@/features/ai-review/api/chat.api'
 import { chatKeys } from '@/features/ai-review/lib/query-keys'
 import { ApiError } from '@/lib/api-client'
@@ -15,11 +14,12 @@ import { ApiError } from '@/lib/api-client'
 export type ChatSendErrorKind =
   | 'provider-unavailable'
   | 'ai-not-enabled'
+  | 'forbidden'
   | 'throttled'
   | 'error'
 
 export interface PendingMessage {
-  content: string
+  content?: string
   status: 'sending' | 'unavailable' | 'error'
   errorKind?: ChatSendErrorKind
 }
@@ -29,8 +29,11 @@ function classifySendError(error: unknown): ChatSendErrorKind {
     if (error.code === 'provider-unavailable' || error.status === 503) {
       return 'provider-unavailable'
     }
-    if (error.code === 'ai-not-enabled' || error.status === 403) {
+    if (error.code === 'ai-not-enabled') {
       return 'ai-not-enabled'
+    }
+    if (error.status === 403) {
+      return 'forbidden'
     }
     if (error.status === 429) {
       return 'throttled'
@@ -84,19 +87,21 @@ export function useProjectChat(projectId: string) {
 
         await sendMessage(projectId, threadId, content)
 
-        setPendingMessage(null)
-        void queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
+        await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
         void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
+        setPendingMessage(null)
       } catch (error) {
         const kind = classifySendError(error)
 
         if (kind === 'provider-unavailable' && threadId !== null) {
-          void queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
+          await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
+          setPendingMessage({ status: 'unavailable', errorKind: kind })
+          return
         }
 
         setPendingMessage({
           content,
-          status: kind === 'provider-unavailable' ? 'unavailable' : 'error',
+          status: 'error',
           errorKind: kind,
         })
       }
@@ -104,23 +109,15 @@ export function useProjectChat(projectId: string) {
     [projectId, activeThreadId, queryClient],
   )
 
-  const sendCaseToReview = useCallback(
-    (threadId: string, messageId: string, caseIndex: number) =>
-      sendToReviewRequest(projectId, threadId, messageId, caseIndex),
-    [projectId],
-  )
-
   return {
     threads: threadsQuery.data ?? [],
     isLoadingThreads: threadsQuery.isLoading,
     activeThreadId,
-    thread: threadQuery.data,
     messages: threadQuery.data?.messages ?? [],
     isLoadingThread: activeThreadId !== null && threadQuery.isLoading,
     pendingMessage,
     startNewChat,
     selectThread,
     send,
-    sendCaseToReview,
   }
 }

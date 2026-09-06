@@ -22,6 +22,7 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
     threads,
     activeThreadId,
     messages,
+    isLoadingThread,
     pendingMessage,
     startNewChat,
     selectThread,
@@ -66,6 +67,7 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
             projectId={projectId}
             messages={messages}
             pendingMessage={pendingMessage}
+            isLoadingThread={isLoadingThread}
             onSelectSuggestion={send}
           />
         </div>

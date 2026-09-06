@@ -4,6 +4,7 @@ import type { ChatMessageRecord } from '@qably/types'
 import { ChatMessageBubble } from './chat-message-bubble'
 import { ListChecks, Flask, ShieldCheck } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import { StateView } from '@/components/ui/state-view'
 import type { PendingMessage } from '@/features/projects/test-generation/hooks/use-project-chat'
 
 function QablyIcon({ className }: { className?: string }) {
@@ -31,6 +32,8 @@ function pendingErrorCopy(
   switch (errorKind) {
     case 'ai-not-enabled':
       return t('aiReview.chatAiNotEnabled')
+    case 'forbidden':
+      return t('aiReview.chatForbidden')
     case 'throttled':
       return t('aiReview.chatThrottled')
     default:
@@ -42,14 +45,20 @@ export function ChatMessageList({
   projectId,
   messages,
   pendingMessage,
+  isLoadingThread = false,
   onSelectSuggestion,
 }: {
   projectId: string
   messages: ChatMessageRecord[]
   pendingMessage?: PendingMessage | null
+  isLoadingThread?: boolean
   onSelectSuggestion?: (prompt: string) => void
 }) {
   const { t } = useTranslation()
+
+  if (messages.length === 0 && !pendingMessage && isLoadingThread) {
+    return <StateView kind="loading" title={t('aiReview.chatLoadingThread')} className="h-full min-h-[380px]" />
+  }
 
   if (messages.length === 0 && !pendingMessage) {
     const starters = [
@@ -108,11 +117,13 @@ export function ChatMessageList({
 
       {pendingMessage && (
         <div className="flex flex-col space-y-2">
-          <div className="flex justify-end">
-            <div className="max-w-[85%] sm:max-w-[80%] bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-xs text-xs sm:text-sm">
-              {pendingMessage.content}
+          {pendingMessage.content && (
+            <div className="flex justify-end">
+              <div className="max-w-[85%] sm:max-w-[80%] bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-xs text-xs sm:text-sm">
+                {pendingMessage.content}
+              </div>
             </div>
-          </div>
+          )}
 
           {pendingMessage.status === 'sending' && (
             <div className="flex justify-start">

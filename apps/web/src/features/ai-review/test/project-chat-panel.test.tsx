@@ -94,7 +94,19 @@ describe('ProjectChatPanel', () => {
     listThreads.mockResolvedValue([])
     createThread.mockResolvedValue(thread)
     sendMessage.mockRejectedValue(new ApiError(503, 'unavailable', 'provider-unavailable'))
-    getThread.mockResolvedValue({ ...thread, messages: [] })
+    getThread.mockResolvedValue({
+      ...thread,
+      messages: [
+        {
+          id: 'message-3',
+          threadId: 'thread-1',
+          role: 'user',
+          content: 'Another question',
+          suggestedCases: [],
+          createdAt: '2026-01-01T00:00:02.000Z',
+        },
+      ],
+    })
     const user = userEvent.setup()
 
     await act(async () => {

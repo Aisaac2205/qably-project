@@ -16,6 +16,14 @@ describe('ChatMessageList', () => {
     expect(screen.getByText('Second')).toBeInTheDocument()
   })
 
+  it('shows the loading state instead of the greeting while the selected thread is still loading', async () => {
+    await act(async () => {
+      render(<ChatMessageList projectId="proj-1" messages={[]} isLoadingThread />)
+    })
+    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(screen.queryByText(/how can I help you today|en qué puedo ayudarte hoy/i)).not.toBeInTheDocument()
+  })
+
   it('shows greeting and hint in empty state when there are no messages', async () => {
     await act(async () => {
       render(<ChatMessageList projectId="proj-1" messages={[]} />)

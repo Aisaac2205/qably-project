@@ -483,8 +483,11 @@
     "assistantThinking": "Pensando…",
     "assistantUnavailable": "El asistente de IA no está disponible en este momento. Tu mensaje se guardó — intenta de nuevo en un momento.",
     "chatAiNotEnabled": "El chat de IA no está habilitado para esta organización.",
+    "chatForbidden": "No tienes acceso a esta conversación.",
     "chatThrottled": "Demasiados mensajes en este momento. Intenta de nuevo en un momento.",
     "chatSendError": "No se pudo enviar tu mensaje. Intenta de nuevo.",
+    "chatMessageTooLong": "Tu mensaje es demasiado largo. Mantenlo por debajo de 4000 caracteres.",
+    "chatLoadingThread": "Cargando la conversación…",
     "chatComposerLabel": "Mensaje"
   },
   "reviewFlow": {
