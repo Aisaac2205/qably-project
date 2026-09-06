@@ -136,7 +136,11 @@ const PROPOSAL_SELECT = {
   priority: true,
   evidenceId: true,
   targetTestCaseId: true,
+  suiteId: true,
+  automationKey: true,
   evidence: { select: { id: true } },
+  codeChange: { select: { filePath: true } },
+  targetTestCase: { select: { automationFilePath: true } },
 } as const;
 
 interface ProposalRow {
@@ -151,7 +155,26 @@ interface ProposalRow {
   priority: 'critical' | 'high' | 'medium' | 'low';
   evidenceId: string;
   targetTestCaseId: string | null;
+  suiteId: string | null;
+  automationKey: string | null;
   evidence: { id: string } | null;
+  codeChange: { filePath: string } | null;
+  targetTestCase: { automationFilePath: string | null } | null;
+}
+
+function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
+  if (proposal.automationKey === null) return {};
+
+  const automationFilePath =
+    proposal.codeChange?.filePath ??
+    proposal.targetTestCase?.automationFilePath ??
+    null;
+
+  return {
+    executionMode: 'automated',
+    automationKey: proposal.automationKey,
+    ...(automationFilePath === null ? {} : { automationFilePath }),
+  };
 }
 
 @Injectable()
@@ -233,7 +256,9 @@ export class ReviewService {
 
     const target = proposal.value.targetTestCaseId;
     const suiteId =
-      target === null ? await this.suiteFor(proposal.value) : null;
+      target === null
+        ? (proposal.value.suiteId ?? (await this.suiteFor(proposal.value)))
+        : null;
 
     if (target === null && suiteId === null) return err('missing-suite');
 
@@ -311,6 +336,7 @@ export class ReviewService {
   ): Promise<ApprovalView> {
     return this.prisma.$transaction(async (tx) => {
       const createdNewCase = proposal.targetTestCaseId === null;
+      const automationFields = automationFieldsFor(proposal);
       const testCaseId = createdNewCase
         ? (
             await tx.testCase.create({
@@ -321,6 +347,8 @@ export class ReviewService {
                 steps: proposal.steps,
                 expectedResult: proposal.expectedResult,
                 priority: proposal.priority,
+                state: 'active',
+                ...automationFields,
               },
               select: { id: true },
             })
@@ -353,6 +381,8 @@ export class ReviewService {
           steps: proposal.steps,
           expectedResult: proposal.expectedResult,
           priority: proposal.priority,
+          state: 'active',
+          ...automationFields,
         },
       });
 

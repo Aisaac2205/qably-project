@@ -22,6 +22,10 @@ const proposalRow = {
   evidenceId: 'evidence-1',
   targetTestCaseId: null as string | null,
   evidence: { id: 'evidence-1' } as { id: string } | null,
+  suiteId: null as string | null,
+  automationKey: null as string | null,
+  codeChange: null as { filePath: string } | null,
+  targetTestCase: null as { automationFilePath: string | null } | null,
 };
 
 interface FakePrisma {
@@ -94,7 +98,50 @@ describe('ReviewService.approve', () => {
       projectId: 'project-1',
       suiteId: 'suite-1',
       name: 'Empties the cart',
+      state: 'active',
     });
+  });
+
+  it('uses the proposal suiteId instead of the default suite when it carries one', async () => {
+    const prisma = createPrisma({ suiteId: 'suite-from-extraction' });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(prisma.suite.findFirst).not.toHaveBeenCalled();
+    const [call] = prisma.testCase.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).toMatchObject({ suiteId: 'suite-from-extraction' });
+  });
+
+  it('marks a new case automated with its automationKey and the code change file path', async () => {
+    const prisma = createPrisma({
+      automationKey: 'Cart > adds an item',
+      codeChange: { filePath: 'src/cart.spec.ts' },
+    });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    const [call] = prisma.testCase.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).toMatchObject({
+      executionMode: 'automated',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+    });
+  });
+
+  it('never marks the case automated when the proposal has no automationKey', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    const [call] = prisma.testCase.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).not.toHaveProperty('executionMode');
+    expect(call[0].data).not.toHaveProperty('automationKey');
   });
 
   it('snapshots the proposal fields into the published version', async () => {
@@ -155,6 +202,7 @@ describe('ReviewService.approve', () => {
         steps: ['Open the cart', 'Remove every item'],
         expectedResult: 'The cart shows zero items',
         priority: 'high',
+        state: 'active',
       },
     });
   });
@@ -182,6 +230,37 @@ describe('ReviewService.approve', () => {
         steps: ['Open the mini basket', 'Remove every item'],
         expectedResult: 'The mini basket shows zero items',
         priority: 'high',
+        state: 'active',
+      },
+    });
+  });
+
+  it('marks the targeted case automated using its own automationFilePath when documenting it', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      automationKey: 'Cart > adds an item',
+      targetTestCase: { automationFilePath: 'src/cart.spec.ts' },
+    });
+    prisma.testCaseVersion.count.mockResolvedValue(1);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-2',
+      version: 2,
+    });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-existing' },
+      data: {
+        currentVersionId: 'version-2',
+        name: 'Empties the cart',
+        steps: ['Open the cart', 'Remove every item'],
+        expectedResult: 'The cart shows zero items',
+        priority: 'high',
+        state: 'active',
+        executionMode: 'automated',
+        automationKey: 'Cart > adds an item',
+        automationFilePath: 'src/cart.spec.ts',
       },
     });
   });
