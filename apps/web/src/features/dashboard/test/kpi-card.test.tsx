@@ -78,4 +78,60 @@ describe('KpiCard', () => {
     })
     expect(screen.queryByText(/vs prior/)).not.toBeInTheDocument()
   })
+
+  it('does not apply an interactive hover treatment when there is no href', async () => {
+    const { container } = await (async () => {
+      let result!: ReturnType<typeof render>
+      await act(async () => {
+        result = render(<KpiCard label="Projects" value="4" icon={TestTube} />)
+      })
+      return result
+    })()
+
+    expect(container.firstElementChild).not.toHaveClass('group')
+  })
+
+  it('applies an interactive hover treatment when href is provided', async () => {
+    await act(async () => {
+      render(<KpiCard label="Projects" value="4" icon={TestTube} href="/projects" />)
+    })
+
+    expect(screen.getByRole('link', { name: /view details/i })).toHaveClass('group')
+  })
+
+  it('tints the icon badge for the fail accent', async () => {
+    await act(async () => {
+      render(<KpiCard label="Regressions" value="2" icon={TestTube} accent="fail" />)
+    })
+
+    const badge = document.querySelector('svg')?.closest('span')
+    expect(badge).toHaveClass('text-fail')
+  })
+
+  it('tints the icon badge for the pass accent', async () => {
+    await act(async () => {
+      render(<KpiCard label="Pass rate" value="98%" icon={TestTube} accent="pass" />)
+    })
+
+    const badge = document.querySelector('svg')?.closest('span')
+    expect(badge).toHaveClass('text-pass')
+  })
+
+  it('tints the icon badge for the ai accent', async () => {
+    await act(async () => {
+      render(<KpiCard label="Pending AI" value="3" icon={TestTube} accent="ai" />)
+    })
+
+    const badge = document.querySelector('svg')?.closest('span')
+    expect(badge).toHaveClass('text-ai')
+  })
+
+  it('uses a neutral icon badge tone by default', async () => {
+    await act(async () => {
+      render(<KpiCard label="Projects" value="4" icon={TestTube} />)
+    })
+
+    const badge = document.querySelector('svg')?.closest('span')
+    expect(badge).toHaveClass('text-muted')
+  })
 })

@@ -7,6 +7,16 @@ import { useTranslation } from '@/lib/i18n'
 
 export type KpiAccent = 'default' | 'primary' | 'running' | 'fail' | 'pass' | 'ai' | 'warn'
 
+const ACCENT_BADGE_CLASSES: Record<KpiAccent, string> = {
+  default: 'border-border/50 bg-surface-raised text-muted',
+  primary: 'border-primary/20 bg-primary/10 text-primary',
+  running: 'border-running/20 bg-running-bg text-running',
+  fail: 'border-fail/20 bg-fail-bg text-fail',
+  pass: 'border-pass/20 bg-pass-bg text-pass',
+  ai: 'border-ai/20 bg-ai-bg text-ai',
+  warn: 'border-warn/20 bg-warn-bg text-warn',
+}
+
 export interface KpiCardProps {
   label: string
   value: string | number
@@ -39,16 +49,28 @@ export function KpiCard({
 }: KpiCardProps) {
   const { t } = useTranslation()
   const showPercent = trend?.isPercentage !== false
+  const isInteractive = href !== undefined
+  const interactiveHoverClasses = isInteractive
+    ? accent === 'default'
+      ? 'group-hover:border-border-strong group-hover:text-default group-hover:shadow-2xs'
+      : 'group-hover:shadow-2xs'
+    : ''
 
   const cardContent = (
 
     <div className="flex h-full flex-col justify-between">
       {/* Tier 1: Header (Category/Label + Icon affordance) */}
       <div className="flex items-center justify-between gap-3">
-        <dt className="truncate text-xs font-medium text-muted transition-colors duration-150 group-hover:text-default">
+        <dt
+          className={`truncate text-xs font-medium text-muted transition-colors duration-150 ${
+            isInteractive ? 'group-hover:text-default' : ''
+          }`}
+        >
           {label}
         </dt>
-        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-surface-raised text-muted transition-all duration-150 group-hover:border-border-strong group-hover:text-default group-hover:shadow-2xs">
+        <span
+          className={`flex size-7 shrink-0 items-center justify-center rounded-lg border transition-all duration-150 ${ACCENT_BADGE_CLASSES[accent]} ${interactiveHoverClasses}`}
+        >
           <Icon size={15} weight="regular" aria-hidden="true" />
         </span>
       </div>
@@ -92,7 +114,11 @@ export function KpiCard({
             {subtext}
           </span>
         ) : (
-          <span className="text-[11px] text-muted/70 transition-colors duration-150 group-hover:text-muted">
+          <span
+            className={`text-[11px] text-muted/70 transition-colors duration-150 ${
+              isInteractive ? 'group-hover:text-muted' : ''
+            }`}
+          >
             {href ? t('common.viewDetails') : t('common.noRecentChange')}
           </span>
         )}
@@ -112,13 +138,13 @@ export function KpiCard({
   )
 
   const commonClasses =
-    'group min-w-0 min-h-[120px] rounded-xl border border-border bg-surface p-4 shadow-card transition-[border-color,box-shadow,transform,background-color] duration-150 ease-out text-left'
+    'min-w-0 min-h-[120px] rounded-xl border border-border bg-surface p-4 shadow-card transition-[border-color,box-shadow,transform,background-color] duration-150 ease-out text-left'
 
   if (href) {
     return (
       <Link
         href={href}
-        className={`${commonClasses} hover:border-border-strong hover:bg-surface-raised hover:shadow-xs active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
+        className={`${commonClasses} group hover:border-border-strong hover:bg-surface-raised hover:shadow-xs active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
       >
         {cardContent}
       </Link>
