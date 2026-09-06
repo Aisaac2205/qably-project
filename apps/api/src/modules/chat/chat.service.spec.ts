@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { ChatAssistant, ChatReplyOutcome } from './chat.assistant';
@@ -138,8 +140,21 @@ function containing(shape: Record<string, unknown>): unknown {
   return expect.objectContaining(shape);
 }
 
-function build(prisma: FakePrisma, assistant: ChatAssistant): ChatService {
-  return new ChatService(prisma as never, assistant);
+function fakeEntitlement(
+  spendCredit: jest.Mock = jest.fn().mockResolvedValue(true),
+): AiEntitlementService {
+  return {
+    isEntitled: jest.fn().mockResolvedValue(true),
+    spendCredit,
+  } as unknown as AiEntitlementService;
+}
+
+function build(
+  prisma: FakePrisma,
+  assistant: ChatAssistant,
+  entitlement: AiEntitlementService = fakeEntitlement(),
+): ChatService {
+  return new ChatService(prisma as never, assistant, entitlement);
 }
 
 describe('ChatService', () => {
@@ -313,5 +328,115 @@ describe('ChatService', () => {
         caseIndex: 0,
       }),
     ).resolves.toEqual({ ok: false, error: 'missing-suite' });
+  });
+
+  it('spends one AI credit after a successful assistant reply', async () => {
+    const prisma = createPrisma();
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [suggestedCase],
+      usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+    });
+    const service = build(prisma, assistant, fakeEntitlement(spendCredit));
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    expect(spendCredit).toHaveBeenCalledWith('org-1');
+  });
+
+  it('does not spend a credit when the provider is unavailable', async () => {
+    const prisma = createPrisma();
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'no-key' }),
+      fakeEntitlement(spendCredit),
+    );
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'Hello',
+    });
+
+    expect(spendCredit).not.toHaveBeenCalled();
+  });
+
+  it('reports ai-not-enabled and keeps the user message when the credit decrement fails', async () => {
+    const prisma = createPrisma();
+    const spendCredit = jest.fn().mockResolvedValue(false);
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [suggestedCase],
+      usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+    });
+    const service = build(prisma, assistant, fakeEntitlement(spendCredit));
+
+    const result = await service.sendMessage(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      { content: 'What is missing in checkout?' },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'ai-not-enabled' });
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes an empty suggestedCases array and logs a warning when the stored JSON is corrupt', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findMany.mockResolvedValue([
+      { ...assistantRow, suggestedCases: 'not-an-array' },
+    ]);
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.getThread(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: containing({
+        messages: [containing({ suggestedCases: [] })],
+      }),
+    });
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('fails closed with invalid-suggested-cases instead of case-not-found when the stored JSON is corrupt', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst.mockResolvedValueOnce({
+      ...assistantRow,
+      suggestedCases: 'not-an-array',
+    });
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      { caseIndex: 0 },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'invalid-suggested-cases' });
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
   });
 });

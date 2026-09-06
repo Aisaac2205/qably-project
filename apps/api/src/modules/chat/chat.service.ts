@@ -1,6 +1,7 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { ChatProjectContext } from './chat-prompt';
@@ -31,6 +32,8 @@ const CONTEXT_CASE_LIMIT = 60;
 const CONTEXT_RUN_LIMIT = 5;
 const THREAD_LIST_LIMIT = 50;
 
+const logger = new Logger('ChatService');
+
 interface ThreadRow {
   id: string;
   projectId: string;
@@ -50,9 +53,18 @@ interface MessageRow {
 
 type TxClient = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
 
-function parseSuggestedCases(value: unknown): SuggestedCase[] {
-  const parsed = suggestedCasesSchema.safeParse(value ?? []);
-  return parsed.success ? parsed.data : [];
+type SuggestedCasesRead =
+  | { kind: 'absent' }
+  | { kind: 'ok'; cases: SuggestedCase[] }
+  | { kind: 'corrupt' };
+
+function readSuggestedCases(value: unknown): SuggestedCasesRead {
+  if (value === null || value === undefined) return { kind: 'absent' };
+
+  const parsed = suggestedCasesSchema.safeParse(value);
+  return parsed.success
+    ? { kind: 'ok', cases: parsed.data }
+    : { kind: 'corrupt' };
 }
 
 function toThreadView(row: ThreadRow): ChatThreadView {
@@ -66,12 +78,18 @@ function toThreadView(row: ThreadRow): ChatThreadView {
 }
 
 function toMessageView(row: MessageRow): ChatMessageView {
+  const read = readSuggestedCases(row.suggestedCases);
+
+  if (read.kind === 'corrupt') {
+    logger.warn(`Corrupt suggestedCases JSON on chat message ${row.id}`);
+  }
+
   return {
     id: row.id,
     threadId: row.threadId,
     role: row.role,
     content: row.content,
-    suggestedCases: parseSuggestedCases(row.suggestedCases),
+    suggestedCases: read.kind === 'ok' ? read.cases : [],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -88,6 +106,7 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CHAT_ASSISTANT) private readonly assistant: ChatAssistant,
+    private readonly entitlement: AiEntitlementService,
   ) {}
 
   async listThreads(
@@ -189,6 +208,11 @@ export class ChatService {
       return err('provider-unavailable');
     }
 
+    const spent = await this.entitlement.spendCredit(org.organizationId);
+    if (!spent) {
+      return err('ai-not-enabled');
+    }
+
     const assistantRow = await this.prisma.$transaction(
       async (tx: TxClient) => {
         const created = await tx.chatMessage.create({
@@ -230,9 +254,11 @@ export class ChatService {
     });
     if (message === null) return err('message-not-found');
 
-    const suggested = parseSuggestedCases(message.suggestedCases)[
-      input.caseIndex
-    ];
+    const read = readSuggestedCases(message.suggestedCases);
+    if (read.kind === 'corrupt') return err('invalid-suggested-cases');
+
+    const suggested =
+      read.kind === 'ok' ? read.cases[input.caseIndex] : undefined;
     if (suggested === undefined) return err('case-not-found');
 
     const suite = await this.prisma.suite.findFirst({
