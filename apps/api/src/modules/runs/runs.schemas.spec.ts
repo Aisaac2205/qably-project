@@ -180,6 +180,15 @@ describe('ingestRunSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects a durationMs above the 32-bit integer range', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInput,
+      cases: [{ ...baseCase, durationMs: 2_147_483_648 }],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('rejects a non-integer durationMs', () => {
     const result = ingestRunSchema.safeParse({
       ...baseInput,

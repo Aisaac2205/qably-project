@@ -6,14 +6,17 @@ const MAX_FILE_PATH_LENGTH = 500;
 const MAX_FAILURE_MESSAGE_LENGTH = 1000;
 const MAX_FAILURE_DETAILS_LENGTH = 4000;
 const MAX_SKIP_REASON_LENGTH = 500;
+const MAX_SUITE_KEY_LENGTH = 500;
 const MAX_TESTSUITE_DEPTH = 32;
 const MAX_TESTCASES = 10_000;
+const MAX_DURATION_MS = 2_147_483_647;
 
 export type JunitCaseStatus = 'pass' | 'fail' | 'skip';
 
 export interface JunitCase {
   name: string;
   suiteName: string;
+  suiteKey: string;
   status: JunitCaseStatus;
   className?: string;
   filePath?: string;
@@ -26,6 +29,7 @@ export interface JunitCase {
 
 export interface JunitReport {
   suiteName: string;
+  suiteKey: string;
   cases: JunitCase[];
 }
 
@@ -62,15 +66,10 @@ type CaseOutcome =
 
 interface CollectedCase {
   suiteName: string;
+  suiteKey: string;
   raw: RawNode;
 }
 
-/**
- * The payload arrives from anyone holding a project API key, so entity
- * handling matters. fast-xml-parser 5 decodes the predefined entities into the
- * test names but never substitutes entities declared in a DOCTYPE, which keeps
- * an expansion bomb inert; the limits below bound what it does expand.
- */
 const parser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: '@_',
@@ -99,7 +98,10 @@ function readAttribute(node: RawNode, attribute: string): string {
 }
 
 function truncateTo(value: string, maxLength: number): string {
-  return value.slice(0, maxLength);
+  const codePoints = Array.from(value);
+  return codePoints.length <= maxLength
+    ? value
+    : codePoints.slice(0, maxLength).join('');
 }
 
 function truncate(value: string): string {
@@ -136,7 +138,7 @@ function parseDurationMs(rawTime: string): number | undefined {
   const seconds = Number.parseFloat(rawTime);
   if (!Number.isFinite(seconds)) return undefined;
 
-  return Math.round(Math.max(seconds, 0) * 1000);
+  return Math.min(Math.round(Math.max(seconds, 0) * 1000), MAX_DURATION_MS);
 }
 
 function deriveCaseOutcome(node: RawNode): CaseOutcome {
@@ -214,7 +216,7 @@ function outcomeFields(outcome: CaseOutcome): Partial<JunitCase> {
 
 function collectCases(
   node: RawNode,
-  parentSuiteName: string,
+  parentSuiteKey: string,
   depth: number,
   acc: CollectedCase[],
 ): void {
@@ -226,7 +228,9 @@ function collectCases(
   }
 
   const ownName = readAttribute(node, 'name');
-  const suiteName = ownName === '' ? parentSuiteName : truncate(ownName);
+  const suiteKey =
+    ownName === '' ? parentSuiteKey : truncateTo(ownName, MAX_SUITE_KEY_LENGTH);
+  const suiteName = truncate(suiteKey);
 
   for (const testCase of toArray(node.testcase)) {
     if (acc.length >= MAX_TESTCASES) {
@@ -236,11 +240,11 @@ function collectCases(
       );
     }
 
-    acc.push({ suiteName, raw: testCase });
+    acc.push({ suiteName, suiteKey, raw: testCase });
   }
 
   for (const child of toArray(node.testsuite)) {
-    collectCases(child, suiteName, depth + 1, acc);
+    collectCases(child, suiteKey, depth + 1, acc);
   }
 }
 
@@ -271,7 +275,7 @@ export function parseJunitXml(xml: string): JunitReport {
 
   const cases: JunitCase[] = [];
 
-  for (const { suiteName, raw } of collected) {
+  for (const { suiteName, suiteKey, raw } of collected) {
     const name = readAttribute(raw, 'name') || readAttribute(raw, 'classname');
     if (name === '') continue;
 
@@ -283,6 +287,7 @@ export function parseJunitXml(xml: string): JunitReport {
     cases.push({
       name: truncate(name),
       suiteName,
+      suiteKey,
       status: outcome.status,
       ...(className === ''
         ? {}
@@ -302,8 +307,13 @@ export function parseJunitXml(xml: string): JunitReport {
     );
   }
 
+  const suiteKey =
+    truncateTo(readAttribute(root, 'name'), MAX_SUITE_KEY_LENGTH) ||
+    cases[0].suiteKey;
+
   return {
-    suiteName: truncate(readAttribute(root, 'name')) || cases[0].suiteName,
+    suiteName: truncate(suiteKey),
+    suiteKey,
     cases,
   };
 }

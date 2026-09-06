@@ -31,6 +31,7 @@ const IDENTIFIER = /^[\p{L}\p{N}_$]+$/u;
 const PASCAL_IDENTIFIER = /^\p{Lu}[\p{L}\p{N}_]*$/u;
 const DOTTED_IDENTIFIER = /^[\p{L}_$][\p{L}\p{N}_$]*(\.[\p{L}_$][\p{L}\p{N}_$]*)+$/u;
 const PYTHON_TEST_FUNCTION = /^test_/u;
+const PYTHON_IDENTIFIER = /^[a-z0-9_]+$/u;
 const JUNIT5_INDEXED_DISPLAY_NAME = /^\[\d+\] \S/u;
 
 export interface CallSuffixSplit {
@@ -93,7 +94,7 @@ function isPytestClassName(className: string, name: string): boolean {
     return true;
   }
   const hasSnakeSegment = className.split('.').some((segment) => segment.includes('_'));
-  return hasSnakeSegment && name.includes('_');
+  return hasSnakeSegment && PYTHON_IDENTIFIER.test(name);
 }
 
 function isJavaClassName(className: string): boolean {

@@ -25,6 +25,13 @@ const nestedSuites = `<testsuites name="e2e" tests="2">
   </testsuite>
 </testsuites>`;
 
+function hasLoneSurrogate(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint >= 0xd800 && codePoint <= 0xdfff;
+  });
+}
+
 describe('parseJunitXml', () => {
   it('maps a passing testcase', () => {
     const report = parseJunitXml(singleSuite);
@@ -32,6 +39,7 @@ describe('parseJunitXml', () => {
     expect(report.cases[0]).toEqual({
       name: 'accepts a valid card',
       suiteName: 'Checkout',
+      suiteKey: 'Checkout',
       status: 'pass',
       className: 'checkout.spec',
       durationMs: 500,
@@ -109,6 +117,40 @@ describe('parseJunitXml', () => {
 
     expect(report.suiteName).toHaveLength(120);
     expect(report.cases[0].name).toHaveLength(120);
+  });
+
+  it('keeps the untruncated suite name as the grouping key', () => {
+    const long = `${'p'.repeat(118)}/alpha.test.ts`;
+    const report = parseJunitXml(
+      `<testsuite name="${long}"><testcase name="x"/></testsuite>`,
+    );
+
+    expect(report.cases[0].suiteName).toHaveLength(120);
+    expect(report.cases[0].suiteKey).toBe(long);
+    expect(report.suiteKey).toBe(long);
+  });
+
+  it('truncates on code points so a surrogate pair is never split', () => {
+    const emoji = String.fromCodePoint(0x1f600);
+    const name = `${'a'.repeat(119)}${emoji}${emoji}`;
+    const details = `${'b'.repeat(3999)}${emoji}${emoji}`;
+    const report = parseJunitXml(
+      `<testsuite name="S"><testcase name="${name}"><failure message="m">${details}</failure></testcase></testsuite>`,
+    );
+
+    const parsed = report.cases[0];
+    expect(hasLoneSurrogate(parsed.name)).toBe(false);
+    expect(Array.from(parsed.name)).toHaveLength(120);
+    expect(hasLoneSurrogate(parsed.failureDetails ?? '')).toBe(false);
+    expect(Array.from(parsed.failureDetails ?? '')).toHaveLength(4000);
+  });
+
+  it('caps durationMs at the largest 32-bit integer', () => {
+    const report = parseJunitXml(
+      '<testsuite name="S"><testcase name="x" time="9999999999"/></testsuite>',
+    );
+
+    expect(report.cases[0].durationMs).toBe(2_147_483_647);
   });
 
   it('rejects malformed xml', () => {

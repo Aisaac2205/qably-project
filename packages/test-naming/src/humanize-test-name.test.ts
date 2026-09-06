@@ -102,6 +102,17 @@ describe('humanizeTestName', () => {
       expect(result.title).toBe('Should reject empty cart');
     });
 
+    it('keeps an underscored java method in an underscored package as java', () => {
+      const result = humanizeTestName({
+        name: 'shouldReturn_whenInvalid',
+        className: 'com.acme.order_service.OrderServiceTest',
+      });
+
+      expect(result.convention).toBe<Convention>('junit-java');
+      expect(result.path).toEqual(['OrderServiceTest']);
+      expect(result.title).toBe('Should return when invalid');
+    });
+
     it('extracts the argument list of a JUnit 5 parameterized method as the parameter', () => {
       const result = humanizeTestName({
         name: 'shouldValidate(String, int)',
