@@ -7,7 +7,6 @@ import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { ReviewCaseList } from './review-case-list'
 import { ReviewCaseDetail } from './review-case-detail'
 import { ReviewToolbar } from './review-toolbar'
-import { CoverageGapsPanel } from './coverage-gaps-panel'
 import { ProjectChatPanel } from './project-chat-panel'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
@@ -19,6 +18,9 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
   const {
     cases,
     selectedCase,
+    isLoading,
+    isError,
+    isDeciding,
     selectCase,
     confirmSelected,
     rejectSelected,
@@ -27,18 +29,6 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<'review' | 'chat'>('review')
   const [listFilter, setListFilter] = useState<'all' | 'duplicates'>('all')
-  const [prefillPrompt, setPrefillPrompt] = useState<string | undefined>(undefined)
-
-  const handleDraftWithAi = (area: string) => {
-    setPrefillPrompt(t('aiReview.suggestCases', { area }))
-    setTab('chat')
-  }
-
-  const handleViewCase = (caseId: string) => {
-    selectCase(caseId)
-    setListFilter('all')
-    setTab('review')
-  }
 
   return (
     <div className="w-full flex-1 flex flex-col h-full min-h-0 space-y-4 p-4 sm:p-6 text-default animate-page-enter">
@@ -50,7 +40,6 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         ]}
       />
 
-      {/* Minimalist header with tabs */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 pt-1 pb-0.5">
         <h1 className="sr-only">{t('aiReview.title')}</h1>
         <p className="text-xs sm:text-sm text-muted">
@@ -94,7 +83,15 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
       </div>
 
       {tab === 'review' ? (
-        cases.length === 0 ? (
+        isLoading ? (
+          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+            <StateView kind="loading" title={t('aiReview.loading')} className="p-12" />
+          </div>
+        ) : isError ? (
+          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+            <StateView kind="error" title={t('aiReview.loadError')} className="p-12" />
+          </div>
+        ) : cases.length === 0 ? (
           <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
             <StateView
               kind="empty"
@@ -161,7 +158,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                       )}
                     </div>
                     <ReviewToolbar
-                      disabled={!selectedCase}
+                      disabled={!selectedCase || isDeciding}
                       onConfirm={confirmSelected}
                       onReject={rejectSelected}
                       onSkip={skipSelected}
@@ -170,20 +167,11 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                 }
               />
             </div>
-
-            <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
-              <CoverageGapsPanel projectId={projectId} onDraftWithAi={handleDraftWithAi} />
-            </div>
           </div>
         )
       ) : (
         <div className="flex-1 flex flex-col min-h-0 rounded-xl border border-border bg-surface shadow-card overflow-hidden">
-          <ProjectChatPanel
-            projectId={projectId}
-            onViewCase={handleViewCase}
-            onReturnToReview={() => setTab('review')}
-            prefillPrompt={prefillPrompt}
-          />
+          <ProjectChatPanel projectId={projectId} />
         </div>
       )}
     </div>

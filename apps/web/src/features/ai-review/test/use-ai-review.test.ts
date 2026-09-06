@@ -1,57 +1,82 @@
-import { renderHook, act } from '@testing-library/react'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { renderHook, act, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
-import { __resetStore, getSnapshot } from '@/lib/mock-store'
+import { withQueryClient } from '@/lib/query-test-utils'
 
-describe('useAiReview governed decisions', () => {
-  beforeEach(() => __resetStore())
+vi.mock('@/features/review-inbox/api/review.api', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/features/review-inbox/api/review.api')
+  >('@/features/review-inbox/api/review.api')
 
-  it('exposes the pending queue as ExtractedProposal records, not AiCase', () => {
-    const { result } = renderHook(() => useAiReview('proj-1'))
-    expect(result.current.selectedCase).toMatchObject({
-      status: 'in_review',
-      title: expect.any(String),
-      evidenceId: expect.any(String),
-    })
-    expect(result.current.selectedCase).not.toHaveProperty('reviewStatus')
-    expect(result.current.selectedCase).not.toHaveProperty('sourceFile')
+  return {
+    ...actual,
+    approveProposal: vi.fn().mockResolvedValue({
+      createdNewCase: true,
+      testCaseId: 'case-1',
+      versionId: 'version-1',
+      version: 1,
+      decisionId: 'decision-1',
+    }),
+    rejectProposal: vi.fn().mockResolvedValue({ decisionId: 'decision-1' }),
+  }
+})
+
+function wrapper({ children }: { children: ReactNode }) {
+  return withQueryClient(children)
+}
+
+describe('useAiReview', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
   })
 
-  it('approves the selected proposal and creates the governed review graph', () => {
-    const { result } = renderHook(() => useAiReview('proj-1'))
-    const proposalId = result.current.selectedCase!.id
-    const casesBefore = getSnapshot().officialTestCases.length
-    const versionsBefore = getSnapshot().testCaseVersions.length
+  it('exposes only in_review proposals scoped to the project', () => {
+    const { result } = renderHook(() => useAiReview('proj-1'), { wrapper })
+
+    expect(result.current.cases.length).toBeGreaterThan(0)
+    for (const proposal of result.current.cases) {
+      expect(proposal.projectId).toBe('proj-1')
+      expect(proposal.status).toBe('in_review')
+    }
+  })
+
+  it('selects the first pending case by default', () => {
+    const { result } = renderHook(() => useAiReview('proj-1'), { wrapper })
+
+    expect(result.current.selectedCase?.id).toBe(result.current.cases[0]?.id)
+  })
+
+  it('approves the selected case', async () => {
+    const { result } = renderHook(() => useAiReview('proj-1'), { wrapper })
+    const firstId = result.current.selectedCase!.id
 
     act(() => {
       result.current.confirmSelected()
     })
 
-    const snapshot = getSnapshot()
-    expect(snapshot.proposals.find((proposal) => proposal.id === proposalId)?.status).toBe('approved')
-    expect(snapshot.reviewDecisions.at(-1)).toMatchObject({ proposalId, actorId: 'member-1', action: 'approved' })
-    expect(snapshot.officialTestCases).toHaveLength(casesBefore)
-    expect(snapshot.testCaseVersions).toHaveLength(versionsBefore + 1)
-    const publishedVersion = snapshot.testCaseVersions.at(-1)!
-    expect(snapshot.officialTestCases.find((item) => item.id === publishedVersion.testCaseId)?.currentVersionId).toBe(publishedVersion.id)
-    expect(snapshot.traceabilityLinks.some((link) => link.from.id === proposalId && link.relation === 'produced')).toBe(true)
+    await waitFor(() => expect(result.current.isDeciding).toBe(false))
+
+    const { approveProposal } = await import('@/features/review-inbox/api/review.api')
+    expect(approveProposal).toHaveBeenCalledWith(firstId, undefined)
   })
 
-  it('rejects the selected proposal with a review decision', () => {
-    const { result } = renderHook(() => useAiReview('proj-1'))
-    const proposalId = result.current.selectedCase!.id
+  it('rejects the selected case', async () => {
+    const { result } = renderHook(() => useAiReview('proj-1'), { wrapper })
+    const firstId = result.current.selectedCase!.id
 
     act(() => {
       result.current.rejectSelected()
     })
 
-    const snapshot = getSnapshot()
-    expect(snapshot.proposals.find((proposal) => proposal.id === proposalId)?.status).toBe('rejected')
-    expect(snapshot.reviewDecisions.at(-1)).toMatchObject({ proposalId, actorId: 'member-1', action: 'rejected' })
+    await waitFor(() => expect(result.current.isDeciding).toBe(false))
+
+    const { rejectProposal } = await import('@/features/review-inbox/api/review.api')
+    expect(rejectProposal).toHaveBeenCalledWith(firstId, undefined)
   })
 
-  it('advances selection on skip without mutating the proposal', () => {
-    const { result } = renderHook(() => useAiReview('proj-1'))
+  it('advances selection on skip without deciding the proposal', async () => {
+    const { result } = renderHook(() => useAiReview('proj-1'), { wrapper })
     const firstId = result.current.selectedCase!.id
 
     act(() => {
@@ -59,11 +84,17 @@ describe('useAiReview governed decisions', () => {
     })
 
     expect(result.current.selectedCase?.id).not.toBe(firstId)
-    expect(getSnapshot().proposals.find((p) => p.id === firstId)?.status).toBe('in_review')
+
+    const { approveProposal, rejectProposal } = await import(
+      '@/features/review-inbox/api/review.api'
+    )
+    expect(approveProposal).not.toHaveBeenCalled()
+    expect(rejectProposal).not.toHaveBeenCalled()
   })
 
   it('does not expose a mass-confirm action', () => {
-    const { result } = renderHook(() => useAiReview('proj-1'))
+    const { result } = renderHook(() => useAiReview('proj-1'), { wrapper })
+
     expect(result.current).not.toHaveProperty('confirmAll')
   })
 })

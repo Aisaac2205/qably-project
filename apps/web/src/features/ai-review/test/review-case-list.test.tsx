@@ -2,11 +2,12 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ReviewCaseList } from '@/features/ai-review/components/review-case-list'
-import { __resetStore, getProposal } from '@/lib/mock-store'
-import type { ExtractedProposal } from '@qably/types'
+import { __resetStore } from '@/lib/mock-store'
+import { proposalListFixtures } from '@/test/review-api-stub'
+import type { ProposalListItem } from '@/features/review-inbox/api/review.api'
 
-function proposal(id: string): ExtractedProposal {
-  const found = getProposal(id)
+function proposal(id: string): ProposalListItem {
+  const found = proposalListFixtures().find((item) => item.id === id)
   if (!found) throw new Error(`Missing seeded proposal: ${id}`)
   return found
 }
@@ -25,7 +26,7 @@ describe('ReviewCaseList', () => {
     expect(screen.getByText('Invalid login shows error message')).toBeInTheDocument()
   })
 
-  it('renders source file names from linked evidence', async () => {
+  it('renders source file names from the proposal evidence title', async () => {
     const onSelect = vi.fn()
     const proposals = [proposal('review-proposal-checkout'), proposal('proposal-ai-3'), proposal('proposal-ai-4')]
     await act(async () => {
@@ -82,14 +83,5 @@ describe('ReviewCaseList', () => {
     })
     expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
     expect(screen.queryByText('Invalid login shows error message')).not.toBeInTheDocument()
-  })
-
-  it('shows the chat origin icon for proposals sourced from chat evidence', async () => {
-    const onSelect = vi.fn()
-    const proposals = [proposal('proposal-ai-5')]
-    await act(async () => {
-      render(<ReviewCaseList proposals={proposals} onSelect={onSelect} />)
-    })
-    expect(screen.getByLabelText('Generated from chat')).toBeInTheDocument()
   })
 })

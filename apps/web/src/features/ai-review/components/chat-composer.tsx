@@ -1,71 +1,80 @@
 'use client'
 
-import { useState } from 'react'
-import { AiPromptInput } from '@/features/ai-prompt'
-import { ProviderPicker } from './provider-picker'
+import { useState, type KeyboardEvent } from 'react'
 import { PaperPlaneRight } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
-import type { AiProvider, AiProviderConnection } from '@qably/types'
+import { useAutoResizeTextarea } from '@/features/projects/test-generation/hooks/use-auto-resize-textarea'
 import { useTranslation } from '@/lib/i18n'
 
+const MIN_HEIGHT = 44
+const MAX_HEIGHT = 200
+
 export function ChatComposer({
-  providers,
-  selectedProvider,
-  onSelectProvider,
   onSend,
+  disabled = false,
   initialValue = '',
 }: {
-  providers: AiProviderConnection[]
-  selectedProvider: AiProvider
-  onSelectProvider: (provider: AiProvider) => void
   onSend: (text: string) => void
+  disabled?: boolean
   initialValue?: string
 }) {
   const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
+  const { textareaRef, adjustHeight } = useAutoResizeTextarea({
+    minHeight: MIN_HEIGHT,
+    maxHeight: MAX_HEIGHT,
+  })
 
-  const handleSend = (prompt: string) => {
-    if (!prompt.trim()) return
-    onSend(prompt.trim())
+  const handleSend = () => {
+    const trimmed = value.trim()
+    if (!trimmed || disabled) return
+    onSend(trimmed)
     setValue('')
+    adjustHeight(true)
+  }
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault()
+      handleSend()
+    }
   }
 
   return (
     <div className="bg-surface px-4 py-3 sm:px-6 sm:py-4">
       <div className="max-w-3xl mx-auto w-full">
-        <div className="bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
-          <AiPromptInput
+        <div className="flex items-end gap-2 bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
+          <label htmlFor="chat-composer-input" className="sr-only">
+            {t('aiReview.chatComposerLabel')}
+          </label>
+          <textarea
+            id="chat-composer-input"
+            ref={textareaRef}
             value={value}
-            onChange={setValue}
-            onSubmit={handleSend}
-            placeholders={[t('aiReview.chatPlaceholder')]}
-            showToolbar={false}
-            showActions={false}
-            showModelSelector={false}
-            className="border-0 shadow-none p-0 bg-transparent"
-            textareaClassName="min-h-[44px] text-sm"
+            disabled={disabled}
+            onChange={(event) => {
+              setValue(event.target.value)
+              adjustHeight()
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={t('aiReview.chatPlaceholder')}
+            rows={1}
+            className="flex-1 resize-none bg-transparent text-sm text-default placeholder:text-muted outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           />
-          <div className="mt-2 flex items-center justify-between pt-2 border-t border-border/40">
-            <ProviderPicker
-              providers={providers}
-              selected={selectedProvider}
-              onSelect={onSelectProvider}
-            />
-            <button
-              type="button"
-              onClick={() => handleSend(value)}
-              disabled={!value.trim()}
-              aria-label={t('aiReview.sendMessage')}
-              className={cn(
-                'size-8 rounded-lg flex items-center justify-center transition-all duration-150',
-                value.trim()
-                  ? 'bg-primary text-primary-fg hover:bg-primary-hover shadow-xs active:scale-95'
-                  : 'bg-canvas text-muted/40 cursor-not-allowed'
-              )}
-            >
-              <PaperPlaneRight size={16} weight="fill" aria-hidden="true" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!value.trim() || disabled}
+            aria-label={t('aiReview.sendMessage')}
+            className={cn(
+              'size-8 shrink-0 rounded-lg flex items-center justify-center transition-all duration-150',
+              value.trim() && !disabled
+                ? 'bg-primary text-primary-fg hover:bg-primary-hover shadow-xs active:scale-95'
+                : 'bg-canvas text-muted/40 cursor-not-allowed',
+            )}
+          >
+            <PaperPlaneRight size={16} weight="fill" aria-hidden="true" />
+          </button>
         </div>
       </div>
     </div>

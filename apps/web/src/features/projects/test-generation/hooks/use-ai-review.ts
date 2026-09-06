@@ -1,60 +1,48 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
-import { useProposals } from '@/lib/use-mock-store'
-import { approveProposal, getMembers, rejectProposal } from '@/lib/mock-store'
+import { useCallback, useState } from 'react'
+import { useProposals } from '@/features/review-inbox/hooks/use-proposals'
+import { useProposalDecision } from '@/features/review-inbox/hooks/use-proposal-decision'
 
 export function useAiReview(projectId: string) {
-  const allProposals = useProposals(projectId)
-  const pending = useMemo(
-    () => allProposals.filter((p) => p.status === 'in_review'),
-    [allProposals],
-  )
+  const { proposals: cases, isLoading, isError } = useProposals({
+    projectId,
+    status: 'in_review',
+  })
+  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
 
-  const [selectedId, setSelectedId] = useState<string>(pending[0]?.id ?? '')
-
-  const selectedCase = useMemo(
-    () => pending.find((p) => p.id === selectedId) ?? pending[0] ?? null,
-    [pending, selectedId],
-  )
+  const selectedCase = cases.find((c) => c.id === selectedId) ?? cases[0]
 
   const selectCase = useCallback((id: string) => {
     setSelectedId(id)
   }, [])
 
-  const advanceSelection = useCallback((resolvedId: string) => {
-    const idx = pending.findIndex((p) => p.id === resolvedId)
-    if (idx < 0) return
-    const remaining = pending.filter((p) => p.id !== resolvedId)
-    setSelectedId(remaining[Math.min(idx, remaining.length - 1)]?.id ?? '')
-  }, [pending])
-
-  const confirmSelected = useCallback(() => {
-    if (!selectedCase) return
-    const actor = getMembers()[0]
-    if (!actor) return
-    const result = approveProposal(selectedCase.id, { actorId: actor.id })
-    if (!result.ok) return
-    advanceSelection(selectedCase.id)
-  }, [selectedCase, advanceSelection])
-
-  const rejectSelected = useCallback(() => {
-    if (!selectedCase) return
-    const actor = getMembers()[0]
-    if (!actor) return
-    const result = rejectProposal(selectedCase.id, { actorId: actor.id })
-    if (!result.ok) return
-    advanceSelection(selectedCase.id)
-  }, [selectedCase, advanceSelection])
-
   const skipSelected = useCallback(() => {
     if (!selectedCase) return
-    advanceSelection(selectedCase.id)
-  }, [selectedCase, advanceSelection])
+    const idx = cases.findIndex((c) => c.id === selectedCase.id)
+    const remaining = cases.filter((c) => c.id !== selectedCase.id)
+    setSelectedId(remaining[Math.min(idx, remaining.length - 1)]?.id)
+  }, [cases, selectedCase])
+
+  const { approve, reject, isDeciding } = useProposalDecision({
+    onApproved: () => setSelectedId(undefined),
+    onRejected: () => setSelectedId(undefined),
+  })
+
+  const confirmSelected = useCallback(() => {
+    if (selectedCase) approve(selectedCase.id)
+  }, [selectedCase, approve])
+
+  const rejectSelected = useCallback(() => {
+    if (selectedCase) reject(selectedCase.id)
+  }, [selectedCase, reject])
 
   return {
-    cases: pending,
+    cases,
     selectedCase,
+    isLoading,
+    isError,
+    isDeciding,
     selectCase,
     confirmSelected,
     rejectSelected,

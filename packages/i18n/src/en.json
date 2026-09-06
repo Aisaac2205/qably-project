@@ -474,7 +474,18 @@
     "ariaConfirmAll": "Confirm all {{count}} pending cases",
     "confirmAll": "Confirm all",
     "suggestCases": "Suggest test cases for: {{area}}",
-    "coverageGapSuggestion": "Suggested from coverage gap"
+    "coverageGapSuggestion": "Suggested from coverage gap",
+    "loading": "Loading the review queue…",
+    "loadError": "Couldn't load the review queue.",
+    "sendToReview": "Send to review",
+    "sendingToReview": "Sending…",
+    "sendToReviewError": "Couldn't send this case to review. Try again.",
+    "assistantThinking": "Thinking…",
+    "assistantUnavailable": "The AI assistant is not available right now. Your message was saved — try again in a moment.",
+    "chatAiNotEnabled": "AI chat isn't enabled for this organization.",
+    "chatThrottled": "Too many messages right now. Try again in a moment.",
+    "chatSendError": "Couldn't send your message. Try again.",
+    "chatComposerLabel": "Message"
   },
   "reviewFlow": {
     "provenance": "Provenance",

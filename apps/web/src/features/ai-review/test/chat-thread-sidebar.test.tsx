@@ -2,19 +2,15 @@ import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { ChatThreadSidebar } from '@/features/ai-review/components/chat-thread-sidebar'
-import type { ChatThread, ChatMessage } from '@qably/types'
+import type { ChatThreadRecord } from '@qably/types'
 
 describe('ChatThreadSidebar', () => {
-  const threads: ChatThread[] = [
-    { id: 't1', projectId: 'proj-1', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:01:00Z' },
-    { id: 't2', projectId: 'proj-1', createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:01:00Z' },
-  ]
-  const messages: ChatMessage[] = [
-    { id: 'm1', threadId: 't1', role: 'user', content: 'First thread message', createdAt: '2026-01-01T00:00:00Z' },
-    { id: 'm2', threadId: 't2', role: 'user', content: 'Second thread message', createdAt: '2026-01-02T00:00:00Z' },
+  const threads: ChatThreadRecord[] = [
+    { id: 't1', projectId: 'proj-1', title: 'First thread message', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:01:00Z' },
+    { id: 't2', projectId: 'proj-1', title: 'Second thread message', createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:01:00Z' },
   ]
 
-  it('renders threads with titles derived from the first user message', async () => {
+  it('renders threads by their title', async () => {
     await act(async () => {
       render(
         <ChatThreadSidebar
@@ -22,8 +18,6 @@ describe('ChatThreadSidebar', () => {
           activeThreadId="t1"
           onSelectThread={vi.fn()}
           onNewChat={vi.fn()}
-          onDeleteThread={vi.fn()}
-          messages={messages}
         />,
       )
     })
@@ -43,8 +37,6 @@ describe('ChatThreadSidebar', () => {
           activeThreadId="t1"
           onSelectThread={vi.fn()}
           onNewChat={onNewChat}
-          onDeleteThread={vi.fn()}
-          messages={messages}
         />,
       )
     })
@@ -65,41 +57,12 @@ describe('ChatThreadSidebar', () => {
           activeThreadId="t1"
           onSelectThread={onSelectThread}
           onNewChat={vi.fn()}
-          onDeleteThread={vi.fn()}
-          messages={messages}
         />,
       )
     })
 
     await user.click(screen.getByText('Second thread message'))
     expect(onSelectThread).toHaveBeenCalledWith('t2')
-  })
-
-  it('opens confirmation dialog and deletes thread on confirmation', async () => {
-    const onDeleteThread = vi.fn()
-    const user = userEvent.setup()
-
-    await act(async () => {
-      render(
-        <ChatThreadSidebar
-          threads={threads}
-          activeThreadId="t1"
-          onSelectThread={vi.fn()}
-          onNewChat={vi.fn()}
-          onDeleteThread={onDeleteThread}
-          messages={messages}
-        />,
-      )
-    })
-
-    const deleteButtons = screen.getAllByRole('button', { name: /delete conversation|eliminar conversaci/i })
-    await user.click(deleteButtons[0])
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
-    const confirmButton = screen.getByRole('button', { name: /delete|eliminar/i })
-    await user.click(confirmButton)
-
-    expect(onDeleteThread).toHaveBeenCalledWith('t1')
   })
 
   it('renders empty state when there are no threads', async () => {
@@ -110,8 +73,6 @@ describe('ChatThreadSidebar', () => {
           activeThreadId={null}
           onSelectThread={vi.fn()}
           onNewChat={vi.fn()}
-          onDeleteThread={vi.fn()}
-          messages={[]}
         />,
       )
     })
@@ -130,8 +91,6 @@ describe('ChatThreadSidebar', () => {
           activeThreadId="t1"
           onSelectThread={vi.fn()}
           onNewChat={vi.fn()}
-          onDeleteThread={vi.fn()}
-          messages={messages}
           isCollapsed={false}
           onToggleCollapse={onToggleCollapse}
         />,
@@ -156,8 +115,6 @@ describe('ChatThreadSidebar', () => {
           activeThreadId="t1"
           onSelectThread={onSelectThread}
           onNewChat={vi.fn()}
-          onDeleteThread={vi.fn()}
-          messages={messages}
           isCollapsed={true}
           onToggleCollapse={onToggleCollapse}
         />,
@@ -169,7 +126,6 @@ describe('ChatThreadSidebar', () => {
     await user.click(expandButton)
     expect(onToggleCollapse).toHaveBeenCalledTimes(1)
 
-    // Clicking a compact thread button selects the thread
     const threadButtons = screen.getAllByRole('button', { name: /First thread message/i })
     await user.click(threadButtons[0])
     expect(onSelectThread).toHaveBeenCalledWith('t1')

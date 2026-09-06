@@ -1,7 +1,8 @@
 'use client'
 
-import type { ExtractedProposal } from '@qably/types'
 import { Sparkle } from '@phosphor-icons/react'
+import type { ProposalListItem } from '@/features/review-inbox/api/review.api'
+import { useProposal } from '@/features/review-inbox/hooks/use-proposals'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CodeSnippet } from './code-snippet'
@@ -10,24 +11,23 @@ import { ProvenanceSummary } from '@/components/ui/provenance-summary'
 import { EvidenceList } from '@/components/ui/evidence-list'
 import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useTranslation } from '@/lib/i18n'
-import { useEvidence, useTraceabilityLinks } from '@/lib/use-mock-store'
 
-function getPriorityBadgeVariant(priority: ExtractedProposal['priority']): 'warn' | 'default' {
+function getPriorityBadgeVariant(priority: ProposalListItem['priority']): 'warn' | 'default' {
   if (priority === 'critical' || priority === 'high') {
     return 'warn'
   }
   return 'default'
 }
 
-export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) {
+export function ReviewCaseDetail({ proposal }: { proposal: ProposalListItem }) {
   const { t } = useTranslation()
-  const evidence = useEvidence(proposal.evidenceId)
-  const links = useTraceabilityLinks(proposal.id)
+  const { proposal: detail } = useProposal(proposal.id)
+  const evidence = detail?.evidence ?? undefined
+  const links = detail?.links ?? []
 
   return (
     <Card className="rounded-none border-0 h-full flex flex-col justify-between overflow-hidden bg-surface">
       <CardContent className="flex-1 overflow-y-auto space-y-5 p-5 sm:p-6 pb-8">
-        {/* Proposal Heading & Source Metadata */}
         <div className="space-y-3 pb-4 border-b border-border">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 rounded-md bg-ai-bg px-2 py-0.5 text-xs font-semibold text-ai">
@@ -54,12 +54,10 @@ export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) 
           )}
         </div>
 
-        {/* Duplicate Comparison if present */}
         {proposal.targetOfficialTestCaseId && (
           <DuplicateComparison targetOfficialTestCaseId={proposal.targetOfficialTestCaseId} />
         )}
 
-        {/* Objective */}
         {proposal.objective && (
           <div className="space-y-1.5">
             <h4 className="text-xs font-semibold text-muted">
@@ -69,7 +67,6 @@ export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) 
           </div>
         )}
 
-        {/* Preconditions */}
         {proposal.preconditions && proposal.preconditions.length > 0 && (
           <div className="space-y-1.5">
             <h4 className="text-xs font-semibold text-muted">
@@ -83,7 +80,6 @@ export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) 
           </div>
         )}
 
-        {/* Steps */}
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted">
             {t('aiReview.steps')}
@@ -103,7 +99,6 @@ export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) 
           </ol>
         </div>
 
-        {/* Expected Result */}
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted">
             {t('aiReview.expectedResult')}
@@ -113,7 +108,6 @@ export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) 
           </div>
         </div>
 
-        {/* Source Code Snippet */}
         {evidence?.excerpt && (
           <div className="space-y-2">
             <h4 className="text-xs font-semibold text-muted">
@@ -123,7 +117,6 @@ export function ReviewCaseDetail({ proposal }: { proposal: ExtractedProposal }) 
           </div>
         )}
 
-        {/* Evidence & Traceability */}
         {evidence && (
           <div className="space-y-5 border-t border-border pt-5">
             <ProvenanceSummary evidence={evidence} />

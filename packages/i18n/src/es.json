@@ -474,7 +474,18 @@
     "ariaConfirmAll": "Confirmar todos los {{count}} casos pendientes",
     "confirmAll": "Confirmar todos",
     "suggestCases": "Sugerir casos de prueba para: {{area}}",
-    "coverageGapSuggestion": "Sugerido por vacío de cobertura"
+    "coverageGapSuggestion": "Sugerido por vacío de cobertura",
+    "loading": "Cargando la cola de revisión…",
+    "loadError": "No se pudo cargar la cola de revisión.",
+    "sendToReview": "Enviar a revisión",
+    "sendingToReview": "Enviando…",
+    "sendToReviewError": "No se pudo enviar este caso a revisión. Intenta de nuevo.",
+    "assistantThinking": "Pensando…",
+    "assistantUnavailable": "El asistente de IA no está disponible en este momento. Tu mensaje se guardó — intenta de nuevo en un momento.",
+    "chatAiNotEnabled": "El chat de IA no está habilitado para esta organización.",
+    "chatThrottled": "Demasiados mensajes en este momento. Intenta de nuevo en un momento.",
+    "chatSendError": "No se pudo enviar tu mensaje. Intenta de nuevo.",
+    "chatComposerLabel": "Mensaje"
   },
   "reviewFlow": {
     "provenance": "Procedencia",

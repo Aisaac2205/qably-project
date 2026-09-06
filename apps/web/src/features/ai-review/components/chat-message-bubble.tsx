@@ -1,16 +1,16 @@
 'use client'
 
-import type { ChatMessage } from '@qably/types'
+import type { ChatMessageRecord } from '@qably/types'
 import { Sparkle } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import { ChatGeneratedCaseCard } from './chat-generated-case-card'
 
 export function ChatMessageBubble({
+  projectId,
   message,
-  onViewCase,
 }: {
-  message: ChatMessage
-  onViewCase: (caseId: string) => void
+  projectId: string
+  message: ChatMessageRecord
 }) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
@@ -33,9 +33,15 @@ export function ChatMessageBubble({
           )}
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
-        {message.generatedCaseIds?.map((caseId) => (
-          <div key={caseId} className="w-full">
-            <ChatGeneratedCaseCard caseId={caseId} onView={onViewCase} />
+        {message.suggestedCases.map((suggestedCase, index) => (
+          <div key={index} className="w-full">
+            <ChatGeneratedCaseCard
+              projectId={projectId}
+              threadId={message.threadId}
+              messageId={message.id}
+              caseIndex={index}
+              suggestedCase={suggestedCase}
+            />
           </div>
         ))}
       </div>

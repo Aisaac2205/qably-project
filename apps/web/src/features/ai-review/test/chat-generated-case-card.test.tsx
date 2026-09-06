@@ -1,33 +1,81 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChatGeneratedCaseCard } from '@/features/ai-review/components/chat-generated-case-card'
-import { __resetStore, sendChatMessage, getProposalForAiReviewCase } from '@/lib/mock-store'
+import type { SuggestedCaseRecord } from '@qably/types'
+import * as chatApi from '@/features/ai-review/api/chat.api'
+
+const suggestedCase: SuggestedCaseRecord = {
+  title: 'Login with 2FA shows a verification prompt',
+  objective: 'Verify the 2FA flow',
+  preconditions: [],
+  steps: ['Enter credentials', 'Enter the 2FA code'],
+  expectedResult: 'User is redirected to the dashboard',
+  priority: 'high',
+}
 
 describe('ChatGeneratedCaseCard', () => {
-  beforeEach(() => __resetStore())
-
-  it('shows the generated proposal title and a link to view it', async () => {
-    const onView = vi.fn()
-    const user = userEvent.setup()
-    const { assistantMessage } = sendChatMessage('proj-1', 'Genera un caso de prueba para el login con 2FA')
-    const caseId = assistantMessage.generatedCaseIds![0]
-
-    // A chat-drafted case must be governed by the same ExtractedProposal
-    // contract as repository-detected cases — Fase 3 review queue reads
-    // proposals, not AiCase, so the bridge must exist before rendering.
-    expect(getProposalForAiReviewCase(caseId)?.status).toBe('in_review')
-
-    await act(async () => {
-      render(<ChatGeneratedCaseCard caseId={caseId} onView={onView} />)
-    })
-    expect(screen.getByText(/Case drafted from chat/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'View in Review Queue' }))
-    expect(onView).toHaveBeenCalledWith(caseId)
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('renders nothing if the proposal cannot be found', async () => {
-    const { container } = render(<ChatGeneratedCaseCard caseId="missing" onView={vi.fn()} />)
-    expect(container).toBeEmptyDOMElement()
+  it('shows the suggested case title and a send-to-review action', async () => {
+    await act(async () => {
+      render(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+        />,
+      )
+    })
+    expect(screen.getByText('Login with 2FA shows a verification prompt')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Send to review' })).toBeInTheDocument()
+  })
+
+  it('sends the case to review and shows a link to the review queue', async () => {
+    vi.spyOn(chatApi, 'sendToReview').mockResolvedValue({ proposalId: 'proposal-1' })
+    const user = userEvent.setup()
+    await act(async () => {
+      render(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={2}
+          suggestedCase={suggestedCase}
+        />,
+      )
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Send to review' }))
+
+    expect(chatApi.sendToReview).toHaveBeenCalledWith('proj-1', 'thread-1', 'message-1', 2)
+    expect(await screen.findByRole('link', { name: 'View in Review Queue' })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/ai-review',
+    )
+  })
+
+  it('shows an error message when sending to review fails', async () => {
+    vi.spyOn(chatApi, 'sendToReview').mockRejectedValue(new Error('boom'))
+    const user = userEvent.setup()
+    await act(async () => {
+      render(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+        />,
+      )
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Send to review' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't send this case/i)
   })
 })

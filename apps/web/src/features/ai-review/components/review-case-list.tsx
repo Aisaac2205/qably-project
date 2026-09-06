@@ -1,11 +1,10 @@
 'use client'
 
-import type { ExtractedProposal } from '@qably/types'
+import type { ProposalListItem } from '@/features/review-inbox/api/review.api'
 import { Card, CardContent } from '@/components/ui/card'
-import { CopySimple, ChatCircleText, GitBranch } from '@phosphor-icons/react'
+import { CopySimple, Sparkle } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { useTranslation } from '@/lib/i18n'
-import { useEvidence } from '@/lib/use-mock-store'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 
@@ -14,13 +13,11 @@ function ReviewCaseListRow({
   isSelected,
   onSelect,
 }: {
-  proposal: ExtractedProposal
+  proposal: ProposalListItem
   isSelected: boolean
   onSelect: (id: string) => void
 }) {
   const { t } = useTranslation()
-  const evidence = useEvidence(proposal.evidenceId)
-  const isChatOrigin = evidence?.kind === 'artifact'
 
   return (
     <li>
@@ -37,11 +34,7 @@ function ReviewCaseListRow({
         <div className="flex items-start justify-between gap-2 mb-1.5">
           <div className="min-w-0 flex-1">
             <p className="text-xs sm:text-sm font-semibold text-default truncate flex items-center gap-2">
-              {isChatOrigin ? (
-                <ChatCircleText size={14} className="text-ai shrink-0" aria-label={t('aiReview.ariaGeneratedChat')} />
-              ) : (
-                <GitBranch size={14} className="text-muted shrink-0" aria-label={t('aiReview.ariaGeneratedWebhook')} />
-              )}
+              <Sparkle size={14} weight="fill" className="text-ai shrink-0" aria-hidden="true" />
               <span className="truncate">{proposal.title}</span>
             </p>
           </div>
@@ -53,9 +46,9 @@ function ReviewCaseListRow({
               {t('aiReview.possibleDuplicate')}
             </Badge>
           )}
-          {evidence?.title && (
+          {proposal.evidenceTitle && (
             <span className="font-mono text-[11px] text-muted truncate max-w-56">
-              {evidence.title}
+              {proposal.evidenceTitle}
             </span>
           )}
         </div>
@@ -70,7 +63,7 @@ export function ReviewCaseList({
   onSelect,
   filter = 'all',
 }: {
-  proposals: ExtractedProposal[]
+  proposals: ProposalListItem[]
   selectedId?: string
   onSelect: (id: string) => void
   filter?: 'all' | 'duplicates'

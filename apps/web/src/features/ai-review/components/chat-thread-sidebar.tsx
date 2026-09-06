@@ -1,19 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash, ChatCircleText, SidebarSimple } from '@phosphor-icons/react'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Plus, ChatCircleText, SidebarSimple } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import type { ChatThread, ChatMessage } from '@qably/types'
+import type { ChatThreadRecord } from '@qably/types'
 
 interface ChatThreadSidebarProps {
-  threads: ChatThread[]
+  threads: ChatThreadRecord[]
   activeThreadId: string | null
   onSelectThread: (threadId: string) => void
   onNewChat: () => void
-  onDeleteThread: (threadId: string) => void
-  messages: ChatMessage[]
   isCollapsed?: boolean
   onToggleCollapse?: () => void
 }
@@ -23,13 +19,10 @@ export function ChatThreadSidebar({
   activeThreadId,
   onSelectThread,
   onNewChat,
-  onDeleteThread,
-  messages,
   isCollapsed = false,
   onToggleCollapse,
 }: ChatThreadSidebarProps) {
   const { t } = useTranslation()
-  const [threadIdToDelete, setThreadIdToDelete] = useState<string | null>(null)
 
   if (isCollapsed) {
     return (
@@ -67,18 +60,14 @@ export function ChatThreadSidebar({
         <div className="mt-3 flex-1 overflow-y-auto min-h-0 w-full flex flex-col items-center gap-1">
           {threads.map((thread) => {
             const isActive = activeThreadId === thread.id
-            const userMsg = messages.find(
-              (m) => m.threadId === thread.id && m.role === 'user',
-            )
-            const title = userMsg?.content || t('aiReview.newChat')
 
             return (
               <button
                 key={thread.id}
                 type="button"
                 onClick={() => onSelectThread(thread.id)}
-                title={title}
-                aria-label={title}
+                title={thread.title}
+                aria-label={thread.title}
                 className={cn(
                   'size-9 rounded-lg inline-flex items-center justify-center transition-all cursor-pointer shrink-0',
                   isActive
@@ -155,22 +144,21 @@ export function ChatThreadSidebar({
         ) : (
           threads.map((thread) => {
             const isActive = activeThreadId === thread.id
-            const userMsg = messages.find(
-              (m) => m.threadId === thread.id && m.role === 'user',
-            )
-            const title = userMsg?.content || t('aiReview.newChat')
 
             return (
-              <div
+              <button
                 key={thread.id}
+                type="button"
                 role="listitem"
+                onClick={() => onSelectThread(thread.id)}
+                aria-current={isActive ? 'true' : undefined}
+                title={thread.title}
                 className={cn(
-                  'group relative flex items-center gap-2 w-full rounded-lg px-2.5 py-2 text-xs transition-all duration-150 cursor-pointer',
+                  'group flex items-center gap-2 w-full rounded-lg px-2.5 py-2 text-xs transition-all duration-150 cursor-pointer text-left',
                   isActive
                     ? 'bg-surface text-default font-semibold shadow-xs border border-border'
                     : 'text-muted hover:text-default hover:bg-surface/70 border border-transparent',
                 )}
-                onClick={() => onSelectThread(thread.id)}
               >
                 <ChatCircleText
                   size={15}
@@ -181,50 +169,12 @@ export function ChatThreadSidebar({
                   )}
                   aria-hidden="true"
                 />
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onSelectThread(thread.id)
-                  }}
-                  aria-current={isActive ? 'true' : undefined}
-                  className="flex-1 min-w-0 text-left truncate focus-visible:outline-2 focus-visible:outline-primary rounded"
-                  title={title}
-                >
-                  {title}
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setThreadIdToDelete(thread.id)
-                  }}
-                  aria-label={t('aiReview.deleteChatAria')}
-                  className={cn(
-                    'size-6 shrink-0 inline-flex items-center justify-center rounded text-muted hover:text-destructive hover:bg-destructive/10 transition-colors focus-visible:outline-2 focus-visible:outline-primary',
-                    'opacity-0 group-hover:opacity-100 focus:opacity-100 group-focus-within:opacity-100',
-                  )}
-                >
-                  <Trash size={13} aria-hidden="true" />
-                </button>
-              </div>
+                <span className="flex-1 min-w-0 truncate">{thread.title}</span>
+              </button>
             )
           })
         )}
       </div>
-
-      <ConfirmDialog
-        open={!!threadIdToDelete}
-        onOpenChange={(open) => !open && setThreadIdToDelete(null)}
-        title={t('aiReview.deleteChatTitle')}
-        description={t('aiReview.deleteChatDesc')}
-        onConfirm={() => {
-          if (threadIdToDelete) {
-            onDeleteThread(threadIdToDelete)
-            setThreadIdToDelete(null)
-          }
-        }}
-      />
     </aside>
   )
 }

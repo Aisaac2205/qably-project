@@ -17,8 +17,10 @@ import { projectKeys } from '@/features/projects/lib/query-keys'
 import { organizationKeys } from '@/features/organizations/lib/query-keys'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
 import {
+  PROPOSAL_STATUSES,
   proposalDetailFixtures,
   proposalListFixtures,
+  proposalListFixturesFor,
 } from '@/test/review-api-stub'
 
 /**
@@ -145,6 +147,19 @@ function seedProposals(client: QueryClient): void {
 
   for (const detail of proposalDetailFixtures()) {
     client.setQueryData(reviewKeys.detail(detail.id), detail)
+  }
+
+  const projectIds = new Set(proposalListFixtures().map((proposal) => proposal.projectId))
+
+  for (const projectId of projectIds) {
+    client.setQueryData(reviewKeys.list({ projectId }), proposalListFixturesFor({ projectId }))
+
+    for (const status of PROPOSAL_STATUSES) {
+      client.setQueryData(
+        reviewKeys.list({ projectId, status }),
+        proposalListFixturesFor({ projectId, status }),
+      )
+    }
   }
 }
 

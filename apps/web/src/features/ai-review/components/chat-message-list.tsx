@@ -1,9 +1,10 @@
 'use client'
 
-import type { ChatMessage } from '@qably/types'
+import type { ChatMessageRecord } from '@qably/types'
 import { ChatMessageBubble } from './chat-message-bubble'
 import { ListChecks, Flask, ShieldCheck } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import type { PendingMessage } from '@/features/projects/test-generation/hooks/use-project-chat'
 
 function QablyIcon({ className }: { className?: string }) {
   return (
@@ -13,44 +14,48 @@ function QablyIcon({ className }: { className?: string }) {
       aria-hidden="true"
       className={className}
     >
-      {/* Row 1 */}
       <rect x="0" y="0" width="28" height="28" rx="5" />
       <rect x="36" y="0" width="28" height="28" rx="5" />
       <rect x="72" y="0" width="28" height="28" rx="5" />
-      {/* Row 2 */}
       <rect x="36" y="36" width="28" height="28" rx="5" />
       <rect x="72" y="36" width="28" height="28" rx="5" />
-      {/* Row 3 */}
       <rect x="72" y="72" width="28" height="28" rx="5" />
     </svg>
   )
 }
 
+function pendingErrorCopy(
+  errorKind: PendingMessage['errorKind'],
+  t: (key: string) => string,
+): string {
+  switch (errorKind) {
+    case 'ai-not-enabled':
+      return t('aiReview.chatAiNotEnabled')
+    case 'throttled':
+      return t('aiReview.chatThrottled')
+    default:
+      return t('aiReview.chatSendError')
+  }
+}
+
 export function ChatMessageList({
+  projectId,
   messages,
-  onViewCase,
+  pendingMessage,
   onSelectSuggestion,
 }: {
-  messages: ChatMessage[]
-  onViewCase: (caseId: string) => void
+  projectId: string
+  messages: ChatMessageRecord[]
+  pendingMessage?: PendingMessage | null
   onSelectSuggestion?: (prompt: string) => void
 }) {
   const { t } = useTranslation()
 
-  if (messages.length === 0) {
+  if (messages.length === 0 && !pendingMessage) {
     const starters = [
-      {
-        icon: ListChecks,
-        text: t('aiReview.promptStarter1'),
-      },
-      {
-        icon: Flask,
-        text: t('aiReview.promptStarter2'),
-      },
-      {
-        icon: ShieldCheck,
-        text: t('aiReview.promptStarter3'),
-      },
+      { icon: ListChecks, text: t('aiReview.promptStarter1') },
+      { icon: Flask, text: t('aiReview.promptStarter2') },
+      { icon: ShieldCheck, text: t('aiReview.promptStarter3') },
     ]
 
     return (
@@ -92,14 +97,54 @@ export function ChatMessageList({
   }
 
   return (
-    <div className="flex flex-col p-4 sm:p-6 space-y-4 max-w-3xl mx-auto w-full">
+    <div
+      className="flex flex-col p-4 sm:p-6 space-y-4 max-w-3xl mx-auto w-full"
+      aria-live="polite"
+      aria-relevant="additions"
+    >
       {messages.map((message) => (
-        <ChatMessageBubble
-          key={message.id}
-          message={message}
-          onViewCase={onViewCase}
-        />
+        <ChatMessageBubble key={message.id} projectId={projectId} message={message} />
       ))}
+
+      {pendingMessage && (
+        <div className="flex flex-col space-y-2">
+          <div className="flex justify-end">
+            <div className="max-w-[85%] sm:max-w-[80%] bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-xs text-xs sm:text-sm">
+              {pendingMessage.content}
+            </div>
+          </div>
+
+          {pendingMessage.status === 'sending' && (
+            <div className="flex justify-start">
+              <p role="status" className="text-xs text-muted italic px-2">
+                {t('aiReview.assistantThinking')}
+              </p>
+            </div>
+          )}
+
+          {pendingMessage.status === 'unavailable' && (
+            <div className="flex justify-start">
+              <p
+                role="status"
+                className="max-w-[85%] sm:max-w-[80%] text-xs sm:text-sm text-muted bg-surface border border-border rounded-2xl rounded-tl-xs px-4 py-2.5"
+              >
+                {t('aiReview.assistantUnavailable')}
+              </p>
+            </div>
+          )}
+
+          {pendingMessage.status === 'error' && (
+            <div className="flex justify-start">
+              <p
+                role="alert"
+                className="max-w-[85%] sm:max-w-[80%] text-xs sm:text-sm text-fail bg-fail-bg border border-fail/30 rounded-2xl rounded-tl-xs px-4 py-2.5"
+              >
+                {pendingErrorCopy(pendingMessage.errorKind, t)}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
