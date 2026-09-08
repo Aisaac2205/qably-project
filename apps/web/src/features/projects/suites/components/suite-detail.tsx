@@ -106,7 +106,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </h1>
               {suite.isDefault && (
                 <span
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-warn bg-warn-bg border border-warn/20 rounded px-2 py-0.5"
+                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-warn bg-warn-bg border border-warn/20 rounded px-2 py-0.5"
                   title={t('suites.defaultSuiteTooltip')}
                 >
                   <Star size={12} weight="fill" aria-hidden="true" />

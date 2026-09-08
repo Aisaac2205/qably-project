@@ -30,6 +30,16 @@ describe('PriorityBadge', () => {
     expect(badge.className).toContain('text-fail')
   })
 
+  it('keeps its label on a single line', async () => {
+    await act(async () => { render(<PriorityBadge priority="critical" />) })
+    expect(screen.getByText('Critical').className).toContain('whitespace-nowrap')
+  })
+
+  it('never shrinks below its label inside a cramped flex row', async () => {
+    await act(async () => { render(<PriorityBadge priority="critical" />) })
+    expect(screen.getByText('Critical').className).toContain('shrink-0')
+  })
+
   it('renders with icon + label, color supplementary', async () => {
     await act(async () => { render(<PriorityBadge priority="high" />) })
     const badge = screen.getByText('High')

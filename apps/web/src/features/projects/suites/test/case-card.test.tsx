@@ -41,6 +41,12 @@ describe('CaseCard', () => {
     expect(screen.getByText('Manual')).toBeInTheDocument()
   })
 
+  it('keeps the version chip from shrinking in the badge row', async () => {
+    await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    const chip = screen.getByText((_, element) => element?.textContent === 'v2' && element.tagName === 'SPAN')
+    expect(chip.className).toContain('shrink-0')
+  })
+
   it('shows the execution mode badge for an automated case', async () => {
     await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
     expect(screen.getByText('Automated')).toBeInTheDocument()

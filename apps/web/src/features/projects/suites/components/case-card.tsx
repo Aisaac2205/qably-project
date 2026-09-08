@@ -70,7 +70,7 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
           )}
         </div>
         {testCase.version !== null && (
-          <span className="rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
+          <span className="shrink-0 whitespace-nowrap rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
             v{testCase.version}
           </span>
         )}

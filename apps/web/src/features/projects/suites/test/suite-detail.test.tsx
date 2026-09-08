@@ -100,6 +100,13 @@ describe('SuiteDetail (redesigned)', () => {
     expect(screen.getByText('Default')).toBeInTheDocument()
   })
 
+  it('keeps the default badge from shrinking beside a long suite name', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+    const badge = screen.getByText('Default').closest('span')
+    expect(badge?.className).toContain('shrink-0')
+    expect(badge?.className).toContain('whitespace-nowrap')
+  })
+
   it('renders a health strip with status, pass rate, last run, cases', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     const strip = screen.getByRole('group', { name: /Suite health/i })
