@@ -1,6 +1,8 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
+import { resolveLocale } from '@qably/i18n';
+import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -27,6 +29,7 @@ export class ExtractionService {
 
   async enqueueCodeChanges(
     codeChanges: CodeChangeCandidate[],
+    organizationId: string,
   ): Promise<number> {
     const targets = codeChanges.filter(
       (change) => change.detectedPattern !== null,
@@ -34,12 +37,15 @@ export class ExtractionService {
 
     if (targets.length === 0) return 0;
 
+    const locale = await resolveOrgDefaultLocale(this.prisma, organizationId);
+
     await this.queue.addBulk(
       targets.map((change) => ({
         name: 'code-change',
         data: {
           kind: 'code-change' as const,
           codeChangeId: change.id,
+          locale,
         },
         opts: { jobId: `code-change:${change.id}` },
       })),
@@ -52,6 +58,7 @@ export class ExtractionService {
     org: OrgContext,
     suiteId: string,
     caseId: string,
+    actorLocale: string | null,
   ): Promise<Result<{ jobId: string }, DocumentCaseError>> {
     const testCase = await this.prisma.testCase.findFirst({
       where: {
@@ -77,11 +84,16 @@ export class ExtractionService {
 
     if (pending !== null) return err('already-pending');
 
+    const locale =
+      actorLocale === null
+        ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
+        : resolveLocale(actorLocale);
+
     const jobId = `document-case:${caseId}`;
 
     await this.queue.add(
       'document-case',
-      { kind: 'document-case', testCaseId: caseId },
+      { kind: 'document-case', testCaseId: caseId, locale },
       { jobId },
     );
 

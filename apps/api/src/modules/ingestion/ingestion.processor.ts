@@ -23,6 +23,7 @@ const BLOB_PATH: Record<
 
 interface PendingEvent {
   id: string;
+  organizationId: string;
   provider: RepoConnectionProvider;
   repo: string;
   commitSha: string;
@@ -88,6 +89,7 @@ export class IngestionProcessor extends WorkerHost {
       where: { id: scmEventId },
       select: {
         id: true,
+        organizationId: true,
         provider: true,
         repo: true,
         commitSha: true,
@@ -147,7 +149,10 @@ export class IngestionProcessor extends WorkerHost {
         },
       });
 
-      await this.extraction.enqueueCodeChanges(batch.codeChanges);
+      await this.extraction.enqueueCodeChanges(
+        batch.codeChanges,
+        event.organizationId,
+      );
     }
   }
 }

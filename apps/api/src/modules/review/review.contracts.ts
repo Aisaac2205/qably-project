@@ -1,3 +1,4 @@
+import type { Locale } from '@qably/i18n';
 import type {
   Evidence,
   ExtractedProposal,
@@ -24,8 +25,8 @@ export interface ListProposalsFilters {
 export const EXTRACTION_QUEUE = 'extraction';
 
 export type ExtractionJobData =
-  | { kind: 'code-change'; codeChangeId: string }
-  | { kind: 'document-case'; testCaseId: string };
+  | { kind: 'code-change'; codeChangeId: string; locale: Locale }
+  | { kind: 'document-case'; testCaseId: string; locale: Locale };
 
 export type DocumentCaseError =
   | 'not-found'

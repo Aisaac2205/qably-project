@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE } from '@qably/i18n';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { ExtractionService } from './extraction.service';
 
@@ -15,6 +16,7 @@ interface FakeQueue {
 interface FakePrisma {
   testCase: { findFirst: jest.Mock };
   extractedProposal: { findFirst: jest.Mock };
+  orgMember: { findFirst: jest.Mock };
 }
 
 function createQueue(): FakeQueue {
@@ -24,7 +26,7 @@ function createQueue(): FakeQueue {
   };
 }
 
-function createPrisma(): FakePrisma {
+function createPrisma(ownerLocale: string | null = null): FakePrisma {
   return {
     testCase: {
       findFirst: jest.fn().mockResolvedValue({
@@ -36,6 +38,11 @@ function createPrisma(): FakePrisma {
     extractedProposal: {
       findFirst: jest.fn().mockResolvedValue(null),
     },
+    orgMember: {
+      findFirst: jest.fn().mockResolvedValue(
+        ownerLocale === null ? null : { user: { locale: ownerLocale } },
+      ),
+    },
   };
 }
 
@@ -44,14 +51,17 @@ function build(prisma: FakePrisma, queue: FakeQueue) {
 }
 
 describe('ExtractionService.enqueueCodeChanges', () => {
-  it('enqueues one bulk job per detected code change with a stable jobId', async () => {
+  it('enqueues one bulk job per detected code change, stamped with the organization default locale', async () => {
     const queue = createQueue();
-    const prisma = createPrisma();
+    const prisma = createPrisma('en');
 
-    const count = await build(prisma, queue).enqueueCodeChanges([
-      { id: 'change-1', detectedPattern: '*.spec.ts' },
-      { id: 'change-2', detectedPattern: '*.spec.ts' },
-    ]);
+    const count = await build(prisma, queue).enqueueCodeChanges(
+      [
+        { id: 'change-1', detectedPattern: '*.spec.ts' },
+        { id: 'change-2', detectedPattern: '*.spec.ts' },
+      ],
+      'org-1',
+    );
 
     expect(count).toBe(2);
     const [jobs] = queue.addBulk.mock.calls[0] as [
@@ -59,46 +69,64 @@ describe('ExtractionService.enqueueCodeChanges', () => {
     ];
     expect(jobs).toHaveLength(2);
     expect(jobs[0]).toMatchObject({
-      data: { kind: 'code-change', codeChangeId: 'change-1' },
+      data: { kind: 'code-change', codeChangeId: 'change-1', locale: 'en' },
       opts: { jobId: 'code-change:change-1' },
     });
     expect(jobs[1]).toMatchObject({
-      data: { kind: 'code-change', codeChangeId: 'change-2' },
+      data: { kind: 'code-change', codeChangeId: 'change-2', locale: 'en' },
       opts: { jobId: 'code-change:change-2' },
     });
+  });
+
+  it("falls back to the default locale when the organization's owner has no preference", async () => {
+    const queue = createQueue();
+    const prisma = createPrisma(null);
+
+    await build(prisma, queue).enqueueCodeChanges(
+      [{ id: 'change-1', detectedPattern: '*.spec.ts' }],
+      'org-1',
+    );
+
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    expect(jobs[0].data).toMatchObject({ locale: DEFAULT_LOCALE });
   });
 
   it('never enqueues a file that matched no declared test pattern', async () => {
     const queue = createQueue();
     const prisma = createPrisma();
 
-    const count = await build(prisma, queue).enqueueCodeChanges([
-      { id: 'change-1', detectedPattern: null },
-    ]);
+    const count = await build(prisma, queue).enqueueCodeChanges(
+      [{ id: 'change-1', detectedPattern: null }],
+      'org-1',
+    );
 
     expect(count).toBe(0);
     expect(queue.addBulk).not.toHaveBeenCalled();
   });
 
-  it('never touches the queue when there are no candidates', async () => {
+  it('never touches the queue or looks up the organization when there are no candidates', async () => {
     const queue = createQueue();
     const prisma = createPrisma();
 
-    await build(prisma, queue).enqueueCodeChanges([]);
+    await build(prisma, queue).enqueueCodeChanges([], 'org-1');
 
     expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(prisma.orgMember.findFirst).not.toHaveBeenCalled();
   });
 });
 
 describe('ExtractionService.enqueueDocumentCase', () => {
-  it('enqueues a document-case job with a stable jobId', async () => {
+  it("uses the acting user's locale when one is set", async () => {
     const queue = createQueue();
-    const prisma = createPrisma();
+    const prisma = createPrisma('en');
 
     const result = await build(prisma, queue).enqueueDocumentCase(
       org,
       'suite-1',
       'case-1',
+      'es',
     );
 
     expect(result).toEqual({
@@ -107,8 +135,45 @@ describe('ExtractionService.enqueueDocumentCase', () => {
     });
     expect(queue.add).toHaveBeenCalledWith(
       'document-case',
-      { kind: 'document-case', testCaseId: 'case-1' },
+      { kind: 'document-case', testCaseId: 'case-1', locale: 'es' },
       expect.objectContaining({ jobId: 'document-case:case-1' }),
+    );
+    expect(prisma.orgMember.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the organization default when the acting user has no locale', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+
+    await build(prisma, queue).enqueueDocumentCase(
+      org,
+      'suite-1',
+      'case-1',
+      null,
+    );
+
+    expect(queue.add).toHaveBeenCalledWith(
+      'document-case',
+      expect.objectContaining({ locale: 'en' }),
+      expect.anything(),
+    );
+  });
+
+  it('falls back to the default locale when neither the user nor the organization has a preference', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma(null);
+
+    await build(prisma, queue).enqueueDocumentCase(
+      org,
+      'suite-1',
+      'case-1',
+      null,
+    );
+
+    expect(queue.add).toHaveBeenCalledWith(
+      'document-case',
+      expect.objectContaining({ locale: DEFAULT_LOCALE }),
+      expect.anything(),
     );
   });
 
@@ -121,6 +186,7 @@ describe('ExtractionService.enqueueDocumentCase', () => {
       org,
       'suite-1',
       'case-1',
+      null,
     );
 
     expect(result).toEqual({ ok: false, error: 'not-found' });
@@ -140,6 +206,7 @@ describe('ExtractionService.enqueueDocumentCase', () => {
       org,
       'suite-1',
       'case-1',
+      null,
     );
 
     expect(result).toEqual({ ok: false, error: 'not-automated' });
@@ -159,6 +226,7 @@ describe('ExtractionService.enqueueDocumentCase', () => {
       org,
       'suite-1',
       'case-1',
+      null,
     );
 
     expect(result).toEqual({ ok: false, error: 'not-automated' });
@@ -173,6 +241,7 @@ describe('ExtractionService.enqueueDocumentCase', () => {
       org,
       'suite-1',
       'case-1',
+      null,
     );
 
     expect(result).toEqual({ ok: false, error: 'already-pending' });

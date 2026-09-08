@@ -18,6 +18,8 @@ import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
 import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
+import type { AuthenticatedUser } from '../auth/auth.contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -163,8 +165,14 @@ export class SuitesController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
     @Param('caseId') caseId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<{ queued: true; jobId: string }> {
-    const result = await this.extraction.enqueueDocumentCase(org, id, caseId);
+    const result = await this.extraction.enqueueDocumentCase(
+      org,
+      id,
+      caseId,
+      user.locale,
+    );
 
     return { queued: true, jobId: unwrapDocumentCase(result).jobId };
   }

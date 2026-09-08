@@ -24,7 +24,6 @@ interface FakePrisma {
   codeChange: { findUnique: jest.Mock; findFirst: jest.Mock };
   testCase: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
   suite: { findFirst: jest.Mock };
-  orgMember: { findFirst: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
   extractedProposal: {
     findFirst: jest.Mock;
@@ -73,9 +72,6 @@ function createPrisma(): FakePrisma {
         .fn()
         .mockResolvedValueOnce({ id: 'suite-by-name' })
         .mockResolvedValue({ id: 'suite-by-name' }),
-    },
-    orgMember: {
-      findFirst: jest.fn().mockResolvedValue(null),
     },
     evidence: {
       create: jest.fn().mockResolvedValue({ id: 'evidence-new' }),
@@ -640,25 +636,23 @@ describe('ExtractionProcessor — code-change job', () => {
     });
   });
 
-  it('resolves the locale from the organization owner instead of hard-coding Spanish', async () => {
+  it('uses the locale carried on the job payload', async () => {
     const prisma = createPrisma();
-    prisma.orgMember.findFirst.mockResolvedValue({ user: { locale: 'en' } });
     const extractSpy = jest
       .fn()
       .mockResolvedValue(extractedOutcome([extractedCase()]));
     const extractor = fakeExtractor(extractSpy);
 
     await build(prisma, fakeSourceReader(), extractor).process({
-      data: { kind: 'code-change', codeChangeId: 'change-1' },
+      data: { kind: 'code-change', codeChangeId: 'change-1', locale: 'en' },
     } as never);
 
     const [extractArgs] = extractSpy.mock.calls[0] as [{ locale: string }];
     expect(extractArgs.locale).toBe('en');
   });
 
-  it('falls back to the default locale when the organization has no owner on record', async () => {
+  it('falls back to the default locale when a redelivered job predates the locale field', async () => {
     const prisma = createPrisma();
-    prisma.orgMember.findFirst.mockResolvedValue(null);
     const extractSpy = jest
       .fn()
       .mockResolvedValue(extractedOutcome([extractedCase()]));

@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { SuitesController } from './suites.controller';
 
@@ -6,6 +7,14 @@ const org: OrgContext = {
   organizationId: 'org-1',
   slug: 'acme',
   role: 'admin',
+};
+
+const user: AuthenticatedUser = {
+  id: 'user-1',
+  email: 'qa@acme.test',
+  name: 'QA',
+  emailVerified: true,
+  locale: 'es',
 };
 
 function fakeExtraction(result: unknown) {
@@ -17,7 +26,7 @@ function build(extraction: ReturnType<typeof fakeExtraction>) {
 }
 
 describe('SuitesController.documentCase', () => {
-  it('queues the extraction and returns the jobId', async () => {
+  it("queues the extraction with the acting user's locale and returns the jobId", async () => {
     const extraction = fakeExtraction({
       ok: true,
       value: { jobId: 'document-case:case-1' },
@@ -27,6 +36,7 @@ describe('SuitesController.documentCase', () => {
       org,
       'suite-1',
       'case-1',
+      user,
     );
 
     expect(result).toEqual({ queued: true, jobId: 'document-case:case-1' });
@@ -34,6 +44,7 @@ describe('SuitesController.documentCase', () => {
       org,
       'suite-1',
       'case-1',
+      'es',
     );
   });
 
@@ -41,10 +52,10 @@ describe('SuitesController.documentCase', () => {
     const extraction = fakeExtraction({ ok: false, error: 'not-found' });
 
     await expect(
-      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
-      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toMatchObject({ response: { code: 'not-found' } });
   });
 
@@ -52,10 +63,10 @@ describe('SuitesController.documentCase', () => {
     const extraction = fakeExtraction({ ok: false, error: 'not-automated' });
 
     await expect(
-      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
-      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toMatchObject({ response: { code: 'not-automated' } });
   });
 
@@ -63,10 +74,10 @@ describe('SuitesController.documentCase', () => {
     const extraction = fakeExtraction({ ok: false, error: 'already-pending' });
 
     await expect(
-      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
-      build(extraction).documentCase(org, 'suite-1', 'case-1'),
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toMatchObject({ response: { code: 'already-pending' } });
   });
 });

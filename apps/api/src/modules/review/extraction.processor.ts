@@ -18,7 +18,6 @@ import { EXTRACTION_QUEUE, type ExtractionJobData } from './review.contracts';
 
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
 const HEAD_REF = 'HEAD';
-const OWNER_ROLE = 'owner';
 const NOT_ENTITLED_REASON = 'ai-not-enabled';
 const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
 const NO_TESTS_FOUND_REASON = 'no-tests-found';
@@ -43,6 +42,7 @@ interface JobContext {
   knownSuiteId: string | null;
   onlyAutomationKey: string | null;
   fallbackEvidenceId: string | null;
+  locale: string | undefined;
 }
 
 interface ExistingProposal {
@@ -135,13 +135,16 @@ export class ExtractionProcessor extends WorkerHost {
 
   async process(job: Job<ExtractionJobData>): Promise<void> {
     if (job.data.kind === 'code-change') {
-      await this.processCodeChange(job.data.codeChangeId);
+      await this.processCodeChange(job.data.codeChangeId, job.data.locale);
     } else {
-      await this.processDocumentCase(job.data.testCaseId);
+      await this.processDocumentCase(job.data.testCaseId, job.data.locale);
     }
   }
 
-  private async processCodeChange(codeChangeId: string): Promise<void> {
+  private async processCodeChange(
+    codeChangeId: string,
+    locale: string | undefined,
+  ): Promise<void> {
     const codeChange = await this.prisma.codeChange.findUnique({
       where: { id: codeChangeId },
       select: {
@@ -181,10 +184,14 @@ export class ExtractionProcessor extends WorkerHost {
       knownSuiteId: null,
       onlyAutomationKey: null,
       fallbackEvidenceId: codeChange.evidenceId,
+      locale,
     });
   }
 
-  private async processDocumentCase(testCaseId: string): Promise<void> {
+  private async processDocumentCase(
+    testCaseId: string,
+    locale: string | undefined,
+  ): Promise<void> {
     const testCase = await this.prisma.testCase.findUnique({
       where: { id: testCaseId },
       select: {
@@ -229,6 +236,7 @@ export class ExtractionProcessor extends WorkerHost {
       knownSuiteId: testCase.suiteId,
       onlyAutomationKey: testCase.automationKey,
       fallbackEvidenceId: null,
+      locale,
     });
   }
 
@@ -289,7 +297,7 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const locale = await this.resolveLocale(ctx.organizationId);
+    const locale = resolveLocale(ctx.locale);
 
     const outcome = await this.extractor.extract({
       filePath: ctx.filePath,
@@ -350,16 +358,6 @@ export class ExtractionProcessor extends WorkerHost {
       await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
     }
     return spent;
-  }
-
-  private async resolveLocale(organizationId: string): Promise<'es' | 'en'> {
-    const owner = await this.prisma.orgMember.findFirst({
-      where: { organizationId, role: OWNER_ROLE },
-      orderBy: { joinedAt: 'asc' },
-      select: { user: { select: { locale: true } } },
-    });
-
-    return resolveLocale(owner?.user.locale);
   }
 
   private async persistExtracted(

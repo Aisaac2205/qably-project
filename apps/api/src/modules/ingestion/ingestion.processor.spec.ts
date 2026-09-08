@@ -7,6 +7,7 @@ interface FakePrisma {
 
 const defaultEvent = {
   id: 'event-1',
+  organizationId: 'org-1',
   provider: 'GITHUB',
   repo: 'acme/shop',
   commitSha: 'a'.repeat(40),
@@ -268,7 +269,10 @@ describe('IngestionProcessor', () => {
       extraction as never,
     ).process(job('event-1'));
 
-    expect(extraction.enqueueCodeChanges).toHaveBeenCalledWith(codeChanges);
+    expect(extraction.enqueueCodeChanges).toHaveBeenCalledWith(
+      codeChanges,
+      'org-1',
+    );
   });
 
   it('marks the event processed even when nothing was worth extracting', async () => {
@@ -282,7 +286,7 @@ describe('IngestionProcessor', () => {
       extraction as never,
     ).process(job('event-1'));
 
-    expect(extraction.enqueueCodeChanges).toHaveBeenCalledWith([]);
+    expect(extraction.enqueueCodeChanges).toHaveBeenCalledWith([], 'org-1');
     expect(prisma.scmEvent.update).toHaveBeenCalledWith({
       where: { id: 'event-1' },
       data: { status: 'PROCESSED' },
