@@ -13,6 +13,7 @@ import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import { DATABASE_PROBE } from '../src/health/health.contracts';
 import { HealthModule } from '../src/health/health.module';
+import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { testEnv } from './support/test-env';
 
@@ -22,6 +23,7 @@ const session: SessionContext = {
     email: 'qa@acme.test',
     name: 'Ada',
     emailVerified: true,
+    locale: null,
   },
   sessionId: 'session-1',
   expiresAt: new Date('2030-01-01T00:00:00.000Z'),
@@ -30,15 +32,16 @@ const session: SessionContext = {
 describe('Auth (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
+  const updateUser = jest.fn().mockResolvedValue({});
 
   beforeEach(async () => {
     const moduleFixture = await Test.createTestingModule({
-      imports: [ConfigModule, AuthModule, HealthModule],
+      imports: [ConfigModule, PrismaModule, AuthModule, HealthModule],
     })
       .overrideProvider(ENV)
       .useValue(testEnv)
       .overrideProvider(PrismaService)
-      .useValue({})
+      .useValue({ user: { update: updateUser } })
       .overrideProvider(AUTH_INSTANCE)
       .useValue({ handler: () => new Response('{}', { status: 200 }) })
       .overrideProvider(SESSION_READER)
@@ -54,6 +57,7 @@ describe('Auth (e2e)', () => {
 
   afterEach(async () => {
     read.mockReset();
+    updateUser.mockClear();
     await app.close();
   });
 
@@ -80,7 +84,40 @@ describe('Auth (e2e)', () => {
       email: 'qa@acme.test',
       name: 'Ada',
       emailVerified: true,
+      locale: null,
     });
+  });
+
+  it('persists the chosen locale and returns the updated user', async () => {
+    read.mockResolvedValue(session);
+
+    const response = await request(app.getHttpServer())
+      .patch('/me')
+      .send({ locale: 'es' })
+      .expect(200);
+
+    expect(updateUser).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: { locale: 'es' },
+    });
+    expect(response.body).toEqual({
+      id: 'user-1',
+      email: 'qa@acme.test',
+      name: 'Ada',
+      emailVerified: true,
+      locale: 'es',
+    });
+  });
+
+  it('rejects a locale outside the supported set', async () => {
+    read.mockResolvedValue(session);
+
+    await request(app.getHttpServer())
+      .patch('/me')
+      .send({ locale: 'fr' })
+      .expect(400);
+
+    expect(updateUser).not.toHaveBeenCalled();
   });
 
   it('leaves the public health route reachable without a session', async () => {

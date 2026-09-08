@@ -22,6 +22,7 @@ const user: AuthenticatedUser = {
   email: 'qa@acme.test',
   name: 'QA',
   emailVerified: true,
+  locale: null,
 };
 
 function fakeChat(result: unknown) {

@@ -24,6 +24,7 @@ const session: SessionContext = {
     email: 'ada@acme.test',
     name: 'Ada Lovelace',
     emailVerified: true,
+    locale: null,
   },
   sessionId: 'session-1',
   expiresAt: new Date('2030-01-01T00:00:00.000Z'),

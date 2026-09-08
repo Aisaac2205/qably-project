@@ -1,3 +1,5 @@
+import type { Locale } from '@qably/i18n';
+
 export const SESSION_READER = Symbol('SESSION_READER');
 
 export interface AuthenticatedUser {
@@ -5,6 +7,7 @@ export interface AuthenticatedUser {
   email: string;
   name: string;
   emailVerified: boolean;
+  locale: Locale | null;
 }
 
 export interface SessionContext {

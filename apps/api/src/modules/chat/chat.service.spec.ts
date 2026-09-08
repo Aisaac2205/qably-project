@@ -17,6 +17,7 @@ const user: AuthenticatedUser = {
   email: 'qa@acme.test',
   name: 'QA',
   emailVerified: true,
+  locale: null,
 };
 
 const threadRow = {

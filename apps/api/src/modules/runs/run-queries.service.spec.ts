@@ -14,6 +14,7 @@ const user: AuthenticatedUser = {
   email: 'ada@acme.test',
   name: 'Ada Lovelace',
   emailVerified: true,
+  locale: null,
 };
 
 const runRow = {
