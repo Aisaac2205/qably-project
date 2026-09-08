@@ -23,6 +23,8 @@ function documentCaseErrorKey(error: unknown): string {
       return 'suites.documentCaseNotFound'
     case 'not-automated':
       return 'suites.documentCaseNotAutomated'
+    case 'no-source-file':
+      return 'suites.documentCaseNoSourceFile'
     case 'already-pending':
       return 'suites.documentCaseAlreadyPending'
   }
@@ -167,9 +169,21 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
       )}
 
       {documentation.isError && (
-        <p role="alert" className="text-xs text-fail">
-          {t(documentCaseErrorKey(documentation.error))}
-        </p>
+        <div role="alert" className="space-y-1.5">
+          <p className="text-xs text-fail">
+            {t(documentCaseErrorKey(documentation.error))}
+          </p>
+          {documentCaseErrorKey(documentation.error) === 'suites.documentCaseNoSourceFile' && (
+            <button
+              onClick={() => onEdit(testCase)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/40 border border-dashed border-border cursor-pointer"
+              type="button"
+            >
+              <PencilSimple size={13} weight="bold" aria-hidden="true" />
+              {t('suites.documentCaseManualFallback')}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Expanded steps */}

@@ -52,6 +52,21 @@ Whenever the extractor cannot produce a usable result, `ExtractionProcessor` sti
 
 The job completes normally in this case; there is no retry loop over a missing API key or a business-rule miss. A human can then document the case by hand from the review inbox. Retrying is reserved for actual infrastructure failures (a broken database call), which propagate and let BullMQ's `attempts: 3` / exponential backoff take over — see "Uncaught errors" below.
 
+## Where a document-case job gets its file
+
+The thesis rule the platform implements is that only test files already present in the repository trigger AI generation, so a document-case job must always name a file the repository side has actually seen. A case created by a JUnit ingest usually cannot name one: `automationFilePath` is only populated when the report carries `<testcase file="...">`, and Surefire, gtest and several other reporters omit that attribute.
+
+`resolveAutomationFilePath` (`apps/api/src/modules/review/lib/resolve-automation-file-path.ts`) closes that gap without guessing, by looking the path up from data the platform already owns:
+
+1. The most recent `ExtractedProposal` in the same project with the same `automationKey`, joined to its `CodeChange.filePath`. This is the strongest provenance: the key came from a file the repository webhook detected and Qably extracted.
+2. Failing that, a sibling `TestCase` in the same project with the same `automationKey` that already knows its path.
+
+Both lookups hinge on `automationKey` being identical on the ingest side and the extraction side. That is not a coincidence — the extraction prompt requires the model to emit the reporter's runtime name byte-for-byte precisely so the two pipelines can be joined here.
+
+No path is ever derived from `className` or a filename heuristic. A guessed path is not evidence, and per-framework derivation rules would quietly widen the platform beyond the single validated automation framework.
+
+When neither lookup finds anything, `enqueueDocumentCase` returns `no-source-file` (HTTP 409) and the processor logs and stops. The web surface treats that as an explanatory state rather than a failure: it tells the reviewer no repository file matches this case and offers manual documentation instead.
+
 ### Fallback matrix
 
 | Situation | Applies to | `objective` reason |

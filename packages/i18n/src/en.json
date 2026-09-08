@@ -706,6 +706,8 @@
     "viewInAiReview": "View in AI Review",
     "documentCaseNotFound": "This case could no longer be found.",
     "documentCaseNotAutomated": "This case isn't automated or has no automation file to read.",
+    "documentCaseNoSourceFile": "This case has no matching test file in the connected repository. Only tests Qably has seen in the repository can be documented with AI.",
+    "documentCaseManualFallback": "Document manually",
     "documentCaseAlreadyPending": "A proposal is already pending review for this case.",
     "documentCaseConflict": "This case can't be documented with AI right now. It may already be pending review or isn't linked to an automation file.",
     "documentCaseAiDisabled": "AI documentation isn't enabled for this organization.",

@@ -212,6 +212,22 @@ describe('CaseCard', () => {
       expect(await screen.findByText(/isn't automated or has no automation file/i)).toBeInTheDocument()
     })
 
+    it('explains that no repository file matches and offers manual documentation', async () => {
+      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'no-source-file'))
+      const onEdit = vi.fn()
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={onEdit} onDelete={noop} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+
+      expect(await screen.findByText(/no matching test file in the connected repository/i)).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: /document manually/i }))
+      expect(onEdit).toHaveBeenCalledWith(automatedCase)
+    })
+
     it('shows an already-pending message when a proposal is already pending review', async () => {
       vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'already-pending'))
       const user = userEvent.setup()

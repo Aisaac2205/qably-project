@@ -705,6 +705,8 @@
     "viewInAiReview": "Ver en revisión de IA",
     "documentCaseNotFound": "Este caso ya no se pudo encontrar.",
     "documentCaseNotAutomated": "Este caso no está automatizado o no tiene un archivo de automatización para leer.",
+    "documentCaseNoSourceFile": "Este caso no tiene un archivo de prueba correlacionado en el repositorio conectado. Solo los archivos que Qably detectó en el repositorio pueden documentarse con IA.",
+    "documentCaseManualFallback": "Documentar manualmente",
     "documentCaseAlreadyPending": "Ya hay una propuesta pendiente de revisión para este caso.",
     "documentCaseConflict": "Este caso no se puede documentar con IA en este momento. Puede que ya esté pendiente de revisión o no esté vinculado a un archivo de automatización.",
     "documentCaseAiDisabled": "La documentación con IA no está habilitada para esta organización.",
