@@ -44,7 +44,7 @@ const memberMember: FakeMember = {
 };
 
 interface FakePrisma {
-  orgMember: { findMany: jest.Mock };
+  orgMember: { findMany: jest.Mock; findFirst: jest.Mock };
   notificationPreference: { findUnique: jest.Mock };
   notification: { upsert: jest.Mock };
   notificationWebhook: { findMany: jest.Mock };
@@ -53,8 +53,15 @@ interface FakePrisma {
 function createPrisma(
   members: FakeMember[] = [ownerMember, adminMember, memberMember],
 ): FakePrisma {
+  const owner = members.find((member) => member.role === 'owner') ?? null;
+
   return {
-    orgMember: { findMany: jest.fn().mockResolvedValue(members) },
+    orgMember: {
+      findMany: jest.fn().mockResolvedValue(members),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(owner === null ? null : { user: owner.user }),
+    },
     notificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
     notification: { upsert: jest.fn().mockResolvedValue({}) },
     notificationWebhook: { findMany: jest.fn().mockResolvedValue([]) },
@@ -298,6 +305,28 @@ describe('NotificationsProcessor team webhook fan-out', () => {
       expect.any(String),
     );
     expect(discord.send).not.toHaveBeenCalled();
+  });
+
+  it("renders the webhook message in the organization owner's locale, since a webhook has no single recipient", async () => {
+    const prisma = createPrisma([
+      { ...ownerMember, user: { ...ownerMember.user, locale: 'es' } },
+    ]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const mailer = createMailer();
+    const slack = createWebhookChannel();
+    const discord = createWebhookChannel();
+
+    await build(prisma, mailer, createEncryption(), slack, discord).process(
+      job(runFailedEvent),
+    );
+
+    const [, message] = slack.send.mock.calls[0] as [string, string];
+    expect(message).toContain('falló');
   });
 
   it('posts through the discord channel for a discord webhook', async () => {

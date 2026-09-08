@@ -1,12 +1,13 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { DEFAULT_LOCALE, resolveLocale } from '@qably/i18n';
+import { resolveLocale } from '@qably/i18n';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationChannel,
   type NotificationWebhookType,
 } from '@qably/types';
+import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
@@ -65,8 +66,12 @@ export class NotificationsProcessor extends WorkerHost {
 
     if (webhooks.length === 0) return;
 
+    const locale = await resolveOrgDefaultLocale(
+      this.prisma,
+      event.organizationId,
+    );
     const message = renderNotificationMessage(
-      DEFAULT_LOCALE,
+      locale,
       event.eventType,
       event.payload,
     );
