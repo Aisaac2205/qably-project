@@ -6,6 +6,7 @@ import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale'
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   EXTRACTION_QUEUE,
   type DocumentCaseError,
@@ -66,16 +67,17 @@ export class ExtractionService {
         suiteId,
         suite: { organizationId: org.organizationId },
       },
-      select: { id: true, executionMode: true, automationFilePath: true },
+      select: {
+        id: true,
+        projectId: true,
+        executionMode: true,
+        automationFilePath: true,
+        automationKey: true,
+      },
     });
 
     if (testCase === null) return err('not-found');
-    if (
-      testCase.executionMode !== 'automated' ||
-      testCase.automationFilePath === null
-    ) {
-      return err('not-automated');
-    }
+    if (testCase.executionMode !== 'automated') return err('not-automated');
 
     const pending = await this.prisma.extractedProposal.findFirst({
       where: { targetTestCaseId: caseId, status: PENDING_STATUS },
@@ -83,6 +85,16 @@ export class ExtractionService {
     });
 
     if (pending !== null) return err('already-pending');
+
+    const filePath =
+      testCase.automationFilePath ??
+      (await resolveAutomationFilePath(
+        this.prisma,
+        testCase.projectId,
+        testCase.automationKey,
+      ));
+
+    if (filePath === null) return err('no-source-file');
 
     const locale =
       actorLocale === null

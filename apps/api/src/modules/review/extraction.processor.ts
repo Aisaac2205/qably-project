@@ -14,6 +14,7 @@ import type {
 } from '../ai/extraction.contracts';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { detectLanguage } from './lib/detect-language';
+import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import { EXTRACTION_QUEUE, type ExtractionJobData } from './review.contracts';
 
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
@@ -215,20 +216,32 @@ export class ExtractionProcessor extends WorkerHost {
       },
     });
 
-    if (testCase === null || testCase.automationFilePath === null) {
+    if (testCase === null) {
       this.logger.warn(`Test case ${testCaseId} is no longer documentable`);
       return;
     }
 
-    const ref = await this.latestCommitShaFor(
-      testCase.projectId,
-      testCase.automationFilePath,
-    );
+    const filePath =
+      testCase.automationFilePath ??
+      (await resolveAutomationFilePath(
+        this.prisma,
+        testCase.projectId,
+        testCase.automationKey,
+      ));
+
+    if (filePath === null) {
+      this.logger.warn(
+        `Test case ${testCaseId} has no source file in the connected repository`,
+      );
+      return;
+    }
+
+    const ref = await this.latestCommitShaFor(testCase.projectId, filePath);
 
     await this.runExtraction({
       projectId: testCase.projectId,
       organizationId: testCase.project.organizationId,
-      filePath: testCase.automationFilePath,
+      filePath,
       ref,
       connection: testCase.project.connection,
       codeChangeId: null,
@@ -368,10 +381,7 @@ export class ExtractionProcessor extends WorkerHost {
     const automationKeys = cases.map((testCase) => testCase.automationKey);
 
     return this.prisma.$transaction(async (tx: TxClient) => {
-      const spent = await this.entitlement.spendCredit(
-        ctx.organizationId,
-        tx,
-      );
+      const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
 
       if (ctx.targetTestCaseId !== null) {

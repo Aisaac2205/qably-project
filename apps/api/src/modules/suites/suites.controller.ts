@@ -69,6 +69,12 @@ function unwrapDocumentCase<T>(result: Result<T, DocumentCaseError>): T {
         code: result.error,
         message: 'This case is not automated or has no automation file to read',
       });
+    case 'no-source-file':
+      throw new ConflictException({
+        code: result.error,
+        message:
+          'This case has no correlated test file in the connected repository',
+      });
     case 'already-pending':
       throw new ConflictException({
         code: result.error,

@@ -70,6 +70,17 @@ describe('SuitesController.documentCase', () => {
     ).rejects.toMatchObject({ response: { code: 'not-automated' } });
   });
 
+  it('throws a coded ConflictException when no repository file matches the case', async () => {
+    const extraction = fakeExtraction({ ok: false, error: 'no-source-file' });
+
+    await expect(
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      build(extraction).documentCase(org, 'suite-1', 'case-1', user),
+    ).rejects.toMatchObject({ response: { code: 'no-source-file' } });
+  });
+
   it('throws a coded ConflictException when a proposal is already pending', async () => {
     const extraction = fakeExtraction({ ok: false, error: 'already-pending' });
 

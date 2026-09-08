@@ -31,8 +31,10 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
     testCase: {
       findFirst: jest.fn().mockResolvedValue({
         id: 'case-1',
+        projectId: 'proj-1',
         executionMode: 'automated',
         automationFilePath: 'src/cart.spec.ts',
+        automationKey: 'CartTest.addsItem',
       }),
     },
     extractedProposal: {
@@ -215,14 +217,21 @@ describe('ExtractionService.enqueueDocumentCase', () => {
     expect(queue.add).not.toHaveBeenCalled();
   });
 
-  it('returns not-automated when the case has no automation file path', async () => {
+  it('resolves the file path from the repository change that produced the same key', async () => {
     const queue = createQueue();
     const prisma = createPrisma();
-    prisma.testCase.findFirst.mockResolvedValue({
+    prisma.testCase.findFirst.mockResolvedValueOnce({
       id: 'case-1',
+      projectId: 'proj-1',
       executionMode: 'automated',
       automationFilePath: null,
+      automationKey: 'CartTest.addsItem',
     });
+    prisma.extractedProposal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        codeChange: { filePath: 'src/cart.spec.ts' },
+      });
 
     const result = await build(prisma, queue).enqueueDocumentCase(
       org,
@@ -231,7 +240,36 @@ describe('ExtractionService.enqueueDocumentCase', () => {
       null,
     );
 
-    expect(result).toEqual({ ok: false, error: 'not-automated' });
+    expect(result).toEqual({
+      ok: true,
+      value: { jobId: 'document-case:case-1' },
+    });
+    expect(queue.add).toHaveBeenCalled();
+  });
+
+  it('returns no-source-file when the repository never produced that key', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.testCase.findFirst
+      .mockResolvedValueOnce({
+        id: 'case-1',
+        projectId: 'proj-1',
+        executionMode: 'automated',
+        automationFilePath: null,
+        automationKey: 'CartTest.addsItem',
+      })
+      .mockResolvedValueOnce(null);
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, queue).enqueueDocumentCase(
+      org,
+      'suite-1',
+      'case-1',
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'no-source-file' });
+    expect(queue.add).not.toHaveBeenCalled();
   });
 
   it('returns already-pending when a proposal already targets the case', async () => {

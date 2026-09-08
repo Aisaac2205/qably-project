@@ -31,6 +31,7 @@ export type ExtractionJobData =
 export type DocumentCaseError =
   | 'not-found'
   | 'not-automated'
+  | 'no-source-file'
   | 'already-pending';
 
 export type ReviewError =

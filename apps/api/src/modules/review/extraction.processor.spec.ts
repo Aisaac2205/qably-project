@@ -697,6 +697,44 @@ describe('ExtractionProcessor — document-case job', () => {
     });
   });
 
+  it('resolves the file path from the repository when the case carries none', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...testCaseRow,
+      automationFilePath: null,
+    });
+    prisma.extractedProposal.findFirst
+      .mockResolvedValueOnce({ codeChange: { filePath: 'src/cart.spec.ts' } })
+      .mockResolvedValue(null);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-1' });
+  });
+
+  it('does nothing when the repository never produced that key', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...testCaseRow,
+      automationFilePath: null,
+    });
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+    prisma.testCase.findFirst.mockResolvedValue(null);
+    const extractor = fakeExtractor(jest.fn());
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
   it('skips when a proposal is already pending for the case (defense in depth)', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
