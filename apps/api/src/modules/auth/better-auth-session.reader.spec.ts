@@ -38,7 +38,10 @@ function fakePrisma(locale: string | null = 'es'): FakePrisma {
   };
 }
 
-function build(auth: AuthInstance, prisma: FakePrisma): BetterAuthSessionReader {
+function build(
+  auth: AuthInstance,
+  prisma: FakePrisma,
+): BetterAuthSessionReader {
   return new BetterAuthSessionReader(auth, prisma as never);
 }
 

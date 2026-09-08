@@ -6,9 +6,11 @@ interface FakePrisma {
 
 function createPrisma(owner: { locale: string | null } | null): FakePrisma {
   return {
-    orgMember: { findFirst: jest.fn().mockResolvedValue(
-      owner === null ? null : { user: owner },
-    ) },
+    orgMember: {
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(owner === null ? null : { user: owner }),
+    },
   };
 }
 

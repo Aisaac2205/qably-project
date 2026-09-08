@@ -39,9 +39,11 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
       findFirst: jest.fn().mockResolvedValue(null),
     },
     orgMember: {
-      findFirst: jest.fn().mockResolvedValue(
-        ownerLocale === null ? null : { user: { locale: ownerLocale } },
-      ),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue(
+          ownerLocale === null ? null : { user: { locale: ownerLocale } },
+        ),
     },
   };
 }

@@ -1,4 +1,13 @@
-import { All, Body, Controller, Get, Inject, Patch, Req, Res } from '@nestjs/common';
+import {
+  All,
+  Body,
+  Controller,
+  Get,
+  Inject,
+  Patch,
+  Req,
+  Res,
+} from '@nestjs/common';
 import { toNodeHandler } from 'better-auth/node';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { PrismaService } from '../../prisma/prisma.service';
