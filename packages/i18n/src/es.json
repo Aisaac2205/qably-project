@@ -766,7 +766,8 @@
       "title": "Idioma",
       "description": "Elija el idioma de la interfaz.",
       "english": "Inglés",
-      "spanish": "Español"
+      "spanish": "Español",
+      "updateError": "No se pudo guardar tu preferencia de idioma. Inténtalo de nuevo."
     },
     "accountPlan": {
       "title": "Plan de cuenta",

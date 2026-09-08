@@ -766,7 +766,8 @@
       "title": "Language",
       "description": "Choose the display language for the interface.",
       "english": "English",
-      "spanish": "Spanish"
+      "spanish": "Spanish",
+      "updateError": "Could not save your language preference. Please try again."
     },
     "accountPlan": {
       "title": "Account Plan",

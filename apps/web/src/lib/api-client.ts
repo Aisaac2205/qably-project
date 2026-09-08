@@ -1,4 +1,5 @@
 import { resolveApiBaseUrl } from '@/lib/api-base-url'
+import { useI18nStore } from '@/lib/i18n/store'
 
 const ORGANIZATION_HEADER = 'x-organization-id'
 
@@ -23,6 +24,8 @@ export interface ApiRequestOptions {
 
 function buildHeaders(options: ApiRequestOptions): Headers {
   const headers = new Headers()
+
+  headers.set('accept-language', useI18nStore.getState().locale)
 
   if (options.body !== undefined) {
     headers.set('content-type', 'application/json')

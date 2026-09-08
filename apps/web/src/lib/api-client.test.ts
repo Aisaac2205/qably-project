@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiRequest } from './api-client'
+import { DEFAULT_LOCALE, useI18nStore } from './i18n/store'
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   const spy = vi.fn().mockResolvedValue({
@@ -15,6 +16,7 @@ function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown>
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  useI18nStore.getState().setLocale(DEFAULT_LOCALE)
 })
 
 describe('apiRequest', () => {
@@ -115,5 +117,15 @@ describe('apiRequest', () => {
 
     const init = spy.mock.calls[0][1] as RequestInit
     expect(new Headers(init.headers).get('x-organization-id')).toBe('org-1')
+  })
+
+  it('sends the current UI locale as Accept-Language', async () => {
+    useI18nStore.getState().setLocale('es')
+    const spy = mockFetch({ json: () => Promise.resolve([]) })
+
+    await apiRequest('/projects')
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect(new Headers(init.headers).get('accept-language')).toBe('es')
   })
 })

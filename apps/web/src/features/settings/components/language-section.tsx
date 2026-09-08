@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useTranslation, useSetLocale, type Locale } from '@/lib/i18n'
+import { updateMyLocale } from '@/features/settings/api/settings.api'
 
 const LANGUAGES: { value: Locale; labelKey: string }[] = [
   { value: 'en', labelKey: 'settings.language.english' },
@@ -10,6 +12,22 @@ const LANGUAGES: { value: Locale; labelKey: string }[] = [
 export function LanguageSection() {
   const { t, locale } = useTranslation()
   const setLocale = useSetLocale()
+  const [error, setError] = useState<string | null>(null)
+
+  async function selectLocale(next: Locale) {
+    if (next === locale) return
+
+    const previous = locale
+    setError(null)
+    setLocale(next)
+
+    try {
+      await updateMyLocale(next)
+    } catch {
+      setLocale(previous)
+      setError(t('settings.language.updateError'))
+    }
+  }
 
   return (
     <section className="rounded-xl border border-border bg-surface p-5 shadow-2xs" aria-labelledby="language-heading">
@@ -28,7 +46,9 @@ export function LanguageSection() {
               key={lang.value}
               type="button"
               aria-pressed={isSelected}
-              onClick={() => setLocale(lang.value)}
+              onClick={() => {
+                void selectLocale(lang.value)
+              }}
               className={[
                 'px-4 py-1.5 text-xs font-semibold rounded-md transition-all duration-150 cursor-pointer active:scale-[0.98]',
                 isSelected
@@ -41,6 +61,12 @@ export function LanguageSection() {
           )
         })}
       </div>
+
+      {error !== null && (
+        <p role="alert" className="mt-2.5 text-xs text-fail">
+          {error}
+        </p>
+      )}
     </section>
   )
 }

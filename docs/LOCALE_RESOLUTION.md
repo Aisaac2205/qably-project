@@ -28,6 +28,15 @@ Extraction jobs (`ExtractionProcessor`) run later, without an HTTP request, and 
 
 `ExtractionProcessor` reads `job.data.locale` directly. Jobs enqueued before this change (or redelivered from before a deploy) may not carry a `locale` field at all; `resolveLocale(job.data.locale)` handles that by falling back to `DEFAULT_LOCALE`, so no separate migration of in-flight jobs is needed.
 
+## Web hydration order
+
+`I18nProvider` (`apps/web/src/lib/i18n/i18n-provider.tsx`) sets the UI locale in this order, without blocking first paint on any network call:
+
+1. Rehydrate the persisted `localStorage` choice (or detect the browser's `navigator.languages` if nothing was ever stored).
+2. In the background, fetch `GET /me`. If it returns a non-null `locale`, that overrides whatever step 1 produced — the server-persisted preference always wins once it arrives.
+
+`GET /me` fails (401) for a signed-out visitor, which is expected and silently ignored: local/browser detection is the correct answer for someone who has never had a chance to set a server-side preference.
+
 ## Notifications: per-recipient vs. per-organization
 
 `NotificationsProcessor.notify()` sends one message per human recipient, so it always uses that recipient's own resolved locale — never a shared default.
