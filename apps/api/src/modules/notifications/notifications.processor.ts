@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { DEFAULT_LOCALE, type Locale } from '@qably/i18n';
+import { DEFAULT_LOCALE, resolveLocale } from '@qably/i18n';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationChannel,
@@ -20,7 +20,7 @@ import { renderNotificationMessage } from './lib/render-notification-message';
 
 interface RecipientRow {
   userId: string;
-  user: { locale: string; email: string; name: string };
+  user: { locale: string | null; email: string; name: string };
 }
 
 interface NotificationWebhookRow {
@@ -144,7 +144,7 @@ export class NotificationsProcessor extends WorkerHost {
     }
 
     if (emailEnabled) {
-      const locale = recipient.user.locale as Locale;
+      const locale = resolveLocale(recipient.user.locale);
       const message = renderNotificationMessage(
         locale,
         event.eventType,

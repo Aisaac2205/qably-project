@@ -19,21 +19,27 @@ const connectionSecurityEvent: NotificationJobData = {
   connectionId: 'connection-1',
 };
 
-const ownerMember = {
+interface FakeMember {
+  userId: string;
+  role: 'owner' | 'admin' | 'member';
+  user: { locale: string | null; email: string; name: string };
+}
+
+const ownerMember: FakeMember = {
   userId: 'user-owner',
-  role: 'owner' as const,
+  role: 'owner',
   user: { locale: 'en', email: 'owner@acme.test', name: 'Owner' },
 };
 
-const adminMember = {
+const adminMember: FakeMember = {
   userId: 'user-admin',
-  role: 'admin' as const,
+  role: 'admin',
   user: { locale: 'en', email: 'admin@acme.test', name: 'Admin' },
 };
 
-const memberMember = {
+const memberMember: FakeMember = {
   userId: 'user-member',
-  role: 'member' as const,
+  role: 'member',
   user: { locale: 'es', email: 'member@acme.test', name: 'Member' },
 };
 
@@ -45,7 +51,7 @@ interface FakePrisma {
 }
 
 function createPrisma(
-  members = [ownerMember, adminMember, memberMember],
+  members: FakeMember[] = [ownerMember, adminMember, memberMember],
 ): FakePrisma {
   return {
     orgMember: { findMany: jest.fn().mockResolvedValue(members) },
@@ -167,6 +173,21 @@ describe('NotificationsProcessor preference resolution', () => {
     const [call] = mailer.send.mock.calls as [[{ html: string; to: string }]];
     expect(call[0].to).toBe('member@acme.test');
     expect(call[0].html).toContain('falló');
+  });
+
+  it('falls back to the default locale when the recipient has none on record', async () => {
+    const prisma = createPrisma([
+      { ...memberMember, user: { ...memberMember.user, locale: null } },
+    ]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    const [call] = mailer.send.mock.calls as [[{ html: string; to: string }]];
+    expect(call[0].html).toContain('failed');
   });
 });
 
