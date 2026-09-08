@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE } from '@qably/i18n';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { EncryptionService } from '../../common/crypto/encryption.service';
 import type { SourceReader } from '../repository/source-reader';
@@ -655,7 +656,7 @@ describe('ExtractionProcessor — code-change job', () => {
     expect(extractArgs.locale).toBe('en');
   });
 
-  it('falls back to Spanish when the organization has no owner on record', async () => {
+  it('falls back to the default locale when the organization has no owner on record', async () => {
     const prisma = createPrisma();
     prisma.orgMember.findFirst.mockResolvedValue(null);
     const extractSpy = jest
@@ -668,7 +669,7 @@ describe('ExtractionProcessor — code-change job', () => {
     } as never);
 
     const [extractArgs] = extractSpy.mock.calls[0] as [{ locale: string }];
-    expect(extractArgs.locale).toBe('es');
+    expect(extractArgs.locale).toBe(DEFAULT_LOCALE);
   });
 });
 

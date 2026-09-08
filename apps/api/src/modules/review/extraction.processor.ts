@@ -1,6 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import { resolveLocale } from '@qably/i18n';
 import type { RepoConnectionProvider } from '@qably/types';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -15,7 +16,6 @@ import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { detectLanguage } from './lib/detect-language';
 import { EXTRACTION_QUEUE, type ExtractionJobData } from './review.contracts';
 
-const FALLBACK_LOCALE = 'es' as const;
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
 const HEAD_REF = 'HEAD';
 const OWNER_ROLE = 'owner';
@@ -359,7 +359,7 @@ export class ExtractionProcessor extends WorkerHost {
       select: { user: { select: { locale: true } } },
     });
 
-    return owner?.user.locale === 'en' ? 'en' : FALLBACK_LOCALE;
+    return resolveLocale(owner?.user.locale);
   }
 
   private async persistExtracted(

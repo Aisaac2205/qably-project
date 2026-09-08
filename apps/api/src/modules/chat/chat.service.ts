@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { resolveLocale } from '@qably/i18n';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
@@ -26,7 +27,6 @@ import type {
   SendToReviewInput,
 } from './chat.schemas';
 
-const DEFAULT_LOCALE = 'es' as const;
 const DEFAULT_THREAD_TITLE = 'New conversation';
 const CONTEXT_CASE_LIMIT = 60;
 const CONTEXT_RUN_LIMIT = 5;
@@ -408,7 +408,7 @@ export class ChatService {
       where: { id: userId },
       select: { locale: true },
     });
-    return row?.locale === 'en' ? 'en' : DEFAULT_LOCALE;
+    return resolveLocale(row?.locale);
   }
 
   private async buildContext(projectId: string): Promise<ChatProjectContext> {

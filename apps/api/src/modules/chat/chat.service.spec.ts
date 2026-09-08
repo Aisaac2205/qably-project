@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { DEFAULT_LOCALE } from '@qably/i18n';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -243,6 +244,26 @@ describe('ChatService', () => {
           totalTokens: 120,
         }),
       }),
+    );
+  });
+
+  it('falls back to the default locale when the user has no locale on record', async () => {
+    const prisma = createPrisma();
+    prisma.user.findUnique.mockResolvedValue({ locale: null });
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [],
+      usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+    });
+    const service = build(prisma, assistant);
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    expect(assistant.reply).toHaveBeenCalledWith(
+      containing({ locale: DEFAULT_LOCALE }),
     );
   });
 
