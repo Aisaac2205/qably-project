@@ -24,6 +24,7 @@ export const es: DocContent = {
       ],
     },
     { label: 'Otros lenguajes', sectionIds: ['other-languages'] },
+    { label: 'Buenas prácticas', sectionIds: ['naming-tests'] },
     {
       label: 'Referencia',
       sectionIds: [
@@ -400,6 +401,62 @@ node scripts/qably-report.mjs report.xml`,
           type: 'callout',
           tone: 'warning',
           text: 'pytest emite un único <testsuite name="pytest"> para toda la corrida, mientras que Jest y Vitest emiten uno por archivo de prueba. Todo lo que corre en pytest cae por defecto en una sola suite de Qably. Para una granularidad más parecida a la de Jest y Vitest, puede configurarse junit_suite_name en la configuración de pytest, o dividir la corrida; es una diferencia de valores por defecto, no un error.',
+        },
+      ],
+    },
+    {
+      id: 'naming-tests',
+      navLabel: 'Nombrar las pruebas',
+      title: 'Cómo nombrar tus pruebas para Qably',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Qably deriva el nombre de cada caso de prueba del nombre que reporta la herramienta que lo ejecutó, y el nombre de cada suite del archivo que lo agrupa. Nada de eso se inventa: lo que se escribe en el código es lo que se lee después en la plataforma. Por eso el nombre de una prueba deja de ser una nota interna y pasa a ser documentación que otra persona va a leer sin abrir el repositorio.',
+        },
+        {
+          type: 'paragraph',
+          text: 'Estas cuatro reglas no son obligatorias para que la integración funcione. Son las que hacen que la suite resultante se lea como documentación en lugar de como una lista de identificadores.',
+        },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'Agrupa por funcionalidad, no por clase ni por archivo técnico. El bloque que contiene las pruebas debería nombrar lo que el usuario hace, por ejemplo "Carrito de compras", no "CartServiceImpl".',
+            'Escribe cada prueba como verbo más condición: "rechaza un token vacío", "acepta un token de hasta 500 caracteres". Se lee como una afirmación sobre el comportamiento del sistema.',
+            'Una prueba, un comportamiento. Un nombre que necesita la palabra "y" casi siempre describe dos casos que conviene separar.',
+            'Nombra el archivo por la funcionalidad que cubre, porque de ahí sale el nombre de la suite. Un archivo llamado como la funcionalidad produce una suite legible sin renombrarla a mano.',
+          ],
+        },
+        {
+          type: 'subheading',
+          text: 'Qué limpia Qably automáticamente y qué no',
+        },
+        {
+          type: 'paragraph',
+          text: 'Al importar, Qably quita el andamiaje habitual de los nombres de prueba: prefijos como "test", "spec", "prueba" o "caso", y aperturas declarativas como "should", "must", "debe", "debería", "cuando" o "dado". Funciona igual en español y en inglés, así que un nombre como "Test que debe rechazar un token vacío" llega a la plataforma como "Rechaza un token vacío".',
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'Lo que Qably no hace es traducir. El nombre técnico de la prueba es la llave que une el código con los resultados de cada ejecución, así que se conserva tal cual. Si tu equipo escribe las pruebas en inglés y trabaja la plataforma en español, la traducción ocurre en la documentación del caso, no en su nombre técnico.',
+        },
+        {
+          type: 'subheading',
+          text: 'Un ejemplo antes y después',
+        },
+        {
+          type: 'table',
+          headers: ['En lugar de', 'Escribe'],
+          rows: [
+            ['test_login_1', 'inicia sesión con credenciales válidas'],
+            ['testTokenNull', 'rechaza un token vacío'],
+            ['should return 400 when body is invalid and user is anonymous', 'rechaza una solicitud con cuerpo inválido'],
+            ['UserServiceTest.java', 'registro-de-usuarios'],
+          ],
+        },
+        {
+          type: 'paragraph',
+          text: 'Las pruebas que ya existen no necesitan renombrarse para empezar. Qably importa lo que haya y respeta cualquier nombre que edites después: una vez que una persona corrige el título de un caso, las importaciones siguientes no lo sobrescriben.',
         },
       ],
     },

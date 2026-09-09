@@ -24,6 +24,7 @@ export const en: DocContent = {
       ],
     },
     { label: 'Other languages', sectionIds: ['other-languages'] },
+    { label: 'Best practices', sectionIds: ['naming-tests'] },
     {
       label: 'Reference',
       sectionIds: [
@@ -400,6 +401,62 @@ node scripts/qably-report.mjs report.xml`,
           type: 'callout',
           tone: 'warning',
           text: 'pytest emits a single <testsuite name="pytest"> for an entire run, while Jest and Vitest emit one per test file. Everything in a pytest run lands in one Qably suite by default. For a granularity closer to Jest and Vitest, junit_suite_name can be set in the pytest configuration, or the run can be split; this is a deliberate difference in defaults, not a bug.',
+        },
+      ],
+    },
+    {
+      id: 'naming-tests',
+      navLabel: 'Naming tests',
+      title: 'Naming tests for Qably',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Qably derives each test case name from the name the tool that ran it reported, and each suite name from the file that grouped it. None of it is invented: what is written in the code is what is read later in the platform. That makes a test name documentation someone else will read without opening the repository, rather than an internal note.',
+        },
+        {
+          type: 'paragraph',
+          text: 'These four rules are not required for the integration to work. They are what makes the resulting suite read as documentation instead of a list of identifiers.',
+        },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'Group by feature, not by class or technical file. The block holding the tests should name what the user does, for example "Shopping cart", not "CartServiceImpl".',
+            'Write each test as verb plus condition: "rejects an empty token", "accepts a token up to 500 characters". It reads as a claim about how the system behaves.',
+            'One test, one behavior. A name that needs the word "and" almost always describes two cases worth separating.',
+            'Name the file after the feature it covers, because the suite name comes from it. A file named after the feature produces a readable suite with no manual renaming.',
+          ],
+        },
+        {
+          type: 'subheading',
+          text: 'What Qably cleans up for you, and what it does not',
+        },
+        {
+          type: 'paragraph',
+          text: 'On import, Qably strips the usual scaffolding from test names: prefixes such as "test", "spec", "prueba" or "caso", and declarative openers such as "should", "must", "when", "given", "debe" or "cuando". It works the same in English and Spanish, so a name like "Test that should reject an empty token" reaches the platform as "Rejects an empty token".',
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'What Qably does not do is translate. The technical test name is the key that joins your code to the results of every run, so it is preserved exactly. If your team writes tests in English and works in the platform in Spanish, the translation happens in the case documentation, not in its technical name.',
+        },
+        {
+          type: 'subheading',
+          text: 'A before and after',
+        },
+        {
+          type: 'table',
+          headers: ['Instead of', 'Write'],
+          rows: [
+            ['test_login_1', 'signs in with valid credentials'],
+            ['testTokenNull', 'rejects an empty token'],
+            ['should return 400 when body is invalid and user is anonymous', 'rejects a request with an invalid body'],
+            ['UserServiceTest.java', 'user-registration'],
+          ],
+        },
+        {
+          type: 'paragraph',
+          text: 'Existing tests do not need renaming to get started. Qably imports whatever is there and respects any name you edit afterwards: once a person corrects a case title, later imports never overwrite it.',
         },
       ],
     },
