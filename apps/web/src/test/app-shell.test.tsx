@@ -32,6 +32,10 @@ vi.mock('@/lib/auth-client', () => ({
     signUp: { email: vi.fn() },
     signOut: vi.fn().mockResolvedValue({ data: {}, error: null }),
   },
+  useSession: () => ({
+    data: { user: { name: 'Ana Ruiz', image: null } },
+    isPending: false,
+  }),
 }))
 
 describe('AppShell', () => {

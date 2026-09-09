@@ -26,6 +26,13 @@ vi.mock('next/navigation', () => ({
   useParams: () => routeParamsFor(mockPathname()),
 }))
 
+vi.mock('@/lib/auth-client', () => ({
+  useSession: () => ({
+    data: { user: { name: 'Ana Ruiz', image: null } },
+    isPending: false,
+  }),
+}))
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [key: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
@@ -83,7 +90,7 @@ describe('TopBar', () => {
     expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /user menu/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument()
-    expect(screen.getByText('IF')).toBeInTheDocument()
+    expect(screen.getByText('AR')).toBeInTheDocument()
     expect(container.firstElementChild).toHaveClass('bg-sidebar')
     expect(container.firstElementChild).not.toHaveClass('border-b')
   })
@@ -124,10 +131,11 @@ describe('TopBar', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
   })
 
-  it('shows user avatar', async () => {
+  it('shows the signed-in user, not a hardcoded name', async () => {
     mockPathname.mockReturnValue('/dashboard')
     await act(async () => { render(<TopBar />) })
-    expect(screen.getByText('IF')).toBeInTheDocument()
+    expect(screen.getByLabelText('Ana Ruiz')).toBeInTheDocument()
+    expect(screen.getByText('AR')).toBeInTheDocument()
   })
 })
 

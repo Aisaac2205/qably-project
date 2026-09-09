@@ -6,17 +6,18 @@ import { CaretUpDown, SignOut } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useAuth } from '@/features/auth/hooks/use-auth'
 import { useTranslation } from '@/lib/i18n'
+import { UserAvatar } from './user-avatar'
 
 const LOGIN_ROUTE = '/login'
 
 interface SidebarAccountProps {
   name: string
+  image: string | null
   role: string
-  initials: string
   collapsed: boolean
 }
 
-export function SidebarAccount({ name, role, initials, collapsed }: SidebarAccountProps) {
+export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountProps) {
   const router = useRouter()
   const { t } = useTranslation()
   const { logout } = useAuth()
@@ -41,7 +42,7 @@ export function SidebarAccount({ name, role, initials, collapsed }: SidebarAccou
   }
 
   const triggerClassName = collapsed
-    ? 'flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-fg shadow-xs transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+    ? 'flex shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
     : 'flex h-12 w-full items-center gap-2.5 rounded-xl border border-border-sidebar bg-sidebar/50 px-3 py-2 text-left transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
 
   return (
@@ -53,15 +54,10 @@ export function SidebarAccount({ name, role, initials, collapsed }: SidebarAccou
           className={triggerClassName}
         >
           {collapsed ? (
-            initials
+            <UserAvatar name={name} image={image} size={36} className="shadow-xs" />
           ) : (
             <>
-              <span
-                aria-hidden="true"
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-fg shadow-xs"
-              >
-                {initials}
-              </span>
+              <UserAvatar name={name} image={image} size={32} className="shadow-xs" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium leading-tight text-sidebar-foreground">{name}</span>
                 <span className="block truncate text-xs leading-normal text-sidebar-fg-muted">{role}</span>

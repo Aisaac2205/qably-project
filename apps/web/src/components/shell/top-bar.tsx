@@ -7,6 +7,8 @@ import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-i
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { NotificationsMenu } from '@/features/notifications'
 import { useTranslation } from '@/lib/i18n'
+import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
+import { UserAvatar } from './user-avatar'
 
 function getPageTitle(pathname: string, project: Project | undefined, t: (key: string) => string): string {
   if (pathname === '/' || pathname === '/dashboard') return t('sidebar.dashboard')
@@ -38,6 +40,7 @@ export function TopBar() {
   const { t } = useTranslation()
   const projectId = useProjectRouteId()
   const { project } = useProject(projectId ?? '')
+  const currentUser = useCurrentUser()
   const title = getPageTitle(pathname, project, t)
 
   return (
@@ -57,12 +60,7 @@ export function TopBar() {
       <div className="flex items-center gap-2 shrink-0">
         <NotificationsMenu />
 
-        <span
-          aria-label="Current user: Isaac F."
-          className="flex size-7 shrink-0 select-none items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-fg"
-        >
-          IF
-        </span>
+        <UserAvatar name={currentUser.name} image={currentUser.image} size={28} />
       </div>
     </div>
   )

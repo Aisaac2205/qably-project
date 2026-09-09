@@ -23,7 +23,7 @@ import { SidebarAccount } from '@/components/shell/sidebar-account'
 
 function renderAccount(collapsed = false) {
   return render(
-    <SidebarAccount name="Isaac F." role="Admin" initials="IF" collapsed={collapsed} />,
+    <SidebarAccount name="Isaac Flores" image={null} role="Admin" collapsed={collapsed} />,
   )
 }
 
@@ -37,7 +37,7 @@ describe('SidebarAccount', () => {
 
     const account = container.querySelector('[data-slot="sidebar-account"]')
     expect(account).toHaveClass('h-12', 'rounded-xl', 'border', 'border-border-sidebar')
-    expect(account).toHaveTextContent('Isaac F.')
+    expect(account).toHaveTextContent('Isaac Flores')
     expect(account).toHaveTextContent('Admin')
     expect(account?.tagName).toBe('BUTTON')
     expect(account).toHaveAttribute('aria-haspopup')
@@ -48,7 +48,7 @@ describe('SidebarAccount', () => {
     const user = userEvent.setup()
     await act(async () => renderAccount())
 
-    await user.click(screen.getByRole('button', { name: /Isaac F\./ }))
+    await user.click(screen.getByRole('button', { name: /Isaac Flores/ }))
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }))
 
     await waitFor(() => expect(signOut).toHaveBeenCalled())
@@ -61,7 +61,7 @@ describe('SidebarAccount', () => {
     const user = userEvent.setup()
     await act(async () => renderAccount())
 
-    await user.click(screen.getByRole('button', { name: /Isaac F\./ }))
+    await user.click(screen.getByRole('button', { name: /Isaac Flores/ }))
     await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Your session expired. Sign in again.')
@@ -71,7 +71,7 @@ describe('SidebarAccount', () => {
   it('still offers sign out when the sidebar is collapsed', async () => {
     await act(async () => renderAccount(true))
 
-    const account = screen.getByRole('button', { name: /Isaac F\./ })
+    const account = screen.getByRole('button', { name: /Isaac Flores/ })
     expect(account).toHaveAttribute('aria-haspopup')
     expect(account).toHaveTextContent('IF')
   })

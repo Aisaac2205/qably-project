@@ -31,6 +31,7 @@ import {
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
+import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
 import { projectQualityPath, projectRootPath, projectSuitesPath } from '@/features/projects/lib/routes'
@@ -47,6 +48,7 @@ export function Sidebar() {
   const pathname = usePathname()
   const { t } = useTranslation()
   const { state } = useSidebar()
+  const currentUser = useCurrentUser()
   const isCollapsed = state === 'collapsed'
 
   const projectId = useProjectRouteId()
@@ -162,7 +164,12 @@ export function Sidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-2">
-        <SidebarAccount name="Isaac F." role={t('sidebar.admin')} initials="IF" collapsed={isCollapsed} />
+        <SidebarAccount
+          name={currentUser.name}
+          image={currentUser.image}
+          role={t('sidebar.admin')}
+          collapsed={isCollapsed}
+        />
       </SidebarFooter>
       </nav>
     </ShadcnSidebar>

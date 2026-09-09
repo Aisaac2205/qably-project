@@ -48,6 +48,10 @@ vi.mock('@/lib/auth-client', () => ({
     signUp: { email: vi.fn() },
     signOut: vi.fn().mockResolvedValue({ data: {}, error: null }),
   },
+  useSession: () => ({
+    data: { user: { name: 'Ana Ruiz', image: null } },
+    isPending: false,
+  }),
 }))
 
 vi.mock('next/link', () => ({
@@ -126,7 +130,7 @@ describe('Sidebar — global state (no project route)', () => {
     const account = container.querySelector('[data-slot="sidebar-account"]')
     expect(footer).not.toHaveClass('border-t')
     expect(account).toHaveClass('h-12', 'rounded-xl', 'border', 'border-border-sidebar')
-    expect(account).toHaveTextContent('Isaac F.')
+    expect(account).toHaveTextContent('Ana Ruiz')
     expect(account).toHaveTextContent('Admin')
   })
 
