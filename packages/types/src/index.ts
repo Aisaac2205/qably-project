@@ -469,6 +469,16 @@ export interface ExtractedProposal {
   needsManualReview: boolean
   targetOfficialTestCaseId?: string
 }
+export type DocumentFilesSkipReason = 'no-source-file' | 'already-pending'
+export interface DocumentFilesSkip {
+  reason: DocumentFilesSkipReason
+  count: number
+}
+export interface DocumentFilesResult {
+  filesEnqueued: number
+  casesTargeted: number
+  casesSkipped: DocumentFilesSkip[]
+}
 export interface ReviewDecision {
   id: string
   proposalId: string

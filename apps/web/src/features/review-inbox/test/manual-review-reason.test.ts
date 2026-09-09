@@ -15,6 +15,9 @@ describe('manualReviewReasonKey', () => {
     expect(manualReviewReasonKey('automation-key-not-found')).toBe(
       'manualReviewReasonAutomationKeyNotFound',
     )
+    expect(manualReviewReasonKey('quota-exhausted')).toBe(
+      'manualReviewReasonQuotaExhausted',
+    )
   })
 
   it('returns null for a provider message it cannot translate', () => {

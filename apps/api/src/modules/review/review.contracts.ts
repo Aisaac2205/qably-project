@@ -47,18 +47,11 @@ export type DocumentCaseError =
 
 export type DocumentFilesError = 'not-found';
 
-export type DocumentFilesSkipReason = 'no-source-file' | 'already-pending';
-
-export interface DocumentFilesSkip {
-  reason: DocumentFilesSkipReason;
-  count: number;
-}
-
-export interface DocumentFilesResult {
-  filesEnqueued: number;
-  casesTargeted: number;
-  casesSkipped: DocumentFilesSkip[];
-}
+export type {
+  DocumentFilesResult,
+  DocumentFilesSkip,
+  DocumentFilesSkipReason,
+} from '@qably/types';
 
 export type ReviewError =
   | 'not-found'

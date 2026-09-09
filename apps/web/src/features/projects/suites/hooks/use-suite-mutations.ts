@@ -8,6 +8,8 @@ import {
   deleteCase,
   deleteSuite,
   documentCase,
+  documentProject,
+  documentSuite,
   updateCase,
   updateSuite,
   type CreateCasePayload,
@@ -113,8 +115,29 @@ export function useDeleteCase() {
 }
 
 export function useDocumentCase() {
+  const invalidateSuites = useSuiteInvalidation()
+
   return useMutation({
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
       documentCase(suiteId, caseId),
+    onSuccess: () => invalidateSuites(),
+  })
+}
+
+export function useDocumentSuite() {
+  const invalidateSuites = useSuiteInvalidation()
+
+  return useMutation({
+    mutationFn: (suiteId: string) => documentSuite(suiteId),
+    onSuccess: () => invalidateSuites(),
+  })
+}
+
+export function useDocumentProject() {
+  const invalidateSuites = useSuiteInvalidation()
+
+  return useMutation({
+    mutationFn: (projectId: string) => documentProject(projectId),
+    onSuccess: () => invalidateSuites(),
   })
 }

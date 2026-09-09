@@ -137,7 +137,7 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
               type="button"
             >
               <Sparkle size={13} weight="bold" aria-hidden="true" />
-              {documentation.isPending ? t('suites.documentingCase') : t('suites.documentWithAi')}
+              {documentation.isPending ? t('suites.documentingCase') : t('suites.documentWithAeris')}
             </button>
           )
         ) : (

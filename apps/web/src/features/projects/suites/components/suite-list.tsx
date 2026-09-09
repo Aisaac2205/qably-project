@@ -21,6 +21,9 @@ import { SuiteFormDialog } from './suite-form-dialog'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
+import { useDocumentProject } from '@/features/projects/suites/hooks/use-suite-mutations'
+import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
+import { DocumentWithAeris } from './document-with-aeris'
 
 interface SuiteListProps {
   projectId: string
@@ -71,6 +74,15 @@ function applyFilters(
 
 export function SuiteList({ projectId }: SuiteListProps) {
   const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
+  const documentProject = useDocumentProject()
+  const documentableCases = useMemo(
+    () =>
+      perSuite.reduce(
+        (total, entry) => total + countDocumentableCases(entry.suite.cases),
+        0,
+      ),
+    [perSuite],
+  )
   const { t } = useTranslation()
 
   const [search, setSearch] = useState('')
@@ -138,10 +150,17 @@ export function SuiteList({ projectId }: SuiteListProps) {
             availableTags={availableTags}
           />
         </div>
-        <Button type="button" size="sm" onClick={() => setCreateOpen(true)} className="shrink-0">
-          <Plus size={14} weight="bold" aria-hidden="true" />
-          {t('suites.newSuite')}
-        </Button>
+        <div className="flex items-start gap-3 shrink-0">
+          <DocumentWithAeris
+            label={t('suites.documentProjectWithAeris')}
+            pendingCount={documentableCases}
+            onDocument={() => documentProject.mutateAsync(projectId)}
+          />
+          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus size={14} weight="bold" aria-hidden="true" />
+            {t('suites.newSuite')}
+          </Button>
+        </div>
       </div>
 
       {sorted.length === 0 ? (

@@ -1,4 +1,9 @@
-import type { CasePriority, CaseState, Suite } from '@qably/types'
+import type {
+  CasePriority,
+  CaseState,
+  DocumentFilesResult,
+  Suite,
+} from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
 export interface CreateSuitePayload {
@@ -103,4 +108,18 @@ export function documentCase(
     `/suites/${suiteId}/cases/${caseId}/document`,
     { method: 'POST' },
   )
+}
+
+export function documentSuite(suiteId: string): Promise<DocumentFilesResult> {
+  return apiRequest<DocumentFilesResult>(`/suites/${suiteId}/document`, {
+    method: 'POST',
+  })
+}
+
+export function documentProject(
+  projectId: string,
+): Promise<DocumentFilesResult> {
+  return apiRequest<DocumentFilesResult>(`/projects/${projectId}/document`, {
+    method: 'POST',
+  })
 }

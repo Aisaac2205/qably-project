@@ -173,7 +173,7 @@ describe('CaseCard', () => {
         )
       })
 
-      expect(screen.queryByRole('button', { name: /document with ai/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
       const link = screen.getByRole('link', { name: /in review/i })
       expect(link).toHaveAttribute('href', '/review-inbox?proposal=proposal-1')
     })
@@ -190,7 +190,7 @@ describe('CaseCard', () => {
         )
       })
 
-      expect(screen.getByRole('button', { name: /document with ai/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /document with aeris/i })).toBeInTheDocument()
       expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
     })
   })
@@ -205,7 +205,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      expect(screen.getByRole('button', { name: /document with ai/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /document with aeris/i })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /^document this case$/i })).not.toBeInTheDocument()
     })
 
@@ -216,9 +216,9 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
-      expect(await screen.findByText(/queued for ai documentation/i)).toBeInTheDocument()
+      expect(await screen.findByText(/queued for aeris documentation/i)).toBeInTheDocument()
       expect(screen.getByRole('link', { name: /view in ai review/i })).toBeInTheDocument()
       expect(suitesApi.documentCase).toHaveBeenCalledWith('suite-1', 'tc-9')
     })
@@ -230,7 +230,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/can't be documented with ai right now/i)).toBeInTheDocument()
     })
@@ -242,7 +242,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/isn't automated or has no automation file/i)).toBeInTheDocument()
     })
@@ -255,7 +255,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={onEdit} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/no matching test file in the connected repository/i)).toBeInTheDocument()
 
@@ -270,7 +270,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/already a proposal pending review|already pending review for this case/i)).toBeInTheDocument()
     })
@@ -282,7 +282,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/could no longer be found/i)).toBeInTheDocument()
     })
@@ -294,7 +294,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/ai documentation isn't enabled/i)).toBeInTheDocument()
     })
@@ -306,7 +306,7 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
       expect(await screen.findByText(/too many ai requests/i)).toBeInTheDocument()
     })
@@ -318,10 +318,10 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      await user.click(screen.getByRole('button', { name: /document with ai/i }))
+      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
 
-      expect(await screen.findByText(/queued for ai documentation/i)).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /document with ai/i })).not.toBeInTheDocument()
+      expect(await screen.findByText(/queued for aeris documentation/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
     })
 
     it('disables the button while the request is pending', async () => {
@@ -334,10 +334,10 @@ describe('CaseCard', () => {
         renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
       })
 
-      const button = screen.getByRole('button', { name: /document with ai/i })
+      const button = screen.getByRole('button', { name: /document with aeris/i })
       await user.click(button)
 
-      expect(await screen.findByRole('button', { name: /documenting with ai/i })).toBeDisabled()
+      expect(await screen.findByRole('button', { name: /documenting with aeris/i })).toBeDisabled()
 
       await act(async () => {
         resolveRequest({ queued: true, jobId: 'job-1' })

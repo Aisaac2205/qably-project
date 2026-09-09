@@ -7,7 +7,7 @@ import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } f
 import type { TestCase } from '@qably/types'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { useDeleteCase, useDeleteSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
+import { useDeleteCase, useDeleteSuite, useDocumentSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,8 @@ import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metr
 import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
+import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
+import { DocumentWithAeris } from './document-with-aeris'
 
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
@@ -33,6 +35,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const { suite, isLoading } = useSuite(suiteId)
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
+  const documentSuite = useDocumentSuite()
   const { project } = useProject(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
@@ -163,6 +166,12 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 {t('suites.allAutomatedHint')}
               </p>
             )}
+
+            <DocumentWithAeris
+              label={t('suites.documentSuiteWithAeris')}
+              pendingCount={countDocumentableCases(suite.cases)}
+              onDocument={() => documentSuite.mutateAsync(suite.id)}
+            />
 
             {/* Suite actions */}
             <Menu>

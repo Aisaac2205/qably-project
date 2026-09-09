@@ -3,6 +3,7 @@ const REASON_KEYS: Record<string, string> = {
   'no-tests-found': 'manualReviewReasonNoTestsFound',
   'ai-not-enabled': 'manualReviewReasonAiNotEnabled',
   'automation-key-not-found': 'manualReviewReasonAutomationKeyNotFound',
+  'quota-exhausted': 'manualReviewReasonQuotaExhausted',
 }
 
 export function manualReviewReasonKey(objective: string): string | null {
