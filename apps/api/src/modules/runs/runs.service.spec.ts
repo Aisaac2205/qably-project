@@ -52,6 +52,7 @@ interface FakePrisma {
     findFirst: jest.Mock;
     create: jest.Mock;
     findFirstOrThrow: jest.Mock;
+    update: jest.Mock;
   };
   testCase: {
     findMany: jest.Mock;
@@ -78,6 +79,7 @@ function createPrisma(): FakePrisma {
           Promise.resolve({ id: 'suite-adopted', name: data.name }),
         ),
       findFirstOrThrow: jest.fn().mockResolvedValue(suiteRow),
+      update: jest.fn().mockResolvedValue(suiteRow),
     },
     testCase: {
       findMany: jest.fn().mockResolvedValue(officialCases),
@@ -171,17 +173,68 @@ describe('RunsService.ingest suite resolution', () => {
     );
   });
 
-  it('resolves an existing suite by name without creating a duplicate', async () => {
+  it('resolves an existing suite by its ingestion key without creating a duplicate', async () => {
     const prisma = createPrisma();
 
     await build(prisma).ingest(apiKey, baseInputBySuiteName);
 
     expect(prisma.suite.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { name: 'Checkout', projectId: 'project-1' },
+        where: { ingestionKey: 'Checkout', projectId: 'project-1' },
       }),
     );
     expect(prisma.suite.create).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps matching a suite that a person or Aeris renamed, so no duplicate appears', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({
+      id: 'suite-renamed',
+      name: 'Esquema del token de acceso',
+    });
+
+    await build(prisma).ingest(apiKey, baseInputBySuiteName);
+
+    expect(prisma.suite.create).not.toHaveBeenCalled();
+    const [call] = prisma.run.upsert.mock.calls[0] as [
+      { create: { suiteId: string } },
+    ];
+    expect(call.create.suiteId).toBe('suite-renamed');
+  });
+
+  it('adopts a legacy suite by name once and stamps its ingestion key so it never falls back again', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'suite-legacy', name: 'Checkout' });
+
+    await build(prisma).ingest(apiKey, baseInputBySuiteName);
+
+    expect(prisma.suite.findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { name: 'Checkout', projectId: 'project-1', ingestionKey: null },
+      }),
+    );
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-legacy' },
+      data: { ingestionKey: 'Checkout' },
+    });
+    expect(prisma.suite.create).not.toHaveBeenCalled();
+  });
+
+  it('never rewrites the name of a suite it matched', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({
+      id: 'suite-renamed',
+      name: 'Esquema del token de acceso',
+    });
+
+    await build(prisma).ingest(apiKey, baseInputBySuiteName);
+
+    const nameWrites = (prisma.suite.update.mock.calls as [{ data: Record<string, unknown> }][])
+      .filter(([call]) => 'name' in call.data);
+    expect(nameWrites).toHaveLength(0);
   });
 
   it('returns suite-not-found when suiteId does not resolve to a suite in this project', async () => {
@@ -209,6 +262,7 @@ describe('RunsService.ingest suite adoption', () => {
           projectId: 'project-1',
           organizationId: 'org-1',
           name: 'Checkout',
+          ingestionKey: 'Checkout',
         },
       }),
     );

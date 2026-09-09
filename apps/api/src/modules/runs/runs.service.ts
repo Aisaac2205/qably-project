@@ -41,6 +41,7 @@ interface AdoptionTx {
     findFirst: PrismaService['suite']['findFirst'];
     create: PrismaService['suite']['create'];
     findFirstOrThrow: PrismaService['suite']['findFirstOrThrow'];
+    update: PrismaService['suite']['update'];
   };
   testCase: {
     findMany: PrismaService['testCase']['findMany'];
@@ -230,21 +231,35 @@ export class RunsService {
   private async adoptSuiteByName(
     tx: AdoptionTx,
     apiKey: ApiKeyIdentity,
-    suiteName: string,
+    suiteKey: string,
   ): Promise<SuiteRef> {
-    const existing = await tx.suite.findFirst({
-      where: { name: suiteName, projectId: apiKey.projectId },
+    const byKey = await tx.suite.findFirst({
+      where: { ingestionKey: suiteKey, projectId: apiKey.projectId },
       select: { id: true, name: true },
     });
 
-    if (existing !== null) return existing;
+    if (byKey !== null) return byKey;
+
+    const legacy = await tx.suite.findFirst({
+      where: { name: suiteKey, projectId: apiKey.projectId, ingestionKey: null },
+      select: { id: true, name: true },
+    });
+
+    if (legacy !== null) {
+      await tx.suite.update({
+        where: { id: legacy.id },
+        data: { ingestionKey: suiteKey },
+      });
+      return legacy;
+    }
 
     try {
       return await tx.suite.create({
         data: {
           projectId: apiKey.projectId,
           organizationId: apiKey.organizationId,
-          name: suiteName,
+          name: suiteKey,
+          ingestionKey: suiteKey,
         },
         select: { id: true, name: true },
       });
@@ -252,7 +267,7 @@ export class RunsService {
       if (!isUniqueViolation(error)) throw error;
 
       return tx.suite.findFirstOrThrow({
-        where: { name: suiteName, projectId: apiKey.projectId },
+        where: { ingestionKey: suiteKey, projectId: apiKey.projectId },
         select: { id: true, name: true },
       });
     }

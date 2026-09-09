@@ -154,6 +154,15 @@ that name until a person or an approved Aeris proposal renames it. The file itse
 (`automation_file_path`), not the suite, because a suite can be renamed into a business-facing name
 (`"Checkout"`) without losing the technical trail back to where each case runs.
 
+That rename used to break the next report. `adoptSuiteByName` matched an existing suite by `name`, so a
+suite renamed to "Esquema del token de acceso" was invisible to a report still carrying
+`setAccessTokenSchema`, and ingestion created a duplicate suite under the raw key. `suite.ingestion_key`
+now holds that raw key and is the join key, exactly like `automation_key` on a case: adoption matches by
+key first and only falls back to `name` for a row whose key is still null, stamping the key on that row so
+the fallback runs once. Ingestion never writes `name` on a suite it matched; only the create branch names
+a suite. `suite.name_source` records who last named it (`ingestion`, `human` or `aeris`), so an approved
+Aeris proposal can replace a raw ingested name but never one a person chose.
+
 ## `run_case.test_case_id` is the bridge
 
 The foreign key is the only link between the two surfaces, and it is what makes traceability possible.
