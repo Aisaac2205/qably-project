@@ -52,6 +52,8 @@ export type DocumentCaseError =
 
 export type DocumentFilesError = 'not-found';
 
+export type DocumentFilesMode = 'undocumented' | 'stale-locale';
+
 export type {
   DocumentFilesResult,
   DocumentFilesSkip,

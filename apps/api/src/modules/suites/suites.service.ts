@@ -44,7 +44,7 @@ const CASE_SELECT = {
   automationKey: true,
   automationClassName: true,
   automationFilePath: true,
-  currentVersion: { select: { version: true } },
+  currentVersion: { select: { version: true, locale: true } },
 } as const;
 
 const SUITE_SELECT = {
@@ -72,7 +72,7 @@ interface CaseRow {
   automationKey: string | null;
   automationClassName: string | null;
   automationFilePath: string | null;
-  currentVersion: { version: number } | null;
+  currentVersion: { version: number; locale?: string | null } | null;
 }
 
 interface PendingProposalRow {
@@ -125,6 +125,7 @@ function toCaseView(testCase: CaseRow): TestCaseView {
     id: testCase.id,
     suiteId: testCase.suiteId,
     version: testCase.currentVersion?.version ?? null,
+    documentedLocale: testCase.currentVersion?.locale ?? null,
     name: testCase.name,
     steps: testCase.steps,
     expectedResult: testCase.expectedResult,

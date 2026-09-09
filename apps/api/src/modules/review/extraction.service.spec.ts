@@ -579,3 +579,48 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     expect(jobs[0].data).toMatchObject({ locale: 'es' });
   });
 });
+
+describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
+  it('targets documented cases whose version locale is missing or differs from the organization locale', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'stale-locale',
+    );
+
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          suiteId: 'suite-1',
+          executionMode: 'automated',
+          NOT: { steps: { equals: [] } },
+          OR: [
+            { currentVersion: null },
+            { currentVersion: { locale: null } },
+            { currentVersion: { locale: { not: 'es' } } },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('keeps the undocumented mode byte-for-byte as before when no mode is given', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma, queue).enqueueDocumentFiles(org, { suiteId: 'suite-1' }, null);
+
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { suiteId: 'suite-1', executionMode: 'automated', steps: { equals: [] } },
+      }),
+    );
+    expect(prisma.orgMember.findFirst).not.toHaveBeenCalled();
+  });
+});

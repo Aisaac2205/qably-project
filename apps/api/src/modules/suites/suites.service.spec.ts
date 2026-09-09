@@ -725,3 +725,28 @@ describe('SuitesService.update name source', () => {
     );
   });
 });
+
+describe('SuitesService documented locale', () => {
+  it('exposes the locale of the published version on each case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [{ ...suiteRow.cases[0], currentVersion: { version: 3, locale: 'es' } }],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].documentedLocale).toBe('es');
+  });
+
+  it('reports null when the case has no published version or the version predates locale stamping', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].documentedLocale).toBeNull();
+  });
+});

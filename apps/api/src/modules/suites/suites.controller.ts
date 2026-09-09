@@ -29,6 +29,10 @@ import type {
   DocumentFilesResult,
 } from '../review/review.contracts';
 import { ExtractionService } from '../review/extraction.service';
+import {
+  documentFilesBodySchema,
+  type DocumentFilesBody,
+} from '../review/review.schemas';
 import type { SuiteError, SuiteView } from './suites.contracts';
 import {
   createCaseSchema,
@@ -206,11 +210,13 @@ export class SuitesController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(documentFilesBodySchema)) body: DocumentFilesBody,
   ): Promise<DocumentFilesResult> {
     const result = await this.extraction.enqueueDocumentFiles(
       org,
       { suiteId: id },
       user.locale,
+      body.mode,
     );
 
     return unwrapDocumentFiles(result);

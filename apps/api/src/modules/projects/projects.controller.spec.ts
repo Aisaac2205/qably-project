@@ -32,11 +32,7 @@ describe('ProjectsController.documentProject', () => {
       value: { filesEnqueued: 4, casesTargeted: 9, casesSkipped: [] },
     });
 
-    const result = await build(extraction).documentProject(
-      org,
-      'project-1',
-      user,
-    );
+    const result = await build(extraction).documentProject(org, 'project-1', user, { mode: 'undocumented' });
 
     expect(result).toEqual({
       filesEnqueued: 4,
@@ -47,6 +43,7 @@ describe('ProjectsController.documentProject', () => {
       org,
       { projectId: 'project-1' },
       'es',
+      'undocumented',
     );
   });
 
@@ -54,10 +51,10 @@ describe('ProjectsController.documentProject', () => {
     const extraction = fakeExtraction({ ok: false, error: 'not-found' });
 
     await expect(
-      build(extraction).documentProject(org, 'project-1', user),
+      build(extraction).documentProject(org, 'project-1', user, { mode: 'undocumented' }),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
-      build(extraction).documentProject(org, 'project-1', user),
+      build(extraction).documentProject(org, 'project-1', user, { mode: 'undocumented' }),
     ).rejects.toMatchObject({ response: { code: 'not-found' } });
   });
 });

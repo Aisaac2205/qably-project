@@ -103,7 +103,7 @@ describe('SuitesController.documentSuite', () => {
       value: { filesEnqueued: 3, casesTargeted: 5, casesSkipped: [] },
     });
 
-    const result = await build(extraction).documentSuite(org, 'suite-1', user);
+    const result = await build(extraction).documentSuite(org, 'suite-1', user, { mode: 'undocumented' });
 
     expect(result).toEqual({
       filesEnqueued: 3,
@@ -114,6 +114,7 @@ describe('SuitesController.documentSuite', () => {
       org,
       { suiteId: 'suite-1' },
       'es',
+      'undocumented',
     );
   });
 
@@ -121,7 +122,7 @@ describe('SuitesController.documentSuite', () => {
     const extraction = fakeExtraction({ ok: false, error: 'not-found' });
 
     await expect(
-      build(extraction).documentSuite(org, 'suite-1', user),
+      build(extraction).documentSuite(org, 'suite-1', user, { mode: 'undocumented' }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

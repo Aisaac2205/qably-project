@@ -181,6 +181,7 @@ export interface TestCase {
   lastResult?: CaseLastResult | null
   pendingProposalId?: string | null
   healthSignals?: CaseHealthSignal[]
+  documentedLocale?: string | null
 }
 
 export interface Suite {

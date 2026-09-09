@@ -23,6 +23,10 @@ import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { ExtractionService } from '../review/extraction.service';
+import {
+  documentFilesBodySchema,
+  type DocumentFilesBody,
+} from '../review/review.schemas';
 import type {
   DocumentFilesError,
   DocumentFilesResult,
@@ -130,11 +134,13 @@ export class ProjectsController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(documentFilesBodySchema)) body: DocumentFilesBody,
   ): Promise<DocumentFilesResult> {
     const result = await this.extraction.enqueueDocumentFiles(
       org,
       { projectId: id },
       user.locale,
+      body.mode,
     );
 
     return unwrapDocumentFiles(result);

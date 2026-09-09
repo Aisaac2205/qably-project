@@ -13,6 +13,7 @@ import {
   type DocumentCaseError,
   type DocumentFileTarget,
   type DocumentFilesError,
+  type DocumentFilesMode,
   type DocumentFilesResult,
   type DocumentFilesSkip,
   type ExtractionJobData,
@@ -154,6 +155,7 @@ export class ExtractionService {
     org: OrgContext,
     scope: DocumentFilesScope,
     actorLocale: string | null,
+    mode: DocumentFilesMode = 'undocumented',
   ): Promise<Result<DocumentFilesResult, DocumentFilesError>> {
     const scopeIsValid = await this.scopeExists(org, scope);
     if (!scopeIsValid) return err('not-found');
@@ -163,11 +165,28 @@ export class ExtractionService {
         ? { suiteId: scope.suiteId }
         : { projectId: scope.projectId };
 
+    const orgLocale =
+      mode === 'stale-locale'
+        ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
+        : null;
+
+    const candidateWhere =
+      mode === 'undocumented'
+        ? { steps: { equals: [] } }
+        : {
+            NOT: { steps: { equals: [] } },
+            OR: [
+              { currentVersion: null },
+              { currentVersion: { locale: null } },
+              { currentVersion: { locale: { not: orgLocale as string } } },
+            ],
+          };
+
     const candidates = (await this.prisma.testCase.findMany({
       where: {
         ...scopeWhere,
         executionMode: 'automated',
-        steps: { equals: [] },
+        ...candidateWhere,
       },
       select: {
         id: true,

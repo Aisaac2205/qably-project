@@ -16,6 +16,14 @@ export const decisionSchema = z.object({
   comment: z.string().trim().min(1).max(1000).optional(),
 });
 
+export const documentFilesBodySchema = z
+  .object({
+    mode: z.enum(['undocumented', 'stale-locale']).default('undocumented'),
+  })
+  .default({ mode: 'undocumented' });
+
+export type DocumentFilesBody = z.infer<typeof documentFilesBodySchema>;
+
 export const bulkDecisionSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(100),
 });
