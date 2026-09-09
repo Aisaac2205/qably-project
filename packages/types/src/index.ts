@@ -155,6 +155,16 @@ export interface CaseLastResult {
   recordedAt: string
 }
 
+export type CaseHealthSignal =
+  | 'no-steps'
+  | 'raw-name'
+  | 'never-run'
+  | 'flaky'
+  | 'duplicate-key'
+  | 'near-duplicate-title'
+
+export type CaseHealthSummary = Partial<Record<CaseHealthSignal, number>>
+
 export interface TestCase {
   id: string
   suiteId: string
@@ -170,6 +180,7 @@ export interface TestCase {
   automationFilePath?: string
   lastResult?: CaseLastResult | null
   pendingProposalId?: string | null
+  healthSignals?: CaseHealthSignal[]
 }
 
 export interface Suite {
@@ -185,6 +196,7 @@ export interface Suite {
   tags: string[]
   isDefault: boolean
   updatedAt: string
+  healthSummary?: CaseHealthSummary
 }
 
 export interface RunCaseOfficialCase {
