@@ -1,6 +1,9 @@
 import { DEFAULT_LOCALE } from '@qably/i18n';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import { ExtractionService } from './extraction.service';
+import {
+  ExtractionService,
+  MAX_DOCUMENT_FILES_PER_REQUEST,
+} from './extraction.service';
 
 const org: OrgContext = {
   organizationId: 'org-1',
@@ -390,7 +393,55 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
           { testCaseId: 'case-2', automationKey: 'Cart > removes an item' },
         ],
       },
-      opts: { jobId: 'document-file:src/cart.spec.ts:0' },
+      opts: { jobId: 'document-file:proj-1:src/cart.spec.ts:0' },
+    });
+  });
+
+  it('scopes the job id by project so two projects sharing a file path never collide', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-9', projectId: 'proj-2' }),
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-2' },
+      null,
+    );
+
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { opts: { jobId: string } }[],
+    ];
+    expect(jobs[0].opts.jobId).toBe('document-file:proj-2:src/cart.spec.ts:0');
+  });
+
+  it('caps how many files a single request can enqueue', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    const many = Array.from({ length: MAX_DOCUMENT_FILES_PER_REQUEST + 5 }, (_, index) =>
+      candidate({
+        id: `case-${index}`,
+        automationKey: `Cart > case ${index}`,
+        automationFilePath: `src/cart-${index}.spec.ts`,
+      }),
+    );
+    prisma.testCase.findMany.mockResolvedValue(many);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    const [jobs] = queue.addBulk.mock.calls[0] as [unknown[]];
+    expect(jobs).toHaveLength(MAX_DOCUMENT_FILES_PER_REQUEST);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        filesEnqueued: MAX_DOCUMENT_FILES_PER_REQUEST,
+        casesTargeted: MAX_DOCUMENT_FILES_PER_REQUEST,
+      },
     });
   });
 
@@ -422,10 +473,10 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     expect(jobs[0].data.targets).toHaveLength(20);
     expect(jobs[1].data.targets).toHaveLength(3);
     expect(jobs[0].opts).toMatchObject({
-      jobId: 'document-file:src/cart.spec.ts:0',
+      jobId: 'document-file:proj-1:src/cart.spec.ts:0',
     });
     expect(jobs[1].opts).toMatchObject({
-      jobId: 'document-file:src/cart.spec.ts:1',
+      jobId: 'document-file:proj-1:src/cart.spec.ts:1',
     });
   });
 

@@ -20,6 +20,8 @@ import {
 
 const PENDING_STATUS = 'in_review';
 
+export const MAX_DOCUMENT_FILES_PER_REQUEST = 50;
+
 export type DocumentFilesScope = { suiteId: string } | { projectId: string };
 
 interface CodeChangeCandidate {
@@ -239,6 +241,12 @@ export class ExtractionService {
         ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
         : resolveLocale(actorLocale);
 
+    const projectId = candidates[0].projectId;
+    const files = [...groupedByFile.entries()].slice(
+      0,
+      MAX_DOCUMENT_FILES_PER_REQUEST,
+    );
+
     let casesTargeted = 0;
     const jobs: {
       name: string;
@@ -246,7 +254,7 @@ export class ExtractionService {
       opts: { jobId: string };
     }[] = [];
 
-    for (const [filePath, targets] of groupedByFile) {
+    for (const [filePath, targets] of files) {
       chunk(targets, MAX_EXTRACTED_CASES).forEach((chunkTargets, index) => {
         casesTargeted += chunkTargets.length;
         jobs.push({
@@ -257,7 +265,7 @@ export class ExtractionService {
             targets: chunkTargets,
             locale,
           },
-          opts: { jobId: `document-file:${filePath}:${index}` },
+          opts: { jobId: `document-file:${projectId}:${filePath}:${index}` },
         });
       });
     }
@@ -265,7 +273,7 @@ export class ExtractionService {
     await this.queue.addBulk(jobs);
 
     return ok({
-      filesEnqueued: groupedByFile.size,
+      filesEnqueued: files.length,
       casesTargeted,
       casesSkipped,
     });
