@@ -33,6 +33,7 @@ interface FakePrisma {
   connection: { findFirst: jest.Mock };
   run: { findMany: jest.Mock; groupBy: jest.Mock };
   runCase: { groupBy: jest.Mock };
+  testCase: { findFirst: jest.Mock };
 }
 
 function createPrisma(): FakePrisma {
@@ -54,6 +55,7 @@ function createPrisma(): FakePrisma {
       groupBy: jest.fn().mockResolvedValue([]),
     },
     runCase: { groupBy: jest.fn().mockResolvedValue([]) },
+    testCase: { findFirst: jest.fn().mockResolvedValue(null) },
   };
 }
 
@@ -539,5 +541,31 @@ describe('ProjectsService repository link', () => {
 
     expect(prisma.connection.findFirst).not.toHaveBeenCalled();
     expect(prisma.project.update).toHaveBeenCalled();
+  });
+});
+
+describe('ProjectsService.findOne hasManualCases', () => {
+  it('reports true when the project has an active manual case', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue(row);
+    prisma.testCase.findFirst.mockResolvedValue({ id: 'case-1' });
+
+    const result = await build(prisma).findOne(owner, 'project-1');
+
+    expect(isOk(result) && result.value.hasManualCases).toBe(true);
+    expect(prisma.testCase.findFirst).toHaveBeenCalledWith({
+      where: { projectId: 'project-1', executionMode: 'manual', state: 'active' },
+      select: { id: true },
+    });
+  });
+
+  it('reports false when the project has no active manual case', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue(row);
+    prisma.testCase.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).findOne(owner, 'project-1');
+
+    expect(isOk(result) && result.value.hasManualCases).toBe(false);
   });
 });

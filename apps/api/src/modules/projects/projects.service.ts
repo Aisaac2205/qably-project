@@ -129,7 +129,14 @@ export class ProjectsService {
       select: SELECT,
     });
 
-    return row === null ? err('not-found') : ok(toView(row));
+    if (row === null) return err('not-found');
+
+    const manualCase = await this.prisma.testCase.findFirst({
+      where: { projectId: id, executionMode: 'manual', state: 'active' },
+      select: { id: true },
+    });
+
+    return ok({ ...toView(row), hasManualCases: manualCase !== null });
   }
 
   async create(

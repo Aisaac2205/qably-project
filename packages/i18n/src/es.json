@@ -613,6 +613,7 @@
     "updateCaseError": "No se pudo guardar el estado del caso. Intenta de nuevo.",
     "updateCaseConflict": "Este caso pertenece a una ejecución automatizada y no puede editarse.",
     "noManualCases": "Esta suite no tiene casos manuales para ejecutar. Todos sus casos están cubiertos por CI.",
+    "noManualCasesInProject": "Los casos automatizados los alimenta CI; agrega un caso manual a una suite para ejecutarlo aquí.",
     "duration": "Duración",
     "skipReason": "Motivo de omisión",
     "coveredByCi": "Cubiertos por CI",

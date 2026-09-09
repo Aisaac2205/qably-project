@@ -93,6 +93,7 @@ export interface Project {
   technologies: string[]
   createdAt: string
   updatedAt: string
+  hasManualCases?: boolean
 }
 
 export interface ProjectSummary extends Project {
