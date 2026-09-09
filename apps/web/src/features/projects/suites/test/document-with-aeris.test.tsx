@@ -132,3 +132,35 @@ describe('DocumentWithAeris', () => {
     })
   })
 })
+
+describe('DocumentWithAeris stale locale', () => {
+  it('offers to redocument outdated cases and sends the stale-locale mode', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn().mockResolvedValue(result())
+
+    renderWithQuery(
+      <DocumentWithAeris
+        label="Document suite"
+        pendingCount={0}
+        staleCount={3}
+        onDocument={onDocument}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /redocument 3 outdated/i }))
+
+    await waitFor(() => expect(onDocument.mock.calls[0]?.[0]).toBe('stale-locale'))
+    expect(screen.queryByRole('button', { name: /^document suite$/i })).not.toBeInTheDocument()
+  })
+
+  it('sends the undocumented mode from the primary action', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn().mockResolvedValue(result())
+
+    renderWithQuery(
+      <DocumentWithAeris label="Document suite" pendingCount={2} onDocument={onDocument} />,
+    )
+    await user.click(screen.getByRole('button', { name: /document suite/i }))
+
+    await waitFor(() => expect(onDocument.mock.calls[0]?.[0]).toBe('undocumented'))
+  })
+})

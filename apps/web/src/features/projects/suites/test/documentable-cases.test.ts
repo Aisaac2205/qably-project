@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TestCase } from '@qably/types'
-import { countDocumentableCases } from '../lib/documentable-cases'
+import { countDocumentableCases, countStaleLocaleCases, localeNameKey } from '../lib/documentable-cases'
 
 function testCase(overrides: Partial<TestCase> = {}): TestCase {
   return {
@@ -49,5 +49,51 @@ describe('countDocumentableCases', () => {
 
   it('counts nothing in an empty suite', () => {
     expect(countDocumentableCases([])).toBe(0)
+  })
+})
+
+describe('countStaleLocaleCases', () => {
+  it('counts a documented automated case written in another language than the viewer uses', () => {
+    expect(
+      countStaleLocaleCases(
+        [testCase({ steps: ['Open the cart'], documentedLocale: 'en' })],
+        'es',
+      ),
+    ).toBe(1)
+  })
+
+  it('ignores a case whose documentation matches the viewer language', () => {
+    expect(
+      countStaleLocaleCases(
+        [testCase({ steps: ['Open the cart'], documentedLocale: 'es' })],
+        'es',
+      ),
+    ).toBe(0)
+  })
+
+  it('ignores a case with no recorded locale, which the stale mode on the server still targets', () => {
+    expect(
+      countStaleLocaleCases([testCase({ steps: ['Open the cart'], documentedLocale: null })], 'es'),
+    ).toBe(0)
+  })
+
+  it('ignores undocumented and pending cases', () => {
+    expect(
+      countStaleLocaleCases(
+        [
+          testCase({ documentedLocale: 'en' }),
+          testCase({ id: 'b', steps: ['x'], documentedLocale: 'en', pendingProposalId: 'p' }),
+        ],
+        'es',
+      ),
+    ).toBe(0)
+  })
+})
+
+describe('localeNameKey', () => {
+  it('maps the two supported locales and falls back for anything else', () => {
+    expect(localeNameKey('es')).toBe('suites.localeNameEs')
+    expect(localeNameKey('en')).toBe('suites.localeNameEn')
+    expect(localeNameKey('pt')).toBe('suites.localeNameOther')
   })
 })

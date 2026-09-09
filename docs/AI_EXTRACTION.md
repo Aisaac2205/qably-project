@@ -123,6 +123,18 @@ The counter is reserved with an `INCR` before the call and rolled back with a `D
 
 This budget protects the platform key, not any one organization's `aiCredits` — the two limits are independent and both must pass. A call made with an organization's own key bypasses it. No such path exists for extraction today, so the bypass is written as a flag that is unconditionally false and becomes meaningful the moment bring-your-own-key extraction lands.
 
+### Suite-level summary
+
+A file-level job also asks the model for a `suite` object, a title of up to 80 characters and a description of up to 300, in business language, requested only for file-level jobs because only there is the file known to be the whole suite. The processor writes one `SuiteProposal` per job when the model returned one and every target belongs to a single suite, guarded by the same "already in review" check the case proposals use. Approving it renames and describes the suite and stamps `nameSource = 'aeris'`, unless a person named the suite (`nameSource = 'human'`, set by any manual rename), in which case the decision is recorded and the suite is left alone. A later Aeris proposal may refresh a name Aeris set before. Suite proposals have their own listing and decision endpoints under `/review/suite-proposals` rather than sharing the case proposal list: a `ReviewDecision` row references a case proposal by foreign key, so a suite decision is recorded on the proposal itself (`status`, `decidedAt`).
+
+### Advisory observations
+
+Each extracted case may carry up to five `observations` of up to 200 characters, written in the organization's language, about the testing practice the code shows: a test without an assertion, a wait on a fixed delay, two tests verifying the same thing. The prompt forbids proposing code or rewriting assertions, per the thesis limit that the platform goes from code to documentation and never the other way. Observations are stored on the proposal and shown to the reviewer; they never become part of a `TestCaseVersion` and are never published. Like every model output they are bounded in Zod and rendered as text, never as HTML.
+
+### Locale re-documentation
+
+Every proposal the processor writes, including manual-review fallbacks, records the locale it was written in, and publishing copies it onto the new `TestCaseVersion`. Each case exposes `documentedLocale`, null for a case documented before locales were recorded. The file-level action accepts `mode: 'stale-locale'`, which targets documented automated cases whose version locale is missing or differs from the organization's locale, instead of undocumented ones. A missing locale counts as stale on purpose: nothing backfills that column, so treating it as unknown would hide every older case from re-documentation forever. The web shows a "documented in ..." badge when a case's locale differs from the viewer's and offers the re-documentation action next to the primary one; the case card itself no longer carries a per-case document button, because documenting one case at a time costs one credit per case where the suite action costs one per file for the same cases.
+
 ### Uncaught errors always land in the fallback
 
 `ExtractionProcessor.runExtraction` wraps the entire extraction path — source read, access-token decryption, and the extractor call — in a try/catch. If any of those throws instead of returning a typed result (e.g. `EncryptionService.decrypt` throwing on a malformed ciphertext), the job still ends in the manual-review fallback with reason `extraction-failed`, instead of failing the BullMQ job with no proposal at all.

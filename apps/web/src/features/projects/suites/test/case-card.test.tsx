@@ -4,8 +4,6 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { CaseCard } from '@/features/projects/suites/components/case-card'
 import type { TestCase } from '@qably/types'
 import { renderWithQuery } from '@/lib/query-test-utils'
-import { ApiError } from '@/lib/api-client'
-import * as suitesApi from '@/features/projects/suites/api/suites.api'
 
 const mockCase: TestCase = {
   id: 'tc-1',
@@ -199,12 +197,12 @@ describe('CaseCard', () => {
         )
       })
 
-      expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
+      expect(screen.queryByText(/^undocumented$/i)).not.toBeInTheDocument()
       const link = screen.getByRole('link', { name: /in review/i })
       expect(link).toHaveAttribute('href', '/review-inbox?proposal=proposal-1')
     })
 
-    it('still offers the AI button when no proposal is pending', async () => {
+    it('shows a state-only undocumented chip, never a button, when no proposal is pending', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
@@ -216,158 +214,41 @@ describe('CaseCard', () => {
         )
       })
 
-      expect(screen.getByRole('button', { name: /document with aeris/i })).toBeInTheDocument()
+      expect(screen.getByText(/^undocumented$/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
       expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
     })
   })
 
-  describe('AI documentation for automated cases', () => {
-    afterEach(() => {
-      vi.restoreAllMocks()
+  describe('documented locale', () => {
+    it('flags a case documented in another language than the one being viewed', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...mockCase, documentedLocale: 'es' }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText(/documented in spanish/i)).toBeInTheDocument()
     })
 
-    it('offers to document an automated case with AI instead of the manual editor', async () => {
+    it('stays quiet when the documentation matches the viewer language or was never recorded', async () => {
       await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...mockCase, documentedLocale: null }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
       })
 
-      expect(screen.getByRole('button', { name: /document with aeris/i })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /^document this case$/i })).not.toBeInTheDocument()
-    })
-
-    it('queues AI documentation and shows a confirmation linking to AI Review', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockResolvedValue({ queued: true, jobId: 'job-1' })
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/queued for aeris documentation/i)).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: /view in ai review/i })).toBeInTheDocument()
-      expect(suitesApi.documentCase).toHaveBeenCalledWith('suite-1', 'tc-9')
-    })
-
-    it('shows a generic conflict message when the 409 has no recognized code', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict'))
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/can't be documented with ai right now/i)).toBeInTheDocument()
-    })
-
-    it('shows a not-automated message when the case has no automation file', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'not-automated'))
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/isn't automated or has no automation file/i)).toBeInTheDocument()
-    })
-
-    it('explains that no repository file matches and offers manual documentation', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'no-source-file'))
-      const onEdit = vi.fn()
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={onEdit} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/no matching test file in the connected repository/i)).toBeInTheDocument()
-
-      await user.click(screen.getByRole('button', { name: /document manually/i }))
-      expect(onEdit).toHaveBeenCalledWith(automatedCase)
-    })
-
-    it('shows an already-pending message when a proposal is already pending review', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(409, 'Conflict', 'already-pending'))
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/already a proposal pending review|already pending review for this case/i)).toBeInTheDocument()
-    })
-
-    it('shows a not-found message when the case no longer exists', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(404, 'Not found'))
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/could no longer be found/i)).toBeInTheDocument()
-    })
-
-    it('shows an ai-not-enabled message when the organization lacks the AI entitlement', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(403, 'Forbidden', 'ai-not-enabled'))
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/ai documentation isn't enabled/i)).toBeInTheDocument()
-    })
-
-    it('shows a throttled message on 429', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockRejectedValue(new ApiError(429, 'Too Many Requests'))
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/too many ai requests/i)).toBeInTheDocument()
-    })
-
-    it('hides the Document with AI button after a successful queue so a second click cannot race an already-pending error', async () => {
-      vi.spyOn(suitesApi, 'documentCase').mockResolvedValue({ queued: true, jobId: 'job-1' })
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      await user.click(screen.getByRole('button', { name: /document with aeris/i }))
-
-      expect(await screen.findByText(/queued for aeris documentation/i)).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
-    })
-
-    it('disables the button while the request is pending', async () => {
-      let resolveRequest: (value: { queued: true; jobId: string }) => void = () => {}
-      vi.spyOn(suitesApi, 'documentCase').mockReturnValue(
-        new Promise((resolve) => { resolveRequest = resolve }),
-      )
-      const user = userEvent.setup()
-      await act(async () => {
-        renderWithQuery(<CaseCard testCase={automatedCase} projectId="proj-1" onEdit={noop} onDelete={noop} />)
-      })
-
-      const button = screen.getByRole('button', { name: /document with aeris/i })
-      await user.click(button)
-
-      expect(await screen.findByRole('button', { name: /documenting with aeris/i })).toBeDisabled()
-
-      await act(async () => {
-        resolveRequest({ queued: true, jobId: 'job-1' })
-      })
+      expect(screen.queryByText(/documented in/i)).not.toBeInTheDocument()
     })
   })
 })

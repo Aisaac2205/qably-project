@@ -7,9 +7,9 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
-  documentCase,
   documentProject,
   documentSuite,
+  type DocumentFilesMode,
   updateCase,
   updateSuite,
   type CreateCasePayload,
@@ -114,21 +114,12 @@ export function useDeleteCase() {
   })
 }
 
-export function useDocumentCase() {
-  const invalidateSuites = useSuiteInvalidation()
-
-  return useMutation({
-    mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
-      documentCase(suiteId, caseId),
-    onSuccess: () => invalidateSuites(),
-  })
-}
-
 export function useDocumentSuite() {
   const invalidateSuites = useSuiteInvalidation()
 
   return useMutation({
-    mutationFn: (suiteId: string) => documentSuite(suiteId),
+    mutationFn: ({ suiteId, mode }: { suiteId: string; mode: DocumentFilesMode }) =>
+      documentSuite(suiteId, mode),
     onSuccess: () => invalidateSuites(),
   })
 }
@@ -137,7 +128,8 @@ export function useDocumentProject() {
   const invalidateSuites = useSuiteInvalidation()
 
   return useMutation({
-    mutationFn: (projectId: string) => documentProject(projectId),
+    mutationFn: ({ projectId, mode }: { projectId: string; mode: DocumentFilesMode }) =>
+      documentProject(projectId, mode),
     onSuccess: () => invalidateSuites(),
   })
 }

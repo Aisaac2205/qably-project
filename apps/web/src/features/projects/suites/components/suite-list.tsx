@@ -22,7 +22,7 @@ import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/h
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useDocumentProject } from '@/features/projects/suites/hooks/use-suite-mutations'
-import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
+import { countDocumentableCases, countStaleLocaleCases } from '@/features/projects/suites/lib/documentable-cases'
 import { DocumentWithAeris } from './document-with-aeris'
 
 interface SuiteListProps {
@@ -73,6 +73,7 @@ function applyFilters(
 }
 
 export function SuiteList({ projectId }: SuiteListProps) {
+  const { t, locale } = useTranslation()
   const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
   const documentProject = useDocumentProject()
   const documentableCases = useMemo(
@@ -83,7 +84,14 @@ export function SuiteList({ projectId }: SuiteListProps) {
       ),
     [perSuite],
   )
-  const { t } = useTranslation()
+  const staleCases = useMemo(
+    () =>
+      perSuite.reduce(
+        (total, entry) => total + countStaleLocaleCases(entry.suite.cases, locale),
+        0,
+      ),
+    [perSuite, locale],
+  )
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<SuiteRunStatus | 'all'>('all')
@@ -154,7 +162,8 @@ export function SuiteList({ projectId }: SuiteListProps) {
           <DocumentWithAeris
             label={t('suites.documentProjectWithAeris')}
             pendingCount={documentableCases}
-            onDocument={() => documentProject.mutateAsync(projectId)}
+            staleCount={staleCases}
+            onDocument={(mode) => documentProject.mutateAsync({ projectId, mode })}
           />
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={14} weight="bold" aria-hidden="true" />

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight, Clock, DotsThree, PencilSimple, Sparkle, Trash } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, Clock, DotsThree, PencilSimple, Trash, Translate } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
@@ -12,29 +12,7 @@ import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
-import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
-import { ApiError } from '@/lib/api-client'
-import { projectAiReviewPath } from '@/features/projects/lib/routes'
-
-function documentCaseErrorKey(error: unknown): string {
-  if (!(error instanceof ApiError)) return 'suites.documentCaseError'
-  switch (error.code) {
-    case 'ai-not-enabled':
-      return 'suites.documentCaseAiDisabled'
-    case 'not-found':
-      return 'suites.documentCaseNotFound'
-    case 'not-automated':
-      return 'suites.documentCaseNotAutomated'
-    case 'no-source-file':
-      return 'suites.documentCaseNoSourceFile'
-    case 'already-pending':
-      return 'suites.documentCaseAlreadyPending'
-  }
-  if (error.status === 404) return 'suites.documentCaseNotFound'
-  if (error.status === 409) return 'suites.documentCaseConflict'
-  if (error.status === 429) return 'suites.documentCaseThrottled'
-  return 'suites.documentCaseError'
-}
+import { isStaleLocale, localeNameKey } from '@/features/projects/suites/lib/documentable-cases'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -44,12 +22,12 @@ interface CaseCardProps {
 }
 
 export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProps) {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
   const described = useMemo(() => describeCase(testCase), [testCase])
   const showRawName = described.raw !== described.title
-  const documentation = useDocumentCase()
+  const staleLocale = isStaleLocale(testCase, locale)
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
@@ -145,16 +123,10 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
               <Clock size={13} weight="bold" aria-hidden="true" />
               {t('suites.caseInReview')}
             </Link>
-          ) : documentation.isSuccess ? null : (
-            <button
-              onClick={() => documentation.mutate({ suiteId: testCase.suiteId, caseId: testCase.id })}
-              disabled={documentation.isPending}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
-              type="button"
-            >
-              <Sparkle size={13} weight="bold" aria-hidden="true" />
-              {documentation.isPending ? t('suites.documentingCase') : t('suites.documentWithAeris')}
-            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted rounded-md py-1 px-2.5 bg-canvas/40 border border-dashed border-border">
+              {t('suites.caseUndocumented')}
+            </span>
           )
         ) : (
           <button
@@ -165,6 +137,13 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
             <PencilSimple size={13} weight="bold" aria-hidden="true" />
             {t('suites.documentCase')}
           </button>
+        )}
+
+        {staleLocale && testCase.documentedLocale && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-warn rounded-md py-1 px-2.5 bg-warn-bg border border-warn/20">
+            <Translate size={13} weight="bold" aria-hidden="true" />
+            {t('suites.documentedInLocale', { locale: t(localeNameKey(testCase.documentedLocale)) })}
+          </span>
         )}
 
         {testCase.expectedResult && (
@@ -180,35 +159,6 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
         )}
 
       </div>
-
-      {documentation.isSuccess && (
-        <p role="status" className="text-xs text-ai flex items-center gap-1.5">
-          {t('suites.documentCaseQueued')}
-          {projectId && (
-            <Link href={projectAiReviewPath(projectId)} className="font-semibold underline hover:text-primary">
-              {t('suites.viewInAiReview')}
-            </Link>
-          )}
-        </p>
-      )}
-
-      {documentation.isError && (
-        <div role="alert" className="space-y-1.5">
-          <p className="text-xs text-fail">
-            {t(documentCaseErrorKey(documentation.error))}
-          </p>
-          {documentCaseErrorKey(documentation.error) === 'suites.documentCaseNoSourceFile' && (
-            <button
-              onClick={() => onEdit(testCase)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/40 border border-dashed border-border cursor-pointer"
-              type="button"
-            >
-              <PencilSimple size={13} weight="bold" aria-hidden="true" />
-              {t('suites.documentCaseManualFallback')}
-            </button>
-          )}
-        </div>
-      )}
 
       {/* Expanded steps */}
       {stepsOpen && (

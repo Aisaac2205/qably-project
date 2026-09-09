@@ -25,7 +25,7 @@ import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metr
 import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
-import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
+import { countDocumentableCases, countStaleLocaleCases } from '@/features/projects/suites/lib/documentable-cases'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
 import { DocumentWithAeris } from './document-with-aeris'
@@ -172,7 +172,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             <DocumentWithAeris
               label={t('suites.documentSuiteWithAeris')}
               pendingCount={countDocumentableCases(suite.cases)}
-              onDocument={() => documentSuite.mutateAsync(suite.id)}
+              staleCount={countStaleLocaleCases(suite.cases, locale)}
+              onDocument={(mode) => documentSuite.mutateAsync({ suiteId: suite.id, mode })}
             />
 
             {/* Suite actions */}

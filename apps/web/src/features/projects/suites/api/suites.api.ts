@@ -95,31 +95,24 @@ export function deleteCase(suiteId: string, caseId: string): Promise<Suite> {
   })
 }
 
-export interface DocumentCaseResult {
-  queued: true
-  jobId: string
-}
+export type DocumentFilesMode = 'undocumented' | 'stale-locale'
 
-export function documentCase(
+export function documentSuite(
   suiteId: string,
-  caseId: string,
-): Promise<DocumentCaseResult> {
-  return apiRequest<DocumentCaseResult>(
-    `/suites/${suiteId}/cases/${caseId}/document`,
-    { method: 'POST' },
-  )
-}
-
-export function documentSuite(suiteId: string): Promise<DocumentFilesResult> {
+  mode: DocumentFilesMode = 'undocumented',
+): Promise<DocumentFilesResult> {
   return apiRequest<DocumentFilesResult>(`/suites/${suiteId}/document`, {
     method: 'POST',
+    body: JSON.stringify({ mode }),
   })
 }
 
 export function documentProject(
   projectId: string,
+  mode: DocumentFilesMode = 'undocumented',
 ): Promise<DocumentFilesResult> {
   return apiRequest<DocumentFilesResult>(`/projects/${projectId}/document`, {
     method: 'POST',
+    body: JSON.stringify({ mode }),
   })
 }
