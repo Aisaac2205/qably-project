@@ -37,6 +37,7 @@ export interface ExtractionInput {
   readonly language: ExtractionLanguage;
   readonly content: string;
   readonly automationKey?: string;
+  readonly targetAutomationKeys?: readonly string[];
   readonly locale: 'es' | 'en';
 }
 

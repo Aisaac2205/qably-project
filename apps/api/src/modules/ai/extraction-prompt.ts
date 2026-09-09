@@ -7,6 +7,15 @@ export const EXTRACTION_PROMPT_VERSION = 'extraction-v3';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
+export const TARGET_CASES_OPEN = '<<<TARGET_CASES>>>';
+export const TARGET_CASES_CLOSE = '<<<END_TARGET_CASES>>>';
+
+const ALL_DELIMITERS = [
+  FILE_CONTENT_OPEN,
+  FILE_CONTENT_CLOSE,
+  TARGET_CASES_OPEN,
+  TARGET_CASES_CLOSE,
+];
 
 const AUTOMATION_KEY_RULES = `- vitest/jest (including jest-junit reports): the enclosing describe chain joined by " > ", followed by the it/test title.
 - pytest: the bare function name (e.g. "test_adds_item_to_cart").
@@ -62,15 +71,26 @@ export function buildSystemInstruction(locale: 'es' | 'en'): string {
   return INSTRUCTION[locale];
 }
 
+function buildTargetCasesBlock(targetAutomationKeys: readonly string[]): string {
+  if (targetAutomationKeys.length === 0) return '';
+
+  const lines = targetAutomationKeys
+    .map((key) => stripBlockDelimiters(key, ALL_DELIMITERS))
+    .join('\n');
+
+  return `\n\n${TARGET_CASES_OPEN}\n${lines}\n${TARGET_CASES_CLOSE}`;
+}
+
 export function buildFileContentTurn(input: {
   filePath: string;
   language: string;
   content: string;
+  targetAutomationKeys?: readonly string[];
 }): string {
   return `File: ${sanitizeUntrustedText(input.filePath)}
 Language: ${sanitizeUntrustedText(input.language)}
 
 ${FILE_CONTENT_OPEN}
 ${stripBlockDelimiters(input.content, [FILE_CONTENT_OPEN, FILE_CONTENT_CLOSE])}
-${FILE_CONTENT_CLOSE}`;
+${FILE_CONTENT_CLOSE}${buildTargetCasesBlock(input.targetAutomationKeys ?? [])}`;
 }

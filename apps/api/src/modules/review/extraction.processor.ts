@@ -15,7 +15,11 @@ import type {
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { detectLanguage } from './lib/detect-language';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
-import { EXTRACTION_QUEUE, type ExtractionJobData } from './review.contracts';
+import {
+  EXTRACTION_QUEUE,
+  type DocumentFileTarget,
+  type ExtractionJobData,
+} from './review.contracts';
 
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
 const HEAD_REF = 'HEAD';
@@ -43,6 +47,16 @@ interface JobContext {
   knownSuiteId: string | null;
   onlyAutomationKey: string | null;
   fallbackEvidenceId: string | null;
+  locale: string | undefined;
+}
+
+interface DocumentFileJobContext {
+  projectId: string;
+  organizationId: string;
+  filePath: string;
+  ref: string;
+  connection: ConnectionInfo | null;
+  targets: DocumentFileTarget[];
   locale: string | undefined;
 }
 
@@ -137,8 +151,14 @@ export class ExtractionProcessor extends WorkerHost {
   async process(job: Job<ExtractionJobData>): Promise<void> {
     if (job.data.kind === 'code-change') {
       await this.processCodeChange(job.data.codeChangeId, job.data.locale);
-    } else {
+    } else if (job.data.kind === 'document-case') {
       await this.processDocumentCase(job.data.testCaseId, job.data.locale);
+    } else {
+      await this.processDocumentFile(
+        job.data.filePath,
+        job.data.targets,
+        job.data.locale,
+      );
     }
   }
 
@@ -264,6 +284,263 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     return latest?.commitSha ?? HEAD_REF;
+  }
+
+  private async processDocumentFile(
+    filePath: string,
+    targets: DocumentFileTarget[],
+    locale: string | undefined,
+  ): Promise<void> {
+    if (targets.length === 0) return;
+
+    const firstTarget = await this.prisma.testCase.findUnique({
+      where: { id: targets[0].testCaseId },
+      select: {
+        projectId: true,
+        project: {
+          select: {
+            organizationId: true,
+            connection: {
+              select: {
+                provider: true,
+                repo: true,
+                encryptedAccessToken: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (firstTarget === null) {
+      this.logger.warn(
+        `Document-file job for ${filePath} has no resolvable project (target case is gone)`,
+      );
+      return;
+    }
+
+    const ref = await this.latestCommitShaFor(firstTarget.projectId, filePath);
+
+    await this.runDocumentFileExtraction({
+      projectId: firstTarget.projectId,
+      organizationId: firstTarget.project.organizationId,
+      filePath,
+      ref,
+      connection: firstTarget.project.connection,
+      targets,
+      locale,
+    });
+  }
+
+  private async runDocumentFileExtraction(
+    ctx: DocumentFileJobContext,
+  ): Promise<void> {
+    try {
+      await this.runDocumentFileExtractionUnsafe(ctx);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown-error';
+      this.logger.error(
+        `Document-file extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
+      );
+      await this.fallbackForTargets(ctx, ctx.targets, EXTRACTION_FAILED_REASON);
+    }
+  }
+
+  private async runDocumentFileExtractionUnsafe(
+    ctx: DocumentFileJobContext,
+  ): Promise<void> {
+    if (ctx.connection === null) {
+      await this.fallbackForTargets(ctx, ctx.targets, 'no-connection');
+      return;
+    }
+
+    const entitled = await this.entitlement.isEntitled(ctx.organizationId);
+    if (!entitled) {
+      await this.fallbackForTargets(ctx, ctx.targets, NOT_ENTITLED_REASON);
+      return;
+    }
+
+    const { owner, repo } = splitRepo(ctx.connection.repo);
+    const accessToken =
+      ctx.connection.encryptedAccessToken === null
+        ? undefined
+        : this.encryption.decrypt(ctx.connection.encryptedAccessToken);
+
+    const source = await this.sourceReader.read({
+      provider: ctx.connection.provider,
+      owner,
+      repo,
+      ref: ctx.ref,
+      path: ctx.filePath,
+      accessToken,
+    });
+
+    if (source.kind === 'unavailable') {
+      await this.fallbackForTargets(ctx, ctx.targets, source.reason);
+      return;
+    }
+
+    const locale = resolveLocale(ctx.locale);
+
+    const outcome = await this.extractor.extract({
+      filePath: ctx.filePath,
+      language: detectLanguage(ctx.filePath),
+      content: source.content,
+      locale,
+      targetAutomationKeys: ctx.targets.map((target) => target.automationKey),
+    });
+
+    if (outcome.kind === 'provider-unavailable') {
+      await this.fallbackForTargets(ctx, ctx.targets, outcome.reason);
+      return;
+    }
+
+    if (outcome.kind === 'no-tests-found') {
+      if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
+        return;
+      }
+      await this.fallbackForTargets(ctx, ctx.targets, NO_TESTS_FOUND_REASON);
+      return;
+    }
+
+    const deduped = dedupeByAutomationKey(outcome.cases);
+    const byAutomationKey = new Map(
+      deduped.map((testCase) => [testCase.automationKey, testCase]),
+    );
+
+    const matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] =
+      [];
+    const unmatched: DocumentFileTarget[] = [];
+
+    for (const target of ctx.targets) {
+      const testCase = byAutomationKey.get(target.automationKey);
+      if (testCase === undefined) {
+        unmatched.push(target);
+      } else {
+        matched.push({ target, testCase });
+      }
+    }
+
+    if (matched.length === 0) {
+      if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
+        return;
+      }
+      await this.fallbackForTargets(ctx, unmatched, NO_MATCHING_CASE_REASON);
+      return;
+    }
+
+    const persisted = await this.persistDocumentFileTargets(matched, ctx);
+    if (!persisted) {
+      await this.fallbackForTargets(ctx, ctx.targets, NOT_ENTITLED_REASON);
+      return;
+    }
+
+    if (unmatched.length > 0) {
+      await this.fallbackForTargets(ctx, unmatched, NO_MATCHING_CASE_REASON);
+    }
+  }
+
+  private async spendCreditOrFallbackForTargets(
+    ctx: DocumentFileJobContext,
+    targets: DocumentFileTarget[],
+  ): Promise<boolean> {
+    const spent = await this.entitlement.spendCredit(ctx.organizationId);
+    if (!spent) {
+      await this.fallbackForTargets(ctx, targets, NOT_ENTITLED_REASON);
+    }
+    return spent;
+  }
+
+  private async persistDocumentFileTargets(
+    matched: { target: DocumentFileTarget; testCase: ExtractedCase }[],
+    ctx: DocumentFileJobContext,
+  ): Promise<boolean> {
+    const connection = ctx.connection as ConnectionInfo;
+    const suiteRows = await this.prisma.testCase.findMany({
+      where: { id: { in: matched.map(({ target }) => target.testCaseId) } },
+      select: { id: true, suiteId: true },
+    });
+    const suiteIdByCaseId = new Map(
+      suiteRows.map((row) => [row.id, row.suiteId]),
+    );
+
+    return this.prisma.$transaction(async (tx: TxClient) => {
+      const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
+      if (!spent) return false;
+
+      for (const { target, testCase } of matched) {
+        const pending = await tx.extractedProposal.findFirst({
+          where: { targetTestCaseId: target.testCaseId, status: 'in_review' },
+          select: { id: true },
+        });
+
+        if (pending !== null) continue;
+
+        const uri = buildBlobUrl(
+          connection.provider,
+          connection.repo,
+          ctx.ref,
+          ctx.filePath,
+        );
+
+        const evidence = await tx.evidence.create({
+          data: {
+            projectId: ctx.projectId,
+            kind: 'SOURCE_EXCERPT',
+            title: ctx.filePath,
+            uri,
+            excerpt: testCase.sourceExcerpt,
+          },
+          select: { id: true },
+        });
+
+        await tx.extractedProposal.create({
+          data: {
+            projectId: ctx.projectId,
+            suiteId: suiteIdByCaseId.get(target.testCaseId) ?? null,
+            status: 'in_review',
+            title: testCase.title,
+            objective: testCase.objective,
+            preconditions: [...testCase.preconditions],
+            steps: [...testCase.steps],
+            expectedResult: testCase.expectedResult,
+            priority: testCase.priority,
+            promptVersion: EXTRACTION_PROMPT_VERSION,
+            evidenceId: evidence.id,
+            codeChangeId: null,
+            automationKey: testCase.automationKey,
+            targetTestCaseId: target.testCaseId,
+          },
+        });
+      }
+
+      return true;
+    });
+  }
+
+  private async fallbackForTargets(
+    ctx: DocumentFileJobContext,
+    targets: readonly DocumentFileTarget[],
+    reason: string,
+  ): Promise<void> {
+    for (const target of targets) {
+      await this.persistManualReviewFallback(
+        {
+          projectId: ctx.projectId,
+          organizationId: ctx.organizationId,
+          filePath: ctx.filePath,
+          ref: ctx.ref,
+          connection: ctx.connection,
+          codeChangeId: null,
+          targetTestCaseId: target.testCaseId,
+          knownSuiteId: null,
+          onlyAutomationKey: target.automationKey,
+          fallbackEvidenceId: null,
+          locale: ctx.locale,
+        },
+        reason,
+      );
+    }
   }
 
   private async runExtraction(ctx: JobContext): Promise<void> {

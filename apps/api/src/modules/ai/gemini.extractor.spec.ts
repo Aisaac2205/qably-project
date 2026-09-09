@@ -109,6 +109,21 @@ describe('GeminiExtractor', () => {
     expect(contents).toContain("it('adds', () => {})");
   });
 
+  it('sends a target-cases block only when the input carries target automation keys', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ targetAutomationKeys: ['Cart > adds an item'] }),
+    );
+
+    const contents = received.contents as string;
+    expect(contents).toContain('Cart > adds an item');
+  });
+
   it('returns no-tests-found when the model returns an empty cases array', async () => {
     const client = fakeClient(() =>
       Promise.resolve({

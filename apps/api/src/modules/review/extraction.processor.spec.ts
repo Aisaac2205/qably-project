@@ -830,6 +830,266 @@ describe('ExtractionProcessor — document-case job', () => {
   });
 });
 
+describe('ExtractionProcessor — document-file job', () => {
+  const firstTargetRow = {
+    projectId: 'project-1',
+    project: { organizationId: 'org-1', connection },
+  };
+
+  const targets = [
+    { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+    { testCaseId: 'case-2', automationKey: 'Cart > removes an item' },
+  ];
+
+  function documentFileJob(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        kind: 'document-file',
+        filePath: 'src/cart.spec.ts',
+        targets,
+        ...overrides,
+      },
+    } as never;
+  }
+
+  it('persists one proposal per matched target with its own targetTestCaseId', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-2' },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
+    const calls = prisma.extractedProposal.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    expect(calls.map(([call]) => call.data)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetTestCaseId: 'case-1',
+          suiteId: 'suite-1',
+          codeChangeId: null,
+        }),
+        expect.objectContaining({
+          targetTestCaseId: 'case-2',
+          suiteId: 'suite-2',
+          codeChangeId: null,
+        }),
+      ]),
+    );
+  });
+
+  it('spends exactly one credit for the whole chunk, not one per matched case', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-2' },
+    ]);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const entitlement = fakeEntitlement(
+      jest.fn().mockResolvedValue(true),
+      spendCredit,
+    );
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      ),
+    );
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      entitlement,
+    ).process(documentFileJob());
+
+    expect(spendCredit).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates an automation-key-not-found fallback for each target absent from the response', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+    ]);
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    const calls = prisma.extractedProposal.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    const fallback = calls
+      .map(([call]) => call.data)
+      .find((data) => data.targetTestCaseId === 'case-2');
+
+    expect(fallback).toMatchObject({
+      needsManualReview: true,
+      objective: 'automation-key-not-found',
+      targetTestCaseId: 'case-2',
+    });
+    const matched = calls
+      .map(([call]) => call.data)
+      .find((data) => data.targetTestCaseId === 'case-1');
+    expect(matched?.needsManualReview).toBeUndefined();
+  });
+
+  it('fans a no-tests-found response out to every target in the chunk', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({ kind: 'no-tests-found' }),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    const calls = prisma.extractedProposal.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    const objectives = calls.map(([call]) => call.data);
+    expect(objectives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetTestCaseId: 'case-1',
+          objective: 'no-tests-found',
+        }),
+        expect.objectContaining({
+          targetTestCaseId: 'case-2',
+          objective: 'no-tests-found',
+        }),
+      ]),
+    );
+  });
+
+  it('falls back every target when the project has no repository connection', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...firstTargetRow,
+      project: { organizationId: 'org-1', connection: null },
+    });
+    const extractSpy = jest.fn();
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extractSpy)).process(
+      documentFileJob(),
+    );
+
+    expect(extractSpy).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back every target without calling the provider when the organization is not entitled', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const extractSpy = jest.fn();
+    const entitlement = fakeEntitlement(jest.fn().mockResolvedValue(false));
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(extractSpy),
+      fakeEncryption(),
+      entitlement,
+    ).process(documentFileJob());
+
+    expect(extractSpy).not.toHaveBeenCalled();
+    const calls = prisma.extractedProposal.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    expect(calls.map(([call]) => call.data)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ objective: 'ai-not-enabled' }),
+      ]),
+    );
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does nothing when the job carries no targets', async () => {
+    const prisma = createPrisma();
+    const extractSpy = jest.fn();
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extractSpy)).process(
+      documentFileJob({ targets: [] }),
+    );
+
+    expect(prisma.testCase.findUnique).not.toHaveBeenCalled();
+    expect(extractSpy).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the first target case no longer exists', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(null);
+    const extractSpy = jest.fn();
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extractSpy)).process(
+      documentFileJob(),
+    );
+
+    expect(extractSpy).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('skips a target that already has an in-review proposal on a redelivered chunk, without losing the rest', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-2' },
+    ]);
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          args.where.targetTestCaseId === 'case-1' ? { id: 'already-pending' } : null,
+        ),
+    );
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-2' });
+  });
+});
+
 describe('ExtractionProcessor — resilience', () => {
   it('lands an uncaught error (e.g. token decryption throwing) in the manual-review fallback', async () => {
     const prisma = createPrisma();

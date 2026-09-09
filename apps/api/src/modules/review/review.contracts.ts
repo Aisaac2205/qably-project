@@ -24,15 +24,41 @@ export interface ListProposalsFilters {
 
 export const EXTRACTION_QUEUE = 'extraction';
 
+export interface DocumentFileTarget {
+  testCaseId: string;
+  automationKey: string;
+}
+
 export type ExtractionJobData =
   | { kind: 'code-change'; codeChangeId: string; locale: Locale }
-  | { kind: 'document-case'; testCaseId: string; locale: Locale };
+  | { kind: 'document-case'; testCaseId: string; locale: Locale }
+  | {
+      kind: 'document-file';
+      filePath: string;
+      targets: DocumentFileTarget[];
+      locale: Locale;
+    };
 
 export type DocumentCaseError =
   | 'not-found'
   | 'not-automated'
   | 'no-source-file'
   | 'already-pending';
+
+export type DocumentFilesError = 'not-found';
+
+export type DocumentFilesSkipReason = 'no-source-file' | 'already-pending';
+
+export interface DocumentFilesSkip {
+  reason: DocumentFilesSkipReason;
+  count: number;
+}
+
+export interface DocumentFilesResult {
+  filesEnqueued: number;
+  casesTargeted: number;
+  casesSkipped: DocumentFilesSkip[];
+}
 
 export type ReviewError =
   | 'not-found'

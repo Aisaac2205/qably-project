@@ -109,7 +109,12 @@ export class GeminiExtractor implements TestCaseExtractor {
     try {
       const response = await this.client.models.generateContent({
         model: this.model,
-        contents: buildFileContentTurn(input),
+        contents: buildFileContentTurn({
+          filePath: input.filePath,
+          language: input.language,
+          content: input.content,
+          targetAutomationKeys: input.targetAutomationKeys,
+        }),
         config: {
           systemInstruction: buildSystemInstruction(input.locale),
           responseMimeType: 'application/json',
