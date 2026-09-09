@@ -126,13 +126,13 @@ export function NotificationsPage() {
   }
 
   return (
-    <div className="w-full space-y-6 px-4 py-5 sm:px-6 lg:px-8 text-default animate-page-enter">
+    <div className="w-full space-y-5 px-4 py-5 sm:px-6 lg:px-8 text-default animate-page-enter">
       <h1 className="sr-only">{t('notifications.title')}</h1>
 
       {/* Header */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-border/80">
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted max-w-2xl">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/80">
+        <div className="space-y-1">
+          <p className="text-xs sm:text-sm text-muted max-w-2xl">
             {t('notifications.subtitle')}
           </p>
         </div>
@@ -142,86 +142,89 @@ export function NotificationsPage() {
             variant="outline"
             size="sm"
             onClick={() => markAllAsRead()}
-            className="shrink-0 inline-flex items-center gap-1.5 self-start sm:self-auto active:scale-[0.98] transition-transform text-xs font-medium"
+            className="shrink-0 inline-flex items-center gap-2 self-start sm:self-auto rounded-full px-4 sm:px-5 py-2 active:scale-[0.98] transition-all text-xs sm:text-sm font-medium border-border/80 bg-surface hover:bg-canvas shadow-xs"
           >
-            <Check size={14} weight="bold" aria-hidden="true" />
+            <Check size={15} weight="bold" aria-hidden="true" />
             <span>{t('notifications.markAllRead')}</span>
           </Button>
         )}
       </header>
 
       {/* Filter Tabs and Search Toolbar */}
-      <div className="space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Status Filter Tabs */}
-          <SegmentedControl
-            className="self-start sm:self-auto"
-            label={t('notifications.filterStatus')}
-            semantics="tabs"
-            options={[
-              {
-                value: 'all' as const,
-                label: (
-                  <>
-                    <span>{t('notifications.filterAll')}</span>
-                    <span className="text-[10px] font-normal opacity-70">
-                      ({notifications.length})
-                    </span>
-                  </>
-                ),
-              },
-              {
-                value: 'unread' as const,
-                label: (
-                  <>
-                    <span>{t('notifications.filterUnread')}</span>
-                    <span className="text-[10px] font-normal opacity-70">({unreadCount})</span>
-                  </>
-                ),
-              },
-              {
-                value: 'read' as const,
-                label: (
-                  <>
-                    <span>{t('notifications.filterRead')}</span>
-                    <span className="text-[10px] font-normal opacity-70">({readCount})</span>
-                  </>
-                ),
-              },
-            ]}
-            value={statusFilter}
-            onChange={setStatusFilter}
-          />
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        {/* Status Filter Tabs */}
+        <SegmentedControl
+          className="self-start lg:self-auto shrink-0"
+          label={t('notifications.filterStatus')}
+          semantics="tabs"
+          options={[
+            {
+              value: 'all' as const,
+              label: (
+                <>
+                  <span>{t('notifications.filterAll')}</span>
+                  <span className="text-[10px] font-normal opacity-75">
+                    ({notifications.length})
+                  </span>
+                </>
+              ),
+            },
+            {
+              value: 'unread' as const,
+              label: (
+                <>
+                  <span>{t('notifications.filterUnread')}</span>
+                  <span className="text-[10px] font-normal opacity-75">({unreadCount})</span>
+                </>
+              ),
+            },
+            {
+              value: 'read' as const,
+              label: (
+                <>
+                  <span>{t('notifications.filterRead')}</span>
+                  <span className="text-[10px] font-normal opacity-75">({readCount})</span>
+                </>
+              ),
+            },
+          ]}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
 
+        {/* Search, Severity, Project & Summary toolbar */}
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
           {/* Quick Search */}
-          <div className="relative flex-1 sm:max-w-xs">
-            <MagnifyingGlass size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden="true" />
+          <div className="relative flex-1 sm:w-60 lg:w-64">
+            <MagnifyingGlass
+              size={14}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted"
+              aria-hidden="true"
+            />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('notifications.searchPlaceholder')}
-              className="w-full rounded-lg border border-border/80 bg-surface pl-8 pr-7 py-1.5 text-xs text-default placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+              className="w-full rounded-full border border-border/80 bg-surface pl-9 pr-8 py-1.5 text-xs text-default placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors shadow-2xs"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-default cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-default cursor-pointer p-0.5"
                 aria-label="Clear search"
               >
                 <X size={12} aria-hidden="true" />
               </button>
             )}
           </div>
-        </div>
 
-        {/* Severity and Project dropdowns */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {/* Severity filter dropdown */}
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value as NotificationSeverity | 'all')}
-            className="text-xs rounded-lg border border-border/80 bg-surface px-2.5 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border"
+            className="text-xs rounded-full border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shadow-2xs shrink-0"
             aria-label={t('notifications.severityAll')}
           >
             <option value="all">{t('notifications.severityAll')}</option>
@@ -231,11 +234,12 @@ export function NotificationsPage() {
             <option value="low">{t('notifications.severityLow')}</option>
           </select>
 
+          {/* Project dropdown */}
           {projects.length > 1 && (
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="text-xs rounded-lg border border-border/80 bg-surface px-2.5 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border"
+              className="text-xs rounded-full border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shadow-2xs shrink-0"
               aria-label={t('notifications.allProjects')}
             >
               <option value="all">{t('notifications.allProjects')}</option>
@@ -247,11 +251,16 @@ export function NotificationsPage() {
             </select>
           )}
 
+          {/* Total filtered count */}
+          <span className="text-xs text-muted font-normal shrink-0 hidden sm:inline-block px-1">
+            {filteredNotifications.length} {t('notifications.title').toLowerCase()}
+          </span>
+
           {hasActiveFilters && (
             <button
               type="button"
               onClick={handleClearFilters}
-              className="text-xs text-muted hover:text-default underline transition-colors cursor-pointer ml-1"
+              className="text-xs text-muted hover:text-default underline transition-colors cursor-pointer ml-1 shrink-0"
             >
               {t('notifications.clearFilters')}
             </button>
@@ -261,9 +270,9 @@ export function NotificationsPage() {
 
       {/* Notifications List */}
       {filteredNotifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-surface p-10 text-center">
-          <div className="flex size-10 items-center justify-center rounded-full bg-canvas border border-border text-muted mb-3">
-            <Bell size={18} aria-hidden="true" />
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-canvas border border-border text-muted mb-3">
+            <Bell size={20} aria-hidden="true" />
           </div>
           <h3 className="text-sm font-semibold text-default">
             {hasActiveFilters ? t('notifications.noMatches') : t('notifications.emptyTitle')}
@@ -272,13 +281,13 @@ export function NotificationsPage() {
             {t('notifications.emptyDescription')}
           </p>
           {hasActiveFilters && (
-            <Button size="sm" variant="outline" onClick={handleClearFilters} className="mt-4 text-xs">
+            <Button size="sm" variant="outline" onClick={handleClearFilters} className="mt-4 text-xs rounded-full px-4 py-2">
               {t('notifications.clearFilters')}
             </Button>
           )}
         </div>
       ) : (
-        <div className="divide-y divide-border/60 rounded-xl border border-border bg-surface shadow-2xs overflow-hidden">
+        <div className="divide-y divide-border/60">
           {filteredNotifications.map((n) => {
             const severity = SEVERITY_CONFIG[n.severity] ?? SEVERITY_CONFIG.medium
             const project = n.projectId ? projectsMap.get(n.projectId) : undefined
@@ -290,47 +299,52 @@ export function NotificationsPage() {
             return (
               <article
                 key={n.id}
-                className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 transition-colors ${
+                className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 sm:py-4.5 transition-colors ${
                   isUnread
                     ? 'bg-surface hover:bg-canvas/30'
-                    : 'bg-canvas/20 hover:bg-canvas/50 opacity-80 hover:opacity-100'
+                    : 'hover:bg-canvas/30 opacity-85 hover:opacity-100'
                 }`}
               >
                 <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                  {/* Left severity indicator icon */}
+                  {/* Left unread indicator dot */}
+                  <div className="flex items-center justify-center size-2.5 mt-2.5 shrink-0">
+                    {isUnread ? (
+                      <span className="size-2 rounded-full bg-primary ring-2 ring-primary/20" aria-label="Unread" />
+                    ) : (
+                      <span className="size-2" />
+                    )}
+                  </div>
+
+                  {/* Severity icon */}
                   <div
-                    className={`flex size-8 shrink-0 items-center justify-center rounded-lg border ${severity.badgeClass} mt-0.5`}
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-full border ${severity.badgeClass} mt-0.5`}
                   >
                     <SeverityIcon size={16} weight="fill" aria-hidden="true" />
                   </div>
 
-                  <div className="space-y-1.5 min-w-0 flex-1">
+                  <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-semibold border ${severity.badgeClass}`}
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${severity.badgeClass}`}
                       >
                         {t(severity.labelKey)}
                       </span>
 
                       {project && (
-                        <span className="inline-flex items-center rounded bg-canvas border border-border/80 px-2 py-0.5 text-[11px] font-medium text-muted">
+                        <span className="inline-flex items-center rounded-full bg-canvas border border-border/80 px-2.5 py-0.5 text-[11px] font-medium text-muted">
                           {project.name}
                         </span>
                       )}
 
                       <span className="text-muted/60 text-xs">·</span>
-                      <time className="text-[11px] text-muted" dateTime={n.createdAt}>
+                      <time className="text-[11px] text-muted font-normal" dateTime={n.createdAt}>
                         {formatDate(n.createdAt)}
                       </time>
-
-                      {isUnread && (
-                        <span className="size-2 rounded-full bg-primary" aria-label="Unread" />
-                      )}
                     </div>
 
                     <p
                       className={`text-sm leading-relaxed ${
-                        isUnread ? 'font-semibold text-default' : 'font-normal text-muted'
+                        isUnread ? 'font-medium text-default' : 'font-normal text-default/85'
                       }`}
                     >
                       {message}
@@ -338,15 +352,15 @@ export function NotificationsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center pl-6 sm:pl-0">
                   {link && (
                     <Link
                       href={link}
                       onClick={() => isUnread && markAsRead(n.id)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-canvas/40 px-3 py-1.5 text-xs font-semibold text-default hover:bg-surface hover:border-border transition-colors active:scale-[0.98]"
+                      className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-surface px-4 py-2 text-xs sm:text-sm font-semibold text-default hover:bg-canvas hover:border-border-strong transition-all duration-150 active:scale-[0.98] shadow-xs group/link"
                     >
                       <span>{t('notifications.viewDetails')}</span>
-                      <ArrowSquareOut size={13} aria-hidden="true" />
+                      <ArrowSquareOut size={15} aria-hidden="true" className="text-muted group-hover/link:text-default transition-colors" />
                     </Link>
                   )}
 
@@ -354,11 +368,11 @@ export function NotificationsPage() {
                     <button
                       type="button"
                       onClick={() => markAsRead(n.id)}
-                      className="inline-flex size-7 items-center justify-center rounded-lg border border-border/70 bg-canvas/20 text-muted hover:text-default hover:bg-surface hover:border-border transition-all cursor-pointer active:scale-[0.98]"
+                      className="inline-flex size-8 sm:size-9 items-center justify-center rounded-full border border-border/70 bg-surface text-muted hover:text-default hover:bg-canvas hover:border-border transition-all cursor-pointer active:scale-[0.98] shadow-xs"
                       title={t('notifications.markAsRead')}
                       aria-label={t('notifications.markAsRead')}
                     >
-                      <Check size={14} weight="regular" className="text-muted" aria-hidden="true" />
+                      <Check size={15} weight="bold" aria-hidden="true" />
                     </button>
                   )}
                 </div>
