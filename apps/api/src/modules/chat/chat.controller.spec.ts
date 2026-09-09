@@ -39,10 +39,15 @@ function build(chat: ReturnType<typeof fakeChat>) {
   return new ChatController(chat as never);
 }
 
+function handler(name: keyof ChatController): object {
+  return (ChatController.prototype as unknown as Record<string, object>)[name];
+}
+
 function throttleKeys(target: object): string[] {
-  return Reflect.getMetadataKeys(target).filter((key) =>
-    String(key).startsWith('THROTTLER:LIMIT'),
-  );
+  const keys: unknown[] = Reflect.getMetadataKeys(target);
+  return keys
+    .map((key) => String(key))
+    .filter((key) => key.startsWith('THROTTLER:LIMIT'));
 }
 
 describe('ChatController error codes', () => {
@@ -199,35 +204,31 @@ describe('ChatController guard and throttle wiring', () => {
   });
 
   it('gates sending a message behind the AI entitlement guard', () => {
-    expect(
-      Reflect.getMetadata(GUARDS_METADATA, ChatController.prototype.send),
-    ).toContain(AiEntitlementGuard);
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler('send'))).toContain(
+      AiEntitlementGuard,
+    );
   });
 
   it('does not gate thread listing, creation or reading behind the AI entitlement guard', () => {
     expect(
-      Reflect.getMetadata(GUARDS_METADATA, ChatController.prototype.list),
+      Reflect.getMetadata(GUARDS_METADATA, handler('list')),
     ).toBeUndefined();
     expect(
-      Reflect.getMetadata(GUARDS_METADATA, ChatController.prototype.create),
+      Reflect.getMetadata(GUARDS_METADATA, handler('create')),
     ).toBeUndefined();
     expect(
-      Reflect.getMetadata(GUARDS_METADATA, ChatController.prototype.get),
+      Reflect.getMetadata(GUARDS_METADATA, handler('get')),
     ).toBeUndefined();
   });
 
   it('throttles thread creation and message sending against runaway cost', () => {
-    expect(
-      throttleKeys(ChatController.prototype.create).length,
-    ).toBeGreaterThan(0);
-    expect(throttleKeys(ChatController.prototype.send).length).toBeGreaterThan(
-      0,
-    );
+    expect(throttleKeys(handler('create')).length).toBeGreaterThan(0);
+    expect(throttleKeys(handler('send')).length).toBeGreaterThan(0);
   });
 
   it('does not throttle reading threads or sending a case to review', () => {
-    expect(throttleKeys(ChatController.prototype.list)).toHaveLength(0);
-    expect(throttleKeys(ChatController.prototype.get)).toHaveLength(0);
-    expect(throttleKeys(ChatController.prototype.sendToReview)).toHaveLength(0);
+    expect(throttleKeys(handler('list'))).toHaveLength(0);
+    expect(throttleKeys(handler('get'))).toHaveLength(0);
+    expect(throttleKeys(handler('sendToReview'))).toHaveLength(0);
   });
 });

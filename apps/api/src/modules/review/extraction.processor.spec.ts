@@ -454,7 +454,9 @@ describe('ExtractionProcessor — code-change job', () => {
   it('persists the case via a conditional update when a concurrent redelivery wins the create race, without losing the other cases in the batch', async () => {
     const prisma = createPrisma();
     prisma.extractedProposal.create.mockImplementationOnce(() => {
-      throw { code: 'P2002' };
+      throw Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+      });
     });
     prisma.extractedProposal.findFirst.mockResolvedValueOnce({
       id: 'winner-proposal',
@@ -527,7 +529,9 @@ describe('ExtractionProcessor — code-change job', () => {
   it('does not mutate an already-decided proposal even when the create races and loses', async () => {
     const prisma = createPrisma();
     prisma.extractedProposal.create.mockImplementationOnce(() => {
-      throw { code: 'P2002' };
+      throw Object.assign(new Error('Unique constraint failed'), {
+        code: 'P2002',
+      });
     });
     prisma.extractedProposal.findFirst.mockResolvedValueOnce({
       id: 'winner-proposal',
