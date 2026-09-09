@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { approveProposal, rejectProposal } from '../api/review.api'
+import { approveProposal, rejectProposal, type ApprovalResult, type RejectionResult } from '../api/review.api'
 import { reviewKeys } from '../lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 
 interface DecisionCallbacks {
-  onApproved: (proposalId: string) => void
-  onRejected: (proposalId: string) => void
+  onApproved: (proposalId: string, result: ApprovalResult) => void
+  onRejected: (proposalId: string, result: RejectionResult) => void
   onError?: (error: unknown, proposalId: string) => void
 }
 
@@ -59,9 +59,9 @@ export function useProposalDecision({
   const approval = useMutation({
     mutationFn: ({ proposalId, comment }: DecisionVariables) =>
       approveProposal(proposalId, comment),
-    onSuccess: (_, { proposalId }) => {
+    onSuccess: (result, { proposalId }) => {
       invalidate()
-      onApproved(proposalId)
+      onApproved(proposalId, result)
     },
     onError: (error, { proposalId }) => handleError(error, proposalId),
   })
@@ -69,9 +69,9 @@ export function useProposalDecision({
   const rejection = useMutation({
     mutationFn: ({ proposalId, comment }: DecisionVariables) =>
       rejectProposal(proposalId, comment),
-    onSuccess: (_, { proposalId }) => {
+    onSuccess: (result, { proposalId }) => {
       invalidate()
-      onRejected(proposalId)
+      onRejected(proposalId, result)
     },
     onError: (error, { proposalId }) => handleError(error, proposalId),
   })

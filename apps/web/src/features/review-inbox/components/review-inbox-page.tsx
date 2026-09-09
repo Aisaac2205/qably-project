@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Info, X } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
@@ -24,7 +25,12 @@ export function ReviewInboxPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>(
     () => searchParams.get('proposal') ?? undefined,
   )
-  const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
+  const [feedbackToast, setFeedbackToast] = useState<{
+    message: string
+    type: 'success' | 'info'
+    href?: string
+    linkLabel?: string
+  } | null>(null)
 
   const filteredProposals = useMemo(() => {
     return proposals.filter((p) => {
@@ -52,10 +58,17 @@ export function ReviewInboxPage() {
   }, [activeSelectedId, filteredProposals])
 
   const { approve, reject } = useProposalDecision({
-    onApproved: () => {
+    onApproved: (proposalId, result) => {
+      const proposal = proposals.find((p) => p.id === proposalId)
       setFeedbackToast({
-        message: t('reviewInbox.approvedSuccess'),
+        message: t('reviewInbox.approvedWithCase', { caseName: result.testCaseName }),
         type: 'success',
+        ...(proposal && result.suiteId
+          ? {
+              href: `/projects/${proposal.projectId}/suites/${result.suiteId}`,
+              linkLabel: t('reviewInbox.viewCase'),
+            }
+          : {}),
       })
       selectNextPending()
     },
@@ -118,13 +131,21 @@ export function ReviewInboxPage() {
                 : 'border-border bg-surface text-default'
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {feedbackToast.type === 'success' ? (
                 <CheckCircle size={16} weight="fill" aria-hidden="true" />
               ) : (
                 <Info size={16} weight="fill" aria-hidden="true" />
               )}
-              <span>{feedbackToast.message}</span>
+              <span className="truncate">{feedbackToast.message}</span>
+              {feedbackToast.href && (
+                <Link
+                  href={feedbackToast.href}
+                  className="font-semibold underline hover:text-primary shrink-0"
+                >
+                  {feedbackToast.linkLabel}
+                </Link>
+              )}
             </div>
             <button
               type="button"

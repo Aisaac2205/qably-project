@@ -32,6 +32,8 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
     approveProposal: vi.fn().mockResolvedValue({
       createdNewCase: true,
       testCaseId: 'case-1',
+      testCaseName: 'Empties the cart',
+      suiteId: 'suite-1',
       versionId: 'version-1',
       version: 1,
       decisionId: 'decision-1',
@@ -148,7 +150,11 @@ describe('ReviewInboxPage', () => {
     const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
     await user.click(approveButton)
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/Proposal approved and published/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Empties the cart published/i)
+    expect(screen.getByRole('link', { name: 'View case' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/suites/suite-1'),
+    )
   })
 
   it('rejects a proposal when clicking Reject', async () => {
@@ -184,7 +190,7 @@ describe('ReviewInboxPage', () => {
 
     await user.keyboard('a')
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/Proposal approved and published/i)
+    expect(await screen.findByRole('status')).toHaveTextContent(/Empties the cart published/i)
   })
 
   it('rejects the selected proposal with the "r" keyboard shortcut', async () => {

@@ -119,7 +119,9 @@
     "manualReviewReasonAiNotEnabled": "AI extraction is not enabled for this organization.",
     "manualReviewReasonAutomationKeyNotFound": "No official case matched the automation key this file reports.",
     "manualReviewReasonUnknown": "The extraction reported: {{reason}}",
-    "approveBlocked": "A proposal with no steps cannot be published"
+    "approveBlocked": "A proposal with no steps cannot be published",
+    "approvedWithCase": "{{caseName}} published",
+    "viewCase": "View case"
   },
   "notifications": {
     "title": "Notifications",

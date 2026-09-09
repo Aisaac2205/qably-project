@@ -90,6 +90,8 @@ describe('ReviewService.approve', () => {
       value: {
         createdNewCase: true,
         testCaseId: 'case-new',
+        testCaseName: 'Empties the cart',
+        suiteId: 'suite-1',
         versionId: 'version-1',
         version: 1,
         decisionId: 'decision-1',
@@ -185,12 +187,32 @@ describe('ReviewService.approve', () => {
       value: {
         createdNewCase: false,
         testCaseId: 'case-existing',
+        testCaseName: 'Empties the cart',
+        suiteId: null,
         versionId: 'version-3',
         version: 3,
         decisionId: 'decision-1',
       },
     });
     expect(prisma.testCase.create).not.toHaveBeenCalled();
+  });
+
+  it('reports the case suite id when the proposal already carries the target case suite', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      suiteId: 'suite-of-existing-case',
+    });
+    prisma.testCaseVersion.count.mockResolvedValue(2);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-3',
+      version: 3,
+    });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result.ok && result.value.suiteId).toBe('suite-of-existing-case');
   });
 
   it('points the official case at the version it just published', async () => {

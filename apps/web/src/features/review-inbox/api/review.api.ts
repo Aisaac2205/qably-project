@@ -25,6 +25,8 @@ export interface ProposalDetail extends ProposalListItem {
 export interface ApprovalResult {
   createdNewCase: boolean
   testCaseId: string
+  testCaseName: string
+  suiteId: string | null
   versionId: string
   version: number
   decisionId: string

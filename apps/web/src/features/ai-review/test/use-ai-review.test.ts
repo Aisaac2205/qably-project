@@ -14,6 +14,8 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
     approveProposal: vi.fn().mockResolvedValue({
       createdNewCase: true,
       testCaseId: 'case-1',
+      testCaseName: 'Empties the cart',
+      suiteId: 'suite-1',
       versionId: 'version-1',
       version: 1,
       decisionId: 'decision-1',

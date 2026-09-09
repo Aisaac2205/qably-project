@@ -430,6 +430,8 @@ export class ReviewService {
       return {
         createdNewCase,
         testCaseId,
+        testCaseName: proposal.title,
+        suiteId: createdNewCase ? (suiteId as string) : (proposal.suiteId ?? null),
         versionId: version.id,
         version: version.version,
         decisionId: decision.id,

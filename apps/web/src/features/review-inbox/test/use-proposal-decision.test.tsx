@@ -56,6 +56,33 @@ describe('useProposalDecision', () => {
     expect(invalidateSpy).not.toHaveBeenCalled()
   })
 
+  it('passes the approval result to onApproved', async () => {
+    vi.spyOn(reviewApi, 'approveProposal').mockResolvedValue({
+      createdNewCase: true,
+      testCaseId: 'case-1',
+      testCaseName: 'Empties the cart',
+      suiteId: 'suite-1',
+      versionId: 'version-1',
+      version: 1,
+      decisionId: 'decision-1',
+    })
+    const onApproved = vi.fn()
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved, onRejected: vi.fn() }),
+      { wrapper },
+    )
+
+    act(() => {
+      result.current.approve('proposal-1')
+    })
+
+    await waitFor(() => expect(onApproved).toHaveBeenCalled())
+    expect(onApproved).toHaveBeenCalledWith(
+      'proposal-1',
+      expect.objectContaining({ testCaseName: 'Empties the cart', suiteId: 'suite-1' }),
+    )
+  })
+
   it('clears the previous decisionError when a new decision is attempted', async () => {
     vi.spyOn(reviewApi, 'rejectProposal')
       .mockRejectedValueOnce(new ApiError(409, 'Conflict', 'invalid-transition'))

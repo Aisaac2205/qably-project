@@ -50,6 +50,8 @@ export interface DecisionInput {
 export interface ApprovalView {
   createdNewCase: boolean;
   testCaseId: string;
+  testCaseName: string;
+  suiteId: string | null;
   versionId: string;
   version: number;
   decisionId: string;

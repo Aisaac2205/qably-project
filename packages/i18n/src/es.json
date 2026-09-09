@@ -119,7 +119,9 @@
     "manualReviewReasonAiNotEnabled": "La extracción por IA no está habilitada para esta organización.",
     "manualReviewReasonAutomationKeyNotFound": "Ningún caso oficial coincide con la clave de automatización que reporta este archivo.",
     "manualReviewReasonUnknown": "La extracción informó: {{reason}}",
-    "approveBlocked": "Una propuesta sin pasos no puede publicarse"
+    "approveBlocked": "Una propuesta sin pasos no puede publicarse",
+    "approvedWithCase": "{{caseName}} publicado",
+    "viewCase": "Ver caso"
   },
   "notifications": {
     "title": "Notificaciones",
