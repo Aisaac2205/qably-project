@@ -33,4 +33,21 @@ The lesson generalises: when a Vitest suite spends the bulk of its wall time in 
 
 After the fix, the full run reports `import 95.6s, tests 70.3s, environment 211.6s, setup 30.4s`. `environment` is jsdom construction — roughly 1.3s for every one of the 159 files — and it is now the dominant term.
 
-`vitest.config.ts` sets `environment: 'jsdom'` globally, so pure-logic files (title formatting, metric derivation, the i18n resolver) pay for a DOM they never touch. Moving them to `environment: 'node'` is the obvious next step and needs `test.projects`: `environmentMatchGlobs` was removed in Vitest 4. It is not a free change — a file's environment cannot be inferred from its extension (`use-auth.test.ts` renders hooks, `store.test.ts` persists to `localStorage`), and `src/test/setup.ts` itself calls `localStorage.clear()`, so a node project needs its own setup file.
+`vitest.config.ts` sets `environment: 'jsdom'` globally, so pure-logic files (title formatting, metric derivation, the i18n resolver) pay for a DOM they never touch. There are two ways to spend that 211s, and both are still open:
+
+- **Run pure-logic files under `environment: 'node'`.** This needs `test.projects`; `environmentMatchGlobs` was removed in Vitest 4. It is not free: a file's environment cannot be inferred from its extension (`use-auth.test.ts` renders hooks, `store.test.ts` persists to `localStorage`), so the node project needs an explicit include list, and `src/test/setup.ts` calls `localStorage.clear()`, so it needs its own setup file. About 22 of the 159 files are provably pure today, which caps the saving at roughly 15s of wall time.
+- **Replace jsdom with happy-dom for every file.** happy-dom constructs much faster, so this attacks all 159 files rather than 14% of them, and the config change is one line. It is a new devDependency and a different DOM implementation, so the 1088 tests are the acceptance test for it. This is the larger lever and it has not been tried.
+
+## The skipped suite
+
+`apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` reports as skipped on every run. That is deliberate: it is gated behind `describe.skip` unless `GEMINI_API_KEY` is set, because it calls the real Gemini API. Nothing is broken and it should stay skipped by default.
+
+It is also the only end-to-end check of the extraction path that exists. Running it with a real key is the cheapest way to confirm that the extraction prompt still produces schema-valid cases after a prompt change:
+
+```
+cd apps/api && GEMINI_API_KEY=... npx jest --maxWorkers=2 gemini.extractor.integration
+```
+
+## Lint baselines
+
+Both apps lint clean as of this change: `apps/api` reports 0 errors and 0 warnings, `apps/web` 0 errors and 4 warnings. All four are `@next/next/no-img-element` on externally hosted technology logos; clearing them means `next/image` plus a `remotePatterns` entry, which changes how those images are served.
