@@ -160,6 +160,41 @@ describe('CaseCard', () => {
     expect(onDelete).toHaveBeenCalledWith(mockCase)
   })
 
+  describe('pending review state', () => {
+    it('shows a non-interactive in-review link instead of the AI button when a proposal is pending', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, pendingProposalId: 'proposal-1' }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.queryByRole('button', { name: /document with ai/i })).not.toBeInTheDocument()
+      const link = screen.getByRole('link', { name: /in review/i })
+      expect(link).toHaveAttribute('href', '/review-inbox?proposal=proposal-1')
+    })
+
+    it('still offers the AI button when no proposal is pending', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, pendingProposalId: null }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByRole('button', { name: /document with ai/i })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
+  })
+
   describe('AI documentation for automated cases', () => {
     afterEach(() => {
       vi.restoreAllMocks()

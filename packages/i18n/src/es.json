@@ -737,6 +737,8 @@
     "documentCaseAiDisabled": "La documentación con IA no está habilitada para esta organización.",
     "documentCaseThrottled": "Demasiadas solicitudes de IA en este momento. Intenta de nuevo en un momento.",
     "documentCaseError": "No se pudo poner este caso en cola para documentación con IA. Intenta de nuevo.",
+    "caseInReview": "En revisión",
+    "viewReviewProposal": "Ver en bandeja de revisión",
     "cannotRunEmptySuite": "Agregue al menos un caso de prueba antes de ejecutar esta suite",
     "allAutomatedHint": "Todos los casos de esta suite se ejecutan en CI",
     "coveredByCi": "Cubiertos por CI",

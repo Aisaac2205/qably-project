@@ -738,6 +738,8 @@
     "documentCaseAiDisabled": "AI documentation isn't enabled for this organization.",
     "documentCaseThrottled": "Too many AI requests right now. Try again in a moment.",
     "documentCaseError": "Couldn't queue this case for AI documentation. Try again.",
+    "caseInReview": "In review",
+    "viewReviewProposal": "View in review inbox",
     "cannotRunEmptySuite": "Add at least one test case before running this suite",
     "allAutomatedHint": "All cases in this suite run in CI",
     "coveredByCi": "Covered by CI",
