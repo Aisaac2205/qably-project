@@ -176,6 +176,7 @@ model Project {
   evidence          Evidence[]
   testCases         TestCase[]
   proposals         ExtractedProposal[]
+  suiteProposals    SuiteProposal[]
   traceabilityLinks TraceabilityLink[]
   chatThreads       ChatThread[]
 
@@ -219,8 +220,12 @@ model Suite {
   cases          TestCase[]
   runs           Run[]
   proposals      ExtractedProposal[]
+  nameSource     String              @default("ingestion")
+  ingestionKey   String?
+  suiteProposals SuiteProposal[]     @relation("SuiteProposals")
 
   @@unique([projectId, name])
+  @@unique([projectId, ingestionKey])
   @@index([projectId])
   @@index([organizationId])
   @@map("suite")
@@ -331,16 +336,17 @@ enum IngestionBatchStatus {
 }
 
 model Evidence {
-  id          String              @id @default(cuid())
-  projectId   String
-  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  kind        EvidenceKind
-  title       String
-  uri         String
-  excerpt     String?
-  createdAt   DateTime            @default(now())
-  codeChanges CodeChange[]
-  proposals   ExtractedProposal[]
+  id             String              @id @default(cuid())
+  projectId      String
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind           EvidenceKind
+  title          String
+  uri            String
+  excerpt        String?
+  createdAt      DateTime            @default(now())
+  codeChanges    CodeChange[]
+  proposals      ExtractedProposal[]
+  suiteProposals SuiteProposal[]
 
   @@index([projectId])
   @@map("evidence")
@@ -443,6 +449,9 @@ model ExtractedProposal {
   updatedAt         DateTime         @updatedAt
   decisions         ReviewDecision[]
 
+  locale       String?
+  observations Json?
+
   @@unique([codeChangeId, automationKey])
   @@index([projectId])
   @@index([projectId, status])
@@ -480,10 +489,32 @@ model TestCaseVersion {
   expectedResult String       @default("")
   priority       CasePriority @default(medium)
   publishedAt    DateTime     @default(now())
+  locale         String?
 
   @@unique([testCaseId, version])
   @@index([testCaseId])
   @@map("test_case_version")
+}
+
+model SuiteProposal {
+  id            String         @id @default(cuid())
+  projectId     String
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suiteId       String
+  suite         Suite          @relation("SuiteProposals", fields: [suiteId], references: [id], onDelete: Cascade)
+  title         String
+  description   String
+  status        ProposalStatus @default(in_review)
+  evidenceId    String
+  evidence      Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  promptVersion String?
+  createdAt     DateTime       @default(now())
+  decidedAt     DateTime?
+
+  @@unique([suiteId, evidenceId])
+  @@index([projectId])
+  @@index([projectId, status])
+  @@map("suite_proposal")
 }
 
 model TraceabilityLink {
