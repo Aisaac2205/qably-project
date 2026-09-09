@@ -164,6 +164,14 @@
 
 /* ─── Base styles ───────────────────────────────────────────────── */
 
+*,
+::after,
+::before,
+::backdrop,
+::file-selector-button {
+  border-color: var(--border);
+}
+
 body {
   background-color: var(--bg);
   color: var(--fg);
