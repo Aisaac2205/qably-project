@@ -10,6 +10,7 @@ import {
 } from './extraction-prompt';
 import {
   extractedCaseSchema,
+  extractedSuiteSchema,
   MAX_EXTRACTED_CASES,
   type ExtractedCase,
   type ExtractionInput,
@@ -49,6 +50,10 @@ export const RESPONSE_JSON_SCHEMA = {
             enum: ['critical', 'high', 'medium', 'low'],
           },
           sourceExcerpt: { type: 'string' },
+          observations: {
+            type: 'array',
+            items: { type: 'string' },
+          },
         },
         required: [
           'automationKey',
@@ -61,11 +66,22 @@ export const RESPONSE_JSON_SCHEMA = {
         ],
       },
     },
+    suite: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['title', 'description'],
+    },
   },
   required: ['cases'],
 } as const;
 
-const envelopeSchema = z.object({ cases: z.array(z.unknown()) });
+const envelopeSchema = z.object({
+  cases: z.array(z.unknown()),
+  suite: z.unknown().optional(),
+});
 
 export interface GeminiUsageMetadata {
   promptTokenCount?: number;
@@ -194,10 +210,12 @@ export class GeminiExtractor implements TestCaseExtractor {
     if (validCases.length === 0) return { kind: 'no-tests-found' };
 
     const usage = response.usageMetadata ?? {};
+    const suite = extractedSuiteSchema.safeParse(envelope.data.suite);
 
     return {
       kind: 'extracted',
       cases: validCases,
+      suite: suite.success ? suite.data : null,
       usage: {
         promptTokens: usage.promptTokenCount ?? 0,
         candidatesTokens: usage.candidatesTokenCount ?? 0,

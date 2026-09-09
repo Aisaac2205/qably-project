@@ -89,3 +89,66 @@ describe('extractionOutputSchema', () => {
     expect(extractionOutputSchema.safeParse({ cases }).success).toBe(false);
   });
 });
+
+describe('extractedCaseSchema observations', () => {
+  const base = {
+    automationKey: 'Cart > adds an item',
+    title: 'Adds an item',
+    objective: 'Verify the cart accepts an item',
+    steps: ['Add an item'],
+    expectedResult: 'The cart holds one item',
+    priority: 'medium',
+    sourceExcerpt: "it('adds an item')",
+  };
+
+  it('accepts up to five short observations', () => {
+    const result = extractedCaseSchema.safeParse({
+      ...base,
+      observations: ['No assertion on the total', 'Uses a fixed delay'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects more than five observations', () => {
+    const result = extractedCaseSchema.safeParse({
+      ...base,
+      observations: ['a', 'b', 'c', 'd', 'e', 'f'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an observation longer than 200 characters', () => {
+    const result = extractedCaseSchema.safeParse({
+      ...base,
+      observations: ['x'.repeat(201)],
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('extractionOutputSchema suite summary', () => {
+  it('accepts an output without a suite summary', () => {
+    expect(extractionOutputSchema.safeParse({ cases: [] }).success).toBe(true);
+  });
+
+  it('bounds the suite title to 80 and the description to 300 characters', () => {
+    expect(
+      extractionOutputSchema.safeParse({
+        cases: [],
+        suite: { title: 'Checkout', description: 'Covers the purchase flow' },
+      }).success,
+    ).toBe(true);
+    expect(
+      extractionOutputSchema.safeParse({
+        cases: [],
+        suite: { title: 'x'.repeat(81), description: 'ok' },
+      }).success,
+    ).toBe(false);
+    expect(
+      extractionOutputSchema.safeParse({
+        cases: [],
+        suite: { title: 'ok', description: 'x'.repeat(301) },
+      }).success,
+    ).toBe(false);
+  });
+});

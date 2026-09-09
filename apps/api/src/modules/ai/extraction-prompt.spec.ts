@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v4');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v5');
   });
 });
 
@@ -136,5 +136,20 @@ describe('buildFileContentTurn', () => {
     });
 
     expect(turn.match(new RegExp(TARGET_CASES_CLOSE, 'g'))).toHaveLength(1);
+  });
+});
+
+describe('buildSystemInstruction advisory and suite fields', () => {
+  it('asks for advisory observations in both locales and forbids proposing code', () => {
+    expect(buildSystemInstruction('es')).toContain('"observations"');
+    expect(buildSystemInstruction('es')).toContain('nunca propongas código');
+    expect(buildSystemInstruction('en')).toContain('"observations"');
+    expect(buildSystemInstruction('en')).toContain('never propose code');
+  });
+
+  it('asks for a suite summary only for a file-level job', () => {
+    expect(buildSystemInstruction('es')).not.toContain('"suite"');
+    expect(buildSystemInstruction('es', true)).toContain('"suite"');
+    expect(buildSystemInstruction('en', true)).toContain('"suite"');
   });
 });

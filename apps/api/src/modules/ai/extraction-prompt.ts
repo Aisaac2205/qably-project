@@ -3,7 +3,7 @@ import {
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v4';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v5';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -43,6 +43,8 @@ Los steps deben ser imperativos, numerados por orden, y describir solo acciones 
 
 "sourceExcerpt" debe ser una cita breve y literal de las líneas del archivo que justifican el caso, nunca una paráfrasis.
 
+"observations" es opcional: hasta cinco frases cortas por caso, en español, sobre la práctica de pruebas que el código muestra, por ejemplo una prueba sin aserción, una espera basada en tiempo fijo, o dos pruebas que verifican lo mismo. Son comentarios para una persona, no una entrega: nunca propongas código, no reescribas aserciones ni uses lenguaje de "corregir". Omite el campo cuando no haya nada relevante que señalar.
+
 Si el archivo no contiene declaraciones de prueba, responde con un arreglo "cases" vacío. Responde solo con JSON, que coincida exactamente con el esquema indicado, con todos los campos salvo "automationKey" escritos en español.`,
   en: `You are a senior QA engineer extracting documented test cases from a single automated test file.
 
@@ -64,6 +66,8 @@ Steps must be imperative, numbered by order, and describe only actions and asser
 
 "sourceExcerpt" must be a short, literal quote of the lines in the file that justify the case — never paraphrased.
 
+"observations" is optional: up to five short sentences per case, in English, about the testing practice the code shows, for example a test with no assertion, a wait based on a fixed delay, or two tests verifying the same thing. They are commentary for a person, not a deliverable: never propose code, never rewrite assertions, never use "fix" language. Omit the field when there is nothing worth pointing out.
+
 If the file contains no test declarations, respond with an empty "cases" array. Respond with JSON only, matching the provided schema exactly, with every field except "automationKey" written in English.`,
 };
 
@@ -72,12 +76,17 @@ const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
   en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit.`,
 };
 
+const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {
+  es: `Incluye además un objeto "suite" con "title" (hasta 80 caracteres) y "description" (hasta 300 caracteres) que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
+  en: `Also include a "suite" object with "title" (up to 80 characters) and "description" (up to 300 characters) summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
+};
+
 export function buildSystemInstruction(
   locale: 'es' | 'en',
   hasTargets = false,
 ): string {
   return hasTargets
-    ? `${INSTRUCTION[locale]}\n\n${TARGET_CASES_SENTENCE[locale]}`
+    ? `${INSTRUCTION[locale]}\n\n${TARGET_CASES_SENTENCE[locale]}\n\n${SUITE_SUMMARY_SENTENCE[locale]}`
     : INSTRUCTION[locale];
 }
 

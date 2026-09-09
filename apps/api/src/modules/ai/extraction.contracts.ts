@@ -14,13 +14,21 @@ export const extractedCaseSchema = z.object({
   expectedResult: shortText(500),
   priority: z.enum(['critical', 'high', 'medium', 'low']),
   sourceExcerpt: shortText(600),
+  observations: z.array(shortText(200)).max(5).optional(),
+});
+
+export const extractedSuiteSchema = z.object({
+  title: shortText(80),
+  description: shortText(300),
 });
 
 export const extractionOutputSchema = z.object({
   cases: z.array(extractedCaseSchema).max(MAX_EXTRACTED_CASES),
+  suite: extractedSuiteSchema.optional(),
 });
 
 export type ExtractedCase = z.infer<typeof extractedCaseSchema>;
+export type ExtractedSuite = z.infer<typeof extractedSuiteSchema>;
 
 export type ExtractionLanguage =
   | 'typescript'
@@ -48,7 +56,12 @@ export interface TokenUsage {
 }
 
 export type ExtractionOutcome =
-  | { kind: 'extracted'; cases: readonly ExtractedCase[]; usage: TokenUsage }
+  | {
+      kind: 'extracted';
+      cases: readonly ExtractedCase[];
+      suite: ExtractedSuite | null;
+      usage: TokenUsage;
+    }
   | { kind: 'no-tests-found' }
   | { kind: 'provider-unavailable'; reason: string };
 

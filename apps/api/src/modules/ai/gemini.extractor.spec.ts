@@ -60,6 +60,7 @@ describe('GeminiExtractor', () => {
     expect(outcome).toEqual({
       kind: 'extracted',
       cases: [validRawCase()],
+      suite: null,
       usage: { promptTokens: 100, candidatesTokens: 50, totalTokens: 150 },
     });
   });
@@ -240,5 +241,41 @@ describe('GeminiExtractor', () => {
       kind: 'provider-unavailable',
       reason: 'network is down',
     });
+  });
+});
+
+describe('GeminiExtractor suite summary and observations', () => {
+  it('passes a valid suite summary through and keeps observations on the case', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          cases: [{ ...validRawCase(), observations: ['No assertion on the total'] }],
+          suite: { title: 'Carrito', description: 'Cubre el flujo de compra' },
+        }),
+        usageMetadata: {},
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).extract(input());
+
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.suite).toEqual({ title: 'Carrito', description: 'Cubre el flujo de compra' });
+    expect(outcome.cases[0].observations).toEqual(['No assertion on the total']);
+  });
+
+  it('reports no suite summary when the model omits it or sends an invalid one', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({ cases: [validRawCase()], suite: { title: '' } }),
+        usageMetadata: {},
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).extract(input());
+
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.suite).toBeNull();
   });
 });
