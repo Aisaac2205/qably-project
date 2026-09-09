@@ -30,6 +30,7 @@ interface FakePrisma {
   };
   suite: { findFirst: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
+  suiteProposal: { findFirst: jest.Mock; create: jest.Mock };
   extractedProposal: {
     findFirst: jest.Mock;
     findMany: jest.Mock;
@@ -75,6 +76,10 @@ function createPrisma(): FakePrisma {
         .fn()
         .mockResolvedValueOnce({ id: 'suite-by-name' })
         .mockResolvedValue({ id: 'suite-by-name' }),
+    },
+    suiteProposal: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 'suite-proposal-new' }),
     },
     evidence: {
       create: jest.fn().mockResolvedValue({ id: 'evidence-new' }),
@@ -158,10 +163,14 @@ function lastCall(mock: jest.Mock): CallArgs {
   return calls[calls.length - 1][0];
 }
 
-function extractedOutcome(cases: ReturnType<typeof extractedCase>[]) {
+function extractedOutcome(
+  cases: ReturnType<typeof extractedCase>[],
+  suite: { title: string; description: string } | null = null,
+) {
   return {
     kind: 'extracted' as const,
     cases,
+    suite,
     usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 },
   };
 }
@@ -1255,6 +1264,130 @@ describe('ExtractionProcessor — resilience', () => {
     expect(createCall.data).toMatchObject({
       needsManualReview: true,
       objective: 'extraction-failed',
+    });
+  });
+});
+
+describe('ExtractionProcessor — suite proposals, locale and observations', () => {
+  const firstTargetRow = {
+    projectId: 'project-1',
+    project: { organizationId: 'org-1', connection },
+  };
+  const targets = [
+    { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+    { testCaseId: 'case-2', automationKey: 'Cart > removes an item' },
+  ];
+  function documentFileJob(locale = 'es') {
+    return {
+      data: { kind: 'document-file', filePath: 'src/cart.spec.ts', targets, locale },
+    } as never;
+  }
+  function twoMatchedCases() {
+    return fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome(
+          [
+            extractedCase({
+              automationKey: 'Cart > adds an item',
+              observations: ['No assertion on the total'],
+            }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ],
+          { title: 'Carrito de compras', description: 'Cubre agregar y quitar artículos' },
+        ),
+      ),
+    );
+  }
+
+  it('creates one suite proposal per file-level job when the model returned a summary', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.suiteProposal.create).toHaveBeenCalledTimes(1);
+    expect(lastCall(prisma.suiteProposal.create).data).toMatchObject({
+      projectId: 'project-1',
+      suiteId: 'suite-1',
+      title: 'Carrito de compras',
+      description: 'Cubre agregar y quitar artículos',
+      status: 'in_review',
+      promptVersion: EXTRACTION_PROMPT_VERSION,
+    });
+  });
+
+  it('creates no suite proposal when the model omitted the summary', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([{ id: 'case-1', suiteId: 'suite-1' }]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([extractedCase({ automationKey: 'Cart > adds an item' })]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(documentFileJob());
+
+    expect(prisma.suiteProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('skips the suite proposal when one is already waiting in review for that suite', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+    prisma.suiteProposal.findFirst.mockResolvedValue({ id: 'pending-suite-proposal' });
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.suiteProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('stamps the job locale and keeps observations on each case proposal', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob('es'),
+    );
+
+    const created = (
+      prisma.extractedProposal.create.mock.calls as [{ data: Record<string, unknown> }][]
+    ).map(([call]) => call.data);
+    const first = created.find((data) => data.targetTestCaseId === 'case-1');
+    const second = created.find((data) => data.targetTestCaseId === 'case-2');
+    expect(first).toMatchObject({ locale: 'es', observations: ['No assertion on the total'] });
+    expect(second).toMatchObject({ locale: 'es' });
+    expect(second).not.toHaveProperty('observations');
+  });
+
+  it('stamps the locale on a manual-review fallback proposal too', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+
+    await build(
+      prisma,
+      fakeSourceReader(jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' })),
+      fakeExtractor(jest.fn()),
+    ).process(documentFileJob('en'));
+
+    expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
+      needsManualReview: true,
+      locale: 'en',
     });
   });
 });

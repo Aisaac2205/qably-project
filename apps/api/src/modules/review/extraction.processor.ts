@@ -11,6 +11,7 @@ import { TEST_CASE_EXTRACTOR } from '../ai/ai.tokens';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import type {
   ExtractedCase,
+  ExtractedSuite,
   TestCaseExtractor,
 } from '../ai/extraction.contracts';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
@@ -97,6 +98,10 @@ interface TxClient {
     findMany: PrismaService['extractedProposal']['findMany'];
     create: PrismaService['extractedProposal']['create'];
     update: PrismaService['extractedProposal']['update'];
+  };
+  suiteProposal: {
+    findFirst: PrismaService['suiteProposal']['findFirst'];
+    create: PrismaService['suiteProposal']['create'];
   };
   organization: { updateMany: PrismaService['organization']['updateMany'] };
   $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
@@ -449,7 +454,11 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const persisted = await this.persistDocumentFileTargets(matched, ctx);
+    const persisted = await this.persistDocumentFileTargets(
+      matched,
+      ctx,
+      outcome.suite,
+    );
     if (!persisted) {
       await this.fallbackForTargets(ctx, ctx.targets, NOT_ENTITLED_REASON);
       return;
@@ -474,6 +483,7 @@ export class ExtractionProcessor extends WorkerHost {
   private async persistDocumentFileTargets(
     matched: { target: DocumentFileTarget; testCase: ExtractedCase }[],
     ctx: DocumentFileJobContext,
+    suite: ExtractedSuite | null,
   ): Promise<boolean> {
     const connection = ctx.connection as ConnectionInfo;
     const suiteRows = await this.prisma.testCase.findMany({
@@ -531,6 +541,10 @@ export class ExtractionProcessor extends WorkerHost {
             expectedResult: testCase.expectedResult,
             priority: testCase.priority,
             promptVersion: EXTRACTION_PROMPT_VERSION,
+            locale: ctx.locale ?? null,
+            ...(testCase.observations === undefined
+              ? {}
+              : { observations: testCase.observations }),
             evidenceId: evidence.id,
             codeChangeId: null,
             automationKey: testCase.automationKey,
@@ -539,7 +553,56 @@ export class ExtractionProcessor extends WorkerHost {
         });
       }
 
+      await this.persistSuiteProposal(tx, ctx, suite, [
+        ...new Set(suiteIdByCaseId.values()),
+      ]);
+
       return true;
+    });
+  }
+
+  private async persistSuiteProposal(
+    tx: TxClient,
+    ctx: DocumentFileJobContext,
+    suite: ExtractedSuite | null,
+    suiteIds: string[],
+  ): Promise<void> {
+    if (suite === null || suiteIds.length !== 1) return;
+    const [suiteId] = suiteIds;
+    const connection = ctx.connection as ConnectionInfo;
+
+    const pending = await tx.suiteProposal.findFirst({
+      where: { suiteId, status: 'in_review' },
+      select: { id: true },
+    });
+    if (pending !== null) return;
+
+    const evidence = await tx.evidence.create({
+      data: {
+        projectId: ctx.projectId,
+        kind: 'SOURCE_EXCERPT',
+        title: ctx.filePath,
+        uri: buildBlobUrl(
+          connection.provider,
+          connection.repo,
+          ctx.ref,
+          ctx.filePath,
+        ),
+        excerpt: null,
+      },
+      select: { id: true },
+    });
+
+    await tx.suiteProposal.create({
+      data: {
+        projectId: ctx.projectId,
+        suiteId,
+        title: suite.title,
+        description: suite.description,
+        status: 'in_review',
+        evidenceId: evidence.id,
+        promptVersion: EXTRACTION_PROMPT_VERSION,
+      },
     });
   }
 
@@ -746,6 +809,10 @@ export class ExtractionProcessor extends WorkerHost {
           expectedResult: testCase.expectedResult,
           priority: testCase.priority,
           promptVersion: EXTRACTION_PROMPT_VERSION,
+          locale: ctx.locale ?? null,
+          ...(testCase.observations === undefined
+            ? {}
+            : { observations: testCase.observations }),
         };
 
         if (ctx.codeChangeId !== null) {
@@ -996,6 +1063,7 @@ export class ExtractionProcessor extends WorkerHost {
         objective: reason.slice(0, MAX_FALLBACK_OBJECTIVE_LENGTH),
         needsManualReview: true,
         promptVersion: EXTRACTION_PROMPT_VERSION,
+        locale: ctx.locale ?? null,
       },
     });
   }
