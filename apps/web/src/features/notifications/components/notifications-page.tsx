@@ -19,6 +19,7 @@ import { resolveNotificationLink } from '@/features/notifications/lib/resolve-no
 import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 
 const SEVERITY_CONFIG: Record<
   NotificationSeverity,
@@ -153,59 +154,44 @@ export function NotificationsPage() {
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Status Filter Tabs */}
-          <div
-            role="tablist"
-            aria-label="Filter status"
-            className="inline-flex p-1 rounded-lg border border-border/80 bg-canvas/40 gap-1 self-start sm:self-auto"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-label={t('notifications.filterAll')}
-              aria-selected={statusFilter === 'all'}
-              onClick={() => setStatusFilter('all')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all cursor-pointer active:scale-[0.98] ${
-                statusFilter === 'all'
-                  ? 'bg-surface text-default shadow-2xs font-semibold border border-border/60'
-                  : 'text-muted hover:text-default border border-transparent'
-              }`}
-            >
-              <span>{t('notifications.filterAll')}</span>
-              <span className="ml-1.5 text-[10px] text-muted">({notifications.length})</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-label={t('notifications.filterUnread')}
-              aria-selected={statusFilter === 'unread'}
-              onClick={() => setStatusFilter('unread')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all cursor-pointer active:scale-[0.98] ${
-                statusFilter === 'unread'
-                  ? 'bg-surface text-default shadow-2xs font-semibold border border-border/60'
-                  : 'text-muted hover:text-default border border-transparent'
-              }`}
-            >
-              <span>{t('notifications.filterUnread')}</span>
-              <span className="ml-1.5 text-[10px] font-bold text-primary">({unreadCount})</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-label={t('notifications.filterRead')}
-              aria-selected={statusFilter === 'read'}
-              onClick={() => setStatusFilter('read')}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-all cursor-pointer active:scale-[0.98] ${
-                statusFilter === 'read'
-                  ? 'bg-surface text-default shadow-2xs font-semibold border border-border/60'
-                  : 'text-muted hover:text-default border border-transparent'
-              }`}
-            >
-              <span>{t('notifications.filterRead')}</span>
-              <span className="ml-1.5 text-[10px] text-muted">({readCount})</span>
-            </button>
-          </div>
+          <SegmentedControl
+            className="self-start sm:self-auto"
+            label={t('notifications.filterStatus')}
+            semantics="tabs"
+            options={[
+              {
+                value: 'all' as const,
+                label: (
+                  <>
+                    <span>{t('notifications.filterAll')}</span>
+                    <span className="text-[10px] font-normal opacity-70">
+                      ({notifications.length})
+                    </span>
+                  </>
+                ),
+              },
+              {
+                value: 'unread' as const,
+                label: (
+                  <>
+                    <span>{t('notifications.filterUnread')}</span>
+                    <span className="text-[10px] font-normal opacity-70">({unreadCount})</span>
+                  </>
+                ),
+              },
+              {
+                value: 'read' as const,
+                label: (
+                  <>
+                    <span>{t('notifications.filterRead')}</span>
+                    <span className="text-[10px] font-normal opacity-70">({readCount})</span>
+                  </>
+                ),
+              },
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+          />
 
           {/* Quick Search */}
           <div className="relative flex-1 sm:max-w-xs">

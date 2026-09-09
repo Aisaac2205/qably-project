@@ -221,6 +221,13 @@ The system is flat by default. Resting surfaces (cards, KPI cards, the AI diff p
 - **Tooltip:** dark (`--foreground`-background) inverted popover with an arrow, zero default delay.
 - **Tabs:** underline-style tab list (`border-b`), selected tab gets a 2px primary underline.
 
+### SegmentedControl
+- **The one option selector in the product.** Any group of mutually exclusive options presented as a row of pills goes through `components/ui/segmented-control.tsx`. Six surfaces used to hand-roll this with six different selected states; there is now one.
+- **Selected state:** solid `--primary` fill with `--primary-fg` text (`bg-primary text-primary-fg shadow-2xs border border-primary`). The selected option is the only near-black element in the group, which is what makes it readable at a glance. Faint tints such as `primary/10` are not a selected state here.
+- **Track:** `rounded-lg` with `border-border/80` over `bg-canvas/40`, 1px gap between options.
+- **Two semantics, one look.** `semantics="tabs"` emits `role="tablist"` / `role="tab"` / `aria-selected` / `aria-controls` with roving tabindex and arrow, Home and End keys, for a switcher that owns tabpanels. `semantics="toggle"` (the default) emits `role="group"` with `aria-pressed` per button, for a filter that owns nothing. Picking the wrong one lies to screen readers, so the choice is explicit rather than inferred.
+- **Not this component:** the underline page tabs in Settings (navigation, not options), the multi-select technology chips on a project, and the active-conversation highlight in the chat sidebar (a list of things, not a set of options).
+
 ### List & Table Primitives
 - **EntityList:** a plain `<ul>` with `divide-y` row separators; the shared list primitive instead of ad hoc bordered rows.
 - **DataTable:** horizontally scrollable wrapper around a plain `<table>` with a screen-reader-only `<caption>`; never forces horizontal scroll to complete a primary decision per the roadmap's responsive rule, so dense tables must expose priority columns plus an inspector rather than relying on scroll alone.

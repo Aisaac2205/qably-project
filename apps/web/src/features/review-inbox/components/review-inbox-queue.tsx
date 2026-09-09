@@ -12,6 +12,7 @@ import type { ProposalListItem } from '../api/review.api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EntityList } from '@/components/ui/entity-list'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { StateView } from '@/components/ui/state-view'
 import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
@@ -211,36 +212,34 @@ export function ReviewInboxQueue({
           </button>
         </div>
 
-        {/* Status filter tabs, counts inline per status */}
-        <div className="flex items-center gap-1 overflow-x-auto pt-0.5">
-          {(['in_review', 'all', 'approved', 'rejected'] as const).map((status) => {
-            const isCurrent = statusFilter === status
-            const label =
-              status === 'in_review'
-                ? t('reviewInbox.filterInReview')
-                : status === 'approved'
-                ? t('reviewInbox.filterApproved')
-                : status === 'rejected'
-                ? t('reviewInbox.filterRejected')
-                : t('reviewInbox.filterAll')
-
-            return (
-              <button
-                key={status}
-                type="button"
-                aria-pressed={isCurrent}
-                onClick={() => onStatusFilterChange(status)}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all duration-150 ${
-                  isCurrent
-                    ? 'bg-primary/10 text-primary border border-primary/20'
-                    : 'text-muted hover:text-default hover:bg-surface-hover'
-                }`}
-              >
-                <span>{label}</span>{' '}
-                <span className="font-mono tabular-nums text-[10px] text-muted">{statusCounts[status]}</span>
-              </button>
-            )
-          })}
+        <div className="flex items-center overflow-x-auto pt-0.5">
+          <SegmentedControl
+            size="sm"
+            label={t('reviewInbox.filterStatus')}
+            options={(['in_review', 'all', 'approved', 'rejected'] as const).map(
+              (status) => ({
+                value: status,
+                label: (
+                  <>
+                    <span>
+                      {status === 'in_review'
+                        ? t('reviewInbox.filterInReview')
+                        : status === 'approved'
+                        ? t('reviewInbox.filterApproved')
+                        : status === 'rejected'
+                        ? t('reviewInbox.filterRejected')
+                        : t('reviewInbox.filterAll')}
+                    </span>
+                    <span className="font-mono tabular-nums text-[10px] font-normal opacity-70">
+                      {statusCounts[status]}
+                    </span>
+                  </>
+                ),
+              }),
+            )}
+            value={statusFilter}
+            onChange={onStatusFilterChange}
+          />
         </div>
       </div>
 

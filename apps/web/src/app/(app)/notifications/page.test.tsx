@@ -64,7 +64,7 @@ describe('NotificationsPage', () => {
     expect(runLinks.length).toBeGreaterThan(0)
     expect(runLinks[0]).toHaveAttribute('href', '/projects/proj-1/runs/run-12')
 
-    await user.click(screen.getByRole('tab', { name: 'Read' }))
+    await user.click(screen.getByRole('tab', { name: /^Read/ }))
     expect(
       screen.getByText('Discount calculation regressed in Checkout during run "#10".'),
     ).toBeInTheDocument()

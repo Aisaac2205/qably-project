@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { StateView } from '@/components/ui/state-view'
 import { WebhookSetupPanel } from '@/features/integrations'
 import { useTranslation } from '@/lib/i18n'
@@ -296,39 +297,19 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
                   </p>
                 </div>
               ) : (
-                <div
-                  className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-canvas border border-border/60 w-fit"
-                  role="group"
-                  aria-label={t('repository.detectedPattern')}
-                >
-                  <button
-                    type="button"
-                    aria-pressed={patternFilter === 'all'}
-                    onClick={() => setPatternFilter('all')}
-                    className={`min-h-6 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary ${
-                      patternFilter === 'all'
-                        ? 'bg-surface text-default font-semibold shadow-xs border border-border/80'
-                        : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent'
-                    }`}
-                  >
-                    {t('repository.filterAll')}
-                  </button>
-                  {source?.testFilePatterns.map((pattern) => (
-                    <button
-                      key={pattern}
-                      type="button"
-                      aria-pressed={patternFilter === pattern}
-                      onClick={() => setPatternFilter(pattern)}
-                      className={`min-h-6 rounded-lg px-3.5 py-1.5 font-mono text-xs font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary ${
-                        patternFilter === pattern
-                          ? 'bg-surface text-default font-semibold shadow-xs border border-border/80'
-                          : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent'
-                      }`}
-                    >
-                      {pattern}
-                    </button>
-                  ))}
-                </div>
+                <SegmentedControl
+                  className="flex-wrap"
+                  label={t('repository.detectedPattern')}
+                  options={[
+                    { value: 'all', label: t('repository.filterAll') },
+                    ...(source?.testFilePatterns ?? []).map((pattern) => ({
+                      value: pattern,
+                      label: <span className="font-mono">{pattern}</span>,
+                    })),
+                  ]}
+                  value={patternFilter}
+                  onChange={setPatternFilter}
+                />
               )}
 
               <ul className="space-y-3 pt-1">

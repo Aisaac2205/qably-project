@@ -9,6 +9,7 @@ import { ReviewCaseDetail } from './review-case-detail'
 import { ReviewToolbar } from './review-toolbar'
 import { ProjectChatPanel } from './project-chat-panel'
 import { ResizableSplit } from '@/components/ui/resizable-split'
+import { SegmentedControl } from '@/components/ui/segmented-control'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 import { projectRootPath } from '@/features/projects/lib/routes'
@@ -49,42 +50,27 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             : t('aiReview.casesPendingReview', { count: cases.length })}
         </p>
 
-        <div
-          role="tablist"
-          aria-label={t('aiReview.title')}
-          className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-canvas/60 border border-border/60 shrink-0"
-        >
-          <button
-            type="button"
-            id="ai-review-tab-review"
-            role="tab"
-            aria-selected={tab === 'review'}
-            aria-controls="ai-review-panel-review"
-            onClick={() => setTab('review')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary cursor-pointer ${
-              tab === 'review'
-                ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs'
-                : 'text-muted hover:text-default hover:bg-surface-hover border border-transparent'
-            }`}
-          >
-            {t('aiReview.reviewQueue')}
-          </button>
-          <button
-            type="button"
-            id="ai-review-tab-chat"
-            role="tab"
-            aria-selected={tab === 'chat'}
-            aria-controls="ai-review-panel-chat"
-            onClick={() => setTab('chat')}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary cursor-pointer ${
-              tab === 'chat'
-                ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs'
-                : 'text-muted hover:text-default hover:bg-surface-hover border border-transparent'
-            }`}
-          >
-            {t('aiReview.projectChat')}
-          </button>
-        </div>
+        <SegmentedControl
+          className="shrink-0"
+          label={t('aiReview.title')}
+          semantics="tabs"
+          options={[
+            {
+              value: 'review' as const,
+              label: t('aiReview.reviewQueue'),
+              id: 'ai-review-tab-review',
+              controls: 'ai-review-panel-review',
+            },
+            {
+              value: 'chat' as const,
+              label: t('aiReview.projectChat'),
+              id: 'ai-review-tab-chat',
+              controls: 'ai-review-panel-chat',
+            },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
       </div>
 
       <div
@@ -121,31 +107,20 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
                 className="h-full"
                 first={
                   <div className="flex flex-col h-full min-h-0 bg-surface">
-                    <div className="flex items-center gap-1.5 px-3.5 py-2.5 border-b border-border bg-canvas/30 shrink-0">
-                      <button
-                        type="button"
-                        aria-pressed={listFilter === 'all'}
-                        onClick={() => setListFilter('all')}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary ${
-                          listFilter === 'all'
-                            ? 'bg-primary/10 text-primary border border-primary/20'
-                            : 'text-muted hover:text-default hover:bg-surface-hover'
-                        }`}
-                      >
-                        {t('aiReview.filterAll')}
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={listFilter === 'duplicates'}
-                        onClick={() => setListFilter('duplicates')}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-150 active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary ${
-                          listFilter === 'duplicates'
-                            ? 'bg-primary/10 text-primary border border-primary/20'
-                            : 'text-muted hover:text-default hover:bg-surface-hover'
-                        }`}
-                      >
-                        {t('aiReview.filterDuplicates')}
-                      </button>
+                    <div className="flex items-center px-3 py-2.5 border-b border-border bg-canvas/30 shrink-0">
+                      <SegmentedControl
+                        size="sm"
+                        label={t('aiReview.filterCases')}
+                        options={[
+                          { value: 'all' as const, label: t('aiReview.filterAll') },
+                          {
+                            value: 'duplicates' as const,
+                            label: t('aiReview.filterDuplicates'),
+                          },
+                        ]}
+                        value={listFilter}
+                        onChange={setListFilter}
+                      />
                     </div>
                     <div className="flex-1 overflow-y-auto min-h-0">
                       <ReviewCaseList
