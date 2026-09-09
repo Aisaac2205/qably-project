@@ -72,6 +72,7 @@ describe('ReviewService.list', () => {
       priority: 'high',
       evidenceId: 'evidence-1',
       evidenceTitle: 'src/cart.spec.ts',
+      locale: null,
     });
   });
 

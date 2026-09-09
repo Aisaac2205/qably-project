@@ -31,7 +31,8 @@ const proposalRow = {
 
 interface FakePrisma {
   extractedProposal: { findFirst: jest.Mock; update: jest.Mock };
-  suite: { findFirst: jest.Mock };
+  suiteProposal: { findMany: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+  suite: { findFirst: jest.Mock; update: jest.Mock };
   testCase: { create: jest.Mock; update: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
   reviewDecision: { create: jest.Mock };
@@ -45,8 +46,14 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
       findFirst: jest.fn().mockResolvedValue({ ...proposalRow, ...overrides }),
       update: jest.fn().mockResolvedValue({ id: 'proposal-1' }),
     },
+    suiteProposal: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({ id: 'suite-proposal-1' }),
+    },
     suite: {
       findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
+      update: jest.fn().mockResolvedValue({ name: 'Carrito de compras' }),
     },
     testCase: {
       create: jest.fn().mockResolvedValue({ id: 'case-new' }),
@@ -586,5 +593,160 @@ describe('ReviewService.findOne', () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.needsManualReview).toBe(false);
+  });
+});
+
+describe('ReviewService suite proposals', () => {
+  const suiteProposalRow = {
+    id: 'suite-proposal-1',
+    projectId: 'project-1',
+    suiteId: 'suite-1',
+    title: 'Carrito de compras',
+    description: 'Cubre agregar y quitar artículos',
+    status: 'in_review' as FixtureStatus,
+    evidenceId: 'evidence-9',
+    createdAt: new Date('2026-09-09T10:00:00.000Z'),
+    decidedAt: null as Date | null,
+    suite: { name: 'cart.spec.ts', nameSource: 'ingestion' },
+  };
+
+  it('lists suite proposals of the organization with the current suite name and its source', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findMany.mockResolvedValue([suiteProposalRow]);
+
+    const items = await build(prisma).listSuiteProposals(org, { projectId: 'project-1' });
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        id: 'suite-proposal-1',
+        suiteName: 'cart.spec.ts',
+        suiteNameSource: 'ingestion',
+        title: 'Carrito de compras',
+        status: 'in_review',
+        createdAt: '2026-09-09T10:00:00.000Z',
+        decidedAt: null,
+      }),
+    ]);
+    expect(prisma.suiteProposal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          project: { organizationId: 'org-1' },
+          projectId: 'project-1',
+        }),
+      }),
+    );
+  });
+
+  it('approving renames and describes a suite whose name still came from ingestion', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findFirst.mockResolvedValue(suiteProposalRow);
+
+    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        proposalId: 'suite-proposal-1',
+        applied: true,
+        suiteId: 'suite-1',
+        suiteName: 'Carrito de compras',
+      },
+    });
+    expect(prisma.suite.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'suite-1' },
+        data: {
+          name: 'Carrito de compras',
+          description: 'Cubre agregar y quitar artículos',
+          nameSource: 'aeris',
+        },
+      }),
+    );
+    expect(prisma.suiteProposal.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'suite-proposal-1' },
+        data: expect.objectContaining({ status: 'approved' }),
+      }),
+    );
+  });
+
+  it('approving a proposal for a suite a person renamed records the decision but touches nothing', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findFirst.mockResolvedValue({
+      ...suiteProposalRow,
+      suite: { name: 'Checkout', nameSource: 'human' },
+    });
+
+    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        proposalId: 'suite-proposal-1',
+        applied: false,
+        suiteId: 'suite-1',
+        suiteName: 'Checkout',
+      },
+    });
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+    expect(prisma.suiteProposal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'approved' }) }),
+    );
+  });
+
+  it('a second Aeris proposal may refresh a name Aeris set before', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findFirst.mockResolvedValue({
+      ...suiteProposalRow,
+      suite: { name: 'Carrito', nameSource: 'aeris' },
+    });
+
+    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+
+    expect(result.ok && result.value.applied).toBe(true);
+    expect(prisma.suite.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejecting marks the proposal and leaves the suite alone', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findFirst.mockResolvedValue(suiteProposalRow);
+
+    const result = await build(prisma).rejectSuiteProposal(org, 'suite-proposal-1');
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        proposalId: 'suite-proposal-1',
+        applied: false,
+        suiteId: 'suite-1',
+        suiteName: 'cart.spec.ts',
+      },
+    });
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+    expect(prisma.suiteProposal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: 'rejected' }) }),
+    );
+  });
+
+  it('refuses to decide a proposal that is no longer in review', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findFirst.mockResolvedValue({ ...suiteProposalRow, status: 'approved' });
+
+    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+
+    expect(result).toEqual({ ok: false, error: 'invalid-transition' });
+  });
+});
+
+describe('ReviewService.publish locale', () => {
+  it('copies the proposal locale onto the published version', async () => {
+    const prisma = createPrisma({ locale: 'es' } as never);
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    const [call] = prisma.testCaseVersion.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).toMatchObject({ locale: 'es' });
   });
 });

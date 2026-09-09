@@ -701,3 +701,27 @@ describe('SuitesService health signals', () => {
     expect(result.value.cases[0].healthSignals).toContain('flaky');
   });
 });
+
+describe('SuitesService.update name source', () => {
+  it('marks the name as chosen by a person when the update renames the suite', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).update(owner, 'suite-1', { name: 'Checkout' });
+
+    expect(prisma.suite.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { name: 'Checkout', nameSource: 'human' },
+      }),
+    );
+  });
+
+  it('leaves the name source alone when only other fields change', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).update(owner, 'suite-1', { description: 'Pagos' });
+
+    expect(prisma.suite.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { description: 'Pagos' } }),
+    );
+  });
+});

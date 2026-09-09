@@ -24,6 +24,8 @@ import type {
   ProposalView,
   RejectionView,
   ReviewError,
+  SuiteProposalDecisionView,
+  SuiteProposalView,
 } from './review.contracts';
 import {
   bulkDecisionSchema,
@@ -85,6 +87,31 @@ export class ReviewController {
     query: ListProposalsQuery,
   ): Promise<ProposalView[]> {
     return this.review.list(org, query);
+  }
+
+  @Get('suite-proposals')
+  async listSuiteProposals(
+    @CurrentOrg() org: OrgContext,
+    @Query(new ZodValidationPipe(listProposalsQuerySchema))
+    query: ListProposalsQuery,
+  ): Promise<SuiteProposalView[]> {
+    return this.review.listSuiteProposals(org, query);
+  }
+
+  @Post('suite-proposals/:id/approve')
+  async approveSuiteProposal(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+  ): Promise<SuiteProposalDecisionView> {
+    return unwrap(await this.review.approveSuiteProposal(org, id));
+  }
+
+  @Post('suite-proposals/:id/reject')
+  async rejectSuiteProposal(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+  ): Promise<SuiteProposalDecisionView> {
+    return unwrap(await this.review.rejectSuiteProposal(org, id));
   }
 
   @Get(':id')

@@ -11,6 +11,8 @@ import type {
   ProposalView,
   RejectionView,
   ReviewError,
+  SuiteProposalDecisionView,
+  SuiteProposalView,
 } from './review.contracts';
 
 const PENDING_STATUS = 'in_review';
@@ -43,6 +45,8 @@ const VIEW_SELECT = {
   evidenceId: true,
   needsManualReview: true,
   targetTestCaseId: true,
+  locale: true,
+  observations: true,
   evidence: { select: { title: true } },
 } as const;
 
@@ -59,7 +63,15 @@ interface ViewRow {
   evidenceId: string;
   needsManualReview: boolean;
   targetTestCaseId: string | null;
+  locale?: string | null;
+  observations?: unknown;
   evidence: { title: string } | null;
+}
+
+function observationsOf(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const strings = raw.filter((item): item is string => typeof item === 'string');
+  return strings.length === 0 ? undefined : strings;
 }
 
 interface EvidenceRow {
@@ -95,6 +107,10 @@ function toView(row: ViewRow): ProposalView {
     evidenceId: row.evidenceId,
     needsManualReview: row.needsManualReview,
     evidenceTitle: row.evidence === null ? '' : row.evidence.title,
+    locale: row.locale ?? null,
+    ...(observationsOf(row.observations) === undefined
+      ? {}
+      : { observations: observationsOf(row.observations) }),
     ...(row.targetTestCaseId === null
       ? {}
       : { targetOfficialTestCaseId: row.targetTestCaseId }),
@@ -128,6 +144,52 @@ function toLink(row: LinkRow): ProposalDetailView['links'][number] {
   };
 }
 
+const HUMAN_NAME_SOURCE = 'human';
+const AERIS_NAME_SOURCE = 'aeris';
+
+const SUITE_PROPOSAL_SELECT = {
+  id: true,
+  projectId: true,
+  suiteId: true,
+  title: true,
+  description: true,
+  status: true,
+  evidenceId: true,
+  createdAt: true,
+  decidedAt: true,
+  suite: { select: { name: true, nameSource: true } },
+} as const;
+
+interface SuiteProposalRow {
+  id: string;
+  projectId: string;
+  suiteId: string;
+  title: string;
+  description: string;
+  status: ProposalView['status'];
+  evidenceId: string;
+  createdAt: Date;
+  decidedAt: Date | null;
+  suite: { name: string; nameSource: string };
+}
+
+function toSuiteProposalView(row: SuiteProposalRow): SuiteProposalView {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    suiteId: row.suiteId,
+    suiteName: row.suite.name,
+    suiteNameSource: row.suite.nameSource as SuiteProposalView['suiteNameSource'],
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    evidenceId: row.evidenceId,
+    locale: null,
+    createdAt: row.createdAt.toISOString(),
+    decidedAt: row.decidedAt === null ? null : row.decidedAt.toISOString(),
+  };
+}
+
 const PROPOSAL_SELECT = {
   id: true,
   projectId: true,
@@ -142,6 +204,7 @@ const PROPOSAL_SELECT = {
   targetTestCaseId: true,
   suiteId: true,
   automationKey: true,
+  locale: true,
   evidence: { select: { id: true } },
   codeChange: { select: { filePath: true } },
   targetTestCase: { select: { automationFilePath: true } },
@@ -151,6 +214,7 @@ interface ProposalRow {
   id: string;
   projectId: string;
   status: string;
+  locale?: string | null;
   title: string;
   objective: string;
   preconditions: string[];
@@ -344,6 +408,107 @@ export class ReviewService {
     return results;
   }
 
+  async listSuiteProposals(
+    org: OrgContext,
+    filters: ListProposalsFilters,
+  ): Promise<SuiteProposalView[]> {
+    const rows = (await this.prisma.suiteProposal.findMany({
+      where: {
+        project: { organizationId: org.organizationId },
+        ...(filters.projectId === undefined
+          ? {}
+          : { projectId: filters.projectId }),
+        ...(filters.status === undefined ? {} : { status: filters.status }),
+      },
+      orderBy: { createdAt: 'desc' },
+      select: SUITE_PROPOSAL_SELECT,
+    })) as SuiteProposalRow[];
+
+    return rows.map(toSuiteProposalView);
+  }
+
+  async approveSuiteProposal(
+    org: OrgContext,
+    proposalId: string,
+  ): Promise<Result<SuiteProposalDecisionView, ReviewError>> {
+    const pending = await this.pendingSuiteProposal(org, proposalId);
+    if (!pending.ok) return pending;
+    const proposal = pending.value;
+    const applies = proposal.suite.nameSource !== HUMAN_NAME_SOURCE;
+
+    try {
+      const suiteName = await this.prisma.$transaction(async (tx) => {
+        const suite = applies
+          ? await tx.suite.update({
+              where: { id: proposal.suiteId },
+              data: {
+                name: proposal.title,
+                description: proposal.description,
+                nameSource: AERIS_NAME_SOURCE,
+              },
+              select: { name: true },
+            })
+          : { name: proposal.suite.name };
+
+        await tx.suiteProposal.update({
+          where: { id: proposal.id },
+          data: { status: 'approved', decidedAt: new Date() },
+        });
+
+        return suite.name;
+      });
+
+      return ok({
+        proposalId: proposal.id,
+        applied: applies,
+        suiteId: proposal.suiteId,
+        suiteName,
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) return err('name-taken');
+      throw error;
+    }
+  }
+
+  async rejectSuiteProposal(
+    org: OrgContext,
+    proposalId: string,
+  ): Promise<Result<SuiteProposalDecisionView, ReviewError>> {
+    const pending = await this.pendingSuiteProposal(org, proposalId);
+    if (!pending.ok) return pending;
+    const proposal = pending.value;
+
+    await this.prisma.suiteProposal.update({
+      where: { id: proposal.id },
+      data: { status: 'rejected', decidedAt: new Date() },
+    });
+
+    return ok({
+      proposalId: proposal.id,
+      applied: false,
+      suiteId: proposal.suiteId,
+      suiteName: proposal.suite.name,
+    });
+  }
+
+  private async pendingSuiteProposal(
+    org: OrgContext,
+    proposalId: string,
+  ): Promise<Result<SuiteProposalRow, ReviewError>> {
+    const row = (await this.prisma.suiteProposal.findFirst({
+      where: {
+        id: proposalId,
+        project: { organizationId: org.organizationId },
+      },
+      select: SUITE_PROPOSAL_SELECT,
+    })) as SuiteProposalRow | null;
+
+    if (row === null) return err('not-found');
+    if (row.status !== PENDING_STATUS) return err('invalid-transition');
+
+    return ok(row);
+  }
+
   private async pending(
     org: OrgContext,
     proposalId: string,
@@ -412,6 +577,7 @@ export class ReviewService {
           steps: proposal.steps,
           expectedResult: proposal.expectedResult,
           priority: proposal.priority,
+          locale: proposal.locale ?? null,
         },
         select: { id: true, version: true },
       });

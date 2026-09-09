@@ -498,6 +498,29 @@ export interface ExtractedProposal {
   evidenceId: string
   needsManualReview: boolean
   targetOfficialTestCaseId?: string
+  locale?: string | null
+  observations?: string[]
+}
+export type SuiteNameSource = 'ingestion' | 'human' | 'aeris'
+export interface SuiteProposal {
+  id: string
+  projectId: string
+  suiteId: string
+  suiteName: string
+  suiteNameSource: SuiteNameSource
+  title: string
+  description: string
+  status: ProposalStatus
+  evidenceId: string
+  locale: string | null
+  createdAt: string
+  decidedAt: string | null
+}
+export interface SuiteProposalDecision {
+  proposalId: string
+  applied: boolean
+  suiteId: string
+  suiteName: string
 }
 export type DocumentFilesSkipReason = 'no-source-file' | 'already-pending'
 export interface DocumentFilesSkip {

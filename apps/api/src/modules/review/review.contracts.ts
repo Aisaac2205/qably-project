@@ -3,12 +3,17 @@ import type {
   Evidence,
   ExtractedProposal,
   ProposalStatus,
+  SuiteProposal,
+  SuiteProposalDecision,
   TraceabilityLink,
 } from '@qably/types';
 
 export interface ProposalView extends ExtractedProposal {
   evidenceTitle: string;
 }
+
+export type SuiteProposalView = SuiteProposal;
+export type SuiteProposalDecisionView = SuiteProposalDecision;
 
 export interface ProposalDetailView extends ProposalView {
   evidence: Evidence | null;
