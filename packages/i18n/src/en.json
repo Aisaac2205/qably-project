@@ -435,6 +435,7 @@
     "noProvider": "No AI provider connected",
     "casesPendingReview": "{{count}} cases pending review",
     "casePendingReview": "{{count}} case pending review",
+    "backToQueue": "Back to the review queue",
     "reviewQueue": "Review Queue",
     "projectChat": "Project Chat",
     "filterAll": "All",

@@ -435,6 +435,7 @@
     "noProvider": "Sin proveedor de IA conectado",
     "casesPendingReview": "{{count}} casos pendientes de revisión",
     "casePendingReview": "{{count}} caso pendiente de revisión",
+    "backToQueue": "Volver a la Cola de Revisión",
     "reviewQueue": "Cola de Revisión",
     "projectChat": "Chat del Proyecto",
     "filterAll": "Todos",

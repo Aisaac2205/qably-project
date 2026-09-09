@@ -1,10 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { List } from '@phosphor-icons/react'
-import { ASSISTANT_MODEL_NAME } from '@qably/types'
+import { CaretLeft, List } from '@phosphor-icons/react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
-import { AerisIcon } from '@/components/icons/aeris-icon'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useTranslation } from '@/lib/i18n'
 import { ChatMessageList } from './chat-message-list'
@@ -22,7 +20,13 @@ function getInitialSidebarCollapsed(): boolean {
   }
 }
 
-export function ProjectChatPanel({ projectId }: { projectId: string }) {
+export function ProjectChatPanel({
+  projectId,
+  onExit,
+}: {
+  projectId: string
+  onExit?: () => void
+}) {
   const {
     threads,
     activeThreadId,
@@ -83,7 +87,7 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
         <SheetContent
           side="left"
           showCloseButton={false}
-          className="w-64 gap-0 p-0 sm:max-w-64 md:hidden"
+          className="w-60 gap-0 border-r-0 p-0 sm:max-w-60 md:hidden"
         >
           <SheetTitle className="sr-only">{t('aiReview.chatConversations')}</SheetTitle>
           <ChatThreadSidebar
@@ -104,6 +108,18 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
 
       <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
         <div className="flex items-center gap-2 shrink-0 border-b border-border bg-surface px-3 py-2 sm:px-4">
+          {onExit && (
+            <button
+              type="button"
+              onClick={onExit}
+              aria-label={t('aiReview.backToQueue')}
+              title={t('aiReview.backToQueue')}
+              className="size-8 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <CaretLeft size={18} weight="bold" aria-hidden="true" />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setIsDrawerOpen(true)}
@@ -117,12 +133,6 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
           <h2 className="flex-1 min-w-0 truncate text-xs sm:text-sm font-semibold text-default">
             {activeTitle}
           </h2>
-
-          <p className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-border/60 bg-canvas/50 px-2 py-1 text-[11px] font-semibold text-muted">
-            <AerisIcon size={13} className="text-primary" />
-            <span className="sr-only">{t('aiReview.modelLabel')}: </span>
-            <span>{ASSISTANT_MODEL_NAME}</span>
-          </p>
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">

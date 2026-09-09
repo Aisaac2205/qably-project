@@ -40,6 +40,19 @@ vi.mock('@/features/ai-review/api/chat.api', () => ({
   getThread: vi.fn(),
   sendMessage: vi.fn(),
   sendToReview: vi.fn(),
+  deleteThread: vi.fn(),
+}))
+
+let urlTab: string | null = null
+const routerReplace = vi.fn((url: string) => {
+  urlTab = url.includes('tab=chat') ? 'chat' : null
+})
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: routerReplace, push: vi.fn(), refresh: vi.fn() }),
+  usePathname: () => '/projects/proj-1/ai-review',
+  useSearchParams: () =>
+    new URLSearchParams(urlTab === null ? '' : `tab=${urlTab}`),
 }))
 
 function renderIsolated(projectId: string) {
@@ -57,6 +70,8 @@ describe('AiReviewPage', () => {
   beforeEach(() => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
+    urlTab = null
+    routerReplace.mockClear()
     vi.mocked(reviewApi.listProposals).mockImplementation((filters: ProposalFilters) =>
       Promise.resolve(proposalListFixturesFor(filters)),
     )
@@ -103,20 +118,82 @@ describe('AiReviewPage', () => {
     expect(screen.getByText('What suites have the most pending cases?')).toBeInTheDocument()
   })
 
-  it('keeps the chat draft text when switching away from and back to the Project Chat tab', async () => {
+  it('gives the chat the whole page, with no breadcrumbs and no tab bar to go back through', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      renderWithQuery(<AiReviewPage projectId="proj-1" />)
+    })
+
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
+
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(document.getElementById('ai-review-panel-review')).toHaveAttribute('hidden')
+  })
+
+  it('records the open chat in the URL so the sidebar can lead back out', async () => {
     const user = userEvent.setup()
     await act(async () => {
       renderWithQuery(<AiReviewPage projectId="proj-1" />)
     })
 
     await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
-    const textarea = screen.getByRole('textbox', { name: 'Message' })
-    await user.type(textarea, 'Draft text')
 
-    await user.click(screen.getByRole('tab', { name: 'Review Queue' }))
-    const chatPanel = document.getElementById('ai-review-panel-chat')
-    expect(chatPanel).toHaveAttribute('hidden')
-    expect(document.getElementById('ai-review-panel-review')).not.toHaveAttribute('hidden')
+    expect(routerReplace).toHaveBeenCalledWith(
+      '/projects/proj-1/ai-review?tab=chat',
+      { scroll: false },
+    )
+  })
+
+  it('leaves the chat through the back control and restores the page chrome', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      renderWithQuery(<AiReviewPage projectId="proj-1" />)
+    })
+
+    await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Back to the review queue' }))
+
+    expect(screen.getByRole('tablist')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeInTheDocument()
+    expect(routerReplace).toHaveBeenLastCalledWith('/projects/proj-1/ai-review', {
+      scroll: false,
+    })
+  })
+
+  it('opens straight into the chat when the URL asks for it', async () => {
+    urlTab = 'chat'
+    await act(async () => {
+      renderIsolated('proj-1')
+    })
+
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
+    expect(document.getElementById('ai-review-panel-chat')).not.toHaveAttribute('hidden')
+  })
+
+  it('keeps the chat draft when the sidebar drops the tab and the user comes back', async () => {
+    const user = userEvent.setup()
+    const view = renderIsolated('proj-1')
+    await act(async () => {})
+
+    await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
+    await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Draft text')
+
+    urlTab = null
+    await act(async () => {
+      view.rerender(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })}>
+          <AiReviewPage projectId="proj-1" />
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(screen.getByRole('tablist')).toBeInTheDocument()
+    expect(document.getElementById('ai-review-panel-chat')).toHaveAttribute('hidden')
 
     await user.click(screen.getByRole('tab', { name: 'Project Chat' }))
     expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('Draft text')

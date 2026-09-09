@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
@@ -29,55 +30,85 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
     skipSelected,
   } = useAiReview(projectId)
   const { t } = useTranslation()
-  const [tab, setTab] = useState<'review' | 'chat'>('review')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const urlTab = searchParams.get('tab') === 'chat' ? 'chat' : 'review'
+  const [tab, setTab] = useState<'review' | 'chat'>(urlTab)
+  const [syncedUrlTab, setSyncedUrlTab] = useState<'review' | 'chat'>(urlTab)
   const [listFilter, setListFilter] = useState<'all' | 'duplicates'>('all')
 
+  if (urlTab !== syncedUrlTab) {
+    setSyncedUrlTab(urlTab)
+    setTab(urlTab)
+  }
+
+  const openTab = useCallback(
+    (next: 'review' | 'chat') => {
+      setTab(next)
+      router.replace(next === 'chat' ? `${pathname}?tab=chat` : pathname, {
+        scroll: false,
+      })
+    },
+    [router, pathname],
+  )
+
+  const isChat = tab === 'chat'
+
   return (
-    <div className="w-full flex-1 flex flex-col h-full min-h-0 space-y-4 p-4 sm:p-6 text-default animate-page-enter">
-      <Breadcrumbs
-        items={[
-          { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-          { label: t('aiReview.title') },
-        ]}
-      />
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 pt-1 pb-0.5">
-        <h1 className="sr-only">{t('aiReview.title')}</h1>
-        <p className="text-xs sm:text-sm text-muted">
-          {cases.length === 1
-            ? t('aiReview.casePendingReview', { count: cases.length })
-            : t('aiReview.casesPendingReview', { count: cases.length })}
-        </p>
-
-        <SegmentedControl
-          className="shrink-0"
-          label={t('aiReview.title')}
-          semantics="tabs"
-          options={[
-            {
-              value: 'review' as const,
-              label: t('aiReview.reviewQueue'),
-              id: 'ai-review-tab-review',
-              controls: 'ai-review-panel-review',
-            },
-            {
-              value: 'chat' as const,
-              label: t('aiReview.projectChat'),
-              id: 'ai-review-tab-chat',
-              controls: 'ai-review-panel-chat',
-            },
+    <div
+      className={`w-full flex-1 flex flex-col h-full min-h-0 text-default animate-page-enter ${
+        isChat ? '' : 'space-y-4 p-4 sm:p-6'
+      }`}
+    >
+      {!isChat && (
+        <Breadcrumbs
+          items={[
+            { label: t('suites.breadcrumbProjects'), href: '/projects' },
+            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+            { label: t('aiReview.title') },
           ]}
-          value={tab}
-          onChange={setTab}
         />
-      </div>
+      )}
+
+      {!isChat && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 pt-1 pb-0.5">
+          <h1 className="sr-only">{t('aiReview.title')}</h1>
+          <p className="text-xs sm:text-sm text-muted">
+            {cases.length === 1
+              ? t('aiReview.casePendingReview', { count: cases.length })
+              : t('aiReview.casesPendingReview', { count: cases.length })}
+          </p>
+
+          <SegmentedControl
+            className="shrink-0"
+            label={t('aiReview.title')}
+            semantics="tabs"
+            options={[
+              {
+                value: 'review' as const,
+                label: t('aiReview.reviewQueue'),
+                id: 'ai-review-tab-review',
+                controls: 'ai-review-panel-review',
+              },
+              {
+                value: 'chat' as const,
+                label: t('aiReview.projectChat'),
+                id: 'ai-review-tab-chat',
+                controls: 'ai-review-panel-chat',
+              },
+            ]}
+            value={tab}
+            onChange={openTab}
+          />
+        </div>
+      )}
 
       <div
         id="ai-review-panel-review"
-        role="tabpanel"
-        aria-labelledby="ai-review-tab-review"
-        hidden={tab !== 'review'}
+        role={isChat ? undefined : 'tabpanel'}
+        aria-labelledby={isChat ? undefined : 'ai-review-tab-review'}
+        hidden={isChat}
         className="flex-1 min-h-0"
       >
         {isLoading ? (
@@ -160,13 +191,13 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
 
       <div
         id="ai-review-panel-chat"
-        role="tabpanel"
-        aria-labelledby="ai-review-tab-chat"
-        hidden={tab !== 'chat'}
-        className="flex-1 min-h-0 -mx-4 -mb-4 sm:mx-0 sm:mb-0"
+        role={isChat ? undefined : 'tabpanel'}
+        aria-labelledby={isChat ? undefined : 'ai-review-tab-chat'}
+        hidden={!isChat}
+        className="flex-1 min-h-0"
       >
-        <div className="flex flex-col h-full min-h-0 border-y border-border bg-surface overflow-hidden sm:rounded-xl sm:border sm:shadow-card">
-          <ProjectChatPanel projectId={projectId} />
+        <div className="flex flex-col h-full min-h-0 bg-surface overflow-hidden">
+          <ProjectChatPanel projectId={projectId} onExit={() => openTab('review')} />
         </div>
       </div>
     </div>

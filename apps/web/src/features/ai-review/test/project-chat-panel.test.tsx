@@ -167,6 +167,40 @@ describe('ProjectChatPanel', () => {
     expect(within(drawer).getByText('How many cases are pending?')).toBeInTheDocument()
   })
 
+  it('offers no back control unless an exit is wired', async () => {
+    listThreads.mockResolvedValue([])
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    expect(
+      screen.queryByRole('button', { name: /back to the review queue|volver a la cola/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('reports the exit when the back control is used', async () => {
+    listThreads.mockResolvedValue([])
+    const onExit = vi.fn()
+    const user = userEvent.setup()
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    })
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <ProjectChatPanel projectId="proj-1" onExit={onExit} />
+        </QueryClientProvider>,
+      )
+    })
+
+    await user.click(
+      screen.getByRole('button', { name: /back to the review queue|volver a la cola/i }),
+    )
+    expect(onExit).toHaveBeenCalledTimes(1)
+  })
+
   it('closes the drawer once a conversation is picked', async () => {
     listThreads.mockResolvedValue([thread])
     getThread.mockResolvedValue(threadDetailAfterReply)
