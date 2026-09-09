@@ -36,6 +36,22 @@ export interface RejectionResult {
   decisionId: string
 }
 
+export type BulkDecisionOutcome = 'approved' | 'rejected' | 'skipped'
+
+export type BulkDecisionErrorCode =
+  | 'not-found'
+  | 'invalid-transition'
+  | 'missing-evidence'
+  | 'incomplete-proposal'
+  | 'missing-suite'
+  | 'name-taken'
+
+export interface BulkDecisionItemResult {
+  id: string
+  outcome: BulkDecisionOutcome
+  reason?: BulkDecisionErrorCode
+}
+
 function buildQuery(filters: ProposalFilters): string {
   const params = new URLSearchParams()
 
@@ -83,5 +99,19 @@ export function rejectProposal(
   return apiRequest<RejectionResult>(`/review/proposals/${id}/reject`, {
     method: 'POST',
     body: comment === undefined ? {} : { comment },
+  })
+}
+
+export function approveProposals(ids: string[]): Promise<BulkDecisionItemResult[]> {
+  return apiRequest<BulkDecisionItemResult[]>('/review/proposals/approve', {
+    method: 'POST',
+    body: { ids },
+  })
+}
+
+export function rejectProposals(ids: string[]): Promise<BulkDecisionItemResult[]> {
+  return apiRequest<BulkDecisionItemResult[]>('/review/proposals/reject', {
+    method: 'POST',
+    body: { ids },
   })
 }

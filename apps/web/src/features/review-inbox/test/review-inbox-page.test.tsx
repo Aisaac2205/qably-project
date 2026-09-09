@@ -39,6 +39,11 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
       decisionId: 'decision-1',
     }),
     rejectProposal: vi.fn().mockResolvedValue({ decisionId: 'decision-1' }),
+    approveProposals: vi.fn().mockResolvedValue([
+      { id: 'proposal-ai-3', outcome: 'approved' },
+      { id: 'proposal-ai-4', outcome: 'skipped', reason: 'incomplete-proposal' },
+    ]),
+    rejectProposals: vi.fn().mockResolvedValue([{ id: 'proposal-ai-3', outcome: 'rejected' }]),
   }
 })
 
@@ -212,5 +217,49 @@ describe('ReviewInboxPage', () => {
     await user.keyboard('d')
 
     expect(duplicateButton).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  describe('bulk approve/reject', () => {
+    it('shows the bulk action bar naming the selection count once a proposal is checked', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
+
+      const checkboxes = screen.getAllByRole('checkbox', { name: 'Select proposal' })
+      await user.click(checkboxes[0])
+
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Approve selected' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reject selected' })).toBeInTheDocument()
+    })
+
+    it('bulk-approves the checked proposals and shows a per-item summary', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      const checkboxes = screen.getAllByRole('checkbox', { name: 'Select proposal' })
+      await user.click(checkboxes[0])
+      await user.click(checkboxes[1])
+      await user.click(screen.getByRole('button', { name: 'Approve selected' }))
+
+      expect(await screen.findByRole('status')).toHaveTextContent(
+        /1 approved, 1 skipped \(1 for incomplete proposal\)/i,
+      )
+      expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
+    })
+
+    it('selects every pending proposal with the select-all checkbox', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      const selectAll = screen.getByRole('checkbox', { name: 'Select all proposals' })
+      await user.click(selectAll)
+
+      const checkboxes = screen.getAllByRole('checkbox', { name: 'Select proposal' })
+      for (const checkbox of checkboxes) {
+        expect(checkbox).toHaveAttribute('data-checked', '')
+      }
+    })
   })
 })

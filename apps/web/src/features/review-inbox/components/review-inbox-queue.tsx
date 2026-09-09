@@ -11,6 +11,7 @@ import {
 import type { ProposalListItem } from '../api/review.api'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { EntityList } from '@/components/ui/entity-list'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { StateView } from '@/components/ui/state-view'
@@ -31,6 +32,13 @@ export interface ReviewInboxQueueProps {
   onToggleDuplicateOnly: () => void
   searchQuery: string
   onSearchQueryChange: (query: string) => void
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
+  onToggleSelectAll: (ids: string[]) => void
+  onBulkApprove: () => void
+  onBulkReject: () => void
+  isBulkApproving: boolean
+  isBulkRejecting: boolean
 }
 
 function ReviewProposalQueueRow({
@@ -38,11 +46,15 @@ function ReviewProposalQueueRow({
   isSelected,
   onSelect,
   projectName,
+  isChecked,
+  onToggleCheck,
 }: {
   proposal: ProposalListItem
   isSelected: boolean
   onSelect: (id: string) => void
   projectName?: string
+  isChecked: boolean
+  onToggleCheck: (id: string) => void
 }) {
   const { t } = useTranslation()
 
@@ -51,12 +63,21 @@ function ReviewProposalQueueRow({
   const isRejected = proposal.status === 'rejected'
 
   return (
-    <li>
+    <li className="flex items-stretch">
+      <div className="flex w-9 shrink-0 items-center justify-center">
+        {isPending && (
+          <Checkbox
+            checked={isChecked}
+            onCheckedChange={() => onToggleCheck(proposal.id)}
+            aria-label={t('reviewInbox.selectProposal')}
+          />
+        )}
+      </div>
       <button
         type="button"
         aria-current={isSelected ? 'true' : undefined}
         onClick={() => onSelect(proposal.id)}
-        className={`w-full text-left px-3.5 py-2.5 transition-colors duration-150 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+        className={`flex-1 min-w-0 text-left pr-3.5 py-2.5 transition-colors duration-150 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary ${
           isSelected
             ? 'bg-surface-hover/90 border-l-4 border-l-primary'
             : 'border-l-4 border-l-transparent'
@@ -126,6 +147,13 @@ export function ReviewInboxQueue({
   onToggleDuplicateOnly,
   searchQuery,
   onSearchQueryChange,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onBulkApprove,
+  onBulkReject,
+  isBulkApproving,
+  isBulkRejecting,
 }: ReviewInboxQueueProps) {
   const { t } = useTranslation()
   const { projects } = useProjects()
@@ -157,6 +185,9 @@ export function ReviewInboxQueue({
   }
 
   const filteredProposals = scopedProposals.filter((p) => statusFilter === 'all' || p.status === statusFilter)
+  const pendingInFiltered = filteredProposals.filter((p) => p.status === 'in_review')
+  const allPendingSelected =
+    pendingInFiltered.length > 0 && pendingInFiltered.every((p) => selectedIds.has(p.id))
 
   return (
     <Card className="rounded-none border-0 h-full flex flex-col justify-between overflow-hidden bg-surface">
@@ -243,6 +274,48 @@ export function ReviewInboxQueue({
         </div>
       </div>
 
+      {/* Bulk selection bar */}
+      {pendingInFiltered.length > 0 && (
+        <div className="flex items-center justify-between gap-2 border-b border-border bg-canvas/20 px-3.5 py-2 shrink-0">
+          <div className="flex items-center gap-2 text-xs font-medium text-default">
+            <Checkbox
+              checked={allPendingSelected}
+              onCheckedChange={() => onToggleSelectAll(pendingInFiltered.map((p) => p.id))}
+              aria-label={
+                selectedIds.size > 0
+                  ? t('reviewInbox.selectedCount', { count: selectedIds.size })
+                  : t('reviewInbox.selectAllProposals')
+              }
+            />
+            <span aria-hidden="true">
+              {selectedIds.size > 0
+                ? t('reviewInbox.selectedCount', { count: selectedIds.size })
+                : t('reviewInbox.selectAllProposals')}
+            </span>
+          </div>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onBulkApprove}
+                disabled={isBulkApproving}
+                className="rounded-md border border-pass/30 bg-pass-bg px-2 py-1 text-[11px] font-semibold text-pass transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isBulkApproving ? t('reviewInbox.bulkApproving') : t('reviewInbox.bulkApprove')}
+              </button>
+              <button
+                type="button"
+                onClick={onBulkReject}
+                disabled={isBulkRejecting}
+                className="rounded-md border border-fail/30 bg-fail-bg px-2 py-1 text-[11px] font-semibold text-fail transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isBulkRejecting ? t('reviewInbox.bulkRejecting') : t('reviewInbox.bulkReject')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Proposals List */}
       <CardContent className="p-0 flex-1 overflow-y-auto">
         {filteredProposals.length === 0 ? (
@@ -261,6 +334,8 @@ export function ReviewInboxQueue({
                 isSelected={proposal.id === selectedId}
                 onSelect={onSelect}
                 projectName={projectMap.get(proposal.projectId)}
+                isChecked={selectedIds.has(proposal.id)}
+                onToggleCheck={onToggleSelect}
               />
             ))}
           </EntityList>

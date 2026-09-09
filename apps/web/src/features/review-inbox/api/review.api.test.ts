@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   approveProposal,
+  approveProposals,
   getProposal,
   listProposals,
   rejectProposal,
+  rejectProposals,
 } from './review.api'
 
 const fetchMock = vi.fn()
@@ -99,5 +101,23 @@ describe('review.api', () => {
     const [url, init] = lastCall()
     expect(url).toMatch(/\/review\/proposals\/proposal-1\/reject$/)
     expect(init.method).toBe('POST')
+  })
+
+  it('bulk-approves a list of proposal ids', async () => {
+    await approveProposals(['proposal-1', 'proposal-2'])
+
+    const [url, init] = lastCall()
+    expect(url).toMatch(/\/review\/proposals\/approve$/)
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(JSON.stringify({ ids: ['proposal-1', 'proposal-2'] }))
+  })
+
+  it('bulk-rejects a list of proposal ids', async () => {
+    await rejectProposals(['proposal-1'])
+
+    const [url, init] = lastCall()
+    expect(url).toMatch(/\/review\/proposals\/reject$/)
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe(JSON.stringify({ ids: ['proposal-1'] }))
   })
 })

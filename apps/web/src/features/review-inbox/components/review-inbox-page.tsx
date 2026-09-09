@@ -8,6 +8,9 @@ import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '../hooks/use-proposals'
 import { useProposalDecision } from '../hooks/use-proposal-decision'
+import { useBulkProposalDecision } from '../hooks/use-bulk-proposal-decision'
+import { bulkDecisionReasonKey, summarizeBulkResults } from '../lib/bulk-decision-reason'
+import type { BulkDecisionItemResult } from '../api/review.api'
 import { useTranslation } from '@/lib/i18n'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue, type ReviewQueueStatusFilter } from './review-inbox-queue'
@@ -25,6 +28,7 @@ export function ReviewInboxPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>(
     () => searchParams.get('proposal') ?? undefined,
   )
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [feedbackToast, setFeedbackToast] = useState<{
     message: string
     type: 'success' | 'info'
@@ -106,6 +110,61 @@ export function ReviewInboxPage() {
     })
   }, [t])
 
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id))
+      return allSelected ? new Set() : new Set(ids)
+    })
+  }, [])
+
+  const buildBulkSummary = useCallback(
+    (results: BulkDecisionItemResult[], kind: 'approve' | 'reject') => {
+      const summary = summarizeBulkResults(results)
+      const base = t(kind === 'approve' ? 'reviewInbox.bulkApproveSummary' : 'reviewInbox.bulkRejectSummary', {
+        approved: summary.succeeded,
+        rejected: summary.succeeded,
+        skipped: summary.skipped,
+      })
+      const reasons = summary.skippedByReason
+        .map(({ reason, count }) =>
+          t('reviewInbox.bulkSkipReason', { count, reason: t(`reviewInbox.${bulkDecisionReasonKey(reason)}`) }),
+        )
+        .join(', ')
+
+      return reasons ? `${base} (${reasons})` : base
+    },
+    [t],
+  )
+
+  const { approveMany, rejectMany, isApproving: isBulkApproving, isRejecting: isBulkRejecting } =
+    useBulkProposalDecision({
+      onApproved: (results) => {
+        setFeedbackToast({ message: buildBulkSummary(results, 'approve'), type: 'success' })
+        setSelectedIds(new Set())
+      },
+      onRejected: (results) => {
+        setFeedbackToast({ message: buildBulkSummary(results, 'reject'), type: 'info' })
+        setSelectedIds(new Set())
+      },
+    })
+
+  const handleBulkApprove = useCallback(() => {
+    approveMany(Array.from(selectedIds))
+  }, [approveMany, selectedIds])
+
+  const handleBulkReject = useCallback(() => {
+    rejectMany(Array.from(selectedIds))
+  }, [rejectMany, selectedIds])
+
   useKeyboardShortcuts({
     a: () => {
       if (selectedProposal?.status === 'in_review') handleApprove(selectedProposal.id)
@@ -183,6 +242,13 @@ export function ReviewInboxPage() {
                 onToggleDuplicateOnly={toggleDuplicateOnly}
                 searchQuery={searchQuery}
                 onSearchQueryChange={(q) => setSearchQuery(q)}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onToggleSelectAll={toggleSelectAll}
+                onBulkApprove={handleBulkApprove}
+                onBulkReject={handleBulkReject}
+                isBulkApproving={isBulkApproving}
+                isBulkRejecting={isBulkRejecting}
               />
             </section>
           }
