@@ -126,10 +126,12 @@ a non-interactive "In review" state instead, linking straight to that proposal i
 409 branch stays as a safety net for the race between two tabs — it just stops being the primary way a
 user learns about a pending proposal.
 
-An ingested suite is named after the file the reporter grouped its cases under, humanized with
-`humanizeSuiteName`. The file itself lives on the case (`automation_file_path`), not the suite, because a
-suite can be renamed by a QA into a business-facing name (`"Checkout"` instead of `"checkout.spec.ts"`)
-without losing the technical trail back to where each case runs.
+An ingested suite is named with the raw `<testsuite name>` the reporter emitted, truncated, exactly as
+`adoptSuiteByName` receives it. `humanizeSuiteName` exists in `@qably/test-naming` and is tested, but
+nothing in the API calls it: a suite that arrives as `setAccessTokenSchema` or `checkout.spec.ts` keeps
+that name until a person or an approved Aeris proposal renames it. The file itself lives on the case
+(`automation_file_path`), not the suite, because a suite can be renamed into a business-facing name
+(`"Checkout"`) without losing the technical trail back to where each case runs.
 
 ## `run_case.test_case_id` is the bridge
 
