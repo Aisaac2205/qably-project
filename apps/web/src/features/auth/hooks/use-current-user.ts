@@ -1,6 +1,7 @@
 'use client'
 
 import { useSession } from '@/lib/auth-client'
+import { normalizeAvatarUrl } from '@/features/auth/lib/user-identity'
 
 export interface CurrentUser {
   name: string
@@ -12,6 +13,6 @@ export function useCurrentUser(): CurrentUser {
 
   return {
     name: data?.user.name ?? '',
-    image: data?.user.image ?? null,
+    image: normalizeAvatarUrl(data?.user.image ?? null),
   }
 }
