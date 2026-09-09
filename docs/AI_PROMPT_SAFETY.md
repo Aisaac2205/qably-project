@@ -53,7 +53,13 @@ There are now two complete prompts, one written in Spanish and one in English. T
 
 Passing the path also fixes an unrelated blind spot: the model was asked to pick an `automationKey` convention per framework without ever being told which file it was reading.
 
-`automationKey` stays untranslated in both locales by explicit rule. It has to match the reporter's runtime name byte-for-byte, because that string is the join key between the extraction pipeline and run ingestion (see `AI_EXTRACTION.md`); only the human-facing fields follow the locale. `EXTRACTION_PROMPT_VERSION` moves to `extraction-v3` with this change.
+`automationKey` stays untranslated in both locales by explicit rule. It has to match the reporter's runtime name byte-for-byte, because that string is the join key between the extraction pipeline and run ingestion (see `AI_EXTRACTION.md`); only the human-facing fields follow the locale. `EXTRACTION_PROMPT_VERSION` moved to `extraction-v3` with that change.
+
+### The target-case block
+
+A file-level job asks for specific cases out of a file that may declare more than the response schema can carry, so the request names them: `buildFileContentTurn` adds a `<<<TARGET_CASES>>>` block listing the `automationKey` values to prioritize, and the instruction tells the model to extract exactly those, up to the schema's limit. The block is only present when a job passes targets, so code-change and document-case requests are byte-for-byte unchanged.
+
+It is fenced and delimiter-escaped like every other data block, for consistency rather than for defence: unlike file content or a chat message, these values are server-originated. They are read from `TestCase.automationKey` rows the platform itself wrote during ingestion, never typed by a user in this request. Escaping them still matters because their *origin* is a JUnit report from the connected repository, so they are untrusted at rest even though nothing in the request path can change them. Naming the targets does not grant the model new authority either — the response is still schema-constrained, re-validated with Zod, and matched back by exact `automationKey`, so a model that invents a key simply fails to match and leaves that target in the manual-review fallback. `EXTRACTION_PROMPT_VERSION` moves to `extraction-v4` with this block.
 
 ## What this does not do
 

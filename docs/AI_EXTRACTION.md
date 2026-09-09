@@ -12,6 +12,7 @@ The extractor is Gemini through the official `@google/genai` SDK (`GoogleGenAI({
 |---|---|---|
 | `GEMINI_API_KEY` | no | Activates `GeminiExtractor`. Without it, `AiModule` binds `DisabledExtractor`, which always returns `provider-unavailable: 'GEMINI_API_KEY not configured'` — every code change still gets a manual-review proposal, nothing is lost. |
 | `GEMINI_MODEL` | no | Model id passed to `generateContent`. See `apps/api/src/config/env.ts` for the current default; override it to move to a different Gemini model without a code change. |
+| `AERIS_DAILY_BUDGET` | no | Maximum provider calls per Pacific calendar day against the platform key. Unset means unmetered. See "Credits and the daily budget" below. |
 
 ## How to change the model
 
@@ -87,8 +88,33 @@ When neither lookup finds anything, `enqueueDocumentCase` returns `no-source-fil
 | Model returns cases, but none match the target case's `automationKey` | **document-case only** | `automation-key-not-found` |
 | Model call fails (invalid credentials, timeout, schema violation, empty response) | code-change and document-case | the provider's reason (e.g. `invalid-credentials`) |
 | An uncaught error is thrown anywhere in the extraction path | code-change and document-case | `extraction-failed` |
+| The platform's daily Aeris budget is spent | all three job kinds | `quota-exhausted` |
 
 For a **code-change** job, "no test declarations found" and "no case for a specific key" do not apply — a code-change extraction persists whatever cases the model found, with no single case to match against. A document-case job always targets exactly one existing automated case, so any outcome that doesn't produce that case ends in the fallback instead of silently doing nothing.
+
+## File-level documentation
+
+A repository connected for the first time arrives with every automated case already created by CI and none of them documented. Asking a reviewer to press a per-case button several hundred times is not a workflow, and it bills a model call per case for work the model does per file anyway: the extractor reads a whole test file and can return up to `MAX_EXTRACTED_CASES` cases from that one call.
+
+The `document-file` job kind is that unit. `ExtractionService.enqueueDocumentFiles` collects the automated cases in a suite or project that have no steps and no proposal already in review, groups them by resolved `automationFilePath`, and enqueues one job per file carrying the list of `automationKey`s to fill. `POST /suites/:id/document` and `POST /projects/:id/document` expose it, both behind `AiEntitlementGuard` and a throttle, and both answer with `filesEnqueued`, `casesTargeted` and a `casesSkipped` breakdown so the caller can see what was left out and why rather than assuming everything was queued.
+
+The processor matches each returned case to a target by `automationKey`, the same join key run ingestion uses, and writes one `ExtractedProposal` per matched target. A target the model never returned gets its own `automation-key-not-found` fallback: a case that could not be documented is visible in the review inbox, never a silent omission.
+
+### Chunking, and why the 20-case cap stays
+
+`MAX_EXTRACTED_CASES` bounds one model response's schema. Raising it to cover a large file would widen the blast radius of a single call against the existing output-token ceiling, for a problem chunking already solves. A file with more target cases than the cap becomes several `document-file` jobs over the same file, each carrying its own slice of the target keys and each a separate model call.
+
+The 60,000-character source cap is unchanged and interacts with this: a declaration past the truncation point can never match, on any retry, because the cutoff is deterministic. That is a carried-over limitation of every job kind, recorded here so it is not mistaken for a chunking bug.
+
+### Credits and the daily budget
+
+A credit is spent per real provider call, so a `document-file` job costs one credit per chunk — one credit per file for the overwhelming majority of files, which is the rule product copy states. Charging per matched case was rejected: the provider bills per call, and pricing by case count would make a 20-case file ten times more expensive than a 2-case file that needed the identical single call.
+
+`AiDailyBudget` (`apps/api/src/modules/ai/ai-daily-budget.service.ts`) caps the calls made against the platform's shared `GEMINI_API_KEY`. It is a Redis counter keyed by the Pacific calendar day, not UTC, because the provider's own rate limits reset at midnight Pacific; keying the gate to any other boundary would drift out of sync by up to eight hours, either refusing calls the provider would still serve or admitting calls into a quota already spent. `AERIS_DAILY_BUDGET` sets the cap and has no default — the right number depends on the paid tier behind the key, which only the account owner can read back.
+
+The counter is reserved with an `INCR` before the call and rolled back with a `DECR` when the reservation exceeds the cap, so a refused job never reaches the provider. The check sits after the source read and before the extractor: a file that could not be fetched never made a provider call, so it must not consume a slot. An exhausted budget routes every target of the job to the manual-review fallback with reason `quota-exhausted`, keeping the guarantee that nothing detected in the repository disappears without a trace.
+
+This budget protects the platform key, not any one organization's `aiCredits` — the two limits are independent and both must pass. A call made with an organization's own key bypasses it. No such path exists for extraction today, so the bypass is written as a flag that is unconditionally false and becomes meaningful the moment bring-your-own-key extraction lands.
 
 ### Uncaught errors always land in the fallback
 
