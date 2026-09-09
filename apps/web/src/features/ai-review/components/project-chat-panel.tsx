@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
+import { useTranslation } from '@/lib/i18n'
 import { ChatMessageList } from './chat-message-list'
 import { ChatComposer } from './chat-composer'
 import { ChatThreadSidebar } from './chat-thread-sidebar'
@@ -24,10 +25,13 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
     messages,
     isLoadingThread,
     pendingMessage,
+    deleteError,
     startNewChat,
     selectThread,
+    removeThread,
     send,
   } = useProjectChat(projectId)
+  const { t } = useTranslation()
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialSidebarCollapsed)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -58,6 +62,7 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
         activeThreadId={activeThreadId}
         onSelectThread={selectThread}
         onNewChat={startNewChat}
+        onDeleteThread={removeThread}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
       />
@@ -71,6 +76,14 @@ export function ProjectChatPanel({ projectId }: { projectId: string }) {
             onSelectSuggestion={send}
           />
         </div>
+        {deleteError && (
+          <p
+            role="alert"
+            className="mx-4 mb-2 rounded-lg border border-fail/30 bg-fail-bg px-3 py-2 text-xs text-fail sm:mx-6"
+          >
+            {t('aiReview.deleteChatError')}
+          </p>
+        )}
         <ChatComposer onSend={send} disabled={isSending} />
       </div>
     </div>

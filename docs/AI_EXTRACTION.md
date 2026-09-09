@@ -150,6 +150,16 @@ At the HTTP layer, `AiEntitlementGuard` (`apps/api/src/modules/ai/guards/ai-enti
 
 Both of those endpoints are additionally throttled (`@Throttle`) against runaway cost even for entitled organizations: 20/min for chat messages, 10/min for document-case, and 20/min for thread creation (`POST /projects/:projectId/chat/threads`, which is not gated by entitlement since it never calls the provider by itself).
 
+## Deleting a chat thread keeps the proposals it produced
+
+`DELETE /projects/:projectId/chat/threads/:threadId` (`ChatService.deleteThread`) removes a conversation and, through the `onDelete: Cascade` on `ChatMessage.thread`, every message inside it. It removes nothing else. The `ExtractedProposal` and `Evidence` rows created by "send to review" from that conversation survive the deletion, and their `Evidence.uri` (`qably://chat/{threadId}/{messageId}/{caseIndex}`) keeps pointing at a thread that no longer exists.
+
+That dangling reference is deliberate. A proposal that a person already reviewed, or already approved into an official case, is a governed artifact of the project; it must not disappear because somebody tidied up their own chat history. The URI stays as the record of where the case came from, and `ChatService.loadSentProposalIds` — the only reader of that prefix — is scoped to a thread that is still being displayed, so it is never asked about a deleted one.
+
+The consequence to know about: after deleting a thread, "send to review" idempotency for its messages is gone with it, but so is any way to reach those messages, so no duplicate can be created from them.
+
+Deletion is scoped through the same `findThread` used by every other thread operation, so it only ever matches a thread that belongs to the caller **and** to a project inside the caller's organization. It is not gated by `AiEntitlementGuard` and not throttled: it calls no provider and costs nothing.
+
 ## Manual integration check
 
 `apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` calls the real Gemini API with a tiny fixture and asserts the response matches `extractionOutputSchema` — it never asserts exact wording, since model output is not deterministic. The `describe` block is skipped unless `GEMINI_API_KEY` is present in the environment running the test, so it never runs in CI by default and costs nothing unless explicitly invoked with a key:

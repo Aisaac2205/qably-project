@@ -47,6 +47,7 @@ const createThread = vi.fn()
 const getThread = vi.fn()
 const sendMessage = vi.fn()
 const sendToReview = vi.fn()
+const deleteThread = vi.fn()
 
 vi.mock('@/features/ai-review/api/chat.api', () => ({
   listThreads: (...args: unknown[]) => listThreads(...args),
@@ -54,6 +55,7 @@ vi.mock('@/features/ai-review/api/chat.api', () => ({
   getThread: (...args: unknown[]) => getThread(...args),
   sendMessage: (...args: unknown[]) => sendMessage(...args),
   sendToReview: (...args: unknown[]) => sendToReview(...args),
+  deleteThread: (...args: unknown[]) => deleteThread(...args),
 }))
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -227,5 +229,65 @@ describe('useProjectChat', () => {
 
     expect(result.current.activeThreadId).toBeNull()
     expect(result.current.messages.length).toBe(0)
+  })
+
+  it('returns to draft state after deleting the thread being read', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    deleteThread.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.activeThreadId).toBe('thread-1'))
+
+    await act(async () => {
+      await result.current.removeThread('thread-1')
+    })
+
+    expect(deleteThread).toHaveBeenCalledWith('proj-1', 'thread-1')
+    expect(result.current.activeThreadId).toBeNull()
+    expect(result.current.messages.length).toBe(0)
+  })
+
+  it('keeps reading the open thread when a different one is deleted', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    deleteThread.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.activeThreadId).toBe('thread-1'))
+
+    await act(async () => {
+      await result.current.removeThread('thread-2')
+    })
+
+    expect(result.current.activeThreadId).toBe('thread-1')
+  })
+
+  it('surfaces a delete failure without dropping the open thread', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    deleteThread.mockRejectedValue(new ApiError(500, 'nope'))
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.activeThreadId).toBe('thread-1'))
+
+    await act(async () => {
+      await result.current.removeThread('thread-1')
+    })
+
+    expect(result.current.activeThreadId).toBe('thread-1')
+    await waitFor(() => expect(result.current.deleteError).toBe(true))
   })
 })

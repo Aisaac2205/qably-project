@@ -4,7 +4,10 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import {
+  GUARDS_METADATA,
+  HTTP_CODE_METADATA,
+} from '@nestjs/common/constants';
 import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
@@ -32,6 +35,7 @@ function fakeChat(result: unknown) {
     getThread: jest.fn().mockResolvedValue(result),
     sendMessage: jest.fn().mockResolvedValue(result),
     sendToReview: jest.fn().mockResolvedValue(result),
+    deleteThread: jest.fn().mockResolvedValue(result),
   };
 }
 
@@ -230,5 +234,36 @@ describe('ChatController guard and throttle wiring', () => {
     expect(throttleKeys(handler('list'))).toHaveLength(0);
     expect(throttleKeys(handler('get'))).toHaveLength(0);
     expect(throttleKeys(handler('sendToReview'))).toHaveLength(0);
+  });
+
+  it('answers a thread deletion with no content', async () => {
+    const chat = fakeChat({ ok: true, value: undefined });
+
+    await expect(
+      build(chat).remove(org, user, 'project-1', 'thread-1'),
+    ).resolves.toBeUndefined();
+    expect(chat.deleteThread).toHaveBeenCalledWith(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+    );
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, handler('remove'))).toBe(
+      204,
+    );
+  });
+
+  it('throws a coded NotFoundException when deleting a conversation that does not exist', async () => {
+    const chat = fakeChat({ ok: false, error: 'thread-not-found' });
+
+    await expect(
+      build(chat).remove(org, user, 'project-1', 'thread-1'),
+    ).rejects.toMatchObject({ response: { code: 'thread-not-found' } });
+  });
+
+  it('does not gate thread deletion behind the AI entitlement guard', () => {
+    expect(
+      Reflect.getMetadata(GUARDS_METADATA, handler('remove')),
+    ).toBeUndefined();
   });
 });

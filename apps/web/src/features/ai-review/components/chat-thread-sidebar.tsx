@@ -1,6 +1,8 @@
 'use client'
 
-import { Plus, ChatCircleText, SidebarSimple } from '@phosphor-icons/react'
+import { useState } from 'react'
+import { Plus, ChatCircleText, SidebarSimple, Trash } from '@phosphor-icons/react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { ChatThreadRecord } from '@qably/types'
@@ -10,6 +12,7 @@ interface ChatThreadSidebarProps {
   activeThreadId: string | null
   onSelectThread: (threadId: string) => void
   onNewChat: () => void
+  onDeleteThread?: (threadId: string) => void
   isCollapsed?: boolean
   onToggleCollapse?: () => void
 }
@@ -19,10 +22,12 @@ export function ChatThreadSidebar({
   activeThreadId,
   onSelectThread,
   onNewChat,
+  onDeleteThread,
   isCollapsed = false,
   onToggleCollapse,
 }: ChatThreadSidebarProps) {
   const { t } = useTranslation()
+  const [threadPendingDeletion, setThreadPendingDeletion] = useState<string | null>(null)
 
   if (isCollapsed) {
     return (
@@ -146,35 +151,77 @@ export function ChatThreadSidebar({
             const isActive = activeThreadId === thread.id
 
             return (
-              <button
+              <div
                 key={thread.id}
-                type="button"
                 role="listitem"
-                onClick={() => onSelectThread(thread.id)}
-                aria-current={isActive ? 'true' : undefined}
-                title={thread.title}
                 className={cn(
-                  'group flex items-center gap-2 w-full rounded-lg px-2.5 py-2 text-xs transition-all duration-150 cursor-pointer text-left',
+                  'group relative flex items-center rounded-lg transition-all duration-150',
                   isActive
-                    ? 'bg-surface text-default font-semibold shadow-xs border border-border'
-                    : 'text-muted hover:text-default hover:bg-surface/70 border border-transparent',
+                    ? 'bg-surface shadow-xs border border-border'
+                    : 'border border-transparent hover:bg-surface/70',
                 )}
               >
-                <ChatCircleText
-                  size={15}
-                  weight={isActive ? 'fill' : 'regular'}
+                <button
+                  type="button"
+                  onClick={() => onSelectThread(thread.id)}
+                  aria-current={isActive ? 'true' : undefined}
+                  title={thread.title}
                   className={cn(
-                    'shrink-0 transition-colors',
-                    isActive ? 'text-primary' : 'text-muted group-hover:text-default',
+                    'flex items-center gap-2 min-w-0 flex-1 rounded-lg px-2.5 py-2 text-xs cursor-pointer text-left',
+                    'focus-visible:outline-2 focus-visible:outline-primary',
+                    onDeleteThread ? 'pr-8' : '',
+                    isActive
+                      ? 'text-default font-semibold'
+                      : 'text-muted group-hover:text-default',
                   )}
-                  aria-hidden="true"
-                />
-                <span className="flex-1 min-w-0 truncate">{thread.title}</span>
-              </button>
+                >
+                  <ChatCircleText
+                    size={15}
+                    weight={isActive ? 'fill' : 'regular'}
+                    className={cn(
+                      'shrink-0 transition-colors',
+                      isActive ? 'text-primary' : 'text-muted group-hover:text-default',
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="flex-1 min-w-0 truncate">{thread.title}</span>
+                </button>
+
+                {onDeleteThread && (
+                  <button
+                    type="button"
+                    onClick={() => setThreadPendingDeletion(thread.id)}
+                    aria-label={t('aiReview.deleteChatAria')}
+                    title={t('aiReview.deleteChatAria')}
+                    className={cn(
+                      'absolute right-1 size-6 shrink-0 rounded-md inline-flex items-center justify-center',
+                      'text-muted hover:text-fail hover:bg-fail-bg cursor-pointer',
+                      'transition-opacity duration-150 focus-visible:outline-2 focus-visible:outline-primary',
+                      'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100',
+                    )}
+                  >
+                    <Trash size={13} weight="regular" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             )
           })
         )}
       </div>
+
+      {onDeleteThread && (
+        <ConfirmDialog
+          open={threadPendingDeletion !== null}
+          onOpenChange={(open) => {
+            if (!open) setThreadPendingDeletion(null)
+          }}
+          title={t('aiReview.deleteChatTitle')}
+          description={t('aiReview.deleteChatDesc')}
+          onConfirm={() => {
+            if (threadPendingDeletion !== null) onDeleteThread(threadPendingDeletion)
+          }}
+        />
+      )}
     </aside>
   )
 }

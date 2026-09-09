@@ -199,6 +199,20 @@ export class ChatService {
     });
   }
 
+  async deleteThread(
+    org: OrgContext,
+    user: AuthenticatedUser,
+    projectId: string,
+    threadId: string,
+  ): Promise<Result<void, ChatError>> {
+    const thread = await this.findThread(org, user, projectId, threadId);
+    if (thread === null) return err('thread-not-found');
+
+    await this.prisma.chatThread.delete({ where: { id: threadId } });
+
+    return ok(undefined);
+  }
+
   async sendMessage(
     org: OrgContext,
     user: AuthenticatedUser,

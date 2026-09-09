@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   HttpCode,
@@ -118,6 +119,17 @@ export class ChatController {
     @Param('threadId') threadId: string,
   ): Promise<ChatThreadDetailView> {
     return unwrap(await this.chat.getThread(org, user, projectId, threadId));
+  }
+
+  @Delete(':threadId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async remove(
+    @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('projectId') projectId: string,
+    @Param('threadId') threadId: string,
+  ): Promise<void> {
+    unwrap(await this.chat.deleteThread(org, user, projectId, threadId));
   }
 
   @Post(':threadId/messages')

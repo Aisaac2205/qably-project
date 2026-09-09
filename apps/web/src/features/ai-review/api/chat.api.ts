@@ -26,6 +26,15 @@ export function createThread(
   })
 }
 
+export function deleteThread(
+  projectId: string,
+  threadId: string,
+): Promise<void> {
+  return apiRequest<void>(`/projects/${projectId}/chat/threads/${threadId}`, {
+    method: 'DELETE',
+  })
+}
+
 export function getThread(
   projectId: string,
   threadId: string,

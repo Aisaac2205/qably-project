@@ -451,6 +451,7 @@
     "chatGreeting": "Hola, ¿en qué puedo ayudarte hoy?",
     "deleteChatTitle": "Eliminar conversación",
     "deleteChatDesc": "¿Estás seguro de que deseas eliminar esta conversación? Esta acción no se puede deshacer.",
+    "deleteChatError": "No se pudo eliminar la conversación. Intenta de nuevo.",
     "noChats": "Sin conversaciones",
     "deleteChatAria": "Eliminar conversación",
     "chatConversations": "Conversaciones",

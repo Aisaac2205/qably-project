@@ -4,6 +4,7 @@ import { useCallback, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createThread,
+  deleteThread,
   getThread,
   listThreads,
   sendMessage,
@@ -50,6 +51,7 @@ export function useProjectChat(projectId: string) {
   const queryClient = useQueryClient()
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState<PendingMessage | null>(null)
+  const [deleteError, setDeleteError] = useState(false)
 
   const threadsQuery = useQuery({
     queryKey: chatKeys.threads(projectId),
@@ -65,12 +67,36 @@ export function useProjectChat(projectId: string) {
   const startNewChat = useCallback(() => {
     setActiveThreadId(null)
     setPendingMessage(null)
+    setDeleteError(false)
   }, [])
 
   const selectThread = useCallback((threadId: string) => {
     setActiveThreadId(threadId)
     setPendingMessage(null)
+    setDeleteError(false)
   }, [])
+
+  const removeThread = useCallback(
+    async (threadId: string) => {
+      setDeleteError(false)
+
+      try {
+        await deleteThread(projectId, threadId)
+      } catch {
+        setDeleteError(true)
+        return
+      }
+
+      if (threadId === activeThreadId) {
+        setActiveThreadId(null)
+        setPendingMessage(null)
+      }
+
+      queryClient.removeQueries({ queryKey: chatKeys.thread(projectId, threadId) })
+      void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
+    },
+    [projectId, activeThreadId, queryClient],
+  )
 
   const send = useCallback(
     async (text: string) => {
@@ -120,8 +146,10 @@ export function useProjectChat(projectId: string) {
     messages: threadQuery.data?.messages ?? [],
     isLoadingThread: activeThreadId !== null && threadQuery.isLoading,
     pendingMessage,
+    deleteError,
     startNewChat,
     selectThread,
+    removeThread,
     send,
   }
 }

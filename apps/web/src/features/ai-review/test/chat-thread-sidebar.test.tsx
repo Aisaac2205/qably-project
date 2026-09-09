@@ -103,6 +103,74 @@ describe('ChatThreadSidebar', () => {
     expect(onToggleCollapse).toHaveBeenCalledTimes(1)
   })
 
+  it('asks for confirmation before deleting a conversation', async () => {
+    const onDeleteThread = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ChatThreadSidebar
+          threads={threads}
+          activeThreadId="t1"
+          onSelectThread={vi.fn()}
+          onNewChat={vi.fn()}
+          onDeleteThread={onDeleteThread}
+        />,
+      )
+    })
+
+    const deleteButtons = screen.getAllByRole('button', {
+      name: /delete conversation|eliminar conversación/i,
+    })
+    await user.click(deleteButtons[1])
+    expect(onDeleteThread).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /^(delete|eliminar)$/i }))
+    expect(onDeleteThread).toHaveBeenCalledWith('t2')
+  })
+
+  it('selecting a conversation is not triggered by its delete button', async () => {
+    const onSelectThread = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      render(
+        <ChatThreadSidebar
+          threads={threads}
+          activeThreadId="t1"
+          onSelectThread={onSelectThread}
+          onNewChat={vi.fn()}
+          onDeleteThread={vi.fn()}
+        />,
+      )
+    })
+
+    const deleteButtons = screen.getAllByRole('button', {
+      name: /delete conversation|eliminar conversación/i,
+    })
+    await user.click(deleteButtons[1])
+    expect(onSelectThread).not.toHaveBeenCalled()
+  })
+
+  it('offers no delete affordance when deletion is not wired', async () => {
+    await act(async () => {
+      render(
+        <ChatThreadSidebar
+          threads={threads}
+          activeThreadId="t1"
+          onSelectThread={vi.fn()}
+          onNewChat={vi.fn()}
+        />,
+      )
+    })
+
+    expect(
+      screen.queryAllByRole('button', {
+        name: /delete conversation|eliminar conversación/i,
+      }),
+    ).toHaveLength(0)
+  })
+
   it('renders compact icons and triggers onToggleCollapse when collapsed', async () => {
     const onToggleCollapse = vi.fn()
     const onSelectThread = vi.fn()

@@ -69,6 +69,7 @@ interface FakePrisma {
     findFirst: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    delete: jest.Mock;
   };
   chatMessage: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
   suite: { findMany: jest.Mock; findFirst: jest.Mock };
@@ -94,6 +95,7 @@ function createPrisma(): FakePrisma {
       findFirst: jest.fn().mockResolvedValue(threadRow),
       create: jest.fn().mockResolvedValue(threadRow),
       update: jest.fn().mockResolvedValue(threadRow),
+      delete: jest.fn().mockResolvedValue(threadRow),
     },
     chatMessage: {
       findMany: jest.fn().mockResolvedValue([userRow, assistantRow]),
@@ -605,5 +607,81 @@ describe('ChatService', () => {
         ],
       }),
     });
+  });
+
+  it('deletes a thread the caller owns', async () => {
+    const prisma = createPrisma();
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.deleteThread(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+    );
+
+    expect(prisma.chatThread.findFirst).toHaveBeenCalledWith(
+      containing({
+        where: { id: 'thread-1', projectId: 'project-1', userId: 'user-1' },
+      }),
+    );
+    expect(prisma.chatThread.delete).toHaveBeenCalledWith({
+      where: { id: 'thread-1' },
+    });
+    expect(result).toEqual({ ok: true, value: undefined });
+  });
+
+  it('refuses to delete a thread that belongs to somebody else', async () => {
+    const prisma = createPrisma();
+    prisma.chatThread.findFirst.mockResolvedValue(null);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.deleteThread(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'thread-not-found' });
+    expect(prisma.chatThread.delete).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete a thread of a project outside the organization', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue(null);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.deleteThread(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'thread-not-found' });
+    expect(prisma.chatThread.delete).not.toHaveBeenCalled();
+  });
+
+  it('keeps the proposals already sent to review from the deleted thread', async () => {
+    const prisma = createPrisma();
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    await service.deleteThread(org, user, 'project-1', 'thread-1');
+
+    expect(prisma.extractedProposal.findMany).not.toHaveBeenCalled();
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
   });
 });
