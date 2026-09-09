@@ -49,6 +49,7 @@ interface FakePrisma {
   testCase: { create: jest.Mock; update: jest.Mock; delete: jest.Mock };
   runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
+  extractedProposal: { findMany: jest.Mock };
   $transaction: jest.Mock;
 }
 
@@ -66,6 +67,7 @@ function createPrisma(): FakePrisma {
     testCase: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
+    extractedProposal: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),
   };
 
@@ -146,6 +148,33 @@ describe('SuitesService.list', () => {
 
     expect(suite.createdAt).toBe('2026-01-01T00:00:00.000Z');
     expect(suite.cases).toHaveLength(1);
+  });
+});
+
+describe('SuitesService pending proposals', () => {
+  it('reports the in_review proposal id targeting a case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { id: 'proposal-1', targetTestCaseId: 'case-1' },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].pendingProposalId).toBe('proposal-1');
+    expect(prisma.extractedProposal.findMany).toHaveBeenCalledWith({
+      where: { targetTestCaseId: { in: ['case-1'] }, status: 'in_review' },
+      select: { id: true, targetTestCaseId: true },
+    });
+  });
+
+  it('reports null when no proposal targets the case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].pendingProposalId).toBeNull();
   });
 });
 

@@ -168,6 +168,7 @@ export interface TestCase {
   automationClassName?: string
   automationFilePath?: string
   lastResult?: CaseLastResult | null
+  pendingProposalId?: string | null
 }
 
 export interface Suite {

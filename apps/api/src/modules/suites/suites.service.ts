@@ -12,6 +12,7 @@ import type {
 } from './suites.schemas';
 
 const UNIQUE_VIOLATION = 'P2002';
+const PENDING_STATUS = 'in_review';
 
 const CASE_SELECT = {
   id: true,
@@ -54,6 +55,11 @@ interface CaseRow {
   automationClassName: string | null;
   automationFilePath: string | null;
   currentVersion: { version: number } | null;
+}
+
+interface PendingProposalRow {
+  id: string;
+  targetTestCaseId: string | null;
 }
 
 interface LastResultRow {
@@ -322,28 +328,42 @@ export class SuitesService {
   }
 
   private async withLastResults(views: SuiteView[]): Promise<SuiteView[]> {
+    const allCaseIds = views.flatMap((view) =>
+      view.cases.map((testCase) => testCase.id),
+    );
     const automatedCaseIds = views.flatMap((view) =>
       view.cases
         .filter((testCase) => testCase.executionMode === 'automated')
         .map((testCase) => testCase.id),
     );
 
-    if (automatedCaseIds.length === 0) return views;
-
-    const rows = (await this.prisma.runCase.findMany({
-      where: { testCaseId: { in: automatedCaseIds } },
-      orderBy: [{ run: { startedAt: 'desc' } }, { id: 'desc' }],
-      distinct: ['testCaseId'],
-      select: {
-        testCaseId: true,
-        status: true,
-        recordedAt: true,
-        run: { select: { id: true, commitSha: true, startedAt: true } },
-      },
-    })) as LastResultRow[];
+    const [lastResultRows, pendingProposalRows] = await Promise.all([
+      automatedCaseIds.length === 0
+        ? Promise.resolve([] as LastResultRow[])
+        : (this.prisma.runCase.findMany({
+            where: { testCaseId: { in: automatedCaseIds } },
+            orderBy: [{ run: { startedAt: 'desc' } }, { id: 'desc' }],
+            distinct: ['testCaseId'],
+            select: {
+              testCaseId: true,
+              status: true,
+              recordedAt: true,
+              run: { select: { id: true, commitSha: true, startedAt: true } },
+            },
+          }) as Promise<LastResultRow[]>),
+      allCaseIds.length === 0
+        ? Promise.resolve([] as PendingProposalRow[])
+        : (this.prisma.extractedProposal.findMany({
+            where: {
+              targetTestCaseId: { in: allCaseIds },
+              status: PENDING_STATUS,
+            },
+            select: { id: true, targetTestCaseId: true },
+          }) as Promise<PendingProposalRow[]>),
+    ]);
 
     const lastResultByCaseId = new Map<string, CaseLastResult>();
-    for (const row of rows) {
+    for (const row of lastResultRows) {
       if (row.testCaseId === null) continue;
 
       lastResultByCaseId.set(row.testCaseId, {
@@ -354,16 +374,23 @@ export class SuitesService {
       });
     }
 
+    const pendingProposalByCaseId = new Map<string, string>();
+    for (const row of pendingProposalRows) {
+      if (row.targetTestCaseId === null) continue;
+      pendingProposalByCaseId.set(row.targetTestCaseId, row.id);
+    }
+
     return views.map((view) => ({
       ...view,
-      cases: view.cases.map((testCase) =>
-        testCase.executionMode === 'automated'
+      cases: view.cases.map((testCase) => ({
+        ...(testCase.executionMode === 'automated'
           ? {
               ...testCase,
               lastResult: lastResultByCaseId.get(testCase.id) ?? null,
             }
-          : testCase,
-      ),
+          : testCase),
+        pendingProposalId: pendingProposalByCaseId.get(testCase.id) ?? null,
+      })),
     }));
   }
 
