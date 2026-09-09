@@ -13,7 +13,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     deps: {
       optimizer: {
-        web: {
+        client: {
           enabled: true,
           include: ['@phosphor-icons/react'],
         },
