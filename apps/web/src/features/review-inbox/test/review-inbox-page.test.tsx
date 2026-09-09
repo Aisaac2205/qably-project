@@ -82,6 +82,17 @@ describe('ReviewInboxPage', () => {
       expect(screen.getByRole('heading', { name: 'Invalid login shows error message' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Valid checkout completes order' })).not.toBeInTheDocument()
     })
+
+    it('falls back to the first filtered proposal when the query param id matches no proposal', async () => {
+      searchParamsQuery = 'proposal=does-not-exist'
+
+      renderWithQuery(<ReviewInboxPage />)
+
+      expect(
+        await screen.findByRole('heading', { name: 'Checkout with empty cart blocked' }),
+      ).toBeInTheDocument()
+      expect(screen.queryByText('Select a proposal from the queue to inspect its structured steps, source evidence, and governance actions.')).not.toBeInTheDocument()
+    })
   })
 
   it('renders the governance statement, queue, and inspector without a local page heading', () => {
@@ -226,7 +237,7 @@ describe('ReviewInboxPage', () => {
 
       expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
 
-      const checkboxes = screen.getAllByRole('checkbox', { name: 'Select proposal' })
+      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
       await user.click(checkboxes[0])
 
       expect(screen.getByText('1 selected')).toBeInTheDocument()
@@ -234,11 +245,21 @@ describe('ReviewInboxPage', () => {
       expect(screen.getByRole('button', { name: 'Reject selected' })).toBeInTheDocument()
     })
 
+    it('gives each proposal checkbox a distinct accessible name that includes its title', () => {
+      renderWithQuery(<ReviewInboxPage />)
+
+      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
+      const names = checkboxes.map((checkbox) => checkbox.getAttribute('aria-label'))
+
+      expect(names.length).toBeGreaterThan(1)
+      expect(new Set(names).size).toBe(names.length)
+    })
+
     it('bulk-approves the checked proposals and shows a per-item summary', async () => {
       const user = userEvent.setup()
       renderWithQuery(<ReviewInboxPage />)
 
-      const checkboxes = screen.getAllByRole('checkbox', { name: 'Select proposal' })
+      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
       await user.click(checkboxes[0])
       await user.click(checkboxes[1])
       await user.click(screen.getByRole('button', { name: 'Approve selected' }))
@@ -256,10 +277,40 @@ describe('ReviewInboxPage', () => {
       const selectAll = screen.getByRole('checkbox', { name: 'Select all proposals' })
       await user.click(selectAll)
 
-      const checkboxes = screen.getAllByRole('checkbox', { name: 'Select proposal' })
+      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
       for (const checkbox of checkboxes) {
         expect(checkbox).toHaveAttribute('data-checked', '')
       }
+    })
+
+    it('clears the selection and hides the bulk bar when the project filter changes', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
+      await user.click(checkboxes[0])
+      await user.click(checkboxes[1])
+      expect(screen.getByText('2 selected')).toBeInTheDocument()
+
+      const projectSelect = screen.getByRole('combobox', { name: /Project/i })
+      await user.selectOptions(projectSelect, 'proj-1')
+
+      expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
+    })
+
+    it('clears the selection when the search query changes', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
+      await user.click(checkboxes[0])
+      expect(screen.getByText('1 selected')).toBeInTheDocument()
+
+      const searchInput = screen.getByRole('searchbox', { name: /Search by title/i })
+      await user.type(searchInput, 'checkout')
+
+      expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument()
     })
   })
 })

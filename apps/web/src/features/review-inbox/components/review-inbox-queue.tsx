@@ -35,8 +35,8 @@ export interface ReviewInboxQueueProps {
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
   onToggleSelectAll: (ids: string[]) => void
-  onBulkApprove: () => void
-  onBulkReject: () => void
+  onBulkApprove: (ids: string[]) => void
+  onBulkReject: (ids: string[]) => void
   isBulkApproving: boolean
   isBulkRejecting: boolean
 }
@@ -69,7 +69,7 @@ function ReviewProposalQueueRow({
           <Checkbox
             checked={isChecked}
             onCheckedChange={() => onToggleCheck(proposal.id)}
-            aria-label={t('reviewInbox.selectProposal')}
+            aria-label={t('reviewInbox.selectProposalNamed', { title: proposal.title })}
           />
         )}
       </div>
@@ -186,14 +186,15 @@ export function ReviewInboxQueue({
 
   const filteredProposals = scopedProposals.filter((p) => statusFilter === 'all' || p.status === statusFilter)
   const pendingInFiltered = filteredProposals.filter((p) => p.status === 'in_review')
+  const visibleSelectedIds = pendingInFiltered
+    .filter((p) => selectedIds.has(p.id))
+    .map((p) => p.id)
   const allPendingSelected =
     pendingInFiltered.length > 0 && pendingInFiltered.every((p) => selectedIds.has(p.id))
 
   return (
     <Card className="rounded-none border-0 h-full flex flex-col justify-between overflow-hidden bg-surface">
-      {/* Search & Filter Header */}
       <div className="p-3.5 sm:p-4 border-b border-border bg-canvas/30 space-y-3 shrink-0">
-        {/* Search input */}
         <div className="relative">
           <MagnifyingGlass
             size={15}
@@ -210,7 +211,6 @@ export function ReviewInboxQueue({
           />
         </div>
 
-        {/* Filters row: Project selector & Duplicate toggle */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex-1 min-w-[130px]">
             <select
@@ -274,7 +274,6 @@ export function ReviewInboxQueue({
         </div>
       </div>
 
-      {/* Bulk selection bar */}
       {pendingInFiltered.length > 0 && (
         <div className="flex items-center justify-between gap-2 border-b border-border bg-canvas/20 px-3.5 py-2 shrink-0">
           <div className="flex items-center gap-2 text-xs font-medium text-default">
@@ -282,22 +281,22 @@ export function ReviewInboxQueue({
               checked={allPendingSelected}
               onCheckedChange={() => onToggleSelectAll(pendingInFiltered.map((p) => p.id))}
               aria-label={
-                selectedIds.size > 0
-                  ? t('reviewInbox.selectedCount', { count: selectedIds.size })
+                visibleSelectedIds.length > 0
+                  ? t('reviewInbox.selectedCount', { count: visibleSelectedIds.length })
                   : t('reviewInbox.selectAllProposals')
               }
             />
             <span aria-hidden="true">
-              {selectedIds.size > 0
-                ? t('reviewInbox.selectedCount', { count: selectedIds.size })
+              {visibleSelectedIds.length > 0
+                ? t('reviewInbox.selectedCount', { count: visibleSelectedIds.length })
                 : t('reviewInbox.selectAllProposals')}
             </span>
           </div>
-          {selectedIds.size > 0 && (
+          {visibleSelectedIds.length > 0 && (
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={onBulkApprove}
+                onClick={() => onBulkApprove(visibleSelectedIds)}
                 disabled={isBulkApproving}
                 className="rounded-md border border-pass/30 bg-pass-bg px-2 py-1 text-[11px] font-semibold text-pass transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -305,7 +304,7 @@ export function ReviewInboxQueue({
               </button>
               <button
                 type="button"
-                onClick={onBulkReject}
+                onClick={() => onBulkReject(visibleSelectedIds)}
                 disabled={isBulkRejecting}
                 className="rounded-md border border-fail/30 bg-fail-bg px-2 py-1 text-[11px] font-semibold text-fail transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -316,7 +315,6 @@ export function ReviewInboxQueue({
         </div>
       )}
 
-      {/* Proposals List */}
       <CardContent className="p-0 flex-1 overflow-y-auto">
         {filteredProposals.length === 0 ? (
           <StateView
@@ -342,7 +340,6 @@ export function ReviewInboxQueue({
         )}
       </CardContent>
 
-      {/* Keyboard shortcut hints */}
       <div
         aria-label={t('reviewInbox.keyboardShortcuts')}
         className="hidden shrink-0 items-center gap-3 border-t border-border bg-canvas/30 px-3.5 py-1.5 text-[11px] text-muted sm:flex"

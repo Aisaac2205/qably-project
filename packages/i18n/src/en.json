@@ -122,7 +122,7 @@
     "approveBlocked": "A proposal with no steps cannot be published",
     "approvedWithCase": "{{caseName}} published",
     "viewCase": "View case",
-    "selectProposal": "Select proposal",
+    "selectProposalNamed": "Select proposal: {{title}}",
     "selectAllProposals": "Select all proposals",
     "selectedCount": "{{count}} selected",
     "bulkApprove": "Approve selected",

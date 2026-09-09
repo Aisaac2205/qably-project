@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Info, X } from '@phosphor-icons/react'
@@ -49,7 +49,10 @@ export function ReviewInboxPage() {
     })
   }, [proposals, selectedProjectId, statusFilter, duplicateOnly, searchQuery])
 
-  const activeSelectedId = selectedId || (filteredProposals.length > 0 ? filteredProposals[0].id : undefined)
+  const activeSelectedId =
+    selectedId !== undefined && proposals.some((p) => p.id === selectedId)
+      ? selectedId
+      : filteredProposals[0]?.id
   const selectedProposal = proposals.find((p) => p.id === activeSelectedId)
 
   const selectNextPending = useCallback(() => {
@@ -110,6 +113,10 @@ export function ReviewInboxPage() {
     })
   }, [t])
 
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [selectedProjectId, statusFilter, duplicateOnly, searchQuery])
+
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -157,13 +164,19 @@ export function ReviewInboxPage() {
       },
     })
 
-  const handleBulkApprove = useCallback(() => {
-    approveMany(Array.from(selectedIds))
-  }, [approveMany, selectedIds])
+  const handleBulkApprove = useCallback(
+    (ids: string[]) => {
+      approveMany(ids)
+    },
+    [approveMany],
+  )
 
-  const handleBulkReject = useCallback(() => {
-    rejectMany(Array.from(selectedIds))
-  }, [rejectMany, selectedIds])
+  const handleBulkReject = useCallback(
+    (ids: string[]) => {
+      rejectMany(ids)
+    },
+    [rejectMany],
+  )
 
   useKeyboardShortcuts({
     a: () => {
