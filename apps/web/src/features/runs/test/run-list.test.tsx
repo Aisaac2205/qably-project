@@ -138,3 +138,29 @@ describe('RunList', () => {
     ).not.toBeInTheDocument()
   })
 })
+
+describe('RunList evidence', () => {
+  it('shows the commit that produced a CI run', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" />)
+    })
+    expect(screen.getByText('b1e4d90')).toBeInTheDocument()
+    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
+  })
+
+  it('omits the delta chip when a run has nothing to compare against', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" />)
+    })
+    expect(screen.queryByRole('group', { name: /changes since the previous run/i })).not.toBeInTheDocument()
+  })
+
+  it('explains that CI fills the page and links to the reporting guide when there are no runs', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-empty" />)
+    })
+    expect(screen.getByText(/ci fills this page automatically/i)).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /how to report results from ci/i })
+    expect(link).toHaveAttribute('href', expect.stringContaining('#step-4-report-ci'))
+  })
+})

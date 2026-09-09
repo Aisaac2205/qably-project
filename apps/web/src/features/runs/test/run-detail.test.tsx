@@ -299,3 +299,32 @@ describe('RunDetail', () => {
     expect(liveRegion?.textContent).toBe('Status: Pass')
   })
 })
+
+describe('RunDetail what changed', () => {
+  it('lists regressed and fixed cases with links to the suite', async () => {
+    const run = getFreshRun()
+    run.delta = {
+      regressions: [{ testCaseId: 'tc-1', caseName: 'Login with valid credentials' }],
+      fixes: [{ testCaseId: 'tc-2', caseName: 'Reset password' }],
+    }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    const section = screen.getByRole('region', { name: /what changed/i })
+    expect(section).toHaveTextContent('Login with valid credentials')
+    expect(section).toHaveTextContent('Reset password')
+    const link = screen.getByRole('link', { name: 'Login with valid credentials' })
+    expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-1')
+  })
+
+  it('says it is the first run of the suite when there is nothing to compare', async () => {
+    const run = getFreshRun()
+    run.delta = null
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    expect(screen.getByText(/first run of this suite/i)).toBeInTheDocument()
+  })
+})

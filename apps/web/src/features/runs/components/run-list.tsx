@@ -10,7 +10,12 @@ import { StatusChip } from './status-chip'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
+import { docsUrl } from '@/lib/docs-url'
+import { GitCommit } from '@phosphor-icons/react'
 import { formatPassRate } from '../lib/format'
+import { RunDeltaChip } from './run-delta-chip'
+
+const REPORT_CI_ANCHOR = 'step-4-report-ci'
 
 function formatDate(iso: string): string {
   try {
@@ -42,10 +47,18 @@ function RunRow({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-default truncate">{run.name}</div>
           <div className="text-xs text-muted truncate mt-0.5">{run.suiteName}</div>
+          {run.commitSha && (
+            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted min-w-0">
+              <GitCommit size={12} weight="bold" aria-hidden="true" className="shrink-0" />
+              <span className="font-mono text-default">{run.commitSha.slice(0, 7)}</span>
+              {run.commitMessage && <span className="truncate">{run.commitMessage}</span>}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="shrink-0 flex items-center gap-4">
+        <RunDeltaChip delta={run.delta} />
         <span className="text-sm font-semibold tabular-nums font-mono text-default w-12 text-right">
           {formatPassRate(run.passRate)}
         </span>
@@ -68,19 +81,30 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
     projectId,
     source,
   )
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   if (runs.length === 0) {
     return (
       <StateView
         kind="empty"
         title={t('runs.noRuns')}
-        action={<Link
-          href={`/projects/${projectId}/runs/new`}
-          className="text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          {t('runs.startARun')}
-        </Link>}
+        description={t('runs.emptyDescription')}
+        action={
+          <div className="flex flex-col items-center gap-2">
+            <a
+              href={docsUrl(REPORT_CI_ANCHOR, locale)}
+              className="text-sm font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {t('runs.emptyDocsLink')}
+            </a>
+            <Link
+              href={`/projects/${projectId}/runs/new`}
+              className="text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {t('runs.startARun')}
+            </Link>
+          </div>
+        }
       />
     )
   }

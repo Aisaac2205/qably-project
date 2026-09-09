@@ -10,6 +10,7 @@ import { useSuite } from '@/features/projects/suites/hooks/use-suites'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { ApiError } from '@/lib/api-client'
 import { RunProgressHeader } from './run-progress-header'
+import { WhatChangedStrip } from './what-changed-strip'
 import { CaseList } from './case-list'
 import { CaseDetail } from './case-detail'
 import { StatusChip } from '@/components/ui/status-chip'
@@ -138,6 +139,8 @@ export function RunDetail({
   return (
     <div className="space-y-6">
       <RunProgressHeader run={run} />
+
+      <WhatChangedStrip projectId={projectId} suiteId={run.suiteId} delta={run.delta} />
 
       {isEditable ? (
         <div
