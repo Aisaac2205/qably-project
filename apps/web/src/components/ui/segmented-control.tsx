@@ -21,8 +21,8 @@ interface SegmentedControlProps<T extends string> {
 }
 
 const SIZES = {
-  sm: 'min-h-6 px-2.5 py-1 text-[11px]',
-  md: 'min-h-7 px-3.5 py-1.5 text-xs',
+  sm: 'min-h-7 px-3.5 py-1.5 text-xs',
+  md: 'min-h-9 px-4.5 py-2 text-xs sm:text-sm',
 } as const
 
 export function SegmentedControl<T extends string>({
@@ -75,7 +75,7 @@ export function SegmentedControl<T extends string>({
       aria-label={label}
       onKeyDown={handleKeyDown}
       className={cn(
-        'inline-flex items-center gap-1 p-1 rounded-lg border border-border/80 bg-canvas/40',
+        'inline-flex items-center gap-2 flex-wrap',
         className,
       )}
     >
@@ -97,13 +97,13 @@ export function SegmentedControl<T extends string>({
             tabIndex={isTabs && !isSelected ? -1 : undefined}
             onClick={() => onChange(option.value)}
             className={cn(
-              'inline-flex items-center justify-center gap-1.5 rounded-md font-semibold whitespace-nowrap',
+              'inline-flex items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap',
               'cursor-pointer active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-primary',
               'transition-[background-color,color,border-color,box-shadow,transform] duration-150',
               SIZES[size],
               isSelected
-                ? 'bg-primary text-primary-fg shadow-2xs border border-primary'
-                : 'text-muted hover:text-default hover:bg-surface/50 border border-transparent',
+                ? 'bg-primary text-primary-fg shadow-xs border border-primary'
+                : 'bg-canvas/80 hover:bg-canvas text-default/80 hover:text-default border border-border/70 hover:border-border font-medium shadow-2xs',
             )}
           >
             {option.label}
