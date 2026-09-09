@@ -480,6 +480,86 @@ describe('ReviewService.reject', () => {
   });
 });
 
+describe('ReviewService.approveMany', () => {
+  function createBulkPrisma(rowsById: Record<string, typeof proposalRow | undefined>) {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: { id: string } }) =>
+        Promise.resolve(rowsById[args.where.id] ?? null),
+    );
+    return prisma;
+  }
+
+  it('returns a per-item outcome, skipping an id that no longer exists', async () => {
+    const prisma = createBulkPrisma({
+      'proposal-1': proposalRow,
+    });
+
+    const results = await build(prisma).approveMany(org, ['proposal-1', 'proposal-missing'], {
+      actorId: 'user-1',
+    });
+
+    expect(results).toEqual([
+      expect.objectContaining({ id: 'proposal-1', outcome: 'approved' }),
+      expect.objectContaining({ id: 'proposal-missing', outcome: 'skipped', reason: 'not-found' }),
+    ]);
+  });
+
+  it('reports the guard reason for a proposal that was already decided', async () => {
+    const prisma = createBulkPrisma({
+      'proposal-1': { ...proposalRow, status: 'approved' },
+    });
+
+    const results = await build(prisma).approveMany(org, ['proposal-1'], {
+      actorId: 'user-1',
+    });
+
+    expect(results).toEqual([
+      { id: 'proposal-1', outcome: 'skipped', reason: 'invalid-transition' },
+    ]);
+  });
+
+  it('deduplicates repeated ids server-side', async () => {
+    const prisma = createBulkPrisma({ 'proposal-1': proposalRow });
+
+    const results = await build(prisma).approveMany(
+      org,
+      ['proposal-1', 'proposal-1'],
+      { actorId: 'user-1' },
+    );
+
+    expect(results).toHaveLength(1);
+    expect(prisma.testCase.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ReviewService.rejectMany', () => {
+  function createBulkPrisma(rowsById: Record<string, typeof proposalRow | undefined>) {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: { id: string } }) =>
+        Promise.resolve(rowsById[args.where.id] ?? null),
+    );
+    return prisma;
+  }
+
+  it('rejects every valid id and skips the rest with a reason', async () => {
+    const prisma = createBulkPrisma({
+      'proposal-1': proposalRow,
+      'proposal-2': { ...proposalRow, status: 'rejected' },
+    });
+
+    const results = await build(prisma).rejectMany(org, ['proposal-1', 'proposal-2'], {
+      actorId: 'user-1',
+    });
+
+    expect(results).toEqual([
+      { id: 'proposal-1', outcome: 'rejected' },
+      { id: 'proposal-2', outcome: 'skipped', reason: 'invalid-transition' },
+    ]);
+  });
+});
+
 describe('ReviewService.findOne', () => {
   it('tells the reviewer when a proposal was flagged for manual review', async () => {
     const prisma = createPrisma({

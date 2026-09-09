@@ -26,6 +26,8 @@ function fakeReview(result: unknown) {
     findOne: jest.fn().mockResolvedValue(result),
     approve: jest.fn().mockResolvedValue(result),
     reject: jest.fn().mockResolvedValue(result),
+    approveMany: jest.fn().mockResolvedValue(result),
+    rejectMany: jest.fn().mockResolvedValue(result),
   };
 }
 
@@ -81,5 +83,38 @@ describe('ReviewController error codes', () => {
     await expect(
       build(review).approve(org, user, 'proposal-1', {}),
     ).rejects.toMatchObject({ response: { code: 'name-taken' } });
+  });
+});
+
+describe('ReviewController bulk decisions', () => {
+  it('forwards the id list to approveMany and returns the per-item results', async () => {
+    const results = [
+      { id: 'proposal-1', outcome: 'approved' },
+      { id: 'proposal-2', outcome: 'skipped', reason: 'invalid-transition' },
+    ];
+    const review = fakeReview(results);
+
+    const response = await build(review).approveMany(org, user, {
+      ids: ['proposal-1', 'proposal-2'],
+    });
+
+    expect(review.approveMany).toHaveBeenCalledWith(org, ['proposal-1', 'proposal-2'], {
+      actorId: 'user-1',
+    });
+    expect(response).toEqual(results);
+  });
+
+  it('forwards the id list to rejectMany and returns the per-item results', async () => {
+    const results = [{ id: 'proposal-1', outcome: 'rejected' }];
+    const review = fakeReview(results);
+
+    const response = await build(review).rejectMany(org, user, {
+      ids: ['proposal-1'],
+    });
+
+    expect(review.rejectMany).toHaveBeenCalledWith(org, ['proposal-1'], {
+      actorId: 'user-1',
+    });
+    expect(response).toEqual(results);
   });
 });

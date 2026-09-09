@@ -19,14 +19,17 @@ import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type {
   ApprovalView,
+  BulkDecisionItemResult,
   ProposalDetailView,
   ProposalView,
   RejectionView,
   ReviewError,
 } from './review.contracts';
 import {
+  bulkDecisionSchema,
   decisionSchema,
   listProposalsQuerySchema,
+  type BulkDecisionBody,
   type DecisionBody,
   type ListProposalsQuery,
 } from './review.schemas';
@@ -114,5 +117,23 @@ export class ReviewController {
     return unwrap(
       await this.review.reject(org, id, { actorId: user.id, ...body }),
     );
+  }
+
+  @Post('approve')
+  async approveMany(
+    @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(bulkDecisionSchema)) body: BulkDecisionBody,
+  ): Promise<BulkDecisionItemResult[]> {
+    return this.review.approveMany(org, body.ids, { actorId: user.id });
+  }
+
+  @Post('reject')
+  async rejectMany(
+    @CurrentOrg() org: OrgContext,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(bulkDecisionSchema)) body: BulkDecisionBody,
+  ): Promise<BulkDecisionItemResult[]> {
+    return this.review.rejectMany(org, body.ids, { actorId: user.id });
   }
 }

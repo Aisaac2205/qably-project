@@ -16,5 +16,10 @@ export const decisionSchema = z.object({
   comment: z.string().trim().min(1).max(1000).optional(),
 });
 
+export const bulkDecisionSchema = z.object({
+  ids: z.array(z.string().min(1)).min(1).max(100),
+});
+
 export type ListProposalsQuery = z.infer<typeof listProposalsQuerySchema>;
 export type DecisionBody = z.infer<typeof decisionSchema>;
+export type BulkDecisionBody = z.infer<typeof bulkDecisionSchema>;

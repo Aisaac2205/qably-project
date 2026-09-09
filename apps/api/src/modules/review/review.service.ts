@@ -1,9 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { err, ok, type Result } from '../../common/result';
+import { err, isErr, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
   ApprovalView,
+  BulkDecisionItemResult,
   DecisionInput,
   ListProposalsFilters,
   ProposalDetailView,
@@ -303,6 +304,44 @@ export class ReviewService {
     });
 
     return ok({ decisionId });
+  }
+
+  async approveMany(
+    org: OrgContext,
+    ids: string[],
+    input: DecisionInput,
+  ): Promise<BulkDecisionItemResult[]> {
+    const results: BulkDecisionItemResult[] = [];
+
+    for (const id of Array.from(new Set(ids))) {
+      const result = await this.approve(org, id, input);
+      results.push(
+        isErr(result)
+          ? { id, outcome: 'skipped', reason: result.error }
+          : { id, outcome: 'approved' },
+      );
+    }
+
+    return results;
+  }
+
+  async rejectMany(
+    org: OrgContext,
+    ids: string[],
+    input: DecisionInput,
+  ): Promise<BulkDecisionItemResult[]> {
+    const results: BulkDecisionItemResult[] = [];
+
+    for (const id of Array.from(new Set(ids))) {
+      const result = await this.reject(org, id, input);
+      results.push(
+        isErr(result)
+          ? { id, outcome: 'skipped', reason: result.error }
+          : { id, outcome: 'rejected' },
+      );
+    }
+
+    return results;
   }
 
   private async pending(

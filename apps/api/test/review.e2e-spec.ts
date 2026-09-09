@@ -176,10 +176,28 @@ describe('Review (e2e)', () => {
     expect(response.body).toEqual({
       createdNewCase: true,
       testCaseId: 'case-new',
+      testCaseName: 'Empties the cart',
+      suiteId: 'suite-1',
       versionId: 'version-1',
       version: 1,
       decisionId: 'decision-1',
     });
+  });
+
+  it('bulk-approves the ids in the request body', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/approve')
+      .send({ ids: ['proposal-1'] })
+      .expect(201);
+
+    expect(response.body).toEqual([{ id: 'proposal-1', outcome: 'approved' }]);
+  });
+
+  it('rejects a bulk request over the 100-id bound', async () => {
+    await request(app.getHttpServer())
+      .post('/review/proposals/approve')
+      .send({ ids: Array.from({ length: 101 }, (_, i) => `proposal-${i}`) })
+      .expect(400);
   });
 
   it('takes the actor from the session, never from the body', async () => {
