@@ -31,24 +31,22 @@ describe('AiEntitlementGuard', () => {
     isEntitled.mockResolvedValue(false);
     const request = { org: { organizationId: 'org-1' } };
 
-    await expect(guard.canActivate(contextFor(request))).rejects.toMatchObject(
-      {
-        response: {
-          code: 'ai-not-enabled',
-        },
+    await expect(guard.canActivate(contextFor(request))).rejects.toMatchObject({
+      response: {
+        code: 'ai-not-enabled',
       },
+    });
+    await expect(guard.canActivate(contextFor(request))).rejects.toBeInstanceOf(
+      ForbiddenException,
     );
-    await expect(
-      guard.canActivate(contextFor(request)),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('fails loudly when OrgScopeGuard did not run first', async () => {
     isEntitled.mockResolvedValue(true);
 
-    await expect(
-      guard.canActivate(contextFor({})),
-    ).rejects.toBeInstanceOf(InternalServerErrorException);
+    await expect(guard.canActivate(contextFor({}))).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
     expect(isEntitled).not.toHaveBeenCalled();
   });
 });

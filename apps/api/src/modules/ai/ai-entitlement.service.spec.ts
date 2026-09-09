@@ -78,7 +78,9 @@ describe('AiEntitlementService', () => {
 
     it('spends the credit through a given transaction client instead of the default connection', async () => {
       const prisma = createPrisma();
-      const tx = { organization: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+      const tx = {
+        organization: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      };
 
       await expect(build(prisma).spendCredit('org-1', tx)).resolves.toBe(true);
       expect(tx.organization.updateMany).toHaveBeenCalledWith({

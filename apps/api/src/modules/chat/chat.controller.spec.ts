@@ -228,8 +228,6 @@ describe('ChatController guard and throttle wiring', () => {
   it('does not throttle reading threads or sending a case to review', () => {
     expect(throttleKeys(ChatController.prototype.list)).toHaveLength(0);
     expect(throttleKeys(ChatController.prototype.get)).toHaveLength(0);
-    expect(throttleKeys(ChatController.prototype.sendToReview)).toHaveLength(
-      0,
-    );
+    expect(throttleKeys(ChatController.prototype.sendToReview)).toHaveLength(0);
   });
 });

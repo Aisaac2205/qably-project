@@ -22,7 +22,11 @@ function extractedCase(overrides: Record<string, unknown> = {}) {
 
 interface FakePrisma {
   codeChange: { findUnique: jest.Mock; findFirst: jest.Mock };
-  testCase: { findUnique: jest.Mock; findFirst: jest.Mock; findMany: jest.Mock };
+  testCase: {
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+  };
   suite: { findFirst: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
   extractedProposal: {
@@ -58,13 +62,11 @@ function createPrisma(): FakePrisma {
     },
     testCase: {
       findUnique: jest.fn(),
-      findFirst: jest.fn().mockImplementation((args: { where: Record<string, unknown> }) =>
-        Promise.resolve(
-          'automationFilePath' in args.where
-            ? null
-            : null,
+      findFirst: jest
+        .fn()
+        .mockImplementation((args: { where: Record<string, unknown> }) =>
+          Promise.resolve('automationFilePath' in args.where ? null : null),
         ),
-      ),
       findMany: jest.fn().mockResolvedValue([]),
     },
     suite: {
@@ -196,7 +198,8 @@ describe('ExtractionProcessor — code-change job', () => {
       'RELEASE SAVEPOINT extraction_proposal',
     ]);
     const savepointOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
-    const evidenceCreateOrder = prisma.evidence.create.mock.invocationCallOrder[0];
+    const evidenceCreateOrder =
+      prisma.evidence.create.mock.invocationCallOrder[0];
     const proposalCreateOrder =
       prisma.extractedProposal.create.mock.invocationCallOrder[0];
     const releaseOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
@@ -462,7 +465,10 @@ describe('ExtractionProcessor — code-change job', () => {
       jest.fn().mockResolvedValue(
         extractedOutcome([
           extractedCase({ title: 'First' }),
-          extractedCase({ automationKey: 'Cart > removes an item', title: 'Second' }),
+          extractedCase({
+            automationKey: 'Cart > removes an item',
+            title: 'Second',
+          }),
         ]),
       ),
     );
@@ -547,7 +553,10 @@ describe('ExtractionProcessor — code-change job', () => {
         extractedOutcome([
           extractedCase({ title: 'First' }),
           extractedCase({ title: 'Duplicate' }),
-          extractedCase({ automationKey: 'Cart > removes an item', title: 'Second' }),
+          extractedCase({
+            automationKey: 'Cart > removes an item',
+            title: 'Second',
+          }),
         ]),
       ),
     );
@@ -609,7 +618,9 @@ describe('ExtractionProcessor — code-change job', () => {
     expect(evidenceUpdateCall.where).toEqual({ id: 'evidence-existing' });
     const proposalUpdateCall = lastCall(prisma.extractedProposal.update);
     expect(proposalUpdateCall.where).toEqual({ id: 'pending-proposal' });
-    expect(proposalUpdateCall.data).toMatchObject({ title: 'Adds an item to the cart' });
+    expect(proposalUpdateCall.data).toMatchObject({
+      title: 'Adds an item to the cart',
+    });
   });
 
   it('resolves the suite by matching automationFilePath before falling back to the suite name', async () => {
@@ -793,11 +804,13 @@ describe('ExtractionProcessor — document-case job', () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
     const extractor = fakeExtractor(
-      jest.fn().mockResolvedValue(
-        extractedOutcome([
-          extractedCase({ automationKey: 'Cart > a different test' }),
-        ]),
-      ),
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > a different test' }),
+          ]),
+        ),
     );
 
     await build(prisma, fakeSourceReader(), extractor).process({

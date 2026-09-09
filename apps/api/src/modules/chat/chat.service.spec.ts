@@ -533,12 +533,7 @@ describe('ChatService', () => {
       createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
     );
 
-    const result = await service.getThread(
-      org,
-      user,
-      'project-1',
-      'thread-1',
-    );
+    const result = await service.getThread(org, user, 'project-1', 'thread-1');
 
     expect(result).toEqual({
       ok: true,
