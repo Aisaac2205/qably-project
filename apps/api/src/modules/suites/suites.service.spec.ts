@@ -164,6 +164,7 @@ describe('SuitesService pending proposals', () => {
     expect(suite.cases[0].pendingProposalId).toBe('proposal-1');
     expect(prisma.extractedProposal.findMany).toHaveBeenCalledWith({
       where: { targetTestCaseId: { in: ['case-1'] }, status: 'in_review' },
+      orderBy: { createdAt: 'asc' },
       select: { id: true, targetTestCaseId: true },
     });
   });

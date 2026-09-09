@@ -358,6 +358,7 @@ export class SuitesService {
               targetTestCaseId: { in: allCaseIds },
               status: PENDING_STATUS,
             },
+            orderBy: { createdAt: 'asc' },
             select: { id: true, targetTestCaseId: true },
           }) as Promise<PendingProposalRow[]>),
     ]);
