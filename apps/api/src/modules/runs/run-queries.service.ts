@@ -437,13 +437,21 @@ export class RunQueriesService {
     run: RunRow,
     cases: readonly RunCaseRow[],
   ): Promise<RunView['delta']> {
+    const finished =
+      (run.status === 'pass' || run.status === 'fail') &&
+      run.finishedAt !== null;
+    if (!finished) return null;
+
     const previous = await this.prisma.run.findFirst({
       where: {
         organizationId,
         suiteId: run.suiteId,
         status: { in: ['pass', 'fail'] },
         finishedAt: { not: null },
-        startedAt: { lt: run.startedAt },
+        OR: [
+          { startedAt: { lt: run.startedAt } },
+          { startedAt: run.startedAt, id: { lt: run.id } },
+        ],
       },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       select: { id: true },

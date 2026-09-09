@@ -656,7 +656,7 @@ describe('SuitesService health signals', () => {
       expect.objectContaining({
         where: {
           projectId: { in: ['project-1'] },
-          automationKey: { not: null },
+          automationKey: { in: ['checkout_pay'] },
         },
       }),
     );
@@ -676,6 +676,8 @@ describe('SuitesService health signals', () => {
     ];
     expect(sqlArg.sql).toContain('PARTITION BY rc."testCaseId"');
     expect(sqlArg.sql).toContain('rn <=');
+    expect(sqlArg.sql).toContain("rc.status IN ('pass', 'fail', 'skip', 'blocked')");
+    expect(sqlArg.sql).toContain('r."finishedAt" IS NOT NULL');
     expect(sqlArg.values).toContain('case-2');
     expect(sqlArg.values).toContain(6);
   });

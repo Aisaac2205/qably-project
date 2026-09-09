@@ -251,7 +251,10 @@ export class SuitesService {
 
         return tx.suite.update({
           where: { id },
-          data: input,
+          data: {
+            ...input,
+            ...(input.name === undefined ? {} : { nameSource: 'human' }),
+          },
           select: SUITE_SELECT,
         });
       });
@@ -367,6 +370,15 @@ export class SuitesService {
         .map((testCase) => testCase.id),
     );
     const projectIds = [...new Set(views.map((view) => view.projectId))];
+    const automationKeys = [
+      ...new Set(
+        views.flatMap((view) =>
+          view.cases
+            .map((testCase) => testCase.automationKey)
+            .filter((key): key is string => typeof key === 'string'),
+        ),
+      ),
+    ];
 
     const [lastResultRows, pendingProposalRows, recentResultRows, duplicateKeyRows] =
       await Promise.all([
@@ -408,16 +420,18 @@ export class SuitesService {
                 FROM "run_case" rc
                 JOIN "run" r ON r.id = rc."runId"
                 WHERE rc."testCaseId" IN (${Prisma.join(automatedCaseIds)})
+                  AND rc.status IN ('pass', 'fail', 'skip', 'blocked')
+                  AND r."finishedAt" IS NOT NULL
               ) ranked
               WHERE rn <= ${FLAKY_WINDOW_SIZE}
               ORDER BY test_case_id ASC, started_at DESC, id DESC
             `) as Promise<RecentResultRow[]>),
-        allCaseIds.length === 0
+        automationKeys.length === 0
           ? Promise.resolve([] as DuplicateKeyCandidateRow[])
           : (this.prisma.testCase.findMany({
               where: {
                 projectId: { in: projectIds },
-                automationKey: { not: null },
+                automationKey: { in: automationKeys },
               },
               select: {
                 id: true,

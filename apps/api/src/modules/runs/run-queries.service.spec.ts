@@ -1364,10 +1364,27 @@ describe('RunQueriesService.list delta', () => {
 });
 
 describe('RunQueriesService.findOne delta', () => {
+  const finishedRow = {
+    ...runRow,
+    status: 'pass' as const,
+    finishedAt: new Date('2026-01-01T01:00:00.000Z'),
+  };
+
+  it('reports no delta and asks for no predecessor while the run is still open', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.delta).toBeNull();
+    expect(prisma.run.findFirst).toHaveBeenCalledTimes(1);
+  });
+
   it('reports no delta when the suite has no earlier finished run', async () => {
     const prisma = createPrisma();
     prisma.run.findFirst
-      .mockResolvedValueOnce(runRow)
+      .mockResolvedValueOnce(finishedRow)
       .mockResolvedValueOnce(null);
 
     const result = await build(prisma).findOne(org, 'run-1');
@@ -1382,7 +1399,10 @@ describe('RunQueriesService.findOne delta', () => {
           organizationId: 'org-1',
           status: { in: ['pass', 'fail'] },
           finishedAt: { not: null },
-          startedAt: { lt: runRow.startedAt },
+          OR: [
+            { startedAt: { lt: finishedRow.startedAt } },
+            { startedAt: finishedRow.startedAt, id: { lt: finishedRow.id } },
+          ],
         }),
         orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       }),
@@ -1392,7 +1412,7 @@ describe('RunQueriesService.findOne delta', () => {
   it('lists the regressed and fixed cases by name against the previous run', async () => {
     const prisma = createPrisma();
     prisma.run.findFirst
-      .mockResolvedValueOnce(runRow)
+      .mockResolvedValueOnce(finishedRow)
       .mockResolvedValueOnce({ id: 'run-0' });
     prisma.runCase.findMany
       .mockResolvedValueOnce([
