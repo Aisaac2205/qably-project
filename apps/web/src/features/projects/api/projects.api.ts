@@ -13,6 +13,7 @@ export type UpdateProjectPayload = Partial<{
   description: string | null
   connectionId: string | null
   technologies: string[]
+  testFilePatterns: string[]
 }>
 
 export function listProjects(signal?: AbortSignal): Promise<ProjectListItem[]> {

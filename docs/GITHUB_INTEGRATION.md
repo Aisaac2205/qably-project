@@ -44,6 +44,8 @@ Patterns are editable through `PATCH /projects/:id`. The validation is deliberat
 
 The column default stays `["*.spec.ts", "*.test.ts"]`.
 
+The editor lives inline in the repository panel (`test-file-patterns-editor.tsx`), next to the chips that already displayed the patterns, rather than behind a dialog: declaring what counts as a test is a small, reversible edit, and a modal would hide the changed-files list the user is reading it against. `validate-test-file-patterns.ts` mirrors the server rules so the wildcard-only case is explained in place instead of coming back as a 422.
+
 ## Credentials, and what is deliberately absent
 
 `Connection` stores **no** GitHub credential. The column that used to hold an encrypted personal

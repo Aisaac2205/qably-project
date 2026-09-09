@@ -204,7 +204,19 @@
     "noTestsTitle": "This change did not touch any test file",
     "noTestsDescription": "The configured patterns are {{patterns}}.",
     "viewFile": "View file at its origin",
-    "loading": "Loading repository…"
+    "loading": "Loading repository…",
+    "patternsEdit": "Edit test file patterns",
+    "patternLabel": "Pattern {{index}}",
+    "patternRemove": "Remove pattern {{index}}",
+    "patternAdd": "Add pattern",
+    "patternsSave": "Save",
+    "patternsSaving": "Saving",
+    "patternsCancel": "Cancel",
+    "patternsSaveError": "The patterns could not be saved. Try again.",
+    "patternsIssueEmpty": "Declare at least one pattern.",
+    "patternsIssueTooMany": "A project declares at most 20 patterns.",
+    "patternsIssueTooLong": "A pattern cannot be longer than 120 characters.",
+    "patternsIssueWildcardOnly": "A pattern needs at least one character that is not *, ? or /, otherwise every changed file counts as a test."
   },
   "webhookSetup": {
     "heading": "Webhook setup",

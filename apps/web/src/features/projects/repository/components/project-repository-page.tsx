@@ -29,6 +29,7 @@ import { useProjectRepository } from '../hooks/use-project-repository'
 import { useRotateWebhookSecret } from '../hooks/use-rotate-webhook-secret'
 import { WebhookSecretDialog } from './webhook-secret-dialog'
 import { matchDeclaredTestPattern } from '../lib/test-file-patterns'
+import { TestFilePatternsEditor } from './test-file-patterns-editor'
 
 function ChangedFileItem({
   change,
@@ -208,15 +209,12 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
                 </p>
               ) : null}
             </div>
-            {source.testFilePatterns?.length ? (
-              <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                {source.testFilePatterns.map((pat) => (
-                  <span key={pat} className="font-mono text-2xs px-2 py-0.5 rounded-md bg-canvas border border-border/60 text-muted">
-                    {pat}
-                  </span>
-                ))}
-              </div>
-            ) : null}
+            <div className="shrink-0">
+              <TestFilePatternsEditor
+                projectId={projectId}
+                patterns={source.testFilePatterns ?? []}
+              />
+            </div>
           </div>
         </section>
       ) : (

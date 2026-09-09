@@ -204,7 +204,19 @@
     "noTestsTitle": "Este cambio no modificó archivos de prueba",
     "noTestsDescription": "Los patrones configurados son {{patterns}}.",
     "viewFile": "Ver el archivo en su origen",
-    "loading": "Cargando repositorio…"
+    "loading": "Cargando repositorio…",
+    "patternsEdit": "Editar los patrones de archivos de prueba",
+    "patternLabel": "Patrón {{index}}",
+    "patternRemove": "Quitar el patrón {{index}}",
+    "patternAdd": "Agregar patrón",
+    "patternsSave": "Guardar",
+    "patternsSaving": "Guardando",
+    "patternsCancel": "Cancelar",
+    "patternsSaveError": "No fue posible guardar los patrones. Vuelva a intentarlo.",
+    "patternsIssueEmpty": "Declarar al menos un patrón.",
+    "patternsIssueTooMany": "Un proyecto declara como máximo 20 patrones.",
+    "patternsIssueTooLong": "Un patrón no puede superar los 120 caracteres.",
+    "patternsIssueWildcardOnly": "Un patrón necesita al menos un carácter que no sea *, ? o /, de lo contrario todo archivo modificado cuenta como prueba."
   },
   "webhookSetup": {
     "heading": "Configuración del webhook",
