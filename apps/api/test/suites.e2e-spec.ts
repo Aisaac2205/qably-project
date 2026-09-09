@@ -70,6 +70,7 @@ describe('Suites (e2e)', () => {
       delete: jest.fn(),
     },
     testCase: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    extractedProposal: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -89,6 +90,7 @@ describe('Suites (e2e)', () => {
     prisma.suite.findUniqueOrThrow.mockResolvedValue(suiteRow);
     prisma.suite.create.mockResolvedValue(suiteRow);
     prisma.suite.update.mockResolvedValue(suiteRow);
+    prisma.extractedProposal.findMany.mockResolvedValue([]);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
