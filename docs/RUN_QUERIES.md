@@ -59,10 +59,34 @@ has to derive it from the counts itself — see `RunSummaryRecord` and `RunCaseC
 
 The counts come from one `prisma.runCase.groupBy` call across all listed runs, not one query per run.
 
+Each item also carries `delta`: `{ regressions, fixes, unchanged }` counted against the immediately
+previous finished run of the same suite, or `null` when the suite has no earlier finished run. `null`
+means "nothing to compare against", never "no changes" — the first run of a suite must not look like a
+quiet one. The previous run is resolved for the whole page with one `LAG()` window query over the
+listed suites (the same query the regression scan uses, shared rather than copied) and one batched
+`runCase.findMany` over the runs being compared. A case with no counterpart in the previous run is
+classified `new` and counted in none of the three buckets.
+
 ## `GET /runs/:id`
 
 Returns the full run, including every case ordered by `position`. This is the detail view, where
 sending the whole case list is the point.
+
+The detail carries `delta` too, but as names rather than counts: `{ regressions: CaseDeltaEntry[],
+fixes: CaseDeltaEntry[] }` with `{ testCaseId, caseName }` per entry, or `null` for a suite's first
+run. Its predecessor is found with a direct indexed `findFirst` (same suite, earlier `startedAt`,
+finished, ordered newest first) instead of the window query: a window function answers for every row
+in the partition, and the detail needs exactly one. What stays shared is the classification,
+`classifyCaseDelta` in `apps/api/src/modules/notifications/lib/regression-check.ts`, so the page and
+the regression alert never disagree.
+
+## `GET /runs/regressions?projectId=<id>&limit=<n>`
+
+Scans the project's most recent finished runs, `limit` at most, and returns every case that passed in
+the previous finished run of its suite and fails in the scanned one, with the run, suite and case names
+and the id of the run it is compared against, plus `runsScanned`. It shipped before this document
+mentioned it. It uses the same window query and the same classifier as the list delta above, filtered
+to the `regression` answer; the quality page reads it to show what recently broke.
 
 ## `POST /runs` — starting a manual run
 

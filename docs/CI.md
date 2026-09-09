@@ -48,6 +48,12 @@ Nest testing module compiles. `nest build` is a pure TypeScript compile and neve
 value; it is never actually dialed, since the build never makes a real request. `vitest.config.ts`
 already sets its own `NEXT_PUBLIC_API_URL` for the test environment, so the two do not conflict.
 
+`NEXT_PUBLIC_DOCS_URL` is optional and names the origin of the public documentation site, so the app
+can link a QA from an empty runs page to the CI reporting guide. Unset, the link is a same-origin path
+(`/docs#...`, `/en/docs#...`), which is right for local development where the two apps are proxied
+together. Production should set the real docs origin; no value is guessed here because domains are
+the owner's call.
+
 ### `type-check`
 
 Both apps' `package.json` gained a `"type-check": "tsc --noEmit"` script as part of this change —

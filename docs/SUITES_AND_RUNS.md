@@ -17,6 +17,27 @@ interchangeable, and which rules the API enforces so they stay that way. The met
 A suite is a taxonomy and a place to write things down. A run is evidence. Most confusion about this
 part of the product comes from reading a run as if it were an editable document.
 
+## What a run is for
+
+A run exists to answer one question a QA actually has: is this evidence of a problem, or of a fix? A
+list of statuses does not answer it; a comparison with the previous run of the same suite does. That is
+the thesis promise behind the page — results registered without manual work (alcance 4), each one linked
+to the change that produced it (alcance 5), and a notice when a case that used to pass starts failing
+(story h).
+
+So every run row carries the commit that produced it and a delta against the immediately previous
+finished run of its suite: how many cases regressed, how many were fixed, how many stayed the same. The
+run detail names those cases. The delta is `null` for the first run of a suite, never a row of zeros —
+the same "not measured is not zero" rule `DASHBOARD_METRICS.md` applies to `healthScore`. The
+classification lives in one place, `classifyCaseDelta` in the notifications module, and the regression
+alert is that same classifier filtered to one of its four answers, so the page and the alert can never
+disagree about what "started failing" means.
+
+The page copy used to describe itself as "historial ... y simulación de CI", a phrase left over from the
+mock era. Nothing here is simulated: every run is a real CI report or a real manual execution, and the
+subtitle now says so. The empty state explains that CI fills the page and links to the public reporting
+guide, because a blank list otherwise reads as a bug.
+
 ## Why `run_case` duplicates the case content
 
 `run_case` carries its own `steps` and `expected_result`, copied from `test_case` when the run is created
