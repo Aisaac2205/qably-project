@@ -1,13 +1,14 @@
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectChatPanel } from '@/features/ai-review/components/project-chat-panel'
 import { ApiError } from '@/lib/api-client'
-import type {
-  ChatMessageRecord,
-  ChatThreadDetailRecord,
-  ChatThreadRecord,
+import {
+  ASSISTANT_MODEL_NAME,
+  type ChatMessageRecord,
+  type ChatThreadDetailRecord,
+  type ChatThreadRecord,
 } from '@qably/types'
 
 const thread: ChatThreadRecord = {
@@ -47,6 +48,7 @@ const createThread = vi.fn()
 const getThread = vi.fn()
 const sendMessage = vi.fn()
 const sendToReview = vi.fn()
+const deleteThread = vi.fn()
 
 vi.mock('@/features/ai-review/api/chat.api', () => ({
   listThreads: (...args: unknown[]) => listThreads(...args),
@@ -54,6 +56,7 @@ vi.mock('@/features/ai-review/api/chat.api', () => ({
   getThread: (...args: unknown[]) => getThread(...args),
   sendMessage: (...args: unknown[]) => sendMessage(...args),
   sendToReview: (...args: unknown[]) => sendToReview(...args),
+  deleteThread: (...args: unknown[]) => deleteThread(...args),
 }))
 
 function renderPanel() {
@@ -118,5 +121,65 @@ describe('ProjectChatPanel', () => {
 
     expect(await screen.findByText('Another question')).toBeInTheDocument()
     expect(await screen.findByText(/not available right now/i)).toBeInTheDocument()
+  })
+
+  it('names the model answering, labelled as the model', async () => {
+    listThreads.mockResolvedValue([])
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    const chip = screen.getByText(ASSISTANT_MODEL_NAME)
+    expect(chip).toBeInTheDocument()
+    expect(chip.parentElement).toHaveTextContent(/model|modelo/i)
+  })
+
+  it('titles the panel with the conversation being read', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetailAfterReply)
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    await user.click(await screen.findByTitle('How many cases are pending?'))
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'How many cases are pending?' }),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  it('reaches the conversations from a drawer on a narrow viewport', async () => {
+    listThreads.mockResolvedValue([thread])
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    await user.click(screen.getByRole('button', { name: /open conversations|ver conversaciones/i }))
+
+    const drawer = await screen.findByRole('dialog')
+    expect(within(drawer).getByText('How many cases are pending?')).toBeInTheDocument()
+  })
+
+  it('closes the drawer once a conversation is picked', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetailAfterReply)
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    await user.click(screen.getByRole('button', { name: /open conversations|ver conversaciones/i }))
+    const drawer = await screen.findByRole('dialog')
+    await user.click(within(drawer).getByText('How many cases are pending?'))
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
   })
 })

@@ -458,6 +458,7 @@
     "toggleSidebar": "Toggle chat sidebar",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
+    "openConversations": "Open conversations",
     "promptStarter1": "What suites have the most pending cases?",
     "promptStarter2": "Generate test cases for the checkout flow",
     "promptStarter3": "Analyze coverage gaps in this project",

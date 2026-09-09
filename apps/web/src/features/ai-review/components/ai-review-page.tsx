@@ -188,9 +188,9 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         role="tabpanel"
         aria-labelledby="ai-review-tab-chat"
         hidden={tab !== 'chat'}
-        className="flex-1 min-h-0"
+        className="flex-1 min-h-0 -mx-4 -mb-4 sm:mx-0 sm:mb-0"
       >
-        <div className="flex flex-col h-full min-h-0 rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+        <div className="flex flex-col h-full min-h-0 border-y border-border bg-surface overflow-hidden sm:rounded-xl sm:border sm:shadow-card">
           <ProjectChatPanel projectId={projectId} />
         </div>
       </div>

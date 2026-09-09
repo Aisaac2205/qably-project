@@ -42,7 +42,7 @@ export function ChatComposer({
   }
 
   return (
-    <div className="bg-surface px-4 py-3 sm:px-6 sm:py-4">
+    <div className="bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-4 sm:pb-4">
       <div className="max-w-3xl mx-auto w-full">
         <div className="flex items-end gap-2 bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
           <label htmlFor="chat-composer-input" className="sr-only">

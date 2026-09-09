@@ -458,6 +458,7 @@
     "toggleSidebar": "Alternar barra lateral de chat",
     "collapseSidebar": "Ocultar barra lateral",
     "expandSidebar": "Mostrar barra lateral",
+    "openConversations": "Ver conversaciones",
     "promptStarter1": "¿Qué suites tienen más casos pendientes?",
     "promptStarter2": "Genera casos de prueba para el flujo de checkout",
     "promptStarter3": "Analiza las brechas de cobertura del proyecto",
