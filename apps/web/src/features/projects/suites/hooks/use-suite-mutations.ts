@@ -15,7 +15,7 @@ import {
   type UpdateCasePayload,
   type UpdateSuitePayload,
 } from '../api/suites.api'
-import { suiteKeys } from '../../lib/query-keys'
+import { projectKeys, suiteKeys } from '../../lib/query-keys'
 
 function useSuiteInvalidation() {
   const queryClient = useQueryClient()
@@ -27,6 +27,18 @@ function useSuiteInvalidation() {
         queryKey: suiteKeys.detail(suite.id),
       })
     }
+  }
+}
+
+function useCaseInvalidation() {
+  const invalidateSuites = useSuiteInvalidation()
+  const queryClient = useQueryClient()
+
+  return async (suite: Suite) => {
+    await invalidateSuites(suite)
+    await queryClient.invalidateQueries({
+      queryKey: projectKeys.detail(suite.projectId),
+    })
   }
 }
 
@@ -59,7 +71,7 @@ export function useDeleteSuite() {
 }
 
 export function useCreateCase() {
-  const invalidate = useSuiteInvalidation()
+  const invalidate = useCaseInvalidation()
 
   return useMutation({
     mutationFn: ({
@@ -74,7 +86,7 @@ export function useCreateCase() {
 }
 
 export function useUpdateCase() {
-  const invalidate = useSuiteInvalidation()
+  const invalidate = useCaseInvalidation()
 
   return useMutation({
     mutationFn: ({
@@ -91,7 +103,7 @@ export function useUpdateCase() {
 }
 
 export function useDeleteCase() {
-  const invalidate = useSuiteInvalidation()
+  const invalidate = useCaseInvalidation()
 
   return useMutation({
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
