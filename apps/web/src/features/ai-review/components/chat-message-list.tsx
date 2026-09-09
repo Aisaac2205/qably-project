@@ -3,27 +3,10 @@
 import type { ChatMessageRecord } from '@qably/types'
 import { ChatMessageBubble } from './chat-message-bubble'
 import { ListChecks, Flask, ShieldCheck } from '@phosphor-icons/react'
+import { AerisIcon } from '@/components/icons/aeris-icon'
 import { useTranslation } from '@/lib/i18n'
 import { StateView } from '@/components/ui/state-view'
 import type { PendingMessage } from '@/features/projects/test-generation/hooks/use-project-chat'
-
-function QablyIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 100 100"
-      fill="currentColor"
-      aria-hidden="true"
-      className={className}
-    >
-      <rect x="0" y="0" width="28" height="28" rx="5" />
-      <rect x="36" y="0" width="28" height="28" rx="5" />
-      <rect x="72" y="0" width="28" height="28" rx="5" />
-      <rect x="36" y="36" width="28" height="28" rx="5" />
-      <rect x="72" y="36" width="28" height="28" rx="5" />
-      <rect x="72" y="72" width="28" height="28" rx="5" />
-    </svg>
-  )
-}
 
 function pendingErrorCopy(
   errorKind: PendingMessage['errorKind'],
@@ -72,7 +55,7 @@ export function ChatMessageList({
     return (
       <div className="flex flex-col items-center justify-center h-full min-h-[380px] text-center p-6 sm:p-8 gap-6 select-none max-w-2xl mx-auto">
         <div className="flex flex-col items-center gap-3">
-          <QablyIcon className="size-11 sm:size-12 text-default shrink-0" />
+          <AerisIcon className="size-11 sm:size-12 text-default shrink-0" />
           <div className="space-y-1.5 max-w-md">
             <h2 className="text-lg sm:text-xl font-semibold text-default tracking-tight">
               {t('aiReview.chatGreeting')}

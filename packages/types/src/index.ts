@@ -701,6 +701,8 @@ export interface ProjectRepositoryView {
   evidence: Evidence[]
 }
 
+export const ASSISTANT_MODEL_NAME = 'Aeris 1.2'
+
 export type ChatRole = 'user' | 'assistant'
 
 export interface SuggestedCaseRecord {

@@ -1,8 +1,7 @@
 'use client'
 
-import type { ChatMessageRecord } from '@qably/types'
-import { Sparkle } from '@phosphor-icons/react'
-import { useTranslation } from '@/lib/i18n'
+import { ASSISTANT_MODEL_NAME, type ChatMessageRecord } from '@qably/types'
+import { AerisIcon } from '@/components/icons/aeris-icon'
 import { ChatGeneratedCaseCard } from './chat-generated-case-card'
 
 export function ChatMessageBubble({
@@ -12,7 +11,6 @@ export function ChatMessageBubble({
   projectId: string
   message: ChatMessageRecord
 }) {
-  const { t } = useTranslation()
   const isUser = message.role === 'user'
 
   return (
@@ -27,8 +25,8 @@ export function ChatMessageBubble({
         >
           {!isUser && (
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted mb-2">
-              <Sparkle size={13} weight="fill" className="text-primary" aria-hidden="true" />
-              <span>{t('aiReview.aiAssistant')}</span>
+              <AerisIcon size={13} className="text-primary" />
+              <span>{ASSISTANT_MODEL_NAME}</span>
             </div>
           )}
           <p className="whitespace-pre-wrap">{message.content}</p>

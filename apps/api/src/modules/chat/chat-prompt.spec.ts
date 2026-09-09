@@ -1,3 +1,4 @@
+import { ASSISTANT_MODEL_NAME } from '@qably/types';
 import {
   PROJECT_DATA_CLOSE,
   PROJECT_DATA_OPEN,
@@ -53,6 +54,35 @@ describe('buildChatSystemInstruction', () => {
       buildChatSystemInstruction('en'),
     );
     expect(buildChatSystemInstruction.length).toBe(1);
+  });
+
+  it('gives the assistant its product name in both locales', () => {
+    for (const locale of ['es', 'en'] as const) {
+      expect(buildChatSystemInstruction(locale)).toContain(
+        ASSISTANT_MODEL_NAME,
+      );
+    }
+  });
+
+  it('opens with the identity, before any other rule', () => {
+    for (const locale of ['es', 'en'] as const) {
+      expect(buildChatSystemInstruction(locale).slice(0, 200)).toContain(
+        ASSISTANT_MODEL_NAME,
+      );
+    }
+  });
+
+  it('never names the underlying provider it runs on', () => {
+    for (const locale of ['es', 'en'] as const) {
+      expect(buildChatSystemInstruction(locale)).not.toMatch(
+        /gemini|google|openai|anthropic|claude|gpt/i,
+      );
+    }
+  });
+
+  it('forbids revealing the provider when the user asks what model it is', () => {
+    expect(buildChatSystemInstruction('es')).toContain('proveedor');
+    expect(buildChatSystemInstruction('en')).toContain('provider');
   });
 });
 
