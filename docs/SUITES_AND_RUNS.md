@@ -106,6 +106,26 @@ are shown alongside, read-only, with their latest verdict and commit — evidenc
 asks anyone to redo. A suite with no manual cases has nothing for a manual run to snapshot, so the "Run
 this suite" action does not appear for it; every case in it is already covered by CI.
 
+The same rule holds one level up, at the project. `ProjectsService.findOne` reports `hasManualCases`,
+computed once server-side (`Project` has at least one `TestCase` with `executionMode: 'manual', state:
+'active'`) rather than fetched and reduced client-side across every suite. `RunListPageClient` disables
+"New run" the same accessible-disabled way `SuiteDetail` already does for an empty suite when
+`hasManualCases` is `false`, because a project whose suites are all automated-only has nothing for the
+runs form to snapshot either — every suite in it would answer the same `no-manual-cases` 409 the form
+already surfaces per-suite. This is not a second rule; it is the existing suite-level rule evaluated one
+level up, so a QA never has to click into a suite to learn what the project view could already tell them.
+
+### Proactive pending-review state
+
+`SuiteView.cases[n].pendingProposalId` is the id of the case's `in_review` `ExtractedProposal`, if any —
+one additional projected column on the suite read query (`SuitesService.withLastResults`, alongside the
+existing last-result lookup), not a new endpoint. Before this field existed, a case whose documentation
+was already queued still showed a clickable "Document with AI" button; the only way a user learned a
+proposal was pending was by clicking it again and reading the `already-pending` 409. `CaseCard` now renders
+a non-interactive "In review" state instead, linking straight to that proposal in `/review-inbox`. The
+409 branch stays as a safety net for the race between two tabs — it just stops being the primary way a
+user learns about a pending proposal.
+
 An ingested suite is named after the file the reporter grouped its cases under, humanized with
 `humanizeSuiteName`. The file itself lives on the case (`automation_file_path`), not the suite, because a
 suite can be renamed by a QA into a business-facing name (`"Checkout"` instead of `"checkout.spec.ts"`)
