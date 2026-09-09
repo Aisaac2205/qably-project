@@ -9,7 +9,10 @@ import {
 } from '../../common/metrics/run-case-metrics';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import { wasRegression } from '../notifications/lib/regression-check';
+import {
+  classifyCaseDelta,
+  wasRegression,
+} from '../notifications/lib/regression-check';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
 import { deriveRunStatus } from './lib/derive-run-status';
@@ -303,9 +306,10 @@ export class RunQueriesService {
       const currentCases = casesByRun.get(run.id) ?? [];
 
       for (const currentCase of currentCases) {
-        if (currentCase.status !== 'fail') continue;
         if (currentCase.testCaseId === null) continue;
-        if (!wasRegression(currentCase.testCaseId, previousCases)) continue;
+        if (classifyCaseDelta(currentCase, previousCases) !== 'regression') {
+          continue;
+        }
 
         items.push({
           runId: run.id,
