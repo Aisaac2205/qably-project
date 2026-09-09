@@ -124,6 +124,22 @@ describe('GeminiExtractor', () => {
     expect(contents).toContain('Cart > adds an item');
   });
 
+  it('tells the system instruction about the target-cases block only when targets are present', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ locale: 'es', targetAutomationKeys: ['Cart > adds an item'] }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.systemInstruction).toBe(buildSystemInstruction('es', true));
+    expect(config.systemInstruction).not.toBe(buildSystemInstruction('es'));
+  });
+
   it('returns no-tests-found when the model returns an empty cases array', async () => {
     const client = fakeClient(() =>
       Promise.resolve({

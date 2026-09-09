@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v3');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v4');
   });
 });
 
@@ -52,6 +52,21 @@ describe('buildSystemInstruction', () => {
       expect(instruction).toContain('"automationKey"');
       expect(instruction).toContain('CartTest.AddsItem');
       expect(instruction).toContain('test_adds_item_to_cart');
+    }
+  });
+
+  it('omits the target-cases sentence by default', () => {
+    for (const locale of ['es', 'en'] as const) {
+      expect(buildSystemInstruction(locale)).not.toContain(TARGET_CASES_OPEN);
+    }
+  });
+
+  it('adds a sentence about the target-cases block only when hasTargets is true', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale, true);
+
+      expect(instruction).toContain(TARGET_CASES_OPEN);
+      expect(instruction).toContain('"automationKey"');
     }
   });
 });

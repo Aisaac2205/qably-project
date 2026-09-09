@@ -116,7 +116,10 @@ export class GeminiExtractor implements TestCaseExtractor {
           targetAutomationKeys: input.targetAutomationKeys,
         }),
         config: {
-          systemInstruction: buildSystemInstruction(input.locale),
+          systemInstruction: buildSystemInstruction(
+            input.locale,
+            (input.targetAutomationKeys?.length ?? 0) > 0,
+          ),
           responseMimeType: 'application/json',
           responseJsonSchema: RESPONSE_JSON_SCHEMA,
           temperature: TEMPERATURE,

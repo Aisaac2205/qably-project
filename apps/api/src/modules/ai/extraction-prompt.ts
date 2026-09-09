@@ -3,7 +3,7 @@ import {
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v3';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v4';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -67,8 +67,18 @@ Steps must be imperative, numbered by order, and describe only actions and asser
 If the file contains no test declarations, respond with an empty "cases" array. Respond with JSON only, matching the provided schema exactly, with every field except "automationKey" written in English.`,
 };
 
-export function buildSystemInstruction(locale: 'es' | 'en'): string {
-  return INSTRUCTION[locale];
+const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
+  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con los valores de "automationKey" que importan: prioriza extraer exactamente esos casos, hasta el límite de casos del esquema.`,
+  en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit.`,
+};
+
+export function buildSystemInstruction(
+  locale: 'es' | 'en',
+  hasTargets = false,
+): string {
+  return hasTargets
+    ? `${INSTRUCTION[locale]}\n\n${TARGET_CASES_SENTENCE[locale]}`
+    : INSTRUCTION[locale];
 }
 
 function buildTargetCasesBlock(targetAutomationKeys: readonly string[]): string {
