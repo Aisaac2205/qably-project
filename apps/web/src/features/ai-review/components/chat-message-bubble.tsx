@@ -25,7 +25,7 @@ export function ChatMessageBubble({
         >
           {!isUser && (
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted mb-2">
-              <AerisIcon size={13} className="text-primary" />
+              <AerisIcon size={14} />
               <span>{ASSISTANT_MODEL_NAME}</span>
             </div>
           )}

@@ -2,6 +2,8 @@
 
 import { useState, type KeyboardEvent } from 'react'
 import { PaperPlaneRight } from '@phosphor-icons/react'
+import { ASSISTANT_MODEL_NAME } from '@qably/types'
+import { AerisIcon } from '@/components/icons/aeris-icon'
 import { cn } from '@/lib/utils'
 import { useAutoResizeTextarea } from '@/features/projects/test-generation/hooks/use-auto-resize-textarea'
 import { useTranslation } from '@/lib/i18n'
@@ -44,7 +46,7 @@ export function ChatComposer({
   return (
     <div className="bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-4 sm:pb-4">
       <div className="max-w-3xl mx-auto w-full">
-        <div className="flex items-end gap-2 bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
+        <div className="flex flex-col gap-2 bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
           <label htmlFor="chat-composer-input" className="sr-only">
             {t('aiReview.chatComposerLabel')}
           </label>
@@ -61,22 +63,31 @@ export function ChatComposer({
             placeholder={t('aiReview.chatPlaceholder')}
             rows={1}
             maxLength={MAX_MESSAGE_LENGTH}
-            className="flex-1 resize-none bg-transparent text-sm text-default placeholder:text-muted outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full resize-none bg-transparent text-sm text-default placeholder:text-muted outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!value.trim() || disabled}
-            aria-label={t('aiReview.sendMessage')}
-            className={cn(
-              'size-8 shrink-0 rounded-lg flex items-center justify-center transition-all duration-150',
-              value.trim() && !disabled
-                ? 'bg-primary text-primary-fg hover:bg-primary-hover shadow-xs active:scale-95'
-                : 'bg-canvas text-muted/40 cursor-not-allowed',
-            )}
-          >
-            <PaperPlaneRight size={16} weight="fill" aria-hidden="true" />
-          </button>
+
+          <div className="flex items-center justify-between gap-2">
+            <p className="inline-flex min-w-0 items-center gap-1.5 rounded-lg border border-border/60 bg-canvas/50 px-2 py-1 text-[11px] font-semibold text-muted">
+              <AerisIcon size={14} />
+              <span className="sr-only">{t('aiReview.modelLabel')}: </span>
+              <span className="truncate">{ASSISTANT_MODEL_NAME}</span>
+            </p>
+
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!value.trim() || disabled}
+              aria-label={t('aiReview.sendMessage')}
+              className={cn(
+                'size-8 shrink-0 rounded-lg flex items-center justify-center transition-all duration-150',
+                value.trim() && !disabled
+                  ? 'bg-primary text-primary-fg hover:bg-primary-hover shadow-xs active:scale-95'
+                  : 'bg-canvas text-muted/40 cursor-not-allowed',
+              )}
+            >
+              <PaperPlaneRight size={16} weight="fill" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

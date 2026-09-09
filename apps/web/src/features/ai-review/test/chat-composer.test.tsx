@@ -1,9 +1,34 @@
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
+import { ASSISTANT_MODEL_NAME } from '@qably/types'
 import { ChatComposer } from '@/features/ai-review/components/chat-composer'
 
 describe('ChatComposer', () => {
+  it('names the model under the input, not above it', async () => {
+    await act(async () => {
+      render(<ChatComposer onSend={vi.fn()} />)
+    })
+
+    const textarea = screen.getByRole('textbox', { name: 'Message' })
+    const model = screen.getByText(ASSISTANT_MODEL_NAME)
+
+    expect(model).toBeInTheDocument()
+    expect(
+      textarea.compareDocumentPosition(model) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('labels the model chip for a screen reader', async () => {
+    await act(async () => {
+      render(<ChatComposer onSend={vi.fn()} />)
+    })
+
+    expect(screen.getByText(ASSISTANT_MODEL_NAME).parentElement).toHaveTextContent(
+      /model|modelo/i,
+    )
+  })
+
   it('sends the typed message and clears the input', async () => {
     const onSend = vi.fn()
     const user = userEvent.setup()
