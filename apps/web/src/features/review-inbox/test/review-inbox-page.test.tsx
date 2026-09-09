@@ -230,87 +230,9 @@ describe('ReviewInboxPage', () => {
     expect(duplicateButton).toHaveAttribute('aria-pressed', 'true')
   })
 
-  describe('bulk approve/reject', () => {
-    it('shows the bulk action bar naming the selection count once a proposal is checked', async () => {
-      const user = userEvent.setup()
-      renderWithQuery(<ReviewInboxPage />)
-
-      expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
-
-      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
-      await user.click(checkboxes[0])
-
-      expect(screen.getByText('1 selected')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Approve selected' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Reject selected' })).toBeInTheDocument()
-    })
-
-    it('gives each proposal checkbox a distinct accessible name that includes its title', () => {
-      renderWithQuery(<ReviewInboxPage />)
-
-      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
-      const names = checkboxes.map((checkbox) => checkbox.getAttribute('aria-label'))
-
-      expect(names.length).toBeGreaterThan(1)
-      expect(new Set(names).size).toBe(names.length)
-    })
-
-    it('bulk-approves the checked proposals and shows a per-item summary', async () => {
-      const user = userEvent.setup()
-      renderWithQuery(<ReviewInboxPage />)
-
-      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
-      await user.click(checkboxes[0])
-      await user.click(checkboxes[1])
-      await user.click(screen.getByRole('button', { name: 'Approve selected' }))
-
-      expect(await screen.findByRole('status')).toHaveTextContent(
-        /1 approved, 1 skipped \(1 for incomplete proposal\)/i,
-      )
-      expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
-    })
-
-    it('selects every pending proposal with the select-all checkbox', async () => {
-      const user = userEvent.setup()
-      renderWithQuery(<ReviewInboxPage />)
-
-      const selectAll = screen.getByRole('checkbox', { name: 'Select all proposals' })
-      await user.click(selectAll)
-
-      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
-      for (const checkbox of checkboxes) {
-        expect(checkbox).toHaveAttribute('data-checked', '')
-      }
-    })
-
-    it('clears the selection and hides the bulk bar when the project filter changes', async () => {
-      const user = userEvent.setup()
-      renderWithQuery(<ReviewInboxPage />)
-
-      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
-      await user.click(checkboxes[0])
-      await user.click(checkboxes[1])
-      expect(screen.getByText('2 selected')).toBeInTheDocument()
-
-      const projectSelect = screen.getByRole('combobox', { name: /Project/i })
-      await user.selectOptions(projectSelect, 'proj-1')
-
-      expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Approve selected' })).not.toBeInTheDocument()
-    })
-
-    it('clears the selection when the search query changes', async () => {
-      const user = userEvent.setup()
-      renderWithQuery(<ReviewInboxPage />)
-
-      const checkboxes = screen.getAllByRole('checkbox', { name: /^Select proposal:/ })
-      await user.click(checkboxes[0])
-      expect(screen.getByText('1 selected')).toBeInTheDocument()
-
-      const searchInput = screen.getByRole('searchbox', { name: /Search by title/i })
-      await user.type(searchInput, 'checkout')
-
-      expect(screen.queryByText(/\d+ selected/)).not.toBeInTheDocument()
-    })
+  it('renders clean queue items without checkboxes', () => {
+    renderWithQuery(<ReviewInboxPage />)
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   })
 })
+
