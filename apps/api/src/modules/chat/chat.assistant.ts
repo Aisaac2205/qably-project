@@ -8,6 +8,8 @@ import type { TokenUsage } from '../ai/extraction.contracts';
 import type { GeminiClient } from '../ai/gemini.extractor';
 import {
   buildChatSystemInstruction,
+  buildProjectContextAcknowledgement,
+  buildProjectContextTurn,
   type ChatProjectContext,
 } from './chat-prompt';
 import {
@@ -90,15 +92,26 @@ const envelopeSchema = z.object({
   cases: z.array(z.unknown()).max(MAX_SUGGESTED_CASES),
 });
 
-function toContents(
-  history: ChatHistoryEntry[],
-  message: string,
-): Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> {
-  const turns = history.map((entry) => ({
+type ContentTurn = {
+  role: 'user' | 'model';
+  parts: Array<{ text: string }>;
+};
+
+function toContents(input: ChatReplyInput): ContentTurn[] {
+  const history: ContentTurn[] = input.history.map((entry) => ({
     role: entry.role === 'assistant' ? ('model' as const) : ('user' as const),
     parts: [{ text: entry.content }],
   }));
-  return [...turns, { role: 'user', parts: [{ text: message }] }];
+
+  return [
+    { role: 'user', parts: [{ text: buildProjectContextTurn(input.context) }] },
+    {
+      role: 'model',
+      parts: [{ text: buildProjectContextAcknowledgement(input.locale) }],
+    },
+    ...history,
+    { role: 'user', parts: [{ text: input.message }] },
+  ];
 }
 
 @Injectable()
@@ -117,12 +130,9 @@ export class GeminiChatAssistant implements ChatAssistant {
     try {
       const response = await this.client.models.generateContent({
         model: this.model,
-        contents: toContents(input.history, input.message),
+        contents: toContents(input),
         config: {
-          systemInstruction: buildChatSystemInstruction(
-            input.locale,
-            input.context,
-          ),
+          systemInstruction: buildChatSystemInstruction(input.locale),
           responseMimeType: 'application/json',
           responseJsonSchema: RESPONSE_JSON_SCHEMA,
           temperature: TEMPERATURE,

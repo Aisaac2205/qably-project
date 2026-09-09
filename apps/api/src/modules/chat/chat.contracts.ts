@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { extractedCaseSchema } from '../ai/extraction.contracts';
 
-export const CHAT_PROMPT_VERSION = 'chat-v1';
+export const CHAT_PROMPT_VERSION = 'chat-v2';
 export const MAX_SUGGESTED_CASES = 5;
 export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;
