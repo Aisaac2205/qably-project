@@ -70,12 +70,38 @@ not redefine them.
   `JEST_JUNIT_OUTPUT_NAME` set per step, so unit and e2e runs write to
   `apps/api/reports/junit-unit.xml` and `apps/api/reports/junit-e2e.xml` respectively. Nothing in
   `package.json`'s `jest` config was changed — the reporter is opt-in, passed only in the workflow.
-- **web** (vitest): `vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml`
-  writes `apps/web/reports/junit.xml`. `--outputFile` is vitest's documented flag for redirecting a
-  `json`, `html` or `junit` reporter's output to a file.
+- **web** and **landing** (vitest): the JUnit reporter is declared in each `vitest.config.ts`,
+  gated on `CI`, writing `reports/junit.xml` under the app. It used to be passed on the command
+  line; it moved into the config because the one option that matters below is a reporter option
+  with no CLI flag, and a `--reporter` on the command line replaces whatever the config declares.
 
 Both XML files are uploaded via `actions/upload-artifact` so a failed run is diagnosable without
 re-running anything.
+
+### The `file` attribute is what lets Aeris read a test
+
+A case created from a JUnit report only knows which source file it lives in when the report says
+so: the parser reads `<testcase file="...">` into `automationFilePath`, and that path is what the
+extractor fetches from the repository when someone asks Aeris to document the case. Without it the
+case is skipped with `no-source-file`, and the fallback that recovers a path from an earlier
+repository change only works for files the SCM webhook has already seen.
+
+Both reporters omit the attribute by default. `jest-junit` turns it on with
+`JEST_JUNIT_ADD_FILE_ATTRIBUTE=true` (set per step in the workflow); vitest's reporter takes
+`addFileAttribute: true` in the config. Connecting the repository is not a substitute: results and
+code changes are two independent pipelines, and only the report can say where a case came from.
+
+Both reporters emit the path relative to the app they ran in (`src/...`), while the repository, the
+webhook and the extractor all speak in repository-relative paths (`apps/web/src/...`). A path
+without the workspace prefix would resolve to nothing on the provider. `scripts/qably-report.mjs`
+rewrites every `file` attribute before sending, prefixing the workspace it derives from the report's
+own location (`<workspace>/reports/<file>.xml`), so no reporter option has to know about the
+monorepo layout. `QABLY_REPO_PATH_PREFIX` overrides the derived prefix for layouts that do not
+follow that convention, and an empty value disables the rewrite. The rewrite is idempotent: a path
+that already carries the prefix is left alone.
+
+Turning this on fixes cases created from then on. A case that already exists keeps its empty path,
+because the path is written once, when the case is first created.
 
 ## Reporting results to Qably
 

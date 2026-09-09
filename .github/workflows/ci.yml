@@ -53,12 +53,14 @@ jobs:
         env:
           JEST_JUNIT_OUTPUT_DIR: ./reports
           JEST_JUNIT_OUTPUT_NAME: junit-unit.xml
+          JEST_JUNIT_ADD_FILE_ATTRIBUTE: 'true'
         run: pnpm --filter @qably/api run test:ci
 
       - name: E2E tests
         env:
           JEST_JUNIT_OUTPUT_DIR: ./reports
           JEST_JUNIT_OUTPUT_NAME: junit-e2e.xml
+          JEST_JUNIT_ADD_FILE_ATTRIBUTE: 'true'
         run: pnpm --filter @qably/api run test:e2e:ci
 
       - name: Report unit results to Qably

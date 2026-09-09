@@ -6,6 +6,9 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     include: ['src/**/*.test.ts'],
+    reporters: process.env.CI
+      ? ['default', ['junit', { outputFile: './reports/junit.xml', addFileAttribute: true }]]
+      : ['default'],
   },
   resolve: {
     alias: {

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { basename } from 'node:path';
+import { basename, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 
@@ -22,6 +23,32 @@ function slugify(value) {
 
 function shortHash(value) {
   return createHash('sha256').update(value).digest('hex').slice(0, 8);
+}
+
+function normalizeSlashes(value) {
+  return value.replace(/\\/g, '/').replace(/^\.\//, '');
+}
+
+export function deriveWorkspacePrefix(reportPath) {
+  const override = process.env.QABLY_REPO_PATH_PREFIX;
+  if (override !== undefined) return normalizeSlashes(override).replace(/\/+$/, '');
+
+  const normalized = normalizeSlashes(reportPath);
+  const reportsDir = dirname(normalized);
+  if (basename(reportsDir) !== 'reports') return '';
+
+  const workspace = dirname(reportsDir);
+  return workspace === '.' || workspace === '/' ? '' : workspace;
+}
+
+export function repoRelativeFilePaths(xml, prefix) {
+  if (prefix === '') return xml;
+
+  return xml.replace(/(<testcase\s[^>]*?\sfile=")([^"]*)(")/g, (match, open, value, close) => {
+    const path = normalizeSlashes(value);
+    if (path === '' || path.startsWith(`${prefix}/`)) return `${open}${path}${close}`;
+    return `${open}${prefix}/${path}${close}`;
+  });
 }
 
 function buildExternalId(filePath, jobId, runId) {
@@ -220,11 +247,13 @@ async function main() {
     commit: readCommitMetadata(),
   };
 
+  const prefix = deriveWorkspacePrefix(filePath);
   const query = buildJunitQuery(filePath, context);
+  const body = repoRelativeFilePaths(xml, prefix);
 
   let ok = false;
   try {
-    ok = await reportJunitFile(baseUrl, apiKey, xml, query);
+    ok = await reportJunitFile(baseUrl, apiKey, body, query);
   } catch (error) {
     console.error(
       `::warning title=Qably report failed::network error reporting "${filePath}": ${error.message}`,
@@ -236,9 +265,15 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(
-    `::warning title=Qably report failed::unexpected error in qably-report.mjs: ${error.message}`,
-  );
-  process.exitCode = 0;
-});
+const invokedDirectly =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error(
+      `::warning title=Qably report failed::unexpected error in qably-report.mjs: ${error.message}`,
+    );
+    process.exitCode = 0;
+  });
+}

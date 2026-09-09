@@ -11,6 +11,9 @@ export default defineConfig({
       NEXT_PUBLIC_API_URL: 'http://localhost:3001',
     },
     setupFiles: ['./src/test/setup.ts'],
+    reporters: process.env.CI
+      ? ['default', ['junit', { outputFile: './reports/junit.xml', addFileAttribute: true }]]
+      : ['default'],
     deps: {
       optimizer: {
         client: {

@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run --maxWorkers=2",
-    "test:ci": "vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml"
+    "test:ci": "vitest run"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
