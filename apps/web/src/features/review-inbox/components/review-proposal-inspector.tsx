@@ -16,6 +16,7 @@ import { EvidenceList } from '@/components/ui/evidence-list'
 import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProposal } from '../hooks/use-proposals'
+import { manualReviewReasonKey } from '../lib/manual-review-reason'
 import { useTranslation } from '@/lib/i18n'
 import { projectRootPath } from '@/features/projects/lib/routes'
 
@@ -49,6 +50,12 @@ export function ReviewProposalInspector({
   const { proposal: detail } = useProposal(proposal.id)
   const evidence = detail?.evidence ?? undefined
   const links = detail?.links ?? []
+
+  const hasNothingToPublish = proposal.steps.length === 0
+  const needsManualReview = proposal.needsManualReview || hasNothingToPublish
+  const manualReviewReason = needsManualReview
+    ? manualReviewReasonKey(proposal.objective)
+    : null
 
   const isPending = proposal.status === 'in_review'
   const isApproved = proposal.status === 'approved'
@@ -105,8 +112,27 @@ export function ReviewProposalInspector({
           <DuplicateComparison targetOfficialTestCaseId={proposal.targetOfficialTestCaseId} />
         )}
 
+        {/* Why this proposal cannot be published as it stands */}
+        {needsManualReview && (
+          <div className="space-y-1.5 rounded-lg border border-warn/40 bg-warn-bg/60 p-3.5">
+            <h4 className="text-xs font-semibold text-warn">
+              {t('reviewInbox.manualReviewTitle')}
+            </h4>
+            <p className="text-sm text-default leading-relaxed">
+              {manualReviewReason === null
+                ? t('reviewInbox.manualReviewReasonUnknown', {
+                    reason: proposal.objective,
+                  })
+                : t(`reviewInbox.${manualReviewReason}`)}
+            </p>
+            <p className="text-xs text-muted leading-relaxed">
+              {t('reviewInbox.manualReviewHint')}
+            </p>
+          </div>
+        )}
+
         {/* Objective */}
-        {proposal.objective && (
+        {!needsManualReview && proposal.objective && (
           <div className="space-y-1.5">
             <h4 className="text-xs font-semibold text-muted">
               {t('reviewInbox.objective')}
@@ -130,6 +156,7 @@ export function ReviewProposalInspector({
         )}
 
         {/* Steps */}
+        {proposal.steps.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted">
             {t('reviewInbox.steps')}
@@ -148,8 +175,10 @@ export function ReviewProposalInspector({
             ))}
           </ol>
         </div>
+        )}
 
         {/* Expected Result */}
+        {proposal.expectedResult !== '' && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted">
             {t('reviewInbox.expectedResult')}
@@ -158,6 +187,7 @@ export function ReviewProposalInspector({
             {proposal.expectedResult}
           </div>
         </div>
+        )}
 
         {/* Source Code Snippet */}
         {evidence?.excerpt && (
@@ -187,9 +217,14 @@ export function ReviewProposalInspector({
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               type="button"
-              disabled={isSubmitting}
+              disabled={isSubmitting || hasNothingToPublish}
               onClick={() => onApprove(proposal.id)}
               aria-label={t('reviewInbox.actionApprove')}
+              title={
+                hasNothingToPublish
+                  ? t('reviewInbox.approveBlocked')
+                  : undefined
+              }
               className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs sm:text-sm font-semibold text-primary-fg shadow-xs transition-all duration-150 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary"
             >
               <CheckCircle size={16} weight="fill" aria-hidden="true" />

@@ -51,6 +51,12 @@ function unwrap<T>(result: Result<T, ReviewError>): T {
         code: result.error,
         message: 'The evidence backing this proposal is no longer available',
       });
+    case 'incomplete-proposal':
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message:
+          'This proposal documents no steps, so there is nothing to publish',
+      });
     case 'missing-suite':
       throw new UnprocessableEntityException({
         code: result.error,

@@ -40,6 +40,7 @@ const VIEW_SELECT = {
   expectedResult: true,
   priority: true,
   evidenceId: true,
+  needsManualReview: true,
   targetTestCaseId: true,
   evidence: { select: { title: true } },
 } as const;
@@ -55,6 +56,7 @@ interface ViewRow {
   expectedResult: string;
   priority: ProposalView['priority'];
   evidenceId: string;
+  needsManualReview: boolean;
   targetTestCaseId: string | null;
   evidence: { title: string } | null;
 }
@@ -90,6 +92,7 @@ function toView(row: ViewRow): ProposalView {
     expectedResult: row.expectedResult,
     priority: row.priority,
     evidenceId: row.evidenceId,
+    needsManualReview: row.needsManualReview,
     evidenceTitle: row.evidence === null ? '' : row.evidence.title,
     ...(row.targetTestCaseId === null
       ? {}
@@ -253,6 +256,7 @@ export class ReviewService {
 
     if (!proposal.ok) return proposal;
     if (proposal.value.evidence === null) return err('missing-evidence');
+    if (proposal.value.steps.length === 0) return err('incomplete-proposal');
 
     const target = proposal.value.targetTestCaseId;
     const suiteId =

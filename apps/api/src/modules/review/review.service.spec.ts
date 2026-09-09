@@ -26,6 +26,7 @@ const proposalRow = {
   automationKey: null as string | null,
   codeChange: null as { filePath: string } | null,
   targetTestCase: null as { automationFilePath: string | null } | null,
+  needsManualReview: false,
 };
 
 interface FakePrisma {
@@ -34,7 +35,7 @@ interface FakePrisma {
   testCase: { create: jest.Mock; update: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
   reviewDecision: { create: jest.Mock };
-  traceabilityLink: { createMany: jest.Mock };
+  traceabilityLink: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
 }
 
@@ -58,7 +59,10 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
     reviewDecision: {
       create: jest.fn().mockResolvedValue({ id: 'decision-1' }),
     },
-    traceabilityLink: { createMany: jest.fn().mockResolvedValue({ count: 2 }) },
+    traceabilityLink: {
+      createMany: jest.fn().mockResolvedValue({ count: 2 }),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     $transaction: jest.fn(),
   };
 
@@ -329,6 +333,18 @@ describe('ReviewService.approve', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('refuses to publish a proposal that documents no steps', async () => {
+    const prisma = createPrisma({ steps: [], needsManualReview: true });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'incomplete-proposal' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.testCase.create).not.toHaveBeenCalled();
+  });
+
   it('returns missing-suite when the project has no suite to publish into', async () => {
     const prisma = createPrisma();
     prisma.suite.findFirst.mockResolvedValue(null);
@@ -411,6 +427,16 @@ describe('ReviewService.reject', () => {
     });
   });
 
+  it('still rejects a proposal that documents no steps', async () => {
+    const prisma = createPrisma({ steps: [], needsManualReview: true });
+
+    const result = await build(prisma).reject(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: true, value: { decisionId: 'decision-1' } });
+  });
+
   it('does not publish an official case when rejecting', async () => {
     const prisma = createPrisma();
 
@@ -429,5 +455,34 @@ describe('ReviewService.reject', () => {
 
     expect(result).toEqual({ ok: false, error: 'invalid-transition' });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewService.findOne', () => {
+  it('tells the reviewer when a proposal was flagged for manual review', async () => {
+    const prisma = createPrisma({
+      steps: [],
+      expectedResult: '',
+      objective: 'extraction-failed',
+      needsManualReview: true,
+      evidence: null,
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.needsManualReview).toBe(true);
+      expect(result.value.steps).toEqual([]);
+    }
+  });
+
+  it('reports an ordinary proposal as not needing manual review', async () => {
+    const prisma = createPrisma({ evidence: null });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.needsManualReview).toBe(false);
   });
 });

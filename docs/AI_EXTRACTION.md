@@ -52,6 +52,14 @@ Whenever the extractor cannot produce a usable result, `ExtractionProcessor` sti
 
 The job completes normally in this case; there is no retry loop over a missing API key or a business-rule miss. A human can then document the case by hand from the review inbox. Retrying is reserved for actual infrastructure failures (a broken database call), which propagate and let BullMQ's `attempts: 3` / exponential backoff take over — see "Uncaught errors" below.
 
+### A fallback proposal carries no steps, and cannot be published
+
+The fallback exists to tell a reviewer that a file could not be documented automatically. It has no `steps`, no `expectedResult` and no `preconditions`, because there is nothing to put in them.
+
+That makes it unpublishable by definition, and the API enforces it: `ReviewService.approve` returns `incomplete-proposal` (HTTP 422) for any proposal whose `steps` are empty, before any transaction opens. Without that guard, approving a fallback published an `active` official case with zero steps — documented intent with no content — which is exactly what human review is supposed to prevent. The invariant is stated on the content, not on the flag: nothing publishes an official case with no steps, whatever produced it.
+
+`needsManualReview` is what the reviewer sees. It travels on `ExtractedProposal` through to the web client, where `review-proposal-inspector.tsx` replaces the Steps and Expected result sections with the reason the extraction gave and disables Approve, leaving Reject available. The reason arrives in `objective` as one of the processor's own codes (`extraction-failed`, `no-tests-found`, `ai-not-enabled`, `automation-key-not-found`); `manual-review-reason.ts` maps those to translated copy and falls back to showing the raw provider message when the reason is something else.
+
 ## Where a document-case job gets its file
 
 The thesis rule the platform implements is that only test files already present in the repository trigger AI generation, so a document-case job must always name a file the repository side has actually seen. A case created by a JUnit ingest usually cannot name one: `automationFilePath` is only populated when the report carries `<testcase file="...">`, and Surefire, gtest and several other reporters omit that attribute.

@@ -111,7 +111,15 @@
     "projectDistributionSubtitle": "Carga de trabajo pendiente de revisión en repositorios conectados",
     "openProject": "Revisar proyecto",
     "temporaryTitle": "Esta área todavía no está disponible",
-    "temporaryDescription": "Los elementos de revisión aparecerán aquí cuando se incorpore el flujo de revisión."
+    "temporaryDescription": "Los elementos de revisión aparecerán aquí cuando se incorpore el flujo de revisión.",
+    "manualReviewTitle": "La documentación automática no produjo ningún caso",
+    "manualReviewHint": "No hay nada que publicar desde esta propuesta. Documentar el archivo a mano, o rechazarla.",
+    "manualReviewReasonExtractionFailed": "No fue posible contactar al proveedor de IA, o su respuesta fue rechazada por el esquema.",
+    "manualReviewReasonNoTestsFound": "No se encontraron declaraciones de prueba en este archivo.",
+    "manualReviewReasonAiNotEnabled": "La extracción por IA no está habilitada para esta organización.",
+    "manualReviewReasonAutomationKeyNotFound": "Ningún caso oficial coincide con la clave de automatización que reporta este archivo.",
+    "manualReviewReasonUnknown": "La extracción informó: {{reason}}",
+    "approveBlocked": "Una propuesta sin pasos no puede publicarse"
   },
   "notifications": {
     "title": "Notificaciones",

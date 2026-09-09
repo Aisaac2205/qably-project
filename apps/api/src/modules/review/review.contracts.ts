@@ -38,6 +38,7 @@ export type ReviewError =
   | 'not-found'
   | 'invalid-transition'
   | 'missing-evidence'
+  | 'incomplete-proposal'
   | 'missing-suite'
   | 'name-taken';
 

@@ -464,6 +464,7 @@ export interface ExtractedProposal {
   expectedResult: string
   priority: CasePriority
   evidenceId: string
+  needsManualReview: boolean
   targetOfficialTestCaseId?: string
 }
 export interface ReviewDecision {
