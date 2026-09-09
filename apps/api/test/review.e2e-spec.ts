@@ -15,6 +15,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReviewModule } from '../src/modules/review/review.module';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -97,15 +98,17 @@ describe('Review (e2e)', () => {
     prisma.traceabilityLink.findMany.mockResolvedValue([]);
     prisma.traceabilityLink.createMany.mockResolvedValue({ count: 2 });
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        ReviewModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          ReviewModule,
+        ],
+      }),
+    )
       .overrideProvider(ENV)
       .useValue(testEnv)
       .overrideProvider(PrismaService)

@@ -47,6 +47,8 @@ const runRow = {
   commitAuthor: 'Aisaac2205',
 };
 
+const runListRow = { ...runRow, suite: { name: 'Checkout' } };
+
 describe('Dashboard (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
@@ -71,7 +73,7 @@ describe('Dashboard (e2e)', () => {
     prisma.project.count.mockResolvedValue(2);
     prisma.suite.count.mockResolvedValue(3);
     prisma.run.count.mockResolvedValue(4);
-    prisma.run.findMany.mockResolvedValue([runRow]);
+    prisma.run.findMany.mockResolvedValue([runListRow]);
     prisma.run.groupBy.mockResolvedValue([{ commitSha: runRow.commitSha }]);
     prisma.$queryRaw.mockResolvedValue([{ day: '2026-06-16', count: 3 }]);
     prisma.runCase.groupBy.mockResolvedValue([

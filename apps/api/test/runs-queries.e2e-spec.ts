@@ -47,6 +47,8 @@ const runRow = {
   commitAuthor: null,
 };
 
+const runListRow = { ...runRow, suite: { name: 'Checkout' } };
+
 function runCaseRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'run-case-1',
@@ -107,7 +109,7 @@ describe('Runs queries (e2e)', () => {
       role: 'member',
       organization: { slug: 'acme' },
     });
-    prisma.run.findMany.mockResolvedValue([runRow]);
+    prisma.run.findMany.mockResolvedValue([runListRow]);
     prisma.run.findFirst.mockResolvedValue(runRow);
     prisma.run.create.mockResolvedValue(runRow);
     prisma.run.update.mockResolvedValue(runRow);
@@ -176,13 +178,15 @@ describe('Runs queries (e2e)', () => {
       .expect(200);
 
     const body = response.body as {
-      id: string;
-      cases?: unknown;
-      caseCounts: { total: number };
-    }[];
-    expect(body).toHaveLength(1);
-    expect(body[0].cases).toBeUndefined();
-    expect(body[0].caseCounts.total).toBe(1);
+      items: {
+        id: string;
+        cases?: unknown;
+        caseCounts: { total: number };
+      }[];
+    };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].cases).toBeUndefined();
+    expect(body.items[0].caseCounts.total).toBe(1);
   });
 
   it('filters the list by project when the query names one', async () => {
@@ -219,13 +223,17 @@ describe('Runs queries (e2e)', () => {
     expect(prisma.run.create).toHaveBeenCalled();
   });
 
-  it('rejects starting a run from a suite with no cases', async () => {
+  it('answers 409 when the suite has no manual cases to run', async () => {
     prisma.suite.findFirst.mockResolvedValue({ ...suiteWithCases, cases: [] });
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/runs')
       .send({ projectId: 'project-1', suiteId: 'suite-1' })
-      .expect(400);
+      .expect(409);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({ code: 'no-manual-cases' }),
+    );
   });
 
   it('answers 404 when the suite is outside the project or organization', async () => {

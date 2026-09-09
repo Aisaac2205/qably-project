@@ -62,7 +62,9 @@ const revokedKeyRow = {
 
 const suiteRow = { id: 'suite-1', name: 'Checkout' };
 
-const officialCases = [{ id: 'case-1', name: 'Adds to cart' }];
+const officialCases = [
+  { id: 'case-1', name: 'Adds to cart', automationKey: 'Adds to cart' },
+];
 
 const runRow = {
   id: 'run-1',
@@ -113,9 +115,17 @@ describe('Runs ingestion (e2e)', () => {
       create: jest.fn(),
       findFirstOrThrow: jest.fn(),
     },
-    testCase: { findMany: jest.fn(), createMany: jest.fn() },
+    testCase: {
+      findMany: jest.fn(),
+      createMany: jest.fn(),
+      update: jest.fn(),
+    },
     run: { upsert: jest.fn() },
-    runCase: { deleteMany: jest.fn(), createManyAndReturn: jest.fn() },
+    runCase: {
+      deleteMany: jest.fn(),
+      createManyAndReturn: jest.fn(),
+      findMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -143,9 +153,11 @@ describe('Runs ingestion (e2e)', () => {
     prisma.suite.findFirstOrThrow.mockResolvedValue(suiteRow);
     prisma.testCase.findMany.mockResolvedValue(officialCases);
     prisma.testCase.createMany.mockResolvedValue({ count: 0 });
+    prisma.testCase.update.mockResolvedValue(officialCases[0]);
     prisma.run.upsert.mockResolvedValue(runRow);
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
+    prisma.runCase.findMany.mockResolvedValue([runCaseRow()]);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -271,6 +283,9 @@ describe('Runs ingestion (e2e)', () => {
     prisma.runCase.createManyAndReturn.mockResolvedValue([
       runCaseRow({ testCaseId: 'draft-case-1' }),
     ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({ testCaseId: 'draft-case-1' }),
+    ]);
 
     const response = await request(app.getHttpServer())
       .post('/runs/ingest')
@@ -296,6 +311,8 @@ describe('Runs ingestion (e2e)', () => {
             projectId: 'project-1',
             name: 'Adds to cart',
             state: 'draft',
+            executionMode: 'automated',
+            automationKey: 'Adds to cart',
           },
         ],
       }),

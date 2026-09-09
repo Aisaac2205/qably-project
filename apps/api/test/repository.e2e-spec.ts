@@ -15,6 +15,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RepositoryModule } from '../src/modules/repository/repository.module';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -81,15 +82,17 @@ describe('Repository (e2e)', () => {
     prisma.project.findFirst.mockResolvedValue(projectRow);
     prisma.ingestionBatch.findFirst.mockResolvedValue(batchRow);
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        RepositoryModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          RepositoryModule,
+        ],
+      }),
+    )
       .overrideProvider(ENV)
       .useValue(testEnv)
       .overrideProvider(PrismaService)
@@ -127,6 +130,7 @@ describe('Repository (e2e)', () => {
         provider: 'GITHUB',
         repo: 'acme/shop',
         testFilePatterns: ['*.spec.ts', '*.test.ts'],
+        hasAccessToken: false,
       },
       batch: {
         id: 'batch-1',
