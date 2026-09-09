@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CaretLeft, List } from '@phosphor-icons/react'
+import { CaretLeft, ChatsCircle, NotePencil } from '@phosphor-icons/react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useTranslation } from '@/lib/i18n'
@@ -64,10 +64,10 @@ export function ProjectChatPanel({
 
   const isSending = pendingMessage?.status === 'sending'
 
-  const activeTitle = useMemo(() => {
-    const active = threads.find((thread) => thread.id === activeThreadId)
-    return active?.title ?? t('aiReview.newChat')
-  }, [threads, activeThreadId, t])
+  const activeTitle = useMemo(
+    () => threads.find((thread) => thread.id === activeThreadId)?.title ?? null,
+    [threads, activeThreadId],
+  )
 
   return (
     <div className="flex h-full min-h-0">
@@ -107,17 +107,28 @@ export function ProjectChatPanel({
       </Sheet>
 
       <div className="flex flex-col flex-1 min-w-0 h-full min-h-0">
-        <div className="flex items-center gap-2 shrink-0 border-b border-border bg-surface px-3 py-2 sm:px-4">
+        <div className="flex items-center gap-2 shrink-0 border-b border-border bg-surface px-2 py-2 sm:px-4">
           {onExit && (
             <button
               type="button"
               onClick={onExit}
               aria-label={t('aiReview.backToQueue')}
               title={t('aiReview.backToQueue')}
-              className="size-8 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-lg py-1.5 pl-1 pr-2 text-xs font-semibold text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
             >
-              <CaretLeft size={18} weight="bold" aria-hidden="true" />
+              <CaretLeft size={16} weight="bold" aria-hidden="true" />
+              <span className="max-w-32 truncate sm:max-w-none">
+                {t('aiReview.reviewQueue')}
+              </span>
             </button>
+          )}
+
+          {activeTitle === null ? (
+            <div className="flex-1" />
+          ) : (
+            <h2 className="flex-1 min-w-0 truncate text-center text-xs sm:text-left sm:text-sm font-semibold text-default">
+              {activeTitle}
+            </h2>
           )}
 
           <button
@@ -127,12 +138,18 @@ export function ProjectChatPanel({
             title={t('aiReview.openConversations')}
             className="md:hidden size-8 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
           >
-            <List size={18} weight="regular" aria-hidden="true" />
+            <ChatsCircle size={18} weight="regular" aria-hidden="true" />
           </button>
 
-          <h2 className="flex-1 min-w-0 truncate text-xs sm:text-sm font-semibold text-default">
-            {activeTitle}
-          </h2>
+          <button
+            type="button"
+            onClick={startNewChat}
+            aria-label={t('aiReview.newChat')}
+            title={t('aiReview.newChat')}
+            className="hidden md:inline-flex size-8 shrink-0 rounded-lg items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <NotePencil size={18} weight="regular" aria-hidden="true" />
+          </button>
         </div>
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto min-h-0">

@@ -167,6 +167,46 @@ describe('ProjectChatPanel', () => {
     expect(within(drawer).getByText('How many cases are pending?')).toBeInTheDocument()
   })
 
+  it('leaves the header untitled until a conversation is actually open', async () => {
+    listThreads.mockResolvedValue([thread])
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    expect(
+      screen.queryByRole('heading', { name: /new chat|nuevo chat/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('starts a new conversation from the header on desktop', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetailAfterReply)
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    await user.click(await screen.findByTitle('How many cases are pending?'))
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: 'How many cases are pending?' }),
+      ).toBeInTheDocument(),
+    )
+
+    const iconOnlyNewChat = screen
+      .getAllByRole('button', { name: /^(new chat|nuevo chat)$/i })
+      .find((button) => button.textContent === '')
+    expect(iconOnlyNewChat).toBeDefined()
+
+    await user.click(iconOnlyNewChat as HTMLElement)
+
+    expect(
+      screen.queryByRole('heading', { name: 'How many cases are pending?' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('offers no back control unless an exit is wired', async () => {
     listThreads.mockResolvedValue([])
 
@@ -195,9 +235,12 @@ describe('ProjectChatPanel', () => {
       )
     })
 
-    await user.click(
-      screen.getByRole('button', { name: /back to the review queue|volver a la cola/i }),
-    )
+    const back = screen.getByRole('button', {
+      name: /back to the review queue|volver a la cola/i,
+    })
+    expect(back).toHaveTextContent(/review queue|cola de revisión/i)
+
+    await user.click(back)
     expect(onExit).toHaveBeenCalledTimes(1)
   })
 

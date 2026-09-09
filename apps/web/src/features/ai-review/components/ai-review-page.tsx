@@ -81,7 +81,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
           </p>
 
           <SegmentedControl
-            className="shrink-0"
+            className="shrink-0 self-end sm:self-auto"
             label={t('aiReview.title')}
             semantics="tabs"
             options={[
@@ -112,15 +112,15 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         className="flex-1 min-h-0"
       >
         {isLoading ? (
-          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+          <div className="-mx-4 border-y border-border bg-surface overflow-hidden sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
             <StateView kind="loading" title={t('aiReview.loading')} className="p-12" />
           </div>
         ) : isError ? (
-          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+          <div className="-mx-4 border-y border-border bg-surface overflow-hidden sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
             <StateView kind="error" title={t('aiReview.loadError')} className="p-12" />
           </div>
         ) : cases.length === 0 ? (
-          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+          <div className="-mx-4 border-y border-border bg-surface overflow-hidden sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
             <StateView
               kind="empty"
               title={t('aiReview.noCasesPending')}
@@ -129,7 +129,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
           </div>
         ) : (
           <div className="flex flex-col h-full min-h-0 space-y-4">
-            <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden min-h-[580px] h-[700px] max-h-[85vh]">
+            <div className="-mx-4 border-y border-border bg-surface overflow-hidden min-h-[580px] h-[700px] max-h-[85vh] sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
               <ResizableSplit
                 storageKey="ai-review-sidebar"
                 defaultWidth={300}
