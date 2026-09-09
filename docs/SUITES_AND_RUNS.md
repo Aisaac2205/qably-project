@@ -78,6 +78,28 @@ happens `ensureOfficialCases` keeps the raw `automation_key` as `name` instead o
 rather than failing the ingestion; the case is still fully linked and still editable, just less pretty
 until a person renames it by hand.
 
+### The humanized title is structural, not localized
+
+`humanizeTestName` takes no locale and never translates. A case ingested from a suite of English tests
+keeps an English title for a reader working in Spanish, and that is the intended behaviour, not a gap in
+the locale chain (`LOCALE_RESOLUTION.md`).
+
+The title is derived from `automation_key`, which is the reporter's runtime name and the join key between
+run ingestion and AI extraction. Its job is to make that string readable, not to be product copy. A
+translated title stops matching the code a QA greps for, stops matching what the next CI run reports, and
+costs an AI call per case to produce a string that is non-deterministic. What the locale does govern is
+the content the AI actually writes — proposal titles, objectives, steps, chat replies — and the interface
+around them.
+
+For the same reason `FILLER_PREFIXES` and `BDD_OPENERS` (`packages/test-naming/src/lexicon.ts`) mix
+Spanish and English entries in one set. The humanizer strips test scaffolding in whichever language the
+test was written in; it never picks an output language.
+
+Humanization also runs exactly once, when `ensureOfficialCases` first creates the case, and existing
+cases are never re-humanized. That is deliberate: a title is editable, and a QA who renamed a case would
+lose that name to the next ingestion. The consequence is worth stating plainly — changing the humanizer
+never rewrites titles that already exist, it only affects cases created afterwards.
+
 A manual run is a commitment a human makes to execute a specific set of cases right now, so
 `RunQueriesService.createManual` snapshots only `manual` cases into it. Automated cases in the same suite
 are shown alongside, read-only, with their latest verdict and commit — evidence, not something this run
