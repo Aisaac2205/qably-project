@@ -1,7 +1,8 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { MagnifyingGlass } from '@phosphor-icons/react'
 import { useAiReview } from '@/features/projects/test-generation/hooks/use-ai-review'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
@@ -37,6 +38,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
   const [tab, setTab] = useState<'review' | 'chat'>(urlTab)
   const [syncedUrlTab, setSyncedUrlTab] = useState<'review' | 'chat'>(urlTab)
   const [listFilter, setListFilter] = useState<'all' | 'duplicates'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   if (urlTab !== syncedUrlTab) {
     setSyncedUrlTab(urlTab)
@@ -55,33 +57,43 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
 
   const isChat = tab === 'chat'
 
-  return (
-    <div
-      className={`w-full flex-1 flex flex-col h-full min-h-0 text-default animate-page-enter ${
-        isChat ? '' : 'space-y-4 p-4 sm:p-6'
-      }`}
-    >
-      {!isChat && (
-        <Breadcrumbs
-          items={[
-            { label: t('suites.breadcrumbProjects'), href: '/projects' },
-            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-            { label: t('aiReview.title') },
-          ]}
-        />
-      )}
+  const filteredCases = useMemo(() => {
+    if (!searchQuery.trim()) return cases
+    const q = searchQuery.toLowerCase().trim()
+    return cases.filter(
+      (c) =>
+        c.title.toLowerCase().includes(q) ||
+        c.objective.toLowerCase().includes(q) ||
+        (c.evidenceTitle && c.evidenceTitle.toLowerCase().includes(q)),
+    )
+  }, [cases, searchQuery])
 
+  return (
+    <div className="w-full flex-1 flex flex-col h-full min-h-0 text-default animate-page-enter bg-surface">
       {!isChat && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 pt-1 pb-0.5">
-          <h1 className="sr-only">{t('aiReview.title')}</h1>
-          <p className="text-xs sm:text-sm text-muted">
-            {cases.length === 1
-              ? t('aiReview.casePendingReview', { count: cases.length })
-              : t('aiReview.casesPendingReview', { count: cases.length })}
-          </p>
+        <header className="shrink-0 px-5 pt-4 pb-4 sm:px-6 sm:pt-5 border-b border-border/80 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-surface">
+          <div className="space-y-1">
+            <Breadcrumbs
+              items={[
+                { label: t('suites.breadcrumbProjects'), href: '/projects' },
+                ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+                { label: t('aiReview.title') },
+              ]}
+            />
+            <div className="pt-0.5">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-default">
+                {t('aiReview.title')}
+              </h1>
+              <p className="text-xs sm:text-sm text-muted mt-0.5">
+                {cases.length === 1
+                  ? t('aiReview.casePendingReview', { count: cases.length })
+                  : t('aiReview.casesPendingReview', { count: cases.length })}
+              </p>
+            </div>
+          </div>
 
           <SegmentedControl
-            className="shrink-0 self-end sm:self-auto"
+            className="shrink-0 self-start sm:self-auto"
             label={t('aiReview.title')}
             semantics="tabs"
             options={[
@@ -101,7 +113,7 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             value={tab}
             onChange={openTab}
           />
-        </div>
+        </header>
       )}
 
       <div
@@ -109,18 +121,18 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
         role={isChat ? undefined : 'tabpanel'}
         aria-labelledby={isChat ? undefined : 'ai-review-tab-review'}
         hidden={isChat}
-        className="flex-1 min-h-0"
+        className="flex-1 min-h-0 flex flex-col h-full"
       >
         {isLoading ? (
-          <div className="-mx-4 border-y border-border bg-surface overflow-hidden sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center bg-surface">
             <StateView kind="loading" title={t('aiReview.loading')} className="p-12" />
           </div>
         ) : isError ? (
-          <div className="-mx-4 border-y border-border bg-surface overflow-hidden sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center bg-surface">
             <StateView kind="error" title={t('aiReview.loadError')} className="p-12" />
           </div>
         ) : cases.length === 0 ? (
-          <div className="-mx-4 border-y border-border bg-surface overflow-hidden sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
+          <div className="flex-1 min-h-0 flex flex-col items-center justify-center bg-surface">
             <StateView
               kind="empty"
               title={t('aiReview.noCasesPending')}
@@ -128,63 +140,76 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
             />
           </div>
         ) : (
-          <div className="flex flex-col h-full min-h-0 space-y-4">
-            <div className="-mx-4 border-y border-border bg-surface overflow-hidden min-h-[580px] h-[700px] max-h-[85vh] sm:mx-0 sm:rounded-xl sm:border sm:shadow-card">
-              <ResizableSplit
-                storageKey="ai-review-sidebar"
-                defaultWidth={300}
-                minWidth={240}
-                maxRatio={0.5}
-                className="h-full"
-                first={
-                  <div className="flex flex-col h-full min-h-0 bg-surface">
-                    <div className="flex items-center px-3 py-2.5 border-b border-border bg-canvas/30 shrink-0">
-                      <SegmentedControl
-                        size="sm"
-                        label={t('aiReview.filterCases')}
-                        options={[
-                          { value: 'all' as const, label: t('aiReview.filterAll') },
-                          {
-                            value: 'duplicates' as const,
-                            label: t('aiReview.filterDuplicates'),
-                          },
-                        ]}
-                        value={listFilter}
-                        onChange={setListFilter}
+          <div className="flex-1 min-h-0 h-full flex flex-col">
+            <ResizableSplit
+              storageKey="ai-review-sidebar"
+              defaultWidth={340}
+              minWidth={280}
+              maxRatio={0.5}
+              className="h-full flex-1 min-h-0"
+              first={
+                <div className="flex flex-col h-full min-h-0 bg-surface">
+                  <div className="flex flex-col gap-2.5 p-3.5 sm:p-4 border-b border-border/80 bg-canvas/30 shrink-0">
+                    <div className="relative">
+                      <MagnifyingGlass
+                        size={14}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted"
+                        aria-hidden="true"
+                      />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={t('reviewInbox.searchPlaceholder') || 'Buscar por título, archivo u objetivo...'}
+                        aria-label={t('reviewInbox.searchPlaceholder') || 'Buscar casos'}
+                        className="w-full rounded-full border border-border/80 bg-surface pl-8.5 pr-3.5 py-1.5 text-xs text-default placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-all"
                       />
                     </div>
-                    <div className="flex-1 overflow-y-auto min-h-0">
-                      <ReviewCaseList
-                        proposals={cases}
-                        selectedId={selectedCase?.id}
-                        onSelect={selectCase}
-                        filter={listFilter}
-                      />
-                    </div>
-                  </div>
-                }
-                second={
-                  <div className="flex flex-col h-full min-h-0 bg-surface">
-                    <div className="flex-1 overflow-y-auto min-h-0">
-                      {selectedCase ? (
-                        <ReviewCaseDetail proposal={selectedCase} />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-sm text-muted p-8 text-center">
-                          {t('aiReview.selectCaseToReview')}
-                        </div>
-                      )}
-                    </div>
-                    <ReviewToolbar
-                      disabled={!selectedCase || isDeciding}
-                      decisionError={decisionError}
-                      onConfirm={confirmSelected}
-                      onReject={rejectSelected}
-                      onSkip={skipSelected}
+                    <SegmentedControl
+                      size="sm"
+                      label={t('aiReview.filterCases')}
+                      options={[
+                        { value: 'all' as const, label: t('aiReview.filterAll') },
+                        {
+                          value: 'duplicates' as const,
+                          label: t('aiReview.filterDuplicates'),
+                        },
+                      ]}
+                      value={listFilter}
+                      onChange={setListFilter}
                     />
                   </div>
-                }
-              />
-            </div>
+                  <div className="flex-1 overflow-y-auto min-h-0">
+                    <ReviewCaseList
+                      proposals={filteredCases}
+                      selectedId={selectedCase?.id}
+                      onSelect={selectCase}
+                      filter={listFilter}
+                    />
+                  </div>
+                </div>
+              }
+              second={
+                <div className="flex flex-col h-full min-h-0 bg-surface">
+                  <div className="flex-1 overflow-y-auto min-h-0">
+                    {selectedCase ? (
+                      <ReviewCaseDetail proposal={selectedCase} />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-sm text-muted p-8 text-center">
+                        {t('aiReview.selectCaseToReview')}
+                      </div>
+                    )}
+                  </div>
+                  <ReviewToolbar
+                    disabled={!selectedCase || isDeciding}
+                    decisionError={decisionError}
+                    onConfirm={confirmSelected}
+                    onReject={rejectSelected}
+                    onSkip={skipSelected}
+                  />
+                </div>
+              }
+            />
           </div>
         )}
       </div>
@@ -203,3 +228,4 @@ export function AiReviewPage({ projectId }: { projectId: string }) {
     </div>
   )
 }
+
