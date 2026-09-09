@@ -1,6 +1,7 @@
 import {
   UNTRUSTED_TEXT_MAX_LENGTH,
   sanitizeUntrustedText,
+  stripBlockDelimiters,
 } from './untrusted-text';
 
 describe('sanitizeUntrustedText', () => {
@@ -55,5 +56,21 @@ describe('sanitizeUntrustedText', () => {
 
   it('returns an empty string for a blank value', () => {
     expect(sanitizeUntrustedText('   \n\t  ')).toBe('');
+  });
+});
+
+describe('stripBlockDelimiters', () => {
+  it('removes every occurrence of each delimiter', () => {
+    const value = '<<<A>>> keep <<<B>>> keep <<<A>>>';
+
+    expect(stripBlockDelimiters(value, ['<<<A>>>', '<<<B>>>'])).toBe(
+      ' keep  keep ',
+    );
+  });
+
+  it('leaves line breaks and code punctuation untouched', () => {
+    const code = "describe('Cart', () => {\n  it('adds', () => {})\n})";
+
+    expect(stripBlockDelimiters(code, ['<<<A>>>'])).toBe(code);
   });
 });

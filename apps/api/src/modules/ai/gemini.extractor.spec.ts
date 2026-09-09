@@ -1,6 +1,11 @@
 import { ApiError } from '@google/genai';
 import type { Env } from '../../config/env';
 import type { ExtractionInput } from './extraction.contracts';
+import {
+  FILE_CONTENT_CLOSE,
+  FILE_CONTENT_OPEN,
+  buildSystemInstruction,
+} from './extraction-prompt';
 import { GeminiExtractor, type GeminiClient } from './gemini.extractor';
 
 function env(overrides: Partial<Env> = {}): Env {
@@ -76,8 +81,7 @@ describe('GeminiExtractor', () => {
     expect(config.responseMimeType).toBe('application/json');
     expect(config.temperature).toBe(0.2);
     expect(config.maxOutputTokens).toBe(8192);
-    expect(typeof config.systemInstruction).toBe('string');
-    expect(config.systemInstruction as string).toMatch(/Spanish/);
+    expect(config.systemInstruction).toBe(buildSystemInstruction('es'));
     expect(config.httpOptions).toEqual({
       timeout: 60_000,
       retryOptions: {
@@ -85,6 +89,24 @@ describe('GeminiExtractor', () => {
         httpStatusCodes: [408, 429, 500, 502, 503, 504],
       },
     });
+  });
+
+  it('sends the file as delimited untrusted data, not as a bare string', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ filePath: 'src/cart.spec.ts', content: "it('adds', () => {})" }),
+    );
+
+    const contents = received.contents as string;
+    expect(contents).toContain('File: src/cart.spec.ts');
+    expect(contents).toContain(FILE_CONTENT_OPEN);
+    expect(contents).toContain(FILE_CONTENT_CLOSE);
+    expect(contents).toContain("it('adds', () => {})");
   });
 
   it('returns no-tests-found when the model returns an empty cases array', async () => {

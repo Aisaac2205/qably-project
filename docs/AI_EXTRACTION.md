@@ -19,9 +19,9 @@ Set `GEMINI_MODEL` to any model id Gemini's `models.list()` reports as available
 
 ## Request shape
 
-`GeminiExtractor` (`apps/api/src/modules/ai/gemini.extractor.ts`) sends the whole file content as `contents`, with:
+`GeminiExtractor` (`apps/api/src/modules/ai/gemini.extractor.ts`) sends the whole file content as `contents`, wrapped by `buildFileContentTurn` in a `<<<FILE_CONTENT>>>` block that also carries the file path and language, with:
 
-- `systemInstruction`: the extraction prompt, versioned as `EXTRACTION_PROMPT_VERSION` (`apps/api/src/modules/ai/extraction-prompt.ts`) and stored on every proposal (`ExtractedProposal.promptVersion`) for audit.
+- `systemInstruction`: the extraction prompt, versioned as `EXTRACTION_PROMPT_VERSION` (`apps/api/src/modules/ai/extraction-prompt.ts`) and stored on every proposal (`ExtractedProposal.promptVersion`) for audit. It declares that block untrusted data; see `AI_PROMPT_SAFETY.md`.
 - `responseMimeType: 'application/json'` and `responseJsonSchema`: forces a structured `{ cases: [...] }` reply.
 - `temperature: 0.2`, `maxOutputTokens: 8192`.
 - `httpOptions.timeout: 60000` and `httpOptions.retryOptions` (3 attempts, retrying `408/429/500/502/503/504`).

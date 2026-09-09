@@ -20,3 +20,13 @@ export function sanitizeUntrustedText(
 
   return `${flattened.slice(0, maxLength).trimEnd()}...`;
 }
+
+export function stripBlockDelimiters(
+  value: string,
+  delimiters: string[],
+): string {
+  return delimiters.reduce(
+    (text, delimiter) => text.split(delimiter).join(''),
+    value,
+  );
+}

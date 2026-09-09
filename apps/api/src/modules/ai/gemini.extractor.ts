@@ -4,7 +4,10 @@ import { z } from 'zod';
 import { InjectEnv } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { GEMINI_CLIENT } from './ai.tokens';
-import { buildSystemInstruction } from './extraction-prompt';
+import {
+  buildFileContentTurn,
+  buildSystemInstruction,
+} from './extraction-prompt';
 import {
   extractedCaseSchema,
   MAX_EXTRACTED_CASES,
@@ -106,7 +109,7 @@ export class GeminiExtractor implements TestCaseExtractor {
     try {
       const response = await this.client.models.generateContent({
         model: this.model,
-        contents: input.content,
+        contents: buildFileContentTurn(input),
         config: {
           systemInstruction: buildSystemInstruction(input.locale),
           responseMimeType: 'application/json',
