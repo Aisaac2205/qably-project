@@ -1140,6 +1140,37 @@ describe('ExtractionProcessor — document-file job', () => {
     expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-2' });
   });
 
+  it('locks the target case rows before checking for a pending proposal, so two chunks cannot both create one', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-2' },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    const lockCall = (prisma.$executeRawUnsafe.mock.calls as [string, ...string[]][]).find(
+      ([sql]) => sql.includes('FOR UPDATE'),
+    );
+    expect(lockCall).toBeDefined();
+    expect(lockCall?.[0]).toContain('test_case');
+    expect(lockCall?.slice(1)).toEqual(['case-1', 'case-2']);
+    expect(
+      prisma.$executeRawUnsafe.mock.invocationCallOrder[0],
+    ).toBeLessThan(prisma.extractedProposal.findFirst.mock.invocationCallOrder[0]);
+  });
+
   it('routes every target to quota-exhausted without calling the provider when the daily budget is spent', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);

@@ -104,6 +104,16 @@ interface TxClient {
 
 const PROPOSAL_SAVEPOINT = 'extraction_proposal';
 
+async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(', ');
+  await tx.$executeRawUnsafe(
+    `SELECT id FROM "test_case" WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`,
+    ...ids,
+  );
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -475,6 +485,11 @@ export class ExtractionProcessor extends WorkerHost {
     );
 
     return this.prisma.$transaction(async (tx: TxClient) => {
+      await lockTestCases(
+        tx,
+        matched.map(({ target }) => target.testCaseId),
+      );
+
       const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
 
