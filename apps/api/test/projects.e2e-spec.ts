@@ -15,6 +15,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ProjectsModule } from '../src/modules/projects/projects.module';
+import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
 const session: SessionContext = {
@@ -45,7 +46,11 @@ describe('Projects (e2e)', () => {
   const read = jest.fn();
   const prisma = {
     orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
-    organization: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
+    organization: {
+      create: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      findUnique: jest.fn(),
+    },
     project: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -54,6 +59,8 @@ describe('Projects (e2e)', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
+    testCase: { findMany: jest.fn() },
+    extractedProposal: { findMany: jest.fn() },
     run: { findMany: jest.fn(), groupBy: jest.fn() },
     runCase: { groupBy: jest.fn() },
     $transaction: jest.fn(),
@@ -69,22 +76,31 @@ describe('Projects (e2e)', () => {
       organizationId: 'org-1',
       role: 'owner',
       organization: { slug: 'acme' },
+      user: { locale: 'en' },
     });
     prisma.organization.findUniqueOrThrow.mockResolvedValue({ maxProjects: 3 });
+    prisma.organization.findUnique.mockResolvedValue({
+      aiEnabled: true,
+      aiCredits: 10,
+    });
     prisma.project.count.mockResolvedValue(0);
+    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.extractedProposal.findMany.mockResolvedValue([]);
     prisma.run.findMany.mockResolvedValue([]);
     prisma.run.groupBy.mockResolvedValue([]);
     prisma.runCase.groupBy.mockResolvedValue([]);
 
-    const moduleFixture = await Test.createTestingModule({
-      imports: [
-        ConfigModule,
-        PrismaModule,
-        AuthModule,
-        OrganizationsModule,
-        ProjectsModule,
-      ],
-    })
+    const moduleFixture = await stubQueues(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          OrganizationsModule,
+          ProjectsModule,
+        ],
+      }),
+    )
       .overrideProvider(ENV)
       .useValue(testEnv)
       .overrideProvider(PrismaService)
@@ -313,5 +329,46 @@ describe('Projects (e2e)', () => {
       .get('/projects')
       .set('x-organization-id', 'org-someone-else')
       .expect(403);
+  });
+
+  it('enqueues file-level documentation for a project and returns the counts', async () => {
+    prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-2',
+        projectId: 'project-1',
+        automationKey: 'Cart > adds an item',
+        automationFilePath: 'src/cart.spec.ts',
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .post('/projects/project-1/document')
+      .expect(201);
+
+    expect(response.body).toEqual({
+      filesEnqueued: 1,
+      casesTargeted: 1,
+      casesSkipped: [],
+    });
+  });
+
+  it('answers 403 for /document when the organization is not entitled to AI', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      aiEnabled: false,
+      aiCredits: 0,
+    });
+
+    await request(app.getHttpServer())
+      .post('/projects/project-1/document')
+      .expect(403);
+  });
+
+  it('answers 404 for /document when the project does not exist', async () => {
+    prisma.project.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/projects/project-1/document')
+      .expect(404);
   });
 });

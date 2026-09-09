@@ -14,9 +14,11 @@ interface FakeQueue {
 }
 
 interface FakePrisma {
-  testCase: { findFirst: jest.Mock };
-  extractedProposal: { findFirst: jest.Mock };
+  testCase: { findFirst: jest.Mock; findMany: jest.Mock };
+  extractedProposal: { findFirst: jest.Mock; findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
+  suite: { findFirst: jest.Mock };
+  project: { findFirst: jest.Mock };
 }
 
 function createQueue(): FakeQueue {
@@ -36,9 +38,11 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
         automationFilePath: 'src/cart.spec.ts',
         automationKey: 'CartTest.addsItem',
       }),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     extractedProposal: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     orgMember: {
       findFirst: jest
@@ -46,6 +50,12 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
         .mockResolvedValue(
           ownerLocale === null ? null : { user: { locale: ownerLocale } },
         ),
+    },
+    suite: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
+    },
+    project: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'proj-1' }),
     },
   };
 }
@@ -286,5 +296,235 @@ describe('ExtractionService.enqueueDocumentCase', () => {
 
     expect(result).toEqual({ ok: false, error: 'already-pending' });
     expect(queue.add).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExtractionService.enqueueDocumentFiles', () => {
+  function candidate(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      projectId: 'proj-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      ...overrides,
+    };
+  }
+
+  it('returns not-found when the suite is not in this organization', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('returns not-found when the project is not in this organization', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty result when the scope has no undocumented automated cases', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('groups cases from the same file into a single job', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-1', automationKey: 'Cart > adds an item' }),
+      candidate({ id: 'case-2', automationKey: 'Cart > removes an item' }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 1, casesTargeted: 2, casesSkipped: [] },
+    });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown>; opts: Record<string, unknown> }[],
+    ];
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]).toMatchObject({
+      data: {
+        kind: 'document-file',
+        filePath: 'src/cart.spec.ts',
+        locale: 'en',
+        targets: [
+          { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+          { testCaseId: 'case-2', automationKey: 'Cart > removes an item' },
+        ],
+      },
+      opts: { jobId: 'document-file:src/cart.spec.ts:0' },
+    });
+  });
+
+  it('splits a file with more than 20 undocumented cases into chunked jobs', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    const many = Array.from({ length: 23 }, (_, index) =>
+      candidate({
+        id: `case-${index}`,
+        automationKey: `Cart > case ${index}`,
+      }),
+    );
+    prisma.testCase.findMany.mockResolvedValue(many);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 1, casesTargeted: 23, casesSkipped: [] },
+    });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: { targets: unknown[] }; opts: Record<string, unknown> }[],
+    ];
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0].data.targets).toHaveLength(20);
+    expect(jobs[1].data.targets).toHaveLength(3);
+    expect(jobs[0].opts).toMatchObject({
+      jobId: 'document-file:src/cart.spec.ts:0',
+    });
+    expect(jobs[1].opts).toMatchObject({
+      jobId: 'document-file:src/cart.spec.ts:1',
+    });
+  });
+
+  it('skips a case with no resolvable source file and counts it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ automationFilePath: null }),
+    ]);
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+    prisma.testCase.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'no-source-file', count: 1 }],
+      },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('skips a case with an in-review proposal already pending and counts it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1' },
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'already-pending', count: 1 }],
+      },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('counts distinct files, not chunks, in filesEnqueued', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({
+        id: 'case-1',
+        automationKey: 'Cart > a',
+        automationFilePath: 'src/cart.spec.ts',
+      }),
+      candidate({
+        id: 'case-2',
+        automationKey: 'Checkout > a',
+        automationFilePath: 'src/checkout.spec.ts',
+      }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 2, casesTargeted: 2, casesSkipped: [] },
+    });
+    expect(queue.addBulk).toHaveBeenCalledTimes(1);
+    const [jobs] = queue.addBulk.mock.calls[0] as [unknown[]];
+    expect(jobs).toHaveLength(2);
+  });
+
+  it("uses the acting user's locale when set, falling back to the org default otherwise", async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      'es',
+    );
+
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    expect(jobs[0].data).toMatchObject({ locale: 'es' });
   });
 });

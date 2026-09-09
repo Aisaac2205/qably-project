@@ -2,6 +2,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
+import { MAX_EXTRACTED_CASES } from '../ai/extraction.contracts';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -10,14 +11,49 @@ import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   EXTRACTION_QUEUE,
   type DocumentCaseError,
+  type DocumentFileTarget,
+  type DocumentFilesError,
+  type DocumentFilesResult,
+  type DocumentFilesSkip,
   type ExtractionJobData,
 } from './review.contracts';
 
 const PENDING_STATUS = 'in_review';
 
+export type DocumentFilesScope = { suiteId: string } | { projectId: string };
+
 interface CodeChangeCandidate {
   id: string;
   detectedPattern: string | null;
+}
+
+interface DocumentFileCandidate {
+  id: string;
+  projectId: string;
+  automationKey: string | null;
+  automationFilePath: string | null;
+}
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
+function buildSkips(
+  noSourceFile: number,
+  alreadyPending: number,
+): DocumentFilesSkip[] {
+  const skips: DocumentFilesSkip[] = [];
+  if (noSourceFile > 0) {
+    skips.push({ reason: 'no-source-file', count: noSourceFile });
+  }
+  if (alreadyPending > 0) {
+    skips.push({ reason: 'already-pending', count: alreadyPending });
+  }
+  return skips;
 }
 
 @Injectable()
@@ -110,5 +146,147 @@ export class ExtractionService {
     );
 
     return ok({ jobId });
+  }
+
+  async enqueueDocumentFiles(
+    org: OrgContext,
+    scope: DocumentFilesScope,
+    actorLocale: string | null,
+  ): Promise<Result<DocumentFilesResult, DocumentFilesError>> {
+    const scopeIsValid = await this.scopeExists(org, scope);
+    if (!scopeIsValid) return err('not-found');
+
+    const scopeWhere =
+      'suiteId' in scope
+        ? { suiteId: scope.suiteId }
+        : { projectId: scope.projectId };
+
+    const candidates = (await this.prisma.testCase.findMany({
+      where: {
+        ...scopeWhere,
+        executionMode: 'automated',
+        steps: { equals: [] },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        automationKey: true,
+        automationFilePath: true,
+      },
+    })) as DocumentFileCandidate[];
+
+    if (candidates.length === 0) {
+      return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] });
+    }
+
+    const pendingRows = await this.prisma.extractedProposal.findMany({
+      where: {
+        targetTestCaseId: { in: candidates.map((candidate) => candidate.id) },
+        status: PENDING_STATUS,
+      },
+      select: { targetTestCaseId: true },
+    });
+    const pendingIds = new Set(
+      pendingRows
+        .map((row) => row.targetTestCaseId)
+        .filter((id): id is string => id !== null),
+    );
+
+    let alreadyPending = 0;
+    let noSourceFile = 0;
+    const groupedByFile = new Map<string, DocumentFileTarget[]>();
+
+    for (const candidate of candidates) {
+      if (pendingIds.has(candidate.id)) {
+        alreadyPending += 1;
+        continue;
+      }
+
+      if (candidate.automationKey === null) {
+        noSourceFile += 1;
+        continue;
+      }
+
+      const filePath =
+        candidate.automationFilePath ??
+        (await resolveAutomationFilePath(
+          this.prisma,
+          candidate.projectId,
+          candidate.automationKey,
+        ));
+
+      if (filePath === null) {
+        noSourceFile += 1;
+        continue;
+      }
+
+      const group = groupedByFile.get(filePath) ?? [];
+      group.push({
+        testCaseId: candidate.id,
+        automationKey: candidate.automationKey,
+      });
+      groupedByFile.set(filePath, group);
+    }
+
+    const casesSkipped = buildSkips(noSourceFile, alreadyPending);
+
+    if (groupedByFile.size === 0) {
+      return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped });
+    }
+
+    const locale =
+      actorLocale === null
+        ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
+        : resolveLocale(actorLocale);
+
+    let casesTargeted = 0;
+    const jobs: {
+      name: string;
+      data: ExtractionJobData;
+      opts: { jobId: string };
+    }[] = [];
+
+    for (const [filePath, targets] of groupedByFile) {
+      chunk(targets, MAX_EXTRACTED_CASES).forEach((chunkTargets, index) => {
+        casesTargeted += chunkTargets.length;
+        jobs.push({
+          name: 'document-file',
+          data: {
+            kind: 'document-file',
+            filePath,
+            targets: chunkTargets,
+            locale,
+          },
+          opts: { jobId: `document-file:${filePath}:${index}` },
+        });
+      });
+    }
+
+    await this.queue.addBulk(jobs);
+
+    return ok({
+      filesEnqueued: groupedByFile.size,
+      casesTargeted,
+      casesSkipped,
+    });
+  }
+
+  private async scopeExists(
+    org: OrgContext,
+    scope: DocumentFilesScope,
+  ): Promise<boolean> {
+    if ('suiteId' in scope) {
+      const suite = await this.prisma.suite.findFirst({
+        where: { id: scope.suiteId, organizationId: org.organizationId },
+        select: { id: true },
+      });
+      return suite !== null;
+    }
+
+    const project = await this.prisma.project.findFirst({
+      where: { id: scope.projectId, organizationId: org.organizationId },
+      select: { id: true },
+    });
+    return project !== null;
   }
 }

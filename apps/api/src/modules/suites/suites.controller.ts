@@ -23,7 +23,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { DocumentCaseError } from '../review/review.contracts';
+import type {
+  DocumentCaseError,
+  DocumentFilesError,
+  DocumentFilesResult,
+} from '../review/review.contracts';
 import { ExtractionService } from '../review/extraction.service';
 import type { SuiteError, SuiteView } from './suites.contracts';
 import {
@@ -79,6 +83,18 @@ function unwrapDocumentCase<T>(result: Result<T, DocumentCaseError>): T {
       throw new ConflictException({
         code: result.error,
         message: 'A proposal is already pending review for this case',
+      });
+  }
+}
+
+function unwrapDocumentFiles<T>(result: Result<T, DocumentFilesError>): T {
+  if (!isErr(result)) return result.value;
+
+  switch (result.error) {
+    case 'not-found':
+      throw new NotFoundException({
+        code: result.error,
+        message: 'Suite not found',
       });
   }
 }
@@ -181,5 +197,22 @@ export class SuitesController {
     );
 
     return { queued: true, jobId: unwrapDocumentCase(result).jobId };
+  }
+
+  @Post(':id/document')
+  @UseGuards(AiEntitlementGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async documentSuite(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DocumentFilesResult> {
+    const result = await this.extraction.enqueueDocumentFiles(
+      org,
+      { suiteId: id },
+      user.locale,
+    );
+
+    return unwrapDocumentFiles(result);
   }
 }

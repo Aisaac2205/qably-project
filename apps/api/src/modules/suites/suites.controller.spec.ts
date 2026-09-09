@@ -18,7 +18,10 @@ const user: AuthenticatedUser = {
 };
 
 function fakeExtraction(result: unknown) {
-  return { enqueueDocumentCase: jest.fn().mockResolvedValue(result) };
+  return {
+    enqueueDocumentCase: jest.fn().mockResolvedValue(result),
+    enqueueDocumentFiles: jest.fn().mockResolvedValue(result),
+  };
 }
 
 function build(extraction: ReturnType<typeof fakeExtraction>) {
@@ -90,5 +93,35 @@ describe('SuitesController.documentCase', () => {
     await expect(
       build(extraction).documentCase(org, 'suite-1', 'case-1', user),
     ).rejects.toMatchObject({ response: { code: 'already-pending' } });
+  });
+});
+
+describe('SuitesController.documentSuite', () => {
+  it('enqueues file-level documentation scoped to the suite and returns the counts', async () => {
+    const extraction = fakeExtraction({
+      ok: true,
+      value: { filesEnqueued: 3, casesTargeted: 5, casesSkipped: [] },
+    });
+
+    const result = await build(extraction).documentSuite(org, 'suite-1', user);
+
+    expect(result).toEqual({
+      filesEnqueued: 3,
+      casesTargeted: 5,
+      casesSkipped: [],
+    });
+    expect(extraction.enqueueDocumentFiles).toHaveBeenCalledWith(
+      org,
+      { suiteId: 'suite-1' },
+      'es',
+    );
+  });
+
+  it('throws a coded NotFoundException when the suite does not exist', async () => {
+    const extraction = fakeExtraction({ ok: false, error: 'not-found' });
+
+    await expect(
+      build(extraction).documentSuite(org, 'suite-1', user),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

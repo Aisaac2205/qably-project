@@ -58,7 +58,11 @@ describe('Suites (e2e)', () => {
   const read = jest.fn();
   const prisma = {
     orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
-    organization: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
+    organization: {
+      create: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+      findUnique: jest.fn(),
+    },
     project: { findFirst: jest.fn() },
     suite: {
       findMany: jest.fn(),
@@ -69,7 +73,12 @@ describe('Suites (e2e)', () => {
       updateMany: jest.fn(),
       delete: jest.fn(),
     },
-    testCase: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    testCase: {
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      findMany: jest.fn(),
+    },
     extractedProposal: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -84,6 +93,7 @@ describe('Suites (e2e)', () => {
       organizationId: 'org-1',
       role: 'owner',
       organization: { slug: 'acme' },
+      user: { locale: 'en' },
     });
     prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
     prisma.suite.findFirst.mockResolvedValue(suiteRow);
@@ -91,6 +101,11 @@ describe('Suites (e2e)', () => {
     prisma.suite.create.mockResolvedValue(suiteRow);
     prisma.suite.update.mockResolvedValue(suiteRow);
     prisma.extractedProposal.findMany.mockResolvedValue([]);
+    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.organization.findUnique.mockResolvedValue({
+      aiEnabled: true,
+      aiCredits: 10,
+    });
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -264,5 +279,45 @@ describe('Suites (e2e)', () => {
       .get('/suites')
       .set('x-organization-id', 'org-someone-else')
       .expect(403);
+  });
+
+  it('enqueues file-level documentation for a suite and returns the counts', async () => {
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-2',
+        projectId: 'project-1',
+        automationKey: 'Cart > adds an item',
+        automationFilePath: 'src/cart.spec.ts',
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .post('/suites/suite-1/document')
+      .expect(201);
+
+    expect(response.body).toEqual({
+      filesEnqueued: 1,
+      casesTargeted: 1,
+      casesSkipped: [],
+    });
+  });
+
+  it('answers 403 for /document when the organization is not entitled to AI', async () => {
+    prisma.organization.findUnique.mockResolvedValue({
+      aiEnabled: false,
+      aiCredits: 0,
+    });
+
+    await request(app.getHttpServer())
+      .post('/suites/suite-1/document')
+      .expect(403);
+  });
+
+  it('answers 404 for /document when the suite does not exist', async () => {
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/suites/suite-1/document')
+      .expect(404);
   });
 });

@@ -13,11 +13,20 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { isErr, type Result } from '../../common/result';
+import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
+import type { AuthenticatedUser } from '../auth/auth.contracts';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { ExtractionService } from '../review/extraction.service';
+import type {
+  DocumentFilesError,
+  DocumentFilesResult,
+} from '../review/review.contracts';
 import type {
   ProjectError,
   ProjectListView,
@@ -54,10 +63,25 @@ function unwrap<T>(result: Result<T, ProjectError>): T {
   }
 }
 
+function unwrapDocumentFiles<T>(result: Result<T, DocumentFilesError>): T {
+  if (!isErr(result)) return result.value;
+
+  switch (result.error) {
+    case 'not-found':
+      throw new NotFoundException({
+        code: result.error,
+        message: 'Project not found',
+      });
+  }
+}
+
 @Controller('projects')
 @UseGuards(OrgScopeGuard)
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly extraction: ExtractionService,
+  ) {}
 
   @Get()
   list(@CurrentOrg() org: OrgContext): Promise<ProjectListView[]> {
@@ -97,5 +121,22 @@ export class ProjectsController {
     @Param('id') id: string,
   ): Promise<void> {
     unwrap(await this.projects.remove(org, id));
+  }
+
+  @Post(':id/document')
+  @UseGuards(AiEntitlementGuard)
+  @Throttle({ default: { limit: 2, ttl: 60_000 } })
+  async documentProject(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<DocumentFilesResult> {
+    const result = await this.extraction.enqueueDocumentFiles(
+      org,
+      { projectId: id },
+      user.locale,
+    );
+
+    return unwrapDocumentFiles(result);
   }
 }
