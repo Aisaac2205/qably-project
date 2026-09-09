@@ -23,7 +23,7 @@ const RETRY_ATTEMPTS = 3;
 const TEMPERATURE = 0.2;
 const MAX_OUTPUT_TOKENS = 8192;
 
-const RESPONSE_JSON_SCHEMA = {
+export const RESPONSE_JSON_SCHEMA = {
   type: 'object',
   properties: {
     cases: {
@@ -32,26 +32,23 @@ const RESPONSE_JSON_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          automationKey: { type: 'string', maxLength: 120 },
-          title: { type: 'string', maxLength: 120 },
-          objective: { type: 'string', maxLength: 500 },
+          automationKey: { type: 'string' },
+          title: { type: 'string' },
+          objective: { type: 'string' },
           preconditions: {
             type: 'array',
-            maxItems: 10,
-            items: { type: 'string', maxLength: 300 },
+            items: { type: 'string' },
           },
           steps: {
             type: 'array',
-            minItems: 1,
-            maxItems: 20,
-            items: { type: 'string', maxLength: 300 },
+            items: { type: 'string' },
           },
-          expectedResult: { type: 'string', maxLength: 500 },
+          expectedResult: { type: 'string' },
           priority: {
             type: 'string',
             enum: ['critical', 'high', 'medium', 'low'],
           },
-          sourceExcerpt: { type: 'string', maxLength: 600 },
+          sourceExcerpt: { type: 'string' },
         },
         required: [
           'automationKey',

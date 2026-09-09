@@ -93,7 +93,7 @@ describeIfKey('GeminiExtractor (manual integration, real API)', () => {
         throw new Error(`Expected Spanish prose, the model returned: ${prose}`);
       }
     }
-  }, 60_000);
+  }, 120_000);
 
   it('returns the exact automation keys a document-file job asked for', async () => {
     const targets = [
@@ -116,5 +116,5 @@ describeIfKey('GeminiExtractor (manual integration, real API)', () => {
     for (const target of targets) {
       expect(returned).toContain(target);
     }
-  }, 60_000);
+  }, 120_000);
 });
