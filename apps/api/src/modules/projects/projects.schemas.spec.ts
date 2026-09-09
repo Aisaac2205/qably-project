@@ -37,3 +37,37 @@ describe('updateProjectSchema', () => {
     expect(updateProjectSchema.safeParse({}).success).toBe(false);
   });
 });
+
+describe('updateProjectSchema testFilePatterns', () => {
+  it('accepts the globs of the frameworks the extractor knows', () => {
+    const parsed = updateProjectSchema.parse({
+      testFilePatterns: ['**/*.test.tsx', 'test_*.py', '*Test.java'],
+    });
+
+    expect(parsed.testFilePatterns).toEqual([
+      '**/*.test.tsx',
+      'test_*.py',
+      '*Test.java',
+    ]);
+  });
+
+  it('rejects a pattern made only of wildcards, which would match every file', () => {
+    for (const pattern of ['**', '*', '**/*', '?']) {
+      expect(
+        updateProjectSchema.safeParse({ testFilePatterns: [pattern] }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects an empty list, so a project always declares what a test is', () => {
+    expect(
+      updateProjectSchema.safeParse({ testFilePatterns: [] }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a blank pattern', () => {
+    expect(
+      updateProjectSchema.safeParse({ testFilePatterns: ['   '] }).success,
+    ).toBe(false);
+  });
+});

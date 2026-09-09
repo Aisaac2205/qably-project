@@ -20,6 +20,30 @@ A `Connection` belongs to the organization and owns the webhook secret. A `Proje
 `Connection` through a nullable foreign key, so the repository of a project is always **derived**
 from its connection and never stored twice.
 
+## What counts as a test file
+
+`Project.testFilePatterns` decides which files in a push are test files. It is the gate in front of everything expensive: only a matching file becomes a `CodeChange` that can trigger AI extraction, which is also the rule the thesis states — repository files, and only repository files, start AI generation.
+
+`matchDeclaredTestPattern` (`packages/types/src/index.ts`) used to be a two-entry lookup table:
+
+```ts
+const DECLARED_TEST_SUFFIXES = { '*.spec.ts': '.spec.ts', '*.test.ts': '.test.ts' }
+```
+
+Any pattern that was not one of those two exact strings matched nothing, silently. A project testing with `.test.tsx`, pytest, JUnit or gtest could push test files all day and read "this change modified no test files" forever — while the extraction prompt and `packages/test-naming` both already knew those four conventions.
+
+It is now a real glob matcher:
+
+- `*` matches inside one path segment, `?` matches one character, `**` crosses any number of segments (`**/*.spec.ts` also matches a file at the root).
+- A pattern with no `/` is matched against the file name, so `*.test.tsx` matches at any depth. A pattern containing `/` is matched against the whole path, so `apps/api/test/**` is anchored.
+- Everything else is literal: the `.` in `*.spec.ts` is a dot, not "any character".
+
+Compiled expressions are cached per pattern, because ingestion runs this over every file of every push.
+
+Patterns are editable through `PATCH /projects/:id`. The validation is deliberately narrow: 1 to 20 entries, each 1 to 120 characters, and **every pattern must contain at least one character that is not `*`, `?` or `/`**. That last rule is what stops `**` from being declared — it would classify every changed file as a test and send an entire push to the model. A project always declares something, so an empty list is refused too; turning extraction off is what `Organization.aiEnabled` is for.
+
+The column default stays `["*.spec.ts", "*.test.ts"]`.
+
 ## Credentials, and what is deliberately absent
 
 `Connection` stores **no** GitHub credential. The column that used to hold an encrypted personal

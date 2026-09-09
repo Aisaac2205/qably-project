@@ -627,9 +627,50 @@ export interface Connection {
   lastSyncAt?: string
 }
 
-const DECLARED_TEST_SUFFIXES: Record<string, string> = {
-  '*.spec.ts': '.spec.ts',
-  '*.test.ts': '.test.ts',
+const REGEXP_SPECIALS = /[.+^${}()|[\]\\]/g
+
+const compiledPatterns = new Map<string, RegExp>()
+
+function globToRegExp(pattern: string): RegExp {
+  const cached = compiledPatterns.get(pattern)
+  if (cached !== undefined) return cached
+
+  let source = ''
+  let index = 0
+
+  while (index < pattern.length) {
+    const char = pattern.charAt(index)
+
+    if (char === '*' && pattern[index + 1] === '*') {
+      if (pattern[index + 2] === '/') {
+        source += '(?:.*/)?'
+        index += 3
+      } else {
+        source += '.*'
+        index += 2
+      }
+      continue
+    }
+
+    if (char === '*') {
+      source += '[^/]*'
+      index += 1
+      continue
+    }
+
+    if (char === '?') {
+      source += '[^/]'
+      index += 1
+      continue
+    }
+
+    source += char.replace(REGEXP_SPECIALS, '\\$&')
+    index += 1
+  }
+
+  const expression = new RegExp(`^${source}$`)
+  compiledPatterns.set(pattern, expression)
+  return expression
 }
 
 export function matchDeclaredTestPattern(
@@ -637,11 +678,13 @@ export function matchDeclaredTestPattern(
   patterns: readonly string[],
 ): string | undefined {
   const normalizedPath = filePath.replaceAll('\\', '/')
+  const fileName = normalizedPath.slice(normalizedPath.lastIndexOf('/') + 1)
 
-  return patterns.find((pattern) => {
-    const suffix = DECLARED_TEST_SUFFIXES[pattern]
-    return suffix !== undefined && normalizedPath.endsWith(suffix)
-  })
+  return patterns.find((pattern) =>
+    globToRegExp(pattern).test(
+      pattern.includes('/') ? normalizedPath : fileName,
+    ),
+  )
 }
 
 export interface RepositorySource {

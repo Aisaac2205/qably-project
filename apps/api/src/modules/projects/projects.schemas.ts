@@ -4,6 +4,19 @@ const name = z.string().trim().min(1).max(80);
 const description = z.string().trim().max(500);
 const connectionId = z.string().trim().min(1).max(64);
 const technologies = z.array(z.string().trim().min(1).max(40)).max(20);
+const testFilePatterns = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(120)
+      .refine((value) => /[^*?/]/.test(value), {
+        message: 'a pattern must name something other than wildcards',
+      }),
+  )
+  .min(1)
+  .max(20);
 
 export const createProjectSchema = z.object({
   name,
@@ -18,6 +31,7 @@ export const updateProjectSchema = z
     description: description.nullable().optional(),
     connectionId: connectionId.nullable().optional(),
     technologies: technologies.optional(),
+    testFilePatterns: testFilePatterns.optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'provide at least one field to update',
