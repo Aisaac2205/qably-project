@@ -21,7 +21,6 @@ import {
   mockIngestionEvidence,
   MOCK_NOW,
 } from '@/lib/mock-data'
-import { validateTags } from '@/lib/tag-validation'
 import { wantsCaseGeneration, buildAssistantReply } from '@/features/projects/test-generation/lib/generate-mock-reply'
 import type {
   ProjectSummary,

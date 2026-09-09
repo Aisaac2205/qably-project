@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowUpIcon,
   AudioLinesIcon,
-  CheckIcon,
   GlobeIcon,
   Loader2Icon,
   PlusIcon,
