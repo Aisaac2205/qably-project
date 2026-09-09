@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Info, X } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
@@ -14,12 +15,15 @@ import { ReviewProposalInspector } from './review-proposal-inspector'
 export function ReviewInboxPage() {
   const { t } = useTranslation()
   const { proposals } = useProposals()
+  const searchParams = useSearchParams()
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<ReviewQueueStatusFilter>('in_review')
   const [duplicateOnly, setDuplicateOnly] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
+  const [selectedId, setSelectedId] = useState<string | undefined>(
+    () => searchParams.get('proposal') ?? undefined,
+  )
   const [feedbackToast, setFeedbackToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null)
 
   const filteredProposals = useMemo(() => {

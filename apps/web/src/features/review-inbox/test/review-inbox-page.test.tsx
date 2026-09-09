@@ -6,6 +6,22 @@ import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
+let searchParamsQuery = ''
+
+vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
+  usePathname: () => '/review-inbox',
+  useRouter: () => ({
+    back: () => {},
+    forward: () => {},
+    prefetch: () => Promise.resolve(),
+    push: () => {},
+    refresh: () => {},
+    replace: () => {},
+  }),
+  useSearchParams: () => new URLSearchParams(searchParamsQuery),
+}))
+
 vi.mock('@/features/review-inbox/api/review.api', async () => {
   const actual = await vi.importActual<
     typeof import('@/features/review-inbox/api/review.api')
@@ -28,6 +44,37 @@ describe('ReviewInboxPage', () => {
   beforeEach(() => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
+    searchParamsQuery = ''
+  })
+
+  describe('?proposal= preselection', () => {
+    it('preselects the proposal named in the query param even outside the default filter', async () => {
+      searchParamsQuery = 'proposal=proposal-ai-1'
+
+      renderWithQuery(<ReviewInboxPage />)
+
+      expect(
+        await screen.findByRole('heading', { name: 'Valid checkout completes order' }),
+      ).toBeInTheDocument()
+    })
+
+    it('does not re-apply the query preselection on a later re-render of the same mount', async () => {
+      const user = userEvent.setup()
+      searchParamsQuery = 'proposal=proposal-ai-1'
+
+      renderWithQuery(<ReviewInboxPage />)
+      await screen.findByRole('heading', { name: 'Valid checkout completes order' })
+
+      await user.click(screen.getByText('Invalid login shows error message'))
+      expect(screen.getByRole('heading', { name: 'Invalid login shows error message' })).toBeInTheDocument()
+
+      const searchInput = screen.getByRole('searchbox', { name: /Search by title/i })
+      await user.type(searchInput, 'x')
+      await user.clear(searchInput)
+
+      expect(screen.getByRole('heading', { name: 'Invalid login shows error message' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Valid checkout completes order' })).not.toBeInTheDocument()
+    })
   })
 
   it('renders the governance statement, queue, and inspector without a local page heading', () => {
