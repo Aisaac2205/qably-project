@@ -44,6 +44,7 @@ const mockRun: RunSummaryRecord = {
   finishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
   caseCounts: { total: 1, pending: 0, running: 0, pass: 1, fail: 0, skip: 0, blocked: 0 },
   passRate: 1,
+  delta: null,
 }
 
 const mockMetrics: SuiteMetrics = {

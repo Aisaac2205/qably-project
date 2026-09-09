@@ -227,6 +227,22 @@ export interface RunCaseRecord {
   skipReason?: string
 }
 
+export interface RunDeltaCounts {
+  regressions: number
+  fixes: number
+  unchanged: number
+}
+
+export interface CaseDeltaEntry {
+  testCaseId: string
+  caseName: string
+}
+
+export interface RunDeltaDetail {
+  regressions: CaseDeltaEntry[]
+  fixes: CaseDeltaEntry[]
+}
+
 export interface RunRecord {
   id: string
   projectId: string
@@ -243,6 +259,7 @@ export interface RunRecord {
   commitMessage?: string
   commitAuthor?: string
   cases: RunCaseRecord[]
+  delta: RunDeltaDetail | null
 }
 
 export interface JunitIngestAcceptedRun {
@@ -284,6 +301,7 @@ export interface RunSummaryRecord {
   commitAuthor?: string
   caseCounts: RunCaseCounts
   passRate: number
+  delta: RunDeltaCounts | null
 }
 
 export interface RunsPageRecord {

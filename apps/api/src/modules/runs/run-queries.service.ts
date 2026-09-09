@@ -75,10 +75,46 @@ interface RegressionCaseRow {
   status: CaseStatus;
 }
 
-function toSummaryView(run: RunListRow, counts: RunCaseCounts): RunSummaryView {
+interface DeltaCaseRow {
+  runId: string;
+  testCaseId: string | null;
+  name: string;
+  status: CaseStatus;
+}
+
+function groupCasesByRun<T extends { runId: string }>(rows: T[]): Map<string, T[]> {
+  const byRun = new Map<string, T[]>();
+  for (const row of rows) {
+    const list = byRun.get(row.runId) ?? [];
+    list.push(row);
+    byRun.set(row.runId, list);
+  }
+  return byRun;
+}
+
+function countDelta(
+  currentCases: readonly DeltaCaseRow[],
+  previousCases: readonly DeltaCaseRow[],
+): RunSummaryView['delta'] {
+  const counts = { regressions: 0, fixes: 0, unchanged: 0 };
+  for (const current of currentCases) {
+    const kind = classifyCaseDelta(current, previousCases);
+    if (kind === 'regression') counts.regressions += 1;
+    if (kind === 'fix') counts.fixes += 1;
+    if (kind === 'unchanged') counts.unchanged += 1;
+  }
+  return counts;
+}
+
+function toSummaryView(
+  run: RunListRow,
+  counts: RunCaseCounts,
+  delta: RunSummaryView['delta'],
+): RunSummaryView {
   const passRate = computePassRate(counts);
 
   return {
+    delta,
     id: run.id,
     projectId: run.projectId,
     organizationId: run.organizationId,
@@ -141,8 +177,13 @@ export class RunQueriesService {
     }[];
 
     const countsByRun = buildCaseCountsByRun(groups);
+    const deltaByRun = await this.listDeltas(org.organizationId, runs);
     const items = runs.map((run) =>
-      toSummaryView(run, countsByRun.get(run.id) ?? emptyCaseCounts()),
+      toSummaryView(
+        run,
+        countsByRun.get(run.id) ?? emptyCaseCounts(),
+        deltaByRun.get(run.id) ?? null,
+      ),
     );
 
     return hasMore
@@ -254,24 +295,10 @@ export class RunQueriesService {
     if (scannedRuns.length === 0) return { items: [], runsScanned: 0 };
 
     const suiteIds = [...new Set(scannedRuns.map((run) => run.suiteId))];
-
-    const chain = await this.prisma.$queryRaw<PreviousRunLinkRow[]>(Prisma.sql`
-      SELECT id, "suiteId",
-        LAG(id) OVER (
-          PARTITION BY "suiteId" ORDER BY "startedAt" ASC, "id" ASC
-        ) AS "previousId"
-      FROM "run"
-      WHERE "organizationId" = ${org.organizationId}
-        AND "suiteId" IN (${Prisma.join(suiteIds)})
-        AND status IN ('pass', 'fail')
-        AND "finishedAt" IS NOT NULL
-    `);
-
-    const previousIdByRunId = new Map<string, string>();
-    for (const row of chain) {
-      if (row.previousId !== null)
-        previousIdByRunId.set(row.id, row.previousId);
-    }
+    const previousIdByRunId = await this.previousRunChain(
+      org.organizationId,
+      suiteIds,
+    );
 
     const previousRunIds = scannedRuns
       .map((run) => previousIdByRunId.get(run.id))
@@ -289,12 +316,7 @@ export class RunQueriesService {
             select: { runId: true, testCaseId: true, name: true, status: true },
           })) as RegressionCaseRow[]);
 
-    const casesByRun = new Map<string, RegressionCaseRow[]>();
-    for (const row of cases) {
-      const list = casesByRun.get(row.runId) ?? [];
-      list.push(row);
-      casesByRun.set(row.runId, list);
-    }
+    const casesByRun = groupCasesByRun(cases);
 
     const items: RegressionsView['items'] = [];
 
@@ -336,8 +358,113 @@ export class RunQueriesService {
     if (run === null) return err('not-found');
 
     const cases = await this.loadCases(this.prisma, id);
+    const delta = await this.detailDelta(org.organizationId, run, cases);
 
-    return ok(toRunView(run, cases));
+    return ok(toRunView(run, cases, delta));
+  }
+
+  private async previousRunChain(
+    organizationId: string,
+    suiteIds: string[],
+  ): Promise<Map<string, string>> {
+    const previousIdByRunId = new Map<string, string>();
+    if (suiteIds.length === 0) return previousIdByRunId;
+
+    const chain = await this.prisma.$queryRaw<PreviousRunLinkRow[]>(Prisma.sql`
+      SELECT id, "suiteId",
+        LAG(id) OVER (
+          PARTITION BY "suiteId" ORDER BY "startedAt" ASC, "id" ASC
+        ) AS "previousId"
+      FROM "run"
+      WHERE "organizationId" = ${organizationId}
+        AND "suiteId" IN (${Prisma.join(suiteIds)})
+        AND status IN ('pass', 'fail')
+        AND "finishedAt" IS NOT NULL
+    `);
+
+    for (const row of chain) {
+      if (row.previousId !== null)
+        previousIdByRunId.set(row.id, row.previousId);
+    }
+
+    return previousIdByRunId;
+  }
+
+  private async listDeltas(
+    organizationId: string,
+    runs: readonly RunListRow[],
+  ): Promise<Map<string, RunSummaryView['delta']>> {
+    const deltaByRun = new Map<string, RunSummaryView['delta']>();
+    const suiteIds = [...new Set(runs.map((run) => run.suiteId))];
+    const previousIdByRunId = await this.previousRunChain(
+      organizationId,
+      suiteIds,
+    );
+
+    const comparable = runs.filter((run) => previousIdByRunId.has(run.id));
+    if (comparable.length === 0) return deltaByRun;
+
+    const involvedRunIds = [
+      ...new Set(
+        comparable.flatMap((run) => [
+          run.id,
+          previousIdByRunId.get(run.id) as string,
+        ]),
+      ),
+    ];
+    const rows = (await this.prisma.runCase.findMany({
+      where: { runId: { in: involvedRunIds } },
+      select: { runId: true, testCaseId: true, name: true, status: true },
+    })) as DeltaCaseRow[];
+    const casesByRun = groupCasesByRun(rows);
+
+    for (const run of comparable) {
+      const previousId = previousIdByRunId.get(run.id) as string;
+      deltaByRun.set(
+        run.id,
+        countDelta(
+          casesByRun.get(run.id) ?? [],
+          casesByRun.get(previousId) ?? [],
+        ),
+      );
+    }
+
+    return deltaByRun;
+  }
+
+  private async detailDelta(
+    organizationId: string,
+    run: RunRow,
+    cases: readonly RunCaseRow[],
+  ): Promise<RunView['delta']> {
+    const previous = await this.prisma.run.findFirst({
+      where: {
+        organizationId,
+        suiteId: run.suiteId,
+        status: { in: ['pass', 'fail'] },
+        finishedAt: { not: null },
+        startedAt: { lt: run.startedAt },
+      },
+      orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      select: { id: true },
+    });
+    if (previous === null) return null;
+
+    const previousCases = (await this.prisma.runCase.findMany({
+      where: { runId: previous.id },
+      select: { testCaseId: true, status: true },
+    })) as { testCaseId: string | null; status: CaseStatus }[];
+
+    const delta: NonNullable<RunView['delta']> = { regressions: [], fixes: [] };
+    for (const current of cases) {
+      if (current.testCaseId === null) continue;
+      const kind = classifyCaseDelta(current, previousCases);
+      const entry = { testCaseId: current.testCaseId, caseName: current.name };
+      if (kind === 'regression') delta.regressions.push(entry);
+      if (kind === 'fix') delta.fixes.push(entry);
+    }
+
+    return delta;
   }
 
   async createManual(

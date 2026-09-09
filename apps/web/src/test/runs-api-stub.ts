@@ -106,6 +106,7 @@ export const runFixtures: RunRecord[] = [
     source: 'manual',
     externalId: '',
     startedAt: '2026-06-16T10:00:00Z',
+    delta: null,
     cases: run12Cases,
   },
   {
@@ -119,6 +120,7 @@ export const runFixtures: RunRecord[] = [
     externalId: '',
     startedAt: '2026-06-15T14:30:00Z',
     finishedAt: '2026-06-15T14:38:00Z',
+    delta: null,
     cases: run11Cases,
   },
   {
@@ -135,6 +137,7 @@ export const runFixtures: RunRecord[] = [
     commitSha: 'b1e4d90',
     commitMessage: 'fix: checkout button not disabling on empty cart',
     commitAuthor: 'CI Bot',
+    delta: null,
     cases: run10Cases,
   },
   {
@@ -148,6 +151,7 @@ export const runFixtures: RunRecord[] = [
     externalId: 'api-run-9',
     startedAt: '2026-06-13T11:00:00Z',
     finishedAt: '2026-06-13T11:08:00Z',
+    delta: null,
     cases: run9Cases,
   },
 ]
@@ -177,6 +181,7 @@ function toSummary(run: RunRecord): RunSummaryRecord {
     commitAuthor: run.commitAuthor,
     caseCounts,
     passRate: passRateOf(caseCounts),
+    delta: null,
   }
 }
 
@@ -278,6 +283,7 @@ export function createRun(payload: {
     source: 'manual',
     externalId: '',
     startedAt: '2026-06-17T00:00:00Z',
+    delta: null,
     cases: [],
   }
   runs = [created, ...runs]

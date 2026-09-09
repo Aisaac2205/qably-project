@@ -1298,3 +1298,121 @@ describe('RunQueriesService.updateCaseStatus regression notifications', () => {
     expect(prisma.run.findFirst).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('RunQueriesService.list delta', () => {
+  const previousRow = {
+    ...runRow,
+    id: 'run-0',
+    startedAt: new Date('2025-12-31T00:00:00.000Z'),
+  };
+
+  it('reports no delta for a run whose suite has no earlier finished run', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-1', suiteId: 'suite-1', previousId: null },
+    ]);
+
+    const { items } = await build(prisma).list(org, { projectId: 'project-1' });
+
+    expect(items[0].delta).toBeNull();
+    expect(prisma.runCase.findMany).not.toHaveBeenCalled();
+  });
+
+  it('counts regressions, fixes and unchanged cases against the previous run of the same suite', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([runRow, previousRow]);
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-0', suiteId: 'suite-1', previousId: null },
+      { id: 'run-1', suiteId: 'suite-1', previousId: 'run-0' },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      { runId: 'run-0', testCaseId: 'case-1', name: 'Adds', status: 'pass' },
+      { runId: 'run-0', testCaseId: 'case-2', name: 'Removes', status: 'fail' },
+      { runId: 'run-0', testCaseId: 'case-3', name: 'Lists', status: 'pass' },
+      { runId: 'run-1', testCaseId: 'case-1', name: 'Adds', status: 'fail' },
+      { runId: 'run-1', testCaseId: 'case-2', name: 'Removes', status: 'pass' },
+      { runId: 'run-1', testCaseId: 'case-3', name: 'Lists', status: 'pass' },
+      { runId: 'run-1', testCaseId: 'case-4', name: 'Pays', status: 'pass' },
+    ]);
+
+    const { items } = await build(prisma).list(org, { projectId: 'project-1' });
+
+    expect(items[0].delta).toEqual({ regressions: 1, fixes: 1, unchanged: 1 });
+    expect(items[1].delta).toBeNull();
+  });
+
+  it('resolves previous runs with one window query over the listed suites and one case read', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([runRow, previousRow]);
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'run-1', suiteId: 'suite-1', previousId: 'run-0' },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).list(org, { projectId: 'project-1' });
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [sqlArg] = prisma.$queryRaw.mock.calls[0] as [{ sql: string }];
+    expect(sqlArg.sql).toContain('LAG(id) OVER');
+    expect(prisma.runCase.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.runCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { runId: { in: expect.arrayContaining(['run-1', 'run-0']) } },
+      }),
+    );
+  });
+});
+
+describe('RunQueriesService.findOne delta', () => {
+  it('reports no delta when the suite has no earlier finished run', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst
+      .mockResolvedValueOnce(runRow)
+      .mockResolvedValueOnce(null);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.delta).toBeNull();
+    expect(prisma.run.findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          suiteId: 'suite-1',
+          organizationId: 'org-1',
+          status: { in: ['pass', 'fail'] },
+          finishedAt: { not: null },
+          startedAt: { lt: runRow.startedAt },
+        }),
+        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+      }),
+    );
+  });
+
+  it('lists the regressed and fixed cases by name against the previous run', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst
+      .mockResolvedValueOnce(runRow)
+      .mockResolvedValueOnce({ id: 'run-0' });
+    prisma.runCase.findMany
+      .mockResolvedValueOnce([
+        runCaseRow({ id: 'rc-1', testCaseId: 'case-1', name: 'Adds', status: 'fail', position: 0 }),
+        runCaseRow({ id: 'rc-2', testCaseId: 'case-2', name: 'Removes', status: 'pass', position: 1 }),
+        runCaseRow({ id: 'rc-3', testCaseId: 'case-3', name: 'Lists', status: 'pass', position: 2 }),
+      ])
+      .mockResolvedValueOnce([
+        { testCaseId: 'case-1', status: 'pass' },
+        { testCaseId: 'case-2', status: 'fail' },
+        { testCaseId: 'case-3', status: 'pass' },
+      ]);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.delta).toEqual({
+      regressions: [{ testCaseId: 'case-1', caseName: 'Adds' }],
+      fixes: [{ testCaseId: 'case-2', caseName: 'Removes' }],
+    });
+  });
+});

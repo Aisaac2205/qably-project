@@ -96,6 +96,7 @@ const runsPage: RunsPageRecord = {
       finishedAt: '2026-06-16T10:05:00Z',
       caseCounts: { total: 4, pending: 0, running: 0, pass: 4, fail: 0, skip: 0, blocked: 0 },
       passRate: 1,
+      delta: null,
     },
     {
       id: 'run-1',
@@ -111,6 +112,7 @@ const runsPage: RunsPageRecord = {
       finishedAt: '2026-06-15T10:05:00Z',
       caseCounts: { total: 4, pending: 0, running: 0, pass: 3, fail: 1, skip: 0, blocked: 0 },
       passRate: 0.75,
+      delta: null,
     },
   ],
 }

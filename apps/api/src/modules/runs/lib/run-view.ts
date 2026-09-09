@@ -102,8 +102,13 @@ export interface RunCaseRow {
   } | null;
 }
 
-export function toRunView(run: RunRow, cases: RunCaseRow[]): RunView {
+export function toRunView(
+  run: RunRow,
+  cases: RunCaseRow[],
+  delta: RunView['delta'] = null,
+): RunView {
   return {
+    delta,
     id: run.id,
     projectId: run.projectId,
     organizationId: run.organizationId,

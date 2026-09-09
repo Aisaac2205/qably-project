@@ -42,6 +42,7 @@ function toSummary(run: (typeof runFixtures)[number]): RunSummaryRecord {
     commitAuthor: run.commitAuthor,
     caseCounts,
     passRate: caseCounts.total === 0 ? 0 : caseCounts.pass / caseCounts.total,
+    delta: null,
   }
 }
 

@@ -40,6 +40,7 @@ function makeRun(
     externalId: '',
     caseCounts: EMPTY_CASE_COUNTS,
     passRate: 1,
+    delta: null,
     ...overrides,
   }
 }

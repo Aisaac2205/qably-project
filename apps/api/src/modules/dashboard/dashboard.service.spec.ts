@@ -34,6 +34,7 @@ function runSummary(
       blocked: 0,
     },
     passRate: 1,
+    delta: null,
     ...overrides,
   };
 }
