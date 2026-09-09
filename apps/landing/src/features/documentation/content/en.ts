@@ -433,7 +433,11 @@ node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'paragraph',
-          text: 'On import, Qably strips the usual scaffolding from test names: prefixes such as "test", "spec", "prueba" or "caso", and declarative openers such as "should", "must", "when", "given", "debe" or "cuando". It works the same in English and Spanish, so a name like "Test that should reject an empty token" reaches the platform as "Rejects an empty token".',
+          text: 'On import, Qably turns technical identifiers into readable text. It splits joined words and drops scaffolding prefixes such as "test", "spec", "prueba" or "caso", so a name like testTokenNull reaches the platform as "Token null". This works the same in English and Spanish.',
+        },
+        {
+          type: 'paragraph',
+          text: 'What Qably does not do is rewrite a name that is already written as a sentence. A name like "should reject an empty token" arrives essentially unchanged, with only its first letter capitalized: the platform does not change the verb or drop words. That is exactly why the name is worth writing readably in the code, because it is the text people will read later.',
         },
         {
           type: 'callout',

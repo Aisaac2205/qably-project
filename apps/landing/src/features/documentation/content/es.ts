@@ -433,7 +433,11 @@ node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'paragraph',
-          text: 'Al importar, Qably quita el andamiaje habitual de los nombres de prueba: prefijos como "test", "spec", "prueba" o "caso", y aperturas declarativas como "should", "must", "debe", "debería", "cuando" o "dado". Funciona igual en español y en inglés, así que un nombre como "Test que debe rechazar un token vacío" llega a la plataforma como "Rechaza un token vacío".',
+          text: 'Al importar, Qably convierte identificadores técnicos en texto legible. Separa las palabras pegadas y descarta prefijos de andamiaje como "test", "spec", "prueba" o "caso", así que un nombre como testTokenNull llega a la plataforma como "Token null". Eso funciona igual en español y en inglés.',
+        },
+        {
+          type: 'paragraph',
+          text: 'Lo que Qably no hace es reescribir una frase que ya está redactada como frase. Un nombre como "debe rechazar un token vacío" llega prácticamente igual, solo con la primera letra en mayúscula: la plataforma no cambia el verbo ni recorta palabras. Esa es justamente la razón por la que conviene escribir el nombre ya legible desde el código, porque es el texto que se va a leer después.',
         },
         {
           type: 'callout',

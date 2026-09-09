@@ -319,3 +319,29 @@ describe('humanizeTestName', () => {
     });
   });
 });
+
+describe('the examples the public documentation promises', () => {
+  it('turns a technical identifier into readable words', () => {
+    expect(
+      humanizeTestName({ name: 'testTokenNull', className: 'AuthTest' }).title,
+    ).toBe('Token null');
+  });
+
+  it('leaves a name already written as a sentence alone, apart from its first letter', () => {
+    expect(
+      humanizeTestName({
+        name: 'should reject an empty token',
+        className: 'AuthTest',
+      }).title,
+    ).toBe('Should reject an empty token');
+  });
+
+  it('never conjugates a verb, so the documentation must not claim it does', () => {
+    expect(
+      humanizeTestName({
+        name: 'rechazar un token vacío',
+        className: 'AuthTest',
+      }).title,
+    ).toBe('Rechazar un token vacío');
+  });
+});
