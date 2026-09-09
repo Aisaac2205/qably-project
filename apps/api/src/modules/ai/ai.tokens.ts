@@ -1,2 +1,3 @@
 export const TEST_CASE_EXTRACTOR = Symbol('TEST_CASE_EXTRACTOR');
 export const GEMINI_CLIENT = Symbol('GEMINI_CLIENT');
+export const AI_DAILY_BUDGET_REDIS = Symbol('AI_DAILY_BUDGET_REDIS');

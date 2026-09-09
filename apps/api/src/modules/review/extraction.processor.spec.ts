@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE } from '@qably/i18n';
+import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { EncryptionService } from '../../common/crypto/encryption.service';
 import type { SourceReader } from '../repository/source-reader';
@@ -121,12 +122,19 @@ function fakeEntitlement(
   return { isEntitled, spendCredit } as unknown as AiEntitlementService;
 }
 
+function fakeDailyBudget(
+  tryConsume: jest.Mock = jest.fn().mockResolvedValue(true),
+): AiDailyBudget {
+  return { tryConsume } as unknown as AiDailyBudget;
+}
+
 function build(
   prisma: FakePrisma,
   sourceReader: SourceReader,
   extractor: TestCaseExtractor,
   encryption: EncryptionService = fakeEncryption(),
   entitlement: AiEntitlementService = fakeEntitlement(),
+  dailyBudget: AiDailyBudget = fakeDailyBudget(),
 ) {
   return new ExtractionProcessor(
     prisma as never,
@@ -134,6 +142,7 @@ function build(
     extractor,
     encryption,
     entitlement,
+    dailyBudget,
   );
 }
 
@@ -264,6 +273,48 @@ describe('ExtractionProcessor — code-change job', () => {
       status: 'in_review',
     });
     expect(extractSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to quota-exhausted without calling the provider when the daily budget is spent', async () => {
+    const prisma = createPrisma();
+    const extractSpy = jest.fn();
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(extractSpy),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(jest.fn().mockResolvedValue(false)),
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
+      needsManualReview: true,
+      objective: 'quota-exhausted',
+    });
+    expect(extractSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not spend a budget slot when the source file cannot be read', async () => {
+    const prisma = createPrisma();
+    const tryConsume = jest.fn().mockResolvedValue(true);
+
+    await build(
+      prisma,
+      fakeSourceReader(
+        jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
+      ),
+      fakeExtractor(jest.fn()),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(tryConsume),
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(tryConsume).not.toHaveBeenCalled();
   });
 
   it('falls back to a manual-review proposal when the source is unavailable', async () => {
@@ -1087,6 +1138,59 @@ describe('ExtractionProcessor — document-file job', () => {
     expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
     const createCall = lastCall(prisma.extractedProposal.create);
     expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-2' });
+  });
+
+  it('routes every target to quota-exhausted without calling the provider when the daily budget is spent', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const extractSpy = jest.fn();
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(extractSpy),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(jest.fn().mockResolvedValue(false)),
+    ).process(documentFileJob());
+
+    const objectives = (
+      prisma.extractedProposal.create.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]
+    ).map(([call]) => call.data);
+    expect(objectives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetTestCaseId: 'case-1',
+          objective: 'quota-exhausted',
+        }),
+        expect.objectContaining({
+          targetTestCaseId: 'case-2',
+          objective: 'quota-exhausted',
+        }),
+      ]),
+    );
+    expect(extractSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not spend a budget slot when the source file cannot be read', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const tryConsume = jest.fn().mockResolvedValue(true);
+
+    await build(
+      prisma,
+      fakeSourceReader(
+        jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
+      ),
+      fakeExtractor(jest.fn()),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(tryConsume),
+    ).process(documentFileJob());
+
+    expect(tryConsume).not.toHaveBeenCalled();
   });
 });
 

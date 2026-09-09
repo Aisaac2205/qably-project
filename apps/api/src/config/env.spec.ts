@@ -164,4 +164,20 @@ describe('parseEnv', () => {
       /BETTER_AUTH_SECRET/,
     );
   });
+
+  it('starts without AERIS_DAILY_BUDGET because an unset budget means unmetered', () => {
+    expect(parseEnv(validEnv).AERIS_DAILY_BUDGET).toBeUndefined();
+  });
+
+  it('coerces a numeric AERIS_DAILY_BUDGET', () => {
+    expect(
+      parseEnv({ ...validEnv, AERIS_DAILY_BUDGET: '500' }).AERIS_DAILY_BUDGET,
+    ).toBe(500);
+  });
+
+  it('rejects a non-positive AERIS_DAILY_BUDGET', () => {
+    expect(() =>
+      parseEnv({ ...validEnv, AERIS_DAILY_BUDGET: '0' }),
+    ).toThrow(/AERIS_DAILY_BUDGET/);
+  });
 });

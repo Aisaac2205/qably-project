@@ -5,6 +5,7 @@ import { resolveLocale } from '@qably/i18n';
 import type { RepoConnectionProvider } from '@qably/types';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import { TEST_CASE_EXTRACTOR } from '../ai/ai.tokens';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
@@ -27,6 +28,8 @@ const NOT_ENTITLED_REASON = 'ai-not-enabled';
 const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
 const NO_TESTS_FOUND_REASON = 'no-tests-found';
 const EXTRACTION_FAILED_REASON = 'extraction-failed';
+const QUOTA_EXHAUSTED_REASON = 'quota-exhausted';
+const NOT_BYOK = { isByok: false };
 const UNIQUE_VIOLATION = 'P2002';
 const LOCK_DURATION_MS = 120_000;
 
@@ -144,6 +147,7 @@ export class ExtractionProcessor extends WorkerHost {
     @Inject(TEST_CASE_EXTRACTOR) private readonly extractor: TestCaseExtractor,
     private readonly encryption: EncryptionService,
     private readonly entitlement: AiEntitlementService,
+    private readonly dailyBudget: AiDailyBudget,
   ) {
     super();
   }
@@ -380,6 +384,12 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
+    const withinBudget = await this.dailyBudget.tryConsume(NOT_BYOK);
+    if (!withinBudget) {
+      await this.fallbackForTargets(ctx, ctx.targets, QUOTA_EXHAUSTED_REASON);
+      return;
+    }
+
     const locale = resolveLocale(ctx.locale);
 
     const outcome = await this.extractor.extract({
@@ -584,6 +594,12 @@ export class ExtractionProcessor extends WorkerHost {
 
     if (source.kind === 'unavailable') {
       await this.persistManualReviewFallback(ctx, source.reason);
+      return;
+    }
+
+    const withinBudget = await this.dailyBudget.tryConsume(NOT_BYOK);
+    if (!withinBudget) {
+      await this.persistManualReviewFallback(ctx, QUOTA_EXHAUSTED_REASON);
       return;
     }
 

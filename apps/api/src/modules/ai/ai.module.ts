@@ -1,9 +1,15 @@
 import { Module } from '@nestjs/common';
+import Redis from 'ioredis';
 import { ConfigModule } from '../../config/config.module';
 import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
+import { AiDailyBudget } from './ai-daily-budget.service';
 import { AiEntitlementService } from './ai-entitlement.service';
-import { GEMINI_CLIENT, TEST_CASE_EXTRACTOR } from './ai.tokens';
+import {
+  AI_DAILY_BUDGET_REDIS,
+  GEMINI_CLIENT,
+  TEST_CASE_EXTRACTOR,
+} from './ai.tokens';
 import { DisabledExtractor } from './disabled.extractor';
 import { AiEntitlementGuard } from './guards/ai-entitlement.guard';
 import { createGeminiClient, GeminiExtractor } from './gemini.extractor';
@@ -13,6 +19,12 @@ import { createGeminiClient, GeminiExtractor } from './gemini.extractor';
   providers: [
     AiEntitlementService,
     AiEntitlementGuard,
+    AiDailyBudget,
+    {
+      provide: AI_DAILY_BUDGET_REDIS,
+      inject: [ENV],
+      useFactory: (env: Env) => new Redis(env.REDIS_URL),
+    },
     {
       provide: GEMINI_CLIENT,
       inject: [ENV],
@@ -38,6 +50,7 @@ import { createGeminiClient, GeminiExtractor } from './gemini.extractor';
     GEMINI_CLIENT,
     AiEntitlementService,
     AiEntitlementGuard,
+    AiDailyBudget,
   ],
 })
 export class AiModule {}

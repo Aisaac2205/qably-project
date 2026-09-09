@@ -46,6 +46,7 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().min(1),
   GEMINI_API_KEY: optionalSecret,
   GEMINI_MODEL: z.string().min(1).default('gemini-3.1-flash-lite'),
+  AERIS_DAILY_BUDGET: z.coerce.number().int().positive().optional(),
   RESEND_API_KEY: optionalSecret,
   RESEND_FROM_EMAIL: z.string().min(1).optional(),
 });
