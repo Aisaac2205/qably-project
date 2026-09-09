@@ -193,6 +193,30 @@ describe('Review (e2e)', () => {
     expect(response.body).toEqual([{ id: 'proposal-1', outcome: 'approved' }]);
   });
 
+  it('bulk-approves a mixed batch, skipping an already-decided proposal with its reason', async () => {
+    const decidedProposalRow = {
+      ...proposalRow,
+      id: 'proposal-2',
+      status: 'approved',
+    };
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: { id: string } }) =>
+        Promise.resolve(
+          args.where.id === 'proposal-2' ? decidedProposalRow : proposalRow,
+        ),
+    );
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/approve')
+      .send({ ids: ['proposal-1', 'proposal-2'] })
+      .expect(201);
+
+    expect(response.body).toEqual([
+      { id: 'proposal-1', outcome: 'approved' },
+      { id: 'proposal-2', outcome: 'skipped', reason: 'invalid-transition' },
+    ]);
+  });
+
   it('rejects a bulk request over the 100-id bound', async () => {
     await request(app.getHttpServer())
       .post('/review/proposals/approve')
