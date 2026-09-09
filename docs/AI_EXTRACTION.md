@@ -100,6 +100,12 @@ The `document-file` job kind is that unit. `ExtractionService.enqueueDocumentFil
 
 The processor matches each returned case to a target by `automationKey`, the same join key run ingestion uses, and writes one `ExtractedProposal` per matched target. A target the model never returned gets its own `automation-key-not-found` fallback: a case that could not be documented is visible in the review inbox, never a silent omission.
 
+One request enqueues at most `MAX_DOCUMENT_FILES_PER_REQUEST` files. A first connection can bring thousands of undocumented cases across hundreds of files, and without a ceiling a single click would commit that many provider calls before anyone could see the bill. The response reports what was actually queued, and the action stays available while cases remain, so the rest is queued by pressing again — a bounded commitment repeated deliberately, rather than one unbounded one.
+
+The job id is `document-file:<projectId>:<filePath>:<chunkIndex>`. The project id is not decoration: two organizations routinely hold a file at the same relative path, and an id built from the path alone would let BullMQ deduplicate one organization's job against another's, leaving the second silently unprocessed while its HTTP response claimed success. Scoping it also makes a repeated identical request idempotent instead of doubling the work.
+
+Writing the proposals takes a row lock (`SELECT ... FOR UPDATE`, ordered by id) on the target cases at the top of the transaction. `ExtractedProposal` has no unique constraint on `targetTestCaseId`, so the check-then-create that precedes each write is not atomic on its own: a chunk redelivered after the worker lock expires could pass the pending check concurrently with the original and write a second proposal for the same case, spending a second credit for one chunk. The lock makes the second writer wait and then observe what the first wrote. Ordering the ids keeps two chunks with overlapping targets from deadlocking against each other.
+
 ### Chunking, and why the 20-case cap stays
 
 `MAX_EXTRACTED_CASES` bounds one model response's schema. Raising it to cover a large file would widen the blast radius of a single call against the existing output-token ceiling, for a problem chunking already solves. A file with more target cases than the cap becomes several `document-file` jobs over the same file, each carrying its own slice of the target keys and each a separate model call.
