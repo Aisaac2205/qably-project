@@ -10,6 +10,8 @@ import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
+import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
+import { HealthSignalChip } from './health-signal-chip'
 import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { ApiError } from '@/lib/api-client'
 import { projectAiReviewPath } from '@/features/projects/lib/routes'
@@ -107,6 +109,20 @@ export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProp
           </MenuPortal>
         </Menu>
       </div>
+
+      {testCase.healthSignals && testCase.healthSignals.length > 0 && (
+        <div
+          role="group"
+          aria-label={t('quality.signals.caseAriaLabel')}
+          className="flex flex-wrap items-center gap-1.5"
+        >
+          {CASE_HEALTH_SIGNAL_ORDER.filter((signal) =>
+            testCase.healthSignals?.includes(signal),
+          ).map((signal) => (
+            <HealthSignalChip key={signal} signal={signal} />
+          ))}
+        </div>
+      )}
 
       {/* Steps, Expected result, & Traceability toggles */}
       <div className="flex flex-wrap items-center gap-2">

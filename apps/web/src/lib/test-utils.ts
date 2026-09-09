@@ -26,6 +26,7 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     tags: overrides.tags ?? ['smoke', 'auth'],
     isDefault: overrides.isDefault ?? false,
     updatedAt: overrides.updatedAt ?? '2026-01-25T00:00:00Z',
+    healthSummary: overrides.healthSummary,
   }
 }
 
@@ -51,5 +52,6 @@ export function createMockTestCase(overrides: Partial<TestCase> = {}): TestCase 
     automationClassName: overrides.automationClassName,
     automationFilePath: overrides.automationFilePath,
     lastResult: overrides.lastResult,
+    healthSignals: overrides.healthSignals,
   }
 }

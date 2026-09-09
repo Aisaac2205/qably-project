@@ -1,4 +1,4 @@
-import { screen, act } from '@testing-library/react'
+import { screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { CaseCard } from '@/features/projects/suites/components/case-card'
@@ -158,6 +158,32 @@ describe('CaseCard', () => {
     await user.click(await screen.findByText('Delete case'))
 
     expect(onDelete).toHaveBeenCalledWith(mockCase)
+  })
+
+  describe('quality health signals', () => {
+    it('renders nothing extra for a case with no health signals', async () => {
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />)
+      })
+
+      expect(screen.queryByRole('group', { name: /quality signals/i })).not.toBeInTheDocument()
+    })
+
+    it('renders a chip per signal the case carries, as a visible label rather than color alone', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, healthSignals: ['no-steps', 'never-run'] }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const strip = screen.getByRole('group', { name: /quality signals/i })
+      expect(within(strip).getByRole('button', { name: /no steps/i })).toBeInTheDocument()
+      expect(within(strip).getByRole('button', { name: /never run/i })).toBeInTheDocument()
+    })
   })
 
   describe('pending review state', () => {

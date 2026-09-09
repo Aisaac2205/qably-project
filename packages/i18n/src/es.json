@@ -394,7 +394,23 @@
     "suitesColumnPassRate": "Tasa de aprobación reciente",
     "suitesColumnTrend": "Tendencia",
     "suitesEmptyTitle": "Todavía no hay suites",
-    "suitesEmptyDescription": "Creá una suite para empezar a registrar su salud acá."
+    "suitesEmptyDescription": "Creá una suite para empezar a registrar su salud acá.",
+    "signals": {
+      "stripAriaLabel": "Señales de calidad de esta suite",
+      "caseAriaLabel": "Señales de calidad de este caso",
+      "noStepsLabel": "Sin pasos",
+      "noStepsDescription": "Este caso automatizado no tiene pasos registrados; documentarlo permite que su historial de resultados tenga sentido.",
+      "rawNameLabel": "Nombre técnico",
+      "rawNameDescription": "El nombre de este caso es su identificador técnico; conviene renombrarlo con un texto que una persona no técnica pueda leer.",
+      "neverRunLabel": "Nunca ejecutado",
+      "neverRunDescription": "Este caso nunca produjo un resultado; ejecutar su suite al menos una vez permite empezar a monitorearlo.",
+      "flakyLabel": "Inestable",
+      "flakyDescription": "Las últimas 6 ejecuciones de este caso alternaron entre éxito y falla más de una vez; conviene investigarlo antes de confiar en su estado.",
+      "duplicateKeyLabel": "Clave duplicada",
+      "duplicateKeyDescription": "Otro caso de este proyecto comparte la clave de automatización de este caso; es probable que uno de los dos esté desactualizado.",
+      "nearDuplicateTitleLabel": "Título casi duplicado",
+      "nearDuplicateTitleDescription": "Otro caso de esta suite tiene un título casi idéntico; conviene renombrarlos o fusionarlos para que cada caso sea inequívoco."
+    }
   },
   "projects": {
     "title": "Proyectos",

@@ -26,6 +26,8 @@ import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
+import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
+import { HealthSignalChip } from './health-signal-chip'
 import { DocumentWithAeris } from './document-with-aeris'
 
 
@@ -247,6 +249,20 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 height={24}
               />
             </div>
+          </div>
+        )}
+
+        {suite.healthSummary && Object.keys(suite.healthSummary).length > 0 && (
+          <div
+            role="group"
+            aria-label={t('quality.signals.stripAriaLabel')}
+            className="flex flex-wrap items-center gap-2 border-t border-border pt-4"
+          >
+            {CASE_HEALTH_SIGNAL_ORDER.filter(
+              (signal) => (suite.healthSummary?.[signal] ?? 0) > 0,
+            ).map((signal) => (
+              <HealthSignalChip key={signal} signal={signal} count={suite.healthSummary?.[signal]} />
+            ))}
           </div>
         )}
       </header>

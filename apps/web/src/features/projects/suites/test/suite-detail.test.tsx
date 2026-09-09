@@ -1,6 +1,7 @@
-import { screen, act, within } from '@testing-library/react'
+import { render, screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
@@ -33,6 +34,10 @@ describe('SuiteDetail (redesigned)', () => {
   beforeEach(() => {
     __resetStore()
     mockPush.mockClear()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('disables the run button on a suite with no cases, while keeping it focusable', async () => {
@@ -87,6 +92,61 @@ describe('SuiteDetail (redesigned)', () => {
   it('renders the description when present', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByText(/Login, registration, and password reset flows/)).toBeInTheDocument()
+  })
+
+  it('renders nothing extra for a suite with an empty health summary', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    expect(screen.queryByRole('group', { name: /quality signals/i })).not.toBeInTheDocument()
+  })
+
+  it('renders a health signal chip per non-zero suite signal, with its count', async () => {
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
+      createMockSuite({
+        id: 'suite-1',
+        projectId: 'proj-1',
+        healthSummary: { flaky: 2, 'raw-name': 1 },
+      }),
+    )
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <SuiteDetail projectId="proj-1" suiteId="suite-1" />
+        </QueryClientProvider>,
+      )
+    })
+
+    const strip = await screen.findByRole('group', { name: /quality signals/i })
+    expect(within(strip).getByRole('button', { name: /flaky/i })).toHaveTextContent('2')
+    expect(within(strip).getByRole('button', { name: /raw name/i })).toHaveTextContent('1')
+  })
+
+  it('omits a suite signal with a zero count from the strip', async () => {
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
+      createMockSuite({
+        id: 'suite-1',
+        projectId: 'proj-1',
+        healthSummary: { flaky: 1 },
+      }),
+    )
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    })
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <SuiteDetail projectId="proj-1" suiteId="suite-1" />
+        </QueryClientProvider>,
+      )
+    })
+
+    const strip = await screen.findByRole('group', { name: /quality signals/i })
+    expect(within(strip).queryByRole('button', { name: /never run/i })).not.toBeInTheDocument()
   })
 
   it('renders tags as Badge pills', async () => {

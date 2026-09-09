@@ -394,7 +394,23 @@
     "suitesColumnPassRate": "Recent pass rate",
     "suitesColumnTrend": "Trend",
     "suitesEmptyTitle": "No suites yet",
-    "suitesEmptyDescription": "Create a suite to start tracking its health here."
+    "suitesEmptyDescription": "Create a suite to start tracking its health here.",
+    "signals": {
+      "stripAriaLabel": "Quality signals for this suite",
+      "caseAriaLabel": "Quality signals for this case",
+      "noStepsLabel": "No steps",
+      "noStepsDescription": "This automated case has no recorded steps — document it so its result history means something.",
+      "rawNameLabel": "Raw name",
+      "rawNameDescription": "This case's name is its technical identifier — rename it into something a non-engineer can read.",
+      "neverRunLabel": "Never run",
+      "neverRunDescription": "This case has never produced a result — run its suite at least once to start tracking it.",
+      "flakyLabel": "Flaky",
+      "flakyDescription": "This case's last 6 runs alternated pass and fail more than once — investigate before trusting its status.",
+      "duplicateKeyLabel": "Duplicate key",
+      "duplicateKeyDescription": "Another case in this project shares this case's automation key — one of them is probably stale.",
+      "nearDuplicateTitleLabel": "Near-duplicate title",
+      "nearDuplicateTitleDescription": "Another case in this suite has a near-identical title — rename or merge them so each case is unambiguous."
+    }
   },
   "projects": {
     "title": "Projects",
