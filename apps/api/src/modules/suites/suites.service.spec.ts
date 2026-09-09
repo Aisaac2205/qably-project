@@ -46,11 +46,17 @@ interface FakePrisma {
     updateMany: jest.Mock;
     delete: jest.Mock;
   };
-  testCase: { create: jest.Mock; update: jest.Mock; delete: jest.Mock };
+  testCase: {
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+    findMany: jest.Mock;
+  };
   runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
   extractedProposal: { findMany: jest.Mock };
   $transaction: jest.Mock;
+  $queryRaw: jest.Mock;
 }
 
 function createPrisma(): FakePrisma {
@@ -64,11 +70,17 @@ function createPrisma(): FakePrisma {
       updateMany: jest.fn(),
       delete: jest.fn(),
     },
-    testCase: { create: jest.fn(), update: jest.fn(), delete: jest.fn() },
+    testCase: {
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
     extractedProposal: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
 
   prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
@@ -534,5 +546,156 @@ describe('SuitesService automated case last result', () => {
     await build(prisma).findOne(owner, 'suite-1');
 
     expect(prisma.runCase.findMany).not.toHaveBeenCalled();
+  });
+
+  it('never runs the flaky-window query when the suite has no automated cases', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).findOne(owner, 'suite-1');
+
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('SuitesService health signals', () => {
+  const automatedCase = {
+    id: 'case-2',
+    suiteId: 'suite-1',
+    name: 'checkout_pay',
+    steps: [] as string[],
+    expectedResult: '',
+    priority: 'medium' as const,
+    state: 'active' as const,
+    currentVersion: null,
+    executionMode: 'automated' as const,
+    automationKey: 'checkout_pay',
+    automationClassName: null,
+    automationFilePath: null,
+  };
+
+  it('attaches the signals a case trips to its read model', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      { ...suiteRow, cases: [automatedCase] },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].healthSignals).toEqual(
+      expect.arrayContaining(['no-steps', 'raw-name', 'never-run']),
+    );
+  });
+
+  it('rolls the case signals up into a suite-level summary, omitting zero counts', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      { ...suiteRow, cases: [automatedCase] },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.healthSummary).toEqual({
+      'no-steps': 1,
+      'raw-name': 1,
+      'never-run': 1,
+    });
+    expect(suite.healthSummary).not.toHaveProperty('flaky');
+  });
+
+  it('reports an empty summary for a suite whose cases trip nothing', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.healthSummary).toEqual({});
+  });
+
+  it('flags duplicate-key across two cases in the same visible batch, scoped to project not suite', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        id: 'suite-1',
+        cases: [{ ...automatedCase, id: 'case-2', suiteId: 'suite-1' }],
+      },
+      {
+        ...suiteRow,
+        id: 'suite-2',
+        cases: [{ ...automatedCase, id: 'case-3', suiteId: 'suite-2' }],
+      },
+    ]);
+
+    const [suiteA, suiteB] = await build(prisma).list(owner);
+
+    expect(suiteA.cases[0].healthSignals).toContain('duplicate-key');
+    expect(suiteB.cases[0].healthSignals).toContain('duplicate-key');
+  });
+
+  it('finds a project-wide duplicate key outside the current suite on a single-suite read', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({
+      ...suiteRow,
+      cases: [automatedCase],
+    });
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-elsewhere',
+        suiteId: 'suite-9',
+        projectId: 'project-1',
+        automationKey: 'checkout_pay',
+      },
+    ]);
+
+    const result = await build(prisma).findOne(owner, 'suite-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].healthSignals).toContain('duplicate-key');
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          projectId: { in: ['project-1'] },
+          automationKey: { not: null },
+        },
+      }),
+    );
+  });
+
+  it('scopes the last-six flaky window to the batch of automated case ids', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({
+      ...suiteRow,
+      cases: [automatedCase],
+    });
+
+    await build(prisma).findOne(owner, 'suite-1');
+
+    const [[sqlArg]] = prisma.$queryRaw.mock.calls as [
+      [{ sql: string; values: unknown[] }],
+    ];
+    expect(sqlArg.sql).toContain('PARTITION BY rc."testCaseId"');
+    expect(sqlArg.sql).toContain('rn <=');
+    expect(sqlArg.values).toContain('case-2');
+    expect(sqlArg.values).toContain(6);
+  });
+
+  it('derives flaky from the last six results, newest first', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({
+      ...suiteRow,
+      cases: [automatedCase],
+    });
+    prisma.$queryRaw.mockResolvedValue([
+      { test_case_id: 'case-2', status: 'pass' },
+      { test_case_id: 'case-2', status: 'fail' },
+      { test_case_id: 'case-2', status: 'pass' },
+    ]);
+
+    const result = await build(prisma).findOne(owner, 'suite-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].healthSignals).toContain('flaky');
   });
 });

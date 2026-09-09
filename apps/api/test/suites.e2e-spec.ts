@@ -80,7 +80,9 @@ describe('Suites (e2e)', () => {
       findMany: jest.fn(),
     },
     extractedProposal: { findMany: jest.fn() },
+    runCase: { findMany: jest.fn() },
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -102,6 +104,8 @@ describe('Suites (e2e)', () => {
     prisma.suite.update.mockResolvedValue(suiteRow);
     prisma.extractedProposal.findMany.mockResolvedValue([]);
     prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.runCase.findMany.mockResolvedValue([]);
+    prisma.$queryRaw.mockResolvedValue([]);
     prisma.organization.findUnique.mockResolvedValue({
       aiEnabled: true,
       aiCredits: 10,
@@ -153,6 +157,47 @@ describe('Suites (e2e)', () => {
     const body = response.body as { id: string; cases: unknown[] }[];
     expect(body).toHaveLength(1);
     expect(body[0].cases).toHaveLength(1);
+  });
+
+  it('exposes health signals per case and a suite-level rollup', async () => {
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          {
+            id: 'case-2',
+            suiteId: 'suite-1',
+            name: 'checkout_flow',
+            steps: [],
+            expectedResult: '',
+            priority: 'medium',
+            state: 'active',
+            currentVersion: null,
+            executionMode: 'automated',
+            automationKey: 'checkout_flow',
+            automationClassName: null,
+            automationFilePath: null,
+          },
+        ],
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/suites')
+      .expect(200);
+
+    const body = response.body as {
+      healthSummary: Record<string, number>;
+      cases: { healthSignals: string[] }[];
+    }[];
+    expect(body[0].cases[0].healthSignals).toEqual(
+      expect.arrayContaining(['no-steps', 'raw-name', 'never-run']),
+    );
+    expect(body[0].healthSummary).toEqual({
+      'no-steps': 1,
+      'raw-name': 1,
+      'never-run': 1,
+    });
   });
 
   it('filters by project when the query names one', async () => {

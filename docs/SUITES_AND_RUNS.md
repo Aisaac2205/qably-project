@@ -163,6 +163,41 @@ Neither surface renders a heading over an empty box for these: the run case expl
 from the report, and the suite card offers to document it. That case is also the intended input of the AI
 review copilot, which is why the empty state is a call to action rather than an error.
 
+## Case health signals
+
+`deriveCaseHealth` (`apps/api/src/common/quality/case-health.ts`) is a pure, Prisma-free function that
+flags six deterministic signals — `no-steps`, `raw-name`, `never-run`, `flaky`, `duplicate-key`,
+`near-duplicate-title` — from data the suite read model already loads. No model call is involved; this is
+the "guía integrada" the thesis asks for (CONTEXT §1.6.1 alcance 2), implemented as code that runs against
+data Qably already has.
+
+`raw-name` reuses `isIdentifier`/`isDottedIdentifier` from `@qably/test-naming` — the same shape detectors
+`humanizeTestName` already uses to decide whether a name looks machine-generated — rather than re-deriving
+the heuristic. A name only counts as raw when it has no spaces **and** either mixes case or contains an
+underscore; a single lowercase English word (`"checkout"`) is not flagged, since `isIdentifier` alone would
+match it too loosely.
+
+`flaky` needs the last six results per case, not the one `SuitesService.withLastResults` already fetches
+(`distinct: ['testCaseId']`). A fourth query, added to the same `Promise.all` as the existing two, uses a
+`ROW_NUMBER() OVER (PARTITION BY "testCaseId" ORDER BY "startedAt" DESC, "id" DESC)` window function capped
+at `rn <= 6`, matching the raw-SQL-over-typed-API precedent `DASHBOARD_METRICS.md` documents for the same
+class of per-group problem. Flakiness is a strict alternation count (at least two pass/fail transitions in
+that window), not a raw fail rate — a case that failed once and recovered is not flaky.
+
+`duplicate-key` is scoped to the **project**, not the suite (`@@unique([suiteId, automationKey])` allows the
+same key to legitimately repeat across suites after a re-parent). `SuitesService.findOne` only loads one
+suite's cases, so a fifth query fetches every other case in the project that carries a non-null
+`automationKey`, feeding `deriveCaseHealth` a wider batch than what is actually rendered — the extra rows
+inform the duplicate check but their own computed signals are discarded. `CaseHealthInput` therefore carries
+`suiteId` and `projectId`, one field more than the interface first sketched for this slice: `suiteId` scopes
+`near-duplicate-title` to the owning suite, `projectId` scopes `duplicate-key` to the owning project, and
+neither signal is decidable without them once the batch can span more than one suite.
+
+`SuiteView.cases[n].healthSignals` and `SuiteView.healthSummary` are both populated inside
+`withLastResults`, next to `lastResult`/`pendingProposalId` — one more read-model projection over the same
+batch, not a second round-trip. `healthSummary` omits zero-count signals rather than padding them, the same
+convention `DASHBOARD_METRICS.md` uses for days with no activity.
+
 ## What is deliberately missing
 
 The traceability trail is not rendered in either surface. `ReviewService` writes real `traceability_link`
