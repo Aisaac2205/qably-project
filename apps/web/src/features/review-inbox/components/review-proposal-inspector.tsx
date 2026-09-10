@@ -155,7 +155,7 @@ export function ReviewProposalInspector({
 
         {/* Duplicate Comparison if present */}
         {proposal.targetOfficialTestCaseId && (
-          <DuplicateComparison targetOfficialTestCaseId={proposal.targetOfficialTestCaseId} />
+          <DuplicateComparison proposalId={proposal.id} />
         )}
 
         {/* Why this proposal cannot be published as it stands */}

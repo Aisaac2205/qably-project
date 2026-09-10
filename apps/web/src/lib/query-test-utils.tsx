@@ -16,6 +16,8 @@ import {
 import { projectKeys } from '@/features/projects/lib/query-keys'
 import { organizationKeys } from '@/features/organizations/lib/query-keys'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
+import { duplicateKeys } from '@/features/ai-review/lib/query-keys'
+import { getSnapshot } from '@/lib/mock-store'
 import {
   PROPOSAL_STATUSES,
   proposalDetailFixtures,
@@ -164,6 +166,36 @@ function seedProposals(client: QueryClient): void {
   }
 }
 
+function seedDuplicates(client: QueryClient): void {
+  const snapshot = getSnapshot()
+
+  for (const proposal of snapshot.proposals) {
+    if (proposal.targetOfficialTestCaseId === undefined) continue
+
+    const officialCase = snapshot.officialTestCases.find(
+      (candidate) => candidate.id === proposal.targetOfficialTestCaseId,
+    )
+    const version = snapshot.testCaseVersions.find(
+      (candidate) => candidate.id === officialCase?.currentVersionId,
+    )
+
+    client.setQueryData(
+      duplicateKeys.detail(proposal.id),
+      officialCase === undefined || version === undefined
+        ? []
+        : [
+            {
+              id: officialCase.id,
+              title: version.title,
+              steps: version.steps,
+              expectedResult: version.expectedResult,
+              matchReason: 'title' as const,
+            },
+          ],
+    )
+  }
+}
+
 export function createTestQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
@@ -180,6 +212,7 @@ export function createTestQueryClient(): QueryClient {
   seedDashboardSummary(client)
   seedTraceability(client)
   seedProposals(client)
+  seedDuplicates(client)
 
   return client
 }

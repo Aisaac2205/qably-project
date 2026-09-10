@@ -109,7 +109,7 @@ export function ReviewCaseDetail({ proposal }: { proposal: ProposalListItem }) {
         </div>
 
         {proposal.targetOfficialTestCaseId && (
-          <DuplicateComparison targetOfficialTestCaseId={proposal.targetOfficialTestCaseId} />
+          <DuplicateComparison proposalId={proposal.id} />
         )}
 
         {/* Section 1: Objetivo */}

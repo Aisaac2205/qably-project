@@ -1,17 +1,22 @@
 'use client'
 
-import { useOfficialTestCase, useTestCaseVersion } from '@/lib/use-mock-store'
 import { CopySimple } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import { Skeleton } from '@/components/ui/skeleton'
+import { useDuplicateCandidates } from '../hooks/use-duplicate-candidates'
+import type { DuplicateMatchReason } from '@qably/types'
 
-export function DuplicateComparison({
-  targetOfficialTestCaseId,
-}: {
-  targetOfficialTestCaseId: string
-}) {
+const REASON_KEY: Record<DuplicateMatchReason, string> = {
+  'automation-key': 'aiReview.duplicateReasonAutomationKey',
+  title: 'aiReview.duplicateReasonSameTitle',
+  'token-overlap': 'aiReview.duplicateReasonSimilarTitle',
+}
+
+export function DuplicateComparison({ proposalId }: { proposalId: string }) {
   const { t } = useTranslation()
-  const officialTestCase = useOfficialTestCase(targetOfficialTestCaseId)
-  const version = useTestCaseVersion(officialTestCase?.currentVersionId)
+  const { candidates, isLoading, isError } = useDuplicateCandidates(proposalId)
+  const showNotFound = !isLoading && (isError || candidates.length === 0)
+  const showCandidates = !isLoading && !isError && candidates.length > 0
 
   return (
     <div className="rounded border border-warn/30 bg-warn-bg p-3.5 space-y-2">
@@ -19,17 +24,33 @@ export function DuplicateComparison({
         <CopySimple size={16} weight="bold" aria-hidden="true" />
         {t('aiReview.possibleDuplicate')}
       </div>
-      {version ? (
-        <div>
-          <p className="text-sm font-medium text-default">{version.title}</p>
-          <p className="text-sm text-muted mt-1 leading-relaxed">
-            {t('aiReview.duplicateDescription')}
-          </p>
+
+      {isLoading && (
+        <div className="space-y-1.5" role="status" aria-label={t('aiReview.possibleDuplicate')}>
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-3 w-1/3" />
+          <Skeleton className="h-3 w-full" />
         </div>
-      ) : (
+      )}
+
+      {showNotFound && (
         <p className="text-sm text-muted leading-relaxed">
           {t('aiReview.duplicateNotFound')}
         </p>
+      )}
+
+      {showCandidates && (
+        <ul className="space-y-2.5">
+          {candidates.map((candidate) => (
+            <li key={candidate.id} className="space-y-0.5">
+              <p className="text-sm font-medium text-default truncate">
+                {candidate.title}
+              </p>
+              <p className="text-xs text-muted">{t(REASON_KEY[candidate.matchReason])}</p>
+              <p className="text-xs text-muted truncate">{candidate.expectedResult}</p>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
