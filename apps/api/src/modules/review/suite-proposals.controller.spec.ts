@@ -1,7 +1,4 @@
-import {
-  ConflictException,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { SuiteProposalsController } from './suite-proposals.controller';
 

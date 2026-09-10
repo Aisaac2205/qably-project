@@ -12,7 +12,7 @@ import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
-import { isStaleLocale, localeNameKey } from '@/features/projects/suites/lib/documentable-cases'
+import { localeNameKey } from '@/features/projects/suites/lib/documentable-cases'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -22,12 +22,12 @@ interface CaseCardProps {
 }
 
 export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
   const described = useMemo(() => describeCase(testCase), [testCase])
   const showRawName = described.raw !== described.title
-  const staleLocale = isStaleLocale(testCase, locale)
+  const staleLocale = testCase.localeStale === true
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">

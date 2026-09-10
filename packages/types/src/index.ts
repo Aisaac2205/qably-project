@@ -182,6 +182,7 @@ export interface TestCase {
   pendingProposalId?: string | null
   healthSignals?: CaseHealthSignal[]
   documentedLocale?: string | null
+  localeStale?: boolean
 }
 
 export interface Suite {
@@ -192,6 +193,7 @@ export interface Suite {
   cases: TestCase[]
   manualCases: number
   automatedCases: number
+  staleLocaleCount: number
   createdAt: string
   description: string
   tags: string[]

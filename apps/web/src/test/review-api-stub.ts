@@ -60,9 +60,21 @@ export function listSuiteProposals(): Promise<SuiteProposal[]> {
 }
 
 export function approveSuiteProposal(id: string): Promise<SuiteProposalDecision> {
-  return Promise.resolve({ proposalId: id, applied: true, suiteId: 'suite-1', suiteName: 'Checkout' })
+  return Promise.resolve({
+    proposalId: id,
+    projectId: 'proj-1',
+    applied: true,
+    suiteId: 'suite-1',
+    suiteName: 'Checkout',
+  })
 }
 
 export function rejectSuiteProposal(id: string): Promise<SuiteProposalDecision> {
-  return Promise.resolve({ proposalId: id, applied: false, suiteId: 'suite-1', suiteName: 'Checkout' })
+  return Promise.resolve({
+    proposalId: id,
+    projectId: 'proj-1',
+    applied: false,
+    suiteId: 'suite-1',
+    suiteName: 'Checkout',
+  })
 }

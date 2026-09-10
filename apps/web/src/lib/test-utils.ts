@@ -13,6 +13,9 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     overrides.manualCases ?? cases.filter((c) => c.executionMode !== 'automated').length
   const automatedCases =
     overrides.automatedCases ?? cases.filter((c) => c.executionMode === 'automated').length
+  const staleLocaleCount =
+    overrides.staleLocaleCount ??
+    cases.filter((c) => c.executionMode === 'automated' && c.localeStale === true).length
   return {
     id: overrides.id ?? 'suite-1',
     projectId: overrides.projectId ?? 'proj-1',
@@ -21,6 +24,7 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     cases,
     manualCases,
     automatedCases,
+    staleLocaleCount,
     createdAt: overrides.createdAt ?? '2026-01-25T00:00:00Z',
     description: overrides.description ?? 'Login and password flows.',
     tags: overrides.tags ?? ['smoke', 'auth'],
@@ -53,5 +57,7 @@ export function createMockTestCase(overrides: Partial<TestCase> = {}): TestCase 
     automationFilePath: overrides.automationFilePath,
     lastResult: overrides.lastResult,
     healthSignals: overrides.healthSignals,
+    documentedLocale: overrides.documentedLocale,
+    localeStale: overrides.localeStale,
   }
 }

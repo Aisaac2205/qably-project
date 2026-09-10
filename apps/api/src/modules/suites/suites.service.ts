@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { Locale } from '@qably/i18n';
 import { Prisma } from '../../../generated/prisma/client';
 import type {
   CaseHealthSummary,
@@ -11,6 +12,8 @@ import {
   type CaseHealthInput,
   type CaseHealthResult,
 } from '../../common/quality/case-health';
+import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
+import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -120,12 +123,17 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-function toCaseView(testCase: CaseRow): TestCaseView {
+function toCaseView(testCase: CaseRow, orgDefaultLocale: Locale): TestCaseView {
+  const documentedLocale = testCase.currentVersion?.locale ?? null;
   const base = {
     id: testCase.id,
     suiteId: testCase.suiteId,
     version: testCase.currentVersion?.version ?? null,
-    documentedLocale: testCase.currentVersion?.locale ?? null,
+    documentedLocale,
+    localeStale: isLocaleStale(
+      { steps: testCase.steps, documentedLocale },
+      orgDefaultLocale,
+    ),
     name: testCase.name,
     steps: testCase.steps,
     expectedResult: testCase.expectedResult,
@@ -151,10 +159,16 @@ function toCaseView(testCase: CaseRow): TestCaseView {
   };
 }
 
-function toView(row: SuiteRow): SuiteView {
-  const cases = row.cases.map(toCaseView);
+function toView(row: SuiteRow, orgDefaultLocale: Locale): SuiteView {
+  const cases = row.cases.map((testCase) =>
+    toCaseView(testCase, orgDefaultLocale),
+  );
   const automatedCases = cases.filter(
     (testCase) => testCase.executionMode === 'automated',
+  ).length;
+  const staleLocaleCount = cases.filter(
+    (testCase) =>
+      testCase.executionMode === 'automated' && testCase.localeStale,
   ).length;
 
   return {
@@ -169,6 +183,7 @@ function toView(row: SuiteRow): SuiteView {
     updatedAt: row.updatedAt.toISOString(),
     manualCases: cases.length - automatedCases,
     automatedCases,
+    staleLocaleCount,
     cases,
   };
 }
@@ -182,16 +197,21 @@ export class SuitesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(org: OrgContext, projectId?: string): Promise<SuiteView[]> {
-    const rows = await this.prisma.suite.findMany({
-      where: {
-        organizationId: org.organizationId,
-        ...(projectId === undefined ? {} : { projectId }),
-      },
-      orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
-      select: SUITE_SELECT,
-    });
+    const [rows, orgDefaultLocale] = await Promise.all([
+      this.prisma.suite.findMany({
+        where: {
+          organizationId: org.organizationId,
+          ...(projectId === undefined ? {} : { projectId }),
+        },
+        orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        select: SUITE_SELECT,
+      }),
+      resolveOrgDefaultLocale(this.prisma, org.organizationId),
+    ]);
 
-    return this.withLastResults(rows.map(toView));
+    return this.withLastResults(
+      rows.map((row) => toView(row, orgDefaultLocale)),
+    );
   }
 
   async findOne(
@@ -202,7 +222,12 @@ export class SuitesService {
 
     if (row === null) return err('not-found');
 
-    return ok(await this.withLastResult(toView(row)));
+    const orgDefaultLocale = await resolveOrgDefaultLocale(
+      this.prisma,
+      org.organizationId,
+    );
+
+    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
   }
 
   async create(
@@ -228,7 +253,12 @@ export class SuitesService {
         });
       });
 
-      return ok(await this.withLastResult(toView(row)));
+      const orgDefaultLocale = await resolveOrgDefaultLocale(
+        this.prisma,
+        org.organizationId,
+      );
+
+      return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -262,7 +292,12 @@ export class SuitesService {
         });
       });
 
-      return ok(await this.withLastResult(toView(row)));
+      const orgDefaultLocale = await resolveOrgDefaultLocale(
+        this.prisma,
+        org.organizationId,
+      );
+
+      return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -306,7 +341,12 @@ export class SuitesService {
       });
     });
 
-    return ok(await this.withLastResult(toView(row)));
+    const orgDefaultLocale = await resolveOrgDefaultLocale(
+      this.prisma,
+      org.organizationId,
+    );
+
+    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
   }
 
   async updateCase(
@@ -331,7 +371,12 @@ export class SuitesService {
       });
     });
 
-    return ok(await this.withLastResult(toView(row)));
+    const orgDefaultLocale = await resolveOrgDefaultLocale(
+      this.prisma,
+      org.organizationId,
+    );
+
+    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
   }
 
   async removeCase(
@@ -355,7 +400,12 @@ export class SuitesService {
       });
     });
 
-    return ok(await this.withLastResult(toView(row)));
+    const orgDefaultLocale = await resolveOrgDefaultLocale(
+      this.prisma,
+      org.organizationId,
+    );
+
+    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
   }
 
   private async withLastResult(view: SuiteView): Promise<SuiteView> {

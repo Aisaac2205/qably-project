@@ -22,7 +22,7 @@ import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/h
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useDocumentProject } from '@/features/projects/suites/hooks/use-suite-mutations'
-import { countDocumentableCases, countStaleLocaleCases } from '@/features/projects/suites/lib/documentable-cases'
+import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
 import { DocumentWithAeris } from './document-with-aeris'
 
 interface SuiteListProps {
@@ -73,7 +73,7 @@ function applyFilters(
 }
 
 export function SuiteList({ projectId }: SuiteListProps) {
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
   const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
   const documentProject = useDocumentProject()
   const documentableCases = useMemo(
@@ -86,11 +86,8 @@ export function SuiteList({ projectId }: SuiteListProps) {
   )
   const staleCases = useMemo(
     () =>
-      perSuite.reduce(
-        (total, entry) => total + countStaleLocaleCases(entry.suite.cases, locale),
-        0,
-      ),
-    [perSuite, locale],
+      perSuite.reduce((total, entry) => total + entry.suite.staleLocaleCount, 0),
+    [perSuite],
   )
 
   const [search, setSearch] = useState('')

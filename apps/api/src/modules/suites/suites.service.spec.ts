@@ -55,6 +55,7 @@ interface FakePrisma {
   runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
   extractedProposal: { findMany: jest.Mock };
+  orgMember: { findFirst: jest.Mock };
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -79,6 +80,9 @@ function createPrisma(): FakePrisma {
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
     extractedProposal: { findMany: jest.fn().mockResolvedValue([]) },
+    orgMember: {
+      findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
+    },
     $transaction: jest.fn(),
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
@@ -770,5 +774,86 @@ describe('SuitesService documented locale', () => {
     const [suite] = await build(prisma).list(owner);
 
     expect(suite.cases[0].documentedLocale).toBeNull();
+  });
+});
+
+describe('SuitesService stale-locale read model', () => {
+  function automatedCase(id: string, overrides: Record<string, unknown> = {}) {
+    return {
+      id,
+      suiteId: 'suite-1',
+      name: `Case ${id}`,
+      steps: ['open'],
+      expectedResult: 'done',
+      priority: 'medium' as const,
+      state: 'active' as const,
+      currentVersion: { version: 1, locale: 'en' },
+      executionMode: 'automated' as const,
+      automationKey: `key-${id}`,
+      automationClassName: null,
+      automationFilePath: null,
+      ...overrides,
+    };
+  }
+
+  it('marks each automated case as locale-stale using only the org default locale, never a viewer locale', async () => {
+    const prisma = createPrisma();
+    prisma.orgMember.findFirst.mockResolvedValue({ user: { locale: 'en' } });
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          automatedCase('fresh', {
+            currentVersion: { version: 1, locale: 'en' },
+          }),
+          automatedCase('stale-other-locale', {
+            currentVersion: { version: 1, locale: 'es' },
+          }),
+          automatedCase('stale-null-locale', { currentVersion: null }),
+          {
+            ...suiteRow.cases[0],
+            id: 'manual-mismatch',
+            currentVersion: { version: 1, locale: 'es' },
+          },
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+    const byId = new Map(suite.cases.map((c) => [c.id, c]));
+
+    expect(byId.get('fresh')?.localeStale).toBe(false);
+    expect(byId.get('stale-other-locale')?.localeStale).toBe(true);
+    expect(byId.get('stale-null-locale')?.localeStale).toBe(true);
+  });
+
+  it('counts staleLocaleCount over automated cases only, matching the extraction candidate predicate exactly', async () => {
+    const prisma = createPrisma();
+    prisma.orgMember.findFirst.mockResolvedValue({ user: { locale: 'en' } });
+    const cases = [
+      automatedCase('fresh', { currentVersion: { version: 1, locale: 'en' } }),
+      automatedCase('stale-1', {
+        currentVersion: { version: 1, locale: 'es' },
+      }),
+      automatedCase('stale-2', { currentVersion: null }),
+      {
+        ...suiteRow.cases[0],
+        id: 'manual-stale-looking',
+        currentVersion: { version: 1, locale: 'es' },
+      },
+    ];
+    prisma.suite.findMany.mockResolvedValue([{ ...suiteRow, cases }]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    const expectedCount = cases.filter(
+      (row) =>
+        row.executionMode === 'automated' &&
+        row.steps.length > 0 &&
+        (row.currentVersion === null || row.currentVersion.locale !== 'en'),
+    ).length;
+
+    expect(suite.staleLocaleCount).toBe(expectedCount);
+    expect(suite.staleLocaleCount).toBe(2);
   });
 });

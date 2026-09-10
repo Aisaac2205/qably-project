@@ -221,11 +221,11 @@ describe('CaseCard', () => {
   })
 
   describe('documented locale', () => {
-    it('flags a case documented in another language than the one being viewed', async () => {
+    it('flags a case the server marked as locale-stale', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
-            testCase={{ ...mockCase, documentedLocale: 'es' }}
+            testCase={{ ...mockCase, documentedLocale: 'es', localeStale: true }}
             projectId="proj-1"
             onEdit={noop}
             onDelete={noop}
@@ -236,11 +236,11 @@ describe('CaseCard', () => {
       expect(screen.getByText(/documented in spanish/i)).toBeInTheDocument()
     })
 
-    it('stays quiet when the documentation matches the viewer language or was never recorded', async () => {
+    it('stays quiet when the server did not mark the case as locale-stale', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
-            testCase={{ ...mockCase, documentedLocale: null }}
+            testCase={{ ...mockCase, documentedLocale: 'es', localeStale: false }}
             projectId="proj-1"
             onEdit={noop}
             onDelete={noop}

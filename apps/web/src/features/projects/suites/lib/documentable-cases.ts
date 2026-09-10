@@ -14,27 +14,6 @@ export function countDocumentableCases(cases: readonly TestCase[]): number {
   ).length
 }
 
-export function isStaleLocale(testCase: TestCase, viewerLocale: string): boolean {
-  return (
-    testCase.steps.length > 0 &&
-    testCase.documentedLocale !== undefined &&
-    testCase.documentedLocale !== null &&
-    testCase.documentedLocale !== viewerLocale
-  )
-}
-
-export function countStaleLocaleCases(
-  cases: readonly TestCase[],
-  viewerLocale: string,
-): number {
-  return cases.filter(
-    (testCase) =>
-      testCase.executionMode === 'automated' &&
-      !testCase.pendingProposalId &&
-      isStaleLocale(testCase, viewerLocale),
-  ).length
-}
-
 export function localeNameKey(locale: string): string {
   return LOCALE_NAME_KEYS[locale] ?? 'suites.localeNameOther'
 }

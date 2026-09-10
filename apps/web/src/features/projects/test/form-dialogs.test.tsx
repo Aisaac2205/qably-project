@@ -64,6 +64,7 @@ const suite: Suite = {
   cases: [testCase],
   manualCases: 1,
   automatedCases: 0,
+  staleLocaleCount: 0,
   isDefault: true,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

@@ -37,6 +37,7 @@ export function createSuite(payload: {
     cases: [],
     manualCases: 0,
     automatedCases: 0,
+    staleLocaleCount: 0,
     description: payload.description ?? '',
     tags: payload.tags ?? [],
     isDefault: false,

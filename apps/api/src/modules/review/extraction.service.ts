@@ -4,6 +4,7 @@ import type { Queue } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
 import { MAX_EXTRACTED_CASES } from '../ai/extraction.contracts';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
+import { staleLocaleWhere } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -165,22 +166,12 @@ export class ExtractionService {
         ? { suiteId: scope.suiteId }
         : { projectId: scope.projectId };
 
-    const orgLocale =
-      mode === 'stale-locale'
-        ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
-        : null;
-
     const candidateWhere =
       mode === 'undocumented'
         ? { steps: { equals: [] } }
-        : {
-            NOT: { steps: { equals: [] } },
-            OR: [
-              { currentVersion: null },
-              { currentVersion: { locale: null } },
-              { currentVersion: { locale: { not: orgLocale as string } } },
-            ],
-          };
+        : staleLocaleWhere(
+            await resolveOrgDefaultLocale(this.prisma, org.organizationId),
+          );
 
     const candidates = (await this.prisma.testCase.findMany({
       where: {
