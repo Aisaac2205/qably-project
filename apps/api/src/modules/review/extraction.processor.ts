@@ -602,6 +602,7 @@ export class ExtractionProcessor extends WorkerHost {
         status: 'in_review',
         evidenceId: evidence.id,
         promptVersion: EXTRACTION_PROMPT_VERSION,
+        locale: ctx.locale ?? null,
       },
     });
   }

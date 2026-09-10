@@ -167,6 +167,7 @@ const SUITE_PROPOSAL_SELECT = {
   description: true,
   status: true,
   evidenceId: true,
+  locale: true,
   createdAt: true,
   decidedAt: true,
   suite: { select: { name: true, nameSource: true } },
@@ -180,6 +181,7 @@ interface SuiteProposalRow {
   description: string;
   status: ProposalView['status'];
   evidenceId: string;
+  locale: string | null;
   createdAt: Date;
   decidedAt: Date | null;
   suite: { name: string; nameSource: string };
@@ -197,7 +199,7 @@ function toSuiteProposalView(row: SuiteProposalRow): SuiteProposalView {
     description: row.description,
     status: row.status,
     evidenceId: row.evidenceId,
-    locale: null,
+    locale: row.locale,
     createdAt: row.createdAt.toISOString(),
     decidedAt: row.decidedAt === null ? null : row.decidedAt.toISOString(),
   };

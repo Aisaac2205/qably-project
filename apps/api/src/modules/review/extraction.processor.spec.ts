@@ -1431,4 +1431,21 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
       locale: 'en',
     });
   });
+
+  it('stamps the job locale onto the suite proposal, exactly like case proposals', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob('es'),
+    );
+
+    expect(lastCall(prisma.suiteProposal.create).data).toMatchObject({
+      locale: 'es',
+    });
+  });
 });

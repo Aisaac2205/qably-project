@@ -508,6 +508,7 @@ model SuiteProposal {
   evidenceId    String
   evidence      Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
   promptVersion String?
+  locale        String?
   createdAt     DateTime       @default(now())
   decidedAt     DateTime?
 

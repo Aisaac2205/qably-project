@@ -628,8 +628,33 @@ describe('ReviewService suite proposals', () => {
     evidenceId: 'evidence-9',
     createdAt: new Date('2026-09-09T10:00:00.000Z'),
     decidedAt: null as Date | null,
+    locale: 'es' as string | null,
     suite: { name: 'cart.spec.ts', nameSource: 'ingestion' },
   };
+
+  it('carries the locale the extraction job stamped on the proposal', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findMany.mockResolvedValue([suiteProposalRow]);
+
+    const [item] = await build(prisma).listSuiteProposals(org, {
+      projectId: 'project-1',
+    });
+
+    expect(item.locale).toBe('es');
+  });
+
+  it('reports a null locale for proposals stamped before locale tracking existed', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findMany.mockResolvedValue([
+      { ...suiteProposalRow, locale: null },
+    ]);
+
+    const [item] = await build(prisma).listSuiteProposals(org, {
+      projectId: 'project-1',
+    });
+
+    expect(item.locale).toBeNull();
+  });
 
   it('lists suite proposals of the organization with the current suite name and its source', async () => {
     const prisma = createPrisma();
