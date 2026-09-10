@@ -501,6 +501,7 @@ export interface ExtractedProposal {
   targetOfficialTestCaseId?: string
   locale?: string | null
   observations?: string[]
+  createdAt?: string
 }
 export type SuiteNameSource = 'ingestion' | 'human' | 'aeris'
 export interface SuiteProposal {

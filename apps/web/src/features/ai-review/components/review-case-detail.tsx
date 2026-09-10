@@ -24,6 +24,7 @@ import { ProvenanceSummary } from '@/components/ui/provenance-summary'
 import { EvidenceList } from '@/components/ui/evidence-list'
 import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useTranslation } from '@/lib/i18n'
+import { AerisObservations } from '@/components/ui/aeris-observations'
 
 function getPriorityBadgeVariant(priority: ProposalListItem['priority']): 'warn' | 'default' {
   if (priority === 'critical' || priority === 'high') {
@@ -176,6 +177,8 @@ export function ReviewCaseDetail({ proposal }: { proposal: ProposalListItem }) {
             {proposal.expectedResult}
           </div>
         </div>
+
+        <AerisObservations observations={proposal.observations} />
 
         {/* Section 5: Fragmento de origen */}
         {evidence?.excerpt && (

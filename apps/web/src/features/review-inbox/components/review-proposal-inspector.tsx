@@ -27,6 +27,7 @@ import { useProject } from '@/features/projects/hooks/use-project'
 import { useProposal } from '../hooks/use-proposals'
 import { manualReviewReasonKey } from '../lib/manual-review-reason'
 import { useTranslation } from '@/lib/i18n'
+import { AerisObservations } from '@/components/ui/aeris-observations'
 import { projectRootPath } from '@/features/projects/lib/routes'
 
 interface ReviewProposalInspectorProps {
@@ -245,6 +246,8 @@ export function ReviewProposalInspector({
             </div>
           </div>
         )}
+
+        <AerisObservations observations={proposal.observations} />
 
         {/* Source Code Snippet */}
         {evidence?.excerpt && (

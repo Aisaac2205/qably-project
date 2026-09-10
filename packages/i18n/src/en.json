@@ -127,6 +127,7 @@
     "suiteProposalRecorded": "Decision recorded. The suite keeps the name a person chose.",
     "suiteProposalRejected": "Suite proposal rejected.",
     "suiteProposalError": "Could not record the decision on the suite. Try again.",
+    "aerisObservations": "Aeris observations",
     "manualReviewReasonQuotaExhausted": "The daily Aeris documentation limit was reached. Try again tomorrow or document this case by hand.",
     "manualReviewReasonUnknown": "The extraction reported: {{reason}}",
     "approveBlocked": "A proposal with no steps cannot be published",

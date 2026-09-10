@@ -47,6 +47,7 @@ const VIEW_SELECT = {
   targetTestCaseId: true,
   locale: true,
   observations: true,
+  createdAt: true,
   evidence: { select: { title: true } },
 } as const;
 
@@ -65,6 +66,7 @@ interface ViewRow {
   targetTestCaseId: string | null;
   locale?: string | null;
   observations?: unknown;
+  createdAt?: Date;
   evidence: { title: string } | null;
 }
 
@@ -108,6 +110,9 @@ function toView(row: ViewRow): ProposalView {
     needsManualReview: row.needsManualReview,
     evidenceTitle: row.evidence === null ? '' : row.evidence.title,
     locale: row.locale ?? null,
+    ...(row.createdAt === undefined
+      ? {}
+      : { createdAt: row.createdAt.toISOString() }),
     ...(observationsOf(row.observations) === undefined
       ? {}
       : { observations: observationsOf(row.observations) }),
