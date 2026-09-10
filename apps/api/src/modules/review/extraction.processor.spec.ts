@@ -1448,4 +1448,57 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
       locale: 'es',
     });
   });
+
+  it('locks the suite row before checking for a pending suite proposal, so two files of the same suite cannot both insert one', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    const lockCall = (
+      prisma.$executeRawUnsafe.mock.calls as [string, ...string[]][]
+    ).find(([sql]) => sql.includes('FOR UPDATE') && sql.includes('"suite"'));
+    expect(lockCall).toBeDefined();
+    expect(lockCall?.[1]).toBe('suite-1');
+    const lockOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder.find(
+      (order, index) =>
+        (prisma.$executeRawUnsafe.mock.calls[index] as [string])[0].includes(
+          '"suite"',
+        ),
+    );
+    expect(lockOrder).toBeLessThan(
+      prisma.suiteProposal.findFirst.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('treats a lost race on the one-pending-per-suite index as already pending, not a failure', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+    prisma.suiteProposal.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+        documentFileJob(),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
+    expect(
+      (
+        prisma.extractedProposal.create.mock.calls as [
+          { data: Record<string, unknown> },
+        ][]
+      ).map(([call]) => call.data.needsManualReview),
+    ).toEqual([undefined, undefined]);
+  });
 });

@@ -108,6 +108,7 @@ interface TxClient {
 }
 
 const PROPOSAL_SAVEPOINT = 'extraction_proposal';
+const SUITE_PROPOSAL_SAVEPOINT = 'suite_proposal';
 
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
@@ -116,6 +117,13 @@ async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   await tx.$executeRawUnsafe(
     `SELECT id FROM "test_case" WHERE id IN (${placeholders}) ORDER BY id FOR UPDATE`,
     ...ids,
+  );
+}
+
+async function lockSuite(tx: TxClient, suiteId: string): Promise<void> {
+  await tx.$executeRawUnsafe(
+    `SELECT id FROM "suite" WHERE id = $1 FOR UPDATE`,
+    suiteId,
   );
 }
 
@@ -571,40 +579,63 @@ export class ExtractionProcessor extends WorkerHost {
     const [suiteId] = suiteIds;
     const connection = ctx.connection as ConnectionInfo;
 
+    await lockSuite(tx, suiteId);
+
     const pending = await tx.suiteProposal.findFirst({
       where: { suiteId, status: 'in_review' },
       select: { id: true },
     });
     if (pending !== null) return;
 
-    const evidence = await tx.evidence.create({
-      data: {
-        projectId: ctx.projectId,
-        kind: 'SOURCE_EXCERPT',
-        title: ctx.filePath,
-        uri: buildBlobUrl(
-          connection.provider,
-          connection.repo,
-          ctx.ref,
-          ctx.filePath,
-        ),
-        excerpt: null,
-      },
-      select: { id: true },
-    });
+    await tx.$executeRawUnsafe(`SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`);
 
-    await tx.suiteProposal.create({
-      data: {
-        projectId: ctx.projectId,
-        suiteId,
-        title: suite.title,
-        description: suite.description,
-        status: 'in_review',
-        evidenceId: evidence.id,
-        promptVersion: EXTRACTION_PROMPT_VERSION,
-        locale: ctx.locale ?? null,
-      },
-    });
+    try {
+      const evidence = await tx.evidence.create({
+        data: {
+          projectId: ctx.projectId,
+          kind: 'SOURCE_EXCERPT',
+          title: ctx.filePath,
+          uri: buildBlobUrl(
+            connection.provider,
+            connection.repo,
+            ctx.ref,
+            ctx.filePath,
+          ),
+          excerpt: null,
+        },
+        select: { id: true },
+      });
+
+      await tx.suiteProposal.create({
+        data: {
+          projectId: ctx.projectId,
+          suiteId,
+          title: suite.title,
+          description: suite.description,
+          status: 'in_review',
+          evidenceId: evidence.id,
+          promptVersion: EXTRACTION_PROMPT_VERSION,
+          locale: ctx.locale ?? null,
+        },
+      });
+
+      await tx.$executeRawUnsafe(
+        `RELEASE SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
+      );
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      await tx.$executeRawUnsafe(
+        `ROLLBACK TO SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
+      );
+      await tx.$executeRawUnsafe(
+        `RELEASE SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
+      );
+
+      this.logger.log(
+        `Lost the race to propose a name for suite ${suiteId}; another job already has one pending`,
+      );
+    }
   }
 
   private async fallbackForTargets(
