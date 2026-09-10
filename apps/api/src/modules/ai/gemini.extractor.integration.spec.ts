@@ -38,7 +38,7 @@ function buildExtractor() {
 
 const SPANISH_LETTERS = /[áéíóúñ¿¡]/i;
 const SPANISH_WORDS =
-  /(el|la|los|las|un|una|de|del|que|con|para|se|no|es|verificar|validar|comprobar|debe|token|caracteres|vacío)/i;
+  /\b(el|la|los|las|un|una|de|del|que|con|para|se|no|es|verificar|validar|comprobar|debe|token|caracteres|vacío)\b/i;
 
 const hasKey =
   typeof process.env.GEMINI_API_KEY === 'string' &&
