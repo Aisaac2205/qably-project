@@ -44,7 +44,7 @@ function isFlaky(recentResults: readonly CaseHealthResult[]): boolean {
   return alternations >= FLAKY_ALTERNATION_THRESHOLD;
 }
 
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   return title
     .toLocaleLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, '')
