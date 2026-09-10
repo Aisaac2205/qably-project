@@ -29,6 +29,7 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
 
   return {
     ...actual,
+    listSuiteProposals: vi.fn().mockResolvedValue([]),
     approveProposal: vi.fn().mockResolvedValue({
       createdNewCase: true,
       testCaseId: 'case-1',

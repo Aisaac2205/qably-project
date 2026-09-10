@@ -9,6 +9,8 @@ import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '../hooks/use-proposals'
 import { useProposalDecision } from '../hooks/use-proposal-decision'
 import { useBulkProposalDecision } from '../hooks/use-bulk-proposal-decision'
+import { useSuiteProposalDecision, useSuiteProposals } from '../hooks/use-suite-proposals'
+import { SuiteProposalsPanel } from './suite-proposals-panel'
 import { bulkDecisionReasonKey, summarizeBulkResults } from '../lib/bulk-decision-reason'
 import type { BulkDecisionItemResult } from '../api/review.api'
 import { useTranslation } from '@/lib/i18n'
@@ -19,6 +21,7 @@ import { ReviewProposalInspector } from './review-proposal-inspector'
 export function ReviewInboxPage() {
   const { t } = useTranslation()
   const { proposals } = useProposals()
+  const { suiteProposals } = useSuiteProposals()
   const searchParams = useSearchParams()
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
@@ -35,6 +38,21 @@ export function ReviewInboxPage() {
     href?: string
     linkLabel?: string
   } | null>(null)
+
+  const suiteDecision = useSuiteProposalDecision((decision, action) => {
+    if (action === 'reject') {
+      setFeedbackToast({ message: t('reviewInbox.suiteProposalRejected'), type: 'info' })
+      return
+    }
+    setFeedbackToast({
+      message: decision.applied
+        ? t('reviewInbox.suiteProposalApplied', { name: decision.suiteName })
+        : t('reviewInbox.suiteProposalRecorded'),
+      type: decision.applied ? 'success' : 'info',
+      href: `/projects/${suiteProposals.find((p) => p.id === decision.proposalId)?.projectId ?? ''}/suites/${decision.suiteId}`,
+      linkLabel: t('reviewInbox.viewCase'),
+    })
+  })
 
   const filteredProposals = useMemo(() => {
     return proposals.filter((p) => {
@@ -194,6 +212,12 @@ export function ReviewInboxPage() {
       className="flex h-full min-h-0 w-full flex-col gap-4 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
       <div className="shrink-0 space-y-4 empty:hidden">
+        <SuiteProposalsPanel
+          proposals={suiteProposals}
+          isDeciding={suiteDecision.isDeciding}
+          onApprove={suiteDecision.approve}
+          onReject={suiteDecision.reject}
+        />
         {feedbackToast && (
           <div
             role="status"

@@ -2,6 +2,8 @@ import type {
   Evidence,
   ExtractedProposal,
   ProposalStatus,
+  SuiteProposal,
+  SuiteProposalDecision,
   TraceabilityLink,
 } from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
@@ -63,6 +65,28 @@ function buildQuery(filters: ProposalFilters): string {
   const query = params.toString()
 
   return query === '' ? '' : `?${query}`
+}
+
+export function listSuiteProposals(
+  filters: Pick<ProposalFilters, 'projectId' | 'status'>,
+  signal?: AbortSignal,
+): Promise<SuiteProposal[]> {
+  return apiRequest<SuiteProposal[]>(
+    `/review/suite-proposals${buildQuery(filters)}`,
+    { signal },
+  )
+}
+
+export function approveSuiteProposal(id: string): Promise<SuiteProposalDecision> {
+  return apiRequest<SuiteProposalDecision>(`/review/suite-proposals/${id}/approve`, {
+    method: 'POST',
+  })
+}
+
+export function rejectSuiteProposal(id: string): Promise<SuiteProposalDecision> {
+  return apiRequest<SuiteProposalDecision>(`/review/suite-proposals/${id}/reject`, {
+    method: 'POST',
+  })
 }
 
 export function listProposals(
