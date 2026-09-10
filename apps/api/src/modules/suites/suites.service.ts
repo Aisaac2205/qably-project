@@ -254,7 +254,9 @@ export class SuitesService {
           where: { id },
           data: {
             ...input,
-            ...(input.name === undefined ? {} : { nameSource: 'human' }),
+            ...(input.name === undefined || input.name === existing.name
+              ? {}
+              : { nameSource: 'human' }),
           },
           select: SUITE_SELECT,
         });

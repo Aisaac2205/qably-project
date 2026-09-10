@@ -23,7 +23,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreateSuite, useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
+import type { UpdateSuitePayload } from '@/features/projects/suites/api/suites.api'
 import { useTranslation } from '@/lib/i18n'
+
+function sameTags(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((tag, index) => tag === b[index])
+}
 
 interface SuiteFormDialogProps {
   projectId: string
@@ -75,10 +80,15 @@ function SuiteFormDialogContent({
       .filter(Boolean)
 
     if (isEdit) {
-      updateSuiteMutation.mutate({
-        id: suite.id,
-        patch: { name: trimmed, description: description.trim(), tags: tagList },
-      })
+      const trimmedDescription = description.trim()
+      const patch: UpdateSuitePayload = {}
+      if (trimmed !== suite.name) patch.name = trimmed
+      if (trimmedDescription !== suite.description) patch.description = trimmedDescription
+      if (!sameTags(tagList, suite.tags)) patch.tags = tagList
+
+      if (Object.keys(patch).length > 0) {
+        updateSuiteMutation.mutate({ id: suite.id, patch })
+      }
     } else {
       createSuiteMutation.mutate({
         projectId,

@@ -708,11 +708,11 @@ describe('SuitesService.update name source', () => {
   it('marks the name as chosen by a person when the update renames the suite', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).update(owner, 'suite-1', { name: 'Checkout' });
+    await build(prisma).update(owner, 'suite-1', { name: 'Payments' });
 
     expect(prisma.suite.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { name: 'Checkout', nameSource: 'human' },
+        data: { name: 'Payments', nameSource: 'human' },
       }),
     );
   });
@@ -724,6 +724,21 @@ describe('SuitesService.update name source', () => {
 
     expect(prisma.suite.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { description: 'Pagos' } }),
+    );
+  });
+
+  it('leaves the name source alone when the patch repeats the current name unchanged', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).update(owner, 'suite-1', {
+      name: 'Checkout',
+      description: 'Pagos',
+    });
+
+    expect(prisma.suite.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { name: 'Checkout', description: 'Pagos' },
+      }),
     );
   });
 });
