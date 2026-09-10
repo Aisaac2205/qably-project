@@ -29,7 +29,36 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
 
   return {
     ...actual,
-    listSuiteProposals: vi.fn().mockResolvedValue([]),
+    listSuiteProposals: vi.fn().mockResolvedValue([
+      {
+        id: 'sp-1',
+        projectId: 'proj-1',
+        suiteId: 'suite-9',
+        suiteName: 'cart.spec.ts',
+        suiteNameSource: 'ingestion',
+        title: 'Cart suite',
+        description: 'Covers the shopping cart',
+        status: 'in_review',
+        evidenceId: 'ev-1',
+        locale: null,
+        createdAt: '2026-09-09T10:00:00Z',
+        decidedAt: null,
+      },
+    ]),
+    approveSuiteProposal: vi.fn().mockResolvedValue({
+      proposalId: 'sp-1',
+      projectId: 'proj-1',
+      applied: true,
+      suiteId: 'suite-9',
+      suiteName: 'Cart suite',
+    }),
+    rejectSuiteProposal: vi.fn().mockResolvedValue({
+      proposalId: 'sp-1',
+      projectId: 'proj-1',
+      applied: false,
+      suiteId: 'suite-9',
+      suiteName: 'cart.spec.ts',
+    }),
     approveProposal: vi.fn().mockResolvedValue({
       createdNewCase: true,
       testCaseId: 'case-1',
@@ -136,6 +165,13 @@ describe('ReviewInboxPage', () => {
 
     await user.selectOptions(projectSelect, 'proj-1')
     expect(projectSelect).toHaveValue('proj-1')
+
+    const { listSuiteProposals } = await import('@/features/review-inbox/api/review.api')
+    await screen.findByRole('button', { name: /^Approve$/i })
+    expect(listSuiteProposals).toHaveBeenLastCalledWith(
+      { status: 'in_review', projectId: 'proj-1' },
+      expect.anything(),
+    )
   })
 
   it('allows filtering proposals by duplicate toggle', async () => {
@@ -234,6 +270,19 @@ describe('ReviewInboxPage', () => {
   it('renders clean queue items without checkboxes', () => {
     renderWithQuery(<ReviewInboxPage />)
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  it('links the applied suite-proposal toast to the projectId the decision response carries', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(<ReviewInboxPage />)
+
+    const approveButton = await screen.findByRole('button', { name: /^Approve$/i })
+    await user.click(approveButton)
+
+    const statuses = await screen.findAllByRole('status')
+    const toast = statuses.find((el) => /Cart suite/i.test(el.textContent ?? ''))
+    expect(toast).toBeDefined()
+    expect(toast?.querySelector('a')).toHaveAttribute('href', '/projects/proj-1/suites/suite-9')
   })
 })
 

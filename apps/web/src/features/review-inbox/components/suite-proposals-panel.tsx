@@ -34,7 +34,12 @@ export function SuiteProposalsPanel({
       <div className="flex items-center gap-2">
         <AerisIcon size={14} />
         <h2 id="suite-proposals-heading" className="text-sm font-semibold text-default">
-          {t('reviewInbox.suiteProposalsTitle', { count: proposals.length })}
+          {t(
+            proposals.length === 1
+              ? 'reviewInbox.suiteProposalsTitle_one'
+              : 'reviewInbox.suiteProposalsTitle_other',
+            { count: proposals.length },
+          )}
         </h2>
       </div>
       <ul className="space-y-2">

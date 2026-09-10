@@ -71,7 +71,8 @@ export type ReviewError =
   | 'missing-evidence'
   | 'incomplete-proposal'
   | 'missing-suite'
-  | 'name-taken';
+  | 'name-taken'
+  | 'suite-name-taken';
 
 export interface DecisionInput {
   actorId: string;

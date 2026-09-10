@@ -40,12 +40,25 @@ describe('SuiteProposalsPanel', () => {
       <SuiteProposalsPanel proposals={[proposal()]} isDeciding={false} onApprove={vi.fn()} onReject={vi.fn()} />,
     )
 
-    expect(screen.getByRole('heading', { name: /aeris proposes names for 1 suites/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /aeris proposes a name for 1 suite/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'setAccessTokenSchema' })).toHaveAttribute(
       'href',
       '/projects/proj-1/suites/suite-1',
     )
     expect(screen.getByText('Esquema del token de acceso')).toBeInTheDocument()
+  })
+
+  it('uses the plural title when Aeris proposed names for more than one suite', () => {
+    render(
+      <SuiteProposalsPanel
+        proposals={[proposal(), proposal({ id: 'sp-2', suiteId: 'suite-2' })]}
+        isDeciding={false}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('heading', { name: /aeris proposes names for 2 suites/i })).toBeInTheDocument()
   })
 
   it('warns when a person already named the suite, so approving will not rename it', () => {

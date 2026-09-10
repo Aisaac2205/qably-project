@@ -520,6 +520,7 @@ export interface SuiteProposal {
 }
 export interface SuiteProposalDecision {
   proposalId: string
+  projectId: string
   applied: boolean
   suiteId: string
   suiteName: string

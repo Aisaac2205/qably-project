@@ -673,6 +673,7 @@ describe('ReviewService suite proposals', () => {
       ok: true,
       value: {
         proposalId: 'suite-proposal-1',
+        projectId: 'project-1',
         applied: true,
         suiteId: 'suite-1',
         suiteName: 'Carrito de compras',
@@ -712,6 +713,7 @@ describe('ReviewService suite proposals', () => {
       ok: true,
       value: {
         proposalId: 'suite-proposal-1',
+        projectId: 'project-1',
         applied: false,
         suiteId: 'suite-1',
         suiteName: 'Checkout',
@@ -754,6 +756,7 @@ describe('ReviewService suite proposals', () => {
       ok: true,
       value: {
         proposalId: 'suite-proposal-1',
+        projectId: 'project-1',
         applied: false,
         suiteId: 'suite-1',
         suiteName: 'cart.spec.ts',
@@ -765,6 +768,19 @@ describe('ReviewService suite proposals', () => {
         data: expect.objectContaining({ status: 'rejected' }) as unknown,
       }),
     );
+  });
+
+  it('returns suite-name-taken when the renamed suite collides with another suite in the project', async () => {
+    const prisma = createPrisma();
+    prisma.suiteProposal.findFirst.mockResolvedValue(suiteProposalRow);
+    prisma.suite.update.mockRejectedValue({ code: 'P2002' });
+
+    const result = await build(prisma).approveSuiteProposal(
+      org,
+      'suite-proposal-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'suite-name-taken' });
   });
 
   it('refuses to decide a proposal that is no longer in review', async () => {

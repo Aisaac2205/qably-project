@@ -21,10 +21,10 @@ import { ReviewProposalInspector } from './review-proposal-inspector'
 export function ReviewInboxPage() {
   const { t } = useTranslation()
   const { proposals } = useProposals()
-  const { suiteProposals } = useSuiteProposals()
   const searchParams = useSearchParams()
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
+  const { suiteProposals } = useSuiteProposals(selectedProjectId)
   const [statusFilter, setStatusFilter] = useState<ReviewQueueStatusFilter>('in_review')
   const [duplicateOnly, setDuplicateOnly] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -49,7 +49,7 @@ export function ReviewInboxPage() {
         ? t('reviewInbox.suiteProposalApplied', { name: decision.suiteName })
         : t('reviewInbox.suiteProposalRecorded'),
       type: decision.applied ? 'success' : 'info',
-      href: `/projects/${suiteProposals.find((p) => p.id === decision.proposalId)?.projectId ?? ''}/suites/${decision.suiteId}`,
+      href: `/projects/${decision.projectId}/suites/${decision.suiteId}`,
       linkLabel: t('reviewInbox.viewCase'),
     })
   })

@@ -561,12 +561,13 @@ export class ReviewService {
 
       return ok({
         proposalId: proposal.id,
+        projectId: proposal.projectId,
         applied: applies,
         suiteId: proposal.suiteId,
         suiteName,
       });
     } catch (error) {
-      if (isUniqueViolation(error)) return err('name-taken');
+      if (isUniqueViolation(error)) return err('suite-name-taken');
       throw error;
     }
   }
@@ -586,6 +587,7 @@ export class ReviewService {
 
     return ok({
       proposalId: proposal.id,
+      projectId: proposal.projectId,
       applied: false,
       suiteId: proposal.suiteId,
       suiteName: proposal.suite.name,

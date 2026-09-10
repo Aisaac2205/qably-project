@@ -25,8 +25,6 @@ import type {
   ProposalView,
   RejectionView,
   ReviewError,
-  SuiteProposalDecisionView,
-  SuiteProposalView,
 } from './review.contracts';
 import {
   bulkDecisionSchema,
@@ -38,7 +36,7 @@ import {
 } from './review.schemas';
 import { ReviewService } from './review.service';
 
-function unwrap<T>(result: Result<T, ReviewError>): T {
+export function unwrap<T>(result: Result<T, ReviewError>): T {
   if (!isErr(result)) return result.value;
 
   switch (result.error) {
@@ -73,6 +71,11 @@ function unwrap<T>(result: Result<T, ReviewError>): T {
         code: result.error,
         message: 'Another official case in this suite already uses that title',
       });
+    case 'suite-name-taken':
+      throw new ConflictException({
+        code: result.error,
+        message: 'Another suite in this project already uses that name',
+      });
   }
 }
 
@@ -88,31 +91,6 @@ export class ReviewController {
     query: ListProposalsQuery,
   ): Promise<ProposalView[]> {
     return this.review.list(org, query);
-  }
-
-  @Get('suite-proposals')
-  async listSuiteProposals(
-    @CurrentOrg() org: OrgContext,
-    @Query(new ZodValidationPipe(listProposalsQuerySchema))
-    query: ListProposalsQuery,
-  ): Promise<SuiteProposalView[]> {
-    return this.review.listSuiteProposals(org, query);
-  }
-
-  @Post('suite-proposals/:id/approve')
-  async approveSuiteProposal(
-    @CurrentOrg() org: OrgContext,
-    @Param('id') id: string,
-  ): Promise<SuiteProposalDecisionView> {
-    return unwrap(await this.review.approveSuiteProposal(org, id));
-  }
-
-  @Post('suite-proposals/:id/reject')
-  async rejectSuiteProposal(
-    @CurrentOrg() org: OrgContext,
-    @Param('id') id: string,
-  ): Promise<SuiteProposalDecisionView> {
-    return unwrap(await this.review.rejectSuiteProposal(org, id));
   }
 
   @Get(':id')

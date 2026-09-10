@@ -11,13 +11,19 @@ import { suiteKeys } from '@/features/projects/lib/query-keys'
 
 export const suiteProposalKeys = {
   all: ['review', 'suite-proposals'] as const,
-  pending: () => [...suiteProposalKeys.all, 'in_review'] as const,
+  pending: (projectId?: string) =>
+    [...suiteProposalKeys.all, 'in_review', projectId ?? 'all'] as const,
 }
 
-export function useSuiteProposals() {
+export function useSuiteProposals(projectId?: string) {
+  const filters =
+    projectId === undefined || projectId === 'all'
+      ? { status: 'in_review' as const }
+      : { status: 'in_review' as const, projectId }
+
   const query = useQuery({
-    queryKey: suiteProposalKeys.pending(),
-    queryFn: ({ signal }) => listSuiteProposals({ status: 'in_review' }, signal),
+    queryKey: suiteProposalKeys.pending(projectId),
+    queryFn: ({ signal }) => listSuiteProposals(filters, signal),
   })
 
   return {
