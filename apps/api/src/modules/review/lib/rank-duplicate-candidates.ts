@@ -82,7 +82,8 @@ function matchFor(
 }
 
 function compareScored(a: ScoredCandidate, b: ScoredCandidate): number {
-  const tierDiff = MATCH_REASON_TIER[a.matchReason] - MATCH_REASON_TIER[b.matchReason];
+  const tierDiff =
+    MATCH_REASON_TIER[a.matchReason] - MATCH_REASON_TIER[b.matchReason];
   if (tierDiff !== 0) return tierDiff;
 
   if (a.score !== b.score) return b.score - a.score;
@@ -103,11 +104,13 @@ export function rankDuplicateCandidates(
 
   scored.sort(compareScored);
 
-  return scored.slice(0, MAX_RANKED_CANDIDATES).map(({ candidate, matchReason }) => ({
-    id: candidate.id,
-    title: candidate.title,
-    steps: candidate.steps,
-    expectedResult: candidate.expectedResult,
-    matchReason,
-  }));
+  return scored
+    .slice(0, MAX_RANKED_CANDIDATES)
+    .map(({ candidate, matchReason }) => ({
+      id: candidate.id,
+      title: candidate.title,
+      steps: candidate.steps,
+      expectedResult: candidate.expectedResult,
+      matchReason,
+    }));
 }

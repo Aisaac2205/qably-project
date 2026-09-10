@@ -20,6 +20,7 @@ import type { OrgContext } from '../organizations/organizations.contracts';
 import type {
   ApprovalView,
   BulkDecisionItemResult,
+  DuplicateCandidateView,
   ProposalDetailView,
   ProposalView,
   RejectionView,
@@ -120,6 +121,14 @@ export class ReviewController {
     @Param('id') id: string,
   ): Promise<ProposalDetailView> {
     return unwrap(await this.review.findOne(org, id));
+  }
+
+  @Get(':id/duplicates')
+  async duplicates(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+  ): Promise<DuplicateCandidateView[]> {
+    return unwrap(await this.review.getDuplicateCandidates(org, id));
   }
 
   @Post(':id/approve')

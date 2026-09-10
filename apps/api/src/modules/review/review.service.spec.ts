@@ -37,7 +37,7 @@ interface FakePrisma {
     update: jest.Mock;
   };
   suite: { findFirst: jest.Mock; update: jest.Mock };
-  testCase: { create: jest.Mock; update: jest.Mock };
+  testCase: { create: jest.Mock; update: jest.Mock; findMany: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
   reviewDecision: { create: jest.Mock };
   traceabilityLink: { createMany: jest.Mock; findMany: jest.Mock };
@@ -62,6 +62,7 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
     testCase: {
       create: jest.fn().mockResolvedValue({ id: 'case-new' }),
       update: jest.fn().mockResolvedValue({ id: 'case-new' }),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     testCaseVersion: {
       count: jest.fn().mockResolvedValue(0),
@@ -792,5 +793,123 @@ describe('ReviewService.publish locale', () => {
       [{ data: Record<string, unknown> }],
     ];
     expect(call[0].data).toMatchObject({ locale: 'es' });
+  });
+});
+
+describe('ReviewService.getDuplicateCandidates', () => {
+  function officialCase(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      name: 'Empties the cart',
+      automationKey: null as string | null,
+      steps: ['Open the cart', 'Remove every item'],
+      expectedResult: 'The cart shows zero items',
+      updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+      ...overrides,
+    };
+  }
+
+  it('returns not-found when the proposal is outside the caller organization', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).getDuplicateCandidates(
+      org,
+      'proposal-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+    expect(prisma.testCase.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty array when no official case plausibly matches', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    const result = await build(prisma).getDuplicateCandidates(
+      org,
+      'proposal-1',
+    );
+
+    expect(result).toEqual({ ok: true, value: [] });
+  });
+
+  it('excludes the proposal own target case from the candidate set', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+
+    await build(prisma).getDuplicateCandidates(org, 'proposal-1');
+
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          projectId: 'project-1',
+          id: { not: 'case-existing' },
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('does not filter by id when the proposal has no target case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).getDuplicateCandidates(org, 'proposal-1');
+
+    const [call] = prisma.testCase.findMany.mock.calls as [
+      [{ where: Record<string, unknown> }],
+    ];
+    expect(call[0].where).not.toHaveProperty('id');
+  });
+
+  it('ranks candidates and returns their current published content, capped at 5', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue(
+      Array.from({ length: 8 }, (_, index) =>
+        officialCase({
+          id: `case-${index}`,
+          updatedAt: new Date(2024, 0, index + 1),
+        }),
+      ),
+    );
+
+    const result = await build(prisma).getDuplicateCandidates(
+      org,
+      'proposal-1',
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value).toHaveLength(5);
+    expect(result.value[0]).toEqual({
+      id: 'case-7',
+      title: 'Empties the cart',
+      steps: ['Open the cart', 'Remove every item'],
+      expectedResult: 'The cart shows zero items',
+      matchReason: 'title',
+    });
+  });
+
+  it('ranks an automation-key match above a title match', async () => {
+    const prisma = createPrisma({ automationKey: 'Cart.emptiesCart' });
+    prisma.testCase.findMany.mockResolvedValue([
+      officialCase({ id: 'case-title-only' }),
+      officialCase({
+        id: 'case-key-match',
+        name: 'A completely different title',
+        automationKey: 'Cart.emptiesCart',
+      }),
+    ]);
+
+    const result = await build(prisma).getDuplicateCandidates(
+      org,
+      'proposal-1',
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.map((candidate) => candidate.id)).toEqual([
+      'case-key-match',
+      'case-title-only',
+    ]);
+    expect(result.value[0].matchReason).toBe('automation-key');
   });
 });

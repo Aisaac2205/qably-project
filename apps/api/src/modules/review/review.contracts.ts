@@ -8,6 +8,11 @@ import type {
   TraceabilityLink,
 } from '@qably/types';
 
+export type {
+  DuplicateCandidateView,
+  DuplicateMatchReason,
+} from '@qably/types';
+
 export interface ProposalView extends ExtractedProposal {
   evidenceTitle: string;
 }

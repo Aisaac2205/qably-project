@@ -6,6 +6,7 @@ import type {
   ApprovalView,
   BulkDecisionItemResult,
   DecisionInput,
+  DuplicateCandidateView,
   ListProposalsFilters,
   ProposalDetailView,
   ProposalView,
@@ -14,6 +15,10 @@ import type {
   SuiteProposalDecisionView,
   SuiteProposalView,
 } from './review.contracts';
+import {
+  rankDuplicateCandidates,
+  type DuplicateRankCandidate,
+} from './lib/rank-duplicate-candidates';
 
 const PENDING_STATUS = 'in_review';
 const UNIQUE_VIOLATION = 'P2002';
@@ -253,6 +258,53 @@ function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
   };
 }
 
+const DUPLICATE_TARGET_SELECT = {
+  id: true,
+  projectId: true,
+  title: true,
+  automationKey: true,
+  targetTestCaseId: true,
+} as const;
+
+interface DuplicateTargetRow {
+  id: string;
+  projectId: string;
+  title: string;
+  automationKey: string | null;
+  targetTestCaseId: string | null;
+}
+
+const DUPLICATE_CANDIDATE_SELECT = {
+  id: true,
+  name: true,
+  automationKey: true,
+  steps: true,
+  expectedResult: true,
+  updatedAt: true,
+} as const;
+
+interface DuplicateCandidateRow {
+  id: string;
+  name: string;
+  automationKey: string | null;
+  steps: string[];
+  expectedResult: string;
+  updatedAt: Date;
+}
+
+function toDuplicateRankCandidate(
+  row: DuplicateCandidateRow,
+): DuplicateRankCandidate {
+  return {
+    id: row.id,
+    title: row.name,
+    steps: row.steps,
+    expectedResult: row.expectedResult,
+    automationKey: row.automationKey,
+    publishedAt: row.updatedAt,
+  };
+}
+
 @Injectable()
 export class ReviewService {
   constructor(private readonly prisma: PrismaService) {}
@@ -318,6 +370,47 @@ export class ReviewService {
       evidence: row.evidence === null ? null : toEvidence(row.evidence),
       links: links.map(toLink),
     });
+  }
+
+  async getDuplicateCandidates(
+    org: OrgContext,
+    proposalId: string,
+  ): Promise<Result<DuplicateCandidateView[], ReviewError>> {
+    const proposal: DuplicateTargetRow | null =
+      await this.prisma.extractedProposal.findFirst({
+        where: {
+          id: proposalId,
+          project: { organizationId: org.organizationId },
+        },
+        select: DUPLICATE_TARGET_SELECT,
+      });
+
+    if (proposal === null) return err('not-found');
+
+    const cases = (await this.prisma.testCase.findMany({
+      where: {
+        projectId: proposal.projectId,
+        ...(proposal.targetTestCaseId === null
+          ? {}
+          : { id: { not: proposal.targetTestCaseId } }),
+      },
+      select: DUPLICATE_CANDIDATE_SELECT,
+    })) as DuplicateCandidateRow[];
+
+    const ranked = rankDuplicateCandidates(
+      { title: proposal.title, automationKey: proposal.automationKey },
+      cases.map(toDuplicateRankCandidate),
+    );
+
+    return ok(
+      ranked.map((candidate) => ({
+        id: candidate.id,
+        title: candidate.title,
+        steps: [...candidate.steps],
+        expectedResult: candidate.expectedResult,
+        matchReason: candidate.matchReason,
+      })),
+    );
   }
 
   async approve(
