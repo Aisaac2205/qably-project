@@ -1,6 +1,6 @@
 import { screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { CaseCard } from '@/features/projects/suites/components/case-card'
 import type { TestCase } from '@qably/types'
 import { renderWithQuery } from '@/lib/query-test-utils'

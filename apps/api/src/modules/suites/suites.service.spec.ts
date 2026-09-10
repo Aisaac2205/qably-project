@@ -676,7 +676,9 @@ describe('SuitesService health signals', () => {
     ];
     expect(sqlArg.sql).toContain('PARTITION BY rc."testCaseId"');
     expect(sqlArg.sql).toContain('rn <=');
-    expect(sqlArg.sql).toContain("rc.status IN ('pass', 'fail', 'skip', 'blocked')");
+    expect(sqlArg.sql).toContain(
+      "rc.status IN ('pass', 'fail', 'skip', 'blocked')",
+    );
     expect(sqlArg.sql).toContain('r."finishedAt" IS NOT NULL');
     expect(sqlArg.values).toContain('case-2');
     expect(sqlArg.values).toContain(6);
@@ -732,7 +734,12 @@ describe('SuitesService documented locale', () => {
     prisma.suite.findMany.mockResolvedValue([
       {
         ...suiteRow,
-        cases: [{ ...suiteRow.cases[0], currentVersion: { version: 3, locale: 'es' } }],
+        cases: [
+          {
+            ...suiteRow.cases[0],
+            currentVersion: { version: 3, locale: 'es' },
+          },
+        ],
       },
     ]);
 

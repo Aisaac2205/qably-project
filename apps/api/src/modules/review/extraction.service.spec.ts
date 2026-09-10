@@ -419,12 +419,14 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
   it('caps how many files a single request can enqueue', async () => {
     const queue = createQueue();
     const prisma = createPrisma('en');
-    const many = Array.from({ length: MAX_DOCUMENT_FILES_PER_REQUEST + 5 }, (_, index) =>
-      candidate({
-        id: `case-${index}`,
-        automationKey: `Cart > case ${index}`,
-        automationFilePath: `src/cart-${index}.spec.ts`,
-      }),
+    const many = Array.from(
+      { length: MAX_DOCUMENT_FILES_PER_REQUEST + 5 },
+      (_, index) =>
+        candidate({
+          id: `case-${index}`,
+          automationKey: `Cart > case ${index}`,
+          automationFilePath: `src/cart-${index}.spec.ts`,
+        }),
     );
     prisma.testCase.findMany.mockResolvedValue(many);
 
@@ -604,7 +606,7 @@ describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
             { currentVersion: { locale: null } },
             { currentVersion: { locale: { not: 'es' } } },
           ],
-        }),
+        }) as unknown,
       }),
     );
   });
@@ -614,11 +616,19 @@ describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
     const prisma = createPrisma('es');
     prisma.testCase.findMany.mockResolvedValue([]);
 
-    await build(prisma, queue).enqueueDocumentFiles(org, { suiteId: 'suite-1' }, null);
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
 
     expect(prisma.testCase.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { suiteId: 'suite-1', executionMode: 'automated', steps: { equals: [] } },
+        where: {
+          suiteId: 'suite-1',
+          executionMode: 'automated',
+          steps: { equals: [] },
+        },
       }),
     );
     expect(prisma.orgMember.findFirst).not.toHaveBeenCalled();

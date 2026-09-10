@@ -98,9 +98,13 @@ describe('ReviewController bulk decisions', () => {
       ids: ['proposal-1', 'proposal-2'],
     });
 
-    expect(review.approveMany).toHaveBeenCalledWith(org, ['proposal-1', 'proposal-2'], {
-      actorId: 'user-1',
-    });
+    expect(review.approveMany).toHaveBeenCalledWith(
+      org,
+      ['proposal-1', 'proposal-2'],
+      {
+        actorId: 'user-1',
+      },
+    );
     expect(response).toEqual(results);
   });
 

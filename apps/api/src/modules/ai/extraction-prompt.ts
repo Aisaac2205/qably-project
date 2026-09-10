@@ -90,7 +90,9 @@ export function buildSystemInstruction(
     : INSTRUCTION[locale];
 }
 
-function buildTargetCasesBlock(targetAutomationKeys: readonly string[]): string {
+function buildTargetCasesBlock(
+  targetAutomationKeys: readonly string[],
+): string {
   if (targetAutomationKeys.length === 0) return '';
 
   const lines = targetAutomationKeys

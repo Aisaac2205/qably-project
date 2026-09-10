@@ -4,10 +4,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
-import {
-  GUARDS_METADATA,
-  HTTP_CODE_METADATA,
-} from '@nestjs/common/constants';
+import { GUARDS_METADATA, HTTP_CODE_METADATA } from '@nestjs/common/constants';
 import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';

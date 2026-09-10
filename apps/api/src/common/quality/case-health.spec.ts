@@ -44,7 +44,10 @@ describe('deriveCaseHealth — no-steps', () => {
 describe('deriveCaseHealth — raw-name', () => {
   it('flags a name equal to its automation key', () => {
     const health = deriveCaseHealth([
-      baseCase({ name: 'checkout.spec > adds to cart', automationKey: 'checkout.spec > adds to cart' }),
+      baseCase({
+        name: 'checkout.spec > adds to cart',
+        automationKey: 'checkout.spec > adds to cart',
+      }),
     ]);
 
     expect(health.get('case-1')).toContain('raw-name');
@@ -63,7 +66,9 @@ describe('deriveCaseHealth — raw-name', () => {
   });
 
   it('flags a dotted identifier-shaped name', () => {
-    const health = deriveCaseHealth([baseCase({ name: 'Checkout.AddsToCart' })]);
+    const health = deriveCaseHealth([
+      baseCase({ name: 'Checkout.AddsToCart' }),
+    ]);
 
     expect(health.get('case-1')).toContain('raw-name');
   });
@@ -75,7 +80,9 @@ describe('deriveCaseHealth — raw-name', () => {
   });
 
   it('never flags a human-readable sentence name', () => {
-    const health = deriveCaseHealth([baseCase({ name: 'Adds an item to the cart' })]);
+    const health = deriveCaseHealth([
+      baseCase({ name: 'Adds an item to the cart' }),
+    ]);
 
     expect(health.get('case-1')).not.toContain('raw-name');
   });
@@ -92,7 +99,11 @@ describe('deriveCaseHealth — never-run', () => {
 
   it('never flags an automated case that has run at least once', () => {
     const health = deriveCaseHealth([
-      baseCase({ executionMode: 'automated', hasAnyRun: true, recentResults: ['pass'] }),
+      baseCase({
+        executionMode: 'automated',
+        hasAnyRun: true,
+        recentResults: ['pass'],
+      }),
     ]);
 
     expect(health.get('case-1')).not.toContain('never-run');
@@ -110,7 +121,11 @@ describe('deriveCaseHealth — never-run', () => {
 describe('deriveCaseHealth — flaky', () => {
   it('is not flaky with only one recorded run', () => {
     const health = deriveCaseHealth([
-      baseCase({ executionMode: 'automated', hasAnyRun: true, recentResults: ['fail'] }),
+      baseCase({
+        executionMode: 'automated',
+        hasAnyRun: true,
+        recentResults: ['fail'],
+      }),
     ]);
 
     expect(health.get('case-1')).not.toContain('flaky');
@@ -142,7 +157,11 @@ describe('deriveCaseHealth — flaky', () => {
 
   it('exactly one alternation is not flaky', () => {
     const health = deriveCaseHealth([
-      baseCase({ executionMode: 'automated', hasAnyRun: true, recentResults: ['pass', 'fail'] }),
+      baseCase({
+        executionMode: 'automated',
+        hasAnyRun: true,
+        recentResults: ['pass', 'fail'],
+      }),
     ]);
 
     expect(health.get('case-1')).not.toContain('flaky');
@@ -150,7 +169,11 @@ describe('deriveCaseHealth — flaky', () => {
 
   it('two alternations is flaky', () => {
     const health = deriveCaseHealth([
-      baseCase({ executionMode: 'automated', hasAnyRun: true, recentResults: ['pass', 'fail', 'pass'] }),
+      baseCase({
+        executionMode: 'automated',
+        hasAnyRun: true,
+        recentResults: ['pass', 'fail', 'pass'],
+      }),
     ]);
 
     expect(health.get('case-1')).toContain('flaky');
@@ -184,8 +207,18 @@ describe('deriveCaseHealth — flaky', () => {
 describe('deriveCaseHealth — duplicate-key', () => {
   it('flags two cases in different suites of the same project sharing an automation key', () => {
     const health = deriveCaseHealth([
-      baseCase({ id: 'case-1', suiteId: 'suite-1', projectId: 'project-1', automationKey: 'checkout > pay' }),
-      baseCase({ id: 'case-2', suiteId: 'suite-2', projectId: 'project-1', automationKey: 'checkout > pay' }),
+      baseCase({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        projectId: 'project-1',
+        automationKey: 'checkout > pay',
+      }),
+      baseCase({
+        id: 'case-2',
+        suiteId: 'suite-2',
+        projectId: 'project-1',
+        automationKey: 'checkout > pay',
+      }),
     ]);
 
     expect(health.get('case-1')).toContain('duplicate-key');
@@ -194,8 +227,16 @@ describe('deriveCaseHealth — duplicate-key', () => {
 
   it('never flags cases with the same key in different projects', () => {
     const health = deriveCaseHealth([
-      baseCase({ id: 'case-1', projectId: 'project-1', automationKey: 'checkout > pay' }),
-      baseCase({ id: 'case-2', projectId: 'project-2', automationKey: 'checkout > pay' }),
+      baseCase({
+        id: 'case-1',
+        projectId: 'project-1',
+        automationKey: 'checkout > pay',
+      }),
+      baseCase({
+        id: 'case-2',
+        projectId: 'project-2',
+        automationKey: 'checkout > pay',
+      }),
     ]);
 
     expect(health.get('case-1')).not.toContain('duplicate-key');
@@ -226,8 +267,16 @@ describe('deriveCaseHealth — duplicate-key', () => {
 describe('deriveCaseHealth — near-duplicate-title', () => {
   it('flags two cases in the same suite with a normalized-equal title', () => {
     const health = deriveCaseHealth([
-      baseCase({ id: 'case-1', suiteId: 'suite-1', name: 'Adds an item to the cart' }),
-      baseCase({ id: 'case-2', suiteId: 'suite-1', name: 'adds an item to the cart' }),
+      baseCase({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        name: 'Adds an item to the cart',
+      }),
+      baseCase({
+        id: 'case-2',
+        suiteId: 'suite-1',
+        name: 'adds an item to the cart',
+      }),
     ]);
 
     expect(health.get('case-1')).toContain('near-duplicate-title');
@@ -236,8 +285,16 @@ describe('deriveCaseHealth — near-duplicate-title', () => {
 
   it('normalizes collapsed whitespace and stripped punctuation', () => {
     const health = deriveCaseHealth([
-      baseCase({ id: 'case-1', suiteId: 'suite-1', name: 'Adds an item, to the cart!' }),
-      baseCase({ id: 'case-2', suiteId: 'suite-1', name: '  Adds   an item to the cart  ' }),
+      baseCase({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        name: 'Adds an item, to the cart!',
+      }),
+      baseCase({
+        id: 'case-2',
+        suiteId: 'suite-1',
+        name: '  Adds   an item to the cart  ',
+      }),
     ]);
 
     expect(health.get('case-1')).toContain('near-duplicate-title');
@@ -246,8 +303,16 @@ describe('deriveCaseHealth — near-duplicate-title', () => {
 
   it('never flags a matching title in a different suite', () => {
     const health = deriveCaseHealth([
-      baseCase({ id: 'case-1', suiteId: 'suite-1', name: 'Adds an item to the cart' }),
-      baseCase({ id: 'case-2', suiteId: 'suite-2', name: 'Adds an item to the cart' }),
+      baseCase({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        name: 'Adds an item to the cart',
+      }),
+      baseCase({
+        id: 'case-2',
+        suiteId: 'suite-2',
+        name: 'Adds an item to the cart',
+      }),
     ]);
 
     expect(health.get('case-1')).not.toContain('near-duplicate-title');
@@ -256,8 +321,16 @@ describe('deriveCaseHealth — near-duplicate-title', () => {
 
   it('never flags a title with no match in the same suite', () => {
     const health = deriveCaseHealth([
-      baseCase({ id: 'case-1', suiteId: 'suite-1', name: 'Adds an item to the cart' }),
-      baseCase({ id: 'case-2', suiteId: 'suite-1', name: 'Removes an item from the cart' }),
+      baseCase({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        name: 'Adds an item to the cart',
+      }),
+      baseCase({
+        id: 'case-2',
+        suiteId: 'suite-1',
+        name: 'Removes an item from the cart',
+      }),
     ]);
 
     expect(health.get('case-1')).not.toContain('near-duplicate-title');

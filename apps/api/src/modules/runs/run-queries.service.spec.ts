@@ -1357,7 +1357,9 @@ describe('RunQueriesService.list delta', () => {
     expect(prisma.runCase.findMany).toHaveBeenCalledTimes(1);
     expect(prisma.runCase.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { runId: { in: expect.arrayContaining(['run-1', 'run-0']) } },
+        where: {
+          runId: { in: expect.arrayContaining(['run-1', 'run-0']) as unknown },
+        },
       }),
     );
   });
@@ -1403,7 +1405,7 @@ describe('RunQueriesService.findOne delta', () => {
             { startedAt: { lt: finishedRow.startedAt } },
             { startedAt: finishedRow.startedAt, id: { lt: finishedRow.id } },
           ],
-        }),
+        }) as unknown,
         orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       }),
     );
@@ -1416,9 +1418,27 @@ describe('RunQueriesService.findOne delta', () => {
       .mockResolvedValueOnce({ id: 'run-0' });
     prisma.runCase.findMany
       .mockResolvedValueOnce([
-        runCaseRow({ id: 'rc-1', testCaseId: 'case-1', name: 'Adds', status: 'fail', position: 0 }),
-        runCaseRow({ id: 'rc-2', testCaseId: 'case-2', name: 'Removes', status: 'pass', position: 1 }),
-        runCaseRow({ id: 'rc-3', testCaseId: 'case-3', name: 'Lists', status: 'pass', position: 2 }),
+        runCaseRow({
+          id: 'rc-1',
+          testCaseId: 'case-1',
+          name: 'Adds',
+          status: 'fail',
+          position: 0,
+        }),
+        runCaseRow({
+          id: 'rc-2',
+          testCaseId: 'case-2',
+          name: 'Removes',
+          status: 'pass',
+          position: 1,
+        }),
+        runCaseRow({
+          id: 'rc-3',
+          testCaseId: 'case-3',
+          name: 'Lists',
+          status: 'pass',
+          position: 2,
+        }),
       ])
       .mockResolvedValueOnce([
         { testCaseId: 'case-1', status: 'pass' },

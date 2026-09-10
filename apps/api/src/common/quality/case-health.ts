@@ -32,7 +32,8 @@ function looksLikeRawName(name: string, automationKey: string | null): boolean {
 
 function isFlaky(recentResults: readonly CaseHealthResult[]): boolean {
   const passOrFail = recentResults.filter(
-    (result): result is 'pass' | 'fail' => result === 'pass' || result === 'fail',
+    (result): result is 'pass' | 'fail' =>
+      result === 'pass' || result === 'fail',
   );
 
   let alternations = 0;
@@ -73,7 +74,10 @@ function computeSingleCaseSignals(input: CaseHealthInput): CaseHealthSignal[] {
   return signals;
 }
 
-function groupBy<T>(items: readonly T[], key: (item: T) => string | null): Map<string, T[]> {
+function groupBy<T>(
+  items: readonly T[],
+  key: (item: T) => string | null,
+): Map<string, T[]> {
   const groups = new Map<string, T[]>();
 
   for (const item of items) {

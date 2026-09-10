@@ -210,7 +210,8 @@ export class SuitesController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body(new ZodValidationPipe(documentFilesBodySchema)) body: DocumentFilesBody,
+    @Body(new ZodValidationPipe(documentFilesBodySchema))
+    body: DocumentFilesBody,
   ): Promise<DocumentFilesResult> {
     const result = await this.extraction.enqueueDocumentFiles(
       org,

@@ -232,8 +232,9 @@ describe('RunsService.ingest suite resolution', () => {
 
     await build(prisma).ingest(apiKey, baseInputBySuiteName);
 
-    const nameWrites = (prisma.suite.update.mock.calls as [{ data: Record<string, unknown> }][])
-      .filter(([call]) => 'name' in call.data);
+    const nameWrites = (
+      prisma.suite.update.mock.calls as [{ data: Record<string, unknown> }][]
+    ).filter(([call]) => 'name' in call.data);
     expect(nameWrites).toHaveLength(0);
   });
 

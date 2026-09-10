@@ -313,7 +313,9 @@ describe('ExtractionProcessor — code-change job', () => {
     await build(
       prisma,
       fakeSourceReader(
-        jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
+        jest
+          .fn()
+          .mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
       ),
       fakeExtractor(jest.fn()),
       fakeEncryption(),
@@ -920,12 +922,14 @@ describe('ExtractionProcessor — document-file job', () => {
       { id: 'case-2', suiteId: 'suite-2' },
     ]);
     const extractor = fakeExtractor(
-      jest.fn().mockResolvedValue(
-        extractedOutcome([
-          extractedCase({ automationKey: 'Cart > adds an item' }),
-          extractedCase({ automationKey: 'Cart > removes an item' }),
-        ]),
-      ),
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
     );
 
     await build(prisma, fakeSourceReader(), extractor).process(
@@ -965,12 +969,14 @@ describe('ExtractionProcessor — document-file job', () => {
       spendCredit,
     );
     const extractor = fakeExtractor(
-      jest.fn().mockResolvedValue(
-        extractedOutcome([
-          extractedCase({ automationKey: 'Cart > adds an item' }),
-          extractedCase({ automationKey: 'Cart > removes an item' }),
-        ]),
-      ),
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
     );
 
     await build(
@@ -1128,16 +1134,20 @@ describe('ExtractionProcessor — document-file job', () => {
     prisma.extractedProposal.findFirst.mockImplementation(
       (args: { where: Record<string, unknown> }) =>
         Promise.resolve(
-          args.where.targetTestCaseId === 'case-1' ? { id: 'already-pending' } : null,
+          args.where.targetTestCaseId === 'case-1'
+            ? { id: 'already-pending' }
+            : null,
         ),
     );
     const extractor = fakeExtractor(
-      jest.fn().mockResolvedValue(
-        extractedOutcome([
-          extractedCase({ automationKey: 'Cart > adds an item' }),
-          extractedCase({ automationKey: 'Cart > removes an item' }),
-        ]),
-      ),
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
     );
 
     await build(prisma, fakeSourceReader(), extractor).process(
@@ -1157,27 +1167,29 @@ describe('ExtractionProcessor — document-file job', () => {
       { id: 'case-2', suiteId: 'suite-2' },
     ]);
     const extractor = fakeExtractor(
-      jest.fn().mockResolvedValue(
-        extractedOutcome([
-          extractedCase({ automationKey: 'Cart > adds an item' }),
-          extractedCase({ automationKey: 'Cart > removes an item' }),
-        ]),
-      ),
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
     );
 
     await build(prisma, fakeSourceReader(), extractor).process(
       documentFileJob(),
     );
 
-    const lockCall = (prisma.$executeRawUnsafe.mock.calls as [string, ...string[]][]).find(
-      ([sql]) => sql.includes('FOR UPDATE'),
-    );
+    const lockCall = (
+      prisma.$executeRawUnsafe.mock.calls as [string, ...string[]][]
+    ).find(([sql]) => sql.includes('FOR UPDATE'));
     expect(lockCall).toBeDefined();
     expect(lockCall?.[0]).toContain('test_case');
     expect(lockCall?.slice(1)).toEqual(['case-1', 'case-2']);
-    expect(
-      prisma.$executeRawUnsafe.mock.invocationCallOrder[0],
-    ).toBeLessThan(prisma.extractedProposal.findFirst.mock.invocationCallOrder[0]);
+    expect(prisma.$executeRawUnsafe.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.extractedProposal.findFirst.mock.invocationCallOrder[0],
+    );
   });
 
   it('routes every target to quota-exhausted without calling the provider when the daily budget is spent', async () => {
@@ -1222,7 +1234,9 @@ describe('ExtractionProcessor — document-file job', () => {
     await build(
       prisma,
       fakeSourceReader(
-        jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
+        jest
+          .fn()
+          .mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
       ),
       fakeExtractor(jest.fn()),
       fakeEncryption(),
@@ -1279,7 +1293,12 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
   ];
   function documentFileJob(locale = 'es') {
     return {
-      data: { kind: 'document-file', filePath: 'src/cart.spec.ts', targets, locale },
+      data: {
+        kind: 'document-file',
+        filePath: 'src/cart.spec.ts',
+        targets,
+        locale,
+      },
     } as never;
   }
   function twoMatchedCases() {
@@ -1293,7 +1312,10 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
             }),
             extractedCase({ automationKey: 'Cart > removes an item' }),
           ],
-          { title: 'Carrito de compras', description: 'Cubre agregar y quitar artículos' },
+          {
+            title: 'Carrito de compras',
+            description: 'Cubre agregar y quitar artículos',
+          },
         ),
       ),
     );
@@ -1325,14 +1347,22 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
   it('creates no suite proposal when the model omitted the summary', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([{ id: 'case-1', suiteId: 'suite-1' }]);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+    ]);
     const extractor = fakeExtractor(
-      jest.fn().mockResolvedValue(
-        extractedOutcome([extractedCase({ automationKey: 'Cart > adds an item' })]),
-      ),
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+          ]),
+        ),
     );
 
-    await build(prisma, fakeSourceReader(), extractor).process(documentFileJob());
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
 
     expect(prisma.suiteProposal.create).not.toHaveBeenCalled();
   });
@@ -1344,7 +1374,9 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
       { id: 'case-1', suiteId: 'suite-1' },
       { id: 'case-2', suiteId: 'suite-1' },
     ]);
-    prisma.suiteProposal.findFirst.mockResolvedValue({ id: 'pending-suite-proposal' });
+    prisma.suiteProposal.findFirst.mockResolvedValue({
+      id: 'pending-suite-proposal',
+    });
 
     await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
       documentFileJob(),
@@ -1366,11 +1398,16 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
     );
 
     const created = (
-      prisma.extractedProposal.create.mock.calls as [{ data: Record<string, unknown> }][]
+      prisma.extractedProposal.create.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]
     ).map(([call]) => call.data);
     const first = created.find((data) => data.targetTestCaseId === 'case-1');
     const second = created.find((data) => data.targetTestCaseId === 'case-2');
-    expect(first).toMatchObject({ locale: 'es', observations: ['No assertion on the total'] });
+    expect(first).toMatchObject({
+      locale: 'es',
+      observations: ['No assertion on the total'],
+    });
     expect(second).toMatchObject({ locale: 'es' });
     expect(second).not.toHaveProperty('observations');
   });
@@ -1381,7 +1418,11 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
 
     await build(
       prisma,
-      fakeSourceReader(jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' })),
+      fakeSourceReader(
+        jest
+          .fn()
+          .mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
+      ),
       fakeExtractor(jest.fn()),
     ).process(documentFileJob('en'));
 

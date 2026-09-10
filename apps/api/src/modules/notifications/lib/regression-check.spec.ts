@@ -20,9 +20,9 @@ describe('classifyCaseDelta', () => {
   });
 
   it('classifies a case with no linked test case as new, since it cannot be compared', () => {
-    expect(classifyCaseDelta({ testCaseId: null, status: 'fail' }, previous)).toBe(
-      'new',
-    );
+    expect(
+      classifyCaseDelta({ testCaseId: null, status: 'fail' }, previous),
+    ).toBe('new');
   });
 
   it('classifies pass then fail as a regression', () => {

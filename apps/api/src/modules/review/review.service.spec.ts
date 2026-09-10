@@ -31,7 +31,11 @@ const proposalRow = {
 
 interface FakePrisma {
   extractedProposal: { findFirst: jest.Mock; update: jest.Mock };
-  suiteProposal: { findMany: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
+  suiteProposal: {
+    findMany: jest.Mock;
+    findFirst: jest.Mock;
+    update: jest.Mock;
+  };
   suite: { findFirst: jest.Mock; update: jest.Mock };
   testCase: { create: jest.Mock; update: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
@@ -488,7 +492,9 @@ describe('ReviewService.reject', () => {
 });
 
 describe('ReviewService.approveMany', () => {
-  function createBulkPrisma(rowsById: Record<string, typeof proposalRow | undefined>) {
+  function createBulkPrisma(
+    rowsById: Record<string, typeof proposalRow | undefined>,
+  ) {
     const prisma = createPrisma();
     prisma.extractedProposal.findFirst.mockImplementation(
       (args: { where: { id: string } }) =>
@@ -502,13 +508,21 @@ describe('ReviewService.approveMany', () => {
       'proposal-1': proposalRow,
     });
 
-    const results = await build(prisma).approveMany(org, ['proposal-1', 'proposal-missing'], {
-      actorId: 'user-1',
-    });
+    const results = await build(prisma).approveMany(
+      org,
+      ['proposal-1', 'proposal-missing'],
+      {
+        actorId: 'user-1',
+      },
+    );
 
     expect(results).toEqual([
       expect.objectContaining({ id: 'proposal-1', outcome: 'approved' }),
-      expect.objectContaining({ id: 'proposal-missing', outcome: 'skipped', reason: 'not-found' }),
+      expect.objectContaining({
+        id: 'proposal-missing',
+        outcome: 'skipped',
+        reason: 'not-found',
+      }),
     ]);
   });
 
@@ -541,7 +555,9 @@ describe('ReviewService.approveMany', () => {
 });
 
 describe('ReviewService.rejectMany', () => {
-  function createBulkPrisma(rowsById: Record<string, typeof proposalRow | undefined>) {
+  function createBulkPrisma(
+    rowsById: Record<string, typeof proposalRow | undefined>,
+  ) {
     const prisma = createPrisma();
     prisma.extractedProposal.findFirst.mockImplementation(
       (args: { where: { id: string } }) =>
@@ -556,9 +572,13 @@ describe('ReviewService.rejectMany', () => {
       'proposal-2': { ...proposalRow, status: 'rejected' },
     });
 
-    const results = await build(prisma).rejectMany(org, ['proposal-1', 'proposal-2'], {
-      actorId: 'user-1',
-    });
+    const results = await build(prisma).rejectMany(
+      org,
+      ['proposal-1', 'proposal-2'],
+      {
+        actorId: 'user-1',
+      },
+    );
 
     expect(results).toEqual([
       { id: 'proposal-1', outcome: 'rejected' },
@@ -614,7 +634,9 @@ describe('ReviewService suite proposals', () => {
     const prisma = createPrisma();
     prisma.suiteProposal.findMany.mockResolvedValue([suiteProposalRow]);
 
-    const items = await build(prisma).listSuiteProposals(org, { projectId: 'project-1' });
+    const items = await build(prisma).listSuiteProposals(org, {
+      projectId: 'project-1',
+    });
 
     expect(items).toEqual([
       expect.objectContaining({
@@ -632,7 +654,7 @@ describe('ReviewService suite proposals', () => {
         where: expect.objectContaining({
           project: { organizationId: 'org-1' },
           projectId: 'project-1',
-        }),
+        }) as unknown,
       }),
     );
   });
@@ -641,7 +663,10 @@ describe('ReviewService suite proposals', () => {
     const prisma = createPrisma();
     prisma.suiteProposal.findFirst.mockResolvedValue(suiteProposalRow);
 
-    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+    const result = await build(prisma).approveSuiteProposal(
+      org,
+      'suite-proposal-1',
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -665,7 +690,7 @@ describe('ReviewService suite proposals', () => {
     expect(prisma.suiteProposal.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'suite-proposal-1' },
-        data: expect.objectContaining({ status: 'approved' }),
+        data: expect.objectContaining({ status: 'approved' }) as unknown,
       }),
     );
   });
@@ -677,7 +702,10 @@ describe('ReviewService suite proposals', () => {
       suite: { name: 'Checkout', nameSource: 'human' },
     });
 
-    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+    const result = await build(prisma).approveSuiteProposal(
+      org,
+      'suite-proposal-1',
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -690,7 +718,9 @@ describe('ReviewService suite proposals', () => {
     });
     expect(prisma.suite.update).not.toHaveBeenCalled();
     expect(prisma.suiteProposal.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'approved' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'approved' }) as unknown,
+      }),
     );
   });
 
@@ -701,7 +731,10 @@ describe('ReviewService suite proposals', () => {
       suite: { name: 'Carrito', nameSource: 'aeris' },
     });
 
-    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+    const result = await build(prisma).approveSuiteProposal(
+      org,
+      'suite-proposal-1',
+    );
 
     expect(result.ok && result.value.applied).toBe(true);
     expect(prisma.suite.update).toHaveBeenCalledTimes(1);
@@ -711,7 +744,10 @@ describe('ReviewService suite proposals', () => {
     const prisma = createPrisma();
     prisma.suiteProposal.findFirst.mockResolvedValue(suiteProposalRow);
 
-    const result = await build(prisma).rejectSuiteProposal(org, 'suite-proposal-1');
+    const result = await build(prisma).rejectSuiteProposal(
+      org,
+      'suite-proposal-1',
+    );
 
     expect(result).toEqual({
       ok: true,
@@ -724,15 +760,23 @@ describe('ReviewService suite proposals', () => {
     });
     expect(prisma.suite.update).not.toHaveBeenCalled();
     expect(prisma.suiteProposal.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: 'rejected' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'rejected' }) as unknown,
+      }),
     );
   });
 
   it('refuses to decide a proposal that is no longer in review', async () => {
     const prisma = createPrisma();
-    prisma.suiteProposal.findFirst.mockResolvedValue({ ...suiteProposalRow, status: 'approved' });
+    prisma.suiteProposal.findFirst.mockResolvedValue({
+      ...suiteProposalRow,
+      status: 'approved',
+    });
 
-    const result = await build(prisma).approveSuiteProposal(org, 'suite-proposal-1');
+    const result = await build(prisma).approveSuiteProposal(
+      org,
+      'suite-proposal-1',
+    );
 
     expect(result).toEqual({ ok: false, error: 'invalid-transition' });
   });

@@ -554,7 +554,11 @@ describe('ProjectsService.findOne hasManualCases', () => {
 
     expect(isOk(result) && result.value.hasManualCases).toBe(true);
     expect(prisma.testCase.findFirst).toHaveBeenCalledWith({
-      where: { projectId: 'project-1', executionMode: 'manual', state: 'active' },
+      where: {
+        projectId: 'project-1',
+        executionMode: 'manual',
+        state: 'active',
+      },
       select: { id: true },
     });
   });

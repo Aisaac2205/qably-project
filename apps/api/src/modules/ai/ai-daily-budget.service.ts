@@ -8,10 +8,10 @@ const PACIFIC_TIMEZONE = 'America/Los_Angeles';
 const KEY_TTL_SECONDS = 26 * 60 * 60;
 
 export interface BudgetRedisClient {
-  incr(key: string): Promise<number>;
-  decr(key: string): Promise<number>;
-  expire(key: string, seconds: number): Promise<number>;
-  quit(): Promise<unknown>;
+  incr: (key: string) => Promise<number>;
+  decr: (key: string) => Promise<number>;
+  expire: (key: string, seconds: number) => Promise<number>;
+  quit: () => Promise<unknown>;
 }
 
 export interface DailyBudgetCheck {

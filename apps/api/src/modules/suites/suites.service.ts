@@ -381,36 +381,40 @@ export class SuitesService {
       ),
     ];
 
-    const [lastResultRows, pendingProposalRows, recentResultRows, duplicateKeyRows] =
-      await Promise.all([
-        automatedCaseIds.length === 0
-          ? Promise.resolve([] as LastResultRow[])
-          : (this.prisma.runCase.findMany({
-              where: { testCaseId: { in: automatedCaseIds } },
-              orderBy: [{ run: { startedAt: 'desc' } }, { id: 'desc' }],
-              distinct: ['testCaseId'],
-              select: {
-                testCaseId: true,
-                status: true,
-                recordedAt: true,
-                run: {
-                  select: { id: true, commitSha: true, startedAt: true },
-                },
+    const [
+      lastResultRows,
+      pendingProposalRows,
+      recentResultRows,
+      duplicateKeyRows,
+    ] = await Promise.all([
+      automatedCaseIds.length === 0
+        ? Promise.resolve([] as LastResultRow[])
+        : (this.prisma.runCase.findMany({
+            where: { testCaseId: { in: automatedCaseIds } },
+            orderBy: [{ run: { startedAt: 'desc' } }, { id: 'desc' }],
+            distinct: ['testCaseId'],
+            select: {
+              testCaseId: true,
+              status: true,
+              recordedAt: true,
+              run: {
+                select: { id: true, commitSha: true, startedAt: true },
               },
-            }) as Promise<LastResultRow[]>),
-        allCaseIds.length === 0
-          ? Promise.resolve([] as PendingProposalRow[])
-          : (this.prisma.extractedProposal.findMany({
-              where: {
-                targetTestCaseId: { in: allCaseIds },
-                status: PENDING_STATUS,
-              },
-              orderBy: { createdAt: 'asc' },
-              select: { id: true, targetTestCaseId: true },
-            }) as Promise<PendingProposalRow[]>),
-        automatedCaseIds.length === 0
-          ? Promise.resolve([] as RecentResultRow[])
-          : (this.prisma.$queryRaw(Prisma.sql`
+            },
+          }) as Promise<LastResultRow[]>),
+      allCaseIds.length === 0
+        ? Promise.resolve([] as PendingProposalRow[])
+        : (this.prisma.extractedProposal.findMany({
+            where: {
+              targetTestCaseId: { in: allCaseIds },
+              status: PENDING_STATUS,
+            },
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, targetTestCaseId: true },
+          }) as Promise<PendingProposalRow[]>),
+      automatedCaseIds.length === 0
+        ? Promise.resolve([] as RecentResultRow[])
+        : (this.prisma.$queryRaw(Prisma.sql`
               SELECT test_case_id, id, status, started_at
               FROM (
                 SELECT rc.id AS id, rc."testCaseId" AS test_case_id, rc.status,
@@ -427,21 +431,21 @@ export class SuitesService {
               WHERE rn <= ${FLAKY_WINDOW_SIZE}
               ORDER BY test_case_id ASC, started_at DESC, id DESC
             `) as Promise<RecentResultRow[]>),
-        automationKeys.length === 0
-          ? Promise.resolve([] as DuplicateKeyCandidateRow[])
-          : (this.prisma.testCase.findMany({
-              where: {
-                projectId: { in: projectIds },
-                automationKey: { in: automationKeys },
-              },
-              select: {
-                id: true,
-                suiteId: true,
-                projectId: true,
-                automationKey: true,
-              },
-            }) as Promise<DuplicateKeyCandidateRow[]>),
-      ]);
+      automationKeys.length === 0
+        ? Promise.resolve([] as DuplicateKeyCandidateRow[])
+        : (this.prisma.testCase.findMany({
+            where: {
+              projectId: { in: projectIds },
+              automationKey: { in: automationKeys },
+            },
+            select: {
+              id: true,
+              suiteId: true,
+              projectId: true,
+              automationKey: true,
+            },
+          }) as Promise<DuplicateKeyCandidateRow[]>),
+    ]);
 
     const lastResultByCaseId = new Map<string, CaseLastResult>();
     for (const row of lastResultRows) {
@@ -461,9 +465,16 @@ export class SuitesService {
       pendingProposalByCaseId.set(row.targetTestCaseId, row.id);
     }
 
-    const recentResultsByCaseId = new Map<string, CaseHealthInput['recentResults'][number][]>();
+    const recentResultsByCaseId = new Map<
+      string,
+      CaseHealthInput['recentResults'][number][]
+    >();
     for (const row of recentResultRows) {
-      if (!RESULT_STATUSES.has(row.status as CaseHealthInput['recentResults'][number])) {
+      if (
+        !RESULT_STATUSES.has(
+          row.status as CaseHealthInput['recentResults'][number],
+        )
+      ) {
         continue;
       }
       const results = recentResultsByCaseId.get(row.test_case_id) ?? [];

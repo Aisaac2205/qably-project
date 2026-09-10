@@ -72,7 +72,9 @@ interface ViewRow {
 
 function observationsOf(raw: unknown): string[] | undefined {
   if (!Array.isArray(raw)) return undefined;
-  const strings = raw.filter((item): item is string => typeof item === 'string');
+  const strings = raw.filter(
+    (item): item is string => typeof item === 'string',
+  );
   return strings.length === 0 ? undefined : strings;
 }
 
@@ -184,7 +186,8 @@ function toSuiteProposalView(row: SuiteProposalRow): SuiteProposalView {
     projectId: row.projectId,
     suiteId: row.suiteId,
     suiteName: row.suite.name,
-    suiteNameSource: row.suite.nameSource as SuiteProposalView['suiteNameSource'],
+    suiteNameSource: row.suite
+      .nameSource as SuiteProposalView['suiteNameSource'],
     title: row.title,
     description: row.description,
     status: row.status,
@@ -500,13 +503,13 @@ export class ReviewService {
     org: OrgContext,
     proposalId: string,
   ): Promise<Result<SuiteProposalRow, ReviewError>> {
-    const row = (await this.prisma.suiteProposal.findFirst({
+    const row = await this.prisma.suiteProposal.findFirst({
       where: {
         id: proposalId,
         project: { organizationId: org.organizationId },
       },
       select: SUITE_PROPOSAL_SELECT,
-    })) as SuiteProposalRow | null;
+    });
 
     if (row === null) return err('not-found');
     if (row.status !== PENDING_STATUS) return err('invalid-transition');
@@ -641,7 +644,7 @@ export class ReviewService {
         createdNewCase,
         testCaseId,
         testCaseName: proposal.title,
-        suiteId: createdNewCase ? (suiteId as string) : (proposal.suiteId ?? null),
+        suiteId: createdNewCase ? suiteId : (proposal.suiteId ?? null),
         versionId: version.id,
         version: version.version,
         decisionId: decision.id,

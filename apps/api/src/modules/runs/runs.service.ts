@@ -241,7 +241,11 @@ export class RunsService {
     if (byKey !== null) return byKey;
 
     const legacy = await tx.suite.findFirst({
-      where: { name: suiteKey, projectId: apiKey.projectId, ingestionKey: null },
+      where: {
+        name: suiteKey,
+        projectId: apiKey.projectId,
+        ingestionKey: null,
+      },
       select: { id: true, name: true },
     });
 

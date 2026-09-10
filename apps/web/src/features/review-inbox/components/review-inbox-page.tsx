@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Info, X } from '@phosphor-icons/react'
@@ -129,11 +129,8 @@ export function ReviewInboxPage() {
       })
       return next
     })
-  }, [t])
-
-  useEffect(() => {
     setSelectedIds(new Set())
-  }, [selectedProjectId, statusFilter, duplicateOnly, searchQuery])
+  }, [t])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -272,13 +269,22 @@ export function ReviewInboxPage() {
                 selectedId={activeSelectedId}
                 onSelect={(id) => setSelectedId(id)}
                 selectedProjectId={selectedProjectId}
-                onSelectProject={(id) => setSelectedProjectId(id)}
+                onSelectProject={(id) => {
+                  setSelectedProjectId(id)
+                  setSelectedIds(new Set())
+                }}
                 statusFilter={statusFilter}
-                onStatusFilterChange={(s) => setStatusFilter(s)}
+                onStatusFilterChange={(s) => {
+                  setStatusFilter(s)
+                  setSelectedIds(new Set())
+                }}
                 duplicateOnly={duplicateOnly}
                 onToggleDuplicateOnly={toggleDuplicateOnly}
                 searchQuery={searchQuery}
-                onSearchQueryChange={(q) => setSearchQuery(q)}
+                onSearchQueryChange={(q) => {
+                  setSearchQuery(q)
+                  setSelectedIds(new Set())
+                }}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onToggleSelectAll={toggleSelectAll}

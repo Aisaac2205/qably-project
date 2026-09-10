@@ -249,7 +249,9 @@ describe('GeminiExtractor suite summary and observations', () => {
     const client = fakeClient(() =>
       Promise.resolve({
         text: JSON.stringify({
-          cases: [{ ...validRawCase(), observations: ['No assertion on the total'] }],
+          cases: [
+            { ...validRawCase(), observations: ['No assertion on the total'] },
+          ],
           suite: { title: 'Carrito', description: 'Cubre el flujo de compra' },
         }),
         usageMetadata: {},
@@ -260,8 +262,13 @@ describe('GeminiExtractor suite summary and observations', () => {
 
     expect(outcome.kind).toBe('extracted');
     if (outcome.kind !== 'extracted') return;
-    expect(outcome.suite).toEqual({ title: 'Carrito', description: 'Cubre el flujo de compra' });
-    expect(outcome.cases[0].observations).toEqual(['No assertion on the total']);
+    expect(outcome.suite).toEqual({
+      title: 'Carrito',
+      description: 'Cubre el flujo de compra',
+    });
+    expect(outcome.cases[0].observations).toEqual([
+      'No assertion on the total',
+    ]);
   });
 
   it('reports no suite summary when the model omits it or sends an invalid one', async () => {

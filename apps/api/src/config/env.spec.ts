@@ -176,8 +176,8 @@ describe('parseEnv', () => {
   });
 
   it('rejects a non-positive AERIS_DAILY_BUDGET', () => {
-    expect(() =>
-      parseEnv({ ...validEnv, AERIS_DAILY_BUDGET: '0' }),
-    ).toThrow(/AERIS_DAILY_BUDGET/);
+    expect(() => parseEnv({ ...validEnv, AERIS_DAILY_BUDGET: '0' })).toThrow(
+      /AERIS_DAILY_BUDGET/,
+    );
   });
 });

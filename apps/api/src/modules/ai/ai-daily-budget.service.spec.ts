@@ -1,11 +1,16 @@
 import type { Env } from '../../config/env';
-import { AiDailyBudget, type BudgetRedisClient } from './ai-daily-budget.service';
+import {
+  AiDailyBudget,
+  type BudgetRedisClient,
+} from './ai-daily-budget.service';
 
 function env(overrides: Partial<Env> = {}): Env {
   return { AERIS_DAILY_BUDGET: 100, ...overrides } as Env;
 }
 
-function fakeRedis(overrides: Partial<BudgetRedisClient> = {}): BudgetRedisClient {
+function fakeRedis(
+  overrides: Partial<BudgetRedisClient> = {},
+): BudgetRedisClient {
   return {
     incr: jest.fn().mockResolvedValue(1),
     decr: jest.fn().mockResolvedValue(0),
@@ -19,7 +24,10 @@ describe('AiDailyBudget.tryConsume', () => {
   it('allows the call and increments the counter when under budget', async () => {
     const redis = fakeRedis({ incr: jest.fn().mockResolvedValue(5) });
 
-    const allowed = await new AiDailyBudget(redis, env({ AERIS_DAILY_BUDGET: 100 })).tryConsume({
+    const allowed = await new AiDailyBudget(
+      redis,
+      env({ AERIS_DAILY_BUDGET: 100 }),
+    ).tryConsume({
       isByok: false,
     });
 
@@ -46,9 +54,10 @@ describe('AiDailyBudget.tryConsume', () => {
   it('blocks and rolls the increment back once the count would exceed the budget', async () => {
     const redis = fakeRedis({ incr: jest.fn().mockResolvedValue(101) });
 
-    const allowed = await new AiDailyBudget(redis, env({ AERIS_DAILY_BUDGET: 100 })).tryConsume(
-      { isByok: false },
-    );
+    const allowed = await new AiDailyBudget(
+      redis,
+      env({ AERIS_DAILY_BUDGET: 100 }),
+    ).tryConsume({ isByok: false });
 
     expect(allowed).toBe(false);
     expect(redis.decr).toHaveBeenCalledTimes(1);
@@ -57,9 +66,10 @@ describe('AiDailyBudget.tryConsume', () => {
   it('allows the call exactly at the budget boundary', async () => {
     const redis = fakeRedis({ incr: jest.fn().mockResolvedValue(100) });
 
-    const allowed = await new AiDailyBudget(redis, env({ AERIS_DAILY_BUDGET: 100 })).tryConsume(
-      { isByok: false },
-    );
+    const allowed = await new AiDailyBudget(
+      redis,
+      env({ AERIS_DAILY_BUDGET: 100 }),
+    ).tryConsume({ isByok: false });
 
     expect(allowed).toBe(true);
     expect(redis.decr).not.toHaveBeenCalled();

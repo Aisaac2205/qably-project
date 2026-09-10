@@ -82,7 +82,9 @@ interface DeltaCaseRow {
   status: CaseStatus;
 }
 
-function groupCasesByRun<T extends { runId: string }>(rows: T[]): Map<string, T[]> {
+function groupCasesByRun<T extends { runId: string }>(
+  rows: T[],
+): Map<string, T[]> {
   const byRun = new Map<string, T[]>();
   for (const row of rows) {
     const list = byRun.get(row.runId) ?? [];

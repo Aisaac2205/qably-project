@@ -21,7 +21,7 @@ interface CaseCardProps {
   onDelete: (testCase: TestCase) => void
 }
 
-export function CaseCard({ testCase, projectId, onEdit, onDelete }: CaseCardProps) {
+export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t, locale } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
