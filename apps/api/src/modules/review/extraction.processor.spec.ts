@@ -1484,7 +1484,10 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
       { id: 'case-1', suiteId: 'suite-1' },
       { id: 'case-2', suiteId: 'suite-1' },
     ]);
-    prisma.suiteProposal.create.mockRejectedValue({ code: 'P2002' });
+    prisma.suiteProposal.create.mockRejectedValue({
+      code: 'P2002',
+      meta: { target: 'suite_proposal_one_pending_per_suite' },
+    });
 
     await expect(
       build(prisma, fakeSourceReader(), twoMatchedCases()).process(
@@ -1500,5 +1503,62 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
         ][]
       ).map(([call]) => call.data.needsManualReview),
     ).toEqual([undefined, undefined]);
+  });
+
+  it('never mistakes an unrelated unique violation on suite_proposal for the pending-per-suite race', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+    prisma.suiteProposal.create.mockRejectedValue({
+      code: 'P2002',
+      meta: { target: 'some_other_suite_proposal_constraint' },
+    });
+
+    await expect(
+      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+        documentFileJob(),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(4);
+    expect(
+      (
+        prisma.extractedProposal.create.mock.calls as [
+          { data: Record<string, unknown> },
+        ][]
+      )
+        .slice(2)
+        .map(([call]) => call.data.needsManualReview),
+    ).toEqual([true, true]);
+  });
+
+  it('never mistakes a P2002 with no target metadata for the pending-per-suite race', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-2', suiteId: 'suite-1' },
+    ]);
+    prisma.suiteProposal.create.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+        documentFileJob(),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(4);
+    expect(
+      (
+        prisma.extractedProposal.create.mock.calls as [
+          { data: Record<string, unknown> },
+        ][]
+      )
+        .slice(2)
+        .map(([call]) => call.data.needsManualReview),
+    ).toEqual([true, true]);
   });
 });

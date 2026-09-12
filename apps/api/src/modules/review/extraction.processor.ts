@@ -33,6 +33,8 @@ const QUOTA_EXHAUSTED_REASON = 'quota-exhausted';
 const NOT_BYOK = { isByok: false };
 const UNIQUE_VIOLATION = 'P2002';
 const LOCK_DURATION_MS = 120_000;
+const SUITE_PROPOSAL_PENDING_CONSTRAINT =
+  'suite_proposal_one_pending_per_suite';
 
 interface ConnectionInfo {
   provider: RepoConnectionProvider;
@@ -133,6 +135,20 @@ function isUniqueViolation(error: unknown): boolean {
     error !== null &&
     (error as { code?: unknown }).code === UNIQUE_VIOLATION
   );
+}
+
+function violatesUniqueConstraint(
+  error: unknown,
+  constraintName: string,
+): boolean {
+  if (!isUniqueViolation(error)) return false;
+
+  const target = (error as { meta?: { target?: unknown } }).meta?.target;
+
+  if (typeof target === 'string') return target.includes(constraintName);
+  if (Array.isArray(target)) return target.includes(constraintName);
+
+  return false;
 }
 
 function splitRepo(full: string): { owner: string; repo: string } {
@@ -623,7 +639,9 @@ export class ExtractionProcessor extends WorkerHost {
         `RELEASE SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
       );
     } catch (error) {
-      if (!isUniqueViolation(error)) throw error;
+      if (!violatesUniqueConstraint(error, SUITE_PROPOSAL_PENDING_CONSTRAINT)) {
+        throw error;
+      }
 
       await tx.$executeRawUnsafe(
         `ROLLBACK TO SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
