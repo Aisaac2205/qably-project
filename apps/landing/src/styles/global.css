@@ -1,23 +1,27 @@
 @import "tailwindcss";
 
-/* ─── Qably Landing — Vercel-Style Pure Black & White Minimalist Theme ── */
+/* ─── Qably Landing — Black & White Minimalist Theme ────────────────────
+   Four background steps with perceptible gaps, deepest first:
+   subtle (recessed wells such as code bodies) < bg (page) < elevated
+   (cards, toolbars) < hover. Pure black is the recess, never the page
+   floor: a black page leaves no room to sink a surface below it. */
 
 :root {
-  /* Backgrounds */
-  --landing-bg:            #000000;
-  --landing-bg-elevated:   #09090b;
-  --landing-bg-hover:      #18181b;
-  --landing-bg-subtle:     #050505;
+  /* Backgrounds — deepest to lightest */
+  --landing-bg-subtle:     #000000;
+  --landing-bg:            #09090b;
+  --landing-bg-elevated:   #18181b;
+  --landing-bg-hover:      #27272a;
 
   /* Foregrounds */
-  --landing-fg:            #ffffff;
+  --landing-fg:            #fafafa;
   --landing-fg-muted:      #a1a1aa;
-  --landing-fg-subtle:     #71717a;
+  --landing-fg-subtle:     #8a8a93;
 
-  /* Brand Primary: Pure White */
-  --primary:               #ffffff;
+  /* Brand Primary: off-white */
+  --primary:               #fafafa;
   --primary-hover:         #e4e4e7;
-  --primary-fg:            #000000;
+  --primary-fg:            #09090b;
 
   /* Semantic status (functional only, never decorative) */
   --status-pass:           #10b981;
@@ -182,14 +186,14 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scroll-behavior: smooth;
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--landing-bg);
+  color: var(--landing-fg);
 }
 
 body {
   margin: 0;
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--landing-bg);
+  color: var(--landing-fg);
   font-family: var(--font-sans);
   line-height: 1.5;
   text-rendering: optimizeLegibility;
@@ -197,8 +201,8 @@ body {
 }
 
 ::selection {
-  background-color: #ffffff;
-  color: #000000;
+  background-color: var(--landing-fg);
+  color: var(--landing-bg);
 }
 
 :focus-visible {
