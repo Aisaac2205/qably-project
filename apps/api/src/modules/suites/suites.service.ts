@@ -276,6 +276,8 @@ export class SuitesService {
 
     try {
       const row = await this.prisma.$transaction(async (tx) => {
+        const currentName = await this.lockSuiteName(tx, id, existing.name);
+
         if (input.isDefault === true) {
           await this.clearDefault(tx, existing.projectId, id);
         }
@@ -284,7 +286,7 @@ export class SuitesService {
           where: { id },
           data: {
             ...input,
-            ...(input.name === undefined || input.name === existing.name
+            ...(input.name === undefined || input.name === currentName
               ? {}
               : { nameSource: 'human' }),
           },
@@ -596,6 +598,18 @@ export class SuitesService {
       where: { id, organizationId: org.organizationId },
       select: SUITE_SELECT,
     });
+  }
+
+  private async lockSuiteName(
+    tx: { $queryRaw: PrismaService['$queryRaw'] },
+    id: string,
+    fallback: string,
+  ): Promise<string> {
+    const rows = await tx.$queryRaw<{ name: string }[]>(
+      Prisma.sql`SELECT name FROM "suite" WHERE id = ${id} FOR UPDATE`,
+    );
+
+    return rows[0]?.name ?? fallback;
   }
 
   private async clearDefault(

@@ -745,6 +745,34 @@ describe('SuitesService.update name source', () => {
       }),
     );
   });
+
+  it('compares against the locked row inside the transaction, not the stale pre-transaction read', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({ ...suiteRow, name: 'Checkout' });
+    prisma.$queryRaw.mockResolvedValue([{ name: 'RenamedConcurrently' }]);
+
+    await build(prisma).update(owner, 'suite-1', { name: 'Checkout' });
+
+    expect(prisma.suite.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { name: 'Checkout', nameSource: 'human' },
+      }),
+    );
+  });
+
+  it('leaves the name source alone when the locked row already carries the patched name', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue({ ...suiteRow, name: 'Stale' });
+    prisma.$queryRaw.mockResolvedValue([{ name: 'Checkout' }]);
+
+    await build(prisma).update(owner, 'suite-1', { name: 'Checkout' });
+
+    expect(prisma.suite.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { name: 'Checkout' },
+      }),
+    );
+  });
 });
 
 describe('SuitesService documented locale', () => {
