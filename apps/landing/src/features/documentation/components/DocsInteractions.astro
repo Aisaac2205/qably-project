@@ -60,6 +60,60 @@
     }
   }
 
+  const TOC_OFFSET = 96;
+
+  function initTocSpy(): void {
+    const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
+    if (links.length === 0) return;
+
+    const sections = links
+      .map((link) => (link.dataset.tocLink ? document.getElementById(link.dataset.tocLink) : null))
+      .filter((section): section is HTMLElement => section !== null)
+      .sort((a, b) =>
+        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+      );
+    if (sections.length === 0) return;
+
+    let activeId = '';
+
+    function setActive(id: string): void {
+      if (id === activeId) return;
+      activeId = id;
+
+      for (const link of links) {
+        const current = link.dataset.tocLink === id;
+        link.classList.toggle('text-fg', current);
+        if (current) link.setAttribute('aria-current', 'true');
+        else link.removeAttribute('aria-current');
+      }
+    }
+
+    function resolveActive(): void {
+      const doc = document.documentElement;
+      const atBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 2;
+      if (atBottom) {
+        setActive(sections[sections.length - 1].id);
+        return;
+      }
+
+      let current = sections[0];
+      for (const section of sections) {
+        if (section.getBoundingClientRect().top - TOC_OFFSET > 1) break;
+        current = section;
+      }
+      setActive(current.id);
+    }
+
+    const observer = new IntersectionObserver(resolveActive, {
+      rootMargin: `-${TOC_OFFSET}px 0px -85% 0px`,
+    });
+    for (const section of sections) observer.observe(section);
+
+    resolveActive();
+  }
+
+  initTocSpy();
+
   document.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;

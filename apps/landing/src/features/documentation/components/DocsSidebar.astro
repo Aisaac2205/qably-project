@@ -20,7 +20,11 @@ const sectionById = new Map(content.sections.map((section) => [section.id, secti
               const section = sectionById.get(id);
               return section ? (
                 <li>
-                  <a href={`#${section.id}`} class="block py-0.5 transition-colors hover:text-fg">
+                  <a
+                    href={`#${section.id}`}
+                    data-toc-link={section.id}
+                    class="block py-0.5 transition-colors hover:text-fg"
+                  >
                     {section.navLabel}
                   </a>
                 </li>
