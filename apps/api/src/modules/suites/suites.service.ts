@@ -79,6 +79,28 @@ interface CaseRow {
   currentVersion: { version: number; locale?: string | null } | null;
 }
 
+interface DocumentedCaseFields {
+  name: string;
+  steps: string[];
+  expectedResult: string;
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function documentedFieldsChanged(
+  input: UpdateCaseInput,
+  current: DocumentedCaseFields,
+): boolean {
+  return (
+    (input.name !== undefined && input.name !== current.name) ||
+    (input.steps !== undefined && !arraysEqual(input.steps, current.steps)) ||
+    (input.expectedResult !== undefined &&
+      input.expectedResult !== current.expectedResult)
+  );
+}
+
 interface PendingProposalRow {
   id: string;
   targetTestCaseId: string | null;
@@ -379,12 +401,27 @@ export class SuitesService {
     const existing = await this.scoped(org, suiteId);
 
     if (existing === null) return err('not-found');
-    if (!existing.cases.some((testCase) => testCase.id === caseId)) {
-      return err('not-found');
-    }
+    const currentCase = existing.cases.find(
+      (testCase) => testCase.id === caseId,
+    );
+    if (currentCase === undefined) return err('not-found');
 
     const row = await this.prisma.$transaction(async (tx) => {
-      await tx.testCase.update({ where: { id: caseId }, data: input });
+      const locked = await this.lockCaseDocumentedFields(
+        tx,
+        caseId,
+        currentCase,
+      );
+
+      await tx.testCase.update({
+        where: { id: caseId },
+        data: {
+          ...input,
+          ...(documentedFieldsChanged(input, locked)
+            ? { documentationSource: 'human' }
+            : {}),
+        },
+      });
 
       return tx.suite.findUniqueOrThrow({
         where: { id: suiteId },
@@ -675,6 +712,18 @@ export class SuitesService {
     );
 
     return rows[0]?.name ?? fallback;
+  }
+
+  private async lockCaseDocumentedFields(
+    tx: { $queryRaw: PrismaService['$queryRaw'] },
+    id: string,
+    fallback: DocumentedCaseFields,
+  ): Promise<DocumentedCaseFields> {
+    const rows = await tx.$queryRaw<DocumentedCaseFields[]>(
+      Prisma.sql`SELECT name, steps, "expectedResult" FROM "test_case" WHERE id = ${id} FOR UPDATE`,
+    );
+
+    return rows[0] ?? fallback;
   }
 
   private async clearDefault(

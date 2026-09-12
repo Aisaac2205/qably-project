@@ -775,6 +775,105 @@ describe('SuitesService.update name source', () => {
   });
 });
 
+describe('SuitesService.updateCase documentation source', () => {
+  it('marks the documentation as human-edited when the steps change', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      steps: ['open', 'add', 'checkout'],
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        steps: ['open', 'add', 'checkout'],
+        documentationSource: 'human',
+      },
+    });
+  });
+
+  it('marks the documentation as human-edited when the name changes', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      name: 'Adds two items to the cart',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        name: 'Adds two items to the cart',
+        documentationSource: 'human',
+      },
+    });
+  });
+
+  it('marks the documentation as human-edited when the expected result changes', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      expectedResult: 'cart has two items',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        expectedResult: 'cart has two items',
+        documentationSource: 'human',
+      },
+    });
+  });
+
+  it('leaves the documentation source alone when the patch repeats the stored values', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      name: 'Adds to cart',
+      steps: ['open', 'add'],
+      expectedResult: 'cart has one item',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        name: 'Adds to cart',
+        steps: ['open', 'add'],
+        expectedResult: 'cart has one item',
+      },
+    });
+  });
+
+  it('leaves the documentation source alone when only non-documented fields change', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      priority: 'high',
+      state: 'active',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { priority: 'high', state: 'active' },
+    });
+  });
+
+  it('compares against the locked row inside the transaction, not the stale pre-transaction read', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockResolvedValue([
+      { name: 'Adds to cart', steps: ['open', 'add'], expectedResult: 'stale' },
+    ]);
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      expectedResult: 'stale',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { expectedResult: 'stale' },
+    });
+  });
+});
+
 describe('SuitesService documented locale', () => {
   it('exposes the locale of the published version on each case', async () => {
     const prisma = createPrisma();
