@@ -333,6 +333,8 @@ describe('Suites (e2e)', () => {
         projectId: 'project-1',
         automationKey: 'Cart > adds an item',
         automationFilePath: 'src/cart.spec.ts',
+        steps: [],
+        currentVersion: null,
       },
     ]);
 

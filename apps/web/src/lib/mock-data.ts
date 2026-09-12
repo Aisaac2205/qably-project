@@ -170,6 +170,7 @@ export const mockSuites: Suite[] = [
     updatedAt: '2026-06-14T10:00:00Z',
     manualCases: 3,
     automatedCases: 0,
+    undocumentedCount: 0,
     staleLocaleCount: 0,
     cases: [
       {
@@ -219,6 +220,7 @@ export const mockSuites: Suite[] = [
     updatedAt: '2026-06-10T14:30:00Z',
     manualCases: 3,
     automatedCases: 0,
+    undocumentedCount: 0,
     staleLocaleCount: 0,
     cases: [
       {
@@ -268,6 +270,7 @@ export const mockSuites: Suite[] = [
     updatedAt: '2026-06-08T09:15:00Z',
     manualCases: 1,
     automatedCases: 0,
+    undocumentedCount: 0,
     staleLocaleCount: 0,
     cases: [
       {
@@ -295,6 +298,7 @@ export const mockSuites: Suite[] = [
     updatedAt: '2026-02-10T00:00:00Z',
     manualCases: 0,
     automatedCases: 0,
+    undocumentedCount: 0,
     staleLocaleCount: 0,
     cases: [],
   },

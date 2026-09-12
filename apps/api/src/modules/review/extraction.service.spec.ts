@@ -309,6 +309,8 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
       projectId: 'proj-1',
       automationKey: 'Cart > adds an item',
       automationFilePath: 'src/cart.spec.ts',
+      steps: [],
+      currentVersion: null,
       ...overrides,
     };
   }
@@ -583,7 +585,19 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
 });
 
 describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
-  it('targets documented cases whose version locale is missing or differs from the organization locale', async () => {
+  function candidate(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      projectId: 'proj-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      steps: ['Open the cart'],
+      currentVersion: { locale: null },
+      ...overrides,
+    };
+  }
+
+  it('scopes the candidate query to the requested suite or project, automated cases only', async () => {
     const queue = createQueue();
     const prisma = createPrisma('es');
     prisma.testCase.findMany.mockResolvedValue([]);
@@ -597,40 +611,137 @@ describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
 
     expect(prisma.testCase.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          suiteId: 'suite-1',
-          executionMode: 'automated',
-          NOT: { steps: { equals: [] } },
-          OR: [
-            { currentVersion: null },
-            { currentVersion: { locale: null } },
-            { currentVersion: { locale: { not: 'es' } } },
-          ],
-        }) as unknown,
+        where: { suiteId: 'suite-1', executionMode: 'automated' },
       }),
     );
   });
 
-  it('keeps the undocumented mode byte-for-byte as before when no mode is given', async () => {
+  it('targets a documented case whose version has no locale yet', async () => {
     const queue = createQueue();
     const prisma = createPrisma('es');
-    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ currentVersion: { locale: null } }),
+    ]);
 
-    await build(prisma, queue).enqueueDocumentFiles(
+    const result = await build(prisma, queue).enqueueDocumentFiles(
       org,
       { suiteId: 'suite-1' },
       null,
+      'stale-locale',
     );
 
-    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          suiteId: 'suite-1',
-          executionMode: 'automated',
-          steps: { equals: [] },
-        },
-      }),
+    expect(result).toMatchObject({
+      ok: true,
+      value: { casesTargeted: 1 },
+    });
+  });
+
+  it('targets a documented case whose version locale differs from the organization default', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ currentVersion: { locale: 'en' } }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'stale-locale',
     );
-    expect(prisma.orgMember.findFirst).not.toHaveBeenCalled();
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { casesTargeted: 1 },
+    });
+  });
+
+  it('never targets a case whose version locale already matches the organization default', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ currentVersion: { locale: 'es' } }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'stale-locale',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
+    });
+  });
+
+  it('never targets an undocumented case (no steps yet) in stale-locale mode', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ steps: [], currentVersion: { locale: null } }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'stale-locale',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
+    });
+  });
+
+  it('skips a stale-locale candidate with a pending proposal instead of targeting it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1' },
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'stale-locale',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'already-pending', count: 1 }],
+      },
+    });
+  });
+
+  it('skips a stale-locale candidate with no automation key instead of targeting it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('es');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ automationKey: null }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'stale-locale',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'no-source-file', count: 1 }],
+      },
+    });
   });
 });

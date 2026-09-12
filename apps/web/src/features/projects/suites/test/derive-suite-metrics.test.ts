@@ -11,6 +11,7 @@ function suite(overrides: Partial<Suite> = {}): Suite {
     cases: [],
     manualCases: 0,
     automatedCases: 0,
+    undocumentedCount: 0,
     staleLocaleCount: 0,
     createdAt: '2026-01-01T00:00:00Z',
     description: '',

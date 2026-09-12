@@ -12,6 +12,7 @@ import {
   type CaseHealthInput,
   type CaseHealthResult,
 } from '../../common/quality/case-health';
+import { isCaseDocumentable } from '../../common/locale/documentable-case';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
 import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
@@ -166,10 +167,6 @@ function toView(row: SuiteRow, orgDefaultLocale: Locale): SuiteView {
   const automatedCases = cases.filter(
     (testCase) => testCase.executionMode === 'automated',
   ).length;
-  const staleLocaleCount = cases.filter(
-    (testCase) =>
-      testCase.executionMode === 'automated' && testCase.localeStale,
-  ).length;
 
   return {
     id: row.id,
@@ -183,7 +180,8 @@ function toView(row: SuiteRow, orgDefaultLocale: Locale): SuiteView {
     updatedAt: row.updatedAt.toISOString(),
     manualCases: cases.length - automatedCases,
     automatedCases,
-    staleLocaleCount,
+    undocumentedCount: 0,
+    staleLocaleCount: 0,
     cases,
   };
 }
@@ -211,6 +209,7 @@ export class SuitesService {
 
     return this.withLastResults(
       rows.map((row) => toView(row, orgDefaultLocale)),
+      orgDefaultLocale,
     );
   }
 
@@ -227,7 +226,12 @@ export class SuitesService {
       org.organizationId,
     );
 
-    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
+    return ok(
+      await this.withLastResult(
+        toView(row, orgDefaultLocale),
+        orgDefaultLocale,
+      ),
+    );
   }
 
   async create(
@@ -258,7 +262,12 @@ export class SuitesService {
         org.organizationId,
       );
 
-      return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
+      return ok(
+        await this.withLastResult(
+          toView(row, orgDefaultLocale),
+          orgDefaultLocale,
+        ),
+      );
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -299,7 +308,12 @@ export class SuitesService {
         org.organizationId,
       );
 
-      return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
+      return ok(
+        await this.withLastResult(
+          toView(row, orgDefaultLocale),
+          orgDefaultLocale,
+        ),
+      );
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -348,7 +362,12 @@ export class SuitesService {
       org.organizationId,
     );
 
-    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
+    return ok(
+      await this.withLastResult(
+        toView(row, orgDefaultLocale),
+        orgDefaultLocale,
+      ),
+    );
   }
 
   async updateCase(
@@ -378,7 +397,12 @@ export class SuitesService {
       org.organizationId,
     );
 
-    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
+    return ok(
+      await this.withLastResult(
+        toView(row, orgDefaultLocale),
+        orgDefaultLocale,
+      ),
+    );
   }
 
   async removeCase(
@@ -407,15 +431,26 @@ export class SuitesService {
       org.organizationId,
     );
 
-    return ok(await this.withLastResult(toView(row, orgDefaultLocale)));
+    return ok(
+      await this.withLastResult(
+        toView(row, orgDefaultLocale),
+        orgDefaultLocale,
+      ),
+    );
   }
 
-  private async withLastResult(view: SuiteView): Promise<SuiteView> {
-    const [withResult] = await this.withLastResults([view]);
+  private async withLastResult(
+    view: SuiteView,
+    orgDefaultLocale: Locale,
+  ): Promise<SuiteView> {
+    const [withResult] = await this.withLastResults([view], orgDefaultLocale);
     return withResult;
   }
 
-  private async withLastResults(views: SuiteView[]): Promise<SuiteView[]> {
+  private async withLastResults(
+    views: SuiteView[],
+    orgDefaultLocale: Locale,
+  ): Promise<SuiteView[]> {
     const allCaseIds = views.flatMap((view) =>
       view.cases.map((testCase) => testCase.id),
     );
@@ -589,7 +624,37 @@ export class SuitesService {
         }
       }
 
-      return { ...view, cases, healthSummary };
+      const documentableCandidate = (testCase: (typeof cases)[number]) => ({
+        executionMode: testCase.executionMode,
+        steps: testCase.steps,
+        documentedLocale: testCase.documentedLocale,
+        automationKey: testCase.automationKey ?? null,
+        hasPendingProposal: testCase.pendingProposalId !== null,
+      });
+
+      const undocumentedCount = cases.filter((testCase) =>
+        isCaseDocumentable(
+          documentableCandidate(testCase),
+          'undocumented',
+          orgDefaultLocale,
+        ),
+      ).length;
+
+      const staleLocaleCount = cases.filter((testCase) =>
+        isCaseDocumentable(
+          documentableCandidate(testCase),
+          'stale-locale',
+          orgDefaultLocale,
+        ),
+      ).length;
+
+      return {
+        ...view,
+        cases,
+        healthSummary,
+        undocumentedCount,
+        staleLocaleCount,
+      };
     });
   }
 

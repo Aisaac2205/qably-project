@@ -16,6 +16,10 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
   const staleLocaleCount =
     overrides.staleLocaleCount ??
     cases.filter((c) => c.executionMode === 'automated' && c.localeStale === true).length
+  const undocumentedCount =
+    overrides.undocumentedCount ??
+    cases.filter((c) => c.executionMode === 'automated' && c.steps.length === 0)
+      .length
   return {
     id: overrides.id ?? 'suite-1',
     projectId: overrides.projectId ?? 'proj-1',
@@ -24,6 +28,7 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     cases,
     manualCases,
     automatedCases,
+    undocumentedCount,
     staleLocaleCount,
     createdAt: overrides.createdAt ?? '2026-01-25T00:00:00Z',
     description: overrides.description ?? 'Login and password flows.',

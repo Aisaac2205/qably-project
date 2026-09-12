@@ -193,6 +193,7 @@ export interface Suite {
   cases: TestCase[]
   manualCases: number
   automatedCases: number
+  undocumentedCount: number
   staleLocaleCount: number
   createdAt: string
   description: string

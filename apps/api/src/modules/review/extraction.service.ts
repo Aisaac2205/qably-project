@@ -3,8 +3,9 @@ import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
 import { MAX_EXTRACTED_CASES } from '../ai/extraction.contracts';
+import { isCaseDocumentable } from '../../common/locale/documentable-case';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
-import { staleLocaleWhere } from '../../common/locale/stale-locale';
+import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -36,6 +37,8 @@ interface DocumentFileCandidate {
   projectId: string;
   automationKey: string | null;
   automationFilePath: string | null;
+  steps: string[];
+  currentVersion: { locale: string | null } | null;
 }
 
 function chunk<T>(items: readonly T[], size: number): T[][] {
@@ -166,34 +169,33 @@ export class ExtractionService {
         ? { suiteId: scope.suiteId }
         : { projectId: scope.projectId };
 
-    const candidateWhere =
-      mode === 'undocumented'
-        ? { steps: { equals: [] } }
-        : staleLocaleWhere(
-            await resolveOrgDefaultLocale(this.prisma, org.organizationId),
-          );
+    const orgDefaultLocale = await resolveOrgDefaultLocale(
+      this.prisma,
+      org.organizationId,
+    );
 
-    const candidates = (await this.prisma.testCase.findMany({
+    const rows = (await this.prisma.testCase.findMany({
       where: {
         ...scopeWhere,
         executionMode: 'automated',
-        ...candidateWhere,
       },
       select: {
         id: true,
         projectId: true,
         automationKey: true,
         automationFilePath: true,
+        steps: true,
+        currentVersion: { select: { locale: true } },
       },
     })) as DocumentFileCandidate[];
 
-    if (candidates.length === 0) {
+    if (rows.length === 0) {
       return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] });
     }
 
     const pendingRows = await this.prisma.extractedProposal.findMany({
       where: {
-        targetTestCaseId: { in: candidates.map((candidate) => candidate.id) },
+        targetTestCaseId: { in: rows.map((row) => row.id) },
         status: PENDING_STATUS,
       },
       select: { targetTestCaseId: true },
@@ -208,23 +210,46 @@ export class ExtractionService {
     let noSourceFile = 0;
     const groupedByFile = new Map<string, DocumentFileTarget[]>();
 
-    for (const candidate of candidates) {
-      if (pendingIds.has(candidate.id)) {
-        alreadyPending += 1;
+    for (const row of rows) {
+      const documentedLocale = row.currentVersion?.locale ?? null;
+      const matchesMode =
+        mode === 'undocumented'
+          ? row.steps.length === 0
+          : row.steps.length > 0 &&
+            isLocaleStale(
+              { steps: row.steps, documentedLocale },
+              orgDefaultLocale,
+            );
+
+      if (!matchesMode) continue;
+
+      const hasPendingProposal = pendingIds.has(row.id);
+
+      const documentable = isCaseDocumentable(
+        {
+          executionMode: 'automated',
+          steps: row.steps,
+          documentedLocale,
+          automationKey: row.automationKey,
+          hasPendingProposal,
+        },
+        mode,
+        orgDefaultLocale,
+      );
+
+      if (!documentable) {
+        if (hasPendingProposal) alreadyPending += 1;
+        else noSourceFile += 1;
         continue;
       }
 
-      if (candidate.automationKey === null) {
-        noSourceFile += 1;
-        continue;
-      }
-
+      const automationKey = row.automationKey as string;
       const filePath =
-        candidate.automationFilePath ??
+        row.automationFilePath ??
         (await resolveAutomationFilePath(
           this.prisma,
-          candidate.projectId,
-          candidate.automationKey,
+          row.projectId,
+          automationKey,
         ));
 
       if (filePath === null) {
@@ -233,10 +258,7 @@ export class ExtractionService {
       }
 
       const group = groupedByFile.get(filePath) ?? [];
-      group.push({
-        testCaseId: candidate.id,
-        automationKey: candidate.automationKey,
-      });
+      group.push({ testCaseId: row.id, automationKey });
       groupedByFile.set(filePath, group);
     }
 
@@ -247,11 +269,9 @@ export class ExtractionService {
     }
 
     const locale =
-      actorLocale === null
-        ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
-        : resolveLocale(actorLocale);
+      actorLocale === null ? orgDefaultLocale : resolveLocale(actorLocale);
 
-    const projectId = candidates[0].projectId;
+    const projectId = rows[0].projectId;
     const files = [...groupedByFile.entries()].slice(
       0,
       MAX_DOCUMENT_FILES_PER_REQUEST,

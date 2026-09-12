@@ -22,7 +22,6 @@ import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/h
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useDocumentProject } from '@/features/projects/suites/hooks/use-suite-mutations'
-import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
 import { DocumentWithAeris } from './document-with-aeris'
 
 interface SuiteListProps {
@@ -79,7 +78,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
   const documentableCases = useMemo(
     () =>
       perSuite.reduce(
-        (total, entry) => total + countDocumentableCases(entry.suite.cases),
+        (total, entry) => total + entry.suite.undocumentedCount,
         0,
       ),
     [perSuite],
