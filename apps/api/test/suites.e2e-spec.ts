@@ -76,6 +76,7 @@ describe('Suites (e2e)', () => {
     testCase: {
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
       findMany: jest.fn(),
     },
@@ -366,5 +367,64 @@ describe('Suites (e2e)', () => {
     await request(app.getHttpServer())
       .post('/suites/suite-1/document')
       .expect(404);
+  });
+
+  it('confirms documented draft cases and reports what was skipped', async () => {
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-documented', currentVersionId: 'version-1' },
+      { id: 'case-undocumented', currentVersionId: null },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .post('/suites/suite-1/confirm-documentation')
+      .expect(201);
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-documented'] } },
+      data: { state: 'active' },
+    });
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        suiteId: 'suite-1',
+        confirmedCaseIds: ['case-documented'],
+        confirmedCount: 1,
+        skippedCaseIds: ['case-undocumented'],
+        skippedCount: 1,
+      }),
+    );
+  });
+
+  it('answers 404 for confirm-documentation when the suite belongs to another organization', async () => {
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    await request(app.getHttpServer())
+      .post('/suites/suite-1/confirm-documentation')
+      .expect(404);
+  });
+
+  it('answers 403 for confirm-documentation when a member cannot write to the suite', async () => {
+    prisma.orgMember.findFirst.mockResolvedValue({
+      organizationId: 'org-1',
+      role: 'member',
+      organization: { slug: 'acme' },
+      user: { locale: 'en' },
+    });
+
+    await request(app.getHttpServer())
+      .post('/suites/suite-1/confirm-documentation')
+      .expect(403);
+  });
+
+  it('confirming twice is not an error and confirms nothing the second time', async () => {
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    const response = await request(app.getHttpServer())
+      .post('/suites/suite-1/confirm-documentation')
+      .expect(201);
+
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
+    expect(response.body).toEqual(
+      expect.objectContaining({ confirmedCount: 0, skippedCount: 0 }),
+    );
   });
 });

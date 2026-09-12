@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { buildJobId } from '../../common/queue/job-id';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -25,8 +29,17 @@ function fakeExtraction(result: unknown) {
   };
 }
 
-function build(extraction: ReturnType<typeof fakeExtraction>) {
-  return new SuitesController({} as never, extraction as never);
+function fakeSuites(result?: unknown) {
+  return {
+    confirmDocumentation: jest.fn().mockResolvedValue(result),
+  };
+}
+
+function build(
+  extraction: ReturnType<typeof fakeExtraction>,
+  suites: ReturnType<typeof fakeSuites> = fakeSuites(),
+) {
+  return new SuitesController(suites as never, extraction as never);
 }
 
 describe('SuitesController.documentCase', () => {
@@ -130,5 +143,56 @@ describe('SuitesController.documentSuite', () => {
         mode: 'undocumented',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('SuitesController.confirmDocumentation', () => {
+  it("confirms the suite's documented draft cases and returns the report", async () => {
+    const report = {
+      suiteId: 'suite-1',
+      confirmedCaseIds: ['case-1'],
+      confirmedCount: 1,
+      skippedCaseIds: [],
+      skippedCount: 0,
+      documentationConfirmedAt: '2026-09-12T00:00:00.000Z',
+      documentationConfirmedById: 'user-1',
+    };
+    const suites = fakeSuites({ ok: true, value: report });
+
+    const result = await build(
+      fakeExtraction(null),
+      suites,
+    ).confirmDocumentation(org, 'suite-1', user);
+
+    expect(result).toEqual(report);
+    expect(suites.confirmDocumentation).toHaveBeenCalledWith(
+      org,
+      'suite-1',
+      user.id,
+    );
+  });
+
+  it('throws a coded NotFoundException when the suite does not exist', async () => {
+    const suites = fakeSuites({ ok: false, error: 'not-found' });
+
+    await expect(
+      build(fakeExtraction(null), suites).confirmDocumentation(
+        org,
+        'suite-1',
+        user,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws a ForbiddenException when the caller cannot write to the suite', async () => {
+    const suites = fakeSuites({ ok: false, error: 'forbidden' });
+
+    await expect(
+      build(fakeExtraction(null), suites).confirmDocumentation(
+        org,
+        'suite-1',
+        user,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

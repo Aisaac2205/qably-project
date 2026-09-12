@@ -514,6 +514,15 @@ export interface DocumentFilesSkip {
   reason: DocumentFilesSkipReason
   count: number
 }
+export interface ConfirmDocumentationResult {
+  suiteId: string
+  confirmedCaseIds: string[]
+  confirmedCount: number
+  skippedCaseIds: string[]
+  skippedCount: number
+  documentationConfirmedAt: string
+  documentationConfirmedById: string
+}
 export interface DocumentFilesResult {
   filesEnqueued: number
   casesTargeted: number

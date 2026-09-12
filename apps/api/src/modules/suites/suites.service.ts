@@ -18,7 +18,12 @@ import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { SuiteError, SuiteView, TestCaseView } from './suites.contracts';
+import type {
+  ConfirmDocumentationResult,
+  SuiteError,
+  SuiteView,
+  TestCaseView,
+} from './suites.contracts';
 import type {
   CreateCaseInput,
   CreateSuiteInput,
@@ -352,6 +357,65 @@ export class SuitesService {
     await this.prisma.suite.delete({ where: { id } });
 
     return ok(undefined);
+  }
+
+  async confirmDocumentation(
+    org: OrgContext,
+    suiteId: string,
+    actorId: string,
+  ): Promise<Result<ConfirmDocumentationResult, SuiteError>> {
+    const existing = await this.scoped(org, suiteId);
+
+    if (existing === null) return err('not-found');
+    if (!canWrite(org)) return err('forbidden');
+
+    const confirmedAt = new Date();
+
+    const { confirmedCaseIds, skippedCaseIds } = await this.prisma.$transaction(
+      async (tx) => {
+        const candidates = await tx.testCase.findMany({
+          where: { suiteId, executionMode: 'automated', state: 'draft' },
+          select: { id: true, currentVersionId: true },
+        });
+
+        const confirmed = candidates.filter(
+          (candidate) => candidate.currentVersionId !== null,
+        );
+        const skipped = candidates.filter(
+          (candidate) => candidate.currentVersionId === null,
+        );
+
+        if (confirmed.length > 0) {
+          await tx.testCase.updateMany({
+            where: { id: { in: confirmed.map((candidate) => candidate.id) } },
+            data: { state: 'active' },
+          });
+        }
+
+        await tx.suite.update({
+          where: { id: suiteId },
+          data: {
+            documentationConfirmedAt: confirmedAt,
+            documentationConfirmedById: actorId,
+          },
+        });
+
+        return {
+          confirmedCaseIds: confirmed.map((candidate) => candidate.id),
+          skippedCaseIds: skipped.map((candidate) => candidate.id),
+        };
+      },
+    );
+
+    return ok({
+      suiteId,
+      confirmedCaseIds,
+      confirmedCount: confirmedCaseIds.length,
+      skippedCaseIds,
+      skippedCount: skippedCaseIds.length,
+      documentationConfirmedAt: confirmedAt.toISOString(),
+      documentationConfirmedById: actorId,
+    });
   }
 
   async addCase(

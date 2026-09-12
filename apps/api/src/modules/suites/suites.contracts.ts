@@ -1,5 +1,7 @@
 import type { Suite, TestCase } from '@qably/types';
 
+export type { ConfirmDocumentationResult } from '@qably/types';
+
 export type SuiteView = Suite;
 export type TestCaseView = TestCase;
 

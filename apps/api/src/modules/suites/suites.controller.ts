@@ -33,7 +33,11 @@ import {
   documentFilesBodySchema,
   type DocumentFilesBody,
 } from '../review/review.schemas';
-import type { SuiteError, SuiteView } from './suites.contracts';
+import type {
+  ConfirmDocumentationResult,
+  SuiteError,
+  SuiteView,
+} from './suites.contracts';
 import {
   createCaseSchema,
   createSuiteSchema,
@@ -201,6 +205,15 @@ export class SuitesController {
     );
 
     return { queued: true, jobId: unwrapDocumentCase(result).jobId };
+  }
+
+  @Post(':id/confirm-documentation')
+  async confirmDocumentation(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<ConfirmDocumentationResult> {
+    return unwrap(await this.suites.confirmDocumentation(org, id, user.id));
   }
 
   @Post(':id/document')

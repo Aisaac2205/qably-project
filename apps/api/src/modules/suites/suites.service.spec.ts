@@ -49,6 +49,7 @@ interface FakePrisma {
   testCase: {
     create: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
     delete: jest.Mock;
     findMany: jest.Mock;
   };
@@ -74,6 +75,7 @@ function createPrisma(): FakePrisma {
     testCase: {
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
       delete: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
     },
@@ -295,6 +297,119 @@ describe('SuitesService.remove', () => {
     expect(prisma.suite.delete).toHaveBeenCalledWith({
       where: { id: 'suite-1' },
     });
+  });
+});
+
+describe('SuitesService.confirmDocumentation', () => {
+  const draftCases = [
+    { id: 'case-documented', currentVersionId: 'version-1' },
+    { id: 'case-undocumented', currentVersionId: null },
+  ];
+
+  it('flips every documented, automated draft case to active and stamps the audit trail', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue(draftCases);
+
+    const result = await build(prisma).confirmDocumentation(
+      owner,
+      'suite-1',
+      'user-1',
+    );
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-documented'] } },
+      data: { state: 'active' },
+    });
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        documentationConfirmedAt: expect.any(Date) as Date,
+        documentationConfirmedById: 'user-1',
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.confirmedCaseIds).toEqual([
+      'case-documented',
+    ]);
+    expect(result.ok && result.value.skippedCaseIds).toEqual([
+      'case-undocumented',
+    ]);
+    expect(result.ok && result.value.confirmedCount).toBe(1);
+    expect(result.ok && result.value.skippedCount).toBe(1);
+  });
+
+  it('only queries automated draft cases in the suite', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).confirmDocumentation(owner, 'suite-1', 'user-1');
+
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          suiteId: 'suite-1',
+          executionMode: 'automated',
+          state: 'draft',
+        },
+      }),
+    );
+  });
+
+  it('is idempotent: confirming again with nothing left in draft does not error and confirms nothing', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    const result = await build(prisma).confirmDocumentation(
+      owner,
+      'suite-1',
+      'user-1',
+    );
+
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
+    expect(prisma.suite.update).toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.confirmedCount).toBe(0);
+    expect(result.ok && result.value.skippedCount).toBe(0);
+  });
+
+  it('refuses a plain member on a suite that exists in their organization', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).confirmDocumentation(
+      member,
+      'suite-1',
+      'user-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'forbidden' });
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it('answers not-found, not forbidden, for a suite belonging to another organization even for a member', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).confirmDocumentation(
+      member,
+      'suite-x',
+      'user-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
+  });
+
+  it('answers not-found for a suite belonging to another organization for a caller who could otherwise write', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).confirmDocumentation(
+      owner,
+      'suite-x',
+      'user-1',
+    );
+
+    expect(result).toEqual({ ok: false, error: 'not-found' });
   });
 });
 
