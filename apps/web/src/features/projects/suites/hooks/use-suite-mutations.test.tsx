@@ -3,22 +3,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Suite } from '@qably/types'
 import {
+  useConfirmDocumentation,
   useCreateCase,
   useDeleteCase,
   useUpdateCase,
 } from './use-suite-mutations'
-import { createCase, deleteCase, updateCase } from '../api/suites.api'
+import {
+  confirmDocumentation,
+  createCase,
+  deleteCase,
+  updateCase,
+} from '../api/suites.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
 
 vi.mock('../api/suites.api', () => ({
   createCase: vi.fn(),
   updateCase: vi.fn(),
   deleteCase: vi.fn(),
+  confirmDocumentation: vi.fn(),
 }))
 
 const create = vi.mocked(createCase)
 const update = vi.mocked(updateCase)
 const remove = vi.mocked(deleteCase)
+const confirm = vi.mocked(confirmDocumentation)
 
 const suite: Suite = {
   id: 'suite-1',
@@ -50,6 +58,38 @@ beforeEach(() => {
   create.mockResolvedValue(suite)
   update.mockResolvedValue(suite)
   remove.mockResolvedValue(suite)
+  confirm.mockResolvedValue({
+    suiteId: 'suite-1',
+    confirmedCaseIds: ['case-1'],
+    confirmedCount: 1,
+    skippedCaseIds: [],
+    skippedCount: 0,
+    documentationConfirmedAt: '2026-09-12T10:00:00.000Z',
+    documentationConfirmedById: 'user-1',
+  })
+})
+
+describe('useConfirmDocumentation', () => {
+  it('refreshes the suite in place so the confirmed cases stop reading as drafts', async () => {
+    const { client, invalidateSpy } = setup()
+    const { result } = renderHook(() => useConfirmDocumentation(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: suiteKeys.detail('suite-1'),
+      })
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: projectKeys.detail('proj-1'),
+    })
+    expect(confirm).toHaveBeenCalledWith('suite-1')
+  })
 })
 
 describe('useCreateCase', () => {

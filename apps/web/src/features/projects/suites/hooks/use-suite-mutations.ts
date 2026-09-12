@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Suite } from '@qably/types'
 import {
+  confirmDocumentation,
   createCase,
   createSuite,
   deleteCase,
@@ -121,6 +122,21 @@ export function useDocumentSuite() {
     mutationFn: ({ suiteId, mode }: { suiteId: string; mode: DocumentFilesMode }) =>
       documentSuite(suiteId, mode),
     onSuccess: () => invalidateSuites(),
+  })
+}
+
+export function useConfirmDocumentation() {
+  const invalidateSuites = useSuiteInvalidation()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ suiteId }: { suiteId: string; projectId: string }) =>
+      confirmDocumentation(suiteId),
+    onSuccess: async (_result, { suiteId, projectId }) => {
+      await invalidateSuites()
+      await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
+      await queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
+    },
   })
 }
 

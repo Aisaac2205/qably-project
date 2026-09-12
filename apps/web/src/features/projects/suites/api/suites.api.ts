@@ -1,6 +1,7 @@
 import type {
   CasePriority,
   CaseState,
+  ConfirmDocumentationResult,
   DocumentFilesResult,
   Suite,
 } from '@qably/types'
@@ -105,6 +106,15 @@ export function documentSuite(
     method: 'POST',
     body: { mode },
   })
+}
+
+export function confirmDocumentation(
+  suiteId: string,
+): Promise<ConfirmDocumentationResult> {
+  return apiRequest<ConfirmDocumentationResult>(
+    `/suites/${suiteId}/confirm-documentation`,
+    { method: 'POST' },
+  )
 }
 
 export function documentProject(

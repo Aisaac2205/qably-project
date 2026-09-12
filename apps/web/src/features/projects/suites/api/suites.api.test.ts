@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  confirmDocumentation,
   createCase,
   createSuite,
   deleteCase,
@@ -120,7 +121,15 @@ describe('suites.api', () => {
     expect(url).toContain('/suites/suite-1/document')
     expect(init.method).toBe('POST')
     expect(init.body).toBe('{"mode":"stale-locale"}')
-    expect(JSON.parse(init.body as string)).toEqual({ mode: 'stale-locale' })
+  })
+
+  it('confirms the documentation of one suite', async () => {
+    await confirmDocumentation('suite-1')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/suites/suite-1/confirm-documentation')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeUndefined()
   })
 
   it('sends the project document mode as a plain JSON object, not a doubly-encoded string', async () => {
