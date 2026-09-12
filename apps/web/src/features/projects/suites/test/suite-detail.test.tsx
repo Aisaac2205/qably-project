@@ -320,7 +320,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => {})
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
-    expect(screen.getByText(/1 automated cases are not documented yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 automated case is not documented yet/i)).toBeInTheDocument()
     expect(screen.queryByText(/all cases in this suite run in ci/i)).not.toBeInTheDocument()
   })
 

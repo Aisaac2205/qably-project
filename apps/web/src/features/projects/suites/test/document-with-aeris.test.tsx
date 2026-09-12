@@ -81,7 +81,7 @@ describe('DocumentWithAeris + DocumentFilesStatus', () => {
       result({
         casesSkipped: [
           { reason: 'no-source-file', count: 3 },
-          { reason: 'already-pending', count: 1 },
+          { reason: 'already-pending', count: 2 },
         ],
       }),
     )
@@ -95,8 +95,47 @@ describe('DocumentWithAeris + DocumentFilesStatus', () => {
       ).toBeInTheDocument()
     })
     expect(
-      screen.getByText(/1 cases already have a proposal waiting/i),
+      screen.getByText(/2 cases already have a proposal waiting/i),
     ).toBeInTheDocument()
+  })
+
+  it('tells the user a person already documented the case rather than blaming the repository', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn().mockResolvedValue(
+      result({
+        casesSkipped: [{ reason: 'human-documented', count: 2 }],
+      }),
+    )
+
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={onDocument} />)
+    await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/2 cases were documented by a person/i),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it('counts in the singular when a single case is involved', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn().mockResolvedValue(
+      result({
+        casesSkipped: [{ reason: 'already-pending', count: 1 }],
+      }),
+    )
+
+    renderWithQuery(<DocumentPanel pendingCount={1} onDocument={onDocument} />)
+
+    expect(screen.getByText(/1 automated case is not documented yet/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/1 case already has a proposal waiting/i),
+      ).toBeInTheDocument()
+    })
   })
 
   it('says nothing was queued when every case was skipped', async () => {

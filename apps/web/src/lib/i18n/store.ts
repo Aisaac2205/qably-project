@@ -33,20 +33,36 @@ type Dict = Record<string, unknown>
 
 const dictionaries: Record<Locale, Dict> = { en, es }
 
-function resolve(path: string, dict: Dict, params?: Record<string, string | number>): string {
+function lookup(path: string, dict: Dict): unknown {
   const keys = path.split('.')
   let current: unknown = dict
   for (const key of keys) {
-    if (current == null || typeof current !== 'object') return path
+    if (current == null || typeof current !== 'object') return undefined
     current = (current as Dict)[key]
   }
-  if (typeof current !== 'string') return path
-  
-  if (!params) return current
-  
+  return current
+}
+
+function interpolate(template: string, params?: Record<string, string | number>): string {
+  if (!params) return template
+
   return Object.entries(params).reduce((result, [key, value]) => {
     return result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
-  }, current)
+  }, template)
+}
+
+function resolve(path: string, dict: Dict, params?: Record<string, string | number>): string {
+  const count = params?.count
+
+  if (typeof count === 'number') {
+    const plural = lookup(`${path}${count === 1 ? '_one' : '_other'}`, dict)
+    if (typeof plural === 'string') return interpolate(plural, params)
+  }
+
+  const entry = lookup(path, dict)
+  if (typeof entry !== 'string') return path
+
+  return interpolate(entry, params)
 }
 
 interface I18nState {

@@ -1,4 +1,4 @@
-import type { ProposalStatus, SuiteProposal, SuiteProposalDecision } from '@qably/types'
+import type { ProposalStatus } from '@qably/types'
 import type {
   ProposalDetail,
   ProposalFilters,
@@ -53,28 +53,4 @@ export function proposalDetailFixtures(): ProposalDetail[] {
       ),
     ),
   }))
-}
-
-export function listSuiteProposals(): Promise<SuiteProposal[]> {
-  return Promise.resolve([])
-}
-
-export function approveSuiteProposal(id: string): Promise<SuiteProposalDecision> {
-  return Promise.resolve({
-    proposalId: id,
-    projectId: 'proj-1',
-    applied: true,
-    suiteId: 'suite-1',
-    suiteName: 'Checkout',
-  })
-}
-
-export function rejectSuiteProposal(id: string): Promise<SuiteProposalDecision> {
-  return Promise.resolve({
-    proposalId: id,
-    projectId: 'proj-1',
-    applied: false,
-    suiteId: 'suite-1',
-    suiteName: 'Checkout',
-  })
 }
