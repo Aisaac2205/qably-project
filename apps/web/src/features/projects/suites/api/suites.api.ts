@@ -103,7 +103,7 @@ export function documentSuite(
 ): Promise<DocumentFilesResult> {
   return apiRequest<DocumentFilesResult>(`/suites/${suiteId}/document`, {
     method: 'POST',
-    body: JSON.stringify({ mode }),
+    body: { mode },
   })
 }
 
@@ -113,6 +113,6 @@ export function documentProject(
 ): Promise<DocumentFilesResult> {
   return apiRequest<DocumentFilesResult>(`/projects/${projectId}/document`, {
     method: 'POST',
-    body: JSON.stringify({ mode }),
+    body: { mode },
   })
 }

@@ -4,6 +4,8 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  documentProject,
+  documentSuite,
   getSuite,
   listSuites,
   updateCase,
@@ -111,4 +113,23 @@ describe('suites.api', () => {
     expect(init.method).toBe('DELETE')
   })
 
+  it('sends the document mode as a plain JSON object, not a doubly-encoded string', async () => {
+    await documentSuite('suite-1', 'stale-locale')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/suites/suite-1/document')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{"mode":"stale-locale"}')
+    expect(JSON.parse(init.body as string)).toEqual({ mode: 'stale-locale' })
+  })
+
+  it('sends the project document mode as a plain JSON object, not a doubly-encoded string', async () => {
+    await documentProject('proj-1', 'undocumented')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/projects/proj-1/document')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBe('{"mode":"undocumented"}')
+    expect(JSON.parse(init.body as string)).toEqual({ mode: 'undocumented' })
+  })
 })
