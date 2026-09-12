@@ -119,6 +119,27 @@ describe('rankDuplicateCandidates', () => {
     expect(rankDuplicateCandidates(target, [unrelated])).toEqual([]);
   });
 
+  it('resolves an identical-timestamp tie deterministically regardless of input order', () => {
+    const target = { title: 'Empties the cart', automationKey: null };
+    const timestamp = new Date('2024-01-01T00:00:00.000Z');
+    const first = candidate({
+      id: 'case-aaa',
+      title: 'Empties the cart',
+      publishedAt: timestamp,
+    });
+    const second = candidate({
+      id: 'case-bbb',
+      title: 'Empties the cart',
+      publishedAt: timestamp,
+    });
+
+    const forward = rankDuplicateCandidates(target, [first, second]);
+    const reversed = rankDuplicateCandidates(target, [second, first]);
+
+    expect(forward.map((c) => c.id)).toEqual(['case-aaa', 'case-bbb']);
+    expect(reversed.map((c) => c.id)).toEqual(['case-aaa', 'case-bbb']);
+  });
+
   it('carries the candidate steps and expected result through unchanged', () => {
     const target = { title: 'Empties the cart', automationKey: null };
     const match = candidate({

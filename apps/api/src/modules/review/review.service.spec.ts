@@ -890,6 +890,16 @@ describe('ReviewService.getDuplicateCandidates', () => {
     );
   });
 
+  it('queries candidates with an explicit deterministic order', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).getDuplicateCandidates(org, 'proposal-1');
+
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ orderBy: { id: 'asc' } }),
+    );
+  });
+
   it('does not filter by id when the proposal has no target case', async () => {
     const prisma = createPrisma();
 

@@ -396,6 +396,7 @@ export class ReviewService {
           ? {}
           : { id: { not: proposal.targetTestCaseId } }),
       },
+      orderBy: { id: 'asc' },
       select: DUPLICATE_CANDIDATE_SELECT,
     })) as DuplicateCandidateRow[];
 

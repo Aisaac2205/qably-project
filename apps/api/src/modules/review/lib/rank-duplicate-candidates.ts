@@ -88,7 +88,15 @@ function compareScored(a: ScoredCandidate, b: ScoredCandidate): number {
 
   if (a.score !== b.score) return b.score - a.score;
 
-  return b.candidate.publishedAt.getTime() - a.candidate.publishedAt.getTime();
+  const publishedDiff =
+    b.candidate.publishedAt.getTime() - a.candidate.publishedAt.getTime();
+  if (publishedDiff !== 0) return publishedDiff;
+
+  return a.candidate.id < b.candidate.id
+    ? -1
+    : a.candidate.id > b.candidate.id
+      ? 1
+      : 0;
 }
 
 export function rankDuplicateCandidates(

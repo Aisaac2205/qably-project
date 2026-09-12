@@ -15,7 +15,8 @@ const REASON_KEY: Record<DuplicateMatchReason, string> = {
 export function DuplicateComparison({ proposalId }: { proposalId: string }) {
   const { t } = useTranslation()
   const { candidates, isLoading, isError } = useDuplicateCandidates(proposalId)
-  const showNotFound = !isLoading && (isError || candidates.length === 0)
+  const showError = !isLoading && isError
+  const showNotFound = !isLoading && !isError && candidates.length === 0
   const showCandidates = !isLoading && !isError && candidates.length > 0
 
   return (
@@ -31,6 +32,12 @@ export function DuplicateComparison({ proposalId }: { proposalId: string }) {
           <Skeleton className="h-3 w-1/3" />
           <Skeleton className="h-3 w-full" />
         </div>
+      )}
+
+      {showError && (
+        <p className="text-sm text-muted leading-relaxed">
+          {t('aiReview.duplicateCheckFailed')}
+        </p>
       )}
 
       {showNotFound && (

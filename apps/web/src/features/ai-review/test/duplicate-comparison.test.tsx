@@ -62,7 +62,7 @@ describe('DuplicateComparison', () => {
     expect(screen.getByText('Similar title')).toBeInTheDocument()
   })
 
-  it('shows the not-found message when the duplicates query fails', async () => {
+  it('shows a dedicated failure message when the duplicates query fails, distinct from the empty state', async () => {
     vi.mocked(duplicatesApi.getDuplicateCandidates).mockRejectedValue(
       new Error('network error'),
     )
@@ -70,7 +70,8 @@ describe('DuplicateComparison', () => {
     renderComparison('proposal-1')
 
     expect(
-      await screen.findByText(/could not be located/i),
+      await screen.findByText(/could not be completed/i),
     ).toBeInTheDocument()
+    expect(screen.queryByText(/could not be located/i)).not.toBeInTheDocument()
   })
 })
