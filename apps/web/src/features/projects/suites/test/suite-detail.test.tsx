@@ -250,6 +250,7 @@ describe('SuiteDetail (redesigned)', () => {
       name: 'CI Only',
       manualCases: 0,
       automatedCases: 1,
+      undocumentedCount: 0,
       cases: [
         createMockTestCase({
           id: 'tc-ci-1',
@@ -294,8 +295,33 @@ describe('SuiteDetail (redesigned)', () => {
 
     const aerisButton = screen.getByRole('button', { name: /document suite with aeris/i })
     expect(aerisButton.className).not.toContain('border-dashed')
-    expect(screen.getByText(/all cases in this suite run in ci/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /suite actions/i })).toBeInTheDocument()
+  })
+
+  it('shows only the undocumented-cases hint, not the CI-only explanation, when the suite has both', async () => {
+    const ciOnlySuite = createMockSuite({
+      id: 'suite-ci-only',
+      name: 'CI Only',
+      manualCases: 0,
+      automatedCases: 1,
+      cases: [
+        createMockTestCase({
+          id: 'tc-ci-1',
+          executionMode: 'automated',
+          name: 'Redirects to dashboard on valid login',
+          automationKey: 'useCreateRun > redirects to dashboard on valid login',
+          state: 'active',
+        }),
+      ],
+    })
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(ciOnlySuite)
+
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-ci-only" />)
+    await act(async () => {})
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect(screen.getByText(/1 automated cases are not documented yet/i)).toBeInTheDocument()
+    expect(screen.queryByText(/all cases in this suite run in ci/i)).not.toBeInTheDocument()
   })
 
   it('lists automated cases with their last result under "Covered by CI"', async () => {

@@ -21,11 +21,17 @@ const SECONDARY_ACTION_CLASS =
 const PRIMARY_ACTION_CLASS =
   'text-sm font-semibold text-ai hover:text-ai border-ai/40 bg-ai-bg hover:bg-ai-bg/70 focus-visible:ring-ai/40'
 
+export function useDocumentFiles(onDocument: (mode: DocumentFilesMode) => Promise<DocumentFilesResult>) {
+  return useMutation({ mutationFn: onDocument })
+}
+
+export type DocumentFilesMutation = ReturnType<typeof useDocumentFiles>
+
 interface DocumentWithAerisProps {
   label: string
   pendingCount: number
   staleCount?: number
-  onDocument: (mode: DocumentFilesMode) => Promise<DocumentFilesResult>
+  documentation: DocumentFilesMutation
   primary?: boolean
 }
 
@@ -33,15 +39,12 @@ export function DocumentWithAeris({
   label,
   pendingCount,
   staleCount = 0,
-  onDocument,
+  documentation,
   primary = false,
 }: DocumentWithAerisProps) {
   const { t } = useTranslation()
-  const documentation = useMutation({ mutationFn: onDocument })
 
   if (pendingCount === 0 && staleCount === 0) return null
-
-  const result = documentation.data
 
   function renderTrigger(mode: DocumentFilesMode, icon: ReactNode, text: ReactNode) {
     const isActive = documentation.isPending && documentation.variables === mode
@@ -55,6 +58,7 @@ export function DocumentWithAeris({
     if (primary) {
       return (
         <Button
+          key={mode}
           type="button"
           variant="outline"
           size="default"
@@ -69,6 +73,7 @@ export function DocumentWithAeris({
 
     return (
       <button
+        key={mode}
         type="button"
         onClick={() => documentation.mutate(mode)}
         disabled={documentation.isPending}
@@ -79,50 +84,75 @@ export function DocumentWithAeris({
     )
   }
 
-  return (
-    <div className="flex flex-col items-end gap-1.5">
+  const showUndocumented = pendingCount > 0
+  const showStale = staleCount > 0
+
+  if (showUndocumented && showStale) {
+    return (
       <div className="flex items-center gap-2">
-        {pendingCount > 0 &&
-          renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, label)}
-        {staleCount > 0 &&
-          renderTrigger(
-            'stale-locale',
-            <Translate size={primary ? 14 : 13} weight="bold" aria-hidden="true" />,
-            t('suites.redocumentStale', { count: staleCount }),
-          )}
-      </div>
-
-      <div className="min-h-5 flex flex-col items-end gap-1 text-right">
-        {result === undefined && !documentation.isError && pendingCount > 0 && (
-          <p className="text-xs text-muted">
-            {t('suites.documentFilesPending', { count: pendingCount })}
-          </p>
-        )}
-
-        {result !== undefined && (
-          <>
-            <p role="status" className="text-xs font-medium text-ai">
-              {result.filesEnqueued === 0
-                ? t('suites.documentFilesNothingToDo')
-                : t('suites.documentFilesQueued', {
-                    cases: result.casesTargeted,
-                    files: result.filesEnqueued,
-                  })}
-            </p>
-            {result.casesSkipped.map((skip) => (
-              <p key={skip.reason} className="text-xs text-muted">
-                {t(SKIP_KEYS[skip.reason], { count: skip.count })}
-              </p>
-            ))}
-          </>
-        )}
-
-        {documentation.isError && (
-          <p role="alert" className="text-xs font-medium text-fail">
-            {t('suites.documentFilesError')}
-          </p>
+        {renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, label)}
+        {renderTrigger(
+          'stale-locale',
+          <Translate size={primary ? 14 : 13} weight="bold" aria-hidden="true" />,
+          t('suites.redocumentStale', { count: staleCount }),
         )}
       </div>
-    </div>
+    )
+  }
+
+  if (showUndocumented) {
+    return renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, label)
+  }
+
+  return renderTrigger(
+    'stale-locale',
+    <Translate size={primary ? 14 : 13} weight="bold" aria-hidden="true" />,
+    t('suites.redocumentStale', { count: staleCount }),
   )
+}
+
+interface DocumentFilesStatusProps {
+  documentation: DocumentFilesMutation
+  pendingCount: number
+}
+
+export function DocumentFilesStatus({ documentation, pendingCount }: DocumentFilesStatusProps) {
+  const { t } = useTranslation()
+  const result = documentation.data
+
+  if (documentation.isError) {
+    return (
+      <p role="alert" className="text-xs font-medium text-fail">
+        {t('suites.documentFilesError')}
+      </p>
+    )
+  }
+
+  if (result !== undefined) {
+    return (
+      <>
+        <p role="status" className="text-xs font-medium text-ai">
+          {result.filesEnqueued === 0
+            ? t('suites.documentFilesNothingToDo')
+            : t('suites.documentFilesQueued', {
+                cases: result.casesTargeted,
+                files: result.filesEnqueued,
+              })}
+        </p>
+        {result.casesSkipped.map((skip) => (
+          <p key={skip.reason} className="text-xs text-muted">
+            {t(SKIP_KEYS[skip.reason], { count: skip.count })}
+          </p>
+        ))}
+      </>
+    )
+  }
+
+  if (pendingCount > 0) {
+    return (
+      <p className="text-xs text-muted">{t('suites.documentFilesPending', { count: pendingCount })}</p>
+    )
+  }
+
+  return null
 }

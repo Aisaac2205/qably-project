@@ -22,7 +22,7 @@ import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/h
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { useDocumentProject } from '@/features/projects/suites/hooks/use-suite-mutations'
-import { DocumentWithAeris } from './document-with-aeris'
+import { DocumentWithAeris, DocumentFilesStatus, useDocumentFiles } from './document-with-aeris'
 
 interface SuiteListProps {
   projectId: string
@@ -75,6 +75,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
   const { t } = useTranslation()
   const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
   const documentProject = useDocumentProject()
+  const documentation = useDocumentFiles((mode) => documentProject.mutateAsync({ projectId, mode }))
   const documentableCases = useMemo(
     () =>
       perSuite.reduce(
@@ -155,12 +156,19 @@ export function SuiteList({ projectId }: SuiteListProps) {
           />
         </div>
         <div className="flex items-start gap-3 shrink-0">
-          <DocumentWithAeris
-            label={t('suites.documentProjectWithAeris')}
-            pendingCount={documentableCases}
-            staleCount={staleCases}
-            onDocument={(mode) => documentProject.mutateAsync({ projectId, mode })}
-          />
+          {(documentableCases > 0 || staleCases > 0) && (
+            <div className="flex flex-col items-end gap-1.5">
+              <DocumentWithAeris
+                label={t('suites.documentProjectWithAeris')}
+                pendingCount={documentableCases}
+                staleCount={staleCases}
+                documentation={documentation}
+              />
+              <div className="min-h-5 flex flex-col items-end gap-1 text-right">
+                <DocumentFilesStatus documentation={documentation} pendingCount={documentableCases} />
+              </div>
+            </div>
+          )}
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={14} weight="bold" aria-hidden="true" />
             {t('suites.newSuite')}

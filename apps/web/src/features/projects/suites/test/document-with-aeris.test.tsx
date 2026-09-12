@@ -2,34 +2,57 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { DocumentFilesResult } from '@qably/types'
-import { DocumentWithAeris } from '@/features/projects/suites/components/document-with-aeris'
+import {
+  DocumentWithAeris,
+  DocumentFilesStatus,
+  useDocumentFiles,
+  type DocumentFilesMode,
+} from '@/features/projects/suites/components/document-with-aeris'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 function result(overrides: Partial<DocumentFilesResult> = {}): DocumentFilesResult {
   return { filesEnqueued: 2, casesTargeted: 7, casesSkipped: [], ...overrides }
 }
 
-describe('DocumentWithAeris', () => {
+function DocumentPanel({
+  label = 'Document suite with Aeris',
+  pendingCount,
+  staleCount,
+  onDocument,
+  primary,
+}: {
+  label?: string
+  pendingCount: number
+  staleCount?: number
+  onDocument: (mode: DocumentFilesMode) => Promise<DocumentFilesResult>
+  primary?: boolean
+}) {
+  const documentation = useDocumentFiles(onDocument)
+  return (
+    <>
+      <DocumentWithAeris
+        label={label}
+        pendingCount={pendingCount}
+        staleCount={staleCount}
+        documentation={documentation}
+        primary={primary}
+      />
+      <DocumentFilesStatus documentation={documentation} pendingCount={pendingCount} />
+    </>
+  )
+}
+
+describe('DocumentWithAeris + DocumentFilesStatus', () => {
   it('renders nothing when the scope has no documentable cases', () => {
     const { container } = renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={0}
-        onDocument={vi.fn()}
-      />,
+      <DocumentPanel pendingCount={0} onDocument={vi.fn()} />,
     )
 
     expect(container).toBeEmptyDOMElement()
   })
 
   it('names how many cases are waiting so the cost is visible before the click', () => {
-    renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={7}
-        onDocument={vi.fn()}
-      />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={vi.fn()} />)
 
     expect(
       screen.getByRole('button', { name: /document suite with aeris/i }),
@@ -41,13 +64,7 @@ describe('DocumentWithAeris', () => {
     const user = userEvent.setup()
     const onDocument = vi.fn().mockResolvedValue(result())
 
-    renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={7}
-        onDocument={onDocument}
-      />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={onDocument} />)
     await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
 
     await waitFor(() => {
@@ -69,13 +86,7 @@ describe('DocumentWithAeris', () => {
       }),
     )
 
-    renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={7}
-        onDocument={onDocument}
-      />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={onDocument} />)
     await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
 
     await waitFor(() => {
@@ -98,13 +109,7 @@ describe('DocumentWithAeris', () => {
       }),
     )
 
-    renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={4}
-        onDocument={onDocument}
-      />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={4} onDocument={onDocument} />)
     await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
 
     await waitFor(() => {
@@ -118,13 +123,7 @@ describe('DocumentWithAeris', () => {
     const user = userEvent.setup()
     const onDocument = vi.fn().mockRejectedValue(new Error('boom'))
 
-    renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={7}
-        onDocument={onDocument}
-      />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={onDocument} />)
     await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
 
     await waitFor(() => {
@@ -135,23 +134,14 @@ describe('DocumentWithAeris', () => {
 
 describe('DocumentWithAeris primary emphasis', () => {
   it('renders as a dashed secondary chip by default, beside a real primary action', () => {
-    renderWithQuery(
-      <DocumentWithAeris label="Document suite with Aeris" pendingCount={7} onDocument={vi.fn()} />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={vi.fn()} />)
 
     const button = screen.getByRole('button', { name: /document suite with aeris/i })
     expect(button.className).toContain('border-dashed')
   })
 
   it('renders as the primary control when it is the only actionable item in the header', () => {
-    renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite with Aeris"
-        pendingCount={7}
-        onDocument={vi.fn()}
-        primary
-      />,
-    )
+    renderWithQuery(<DocumentPanel pendingCount={7} onDocument={vi.fn()} primary />)
 
     const button = screen.getByRole('button', { name: /document suite with aeris/i })
     expect(button.className).not.toContain('border-dashed')
@@ -165,12 +155,7 @@ describe('DocumentWithAeris stale locale', () => {
     const onDocument = vi.fn().mockResolvedValue(result())
 
     renderWithQuery(
-      <DocumentWithAeris
-        label="Document suite"
-        pendingCount={0}
-        staleCount={3}
-        onDocument={onDocument}
-      />,
+      <DocumentPanel label="Document suite" pendingCount={0} staleCount={3} onDocument={onDocument} />,
     )
     await user.click(screen.getByRole('button', { name: /redocument 3 outdated/i }))
 
@@ -182,11 +167,25 @@ describe('DocumentWithAeris stale locale', () => {
     const user = userEvent.setup()
     const onDocument = vi.fn().mockResolvedValue(result())
 
-    renderWithQuery(
-      <DocumentWithAeris label="Document suite" pendingCount={2} onDocument={onDocument} />,
-    )
+    renderWithQuery(<DocumentPanel label="Document suite" pendingCount={2} onDocument={onDocument} />)
     await user.click(screen.getByRole('button', { name: /document suite/i }))
 
     await waitFor(() => expect(onDocument.mock.calls[0]?.[0]).toBe('undocumented'))
+  })
+
+  it('renders both triggers without a wrapper around a single button when both modes apply', () => {
+    renderWithQuery(
+      <DocumentPanel label="Document suite" pendingCount={2} staleCount={3} onDocument={vi.fn()} />,
+    )
+
+    expect(screen.getByRole('button', { name: /^document suite$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /redocument 3 outdated/i })).toBeInTheDocument()
+  })
+})
+
+describe('DocumentFilesStatus', () => {
+  it('renders nothing on its own when there is no pending count and no mutation activity', () => {
+    const { container } = renderWithQuery(<DocumentPanel pendingCount={0} onDocument={vi.fn()} />)
+    expect(container).toBeEmptyDOMElement()
   })
 })

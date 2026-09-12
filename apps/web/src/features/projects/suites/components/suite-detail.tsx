@@ -27,7 +27,7 @@ import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
-import { DocumentWithAeris } from './document-with-aeris'
+import { DocumentWithAeris, DocumentFilesStatus, useDocumentFiles } from './document-with-aeris'
 
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
@@ -37,6 +37,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
   const documentSuite = useDocumentSuite()
+  const documentation = useDocumentFiles((mode) =>
+    documentSuite.mutateAsync({ suiteId: suiteId, mode }),
+  )
   const { project } = useProject(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
@@ -170,7 +173,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 label={t('suites.documentSuiteWithAeris')}
                 pendingCount={pendingDocCount}
                 staleCount={suite.staleLocaleCount}
-                onDocument={(mode) => documentSuite.mutateAsync({ suiteId: suite.id, mode })}
+                documentation={documentation}
                 primary={isFullyAutomated}
               />
 
@@ -202,17 +205,17 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </Menu>
             </div>
 
-            {cannotRunEmptySuite && (
-              <p id="run-suite-empty-hint" className="text-xs text-muted text-right">
-                {t('suites.cannotRunEmptySuite')}
-              </p>
-            )}
-
-            {isFullyAutomated && (
-              <p className="text-xs text-muted max-w-56 text-right">
-                {t('suites.allAutomatedHint')}
-              </p>
-            )}
+            <div className="min-h-5 max-w-56 flex flex-col items-end gap-1 text-right">
+              {documentation.isError || documentation.data !== undefined || pendingDocCount > 0 ? (
+                <DocumentFilesStatus documentation={documentation} pendingCount={pendingDocCount} />
+              ) : cannotRunEmptySuite ? (
+                <p id="run-suite-empty-hint" className="text-xs text-muted">
+                  {t('suites.cannotRunEmptySuite')}
+                </p>
+              ) : isFullyAutomated ? (
+                <p className="text-xs text-muted">{t('suites.allAutomatedHint')}</p>
+              ) : null}
+            </div>
           </div>
         </div>
 
