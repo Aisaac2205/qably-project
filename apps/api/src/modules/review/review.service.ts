@@ -17,6 +17,7 @@ import {
   rankDuplicateCandidates,
   type DuplicateRankCandidate,
 } from './lib/rank-duplicate-candidates';
+import { publishTestCaseVersion } from './lib/publish-test-case-version';
 
 const PENDING_STATUS = 'in_review';
 const UNIQUE_VIOLATION = 'P2002';
@@ -515,14 +516,10 @@ export class ReviewService {
           ).id
         : (proposal.targetTestCaseId as string);
 
-      const published = await tx.testCaseVersion.count({
-        where: { testCaseId },
-      });
-
-      const version = await tx.testCaseVersion.create({
-        data: {
-          testCaseId,
-          version: published + 1,
+      const version = await publishTestCaseVersion(
+        tx,
+        testCaseId,
+        {
           title: proposal.title,
           objective: proposal.objective,
           preconditions: proposal.preconditions,
@@ -531,21 +528,8 @@ export class ReviewService {
           priority: proposal.priority,
           locale: proposal.locale ?? null,
         },
-        select: { id: true, version: true },
-      });
-
-      await tx.testCase.update({
-        where: { id: testCaseId },
-        data: {
-          currentVersionId: version.id,
-          name: proposal.title,
-          steps: proposal.steps,
-          expectedResult: proposal.expectedResult,
-          priority: proposal.priority,
-          state: 'active',
-          ...automationFields,
-        },
-      });
+        { priority: proposal.priority, state: 'active', ...automationFields },
+      );
 
       await tx.traceabilityLink.createMany({
         data: [
