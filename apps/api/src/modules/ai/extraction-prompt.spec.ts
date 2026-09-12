@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v5');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v6');
   });
 });
 
@@ -151,5 +151,10 @@ describe('buildSystemInstruction advisory and suite fields', () => {
     expect(buildSystemInstruction('es')).not.toContain('"suite"');
     expect(buildSystemInstruction('es', true)).toContain('"suite"');
     expect(buildSystemInstruction('en', true)).toContain('"suite"');
+  });
+
+  it('asks the suite summary to include business-language tags', () => {
+    expect(buildSystemInstruction('es', true)).toContain('"tags"');
+    expect(buildSystemInstruction('en', true)).toContain('"tags"');
   });
 });

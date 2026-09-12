@@ -1,5 +1,6 @@
 import {
   extractedCaseSchema,
+  extractedSuiteSchema,
   extractionOutputSchema,
   MAX_EXTRACTED_CASES,
 } from './extraction.contracts';
@@ -150,5 +151,45 @@ describe('extractionOutputSchema suite summary', () => {
         suite: { title: 'ok', description: 'x'.repeat(301) },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('extractedSuiteSchema tags', () => {
+  it('defaults tags to an empty array when omitted', () => {
+    const result = extractedSuiteSchema.safeParse({
+      title: 'Checkout',
+      description: 'Covers the purchase flow',
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.tags).toEqual([]);
+  });
+
+  it('accepts up to 20 short business-language tags', () => {
+    const tags = Array.from({ length: 20 }, (_, i) => `tag-${i}`);
+    const result = extractedSuiteSchema.safeParse({
+      title: 'Checkout',
+      description: 'Covers the purchase flow',
+      tags,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects more than 20 tags', () => {
+    const tags = Array.from({ length: 21 }, (_, i) => `tag-${i}`);
+    const result = extractedSuiteSchema.safeParse({
+      title: 'Checkout',
+      description: 'Covers the purchase flow',
+      tags,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a tag longer than 40 characters', () => {
+    const result = extractedSuiteSchema.safeParse({
+      title: 'Checkout',
+      description: 'Covers the purchase flow',
+      tags: ['x'.repeat(41)],
+    });
+    expect(result.success).toBe(false);
   });
 });

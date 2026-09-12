@@ -265,10 +265,33 @@ describe('GeminiExtractor suite summary and observations', () => {
     expect(outcome.suite).toEqual({
       title: 'Carrito',
       description: 'Cubre el flujo de compra',
+      tags: [],
     });
     expect(outcome.cases[0].observations).toEqual([
       'No assertion on the total',
     ]);
+  });
+
+  it('passes proposed suite tags through', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          cases: [validRawCase()],
+          suite: {
+            title: 'Carrito',
+            description: 'Cubre el flujo de compra',
+            tags: ['pagos', 'carrito'],
+          },
+        }),
+        usageMetadata: {},
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).extract(input());
+
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.suite?.tags).toEqual(['pagos', 'carrito']);
   });
 
   it('reports no suite summary when the model omits it or sends an invalid one', async () => {

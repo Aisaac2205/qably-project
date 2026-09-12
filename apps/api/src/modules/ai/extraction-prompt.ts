@@ -3,7 +3,7 @@ import {
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v5';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v6';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -77,8 +77,8 @@ const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
 };
 
 const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {
-  es: `Incluye además un objeto "suite" con "title" (hasta 80 caracteres) y "description" (hasta 300 caracteres) que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
-  en: `Also include a "suite" object with "title" (up to 80 characters) and "description" (up to 300 characters) summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
+  es: `Incluye además un objeto "suite" con "title" (hasta 80 caracteres), "description" (hasta 300 caracteres) y "tags" (hasta 20 etiquetas cortas en lenguaje de negocio, por ejemplo "pagos" o "autenticación") que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
+  en: `Also include a "suite" object with "title" (up to 80 characters), "description" (up to 300 characters) and "tags" (up to 20 short business-language labels, for example "payments" or "authentication") summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
 };
 
 export function buildSystemInstruction(

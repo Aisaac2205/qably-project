@@ -71,6 +71,10 @@ export const RESPONSE_JSON_SCHEMA = {
       properties: {
         title: { type: 'string' },
         description: { type: 'string' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+        },
       },
       required: ['title', 'description'],
     },

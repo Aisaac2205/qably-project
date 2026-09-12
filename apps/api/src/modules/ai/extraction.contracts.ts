@@ -20,6 +20,7 @@ export const extractedCaseSchema = z.object({
 export const extractedSuiteSchema = z.object({
   title: shortText(80),
   description: shortText(300),
+  tags: z.array(shortText(40)).max(20).default([]),
 });
 
 export const extractionOutputSchema = z.object({
