@@ -25,7 +25,6 @@ import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metr
 import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
-import { countDocumentableCases } from '@/features/projects/suites/lib/documentable-cases'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
 import { DocumentWithAeris } from './document-with-aeris'
@@ -90,6 +89,10 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     )
   }
 
+  const pendingDocCount = suite.undocumentedCount
+  const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
+  const cannotRunEmptySuite = suite.manualCases === 0 && suite.cases.length === 0
+
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
       <Breadcrumbs
@@ -134,19 +137,21 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {suite.manualCases > 0 ? (
-              <Button
-                type="button"
-                onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
-                className="text-sm font-semibold"
-                size="default"
-              >
-                <Play size={14} weight="bold" aria-hidden="true" />
-                {t('suites.runThisSuite')}
-              </Button>
-            ) : suite.cases.length === 0 ? (
-              <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <div className="flex items-center gap-2">
+              {suite.manualCases > 0 && (
+                <Button
+                  type="button"
+                  onClick={() => router.push(`/projects/${projectId}/runs/new?suite=${suite.id}`)}
+                  className="text-sm font-semibold"
+                  size="default"
+                >
+                  <Play size={14} weight="bold" aria-hidden="true" />
+                  {t('suites.runThisSuite')}
+                </Button>
+              )}
+
+              {cannotRunEmptySuite && (
                 <Button
                   type="button"
                   disabled
@@ -159,49 +164,55 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                   <Play size={14} weight="bold" aria-hidden="true" />
                   {t('suites.runThisSuite')}
                 </Button>
-                <p id="run-suite-empty-hint" className="text-xs text-muted">
-                  {t('suites.cannotRunEmptySuite')}
-                </p>
-              </div>
-            ) : (
-              <p className="text-xs text-muted max-w-[220px] text-right">
-                {t('suites.allAutomatedHint')}
+              )}
+
+              <DocumentWithAeris
+                label={t('suites.documentSuiteWithAeris')}
+                pendingCount={pendingDocCount}
+                staleCount={suite.staleLocaleCount}
+                onDocument={(mode) => documentSuite.mutateAsync({ suiteId: suite.id, mode })}
+                primary={isFullyAutomated}
+              />
+
+              {/* Suite actions */}
+              <Menu>
+                <MenuTrigger
+                  aria-label={t('suites.suiteActions')}
+                  className="size-8 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+                >
+                  <DotsThreeVertical size={16} weight="bold" aria-hidden="true" />
+                </MenuTrigger>
+                <MenuPortal>
+                  <MenuPositioner align="end">
+                    <MenuContent>
+                      <MenuItem onClick={() => setEditOpen(true)}>
+                        <PencilSimple size={14} aria-hidden="true" />
+                        {t('suites.editSuite')}
+                      </MenuItem>
+                      <MenuItem
+                        onClick={() => setDeleteOpen(true)}
+                        className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
+                      >
+                        <Trash size={14} aria-hidden="true" />
+                        {t('suites.deleteSuite')}
+                      </MenuItem>
+                    </MenuContent>
+                  </MenuPositioner>
+                </MenuPortal>
+              </Menu>
+            </div>
+
+            {cannotRunEmptySuite && (
+              <p id="run-suite-empty-hint" className="text-xs text-muted text-right">
+                {t('suites.cannotRunEmptySuite')}
               </p>
             )}
 
-            <DocumentWithAeris
-              label={t('suites.documentSuiteWithAeris')}
-              pendingCount={countDocumentableCases(suite.cases)}
-              staleCount={suite.staleLocaleCount}
-              onDocument={(mode) => documentSuite.mutateAsync({ suiteId: suite.id, mode })}
-            />
-
-            {/* Suite actions */}
-            <Menu>
-              <MenuTrigger
-                aria-label={t('suites.suiteActions')}
-                className="size-8 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                <DotsThreeVertical size={16} weight="bold" aria-hidden="true" />
-              </MenuTrigger>
-              <MenuPortal>
-                <MenuPositioner align="end">
-                  <MenuContent>
-                    <MenuItem onClick={() => setEditOpen(true)}>
-                      <PencilSimple size={14} aria-hidden="true" />
-                      {t('suites.editSuite')}
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => setDeleteOpen(true)}
-                      className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
-                    >
-                      <Trash size={14} aria-hidden="true" />
-                      {t('suites.deleteSuite')}
-                    </MenuItem>
-                  </MenuContent>
-                </MenuPositioner>
-              </MenuPortal>
-            </Menu>
+            {isFullyAutomated && (
+              <p className="text-xs text-muted max-w-56 text-right">
+                {t('suites.allAutomatedHint')}
+              </p>
+            )}
           </div>
         </div>
 

@@ -133,6 +133,32 @@ describe('DocumentWithAeris', () => {
   })
 })
 
+describe('DocumentWithAeris primary emphasis', () => {
+  it('renders as a dashed secondary chip by default, beside a real primary action', () => {
+    renderWithQuery(
+      <DocumentWithAeris label="Document suite with Aeris" pendingCount={7} onDocument={vi.fn()} />,
+    )
+
+    const button = screen.getByRole('button', { name: /document suite with aeris/i })
+    expect(button.className).toContain('border-dashed')
+  })
+
+  it('renders as the primary control when it is the only actionable item in the header', () => {
+    renderWithQuery(
+      <DocumentWithAeris
+        label="Document suite with Aeris"
+        pendingCount={7}
+        onDocument={vi.fn()}
+        primary
+      />,
+    )
+
+    const button = screen.getByRole('button', { name: /document suite with aeris/i })
+    expect(button.className).not.toContain('border-dashed')
+    expect(button.className).toContain('font-semibold')
+  })
+})
+
 describe('DocumentWithAeris stale locale', () => {
   it('offers to redocument outdated cases and sends the stale-locale mode', async () => {
     const user = userEvent.setup()
