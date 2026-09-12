@@ -165,8 +165,31 @@ describe('parseJunitXml', () => {
     expect(() => parseJunitXml('<project><target/></project>')).toThrow();
   });
 
-  it('leaves a doctype entity bomb inert instead of expanding it', () => {
-    const declarations = ['  <!ENTITY lol "lollollollollolloll">'];
+  it('parses a report with hundreds of predefined entities across names and failure messages', () => {
+    const cases = Array.from({ length: 60 }, (_unused, index) => {
+      const name = `suite &quot;${index}&quot; handles &lt;input&gt; &amp; &apos;output&apos;`;
+      const message = `expected &lt;div&gt; to contain &quot;value ${index}&quot; &amp; &apos;more&apos;`;
+      return `<testcase name="${name}"><failure message="${message}">at case ${index}</failure></testcase>`;
+    }).join('');
+
+    const xml = `<testsuites name="ci"><testsuite name="Suite &amp; Co">${cases}</testsuite></testsuites>`;
+
+    const report = parseJunitXml(xml);
+
+    expect(report.suiteName).toBe('ci');
+    expect(report.cases).toHaveLength(60);
+    expect(report.cases[0].suiteName).toBe('Suite & Co');
+    expect(report.cases[0].name).toBe('suite "0" handles <input> & \'output\'');
+    expect(report.cases[0].failureMessage).toBe(
+      'expected <div> to contain "value 0" & \'more\'',
+    );
+    expect(report.cases[59].name).toBe(
+      'suite "59" handles <input> & \'output\'',
+    );
+  });
+
+  it('rejects a billion-laughs document instead of expanding nested custom entities', () => {
+    const declarations = ['  <!ENTITY lol "lol">'];
 
     for (let level = 2; level <= 7; level += 1) {
       const previous = level === 2 ? 'lol' : `lol${level - 1}`;
@@ -182,10 +205,59 @@ describe('parseJunitXml', () => {
       '<testsuite name="s"><testcase name="&lol7;"/></testsuite>',
     ].join('\n');
 
-    const report = parseJunitXml(bomb);
+    expect(() => parseJunitXml(bomb)).toThrow(JunitParseError);
 
-    expect(report.cases[0].name).not.toContain('lollol');
-    expect(report.cases[0].name.length).toBeLessThanOrEqual(120);
+    try {
+      parseJunitXml(bomb);
+      throw new Error('expected parseJunitXml to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(JunitParseError);
+      expect((error as JunitParseError).code).toBe('doctype-not-allowed');
+    }
+  });
+
+  it('rejects a document declaring an external entity without attempting to resolve it', () => {
+    const xxe = [
+      '<?xml version="1.0"?>',
+      '<!DOCTYPE testsuite [',
+      '  <!ENTITY xxe SYSTEM "http://203.0.113.1:9999/should-not-be-fetched">',
+      ']>',
+      '<testsuite name="s"><testcase name="&xxe;"/></testsuite>',
+    ].join('\n');
+
+    const startedAt = Date.now();
+
+    expect(() => parseJunitXml(xxe)).toThrow(JunitParseError);
+
+    expect(Date.now() - startedAt).toBeLessThan(200);
+
+    try {
+      parseJunitXml(xxe);
+      throw new Error('expected parseJunitXml to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(JunitParseError);
+      expect((error as JunitParseError).code).toBe('doctype-not-allowed');
+    }
+  });
+
+  it('rejects a harmless DOCTYPE with no entity declarations, with the same clear message', () => {
+    const xml = [
+      '<?xml version="1.0"?>',
+      '<!DOCTYPE testsuite>',
+      '<testsuite name="s"><testcase name="ok"/></testsuite>',
+    ].join('\n');
+
+    expect(() => parseJunitXml(xml)).toThrow(
+      'junit xml must not declare a DOCTYPE',
+    );
+
+    try {
+      parseJunitXml(xml);
+      throw new Error('expected parseJunitXml to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(JunitParseError);
+      expect((error as JunitParseError).code).toBe('doctype-not-allowed');
+    }
   });
 
   it('throws a typed error when testsuite nesting exceeds the depth limit', () => {

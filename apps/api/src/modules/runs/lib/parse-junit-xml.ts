@@ -10,6 +10,7 @@ const MAX_SUITE_KEY_LENGTH = 500;
 const MAX_TESTSUITE_DEPTH = 32;
 const MAX_TESTCASES = 10_000;
 const MAX_DURATION_MS = 2_147_483_647;
+const DOCTYPE_DECLARATION_PATTERN = /<!DOCTYPE\b/;
 
 export type JunitCaseStatus = 'pass' | 'fail' | 'skip';
 
@@ -35,6 +36,7 @@ export interface JunitReport {
 
 export type JunitParseErrorCode =
   | 'invalid-xml'
+  | 'doctype-not-allowed'
   | 'missing-root'
   | 'no-testcases'
   | 'depth-exceeded'
@@ -75,14 +77,7 @@ const parser = new XMLParser({
   attributeNamePrefix: '@_',
   parseAttributeValue: false,
   parseTagValue: false,
-  processEntities: {
-    enabled: true,
-    maxEntitySize: 1_000,
-    maxEntityCount: 50,
-    maxExpansionDepth: 20,
-    maxTotalExpansions: 100,
-    maxExpandedLength: 100_000,
-  },
+  processEntities: true,
 });
 
 function toArray(value: unknown): RawNode[] {
@@ -249,6 +244,13 @@ function collectCases(
 }
 
 export function parseJunitXml(xml: string): JunitReport {
+  if (DOCTYPE_DECLARATION_PATTERN.test(xml)) {
+    throw new JunitParseError(
+      'doctype-not-allowed',
+      'junit xml must not declare a DOCTYPE',
+    );
+  }
+
   const validation = XMLValidator.validate(xml);
 
   if (validation !== true) {
