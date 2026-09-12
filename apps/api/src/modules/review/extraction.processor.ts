@@ -131,16 +131,44 @@ async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   );
 }
 
-async function lockSuiteNameSource(
+interface SuiteMetadataLock {
+  nameSource: string;
+  tags: string[];
+}
+
+async function lockSuiteMetadata(
   tx: TxClient,
   suiteId: string,
-): Promise<string | null> {
-  const rows = await tx.$queryRawUnsafe<{ nameSource: string }[]>(
-    `SELECT "nameSource" FROM "suite" WHERE id = $1 FOR UPDATE`,
-    suiteId,
-  );
+): Promise<SuiteMetadataLock | null> {
+  const rows = await tx.$queryRawUnsafe<
+    { nameSource: string; tags: string[] | null }[]
+  >(`SELECT "nameSource", tags FROM "suite" WHERE id = $1 FOR UPDATE`, suiteId);
 
-  return rows[0]?.nameSource ?? null;
+  const row = rows[0];
+  if (row === undefined) return null;
+
+  return { nameSource: row.nameSource, tags: row.tags ?? [] };
+}
+
+/**
+ * A human-added tag is never removed: the result keeps every existing tag
+ * and appends any Aeris-proposed tag that is not already present. Aeris can
+ * grow the tag set but never shrinks it.
+ */
+function mergeSuiteTags(
+  existing: readonly string[],
+  proposed: readonly string[],
+): string[] {
+  const seen = new Set(existing);
+  const merged = [...existing];
+
+  for (const tag of proposed) {
+    if (seen.has(tag)) continue;
+    seen.add(tag);
+    merged.push(tag);
+  }
+
+  return merged;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -603,10 +631,10 @@ export class ExtractionProcessor extends WorkerHost {
     if (suite === null || suiteIds.length !== 1) return;
     const [suiteId] = suiteIds;
 
-    const nameSource = await lockSuiteNameSource(tx, suiteId);
-    if (nameSource === null) return;
+    const metadata = await lockSuiteMetadata(tx, suiteId);
+    if (metadata === null) return;
 
-    if (nameSource === HUMAN_NAME_SOURCE) {
+    if (metadata.nameSource === HUMAN_NAME_SOURCE) {
       this.logger.log(
         `Skipped applying suite metadata to ${suiteId}: a human already named this suite`,
       );
@@ -621,7 +649,7 @@ export class ExtractionProcessor extends WorkerHost {
         data: {
           name: suite.title,
           description: suite.description,
-          tags: [...suite.tags],
+          tags: mergeSuiteTags(metadata.tags, suite.tags),
           nameSource: AERIS_NAME_SOURCE,
         },
       });

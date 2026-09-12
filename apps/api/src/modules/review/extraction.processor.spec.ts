@@ -1490,6 +1490,53 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
     expect(case2Update?.[0].data).not.toHaveProperty('observations');
   });
 
+  it('keeps a human-added tag that Aeris did not propose, adding the new Aeris tags alongside it', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { nameSource: 'aeris', tags: ['urgente'] },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        name: 'Carrito de compras',
+        description: 'Cubre agregar y quitar artículos',
+        tags: ['urgente', 'carrito', 'compras'],
+        nameSource: 'aeris',
+      },
+    });
+  });
+
+  it('does not duplicate a tag Aeris re-proposes that a human already added', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { nameSource: 'ingestion', tags: ['carrito'] },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    expect(lastCall(prisma.suite.update).data?.tags).toEqual([
+      'carrito',
+      'compras',
+    ]);
+  });
+
   it('does not touch the suite when the model returned no summary', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
