@@ -27,10 +27,11 @@ interface FakePrisma {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
     findMany: jest.Mock;
+    update: jest.Mock;
   };
-  suite: { findFirst: jest.Mock };
+  testCaseVersion: { count: jest.Mock; create: jest.Mock };
+  suite: { findFirst: jest.Mock; update: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
-  suiteProposal: { findFirst: jest.Mock; create: jest.Mock };
   extractedProposal: {
     findFirst: jest.Mock;
     findMany: jest.Mock;
@@ -39,6 +40,7 @@ interface FakePrisma {
   };
   $transaction: jest.Mock;
   $executeRawUnsafe: jest.Mock;
+  $queryRawUnsafe: jest.Mock;
 }
 
 const connection = {
@@ -70,16 +72,18 @@ function createPrisma(): FakePrisma {
           Promise.resolve('automationFilePath' in args.where ? null : null),
         ),
       findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue({ id: 'case-updated' }),
+    },
+    testCaseVersion: {
+      count: jest.fn().mockResolvedValue(0),
+      create: jest.fn().mockResolvedValue({ id: 'version-new', version: 1 }),
     },
     suite: {
       findFirst: jest
         .fn()
         .mockResolvedValueOnce({ id: 'suite-by-name' })
         .mockResolvedValue({ id: 'suite-by-name' }),
-    },
-    suiteProposal: {
-      findFirst: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockResolvedValue({ id: 'suite-proposal-new' }),
+      update: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     evidence: {
       create: jest.fn().mockResolvedValue({ id: 'evidence-new' }),
@@ -93,6 +97,7 @@ function createPrisma(): FakePrisma {
     },
     $transaction: jest.fn(),
     $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
+    $queryRawUnsafe: jest.fn().mockResolvedValue([{ nameSource: 'ingestion' }]),
   };
 
   prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
@@ -165,7 +170,7 @@ function lastCall(mock: jest.Mock): CallArgs {
 
 function extractedOutcome(
   cases: ReturnType<typeof extractedCase>[],
-  suite: { title: string; description: string } | null = null,
+  suite: { title: string; description: string; tags?: string[] } | null = null,
 ) {
   return {
     kind: 'extracted' as const,
@@ -174,6 +179,23 @@ function extractedOutcome(
     usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 },
   };
 }
+
+describe('ExtractionProcessor — code-change job still proposes (CONTEXT.md §4.3.4 b regression guard)', () => {
+  it('still creates an ExtractedProposal for a code-change extraction, unlike the document-file direct-write path', async () => {
+    const prisma = createPrisma();
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+  });
+});
 
 describe('ExtractionProcessor — code-change job', () => {
   it('persists a new proposal with evidence, suite and prompt version for an extracted case', async () => {
@@ -914,12 +936,95 @@ describe('ExtractionProcessor — document-file job', () => {
     } as never;
   }
 
-  it('persists one proposal per matched target with its own targetTestCaseId', async () => {
+  it('writes the documentation directly onto each matched case, creating no proposal', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-2' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({
+            automationKey: 'Cart > adds an item',
+            title: 'Adds an item',
+          }),
+          extractedCase({
+            automationKey: 'Cart > removes an item',
+            title: 'Removes an item',
+          }),
+        ]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(2);
+    expect(prisma.testCase.update).toHaveBeenCalledTimes(2);
+
+    const versionCalls = prisma.testCaseVersion.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    expect(versionCalls.map(([call]) => call.data)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          testCaseId: 'case-1',
+          title: 'Adds an item',
+        }),
+        expect.objectContaining({
+          testCaseId: 'case-2',
+          title: 'Removes an item',
+        }),
+      ]),
+    );
+
+    const caseUpdateCalls = prisma.testCase.update.mock.calls as [
+      { where: { id: string }; data: Record<string, unknown> },
+    ][];
+    expect(caseUpdateCalls.map(([call]) => [call.where.id, call.data])).toEqual(
+      expect.arrayContaining([
+        ['case-1', expect.objectContaining({ documentationSource: 'aeris' })],
+        ['case-2', expect.objectContaining({ documentationSource: 'aeris' })],
+      ]),
+    );
+  });
+
+  it('leaves the case state untouched (still draft) when writing documentation directly', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({ targets: [targets[0]] }),
+    );
+
+    const [call] = prisma.testCase.update.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    expect(call[0].data).not.toHaveProperty('state');
+  });
+
+  it('skips a case whose documentation source is human, counts it, and leaves its stored documentation untouched', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'human' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
     ]);
     const extractor = fakeExtractor(
       jest
@@ -936,24 +1041,11 @@ describe('ExtractionProcessor — document-file job', () => {
       documentFileJob(),
     );
 
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
-    const calls = prisma.extractedProposal.create.mock.calls as [
-      { data: Record<string, unknown> },
-    ][];
-    expect(calls.map(([call]) => call.data)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          targetTestCaseId: 'case-1',
-          suiteId: 'suite-1',
-          codeChangeId: null,
-        }),
-        expect.objectContaining({
-          targetTestCaseId: 'case-2',
-          suiteId: 'suite-2',
-          codeChangeId: null,
-        }),
-      ]),
+    expect(prisma.testCase.update).toHaveBeenCalledTimes(1);
+    expect(prisma.testCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'case-2' } }),
     );
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(1);
   });
 
   it('spends exactly one credit for the whole chunk, not one per matched case', async () => {
@@ -990,11 +1082,11 @@ describe('ExtractionProcessor — document-file job', () => {
     expect(spendCredit).toHaveBeenCalledTimes(1);
   });
 
-  it('creates an automation-key-not-found fallback for each target absent from the response', async () => {
+  it('creates an automation-key-not-found fallback proposal only for the unmatched target, while the matched one is documented directly', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
     ]);
     const extractor = fakeExtractor(
       jest
@@ -1010,22 +1102,16 @@ describe('ExtractionProcessor — document-file job', () => {
       documentFileJob(),
     );
 
-    const calls = prisma.extractedProposal.create.mock.calls as [
-      { data: Record<string, unknown> },
-    ][];
-    const fallback = calls
-      .map(([call]) => call.data)
-      .find((data) => data.targetTestCaseId === 'case-2');
-
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    const fallback = lastCall(prisma.extractedProposal.create).data;
     expect(fallback).toMatchObject({
       needsManualReview: true,
       objective: 'automation-key-not-found',
       targetTestCaseId: 'case-2',
     });
-    const matched = calls
-      .map(([call]) => call.data)
-      .find((data) => data.targetTestCaseId === 'case-1');
-    expect(matched?.needsManualReview).toBeUndefined();
+    expect(prisma.testCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'case-1' } }),
+    );
   });
 
   it('fans a no-tests-found response out to every target in the chunk', async () => {
@@ -1124,47 +1210,12 @@ describe('ExtractionProcessor — document-file job', () => {
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
   });
 
-  it('skips a target that already has an in-review proposal on a redelivered chunk, without losing the rest', async () => {
+  it('locks the target case rows before writing their documentation, so two chunks cannot race the same case', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-2' },
-    ]);
-    prisma.extractedProposal.findFirst.mockImplementation(
-      (args: { where: Record<string, unknown> }) =>
-        Promise.resolve(
-          args.where.targetTestCaseId === 'case-1'
-            ? { id: 'already-pending' }
-            : null,
-        ),
-    );
-    const extractor = fakeExtractor(
-      jest
-        .fn()
-        .mockResolvedValue(
-          extractedOutcome([
-            extractedCase({ automationKey: 'Cart > adds an item' }),
-            extractedCase({ automationKey: 'Cart > removes an item' }),
-          ]),
-        ),
-    );
-
-    await build(prisma, fakeSourceReader(), extractor).process(
-      documentFileJob(),
-    );
-
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
-    const createCall = lastCall(prisma.extractedProposal.create);
-    expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-2' });
-  });
-
-  it('locks the target case rows before checking for a pending proposal, so two chunks cannot both create one', async () => {
-    const prisma = createPrisma();
-    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-2' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
     ]);
     const extractor = fakeExtractor(
       jest
@@ -1188,7 +1239,7 @@ describe('ExtractionProcessor — document-file job', () => {
     expect(lockCall?.[0]).toContain('test_case');
     expect(lockCall?.slice(1)).toEqual(['case-1', 'case-2']);
     expect(prisma.$executeRawUnsafe.mock.invocationCallOrder[0]).toBeLessThan(
-      prisma.extractedProposal.findFirst.mock.invocationCallOrder[0],
+      prisma.testCaseVersion.create.mock.invocationCallOrder[0],
     );
   });
 
@@ -1282,7 +1333,7 @@ describe('ExtractionProcessor — resilience', () => {
   });
 });
 
-describe('ExtractionProcessor — suite proposals, locale and observations', () => {
+describe('ExtractionProcessor — direct suite metadata and locale', () => {
   const firstTargetRow = {
     projectId: 'project-1',
     project: { organizationId: 'org-1', connection },
@@ -1315,40 +1366,41 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
           {
             title: 'Carrito de compras',
             description: 'Cubre agregar y quitar artículos',
+            tags: ['carrito', 'compras'],
           },
         ),
       ),
     );
   }
 
-  it('creates one suite proposal per file-level job when the model returned a summary', async () => {
+  it('applies the extracted suite name, description and tags directly, stamping nameSource to aeris', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
     ]);
 
     await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
       documentFileJob(),
     );
 
-    expect(prisma.suiteProposal.create).toHaveBeenCalledTimes(1);
-    expect(lastCall(prisma.suiteProposal.create).data).toMatchObject({
-      projectId: 'project-1',
-      suiteId: 'suite-1',
-      title: 'Carrito de compras',
-      description: 'Cubre agregar y quitar artículos',
-      status: 'in_review',
-      promptVersion: EXTRACTION_PROMPT_VERSION,
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        name: 'Carrito de compras',
+        description: 'Cubre agregar y quitar artículos',
+        tags: ['carrito', 'compras'],
+        nameSource: 'aeris',
+      },
     });
   });
 
-  it('creates no suite proposal when the model omitted the summary', async () => {
+  it('does not touch the suite when the model returned no summary', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
     ]);
     const extractor = fakeExtractor(
       jest
@@ -1364,52 +1416,132 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
       documentFileJob(),
     );
 
-    expect(prisma.suiteProposal.create).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
   });
 
-  it('skips the suite proposal when one is already waiting in review for that suite', async () => {
+  it('does not touch the suite when the matched targets span more than one suite', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
     ]);
-    prisma.suiteProposal.findFirst.mockResolvedValue({
-      id: 'pending-suite-proposal',
-    });
 
     await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
       documentFileJob(),
     );
 
-    expect(prisma.suiteProposal.create).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
   });
 
-  it('stamps the job locale and keeps observations on each case proposal', async () => {
+  it('skips applying suite metadata when the suite name is already human-chosen, without failing the job or losing the case documentation', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    prisma.$queryRawUnsafe.mockResolvedValue([{ nameSource: 'human' }]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(2);
+    expect(prisma.testCase.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the suite untouched and reports a skip when the proposed name collides with another suite, without losing the case documentation written in the same job', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    prisma.suite.update.mockRejectedValue({
+      code: 'P2002',
+      meta: { target: ['projectId', 'name'] },
+    });
+
+    await expect(
+      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+        documentFileJob(),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(2);
+    expect(prisma.testCase.update).toHaveBeenCalledTimes(2);
+    const savepointCalls = prisma.$executeRawUnsafe.mock.calls.map(
+      ([sql]: [string]) => sql,
+    );
+    expect(savepointCalls).toEqual(
+      expect.arrayContaining([
+        'SAVEPOINT suite_metadata',
+        'ROLLBACK TO SAVEPOINT suite_metadata',
+        'RELEASE SAVEPOINT suite_metadata',
+      ]),
+    );
+  });
+
+  it('treats any unique violation while applying suite metadata as a name collision skip, even without constraint metadata', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    prisma.suite.update.mockRejectedValue({ code: 'P2002' });
+
+    await expect(
+      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+        documentFileJob(),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('locks the suite row before reading its nameSource', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('FOR UPDATE'),
+      'suite-1',
+    );
+    expect(prisma.$queryRawUnsafe.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.suite.update.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('stamps the job locale onto each documented version', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
     ]);
 
     await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
       documentFileJob('es'),
     );
 
-    const created = (
-      prisma.extractedProposal.create.mock.calls as [
-        { data: Record<string, unknown> },
-      ][]
-    ).map(([call]) => call.data);
-    const first = created.find((data) => data.targetTestCaseId === 'case-1');
-    const second = created.find((data) => data.targetTestCaseId === 'case-2');
-    expect(first).toMatchObject({
-      locale: 'es',
-      observations: ['No assertion on the total'],
-    });
-    expect(second).toMatchObject({ locale: 'es' });
-    expect(second).not.toHaveProperty('observations');
+    const versionCalls = prisma.testCaseVersion.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    expect(versionCalls.map(([call]) => call.data.locale)).toEqual([
+      'es',
+      'es',
+    ]);
   });
 
   it('stamps the locale on a manual-review fallback proposal too', async () => {
@@ -1430,135 +1562,5 @@ describe('ExtractionProcessor — suite proposals, locale and observations', () 
       needsManualReview: true,
       locale: 'en',
     });
-  });
-
-  it('stamps the job locale onto the suite proposal, exactly like case proposals', async () => {
-    const prisma = createPrisma();
-    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
-    ]);
-
-    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
-      documentFileJob('es'),
-    );
-
-    expect(lastCall(prisma.suiteProposal.create).data).toMatchObject({
-      locale: 'es',
-    });
-  });
-
-  it('locks the suite row before checking for a pending suite proposal, so two files of the same suite cannot both insert one', async () => {
-    const prisma = createPrisma();
-    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
-    ]);
-
-    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
-      documentFileJob(),
-    );
-
-    const lockCall = (
-      prisma.$executeRawUnsafe.mock.calls as [string, ...string[]][]
-    ).find(([sql]) => sql.includes('FOR UPDATE') && sql.includes('"suite"'));
-    expect(lockCall).toBeDefined();
-    expect(lockCall?.[1]).toBe('suite-1');
-    const lockOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder.find(
-      (order, index) =>
-        (prisma.$executeRawUnsafe.mock.calls[index] as [string])[0].includes(
-          '"suite"',
-        ),
-    );
-    expect(lockOrder).toBeLessThan(
-      prisma.suiteProposal.findFirst.mock.invocationCallOrder[0],
-    );
-  });
-
-  it('treats a lost race on the one-pending-per-suite index as already pending, not a failure', async () => {
-    const prisma = createPrisma();
-    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
-    ]);
-    prisma.suiteProposal.create.mockRejectedValue({
-      code: 'P2002',
-      meta: { target: 'suite_proposal_one_pending_per_suite' },
-    });
-
-    await expect(
-      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
-        documentFileJob(),
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
-    expect(
-      (
-        prisma.extractedProposal.create.mock.calls as [
-          { data: Record<string, unknown> },
-        ][]
-      ).map(([call]) => call.data.needsManualReview),
-    ).toEqual([undefined, undefined]);
-  });
-
-  it('never mistakes an unrelated unique violation on suite_proposal for the pending-per-suite race', async () => {
-    const prisma = createPrisma();
-    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
-    ]);
-    prisma.suiteProposal.create.mockRejectedValue({
-      code: 'P2002',
-      meta: { target: 'some_other_suite_proposal_constraint' },
-    });
-
-    await expect(
-      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
-        documentFileJob(),
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(4);
-    expect(
-      (
-        prisma.extractedProposal.create.mock.calls as [
-          { data: Record<string, unknown> },
-        ][]
-      )
-        .slice(2)
-        .map(([call]) => call.data.needsManualReview),
-    ).toEqual([true, true]);
-  });
-
-  it('never mistakes a P2002 with no target metadata for the pending-per-suite race', async () => {
-    const prisma = createPrisma();
-    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
-    prisma.testCase.findMany.mockResolvedValue([
-      { id: 'case-1', suiteId: 'suite-1' },
-      { id: 'case-2', suiteId: 'suite-1' },
-    ]);
-    prisma.suiteProposal.create.mockRejectedValue({ code: 'P2002' });
-
-    await expect(
-      build(prisma, fakeSourceReader(), twoMatchedCases()).process(
-        documentFileJob(),
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(4);
-    expect(
-      (
-        prisma.extractedProposal.create.mock.calls as [
-          { data: Record<string, unknown> },
-        ][]
-      )
-        .slice(2)
-        .map(([call]) => call.data.needsManualReview),
-    ).toEqual([true, true]);
   });
 });

@@ -39,6 +39,7 @@ interface DocumentFileCandidate {
   automationKey: string | null;
   automationFilePath: string | null;
   steps: string[];
+  documentationSource: string;
   currentVersion: { locale: string | null } | null;
 }
 
@@ -53,6 +54,7 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
 function buildSkips(
   noSourceFile: number,
   alreadyPending: number,
+  humanDocumented: number,
 ): DocumentFilesSkip[] {
   const skips: DocumentFilesSkip[] = [];
   if (noSourceFile > 0) {
@@ -60,6 +62,9 @@ function buildSkips(
   }
   if (alreadyPending > 0) {
     skips.push({ reason: 'already-pending', count: alreadyPending });
+  }
+  if (humanDocumented > 0) {
+    skips.push({ reason: 'human-documented', count: humanDocumented });
   }
   return skips;
 }
@@ -186,6 +191,7 @@ export class ExtractionService {
         automationKey: true,
         automationFilePath: true,
         steps: true,
+        documentationSource: true,
         currentVersion: { select: { locale: true } },
       },
     })) as DocumentFileCandidate[];
@@ -209,9 +215,15 @@ export class ExtractionService {
 
     let alreadyPending = 0;
     let noSourceFile = 0;
+    let humanDocumented = 0;
     const groupedByFile = new Map<string, DocumentFileTarget[]>();
 
     for (const row of rows) {
+      if (row.documentationSource === 'human') {
+        humanDocumented += 1;
+        continue;
+      }
+
       const documentedLocale = row.currentVersion?.locale ?? null;
       const matchesMode =
         mode === 'undocumented'
@@ -263,7 +275,11 @@ export class ExtractionService {
       groupedByFile.set(filePath, group);
     }
 
-    const casesSkipped = buildSkips(noSourceFile, alreadyPending);
+    const casesSkipped = buildSkips(
+      noSourceFile,
+      alreadyPending,
+      humanDocumented,
+    );
 
     if (groupedByFile.size === 0) {
       return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped });

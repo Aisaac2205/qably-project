@@ -542,6 +542,34 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     expect(queue.addBulk).not.toHaveBeenCalled();
   });
 
+  it('skips a case a human already documented and counts it, never enqueuing it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({
+        steps: [],
+        documentationSource: 'human',
+        currentVersion: { locale: 'en' },
+      }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'human-documented', count: 1 }],
+      },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
   it('counts distinct files, not chunks, in filesEnqueued', async () => {
     const queue = createQueue();
     const prisma = createPrisma('en');

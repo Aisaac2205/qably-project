@@ -16,6 +16,10 @@ import type {
 } from '../ai/extraction.contracts';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { detectLanguage } from './lib/detect-language';
+import {
+  publishTestCaseVersion,
+  type PublishTestCaseVersionTx,
+} from './lib/publish-test-case-version';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   EXTRACTION_QUEUE,
@@ -33,8 +37,11 @@ const QUOTA_EXHAUSTED_REASON = 'quota-exhausted';
 const NOT_BYOK = { isByok: false };
 const UNIQUE_VIOLATION = 'P2002';
 const LOCK_DURATION_MS = 120_000;
-const SUITE_PROPOSAL_PENDING_CONSTRAINT =
-  'suite_proposal_one_pending_per_suite';
+const HUMAN_DOCUMENTATION_SOURCE = 'human';
+const AERIS_DOCUMENTATION_SOURCE = 'aeris';
+const HUMAN_NAME_SOURCE = 'human';
+const AERIS_NAME_SOURCE = 'aeris';
+const SUITE_METADATA_SAVEPOINT = 'suite_metadata';
 
 interface ConnectionInfo {
   provider: RepoConnectionProvider;
@@ -85,11 +92,15 @@ interface SharedProposalFields {
   promptVersion: string;
 }
 
-interface TxClient {
-  suite: { findFirst: PrismaService['suite']['findFirst'] };
+interface TxClient extends PublishTestCaseVersionTx {
+  suite: {
+    findFirst: PrismaService['suite']['findFirst'];
+    update: PrismaService['suite']['update'];
+  };
   testCase: {
     findFirst: PrismaService['testCase']['findFirst'];
     findMany: PrismaService['testCase']['findMany'];
+    update: PrismaService['testCase']['update'];
   };
   evidence: {
     create: PrismaService['evidence']['create'];
@@ -101,16 +112,12 @@ interface TxClient {
     create: PrismaService['extractedProposal']['create'];
     update: PrismaService['extractedProposal']['update'];
   };
-  suiteProposal: {
-    findFirst: PrismaService['suiteProposal']['findFirst'];
-    create: PrismaService['suiteProposal']['create'];
-  };
   organization: { updateMany: PrismaService['organization']['updateMany'] };
   $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
+  $queryRawUnsafe: PrismaService['$queryRawUnsafe'];
 }
 
 const PROPOSAL_SAVEPOINT = 'extraction_proposal';
-const SUITE_PROPOSAL_SAVEPOINT = 'suite_proposal';
 
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
@@ -122,11 +129,16 @@ async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   );
 }
 
-async function lockSuite(tx: TxClient, suiteId: string): Promise<void> {
-  await tx.$executeRawUnsafe(
-    `SELECT id FROM "suite" WHERE id = $1 FOR UPDATE`,
+async function lockSuiteNameSource(
+  tx: TxClient,
+  suiteId: string,
+): Promise<string | null> {
+  const rows = await tx.$queryRawUnsafe<{ nameSource: string }[]>(
+    `SELECT "nameSource" FROM "suite" WHERE id = $1 FOR UPDATE`,
     suiteId,
   );
+
+  return rows[0]?.nameSource ?? null;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -135,20 +147,6 @@ function isUniqueViolation(error: unknown): boolean {
     error !== null &&
     (error as { code?: unknown }).code === UNIQUE_VIOLATION
   );
-}
-
-function violatesUniqueConstraint(
-  error: unknown,
-  constraintName: string,
-): boolean {
-  if (!isUniqueViolation(error)) return false;
-
-  const target = (error as { meta?: { target?: unknown } }).meta?.target;
-
-  if (typeof target === 'string') return target.includes(constraintName);
-  if (Array.isArray(target)) return target.includes(constraintName);
-
-  return false;
 }
 
 function splitRepo(full: string): { owner: string; repo: string } {
@@ -509,14 +507,11 @@ export class ExtractionProcessor extends WorkerHost {
     ctx: DocumentFileJobContext,
     suite: ExtractedSuite | null,
   ): Promise<boolean> {
-    const connection = ctx.connection as ConnectionInfo;
-    const suiteRows = await this.prisma.testCase.findMany({
+    const caseRows = await this.prisma.testCase.findMany({
       where: { id: { in: matched.map(({ target }) => target.testCaseId) } },
-      select: { id: true, suiteId: true },
+      select: { id: true, suiteId: true, documentationSource: true },
     });
-    const suiteIdByCaseId = new Map(
-      suiteRows.map((row) => [row.id, row.suiteId]),
-    );
+    const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
 
     return this.prisma.$transaction(async (tx: TxClient) => {
       await lockTestCases(
@@ -527,131 +522,94 @@ export class ExtractionProcessor extends WorkerHost {
       const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
 
+      let skippedForHumanEdit = 0;
+      const suiteIds = new Set<string>();
+
       for (const { target, testCase } of matched) {
-        const pending = await tx.extractedProposal.findFirst({
-          where: { targetTestCaseId: target.testCaseId, status: 'in_review' },
-          select: { id: true },
-        });
+        const info = caseInfoById.get(target.testCaseId);
+        if (info === undefined) continue;
 
-        if (pending !== null) continue;
+        suiteIds.add(info.suiteId);
 
-        const uri = buildBlobUrl(
-          connection.provider,
-          connection.repo,
-          ctx.ref,
-          ctx.filePath,
-        );
+        if (info.documentationSource === HUMAN_DOCUMENTATION_SOURCE) {
+          skippedForHumanEdit += 1;
+          continue;
+        }
 
-        const evidence = await tx.evidence.create({
-          data: {
-            projectId: ctx.projectId,
-            kind: 'SOURCE_EXCERPT',
-            title: ctx.filePath,
-            uri,
-            excerpt: testCase.sourceExcerpt,
-          },
-          select: { id: true },
-        });
-
-        await tx.extractedProposal.create({
-          data: {
-            projectId: ctx.projectId,
-            suiteId: suiteIdByCaseId.get(target.testCaseId) ?? null,
-            status: 'in_review',
+        await publishTestCaseVersion(
+          tx,
+          target.testCaseId,
+          {
             title: testCase.title,
             objective: testCase.objective,
             preconditions: [...testCase.preconditions],
             steps: [...testCase.steps],
             expectedResult: testCase.expectedResult,
             priority: testCase.priority,
-            promptVersion: EXTRACTION_PROMPT_VERSION,
             locale: ctx.locale ?? null,
-            ...(testCase.observations === undefined
-              ? {}
-              : { observations: testCase.observations }),
-            evidenceId: evidence.id,
-            codeChangeId: null,
-            automationKey: testCase.automationKey,
-            targetTestCaseId: target.testCaseId,
           },
-        });
+          { documentationSource: AERIS_DOCUMENTATION_SOURCE },
+        );
       }
 
-      await this.persistSuiteProposal(tx, ctx, suite, [
-        ...new Set(suiteIdByCaseId.values()),
-      ]);
+      if (skippedForHumanEdit > 0) {
+        this.logger.log(
+          `Skipped documenting ${skippedForHumanEdit} case(s) in ${ctx.filePath}: a human already edited their documentation`,
+        );
+      }
+
+      await this.applySuiteMetadata(tx, suite, [...suiteIds]);
 
       return true;
     });
   }
 
-  private async persistSuiteProposal(
+  private async applySuiteMetadata(
     tx: TxClient,
-    ctx: DocumentFileJobContext,
     suite: ExtractedSuite | null,
     suiteIds: string[],
   ): Promise<void> {
     if (suite === null || suiteIds.length !== 1) return;
     const [suiteId] = suiteIds;
-    const connection = ctx.connection as ConnectionInfo;
 
-    await lockSuite(tx, suiteId);
+    const nameSource = await lockSuiteNameSource(tx, suiteId);
+    if (nameSource === null) return;
 
-    const pending = await tx.suiteProposal.findFirst({
-      where: { suiteId, status: 'in_review' },
-      select: { id: true },
-    });
-    if (pending !== null) return;
+    if (nameSource === HUMAN_NAME_SOURCE) {
+      this.logger.log(
+        `Skipped applying suite metadata to ${suiteId}: a human already named this suite`,
+      );
+      return;
+    }
 
-    await tx.$executeRawUnsafe(`SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`);
+    await tx.$executeRawUnsafe(`SAVEPOINT ${SUITE_METADATA_SAVEPOINT}`);
 
     try {
-      const evidence = await tx.evidence.create({
+      await tx.suite.update({
+        where: { id: suiteId },
         data: {
-          projectId: ctx.projectId,
-          kind: 'SOURCE_EXCERPT',
-          title: ctx.filePath,
-          uri: buildBlobUrl(
-            connection.provider,
-            connection.repo,
-            ctx.ref,
-            ctx.filePath,
-          ),
-          excerpt: null,
-        },
-        select: { id: true },
-      });
-
-      await tx.suiteProposal.create({
-        data: {
-          projectId: ctx.projectId,
-          suiteId,
-          title: suite.title,
+          name: suite.title,
           description: suite.description,
-          status: 'in_review',
-          evidenceId: evidence.id,
-          promptVersion: EXTRACTION_PROMPT_VERSION,
-          locale: ctx.locale ?? null,
+          tags: [...suite.tags],
+          nameSource: AERIS_NAME_SOURCE,
         },
       });
 
       await tx.$executeRawUnsafe(
-        `RELEASE SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
+        `RELEASE SAVEPOINT ${SUITE_METADATA_SAVEPOINT}`,
       );
     } catch (error) {
-      if (!violatesUniqueConstraint(error, SUITE_PROPOSAL_PENDING_CONSTRAINT)) {
-        throw error;
-      }
+      if (!isUniqueViolation(error)) throw error;
 
       await tx.$executeRawUnsafe(
-        `ROLLBACK TO SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
+        `ROLLBACK TO SAVEPOINT ${SUITE_METADATA_SAVEPOINT}`,
       );
       await tx.$executeRawUnsafe(
-        `RELEASE SAVEPOINT ${SUITE_PROPOSAL_SAVEPOINT}`,
+        `RELEASE SAVEPOINT ${SUITE_METADATA_SAVEPOINT}`,
       );
 
       this.logger.log(
-        `Lost the race to propose a name for suite ${suiteId}; another job already has one pending`,
+        `Skipped applying suite metadata to ${suiteId}: the proposed name collides with another suite in this project`,
       );
     }
   }
