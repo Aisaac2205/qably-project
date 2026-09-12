@@ -1,4 +1,7 @@
-import { publishTestCaseVersion } from './publish-test-case-version';
+import {
+  isSameDocumentation,
+  publishTestCaseVersion,
+} from './publish-test-case-version';
 
 function fields(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -119,5 +122,70 @@ describe('publishTestCaseVersion', () => {
       executionMode: 'automated',
       automationKey: 'Cart > adds an item',
     });
+  });
+});
+
+describe('isSameDocumentation', () => {
+  function currentVersion(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      title: 'Adds an item to the cart',
+      objective: 'Verify the cart total updates',
+      preconditions: ['The cart is empty'],
+      steps: ['Add one item', 'Read the total'],
+      expectedResult: 'The total reflects the item price',
+      priority: 'medium' as const,
+      locale: 'en' as string | null,
+      ...overrides,
+    };
+  }
+
+  it('is false when there is no current version yet', () => {
+    expect(isSameDocumentation(null, fields())).toBe(false);
+  });
+
+  it('is true when every documentation field matches the current version exactly', () => {
+    expect(isSameDocumentation(currentVersion(), fields())).toBe(true);
+  });
+
+  it('is false when the title changed', () => {
+    expect(
+      isSameDocumentation(
+        currentVersion({ title: 'Adds two items to the cart' }),
+        fields(),
+      ),
+    ).toBe(false);
+  });
+
+  it('is false when the steps changed', () => {
+    expect(
+      isSameDocumentation(
+        currentVersion({ steps: ['Add one item'] }),
+        fields(),
+      ),
+    ).toBe(false);
+  });
+
+  it('is false when the steps have the same length but a different order', () => {
+    expect(
+      isSameDocumentation(
+        currentVersion({ steps: ['Read the total', 'Add one item'] }),
+        fields(),
+      ),
+    ).toBe(false);
+  });
+
+  it('is false when the locale changed', () => {
+    expect(
+      isSameDocumentation(currentVersion({ locale: 'es' }), fields()),
+    ).toBe(false);
+  });
+
+  it('treats a null current locale and an undefined next locale as equal', () => {
+    expect(
+      isSameDocumentation(
+        currentVersion({ locale: null }),
+        fields({ locale: null }),
+      ),
+    ).toBe(true);
   });
 });

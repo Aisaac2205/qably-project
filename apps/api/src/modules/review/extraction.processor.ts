@@ -17,7 +17,9 @@ import type {
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { detectLanguage } from './lib/detect-language';
 import {
+  isSameDocumentation,
   publishTestCaseVersion,
+  type PublishTestCaseVersionFields,
   type PublishTestCaseVersionTx,
 } from './lib/publish-test-case-version';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
@@ -509,7 +511,22 @@ export class ExtractionProcessor extends WorkerHost {
   ): Promise<boolean> {
     const caseRows = await this.prisma.testCase.findMany({
       where: { id: { in: matched.map(({ target }) => target.testCaseId) } },
-      select: { id: true, suiteId: true, documentationSource: true },
+      select: {
+        id: true,
+        suiteId: true,
+        documentationSource: true,
+        currentVersion: {
+          select: {
+            title: true,
+            objective: true,
+            preconditions: true,
+            steps: true,
+            expectedResult: true,
+            priority: true,
+            locale: true,
+          },
+        },
+      },
     });
     const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
 
@@ -523,6 +540,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (!spent) return false;
 
       let skippedForHumanEdit = 0;
+      let skippedForIdenticalRedelivery = 0;
       const suiteIds = new Set<string>();
 
       for (const { target, testCase } of matched) {
@@ -536,25 +554,35 @@ export class ExtractionProcessor extends WorkerHost {
           continue;
         }
 
-        await publishTestCaseVersion(
-          tx,
-          target.testCaseId,
-          {
-            title: testCase.title,
-            objective: testCase.objective,
-            preconditions: [...testCase.preconditions],
-            steps: [...testCase.steps],
-            expectedResult: testCase.expectedResult,
-            priority: testCase.priority,
-            locale: ctx.locale ?? null,
-          },
-          { documentationSource: AERIS_DOCUMENTATION_SOURCE },
-        );
+        const nextFields: PublishTestCaseVersionFields = {
+          title: testCase.title,
+          objective: testCase.objective,
+          preconditions: [...testCase.preconditions],
+          steps: [...testCase.steps],
+          expectedResult: testCase.expectedResult,
+          priority: testCase.priority,
+          locale: ctx.locale ?? null,
+        };
+
+        if (isSameDocumentation(info.currentVersion ?? null, nextFields)) {
+          skippedForIdenticalRedelivery += 1;
+          continue;
+        }
+
+        await publishTestCaseVersion(tx, target.testCaseId, nextFields, {
+          documentationSource: AERIS_DOCUMENTATION_SOURCE,
+        });
       }
 
       if (skippedForHumanEdit > 0) {
         this.logger.log(
           `Skipped documenting ${skippedForHumanEdit} case(s) in ${ctx.filePath}: a human already edited their documentation`,
+        );
+      }
+
+      if (skippedForIdenticalRedelivery > 0) {
+        this.logger.log(
+          `Skipped documenting ${skippedForIdenticalRedelivery} case(s) in ${ctx.filePath}: the current version already carries this documentation (redelivery)`,
         );
       }
 

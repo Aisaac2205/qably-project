@@ -27,6 +27,42 @@ export interface PublishedTestCaseVersion {
   version: number;
 }
 
+export interface CurrentTestCaseVersionFields {
+  title: string;
+  objective: string;
+  preconditions: string[];
+  steps: string[];
+  expectedResult: string;
+  priority: string;
+  locale: string | null;
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+/**
+ * Whether `current` (the case's already-published version) carries exactly
+ * the documentation `next` is about to write. Used to make a redelivered
+ * document-file job a no-op instead of creating a new version every retry.
+ */
+export function isSameDocumentation(
+  current: CurrentTestCaseVersionFields | null,
+  next: PublishTestCaseVersionFields,
+): boolean {
+  if (current === null) return false;
+
+  return (
+    current.title === next.title &&
+    current.objective === next.objective &&
+    arraysEqual(current.preconditions, next.preconditions) &&
+    arraysEqual(current.steps, next.steps) &&
+    current.expectedResult === next.expectedResult &&
+    current.priority === next.priority &&
+    (current.locale ?? null) === (next.locale ?? null)
+  );
+}
+
 export async function publishTestCaseVersion(
   tx: PublishTestCaseVersionTx,
   testCaseId: string,

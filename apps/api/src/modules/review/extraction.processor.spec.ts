@@ -993,6 +993,72 @@ describe('ExtractionProcessor — document-file job', () => {
     );
   });
 
+  it('does not create a second version when the job is redelivered and the current version already matches exactly', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const documented = extractedCase({ automationKey: 'Cart > adds an item' });
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-1',
+        suiteId: 'suite-1',
+        documentationSource: 'aeris',
+        currentVersion: {
+          title: documented.title,
+          objective: documented.objective,
+          preconditions: documented.preconditions,
+          steps: documented.steps,
+          expectedResult: documented.expectedResult,
+          priority: documented.priority,
+          locale: null,
+        },
+      },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([documented])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({ targets: [targets[0]] }),
+    );
+
+    expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+  });
+
+  it('does create a new version on redelivery when the extracted content actually changed', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const documented = extractedCase({
+      automationKey: 'Cart > adds an item',
+      title: 'Adds two items to the cart',
+    });
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        id: 'case-1',
+        suiteId: 'suite-1',
+        documentationSource: 'aeris',
+        currentVersion: {
+          title: 'Adds an item to the cart',
+          objective: documented.objective,
+          preconditions: documented.preconditions,
+          steps: documented.steps,
+          expectedResult: documented.expectedResult,
+          priority: documented.priority,
+          locale: null,
+        },
+      },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([documented])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({ targets: [targets[0]] }),
+    );
+
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(1);
+  });
+
   it('leaves the case state untouched (still draft) when writing documentation directly', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
