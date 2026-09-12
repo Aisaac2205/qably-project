@@ -17,6 +17,7 @@ import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { ApiKeyGuard } from '../api-keys/guards/api-key.guard';
 import { Public } from '../auth/decorators/public.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { buildJobId } from '../../common/queue/job-id';
 import { isErr, type Result } from '../../common/result';
 import type { JunitIngestView, RunError, RunView } from './runs.contracts';
 import { RUN_INGEST_QUEUE, type RunIngestJobData } from './runs.contracts';
@@ -32,8 +33,6 @@ import {
   type JunitSuiteGroup,
 } from './lib/group-junit-report';
 import { RunsService } from './runs.service';
-
-const UNSAFE_JOB_ID_CHARACTERS = /[^a-zA-Z0-9_.:-]/g;
 
 function parseJunitReport(xml: string) {
   try {
@@ -77,11 +76,6 @@ function resolveRunName(
 ): string {
   if (query.name !== undefined) return query.name;
   return group.suiteName !== '' ? group.suiteName : query.externalId;
-}
-
-function jobIdFor(projectId: string, body: IngestRunInput): string {
-  const raw = `${projectId}:${body.source}:${body.externalId}`;
-  return raw.replace(UNSAFE_JOB_ID_CHARACTERS, '-');
 }
 
 function validateGroup(
@@ -163,7 +157,13 @@ export class RunsController {
     const jobs = bodies.map((body, index) => ({
       name: 'ingest',
       data: { apiKey, body } satisfies RunIngestJobData,
-      opts: { jobId: jobIdFor(apiKey.projectId, body) },
+      opts: {
+        jobId: buildJobId('ingest', [
+          apiKey.projectId,
+          body.source,
+          body.externalId,
+        ]),
+      },
       suiteName: groups[index].suiteName,
     }));
 

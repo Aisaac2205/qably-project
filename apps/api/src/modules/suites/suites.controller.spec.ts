@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { buildJobId } from '../../common/queue/job-id';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { SuitesController } from './suites.controller';
@@ -30,9 +31,10 @@ function build(extraction: ReturnType<typeof fakeExtraction>) {
 
 describe('SuitesController.documentCase', () => {
   it("queues the extraction with the acting user's locale and returns the jobId", async () => {
+    const jobId = buildJobId('document-case', ['case-1']);
     const extraction = fakeExtraction({
       ok: true,
-      value: { jobId: 'document-case:case-1' },
+      value: { jobId },
     });
 
     const result = await build(extraction).documentCase(
@@ -42,7 +44,7 @@ describe('SuitesController.documentCase', () => {
       user,
     );
 
-    expect(result).toEqual({ queued: true, jobId: 'document-case:case-1' });
+    expect(result).toEqual({ queued: true, jobId });
     expect(extraction.enqueueDocumentCase).toHaveBeenCalledWith(
       org,
       'suite-1',

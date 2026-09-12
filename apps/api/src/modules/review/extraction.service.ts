@@ -9,6 +9,7 @@ import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { buildJobId } from '../../common/queue/job-id';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   EXTRACTION_QUEUE,
@@ -91,7 +92,7 @@ export class ExtractionService {
           codeChangeId: change.id,
           locale,
         },
-        opts: { jobId: `code-change:${change.id}` },
+        opts: { jobId: buildJobId('code-change', [change.id]) },
       })),
     );
 
@@ -144,7 +145,7 @@ export class ExtractionService {
         ? await resolveOrgDefaultLocale(this.prisma, org.organizationId)
         : resolveLocale(actorLocale);
 
-    const jobId = `document-case:${caseId}`;
+    const jobId = buildJobId('document-case', [caseId]);
 
     await this.queue.add(
       'document-case',
@@ -295,7 +296,9 @@ export class ExtractionService {
             targets: chunkTargets,
             locale,
           },
-          opts: { jobId: `document-file:${projectId}:${filePath}:${index}` },
+          opts: {
+            jobId: buildJobId('document-file', [projectId, filePath, index]),
+          },
         });
       });
     }

@@ -1,4 +1,5 @@
 import { DEFAULT_LOCALE } from '@qably/i18n';
+import { buildJobId } from '../../common/queue/job-id';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import {
   ExtractionService,
@@ -87,11 +88,11 @@ describe('ExtractionService.enqueueCodeChanges', () => {
     expect(jobs).toHaveLength(2);
     expect(jobs[0]).toMatchObject({
       data: { kind: 'code-change', codeChangeId: 'change-1', locale: 'en' },
-      opts: { jobId: 'code-change:change-1' },
+      opts: { jobId: buildJobId('code-change', ['change-1']) },
     });
     expect(jobs[1]).toMatchObject({
       data: { kind: 'code-change', codeChangeId: 'change-2', locale: 'en' },
-      opts: { jobId: 'code-change:change-2' },
+      opts: { jobId: buildJobId('code-change', ['change-2']) },
     });
   });
 
@@ -148,12 +149,14 @@ describe('ExtractionService.enqueueDocumentCase', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { jobId: 'document-case:case-1' },
+      value: { jobId: buildJobId('document-case', ['case-1']) },
     });
     expect(queue.add).toHaveBeenCalledWith(
       'document-case',
       { kind: 'document-case', testCaseId: 'case-1', locale: 'es' },
-      expect.objectContaining({ jobId: 'document-case:case-1' }),
+      expect.objectContaining({
+        jobId: buildJobId('document-case', ['case-1']),
+      }),
     );
     expect(prisma.orgMember.findFirst).not.toHaveBeenCalled();
   });
@@ -255,7 +258,7 @@ describe('ExtractionService.enqueueDocumentCase', () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { jobId: 'document-case:case-1' },
+      value: { jobId: buildJobId('document-case', ['case-1']) },
     });
     expect(queue.add).toHaveBeenCalled();
   });
@@ -395,7 +398,9 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
           { testCaseId: 'case-2', automationKey: 'Cart > removes an item' },
         ],
       },
-      opts: { jobId: 'document-file:proj-1:src/cart.spec.ts:0' },
+      opts: {
+        jobId: buildJobId('document-file', ['proj-1', 'src/cart.spec.ts', 0]),
+      },
     });
   });
 
@@ -415,7 +420,9 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     const [jobs] = queue.addBulk.mock.calls[0] as [
       { opts: { jobId: string } }[],
     ];
-    expect(jobs[0].opts.jobId).toBe('document-file:proj-2:src/cart.spec.ts:0');
+    expect(jobs[0].opts.jobId).toBe(
+      buildJobId('document-file', ['proj-2', 'src/cart.spec.ts', 0]),
+    );
   });
 
   it('caps how many files a single request can enqueue', async () => {
@@ -477,10 +484,10 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     expect(jobs[0].data.targets).toHaveLength(20);
     expect(jobs[1].data.targets).toHaveLength(3);
     expect(jobs[0].opts).toMatchObject({
-      jobId: 'document-file:proj-1:src/cart.spec.ts:0',
+      jobId: buildJobId('document-file', ['proj-1', 'src/cart.spec.ts', 0]),
     });
     expect(jobs[1].opts).toMatchObject({
-      jobId: 'document-file:proj-1:src/cart.spec.ts:1',
+      jobId: buildJobId('document-file', ['proj-1', 'src/cart.spec.ts', 1]),
     });
   });
 

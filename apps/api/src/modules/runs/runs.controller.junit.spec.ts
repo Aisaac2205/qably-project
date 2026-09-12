@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { buildJobId } from '../../common/queue/job-id';
 import { RunsController } from './runs.controller';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import type { RunIngestJobData } from './runs.contracts';
@@ -51,7 +52,11 @@ describe('RunsController.ingestJunit', () => {
 
     expect(result.accepted).toBe(1);
     expect(result.runs).toEqual([
-      { externalId: 'ci-42', suiteName: 'Checkout', jobId: 'proj-1:api:ci-42' },
+      {
+        externalId: 'ci-42',
+        suiteName: 'Checkout',
+        jobId: buildJobId('ingest', ['proj-1', 'api', 'ci-42']),
+      },
     ]);
     expect(runIngestQueue.addBulk).toHaveBeenCalledTimes(1);
     expect(jobBodies(runIngestQueue)).toHaveLength(1);

@@ -3,6 +3,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import type { RepoConnectionProvider } from '@qably/types';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { buildJobId } from '../../common/queue/job-id';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
@@ -193,7 +194,7 @@ export class IngestionService {
     await this.queue.add(
       JOB_NAME,
       { scmEventId },
-      { jobId: `${event.provider}-${event.eventId}` },
+      { jobId: buildJobId('scm-event', [event.provider, event.eventId]) },
     );
   }
 }

@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { buildJobId } from '../../common/queue/job-id';
 import { BitbucketAdapter } from './adapters/bitbucket.adapter';
 import { GithubAdapter } from './adapters/github.adapter';
 import { IngestionService } from './ingestion.service';
@@ -63,13 +64,7 @@ function createQueue() {
   return {
     add: jest.fn(
       (_name: string, _data: unknown, options?: { jobId?: string }) => {
-        const jobId = options?.jobId;
-
-        if (
-          jobId !== undefined &&
-          jobId.includes(':') &&
-          jobId.split(':').length !== 3
-        ) {
+        if (options?.jobId?.includes(':') === true) {
           throw new Error('Custom Id cannot contain :');
         }
 
@@ -210,7 +205,9 @@ describe('IngestionService.ingest', () => {
     expect(queue.add).toHaveBeenCalledWith(
       'scm-event',
       { scmEventId: 'event-1' },
-      expect.objectContaining({ jobId: 'GITHUB-delivery-1' }),
+      expect.objectContaining({
+        jobId: buildJobId('scm-event', ['GITHUB', 'delivery-1']),
+      }),
     );
   });
 
@@ -248,7 +245,9 @@ describe('IngestionService.ingest', () => {
     expect(queue.add).toHaveBeenCalledWith(
       'scm-event',
       { scmEventId: 'orphan-1' },
-      expect.objectContaining({ jobId: 'GITHUB-delivery-1' }),
+      expect.objectContaining({
+        jobId: buildJobId('scm-event', ['GITHUB', 'delivery-1']),
+      }),
     );
   });
 
