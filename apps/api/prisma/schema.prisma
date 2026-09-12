@@ -250,6 +250,7 @@ model TestCase {
   automationClassName String?
   automationFilePath  String?
   documentationSource String              @default("ingestion")
+  observations        Json?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   runCases            RunCase[]

@@ -989,6 +989,52 @@ describe('SuitesService.updateCase documentation source', () => {
   });
 });
 
+describe('SuitesService documented observations', () => {
+  it('surfaces persisted observations on the case read model', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          {
+            ...suiteRow.cases[0],
+            observations: ['No assertion on the total'],
+          },
+        ],
+      },
+    ]);
+
+    const suites = await build(prisma).list(owner);
+
+    expect(suites[0].cases[0].observations).toEqual([
+      'No assertion on the total',
+    ]);
+  });
+
+  it('omits observations from the view when none were recorded', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const suites = await build(prisma).list(owner);
+
+    expect(suites[0].cases[0].observations).toBeUndefined();
+  });
+
+  it('ignores a malformed observations value rather than surfacing garbage', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [{ ...suiteRow.cases[0], observations: 'not-an-array' }],
+      },
+    ]);
+
+    const suites = await build(prisma).list(owner);
+
+    expect(suites[0].cases[0].observations).toBeUndefined();
+  });
+});
+
 describe('SuitesService documented locale', () => {
   it('exposes the locale of the published version on each case', async () => {
     const prisma = createPrisma();

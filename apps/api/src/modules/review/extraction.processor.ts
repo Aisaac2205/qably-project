@@ -571,6 +571,9 @@ export class ExtractionProcessor extends WorkerHost {
 
         await publishTestCaseVersion(tx, target.testCaseId, nextFields, {
           documentationSource: AERIS_DOCUMENTATION_SOURCE,
+          ...(testCase.observations === undefined
+            ? {}
+            : { observations: testCase.observations }),
         });
       }
 

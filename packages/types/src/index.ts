@@ -183,6 +183,7 @@ export interface TestCase {
   healthSignals?: CaseHealthSignal[]
   documentedLocale?: string | null
   localeStale?: boolean
+  observations?: string[]
 }
 
 export interface Suite {

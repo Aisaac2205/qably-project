@@ -1462,6 +1462,34 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
     });
   });
 
+  it('persists the extractor observations onto the case, and omits the key when the extractor gave none', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+
+    await build(prisma, fakeSourceReader(), twoMatchedCases()).process(
+      documentFileJob(),
+    );
+
+    const caseUpdateCalls = prisma.testCase.update.mock.calls as [
+      { where: { id: string }; data: Record<string, unknown> },
+    ][];
+    const case1Update = caseUpdateCalls.find(
+      ([call]) => call.where.id === 'case-1',
+    );
+    const case2Update = caseUpdateCalls.find(
+      ([call]) => call.where.id === 'case-2',
+    );
+
+    expect(case1Update?.[0].data).toMatchObject({
+      observations: ['No assertion on the total'],
+    });
+    expect(case2Update?.[0].data).not.toHaveProperty('observations');
+  });
+
   it('does not touch the suite when the model returned no summary', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);

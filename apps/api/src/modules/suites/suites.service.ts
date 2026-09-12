@@ -53,6 +53,7 @@ const CASE_SELECT = {
   automationKey: true,
   automationClassName: true,
   automationFilePath: true,
+  observations: true,
   currentVersion: { select: { version: true, locale: true } },
 } as const;
 
@@ -81,7 +82,16 @@ interface CaseRow {
   automationKey: string | null;
   automationClassName: string | null;
   automationFilePath: string | null;
+  observations?: unknown;
   currentVersion: { version: number; locale?: string | null } | null;
+}
+
+function observationsOf(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const strings = raw.filter(
+    (item): item is string => typeof item === 'string',
+  );
+  return strings.length === 0 ? undefined : strings;
 }
 
 interface DocumentedCaseFields {
@@ -168,6 +178,9 @@ function toCaseView(testCase: CaseRow, orgDefaultLocale: Locale): TestCaseView {
     priority: testCase.priority,
     state: testCase.state,
     executionMode: testCase.executionMode,
+    ...(observationsOf(testCase.observations) === undefined
+      ? {}
+      : { observations: observationsOf(testCase.observations) }),
   };
 
   if (testCase.executionMode !== 'automated') return base;
