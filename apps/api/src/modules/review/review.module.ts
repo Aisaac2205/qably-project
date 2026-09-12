@@ -12,7 +12,6 @@ import { ExtractionService } from './extraction.service';
 import { EXTRACTION_QUEUE } from './review.contracts';
 import { ReviewController } from './review.controller';
 import { ReviewService } from './review.service';
-import { SuiteProposalsController } from './suite-proposals.controller';
 
 @Module({
   imports: [
@@ -34,7 +33,7 @@ import { SuiteProposalsController } from './suite-proposals.controller';
       },
     }),
   ],
-  controllers: [ReviewController, SuiteProposalsController],
+  controllers: [ReviewController],
   providers: [
     ReviewService,
     ExtractionService,

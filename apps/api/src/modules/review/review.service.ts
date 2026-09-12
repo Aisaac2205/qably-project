@@ -12,8 +12,6 @@ import type {
   ProposalView,
   RejectionView,
   ReviewError,
-  SuiteProposalDecisionView,
-  SuiteProposalView,
 } from './review.contracts';
 import {
   rankDuplicateCandidates,
@@ -153,55 +151,6 @@ function toLink(row: LinkRow): ProposalDetailView['links'][number] {
       id: row.toId,
     },
     relation: row.relation as ProposalDetailView['links'][number]['relation'],
-  };
-}
-
-const HUMAN_NAME_SOURCE = 'human';
-const AERIS_NAME_SOURCE = 'aeris';
-
-const SUITE_PROPOSAL_SELECT = {
-  id: true,
-  projectId: true,
-  suiteId: true,
-  title: true,
-  description: true,
-  status: true,
-  evidenceId: true,
-  locale: true,
-  createdAt: true,
-  decidedAt: true,
-  suite: { select: { name: true, nameSource: true } },
-} as const;
-
-interface SuiteProposalRow {
-  id: string;
-  projectId: string;
-  suiteId: string;
-  title: string;
-  description: string;
-  status: ProposalView['status'];
-  evidenceId: string;
-  locale: string | null;
-  createdAt: Date;
-  decidedAt: Date | null;
-  suite: { name: string; nameSource: string };
-}
-
-function toSuiteProposalView(row: SuiteProposalRow): SuiteProposalView {
-  return {
-    id: row.id,
-    projectId: row.projectId,
-    suiteId: row.suiteId,
-    suiteName: row.suite.name,
-    suiteNameSource: row.suite
-      .nameSource as SuiteProposalView['suiteNameSource'],
-    title: row.title,
-    description: row.description,
-    status: row.status,
-    evidenceId: row.evidenceId,
-    locale: row.locale,
-    createdAt: row.createdAt.toISOString(),
-    decidedAt: row.decidedAt === null ? null : row.decidedAt.toISOString(),
   };
 }
 
@@ -510,109 +459,6 @@ export class ReviewService {
     }
 
     return results;
-  }
-
-  async listSuiteProposals(
-    org: OrgContext,
-    filters: ListProposalsFilters,
-  ): Promise<SuiteProposalView[]> {
-    const rows = (await this.prisma.suiteProposal.findMany({
-      where: {
-        project: { organizationId: org.organizationId },
-        ...(filters.projectId === undefined
-          ? {}
-          : { projectId: filters.projectId }),
-        ...(filters.status === undefined ? {} : { status: filters.status }),
-      },
-      orderBy: { createdAt: 'desc' },
-      select: SUITE_PROPOSAL_SELECT,
-    })) as SuiteProposalRow[];
-
-    return rows.map(toSuiteProposalView);
-  }
-
-  async approveSuiteProposal(
-    org: OrgContext,
-    proposalId: string,
-  ): Promise<Result<SuiteProposalDecisionView, ReviewError>> {
-    const pending = await this.pendingSuiteProposal(org, proposalId);
-    if (!pending.ok) return pending;
-    const proposal = pending.value;
-    const applies = proposal.suite.nameSource !== HUMAN_NAME_SOURCE;
-
-    try {
-      const suiteName = await this.prisma.$transaction(async (tx) => {
-        const suite = applies
-          ? await tx.suite.update({
-              where: { id: proposal.suiteId },
-              data: {
-                name: proposal.title,
-                description: proposal.description,
-                nameSource: AERIS_NAME_SOURCE,
-              },
-              select: { name: true },
-            })
-          : { name: proposal.suite.name };
-
-        await tx.suiteProposal.update({
-          where: { id: proposal.id },
-          data: { status: 'approved', decidedAt: new Date() },
-        });
-
-        return suite.name;
-      });
-
-      return ok({
-        proposalId: proposal.id,
-        projectId: proposal.projectId,
-        applied: applies,
-        suiteId: proposal.suiteId,
-        suiteName,
-      });
-    } catch (error) {
-      if (isUniqueViolation(error)) return err('suite-name-taken');
-      throw error;
-    }
-  }
-
-  async rejectSuiteProposal(
-    org: OrgContext,
-    proposalId: string,
-  ): Promise<Result<SuiteProposalDecisionView, ReviewError>> {
-    const pending = await this.pendingSuiteProposal(org, proposalId);
-    if (!pending.ok) return pending;
-    const proposal = pending.value;
-
-    await this.prisma.suiteProposal.update({
-      where: { id: proposal.id },
-      data: { status: 'rejected', decidedAt: new Date() },
-    });
-
-    return ok({
-      proposalId: proposal.id,
-      projectId: proposal.projectId,
-      applied: false,
-      suiteId: proposal.suiteId,
-      suiteName: proposal.suite.name,
-    });
-  }
-
-  private async pendingSuiteProposal(
-    org: OrgContext,
-    proposalId: string,
-  ): Promise<Result<SuiteProposalRow, ReviewError>> {
-    const row = await this.prisma.suiteProposal.findFirst({
-      where: {
-        id: proposalId,
-        project: { organizationId: org.organizationId },
-      },
-      select: SUITE_PROPOSAL_SELECT,
-    });
-
-    if (row === null) return err('not-found');
-    if (row.status !== PENDING_STATUS) return err('invalid-transition');
-
-    return ok(row);
   }
 
   private async pending(

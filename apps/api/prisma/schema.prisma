@@ -176,7 +176,6 @@ model Project {
   evidence          Evidence[]
   testCases         TestCase[]
   proposals         ExtractedProposal[]
-  suiteProposals    SuiteProposal[]
   traceabilityLinks TraceabilityLink[]
   chatThreads       ChatThread[]
 
@@ -206,23 +205,24 @@ model ApiKey {
 }
 
 model Suite {
-  id             String              @id @default(cuid())
-  projectId      String
-  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  name           String
-  description    String              @default("")
-  tags           String[]            @default([])
-  isDefault      Boolean             @default(false)
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  cases          TestCase[]
-  runs           Run[]
-  proposals      ExtractedProposal[]
-  nameSource     String              @default("ingestion")
-  ingestionKey   String?
-  suiteProposals SuiteProposal[]     @relation("SuiteProposals")
+  id                         String              @id @default(cuid())
+  projectId                  String
+  project                    Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId             String
+  organization               Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                       String
+  description                String              @default("")
+  tags                       String[]            @default([])
+  isDefault                  Boolean             @default(false)
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+  cases                      TestCase[]
+  runs                       Run[]
+  proposals                  ExtractedProposal[]
+  nameSource                 String              @default("ingestion")
+  ingestionKey               String?
+  documentationConfirmedAt   DateTime?
+  documentationConfirmedById String?
 
   @@unique([projectId, name])
   @@unique([projectId, ingestionKey])
@@ -249,6 +249,7 @@ model TestCase {
   automationKey       String?
   automationClassName String?
   automationFilePath  String?
+  documentationSource String              @default("ingestion")
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
   runCases            RunCase[]
@@ -336,17 +337,16 @@ enum IngestionBatchStatus {
 }
 
 model Evidence {
-  id             String              @id @default(cuid())
-  projectId      String
-  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  kind           EvidenceKind
-  title          String
-  uri            String
-  excerpt        String?
-  createdAt      DateTime            @default(now())
-  codeChanges    CodeChange[]
-  proposals      ExtractedProposal[]
-  suiteProposals SuiteProposal[]
+  id          String              @id @default(cuid())
+  projectId   String
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  kind        EvidenceKind
+  title       String
+  uri         String
+  excerpt     String?
+  createdAt   DateTime            @default(now())
+  codeChanges CodeChange[]
+  proposals   ExtractedProposal[]
 
   @@index([projectId])
   @@map("evidence")
@@ -494,28 +494,6 @@ model TestCaseVersion {
   @@unique([testCaseId, version])
   @@index([testCaseId])
   @@map("test_case_version")
-}
-
-model SuiteProposal {
-  id            String         @id @default(cuid())
-  projectId     String
-  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  suiteId       String
-  suite         Suite          @relation("SuiteProposals", fields: [suiteId], references: [id], onDelete: Cascade)
-  title         String
-  description   String
-  status        ProposalStatus @default(in_review)
-  evidenceId    String
-  evidence      Evidence       @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
-  promptVersion String?
-  locale        String?
-  createdAt     DateTime       @default(now())
-  decidedAt     DateTime?
-
-  @@unique([suiteId, evidenceId])
-  @@index([projectId])
-  @@index([projectId, status])
-  @@map("suite_proposal")
 }
 
 model TraceabilityLink {

@@ -506,29 +506,10 @@ export interface ExtractedProposal {
   observations?: string[]
   createdAt?: string
 }
-export type SuiteNameSource = 'ingestion' | 'human' | 'aeris'
-export interface SuiteProposal {
-  id: string
-  projectId: string
-  suiteId: string
-  suiteName: string
-  suiteNameSource: SuiteNameSource
-  title: string
-  description: string
-  status: ProposalStatus
-  evidenceId: string
-  locale: string | null
-  createdAt: string
-  decidedAt: string | null
-}
-export interface SuiteProposalDecision {
-  proposalId: string
-  projectId: string
-  applied: boolean
-  suiteId: string
-  suiteName: string
-}
-export type DocumentFilesSkipReason = 'no-source-file' | 'already-pending'
+export type DocumentFilesSkipReason =
+  | 'no-source-file'
+  | 'already-pending'
+  | 'human-documented'
 export interface DocumentFilesSkip {
   reason: DocumentFilesSkipReason
   count: number

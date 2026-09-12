@@ -3,8 +3,6 @@ import type {
   Evidence,
   ExtractedProposal,
   ProposalStatus,
-  SuiteProposal,
-  SuiteProposalDecision,
   TraceabilityLink,
 } from '@qably/types';
 
@@ -16,9 +14,6 @@ export type {
 export interface ProposalView extends ExtractedProposal {
   evidenceTitle: string;
 }
-
-export type SuiteProposalView = SuiteProposal;
-export type SuiteProposalDecisionView = SuiteProposalDecision;
 
 export interface ProposalDetailView extends ProposalView {
   evidence: Evidence | null;
@@ -71,8 +66,7 @@ export type ReviewError =
   | 'missing-evidence'
   | 'incomplete-proposal'
   | 'missing-suite'
-  | 'name-taken'
-  | 'suite-name-taken';
+  | 'name-taken';
 
 export interface DecisionInput {
   actorId: string;

@@ -71,11 +71,6 @@ export function unwrap<T>(result: Result<T, ReviewError>): T {
         code: result.error,
         message: 'Another official case in this suite already uses that title',
       });
-    case 'suite-name-taken':
-      throw new ConflictException({
-        code: result.error,
-        message: 'Another suite in this project already uses that name',
-      });
   }
 }
 
