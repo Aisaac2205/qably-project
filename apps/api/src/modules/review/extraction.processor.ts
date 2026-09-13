@@ -22,6 +22,7 @@ import {
   type PublishTestCaseVersionFields,
   type PublishTestCaseVersionTx,
 } from './lib/publish-test-case-version';
+import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   EXTRACTION_QUEUE,
@@ -482,7 +483,10 @@ export class ExtractionProcessor extends WorkerHost {
 
     const deduped = dedupeByAutomationKey(outcome.cases);
     const byAutomationKey = new Map(
-      deduped.map((testCase) => [testCase.automationKey, testCase]),
+      deduped.map((testCase) => [
+        normalizeAutomationKey(testCase.automationKey),
+        testCase,
+      ]),
     );
 
     const matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] =
@@ -490,7 +494,9 @@ export class ExtractionProcessor extends WorkerHost {
     const unmatched: DocumentFileTarget[] = [];
 
     for (const target of ctx.targets) {
-      const testCase = byAutomationKey.get(target.automationKey);
+      const testCase = byAutomationKey.get(
+        normalizeAutomationKey(target.automationKey),
+      );
       if (testCase === undefined) {
         unmatched.push(target);
       } else {
@@ -781,7 +787,9 @@ export class ExtractionProcessor extends WorkerHost {
       ctx.onlyAutomationKey === null
         ? deduped
         : deduped.filter(
-            (candidate) => candidate.automationKey === ctx.onlyAutomationKey,
+            (candidate) =>
+              normalizeAutomationKey(candidate.automationKey) ===
+              normalizeAutomationKey(ctx.onlyAutomationKey as string),
           );
 
     if (cases.length === 0) {

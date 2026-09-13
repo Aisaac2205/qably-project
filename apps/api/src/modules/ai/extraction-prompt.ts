@@ -17,7 +17,8 @@ const ALL_DELIMITERS = [
   TARGET_CASES_CLOSE,
 ];
 
-const AUTOMATION_KEY_RULES = `- vitest/jest (including jest-junit reports): the enclosing describe chain joined by " > ", followed by the it/test title.
+const AUTOMATION_KEY_RULES = `- vitest (JUnit reporter): the enclosing describe chain and the it/test title joined by " > " (e.g. "Cart > adds an item").
+- jest with jest-junit (default templates): the enclosing describe chain and the it/test title joined by a single space (e.g. "Cart adds an item").
 - pytest: the bare function name (e.g. "test_adds_item_to_cart").
 - JUnit (Java/Kotlin): the bare method name (e.g. "addsItemToCart").
 - GoogleTest/gtest (C++): the test suite and test name joined by "." exactly as gtest reports it (e.g. "CartTest.AddsItem" for "TEST(CartTest, AddsItem)" or "TEST_F(CartTest, AddsItem)").`;
@@ -72,8 +73,8 @@ If the file contains no test declarations, respond with an empty "cases" array. 
 };
 
 const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
-  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con los valores de "automationKey" que importan: prioriza extraer exactamente esos casos, hasta el límite de casos del esquema.`,
-  en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit.`,
+  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con los valores de "automationKey" que importan: prioriza extraer exactamente esos casos, hasta el límite de casos del esquema. Cuando una prueba del archivo corresponde a una de esas entradas, usa exactamente esa cadena como su "automationKey", copiada del bloque, sin derivarla ni reformatearla.`,
+  en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit. When a test in the file corresponds to one of those entries, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
 };
 
 const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {

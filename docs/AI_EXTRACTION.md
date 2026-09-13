@@ -79,6 +79,8 @@ The thesis rule the platform implements is that only test files already present 
 
 Both lookups hinge on `automationKey` being identical on the ingest side and the extraction side. That is not a coincidence — the extraction prompt requires the model to emit the reporter's runtime name byte-for-byte precisely so the two pipelines can be joined here.
 
+The two reporters Qably supports do not agree on that name. vitest's JUnit reporter joins the describe chain and the test title with `" > "`; jest-junit on its default templates joins them with a single space. The prompt states both conventions, and when a job carries a `TARGET_CASES` block it tells the model to copy each listed key verbatim rather than derive it. The processor then matches through `normalizeAutomationKey` (`apps/api/src/modules/review/lib/normalize-automation-key.ts`), which treats the two joins and any run of whitespace as the same key while keeping case. Before that, a jest-junit key stored as `Cart adds an item` never equalled the `Cart > adds an item` the model produced, and every target of the file fell through to an `automation-key-not-found` fallback.
+
 No path is ever derived from `className` or a filename heuristic. A guessed path is not evidence, and per-framework derivation rules would quietly widen the platform beyond the single validated automation framework.
 
 A case with no `automationKey` never reaches those lookups: `enqueueDocumentCase` returns `no-automation-key` (HTTP 409) before resolution is attempted, and `enqueueDocumentFiles` counts it under the skip reason of the same name. The distinction is deliberate. `no-source-file` may only be claimed after resolution actually ran and came back empty; anything else would report a cause the platform never checked.

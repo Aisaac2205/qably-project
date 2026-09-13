@@ -92,6 +92,11 @@ extractor fetches from the repository when someone asks Aeris to document the ca
 case is skipped with `no-source-file`, and the fallback that recovers a path from an earlier
 repository change only works for files the SCM webhook has already seen.
 
+Both reporters also name a case differently. vitest writes `Describe > it title`; jest-junit on its
+default templates writes `Describe it title`, joined by a single space. Qably stores the name as the
+report gives it and matches Aeris output tolerant of that difference, so neither reporter needs a
+custom `titleTemplate`.
+
 Both reporters omit the attribute by default. `jest-junit` turns it on with
 `JEST_JUNIT_ADD_FILE_ATTRIBUTE=true` (set per step in the workflow); vitest's reporter takes
 `addFileAttribute: true` in the config. Connecting the repository is not a substitute: results and

@@ -62,6 +62,24 @@ describe('buildSystemInstruction', () => {
     expect(buildSystemInstruction('en')).not.toContain('numbered by order');
   });
 
+  it('tells the model to copy a listed automationKey verbatim instead of deriving it', () => {
+    expect(buildSystemInstruction('es', true)).toContain(
+      'exactamente esa cadena',
+    );
+    expect(buildSystemInstruction('en', true)).toContain('exactly that string');
+  });
+
+  it('separates the vitest join from the jest-junit join in the key convention', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+
+      expect(instruction).toContain('vitest');
+      expect(instruction).toContain('jest-junit');
+      expect(instruction).toContain('" > "');
+      expect(instruction).toContain('single space');
+    }
+  });
+
   it('omits the target-cases sentence by default', () => {
     for (const locale of ['es', 'en'] as const) {
       expect(buildSystemInstruction(locale)).not.toContain(TARGET_CASES_OPEN);

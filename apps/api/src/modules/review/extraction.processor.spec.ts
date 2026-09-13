@@ -1180,6 +1180,34 @@ describe('ExtractionProcessor — document-file job', () => {
     );
   });
 
+  it('matches a target stored with the jest-junit space join when the model answers with the vitest separator', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({
+        targets: [{ testCaseId: 'case-1', automationKey: 'Cart adds an item' }],
+      }),
+    );
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.testCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'case-1' } }),
+    );
+  });
+
   it('fans a no-tests-found response out to every target in the chunk', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
