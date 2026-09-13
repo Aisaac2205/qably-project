@@ -147,5 +147,11 @@ export const es: Dictionary = {
       githubActions: 'GitHub Actions CI Guide',
       githubRepo: 'Repositorio GitHub',
     },
+    companyLinks: {
+      pricing: 'Precios',
+      terms: 'Términos de Servicio',
+      privacy: 'Política de Privacidad',
+      security: 'Seguridad & SOC 2',
+    },
   },
 };

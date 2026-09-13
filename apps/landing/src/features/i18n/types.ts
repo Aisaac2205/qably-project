@@ -135,6 +135,12 @@ export interface FooterTranslations {
     githubActions: string;
     githubRepo: string;
   };
+  companyLinks: {
+    pricing: string;
+    terms: string;
+    privacy: string;
+    security: string;
+  };
 }
 
 export interface Dictionary {
