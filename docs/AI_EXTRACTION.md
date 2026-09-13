@@ -18,6 +18,12 @@ The extractor is Gemini through the official `@google/genai` SDK (`GoogleGenAI({
 
 Set `GEMINI_MODEL` to any model id Gemini's `models.list()` reports as available for `generateContent`, and restart the API. No code change is required.
 
+## Provider marks are staged for bring-your-own-key
+
+`apps/web/src/components/icons/` holds marks for Claude, Gemini, OpenAI, DeepSeek and Qwen. Nothing imports them today and that is expected: the platform default is labelled Aeris everywhere, and only an organization that connects its own provider key will ever see a real model id — and the mark that belongs to it. They are staged for that surface, not leftovers. Do not remove them as unreferenced code.
+
+`aeris-icon.tsx`, in the same folder, is the platform mark and is in use now.
+
 ## Request shape
 
 `GeminiExtractor` (`apps/api/src/modules/ai/gemini.extractor.ts`) sends the whole file content as `contents`, wrapped by `buildFileContentTurn` in a `<<<FILE_CONTENT>>>` block that also carries the file path and language, with:
