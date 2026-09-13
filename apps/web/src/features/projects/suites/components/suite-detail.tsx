@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
@@ -36,6 +36,8 @@ import { DocumentWithAeris, DocumentFilesStatus, useDocumentFiles } from './docu
 import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
 import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confirmable-cases'
 import { useDocumentationWatch } from '@/features/projects/suites/hooks/use-documentation-watch'
+import type { DocumentationWatchStatus } from '@/features/projects/suites/lib/documentation-watch'
+import { notify } from '@/lib/notify'
 import type { DocumentFilesMode } from './document-with-aeris'
 
 function watchedCount(
@@ -69,9 +71,18 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     return result
   })
   const confirmDocumentation = useConfirmDocumentation()
-  const confirmation = useConfirmDocumentationState(() =>
-    confirmDocumentation.mutateAsync({ suiteId, projectId }),
-  )
+  const confirmation = useConfirmDocumentationState(async () => {
+    try {
+      const outcome = await confirmDocumentation.mutateAsync({ suiteId, projectId })
+      notify.success(
+        t('suites.confirmDocumentationDone', { count: outcome.confirmedCount }),
+      )
+      return outcome
+    } catch (error) {
+      notify.error(t('suites.confirmDocumentationError'))
+      throw error
+    }
+  })
   const { project } = useProject(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
@@ -81,6 +92,23 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const [caseDialogOpen, setCaseDialogOpen] = useState(false)
   const [editingCase, setEditingCase] = useState<TestCase | undefined>(undefined)
   const [deletingCase, setDeletingCase] = useState<TestCase | undefined>(undefined)
+
+  const currentWatchedCount = watchedCount(suite, watchedMode)
+  const watchStatus = watch.statusFor(currentWatchedCount)
+  const documentedCount = watch.documentedCountSince(currentWatchedCount)
+  const announcedStatus = useRef<DocumentationWatchStatus>('idle')
+
+  useEffect(() => {
+    if (watchStatus === announcedStatus.current) return
+    announcedStatus.current = watchStatus
+
+    if (watchStatus === 'settled') {
+      notify.success(t('suites.documentFilesSettled', { count: documentedCount }))
+    }
+    if (watchStatus === 'timed-out') {
+      notify.warning(t('suites.documentFilesStillWorking'))
+    }
+  }, [watchStatus, documentedCount, t])
 
   function handleEditCase(tc: TestCase) {
     setEditingCase(tc)
@@ -126,8 +154,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   const pendingDocCount = suite.undocumentedCount
   const awaitingConfirmation = casesAwaitingConfirmation(suite.cases).length
-  const currentWatchedCount = watchedCount(suite, watchedMode)
-  const watchStatus = watch.statusFor(currentWatchedCount)
   const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
   const cannotRunEmptySuite = suite.manualCases === 0 && suite.cases.length === 0
 

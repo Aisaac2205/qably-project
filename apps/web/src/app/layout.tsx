@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { QueryProvider } from "@/providers/query-provider";
 import { I18nProvider } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,6 +35,7 @@ export default function RootLayout({
         <TooltipProvider>
           <I18nProvider>
             <QueryProvider>{children}</QueryProvider>
+            <Toaster />
           </I18nProvider>
         </TooltipProvider>
       </body>

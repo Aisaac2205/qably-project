@@ -1,6 +1,7 @@
 {
   "common": {
     "loading": "Loading…",
+    "dismiss": "Dismiss",
     "viewAll": "View all",
     "viewDetails": "View details",
     "noRecentChange": "No recent change",
