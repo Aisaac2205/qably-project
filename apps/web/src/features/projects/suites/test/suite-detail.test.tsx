@@ -271,6 +271,72 @@ describe('SuiteDetail (redesigned)', () => {
     expect(screen.getByText(/all cases in this suite run in ci/i)).toBeInTheDocument()
   })
 
+  it('asks for one confirmation while Aeris-documented drafts remain in the suite', async () => {
+    const documentedSuite = createMockSuite({
+      id: 'suite-documented',
+      name: 'Documented',
+      manualCases: 0,
+      automatedCases: 2,
+      undocumentedCount: 0,
+      cases: [
+        createMockTestCase({
+          id: 'tc-doc-1',
+          executionMode: 'automated',
+          state: 'draft',
+          steps: ['Open the cart', 'Pay'],
+          expectedResult: 'The order is created',
+        }),
+        createMockTestCase({
+          id: 'tc-doc-2',
+          executionMode: 'automated',
+          state: 'active',
+          steps: ['Log in'],
+          expectedResult: 'The dashboard opens',
+        }),
+      ],
+    })
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(documentedSuite)
+
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-documented" />)
+    await act(async () => {})
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect(
+      screen.getByText(/1 documented case is waiting for your confirmation/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /confirm documentation/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('does not ask for confirmation when no documented draft is left', async () => {
+    const confirmedSuite = createMockSuite({
+      id: 'suite-confirmed',
+      name: 'Confirmed',
+      manualCases: 0,
+      automatedCases: 1,
+      undocumentedCount: 0,
+      cases: [
+        createMockTestCase({
+          id: 'tc-done-1',
+          executionMode: 'automated',
+          state: 'active',
+          steps: ['Log in'],
+          expectedResult: 'The dashboard opens',
+        }),
+      ],
+    })
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(confirmedSuite)
+
+    renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-confirmed" />)
+    await act(async () => {})
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+    expect(
+      screen.queryByRole('button', { name: /confirm documentation/i }),
+    ).not.toBeInTheDocument()
+  })
+
   it('renders the Aeris action as the primary control when the suite is fully automated', async () => {
     const ciOnlySuite = createMockSuite({
       id: 'suite-ci-only',

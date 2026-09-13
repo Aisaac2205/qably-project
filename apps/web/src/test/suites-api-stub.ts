@@ -1,4 +1,8 @@
-import type { DocumentFilesResult, Suite } from '@qably/types'
+import type {
+  ConfirmDocumentationResult,
+  DocumentFilesResult,
+  Suite,
+} from '@qably/types'
 import { mockSuites } from '@/lib/mock-data'
 
 let suites: Suite[] = structuredClone(mockSuites)
@@ -91,5 +95,19 @@ export function documentProject(): Promise<DocumentFilesResult> {
     filesEnqueued: 0,
     casesTargeted: 0,
     casesSkipped: [],
+  })
+}
+
+export function confirmDocumentation(
+  suiteId: string,
+): Promise<ConfirmDocumentationResult> {
+  return Promise.resolve({
+    suiteId,
+    confirmedCaseIds: [],
+    confirmedCount: 0,
+    skippedCaseIds: [],
+    skippedCount: 0,
+    documentationConfirmedAt: '2026-09-12T10:00:00.000Z',
+    documentationConfirmedById: 'user-1',
   })
 }

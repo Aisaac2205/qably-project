@@ -7,7 +7,12 @@ import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } f
 import type { TestCase } from '@qably/types'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { useDeleteCase, useDeleteSuite, useDocumentSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
+import {
+  useConfirmDocumentation,
+  useDeleteCase,
+  useDeleteSuite,
+  useDocumentSuite,
+} from '@/features/projects/suites/hooks/use-suite-mutations'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +33,8 @@ import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
 import { DocumentWithAeris, DocumentFilesStatus, useDocumentFiles } from './document-with-aeris'
+import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
+import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confirmable-cases'
 
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
@@ -39,6 +46,10 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const documentSuite = useDocumentSuite()
   const documentation = useDocumentFiles((mode) =>
     documentSuite.mutateAsync({ suiteId: suiteId, mode }),
+  )
+  const confirmDocumentation = useConfirmDocumentation()
+  const confirmation = useConfirmDocumentationState(() =>
+    confirmDocumentation.mutateAsync({ suiteId, projectId }),
   )
   const { project } = useProject(projectId)
   const { perSuite } = useSuiteMetrics(projectId)
@@ -93,6 +104,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   }
 
   const pendingDocCount = suite.undocumentedCount
+  const awaitingConfirmation = casesAwaitingConfirmation(suite.cases).length
   const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
   const cannotRunEmptySuite = suite.manualCases === 0 && suite.cases.length === 0
 
@@ -281,6 +293,11 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           </div>
         )}
       </header>
+
+      <ConfirmDocumentation
+        pendingCount={awaitingConfirmation}
+        confirmation={confirmation}
+      />
 
       {/* Case list */}
       <section className="space-y-3">
