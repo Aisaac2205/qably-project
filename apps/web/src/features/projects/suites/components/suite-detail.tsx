@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
@@ -32,11 +32,11 @@ import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { HealthSignalChip } from './health-signal-chip'
-import { DocumentWithAeris, DocumentFilesStatus, useDocumentFiles } from './document-with-aeris'
+import { DocumentWithAeris, useDocumentFiles } from './document-with-aeris'
 import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
 import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confirmable-cases'
 import { useDocumentationWatch } from '@/features/projects/suites/hooks/use-documentation-watch'
-import type { DocumentationWatchStatus } from '@/features/projects/suites/lib/documentation-watch'
+import { useDocumentationFeedback } from '@/features/projects/suites/hooks/use-documentation-feedback'
 import { notify } from '@/lib/notify'
 import type { DocumentFilesMode } from './document-with-aeris'
 
@@ -96,19 +96,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const currentWatchedCount = watchedCount(suite, watchedMode)
   const watchStatus = watch.statusFor(currentWatchedCount)
   const documentedCount = watch.documentedCountSince(currentWatchedCount)
-  const announcedStatus = useRef<DocumentationWatchStatus>('idle')
 
-  useEffect(() => {
-    if (watchStatus === announcedStatus.current) return
-    announcedStatus.current = watchStatus
-
-    if (watchStatus === 'settled') {
-      notify.success(t('suites.documentFilesSettled', { count: documentedCount }))
-    }
-    if (watchStatus === 'timed-out') {
-      notify.warning(t('suites.documentFilesStillWorking'))
-    }
-  }, [watchStatus, documentedCount, t])
+  useDocumentationFeedback({ documentation, watchStatus, documentedCount })
 
   function handleEditCase(tc: TestCase) {
     setEditingCase(tc)
@@ -231,11 +220,12 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               )}
 
               <DocumentWithAeris
-                label={t('suites.documentSuiteWithAeris')}
+                label={t('suites.documentSuiteWithAeris', { count: pendingDocCount })}
                 pendingCount={pendingDocCount}
                 staleCount={suite.staleLocaleCount}
                 documentation={documentation}
                 primary={isFullyAutomated}
+                activeMode={watchStatus === 'working' ? watchedMode : undefined}
               />
 
               {/* Suite actions */}
@@ -266,22 +256,11 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               </Menu>
             </div>
 
-            <div className="min-h-5 max-w-56 flex flex-col items-end gap-1 text-right">
-              {documentation.isError || documentation.data !== undefined || watchStatus !== 'idle' || pendingDocCount > 0 ? (
-                <DocumentFilesStatus
-                  documentation={documentation}
-                  pendingCount={pendingDocCount}
-                  watchStatus={watchStatus}
-                  documentedCount={watch.documentedCountSince(currentWatchedCount)}
-                />
-              ) : cannotRunEmptySuite ? (
-                <p id="run-suite-empty-hint" className="text-xs text-muted">
-                  {t('suites.cannotRunEmptySuite')}
-                </p>
-              ) : isFullyAutomated ? (
-                <p className="text-xs text-muted">{t('suites.allAutomatedHint')}</p>
-              ) : null}
-            </div>
+            {cannotRunEmptySuite && (
+              <p id="run-suite-empty-hint" className="max-w-56 text-right text-xs text-muted">
+                {t('suites.cannotRunEmptySuite')}
+              </p>
+            )}
           </div>
         </div>
 

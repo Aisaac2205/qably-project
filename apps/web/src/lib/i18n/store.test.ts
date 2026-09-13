@@ -36,19 +36,19 @@ describe('t pluralization', () => {
   it('picks the singular form when count is one', () => {
     const { t } = useI18nStore.getState()
 
-    expect(t('suites.documentFilesPending', { count: 1 })).toBe(
-      '1 automated case is not documented yet.',
+    expect(t('suites.documentSuiteWithAeris', { count: 1 })).toBe(
+      'Document 1 case with Aeris',
     )
   })
 
   it('picks the plural form for any other count', () => {
     const { t } = useI18nStore.getState()
 
-    expect(t('suites.documentFilesPending', { count: 4 })).toBe(
-      '4 automated cases are not documented yet.',
+    expect(t('suites.documentSuiteWithAeris', { count: 4 })).toBe(
+      'Document 4 cases with Aeris',
     )
-    expect(t('suites.documentFilesPending', { count: 0 })).toBe(
-      '0 automated cases are not documented yet.',
+    expect(t('suites.documentSuiteWithAeris', { count: 0 })).toBe(
+      'Document 0 cases with Aeris',
     )
   })
 

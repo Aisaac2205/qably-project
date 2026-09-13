@@ -268,7 +268,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
     expect(screen.queryByRole('button', { name: /run this suite/i })).not.toBeInTheDocument()
-    expect(screen.getByText(/all cases in this suite run in ci/i)).toBeInTheDocument()
+    expect(screen.queryByText(/all cases in this suite run in ci/i)).not.toBeInTheDocument()
   })
 
   it('asks for one confirmation while Aeris-documented drafts remain in the suite', async () => {
@@ -359,7 +359,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => {})
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
-    const aerisButton = screen.getByRole('button', { name: /document suite with aeris/i })
+    const aerisButton = screen.getByRole('button', { name: /document 1 case with aeris/i })
     expect(aerisButton.className).not.toContain('border-dashed')
     expect(screen.getByRole('button', { name: /suite actions/i })).toBeInTheDocument()
   })
@@ -386,7 +386,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => {})
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
-    expect(screen.getByText(/1 automated case is not documented yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /document 1 case with aeris/i })).toBeInTheDocument()
     expect(screen.queryByText(/all cases in this suite run in ci/i)).not.toBeInTheDocument()
   })
 

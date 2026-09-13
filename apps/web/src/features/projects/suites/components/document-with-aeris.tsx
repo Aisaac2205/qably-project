@@ -3,21 +3,13 @@
 import type { ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Translate } from '@phosphor-icons/react'
-import type { DocumentFilesResult, DocumentFilesSkipReason } from '@qably/types'
-import type { DocumentationWatchStatus } from '@/features/projects/suites/lib/documentation-watch'
+import type { DocumentFilesResult } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useTranslation } from '@/lib/i18n'
 
 export type DocumentFilesMode = 'undocumented' | 'stale-locale'
-
-const SKIP_KEYS: Record<DocumentFilesSkipReason, string> = {
-  'no-source-file': 'suites.documentFilesSkippedNoSourceFile',
-  'no-automation-key': 'suites.documentFilesSkippedNoAutomationKey',
-  'already-pending': 'suites.documentFilesSkippedAlreadyPending',
-  'human-documented': 'suites.documentFilesSkippedHumanDocumented',
-}
 
 const SECONDARY_ACTION_CLASS =
   'inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70'
@@ -37,6 +29,7 @@ interface DocumentWithAerisProps {
   staleCount?: number
   documentation: DocumentFilesMutation
   primary?: boolean
+  activeMode?: DocumentFilesMode
 }
 
 export function DocumentWithAeris({
@@ -45,13 +38,17 @@ export function DocumentWithAeris({
   staleCount = 0,
   documentation,
   primary = false,
+  activeMode,
 }: DocumentWithAerisProps) {
   const { t } = useTranslation()
 
   if (pendingCount === 0 && staleCount === 0) return null
 
+  const busy = documentation.isPending || activeMode !== undefined
+
   function renderTrigger(mode: DocumentFilesMode, icon: ReactNode, text: ReactNode) {
-    const isActive = documentation.isPending && documentation.variables === mode
+    const isActive =
+      (documentation.isPending && documentation.variables === mode) || activeMode === mode
     const content = (
       <>
         {isActive ? <Spinner size={primary ? 'md' : 'sm'} /> : icon}
@@ -67,7 +64,7 @@ export function DocumentWithAeris({
           variant="outline"
           size="default"
           onClick={() => documentation.mutate(mode)}
-          disabled={documentation.isPending}
+          disabled={busy}
           className={PRIMARY_ACTION_CLASS}
         >
           {content}
@@ -80,7 +77,7 @@ export function DocumentWithAeris({
         key={mode}
         type="button"
         onClick={() => documentation.mutate(mode)}
-        disabled={documentation.isPending}
+        disabled={busy}
         className={SECONDARY_ACTION_CLASS}
       >
         {content}
@@ -113,82 +110,4 @@ export function DocumentWithAeris({
     <Translate size={primary ? 14 : 13} weight="bold" aria-hidden="true" />,
     t('suites.redocumentStale', { count: staleCount }),
   )
-}
-
-interface DocumentFilesStatusProps {
-  documentation: DocumentFilesMutation
-  pendingCount: number
-  watchStatus?: DocumentationWatchStatus
-  documentedCount?: number
-}
-
-const WATCH_KEYS: Record<Exclude<DocumentationWatchStatus, 'idle'>, string> = {
-  working: 'suites.documentFilesWorking',
-  settled: 'suites.documentFilesSettled',
-  'timed-out': 'suites.documentFilesStillWorking',
-}
-
-export function DocumentFilesStatus({
-  documentation,
-  pendingCount,
-  watchStatus = 'idle',
-  documentedCount = 0,
-}: DocumentFilesStatusProps) {
-  const { t } = useTranslation()
-  const result = documentation.data
-
-  if (documentation.isError) {
-    return (
-      <p role="alert" className="text-xs font-medium text-fail">
-        {t('suites.documentFilesError')}
-      </p>
-    )
-  }
-
-  if (watchStatus !== 'idle') {
-    return (
-      <>
-        <p
-          role="status"
-          className={`text-xs font-medium ${watchStatus === 'timed-out' ? 'text-muted' : 'text-ai'}`}
-        >
-          {t(WATCH_KEYS[watchStatus], { count: documentedCount })}
-        </p>
-        {result !== undefined &&
-          result.casesSkipped.map((skip) => (
-            <p key={skip.reason} className="text-xs text-muted">
-              {t(SKIP_KEYS[skip.reason], { count: skip.count })}
-            </p>
-          ))}
-      </>
-    )
-  }
-
-  if (result !== undefined) {
-    return (
-      <>
-        <p role="status" className="text-xs font-medium text-ai">
-          {result.filesEnqueued === 0
-            ? t('suites.documentFilesNothingToDo')
-            : t('suites.documentFilesQueued', {
-                cases: result.casesTargeted,
-                files: result.filesEnqueued,
-              })}
-        </p>
-        {result.casesSkipped.map((skip) => (
-          <p key={skip.reason} className="text-xs text-muted">
-            {t(SKIP_KEYS[skip.reason], { count: skip.count })}
-          </p>
-        ))}
-      </>
-    )
-  }
-
-  if (pendingCount > 0) {
-    return (
-      <p className="text-xs text-muted">{t('suites.documentFilesPending', { count: pendingCount })}</p>
-    )
-  }
-
-  return null
 }

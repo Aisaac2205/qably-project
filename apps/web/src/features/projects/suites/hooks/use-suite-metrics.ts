@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import type { SuiteMetricsEntry } from '@qably/types'
 import { getSuiteMetrics } from '@/features/runs/api/runs.api'
 import { runKeys } from '@/features/runs/lib/query-keys'
-import { useSuites } from '@/features/projects/suites/hooks/use-suites'
+import { useSuites, type SuitesRefetchInterval } from '@/features/projects/suites/hooks/use-suites'
 import { deriveSuiteMetrics, type DerivedSuiteMetrics } from '@/features/projects/suites/lib/derive-suite-metrics'
 
 export type SuiteMetrics = DerivedSuiteMetrics
@@ -16,8 +16,11 @@ export interface UseSuiteMetricsResult {
   isError: boolean
 }
 
-export function useSuiteMetrics(projectId: string): UseSuiteMetricsResult {
-  const { suites, isLoading: suitesLoading, isError: suitesError } = useSuites(projectId)
+export function useSuiteMetrics(
+  projectId: string,
+  refetchInterval: SuitesRefetchInterval = false,
+): UseSuiteMetricsResult {
+  const { suites, isLoading: suitesLoading, isError: suitesError } = useSuites(projectId, refetchInterval)
 
   const metricsQuery = useQuery({
     queryKey: runKeys.suiteMetrics(projectId),

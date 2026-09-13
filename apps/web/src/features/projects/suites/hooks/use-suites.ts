@@ -10,10 +10,19 @@ export type SuiteRefetchInterval =
   | false
   | ((suite: Suite | undefined) => number | false)
 
-export function useSuites(projectId?: string) {
+export type SuitesRefetchInterval =
+  | number
+  | false
+  | ((suites: Suite[] | undefined) => number | false)
+
+export function useSuites(projectId?: string, refetchInterval: SuitesRefetchInterval = false) {
   const query = useQuery({
     queryKey: suiteKeys.list(projectId ?? 'all'),
     queryFn: ({ signal }) => listSuites(projectId, signal),
+    refetchInterval:
+      typeof refetchInterval === 'function'
+        ? (query) => refetchInterval(query.state.data)
+        : refetchInterval,
   })
 
   return {
