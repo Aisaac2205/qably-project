@@ -39,6 +39,20 @@ vi.mock('@/lib/auth-client', () => ({
 }))
 
 describe('AppShell', () => {
+  it('bounds the shell to the viewport so page columns scroll inside main, not the document', async () => {
+    await act(async () => {
+      render(
+        <AppShell>
+          <p>Content</p>
+        </AppShell>,
+      )
+    })
+    const wrapper = document.querySelector('[data-slot="sidebar-wrapper"]')
+    expect(wrapper).not.toBeNull()
+    expect(wrapper).toHaveClass('h-dvh')
+    expect(wrapper).not.toHaveClass('min-h-dvh')
+  })
+
   it('renders children', async () => {
     await act(async () => {
       render(

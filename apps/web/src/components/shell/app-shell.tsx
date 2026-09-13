@@ -17,7 +17,7 @@ export function AppShell({ children }: AppShellProps) {
   const { t } = useTranslation()
 
   return (
-    <SidebarProvider defaultOpen={true} className="min-h-dvh w-full overflow-hidden bg-sidebar">
+    <SidebarProvider defaultOpen={true} className="h-dvh w-full overflow-hidden bg-sidebar">
       <a
         href="#main-content"
         onClick={focusMainContent}
