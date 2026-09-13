@@ -238,7 +238,23 @@ describe('CaseCard', () => {
       expect(screen.queryByRole('group', { name: /quality signals/i })).not.toBeInTheDocument()
     })
 
-    it('renders a chip per signal the case carries, as a visible label rather than color alone', async () => {
+    it('renders a chip per quality signal the case carries, as a visible label rather than color alone', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, healthSignals: ['raw-name', 'flaky'] }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const strip = screen.getByRole('group', { name: /quality signals/i })
+      expect(within(strip).getByRole('button', { name: /raw name/i })).toBeInTheDocument()
+      expect(within(strip).getByRole('button', { name: /flaky/i })).toBeInTheDocument()
+    })
+
+    it('collapses the workflow signals into the single most actionable state', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
@@ -249,9 +265,32 @@ describe('CaseCard', () => {
         )
       })
 
-      const strip = screen.getByRole('group', { name: /quality signals/i })
-      expect(within(strip).getByRole('button', { name: /no steps/i })).toBeInTheDocument()
-      expect(within(strip).getByRole('button', { name: /never run/i })).toBeInTheDocument()
+      expect(screen.getByText(/^undocumented$/i)).toBeInTheDocument()
+      expect(screen.queryByText(/^draft$/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/^no steps$/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/^never run$/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: /quality signals/i })).not.toBeInTheDocument()
+    })
+
+    it('asks for confirmation on a documented draft instead of stacking draft and never-run', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              steps: ['Log in'],
+              expectedResult: 'The dashboard opens',
+              healthSignals: ['never-run'],
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText(/^unconfirmed$/i)).toBeInTheDocument()
+      expect(screen.queryByText(/^draft$/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/^never run$/i)).not.toBeInTheDocument()
     })
   })
 

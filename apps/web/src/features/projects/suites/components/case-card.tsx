@@ -11,6 +11,11 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
+import {
+  deriveCaseAttention,
+  WORKFLOW_HEALTH_SIGNALS,
+} from '@/features/projects/suites/lib/case-attention'
+import { CaseAttentionChip } from './case-attention-chip'
 import { HealthSignalChip } from './health-signal-chip'
 import { localeNameKey } from '@/features/projects/suites/lib/documentable-cases'
 
@@ -30,6 +35,12 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const described = useMemo(() => describeCase(testCase), [testCase])
   const showRawName = described.raw !== described.title
   const staleLocale = testCase.localeStale === true
+  const attention = deriveCaseAttention(testCase)
+  const qualitySignals = CASE_HEALTH_SIGNAL_ORDER.filter(
+    (signal) =>
+      testCase.healthSignals?.includes(signal) === true &&
+      !WORKFLOW_HEALTH_SIGNALS.includes(signal),
+  )
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
@@ -60,7 +71,11 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
         )}
         <ExecutionModeBadge mode={testCase.executionMode} />
         <PriorityBadge priority={testCase.priority} />
-        <StatusChip status={testCase.state} scope="lifecycle" />
+        {attention === null || attention === 'in-review' ? (
+          <StatusChip status={testCase.state} scope="lifecycle" />
+        ) : (
+          <CaseAttentionChip attention={attention} />
+        )}
 
         {/* Row actions */}
         <Menu>
@@ -90,15 +105,13 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
         </Menu>
       </div>
 
-      {testCase.healthSignals && testCase.healthSignals.length > 0 && (
+      {qualitySignals.length > 0 && (
         <div
           role="group"
           aria-label={t('quality.signals.caseAriaLabel')}
           className="flex flex-wrap items-center gap-1.5"
         >
-          {CASE_HEALTH_SIGNAL_ORDER.filter((signal) =>
-            testCase.healthSignals?.includes(signal),
-          ).map((signal) => (
+          {qualitySignals.map((signal) => (
             <HealthSignalChip key={signal} signal={signal} />
           ))}
         </div>
@@ -125,11 +138,7 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
               <Clock size={13} weight="bold" aria-hidden="true" />
               {t('suites.caseInReview')}
             </Link>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted rounded-md py-1 px-2.5 bg-canvas/40 border border-dashed border-border">
-              {t('suites.caseUndocumented')}
-            </span>
-          )
+          ) : null
         ) : (
           <button
             onClick={() => onEdit(testCase)}

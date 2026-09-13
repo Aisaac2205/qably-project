@@ -782,6 +782,7 @@
     "noCasesCta": "Add the first test case to start documenting this suite.",
     "documentCase": "Document this case",
     "caseUndocumented": "Undocumented",
+    "caseAwaitingConfirmation": "Unconfirmed",
     "documentedInLocale": "Documented in {{locale}}",
     "redocumentStale": "Redocument {{count}} outdated",
     "localeNameEs": "Spanish",

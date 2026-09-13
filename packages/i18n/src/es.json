@@ -781,6 +781,7 @@
     "caseNameRequired": "El título del caso es requerido",
     "documentCase": "Documentar este caso",
     "caseUndocumented": "Sin documentar",
+    "caseAwaitingConfirmation": "Sin confirmar",
     "documentedInLocale": "Documentado en {{locale}}",
     "redocumentStale": "Redocumentar {{count}} desactualizados",
     "localeNameEs": "español",
