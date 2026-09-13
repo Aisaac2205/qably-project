@@ -24,6 +24,41 @@ describe('extractedCaseSchema', () => {
     expect(extractedCaseSchema.safeParse(validCase()).success).toBe(true);
   });
 
+  it('strips a leading ordinal from every step so the interface is the only thing that numbers them', () => {
+    const result = extractedCaseSchema.safeParse(
+      validCase({
+        steps: [
+          '1. Add one item to the cart',
+          '2) Read the cart total',
+          'Compare both',
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.steps).toEqual([
+      'Add one item to the cart',
+      'Read the cart total',
+      'Compare both',
+    ]);
+  });
+
+  it('strips a leading ordinal from preconditions the same way', () => {
+    const result = extractedCaseSchema.safeParse(
+      validCase({ preconditions: ['1. The cart is empty'] }),
+    );
+
+    expect(result.success && result.data.preconditions).toEqual([
+      'The cart is empty',
+    ]);
+  });
+
+  it('rejects a step that is nothing but an ordinal', () => {
+    expect(
+      extractedCaseSchema.safeParse(validCase({ steps: ['1.'] })).success,
+    ).toBe(false);
+  });
+
   it('rejects a case with zero steps', () => {
     expect(
       extractedCaseSchema.safeParse(validCase({ steps: [] })).success,

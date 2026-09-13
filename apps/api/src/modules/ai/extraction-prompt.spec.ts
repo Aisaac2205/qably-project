@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v6');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v7');
   });
 });
 
@@ -53,6 +53,13 @@ describe('buildSystemInstruction', () => {
       expect(instruction).toContain('CartTest.AddsItem');
       expect(instruction).toContain('test_adds_item_to_cart');
     }
+  });
+
+  it('asks for ordered steps without numbers, because the interface numbers them', () => {
+    expect(buildSystemInstruction('es')).toContain('sin numerarlos');
+    expect(buildSystemInstruction('es')).not.toContain('numerados por orden');
+    expect(buildSystemInstruction('en')).toContain('without numbering them');
+    expect(buildSystemInstruction('en')).not.toContain('numbered by order');
   });
 
   it('omits the target-cases sentence by default', () => {

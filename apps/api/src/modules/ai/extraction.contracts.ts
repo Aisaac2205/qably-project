@@ -5,12 +5,21 @@ export const MAX_EXTRACTED_CASES = 20;
 
 const shortText = (max: number) => z.string().trim().min(1).max(max);
 
+const LEADING_ORDINAL = /^\d+[.)]\s*/;
+
+const listItem = (max: number) =>
+  z
+    .string()
+    .trim()
+    .transform((value) => value.replace(LEADING_ORDINAL, ''))
+    .pipe(shortText(max));
+
 export const extractedCaseSchema = z.object({
   automationKey: shortText(120),
   title: shortText(120),
   objective: shortText(500),
-  preconditions: z.array(shortText(300)).max(10).default([]),
-  steps: z.array(shortText(300)).min(1).max(20),
+  preconditions: z.array(listItem(300)).max(10).default([]),
+  steps: z.array(listItem(300)).min(1).max(20),
   expectedResult: shortText(500),
   priority: z.enum(['critical', 'high', 'medium', 'low']),
   sourceExcerpt: shortText(600),

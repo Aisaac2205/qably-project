@@ -3,7 +3,7 @@ import {
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v6';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v7';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -37,7 +37,7 @@ Crea exactamente una entrada por cada declaración de prueba que encuentres: una
 ${AUTOMATION_KEY_RULES}
 No traduzcas ni reformatees ese valor: debe coincidir byte por byte con lo que emitiría el reporter.
 
-Los steps deben ser imperativos, numerados por orden, y describir solo acciones y aserciones presentes en el cuerpo de la prueba.
+Los steps deben ser imperativos, ir en orden y sin numerarlos (la interfaz los numera), y describir solo acciones y aserciones presentes en el cuerpo de la prueba.
 
 "priority" debe reflejar el riesgo del comportamiento bajo prueba: "critical" para pagos, autenticación, autorización o acciones destructivas o irreversibles; "high" para flujos de negocio principales; "medium" para comportamiento funcional estándar; "low" para verificaciones cosméticas o meramente informativas.
 
@@ -60,7 +60,7 @@ Create exactly one entry per test declaration you find: an "it(...)" or "test(..
 ${AUTOMATION_KEY_RULES}
 Do not translate or reformat this value — it must match byte-for-byte what the reporter would emit.
 
-Steps must be imperative, numbered by order, and describe only actions and assertions present in the test body.
+Steps must be imperative, in order and without numbering them (the interface numbers them), and describe only actions and assertions present in the test body.
 
 "priority" must reflect the risk of the behavior under test: "critical" for payments, authentication, authorization or destructive/irreversible actions; "high" for core business flows; "medium" for standard functional behavior; "low" for cosmetic or purely informational checks.
 
