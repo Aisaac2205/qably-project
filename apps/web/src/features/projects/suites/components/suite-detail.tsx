@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
-import type { TestCase } from '@qably/types'
+import type { Suite, TestCase } from '@qably/types'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
 import { useProject } from '@/features/projects/hooks/use-project'
 import {
@@ -35,18 +35,39 @@ import { HealthSignalChip } from './health-signal-chip'
 import { DocumentWithAeris, DocumentFilesStatus, useDocumentFiles } from './document-with-aeris'
 import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
 import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confirmable-cases'
+import { useDocumentationWatch } from '@/features/projects/suites/hooks/use-documentation-watch'
+import type { DocumentFilesMode } from './document-with-aeris'
 
+function watchedCount(
+  suite: Suite | undefined,
+  mode: DocumentFilesMode,
+): number | undefined {
+  if (suite === undefined) return undefined
+  return mode === 'stale-locale' ? suite.staleLocaleCount : suite.undocumentedCount
+}
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
   const { t, locale } = useTranslation()
-  const { suite, isLoading } = useSuite(suiteId)
+  const [watchedMode, setWatchedMode] = useState<DocumentFilesMode>('undocumented')
+  const watch = useDocumentationWatch()
+  const { suite, isLoading } = useSuite(suiteId, (current) =>
+    watch.intervalFor(watchedCount(current, watchedMode)),
+  )
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
   const documentSuite = useDocumentSuite()
-  const documentation = useDocumentFiles((mode) =>
-    documentSuite.mutateAsync({ suiteId: suiteId, mode }),
-  )
+  const documentation = useDocumentFiles(async (mode) => {
+    const baseline = watchedCount(suite, mode) ?? 0
+    const result = await documentSuite.mutateAsync({ suiteId: suiteId, mode })
+
+    if (result.casesTargeted > 0) {
+      setWatchedMode(mode)
+      watch.begin(baseline)
+    }
+
+    return result
+  })
   const confirmDocumentation = useConfirmDocumentation()
   const confirmation = useConfirmDocumentationState(() =>
     confirmDocumentation.mutateAsync({ suiteId, projectId }),
@@ -105,6 +126,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   const pendingDocCount = suite.undocumentedCount
   const awaitingConfirmation = casesAwaitingConfirmation(suite.cases).length
+  const currentWatchedCount = watchedCount(suite, watchedMode)
+  const watchStatus = watch.statusFor(currentWatchedCount)
   const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
   const cannotRunEmptySuite = suite.manualCases === 0 && suite.cases.length === 0
 
@@ -218,8 +241,13 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             </div>
 
             <div className="min-h-5 max-w-56 flex flex-col items-end gap-1 text-right">
-              {documentation.isError || documentation.data !== undefined || pendingDocCount > 0 ? (
-                <DocumentFilesStatus documentation={documentation} pendingCount={pendingDocCount} />
+              {documentation.isError || documentation.data !== undefined || watchStatus !== 'idle' || pendingDocCount > 0 ? (
+                <DocumentFilesStatus
+                  documentation={documentation}
+                  pendingCount={pendingDocCount}
+                  watchStatus={watchStatus}
+                  documentedCount={watch.documentedCountSince(currentWatchedCount)}
+                />
               ) : cannotRunEmptySuite ? (
                 <p id="run-suite-empty-hint" className="text-xs text-muted">
                   {t('suites.cannotRunEmptySuite')}

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Translate } from '@phosphor-icons/react'
 import type { DocumentFilesResult, DocumentFilesSkipReason } from '@qably/types'
+import type { DocumentationWatchStatus } from '@/features/projects/suites/lib/documentation-watch'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
@@ -115,9 +116,22 @@ export function DocumentWithAeris({
 interface DocumentFilesStatusProps {
   documentation: DocumentFilesMutation
   pendingCount: number
+  watchStatus?: DocumentationWatchStatus
+  documentedCount?: number
 }
 
-export function DocumentFilesStatus({ documentation, pendingCount }: DocumentFilesStatusProps) {
+const WATCH_KEYS: Record<Exclude<DocumentationWatchStatus, 'idle'>, string> = {
+  working: 'suites.documentFilesWorking',
+  settled: 'suites.documentFilesSettled',
+  'timed-out': 'suites.documentFilesStillWorking',
+}
+
+export function DocumentFilesStatus({
+  documentation,
+  pendingCount,
+  watchStatus = 'idle',
+  documentedCount = 0,
+}: DocumentFilesStatusProps) {
   const { t } = useTranslation()
   const result = documentation.data
 
@@ -126,6 +140,25 @@ export function DocumentFilesStatus({ documentation, pendingCount }: DocumentFil
       <p role="alert" className="text-xs font-medium text-fail">
         {t('suites.documentFilesError')}
       </p>
+    )
+  }
+
+  if (watchStatus !== 'idle') {
+    return (
+      <>
+        <p
+          role="status"
+          className={`text-xs font-medium ${watchStatus === 'timed-out' ? 'text-muted' : 'text-ai'}`}
+        >
+          {t(WATCH_KEYS[watchStatus], { count: documentedCount })}
+        </p>
+        {result !== undefined &&
+          result.casesSkipped.map((skip) => (
+            <p key={skip.reason} className="text-xs text-muted">
+              {t(SKIP_KEYS[skip.reason], { count: skip.count })}
+            </p>
+          ))}
+      </>
     )
   }
 

@@ -9,6 +9,7 @@ import {
   type DocumentFilesMode,
 } from '@/features/projects/suites/components/document-with-aeris'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import type { DocumentationWatchStatus } from '@/features/projects/suites/lib/documentation-watch'
 
 function result(overrides: Partial<DocumentFilesResult> = {}): DocumentFilesResult {
   return { filesEnqueued: 2, casesTargeted: 7, casesSkipped: [], ...overrides }
@@ -20,12 +21,16 @@ function DocumentPanel({
   staleCount,
   onDocument,
   primary,
+  watchStatus = 'idle',
+  documentedCount = 0,
 }: {
   label?: string
   pendingCount: number
   staleCount?: number
   onDocument: (mode: DocumentFilesMode) => Promise<DocumentFilesResult>
   primary?: boolean
+  watchStatus?: DocumentationWatchStatus
+  documentedCount?: number
 }) {
   const documentation = useDocumentFiles(onDocument)
   return (
@@ -37,10 +42,50 @@ function DocumentPanel({
         documentation={documentation}
         primary={primary}
       />
-      <DocumentFilesStatus documentation={documentation} pendingCount={pendingCount} />
+      <DocumentFilesStatus
+        documentation={documentation}
+        pendingCount={pendingCount}
+        watchStatus={watchStatus}
+        documentedCount={documentedCount}
+      />
     </>
   )
 }
+
+describe('DocumentFilesStatus while a run is outstanding', () => {
+  it('says Aeris is still working instead of claiming the queue accepted means done', () => {
+    renderWithQuery(
+      <DocumentPanel pendingCount={7} onDocument={vi.fn()} watchStatus="working" />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(/aeris is documenting this suite/i)
+  })
+
+  it('reports the real number of cases documented once the counts settle', () => {
+    renderWithQuery(
+      <DocumentPanel
+        pendingCount={2}
+        onDocument={vi.fn()}
+        watchStatus="settled"
+        documentedCount={12}
+      />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /aeris documented 12 cases in this suite/i,
+    )
+  })
+
+  it('admits it stopped watching rather than reporting a failure it never observed', () => {
+    renderWithQuery(
+      <DocumentPanel pendingCount={7} onDocument={vi.fn()} watchStatus="timed-out" />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      /aeris is taking longer than usual/i,
+    )
+  })
+})
 
 describe('DocumentWithAeris + DocumentFilesStatus', () => {
   it('renders nothing when the scope has no documentable cases', () => {
