@@ -136,12 +136,31 @@ describe('DocumentWithAeris + DocumentFilesStatus', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/3 cases were skipped because they have no test file/i),
+        screen.getByText(/3 cases were skipped because Aeris has not identified their test files/i),
       ).toBeInTheDocument()
     })
     expect(
       screen.getByText(/2 cases already have a proposal waiting/i),
     ).toBeInTheDocument()
+  })
+
+  it('separates a case with no automated test from a case whose file is unknown', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn().mockResolvedValue(
+      result({
+        casesSkipped: [{ reason: 'no-automation-key', count: 4 }],
+      }),
+    )
+
+    renderWithQuery(<DocumentPanel pendingCount={4} onDocument={onDocument} />)
+    await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/4 cases were skipped because they are not linked to any automated test/i),
+      ).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/test file/i)).not.toBeInTheDocument()
   })
 
   it('tells the user a person already documented the case rather than blaming the repository', async () => {

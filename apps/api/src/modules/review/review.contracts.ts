@@ -47,6 +47,7 @@ export type ExtractionJobData =
 export type DocumentCaseError =
   | 'not-found'
   | 'not-automated'
+  | 'no-automation-key'
   | 'no-source-file'
   | 'already-pending';
 

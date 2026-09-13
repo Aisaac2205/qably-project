@@ -3,9 +3,11 @@ import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
 import { MAX_EXTRACTED_CASES } from '../ai/extraction.contracts';
-import { isCaseDocumentable } from '../../common/locale/documentable-case';
+import {
+  classifyDocumentableCase,
+  type CaseNotDocumentableReason,
+} from '../../common/locale/documentable-case';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
-import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -19,6 +21,7 @@ import {
   type DocumentFilesMode,
   type DocumentFilesResult,
   type DocumentFilesSkip,
+  type DocumentFilesSkipReason,
   type ExtractionJobData,
 } from './review.contracts';
 
@@ -51,22 +54,35 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return chunks;
 }
 
-function buildSkips(
-  noSourceFile: number,
-  alreadyPending: number,
-  humanDocumented: number,
-): DocumentFilesSkip[] {
-  const skips: DocumentFilesSkip[] = [];
-  if (noSourceFile > 0) {
-    skips.push({ reason: 'no-source-file', count: noSourceFile });
+type SkipTally = Record<DocumentFilesSkipReason, number>;
+
+function emptySkipTally(): SkipTally {
+  return {
+    'no-source-file': 0,
+    'no-automation-key': 0,
+    'already-pending': 0,
+    'human-documented': 0,
+  };
+}
+
+function toSkipReason(
+  reason: CaseNotDocumentableReason,
+): DocumentFilesSkipReason | null {
+  switch (reason) {
+    case 'out-of-scope':
+    case 'not-automated':
+      return null;
+    case 'already-pending':
+      return 'already-pending';
+    case 'no-automation-key':
+      return 'no-automation-key';
   }
-  if (alreadyPending > 0) {
-    skips.push({ reason: 'already-pending', count: alreadyPending });
-  }
-  if (humanDocumented > 0) {
-    skips.push({ reason: 'human-documented', count: humanDocumented });
-  }
-  return skips;
+}
+
+function buildSkips(tally: SkipTally): DocumentFilesSkip[] {
+  return (Object.entries(tally) as [DocumentFilesSkipReason, number][])
+    .filter(([, count]) => count > 0)
+    .map(([reason, count]) => ({ reason, count }));
 }
 
 @Injectable()
@@ -134,6 +150,7 @@ export class ExtractionService {
     });
 
     if (pending !== null) return err('already-pending');
+    if (testCase.automationKey === null) return err('no-automation-key');
 
     const filePath =
       testCase.automationFilePath ??
@@ -213,46 +230,30 @@ export class ExtractionService {
         .filter((id): id is string => id !== null),
     );
 
-    let alreadyPending = 0;
-    let noSourceFile = 0;
-    let humanDocumented = 0;
+    const tally = emptySkipTally();
     const groupedByFile = new Map<string, DocumentFileTarget[]>();
 
     for (const row of rows) {
       if (row.documentationSource === 'human') {
-        humanDocumented += 1;
+        tally['human-documented'] += 1;
         continue;
       }
 
-      const documentedLocale = row.currentVersion?.locale ?? null;
-      const matchesMode =
-        mode === 'undocumented'
-          ? row.steps.length === 0
-          : row.steps.length > 0 &&
-            isLocaleStale(
-              { steps: row.steps, documentedLocale },
-              orgDefaultLocale,
-            );
-
-      if (!matchesMode) continue;
-
-      const hasPendingProposal = pendingIds.has(row.id);
-
-      const documentable = isCaseDocumentable(
+      const verdict = classifyDocumentableCase(
         {
           executionMode: 'automated',
           steps: row.steps,
-          documentedLocale,
+          documentedLocale: row.currentVersion?.locale ?? null,
           automationKey: row.automationKey,
-          hasPendingProposal,
+          hasPendingProposal: pendingIds.has(row.id),
         },
         mode,
         orgDefaultLocale,
       );
 
-      if (!documentable) {
-        if (hasPendingProposal) alreadyPending += 1;
-        else noSourceFile += 1;
+      if (!verdict.documentable) {
+        const reason = toSkipReason(verdict.reason);
+        if (reason !== null) tally[reason] += 1;
         continue;
       }
 
@@ -266,7 +267,7 @@ export class ExtractionService {
         ));
 
       if (filePath === null) {
-        noSourceFile += 1;
+        tally['no-source-file'] += 1;
         continue;
       }
 
@@ -275,11 +276,7 @@ export class ExtractionService {
       groupedByFile.set(filePath, group);
     }
 
-    const casesSkipped = buildSkips(
-      noSourceFile,
-      alreadyPending,
-      humanDocumented,
-    );
+    const casesSkipped = buildSkips(tally);
 
     if (groupedByFile.size === 0) {
       return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped });

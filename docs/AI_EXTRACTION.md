@@ -75,7 +75,9 @@ Both lookups hinge on `automationKey` being identical on the ingest side and the
 
 No path is ever derived from `className` or a filename heuristic. A guessed path is not evidence, and per-framework derivation rules would quietly widen the platform beyond the single validated automation framework.
 
-When neither lookup finds anything, `enqueueDocumentCase` returns `no-source-file` (HTTP 409) and the processor logs and stops. The web surface treats that as an explanatory state rather than a failure: it tells the reviewer no repository file matches this case and offers manual documentation instead.
+A case with no `automationKey` never reaches those lookups: `enqueueDocumentCase` returns `no-automation-key` (HTTP 409) before resolution is attempted, and `enqueueDocumentFiles` counts it under the skip reason of the same name. The distinction is deliberate. `no-source-file` may only be claimed after resolution actually ran and came back empty; anything else would report a cause the platform never checked.
+
+When both lookups run and neither finds anything, `enqueueDocumentCase` returns `no-source-file` (HTTP 409) and the processor logs and stops. The web surface treats that as an explanatory state rather than a failure: it tells the reviewer Qably has no test file on record for this case and offers manual documentation instead. It does not claim the repository was inspected, because it was not — both lookups read Qably's own tables.
 
 ### Fallback matrix
 

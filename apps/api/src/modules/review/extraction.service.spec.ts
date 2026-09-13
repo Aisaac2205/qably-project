@@ -303,6 +303,29 @@ describe('ExtractionService.enqueueDocumentCase', () => {
     expect(result).toEqual({ ok: false, error: 'already-pending' });
     expect(queue.add).not.toHaveBeenCalled();
   });
+
+  it('returns no-automation-key when the case is not linked to an automated test', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.testCase.findFirst.mockResolvedValueOnce({
+      id: 'case-1',
+      projectId: 'proj-1',
+      executionMode: 'automated',
+      automationFilePath: null,
+      automationKey: null,
+    });
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma, queue).enqueueDocumentCase(
+      org,
+      'suite-1',
+      'case-1',
+      null,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'no-automation-key' });
+    expect(queue.add).not.toHaveBeenCalled();
+  });
 });
 
 describe('ExtractionService.enqueueDocumentFiles', () => {
@@ -617,6 +640,67 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
     ];
     expect(jobs[0].data).toMatchObject({ locale: 'es' });
   });
+
+  it('reports a case with no automation key as no-automation-key, never as a missing source file', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ automationKey: null, automationFilePath: null }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'no-automation-key', count: 1 }],
+      },
+    });
+  });
+
+  it('never looks for a source file when the case has no automation key', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ automationKey: null, automationFilePath: null }),
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.extractedProposal.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('reports no skip at all for a case that was never a target of this mode', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ steps: ['Open the cart'], automationKey: null }),
+    ]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1' },
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
+    });
+  });
 });
 
 describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
@@ -775,7 +859,7 @@ describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
       value: {
         filesEnqueued: 0,
         casesTargeted: 0,
-        casesSkipped: [{ reason: 'no-source-file', count: 1 }],
+        casesSkipped: [{ reason: 'no-automation-key', count: 1 }],
       },
     });
   });

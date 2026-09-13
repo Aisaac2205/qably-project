@@ -1,4 +1,7 @@
-import { isCaseDocumentable } from './documentable-case';
+import {
+  classifyDocumentableCase,
+  isCaseDocumentable,
+} from './documentable-case';
 
 function candidate(
   overrides: Partial<Parameters<typeof isCaseDocumentable>[0]> = {},
@@ -116,5 +119,77 @@ describe('isCaseDocumentable', () => {
         'en',
       ),
     ).toBe(false);
+  });
+});
+
+describe('classifyDocumentableCase', () => {
+  it('reports the case as documentable when every rule passes', () => {
+    expect(
+      classifyDocumentableCase(candidate({ steps: [] }), 'undocumented', 'en'),
+    ).toEqual({ documentable: true });
+  });
+
+  it('reports no-automation-key when the case is not linked to an automated test', () => {
+    expect(
+      classifyDocumentableCase(
+        candidate({ steps: [], automationKey: null }),
+        'undocumented',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'no-automation-key' });
+  });
+
+  it('reports already-pending when a proposal is waiting for review', () => {
+    expect(
+      classifyDocumentableCase(
+        candidate({ steps: [], hasPendingProposal: true }),
+        'undocumented',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'already-pending' });
+  });
+
+  it('reports not-automated for a manual case', () => {
+    expect(
+      classifyDocumentableCase(
+        candidate({ steps: [], executionMode: 'manual' }),
+        'undocumented',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'not-automated' });
+  });
+
+  it('reports out-of-scope when the case already has steps in undocumented mode', () => {
+    expect(
+      classifyDocumentableCase(
+        candidate({ steps: ['Open the cart'] }),
+        'undocumented',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'out-of-scope' });
+  });
+
+  it('reports out-of-scope when the documented locale already matches the org default', () => {
+    expect(
+      classifyDocumentableCase(
+        candidate({ steps: ['Open the cart'], documentedLocale: 'en' }),
+        'stale-locale',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'out-of-scope' });
+  });
+
+  it('prefers out-of-scope over any other reason so non-targets are never reported as skips', () => {
+    expect(
+      classifyDocumentableCase(
+        candidate({
+          steps: ['Open the cart'],
+          automationKey: null,
+          hasPendingProposal: true,
+        }),
+        'undocumented',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'out-of-scope' });
   });
 });

@@ -509,6 +509,7 @@ export interface ExtractedProposal {
 }
 export type DocumentFilesSkipReason =
   | 'no-source-file'
+  | 'no-automation-key'
   | 'already-pending'
   | 'human-documented'
 export interface DocumentFilesSkip {

@@ -13,6 +13,7 @@ export type DocumentFilesMode = 'undocumented' | 'stale-locale'
 
 const SKIP_KEYS: Record<DocumentFilesSkipReason, string> = {
   'no-source-file': 'suites.documentFilesSkippedNoSourceFile',
+  'no-automation-key': 'suites.documentFilesSkippedNoAutomationKey',
   'already-pending': 'suites.documentFilesSkippedAlreadyPending',
   'human-documented': 'suites.documentFilesSkippedHumanDocumented',
 }
