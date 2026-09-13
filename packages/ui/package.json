@@ -4,18 +4,36 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./utils": "./src/utils.ts"
+    "./utils": "./src/utils.ts",
+    "./dashboard": "./src/dashboard/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --maxWorkers=2",
+    "type-check": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@qably/types": "workspace:*",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.6.0"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "@phosphor-icons/react": "^2.1.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@qably/config": "workspace:*",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.0.0",
-    "typescript": "^5.0.0"
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
+    "jsdom": "^29.1.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.9"
   }
 }

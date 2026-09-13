@@ -1,8 +1,10 @@
 {
   "extends": "../../packages/config/tsconfig.base.json",
   "compilerOptions": {
-    "jsx": "preserve",
-    "outDir": "./dist"
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vitest/globals", "@testing-library/jest-dom"],
+    "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src", "vitest.config.ts"]
 }

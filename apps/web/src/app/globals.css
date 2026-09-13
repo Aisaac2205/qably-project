@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../../../packages/ui/src";
 
 /* ─── Qably Design Tokens ──────────────────────────────────────── */
 
@@ -80,6 +81,15 @@
   --sidebar-accent-foreground: var(--fg-sidebar);
   --sidebar-border: var(--border-sidebar);
   --sidebar-ring: var(--primary);
+
+  /* @qably/ui chart bridge. Chart steps are re-stepped from the status hues so
+     pass and fail stay apart under deuteranopia (validated: dE 17.4); chips
+     keep the status tokens because they carry an icon and a label. */
+  --qb-chart-line:  var(--primary);
+  --qb-chart-grid:  var(--border);
+  --qb-chart-pass:  oklch(0.62 0.16 145);
+  --qb-chart-fail:  oklch(0.42 0.19 25);
+  --qb-chart-skip:  oklch(0.62 0.00 0);
 }
 
 /* ─── Tailwind v4 theme mapping ─────────────────────────────────── */
@@ -160,6 +170,41 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border:     var(--sidebar-border);
   --color-sidebar-ring:       var(--sidebar-ring);
+
+  /* @qably/ui contract. The shared dashboard blocks only speak qb-*; each
+     surface binds the names to its own tokens. See docs/DASHBOARD_UI.md. */
+  --color-qb-canvas:          var(--bg);
+  --color-qb-canvas-hover:    var(--surface-hover);
+  --color-qb-surface:         var(--bg-surface);
+  --color-qb-surface-raised:  var(--bg-surface-raised);
+  --color-qb-fg:              var(--fg);
+  --color-qb-muted:           var(--fg-muted);
+  --color-qb-border:          var(--border);
+  --color-qb-border-strong:   var(--border-strong);
+  --color-qb-primary:         var(--primary);
+  --color-qb-primary-hover:   var(--primary-hover);
+  --color-qb-primary-fg:      var(--primary-fg);
+  --color-qb-ai:              var(--accent-ai);
+  --color-qb-ai-bg:           var(--accent-ai-bg);
+  --color-qb-pass:            var(--status-pass);
+  --color-qb-pass-bg:         var(--status-pass-bg);
+  --color-qb-fail:            var(--status-fail);
+  --color-qb-fail-bg:         var(--status-fail-bg);
+  --color-qb-blocked:         var(--status-blocked);
+  --color-qb-blocked-bg:      var(--status-blocked-bg);
+  --color-qb-skip:            var(--status-skip);
+  --color-qb-skip-bg:         var(--status-skip-bg);
+  --color-qb-running:         var(--status-running);
+  --color-qb-running-bg:      var(--status-running-bg);
+  --color-qb-warn:            var(--status-warn);
+  --color-qb-warn-bg:         var(--status-warn-bg);
+  --color-qb-heatmap-l0:      var(--heatmap-l0);
+  --color-qb-heatmap-l1:      var(--heatmap-l1);
+  --color-qb-heatmap-l2:      var(--heatmap-l2);
+  --color-qb-heatmap-l3:      var(--heatmap-l3);
+  --color-qb-heatmap-l4:      var(--heatmap-l4);
+  --shadow-qb-card:           var(--shadow-card);
+  --shadow-qb-pop:            var(--shadow-pop);
 }
 
 /* ─── Base styles ───────────────────────────────────────────────── */

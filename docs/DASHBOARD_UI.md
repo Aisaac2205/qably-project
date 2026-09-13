@@ -194,3 +194,15 @@ than not announcing it.
 
 Day labels come from `describeDay`, shared by the tooltip and the cell labels, which picks the
 singular, plural or empty phrasing from the active locale instead of formatting "1 eventos".
+
+## The dashboard blocks live in `@qably/ui`, and both surfaces render them
+
+`packages/ui/src/dashboard/` holds the presentational blocks of the dashboard: `KpiCard`, `StatusChip`, `Sparkline`, `TrendChart` and, as they move, the project table, the activity queues and the pending proposals list. They take data and copy through props and know nothing about react-query, Next or the i18n store. `apps/web` wraps them in containers that fetch real data; `apps/landing` renders the same components with demo data inside the hero window. That is what makes the marketing preview identical to the product: it is the product's components.
+
+The blocks speak only one token vocabulary, the `qb-*` classes (`bg-qb-surface`, `text-qb-muted`, `text-qb-pass`, `shadow-qb-card`, `fill-qb-primary`). Each surface binds those names in its own `@theme`: `apps/web/src/app/globals.css` maps them to the product tokens, `apps/landing/src/styles/global.css` maps them to its `app-*` mirror. Neither surface copies a value from the other, and the landing's own brand tokens (`--color-primary` is white there) are never touched. Both CSS files also declare `@source "../../../../packages/ui/src"` so Tailwind generates the package's classes; forget that line and the blocks render unstyled.
+
+Links are injected: every block that navigates accepts `linkComponent`, which `apps/web` fills with `next/link` and the landing leaves as a plain anchor.
+
+### Chart colours are re-stepped from the status hues
+
+`--qb-chart-line`, `--qb-chart-grid`, `--qb-chart-pass`, `--qb-chart-fail` and `--qb-chart-skip` are plain CSS variables read by the SVG charts. The pass and fail steps are not the status tokens: `--status-pass` and `--status-fail` sit at the same lightness (L 0.45) and separate by only dE 3.2 under deuteranopia, which is fine for a chip that also carries an icon and a label, and unacceptable for two adjacent bar segments. The chart steps (pass L 0.62, fail L 0.42, same hues) separate by dE 17.4 and keep 3:1 against the surface; `--qb-chart-skip` is a grey that the categorical validator flags for chroma by design, because it encodes a state, not an identity. Stacked segments additionally keep a 2px surface gap and every chart ships a legend, a tooltip and a screen-reader table, so no value is colour-only.
