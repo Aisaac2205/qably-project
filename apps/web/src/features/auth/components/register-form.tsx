@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CircleNotch } from '@phosphor-icons/react'
+import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import {
   Field,
@@ -131,11 +131,7 @@ export function RegisterForm() {
         <Field>
           <Button type="submit" size="lg" disabled={isSubmitting || isRedirecting}>
             {isSubmitting && (
-              <CircleNotch
-                className="mr-1.5 size-4 animate-spin motion-reduce:animate-none"
-                weight="bold"
-                aria-hidden="true"
-              />
+              <Spinner className="mr-1.5" />
             )}
             {isSubmitting ? 'Creating account…' : 'Create account'}
           </Button>

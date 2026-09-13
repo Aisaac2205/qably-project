@@ -1,4 +1,4 @@
-import { CircleNotch } from '@phosphor-icons/react'
+import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { GithubMark } from '@/features/auth/components/brand-marks'
 
@@ -25,11 +25,7 @@ export function GithubAuthButton({
       onClick={onClick}
     >
       {pending ? (
-        <CircleNotch
-          className="size-4 animate-spin motion-reduce:animate-none"
-          weight="bold"
-          aria-hidden="true"
-        />
+        <Spinner />
       ) : (
         <GithubMark className="size-4" />
       )}

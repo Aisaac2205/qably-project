@@ -4,7 +4,6 @@ import {
   ArrowUpIcon,
   AudioLinesIcon,
   GlobeIcon,
-  Loader2Icon,
   PlusIcon,
   PuzzleIcon,
   SquareIcon,
@@ -13,6 +12,7 @@ import {
   UploadIcon,
   XIcon,
 } from 'lucide-react'
+import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import {
   CHIP_SURFACE_CLASS,
@@ -279,7 +279,7 @@ export function ActionButton({
           </IconSwapFrame>
         ) : isLoading ? (
           <IconSwapFrame swapKey="loader" reduceMotion={reduceMotion}>
-            <Loader2Icon className="size-4 animate-spin" aria-hidden />
+            <Spinner />
           </IconSwapFrame>
         ) : showSend ? (
           <IconSwapFrame swapKey="arrow" reduceMotion={reduceMotion}>

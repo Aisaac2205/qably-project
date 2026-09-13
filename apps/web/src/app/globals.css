@@ -239,8 +239,10 @@ button:focus-visible,
 
 /* ─── Motion ──────────────────────────────────────────────────────
    Motion earns its place: page content fades/rises once on mount to
-   guide attention, never loops, never decorates. 200ms ease-out max
-   per product motion budget. Fully disabled under reduced motion. */
+   guide attention, never decorates. 200ms ease-out max per product
+   motion budget. Fully disabled under reduced motion.
+   The one loop allowed is the spinner: a wait with no known end is a
+   state, and a still mark cannot express it. */
 
 @keyframes page-enter {
   from {
@@ -256,6 +258,60 @@ button:focus-visible,
 @media (prefers-reduced-motion: no-preference) {
   .animate-page-enter {
     animation: page-enter 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+}
+
+/* ─── Spinner ─────────────────────────────────────────────────────
+   Markers swing to 155% of their own width, so the reserved box holds
+   the full sweep and the dot is a fraction of it. Colour comes from
+   currentColor, chosen at the call site with a text-* token. Under
+   reduced motion the markers rest at opposite poles, never stacked. */
+
+@keyframes spinner-orbit {
+  to {
+    transform: rotate(360deg) translate(155%);
+  }
+}
+
+.spinner {
+  --spinner-dot: calc(var(--spinner-size) * 0.22);
+  position: relative;
+  display: inline-block;
+  flex: none;
+  inline-size: var(--spinner-size);
+  block-size: var(--spinner-size);
+}
+
+.spinner-core,
+.spinner-marker {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  inline-size: var(--spinner-dot);
+  block-size: var(--spinner-dot);
+  margin-block-start: calc(var(--spinner-dot) / -2);
+  margin-inline-start: calc(var(--spinner-dot) / -2);
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+.spinner-marker {
+  transform: rotate(0deg) translate(155%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spinner-marker {
+    animation: spinner-orbit var(--spinner-duration, 1s) linear infinite;
+  }
+
+  .spinner-marker:last-child {
+    animation-delay: calc(var(--spinner-duration, 1s) / -2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner-marker:last-child {
+    transform: rotate(180deg) translate(155%);
   }
 }
 

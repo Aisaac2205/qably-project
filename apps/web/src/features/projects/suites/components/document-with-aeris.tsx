@@ -7,6 +7,7 @@ import type { DocumentFilesResult, DocumentFilesSkipReason } from '@qably/types'
 import type { DocumentationWatchStatus } from '@/features/projects/suites/lib/documentation-watch'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { useTranslation } from '@/lib/i18n'
 
 export type DocumentFilesMode = 'undocumented' | 'stale-locale'
@@ -53,7 +54,7 @@ export function DocumentWithAeris({
     const isActive = documentation.isPending && documentation.variables === mode
     const content = (
       <>
-        {icon}
+        {isActive ? <Spinner size={primary ? 'md' : 'sm'} /> : icon}
         {isActive ? t('suites.documentingFiles') : text}
       </>
     )

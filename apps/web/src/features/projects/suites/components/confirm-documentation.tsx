@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { SealCheck } from '@phosphor-icons/react'
 import type { ConfirmDocumentationResult } from '@qably/types'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { useTranslation } from '@/lib/i18n'
 
 export function useConfirmDocumentationState(
@@ -58,6 +59,7 @@ export function ConfirmDocumentation({
             disabled={confirmation.isPending}
             className="text-sm font-semibold"
           >
+            {confirmation.isPending && <Spinner className="mr-1.5" />}
             {confirmation.isPending
               ? t('suites.confirmingDocumentation')
               : t('suites.confirmDocumentationAction')}

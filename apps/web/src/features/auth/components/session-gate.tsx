@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { CircleNotch } from '@phosphor-icons/react'
+import { Spinner } from '@/components/ui/spinner'
 import { useSession } from '@/lib/auth-client'
 import { useTranslation } from '@/lib/i18n'
 
@@ -34,7 +34,7 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
         role="status"
         aria-live="polite"
       >
-        <CircleNotch className="size-5 animate-spin" aria-hidden="true" />
+        <Spinner size="lg" />
         <span className="ml-2.5 text-sm">{t('common.loading')}</span>
       </div>
     )

@@ -119,3 +119,45 @@ describe('ConfirmDocumentation', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('ConfirmDocumentation pending feedback', () => {
+  it('shows a spinner inside the button while the confirmation is in flight', async () => {
+    const user = userEvent.setup()
+    let release: (value: ConfirmDocumentationResult) => void = () => {}
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<ConfirmDocumentationResult>((resolve) => {
+          release = resolve
+        }),
+    )
+
+    const { container } = renderWithQuery(
+      <Panel pendingCount={3} onConfirm={onConfirm} />,
+    )
+    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
+
+    await waitFor(() => {
+      expect(container.querySelector('.spinner')).not.toBeNull()
+    })
+
+    release(result())
+    await waitFor(() => {
+      expect(container.querySelector('.spinner')).toBeNull()
+    })
+  })
+
+  it('keeps the spinner out of the accessibility tree so the button name stays readable', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn(() => new Promise<ConfirmDocumentationResult>(() => {}))
+
+    const { container } = renderWithQuery(
+      <Panel pendingCount={3} onConfirm={onConfirm} />,
+    )
+    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
+
+    await waitFor(() => {
+      expect(container.querySelector('.spinner')).toHaveAttribute('aria-hidden', 'true')
+    })
+    expect(screen.getByRole('button', { name: /confirming/i })).toBeInTheDocument()
+  })
+})

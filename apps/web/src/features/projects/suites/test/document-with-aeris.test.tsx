@@ -292,3 +292,28 @@ describe('DocumentFilesStatus', () => {
     expect(container).toBeEmptyDOMElement()
   })
 })
+
+describe('DocumentWithAeris pending feedback', () => {
+  it('shows a spinner on the trigger that was clicked while Aeris works', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn(() => new Promise<DocumentFilesResult>(() => {}))
+
+    const { container } = renderWithQuery(
+      <DocumentPanel pendingCount={5} onDocument={onDocument} />,
+    )
+    await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
+
+    await waitFor(() => {
+      expect(container.querySelector('.spinner')).not.toBeNull()
+    })
+    expect(container.querySelector('.spinner')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('shows no spinner before the action is triggered', () => {
+    const { container } = renderWithQuery(
+      <DocumentPanel pendingCount={5} onDocument={vi.fn()} />,
+    )
+
+    expect(container.querySelector('.spinner')).toBeNull()
+  })
+})
