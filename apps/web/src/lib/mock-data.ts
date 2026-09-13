@@ -378,6 +378,7 @@ export const mockAiCases: AiCase[] = [
     projectId: 'proj-1',
     source: 'chat',
     coverageGapId: 'gap-2',
+    documentsCaseId: 'tc-4',
   },
 ]
 

@@ -113,7 +113,8 @@ function createReviewDomain() {
     expectedResult: aiCase.expectedResult,
     priority: 'medium',
     evidenceId: `evidence-${aiCase.id}`,
-    targetOfficialTestCaseId: aiCase.possibleDuplicateOf ? `case-${aiCase.possibleDuplicateOf}` : undefined,
+    ...(aiCase.possibleDuplicateOf === undefined ? {} : { possibleDuplicate: true }),
+    ...(aiCase.documentsCaseId === undefined ? {} : { targetOfficialTestCaseId: `case-${aiCase.documentsCaseId}` }),
   }))
   const existingCases = mockSuites.flatMap((suite) => suite.cases.map<OfficialTestCase>((testCase) => ({
     id: `case-${testCase.id}`,
@@ -169,7 +170,7 @@ let reviewDecisions: ReviewDecision[] = []
 let qualityRisks: QualityRisk[] = structuredClone(mockQualityRisks)
 const reviewScenarios: ReviewScenario[] = [
   { id: 'approval-new', proposalId: 'proposal-ai-4' },
-  { id: 'approval-version', proposalId: 'review-proposal-checkout' },
+  { id: 'approval-version', proposalId: 'proposal-ai-6' },
   { id: 'rejection-evidence', proposalId: 'proposal-ai-3' },
 ]
 

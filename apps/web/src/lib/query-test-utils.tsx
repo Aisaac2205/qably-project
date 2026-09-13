@@ -170,10 +170,13 @@ function seedDuplicates(client: QueryClient): void {
   const snapshot = getSnapshot()
 
   for (const proposal of snapshot.proposals) {
-    if (proposal.targetOfficialTestCaseId === undefined) continue
+    const aiCase = snapshot.aiCases.find(
+      (candidate) => snapshot.proposalIdByAiCaseId[candidate.id] === proposal.id,
+    )
+    if (aiCase?.possibleDuplicateOf === undefined) continue
 
     const officialCase = snapshot.officialTestCases.find(
-      (candidate) => candidate.id === proposal.targetOfficialTestCaseId,
+      (candidate) => candidate.id === `case-${aiCase.possibleDuplicateOf}`,
     )
     const version = snapshot.testCaseVersions.find(
       (candidate) => candidate.id === officialCase?.currentVersionId,

@@ -121,7 +121,7 @@ function ReviewProposalQueueRow({
             </span>
           )}
 
-          {proposal.targetOfficialTestCaseId && (
+          {proposal.possibleDuplicate && (
             <Badge variant="warn" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full ml-auto">
               <CopySimple size={10} weight="bold" aria-hidden="true" />
               {t('reviewInbox.possibleDuplicate')}
@@ -203,7 +203,7 @@ export function ReviewInboxQueue({
     if (selectedProjectId !== 'all' && p.projectId !== selectedProjectId) {
       return false
     }
-    if (duplicateOnly && !p.targetOfficialTestCaseId) {
+    if (duplicateOnly && p.possibleDuplicate !== true) {
       return false
     }
     if (searchQuery.trim()) {

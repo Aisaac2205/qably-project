@@ -24,6 +24,7 @@ const row = {
 
 interface FakePrisma {
   extractedProposal: { findMany: jest.Mock; findFirst: jest.Mock };
+  testCase: { findMany: jest.Mock };
   traceabilityLink: { findMany: jest.Mock };
 }
 
@@ -33,6 +34,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([row]),
       findFirst: jest.fn().mockResolvedValue(row),
     },
+    testCase: { findMany: jest.fn().mockResolvedValue([]) },
     traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
   };
 }
@@ -87,7 +89,7 @@ describe('ReviewService.list', () => {
     expect(call[0].select.evidence).toEqual({ select: { title: true } });
   });
 
-  it('exposes the duplicate target when the proposal has one', async () => {
+  it('exposes the documentation target when the proposal has one', async () => {
     const prisma = createPrisma();
     prisma.extractedProposal.findMany.mockResolvedValue([
       { ...row, targetTestCaseId: 'case-9' },
@@ -115,15 +117,16 @@ describe('ReviewService.list', () => {
     });
   });
 
-  it('keeps only proposals with a duplicate target when duplicatesOnly is set', async () => {
+  it('resolves duplicatesOnly against real matches, never against the documentation target', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).list(org, { duplicatesOnly: true });
+    const result = await build(prisma).list(org, { duplicatesOnly: true });
 
     const [call] = prisma.extractedProposal.findMany.mock.calls as [
       [{ where: Record<string, unknown> }],
     ];
-    expect(call[0].where).toMatchObject({ targetTestCaseId: { not: null } });
+    expect(call[0].where).not.toHaveProperty('targetTestCaseId');
+    expect(result).toEqual([]);
   });
 
   it('searches title and objective case-insensitively', async () => {

@@ -49,6 +49,7 @@ const VIEW_SELECT = {
   evidenceId: true,
   needsManualReview: true,
   targetTestCaseId: true,
+  automationKey: true,
   locale: true,
   observations: true,
   createdAt: true,
@@ -68,6 +69,7 @@ interface ViewRow {
   evidenceId: string;
   needsManualReview: boolean;
   targetTestCaseId: string | null;
+  automationKey: string | null;
   locale?: string | null;
   observations?: unknown;
   createdAt?: Date;
@@ -101,7 +103,7 @@ interface LinkRow {
   relation: string;
 }
 
-function toView(row: ViewRow): ProposalView {
+function toView(row: ViewRow, possibleDuplicate = false): ProposalView {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -125,6 +127,7 @@ function toView(row: ViewRow): ProposalView {
     ...(row.targetTestCaseId === null
       ? {}
       : { targetOfficialTestCaseId: row.targetTestCaseId }),
+    ...(possibleDuplicate ? { possibleDuplicate: true } : {}),
   };
 }
 
@@ -226,6 +229,22 @@ interface DuplicateTargetRow {
   targetTestCaseId: string | null;
 }
 
+const DUPLICATE_FLAG_SELECT = {
+  id: true,
+  projectId: true,
+  name: true,
+  automationKey: true,
+  updatedAt: true,
+} as const;
+
+interface DuplicateFlagRow {
+  id: string;
+  projectId: string;
+  name: string;
+  automationKey: string | null;
+  updatedAt: Date;
+}
+
 const DUPLICATE_CANDIDATE_SELECT = {
   id: true,
   name: true,
@@ -272,9 +291,6 @@ export class ReviewService {
           ? {}
           : { projectId: filters.projectId }),
         ...(filters.status === undefined ? {} : { status: filters.status }),
-        ...(filters.duplicatesOnly === true
-          ? { targetTestCaseId: { not: null } }
-          : {}),
         ...(filters.search === undefined
           ? {}
           : {
@@ -290,7 +306,50 @@ export class ReviewService {
       select: VIEW_SELECT,
     })) as ViewRow[];
 
-    return rows.map(toView);
+    const flagged = await this.flagPossibleDuplicates(rows);
+    const views = rows.map((row) => toView(row, flagged.has(row.id)));
+
+    return filters.duplicatesOnly === true
+      ? views.filter((view) => view.possibleDuplicate === true)
+      : views;
+  }
+
+  private async flagPossibleDuplicates(
+    rows: readonly ViewRow[],
+  ): Promise<Set<string>> {
+    const untargeted = rows.filter((row) => row.targetTestCaseId === null);
+    if (untargeted.length === 0) return new Set();
+
+    const projectIds = [...new Set(untargeted.map((row) => row.projectId))];
+    const cases = (await this.prisma.testCase.findMany({
+      where: { projectId: { in: projectIds } },
+      select: DUPLICATE_FLAG_SELECT,
+    })) as DuplicateFlagRow[];
+
+    const candidatesByProject = new Map<string, DuplicateRankCandidate[]>();
+    for (const row of cases) {
+      const list = candidatesByProject.get(row.projectId) ?? [];
+      list.push({
+        id: row.id,
+        title: row.name,
+        steps: [],
+        expectedResult: '',
+        automationKey: row.automationKey,
+        publishedAt: row.updatedAt,
+      });
+      candidatesByProject.set(row.projectId, list);
+    }
+
+    const flagged = new Set<string>();
+    for (const row of untargeted) {
+      const ranked = rankDuplicateCandidates(
+        { title: row.title, automationKey: row.automationKey },
+        candidatesByProject.get(row.projectId) ?? [],
+      );
+      if (ranked.length > 0) flagged.add(row.id);
+    }
+
+    return flagged;
   }
 
   async findOne(

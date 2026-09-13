@@ -161,7 +161,7 @@ describe('mock-store governed proposal scenarios', () => {
     expect(proposal?.id).not.toBe('proposal-ai-2')
   })
 
-  it('approves a duplicate proposal as an immutable next version', () => {
+  it('approves a proposal that documents an existing case as an immutable next version', () => {
     const scenario = getReviewScenario('approval-version')
     const result = approveProposal(scenario.proposalId, { actorId: 'member-1' })
 

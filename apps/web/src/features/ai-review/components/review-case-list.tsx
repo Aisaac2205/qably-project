@@ -66,7 +66,7 @@ function ReviewCaseListRow({
             <span>Qably Project</span>
           </span>
 
-          {proposal.targetOfficialTestCaseId && (
+          {proposal.possibleDuplicate && (
             <Badge variant="warn" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full ml-auto">
               <CopySimple size={10} weight="bold" aria-hidden="true" />
               {t('aiReview.possibleDuplicate')}
@@ -133,7 +133,7 @@ export function ReviewCaseList({
   const { t } = useTranslation()
   const visibleProposals =
     filter === 'duplicates'
-      ? proposals.filter((p) => p.targetOfficialTestCaseId)
+      ? proposals.filter((p) => p.possibleDuplicate === true)
       : proposals
 
   if (visibleProposals.length === 0) {

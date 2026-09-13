@@ -503,6 +503,7 @@ export interface ExtractedProposal {
   evidenceId: string
   needsManualReview: boolean
   targetOfficialTestCaseId?: string
+  possibleDuplicate?: boolean
   locale?: string | null
   observations?: string[]
   createdAt?: string
@@ -599,6 +600,7 @@ export interface AiCase {
   source: 'webhook' | 'chat'
   possibleDuplicateOf?: string
   duplicateOfCaseId?: string
+  documentsCaseId?: string
   similarityScore?: number
   coverageGapId?: string
 }

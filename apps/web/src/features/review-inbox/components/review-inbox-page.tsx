@@ -40,7 +40,7 @@ export function ReviewInboxPage() {
     return proposals.filter((p) => {
       if (selectedProjectId !== 'all' && p.projectId !== selectedProjectId) return false
       if (statusFilter !== 'all' && p.status !== statusFilter) return false
-      if (duplicateOnly && !p.targetOfficialTestCaseId) return false
+      if (duplicateOnly && p.possibleDuplicate !== true) return false
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         return p.title.toLowerCase().includes(q) || p.objective.toLowerCase().includes(q)

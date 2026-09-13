@@ -30,7 +30,11 @@ const proposalRow = {
 };
 
 interface FakePrisma {
-  extractedProposal: { findFirst: jest.Mock; update: jest.Mock };
+  extractedProposal: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    update: jest.Mock;
+  };
   suite: { findFirst: jest.Mock; update: jest.Mock };
   testCase: { create: jest.Mock; update: jest.Mock; findMany: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
@@ -43,6 +47,7 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
   const prisma: FakePrisma = {
     extractedProposal: {
       findFirst: jest.fn().mockResolvedValue({ ...proposalRow, ...overrides }),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({ id: 'proposal-1' }),
     },
     suite: {
@@ -78,6 +83,90 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
 function build(prisma: FakePrisma) {
   return new ReviewService(prisma as never);
 }
+
+function listRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ...proposalRow,
+    locale: null,
+    observations: null,
+    createdAt: new Date('2026-09-12T10:00:00.000Z'),
+    evidence: { title: 'src/cart.spec.ts' },
+    ...overrides,
+  };
+}
+
+function officialCase(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'case-1',
+    projectId: 'project-1',
+    name: 'Empties the cart',
+    automationKey: 'Cart > empties the cart',
+    updatedAt: new Date('2026-09-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+describe('ReviewService.list', () => {
+  it('flags an untargeted proposal that matches an existing case in its project', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      listRow({ automationKey: 'Cart > empties the cart' }),
+    ]);
+    prisma.testCase.findMany.mockResolvedValue([officialCase()]);
+
+    const [view] = await build(prisma).list(org, {});
+
+    expect(view.possibleDuplicate).toBe(true);
+    expect(view.targetOfficialTestCaseId).toBeUndefined();
+  });
+
+  it('never flags a proposal that documents a case, however similar it is to that case', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      listRow({
+        targetTestCaseId: 'case-1',
+        automationKey: 'Cart > empties the cart',
+      }),
+    ]);
+    prisma.testCase.findMany.mockResolvedValue([officialCase()]);
+
+    const [view] = await build(prisma).list(org, {});
+
+    expect(view.possibleDuplicate).toBeUndefined();
+    expect(view.targetOfficialTestCaseId).toBe('case-1');
+    expect(prisma.testCase.findMany).not.toHaveBeenCalled();
+  });
+
+  it('leaves an untargeted proposal unflagged when nothing in the project resembles it', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      listRow({ title: 'Applies a discount code', automationKey: null }),
+    ]);
+    prisma.testCase.findMany.mockResolvedValue([officialCase()]);
+
+    const [view] = await build(prisma).list(org, {});
+
+    expect(view.possibleDuplicate).toBeUndefined();
+  });
+
+  it('keeps only flagged proposals when duplicatesOnly is requested', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      listRow({ id: 'dup', automationKey: 'Cart > empties the cart' }),
+      listRow({
+        id: 'fresh',
+        title: 'Applies a discount code',
+        automationKey: null,
+      }),
+      listRow({ id: 'documents', targetTestCaseId: 'case-1' }),
+    ]);
+    prisma.testCase.findMany.mockResolvedValue([officialCase()]);
+
+    const views = await build(prisma).list(org, { duplicatesOnly: true });
+
+    expect(views.map((view) => view.id)).toEqual(['dup']);
+  });
+});
 
 describe('ReviewService.approve', () => {
   it('creates an official case and its first version when the proposal has no target', async () => {

@@ -154,7 +154,7 @@ export function ReviewProposalInspector({
         </div>
 
         {/* Duplicate Comparison if present */}
-        {proposal.targetOfficialTestCaseId && (
+        {proposal.possibleDuplicate && (
           <DuplicateComparison proposalId={proposal.id} />
         )}
 
