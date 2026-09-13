@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion'
-import { CheckIcon, PencilIcon } from 'lucide-react'
+import { Check, PencilSimple } from '@phosphor-icons/react'
 import { GeminiIcon } from '@/components/icons/gemini-icon'
 import { cn } from '@/lib/utils'
 import type { AiModel, AiModelSelection } from '../types'
@@ -75,7 +75,7 @@ export function MenuCheckmark({
     <AnimatePresence>
       {visible && (
         <motion.span {...iconPresence(reduceMotion)} className={cn('flex items-center justify-center', className)}>
-          <CheckIcon className="size-3.5" aria-hidden />
+          <Check className="size-3.5" aria-hidden />
         </motion.span>
       )}
     </AnimatePresence>
@@ -269,7 +269,7 @@ export function ModelSelectorItem({ model }: { model: AiModel }) {
           isEditing && 'bg-surface-hover text-default'
         )}
       >
-        <PencilIcon className="size-3.5" aria-hidden />
+        <PencilSimple className="size-3.5" aria-hidden />
       </motion.button>
     </motion.div>
   )

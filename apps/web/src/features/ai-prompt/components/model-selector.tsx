@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ChevronDownIcon } from 'lucide-react'
+import { CaretDown } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type {
   AiModel,
@@ -322,7 +322,7 @@ export const ModelSelectorTrigger = React.forwardRef<
         transition={{ duration: 0.2, ease: EASE }}
         className="flex shrink-0 ml-0.5"
       >
-        <ChevronDownIcon className="size-3.5 text-muted" aria-hidden />
+        <CaretDown className="size-3.5 text-muted" aria-hidden />
       </motion.span>
     </motion.button>
   )

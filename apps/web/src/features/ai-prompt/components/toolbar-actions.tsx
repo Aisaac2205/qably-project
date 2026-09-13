@@ -1,17 +1,17 @@
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowUpIcon,
-  AudioLinesIcon,
-  GlobeIcon,
-  PlusIcon,
-  PuzzleIcon,
-  SquareIcon,
-  TelescopeIcon,
-  UnplugIcon,
-  UploadIcon,
-  XIcon,
-} from 'lucide-react'
+  ArrowUp,
+  Binoculars,
+  Globe,
+  Plugs,
+  Plus,
+  PuzzlePiece,
+  Square,
+  UploadSimple,
+  Waveform,
+  X,
+} from '@phosphor-icons/react'
 import { Spinner } from '@/components/ui/spinner'
 import { cn } from '@/lib/utils'
 import {
@@ -67,7 +67,7 @@ export function ActiveToolChip({
         onClick={onRemove}
         className="text-muted hover:text-default flex size-4 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <XIcon className="size-3" aria-hidden />
+        <X className="size-3" aria-hidden />
       </button>
     </motion.span>
   )
@@ -131,7 +131,7 @@ export function PlusActionsMenu({
           transition={{ duration: 0.2, ease: EASE }}
           className="flex [&_svg]:size-4"
         >
-          <PlusIcon aria-hidden />
+          <Plus aria-hidden />
         </motion.span>
       </motion.button>
 
@@ -155,7 +155,7 @@ export function PlusActionsMenu({
             className={itemClass()}
             onClick={() => runAndClose(onUploadFile)}
           >
-            <UploadIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+            <UploadSimple className="size-4 shrink-0 opacity-70" aria-hidden />
             <span className="font-semibold">Upload file</span>
           </motion.button>
 
@@ -168,7 +168,7 @@ export function PlusActionsMenu({
             className={itemClass(deepResearch)}
             onClick={() => runAndClose(onToggleDeepResearch)}
           >
-            <TelescopeIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+            <Binoculars className="size-4 shrink-0 opacity-70" aria-hidden />
             <span className="min-w-0 flex-1 font-semibold">Deep research</span>
             <MenuCheckmark visible={deepResearch} reduceMotion={reduceMotion} />
           </motion.button>
@@ -182,7 +182,7 @@ export function PlusActionsMenu({
             className={itemClass(webSearch)}
             onClick={() => runAndClose(onToggleWebSearch)}
           >
-            <GlobeIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+            <Globe className="size-4 shrink-0 opacity-70" aria-hidden />
             <span className="min-w-0 flex-1 font-semibold">Web search</span>
             <MenuCheckmark visible={webSearch} reduceMotion={reduceMotion} />
           </motion.button>
@@ -197,7 +197,7 @@ export function PlusActionsMenu({
             className={itemClass()}
             onClick={() => runAndClose(onSkills)}
           >
-            <PuzzleIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+            <PuzzlePiece className="size-4 shrink-0 opacity-70" aria-hidden />
             <span className="font-semibold">Skills</span>
           </motion.button>
 
@@ -209,7 +209,7 @@ export function PlusActionsMenu({
             className={itemClass()}
             onClick={() => runAndClose(onConnectors)}
           >
-            <UnplugIcon className="size-4 shrink-0 opacity-70" aria-hidden />
+            <Plugs className="size-4 shrink-0 opacity-70" aria-hidden />
             <span className="font-semibold">Connectors</span>
           </motion.button>
         </div>
@@ -275,7 +275,7 @@ export function ActionButton({
       <AnimatePresence mode="wait" initial={false}>
         {talking ? (
           <IconSwapFrame swapKey="stop" reduceMotion={reduceMotion}>
-            <SquareIcon className="size-3.5 fill-current" aria-hidden />
+            <Square className="size-3.5" weight="fill" aria-hidden />
           </IconSwapFrame>
         ) : isLoading ? (
           <IconSwapFrame swapKey="loader" reduceMotion={reduceMotion}>
@@ -283,11 +283,11 @@ export function ActionButton({
           </IconSwapFrame>
         ) : showSend ? (
           <IconSwapFrame swapKey="arrow" reduceMotion={reduceMotion}>
-            <ArrowUpIcon className="size-4" aria-hidden />
+            <ArrowUp className="size-4" aria-hidden />
           </IconSwapFrame>
         ) : (
           <IconSwapFrame swapKey="waves" reduceMotion={reduceMotion}>
-            <AudioLinesIcon className="size-4" aria-hidden />
+            <Waveform className="size-4" aria-hidden />
           </IconSwapFrame>
         )}
       </AnimatePresence>

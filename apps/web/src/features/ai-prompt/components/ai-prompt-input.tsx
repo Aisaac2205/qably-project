@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { TelescopeIcon, GlobeIcon } from 'lucide-react'
+import { Binoculars, Globe } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import type { AiPromptInputProps } from '../types'
 import {
@@ -193,7 +193,7 @@ export const AiPromptInput = React.forwardRef<HTMLTextAreaElement, AiPromptInput
                   <ActiveToolChip
                     key="deep-research"
                     label="Deep research"
-                    icon={<TelescopeIcon aria-hidden />}
+                    icon={<Binoculars aria-hidden />}
                     reduceMotion={reduceMotion}
                     onRemove={() => setDeepResearch(false)}
                   />
@@ -202,7 +202,7 @@ export const AiPromptInput = React.forwardRef<HTMLTextAreaElement, AiPromptInput
                   <ActiveToolChip
                     key="web-search"
                     label="Web search"
-                    icon={<GlobeIcon aria-hidden />}
+                    icon={<Globe aria-hidden />}
                     reduceMotion={reduceMotion}
                     onRemove={() => setWebSearch(false)}
                   />
