@@ -31,7 +31,78 @@ const automatedCase: TestCase = {
   automationFilePath: 'src/features/runs/hooks/use-create-run.test.ts',
 }
 
+const observedCase: TestCase = {
+  ...mockCase,
+  id: 'tc-obs',
+  observations: [
+    'The test asserts the redirect but never checks the session cookie.',
+    'It depends on a fixture user that other suites also mutate.',
+  ],
+}
+
 const noop = () => {}
+
+describe('CaseCard observations', () => {
+  it('keeps the Aeris observations behind a toggle so the card stays scannable', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      renderWithQuery(<CaseCard testCase={observedCase} onEdit={noop} onDelete={noop} />)
+    })
+
+    expect(
+      screen.queryByText(/never checks the session cookie/i),
+    ).not.toBeInTheDocument()
+
+    const toggle = screen.getByRole('button', { name: /2 Aeris observations/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(toggle)
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText(/never checks the session cookie/i)).toBeInTheDocument()
+    expect(screen.getByText(/other suites also mutate/i)).toBeInTheDocument()
+  })
+
+  it('counts a single observation in the singular', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseCard
+          testCase={{ ...observedCase, observations: ['Only one note.'] }}
+          onEdit={noop}
+          onDelete={noop}
+        />,
+      )
+    })
+
+    expect(
+      screen.getByRole('button', { name: /1 Aeris observation$/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('shows no observations affordance when Aeris left none', async () => {
+    await act(async () => {
+      renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />)
+    })
+
+    expect(
+      screen.queryByRole('button', { name: /Aeris observation/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('counts a single step in the singular', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseCard
+          testCase={{ ...mockCase, steps: ['Only one step'] }}
+          onEdit={noop}
+          onDelete={noop}
+        />,
+      )
+    })
+
+    expect(screen.getByRole('button', { name: /^1 step$/i })).toBeInTheDocument()
+  })
+})
 
 describe('CaseCard', () => {
   it('shows the execution mode badge for a manual case', async () => {

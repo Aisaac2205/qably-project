@@ -25,6 +25,8 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
+  const [observationsOpen, setObservationsOpen] = useState(false)
+  const observations = testCase.observations ?? []
   const described = useMemo(() => describeCase(testCase), [testCase])
   const showRawName = described.raw !== described.title
   const staleLocale = testCase.localeStale === true
@@ -158,6 +160,18 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
           </button>
         )}
 
+        {observations.length > 0 && (
+          <button
+            onClick={() => setObservationsOpen(!observationsOpen)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-ai/30 cursor-pointer"
+            aria-expanded={observationsOpen}
+            type="button"
+          >
+            {observationsOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
+            {t('suites.aerisObservations', { count: observations.length })}
+          </button>
+        )}
+
       </div>
 
       {/* Expanded steps */}
@@ -175,6 +189,17 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
           <p className="text-xs font-semibold text-muted mb-1">{t('suites.expectedResult')}:</p>
           <p className="font-medium text-default">{testCase.expectedResult}</p>
         </div>
+      )}
+
+      {/* Expanded Aeris observations */}
+      {observationsOpen && observations.length > 0 && (
+        <ul className="mt-2 space-y-1.5 rounded-lg border border-ai/30 bg-ai-bg/30 p-3.5 text-sm leading-relaxed">
+          {observations.map((observation, i) => (
+            <li key={i} className="text-default font-medium">
+              {observation}
+            </li>
+          ))}
+        </ul>
       )}
 
     </div>
