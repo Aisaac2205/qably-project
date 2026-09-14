@@ -9,7 +9,6 @@ import {
   deleteCase,
   deleteSuite,
   documentCase,
-  documentProject,
   documentSuite,
   type DocumentFilesMode,
   updateCase,
@@ -173,15 +172,5 @@ export function useDocumentCase() {
       }
       notify.error(t('suites.documentFilesError'))
     },
-  })
-}
-
-export function useDocumentProject() {
-  const invalidateSuites = useSuiteInvalidation()
-
-  return useMutation({
-    mutationFn: ({ projectId, mode }: { projectId: string; mode: DocumentFilesMode }) =>
-      documentProject(projectId, mode),
-    onSuccess: () => invalidateSuites(),
   })
 }

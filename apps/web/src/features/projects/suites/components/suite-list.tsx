@@ -19,24 +19,8 @@ import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
 import { SuiteFormDialog } from './suite-form-dialog'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
-import type { Suite, SuiteRunStatus } from '@qably/types'
+import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
-import { useDocumentProject } from '@/features/projects/suites/hooks/use-suite-mutations'
-import { DocumentWithAeris, useDocumentFiles, type DocumentFilesMode } from './document-with-aeris'
-import { useDocumentationWatch } from '@/features/projects/suites/hooks/use-documentation-watch'
-import { useDocumentationFeedback } from '@/features/projects/suites/hooks/use-documentation-feedback'
-
-function projectWatchedCount(
-  suites: readonly Suite[] | undefined,
-  mode: DocumentFilesMode,
-): number | undefined {
-  if (suites === undefined) return undefined
-  return suites.reduce(
-    (total, suite) =>
-      total + (mode === 'stale-locale' ? suite.staleLocaleCount : suite.undocumentedCount),
-    0,
-  )
-}
 
 interface SuiteListProps {
   projectId: string
@@ -87,44 +71,7 @@ function applyFilters(
 
 export function SuiteList({ projectId }: SuiteListProps) {
   const { t } = useTranslation()
-  const [watchedMode, setWatchedMode] = useState<DocumentFilesMode>('undocumented')
-  const watch = useDocumentationWatch()
-  const { perSuite, isLoading, isError } = useSuiteMetrics(projectId, (suites) =>
-    watch.intervalFor(projectWatchedCount(suites, watchedMode)),
-  )
-  const documentProject = useDocumentProject()
-  const documentation = useDocumentFiles(async (mode) => {
-    const baseline = projectWatchedCount(perSuite.map((entry) => entry.suite), mode) ?? 0
-    const result = await documentProject.mutateAsync({ projectId, mode })
-
-    if (result.casesTargeted > 0) {
-      setWatchedMode(mode)
-      watch.begin(baseline)
-    }
-
-    return result
-  })
-  const documentableCases = useMemo(
-    () =>
-      perSuite.reduce(
-        (total, entry) => total + entry.suite.undocumentedCount,
-        0,
-      ),
-    [perSuite],
-  )
-  const staleCases = useMemo(
-    () =>
-      perSuite.reduce((total, entry) => total + entry.suite.staleLocaleCount, 0),
-    [perSuite],
-  )
-  const currentWatchedCount = projectWatchedCount(
-    perSuite.map((entry) => entry.suite),
-    watchedMode,
-  )
-  const watchStatus = watch.statusFor(currentWatchedCount)
-  const documentedCount = watch.documentedCountSince(currentWatchedCount)
-
-  useDocumentationFeedback({ documentation, watchStatus, documentedCount })
+  const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<SuiteRunStatus | 'all'>('all')
@@ -191,23 +138,10 @@ export function SuiteList({ projectId }: SuiteListProps) {
             availableTags={availableTags}
           />
         </div>
-        <div className="flex items-start gap-3 shrink-0">
-          {(documentableCases > 0 || staleCases > 0) && (
-            <div className="flex flex-col items-end gap-1.5">
-              <DocumentWithAeris
-                label={t('suites.documentProjectWithAeris', { count: documentableCases })}
-                pendingCount={documentableCases}
-                staleCount={staleCases}
-                documentation={documentation}
-                activeMode={watchStatus === 'working' ? watchedMode : undefined}
-              />
-            </div>
-          )}
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus size={14} weight="bold" aria-hidden="true" />
-            {t('suites.newSuite')}
-          </Button>
-        </div>
+        <Button type="button" size="sm" className="shrink-0" onClick={() => setCreateOpen(true)}>
+          <Plus size={14} weight="bold" aria-hidden="true" />
+          {t('suites.newSuite')}
+        </Button>
       </div>
 
       {sorted.length === 0 ? (
