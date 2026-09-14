@@ -590,10 +590,6 @@
     }
   },
   "cases": {
-    "executionMode": {
-      "manual": "Manual",
-      "automated": "Automated"
-    },
     "rawName": "Raw name",
     "filePath": "File"
   },
@@ -767,6 +763,7 @@
     "editCase": "Edit case",
     "deleteCase": "Delete case",
     "caseActions": "Case actions",
+    "viewInGithub": "View file on GitHub",
     "deleteCaseTitle": "Delete test case?",
     "deleteCaseDescription": "This permanently deletes “{{name}}”. This action cannot be undone.",
     "caseNameLabel": "Title",

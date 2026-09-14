@@ -590,10 +590,6 @@
     }
   },
   "cases": {
-    "executionMode": {
-      "manual": "Manual",
-      "automated": "Automatizado"
-    },
     "rawName": "Nombre crudo",
     "filePath": "Archivo"
   },
@@ -767,6 +763,7 @@
     "editCase": "Editar caso",
     "deleteCase": "Eliminar caso",
     "caseActions": "Acciones del caso",
+    "viewInGithub": "Ver archivo en GitHub",
     "deleteCaseTitle": "¿Eliminar caso de prueba?",
     "deleteCaseDescription": "Esto elimina permanentemente “{{name}}”. Esta acción no se puede deshacer.",
     "caseNameLabel": "Título",

@@ -105,20 +105,10 @@ describe('CaseCard observations', () => {
 })
 
 describe('CaseCard', () => {
-  it('shows the execution mode badge for a manual case', async () => {
-    await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
-    expect(screen.getByText('Manual')).toBeInTheDocument()
-  })
-
   it('keeps the version chip from shrinking in the badge row', async () => {
     await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
     const chip = screen.getByText((_, element) => element?.textContent === 'v2' && element.tagName === 'SPAN')
     expect(chip.className).toContain('shrink-0')
-  })
-
-  it('shows the execution mode badge for an automated case', async () => {
-    await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
-    expect(screen.getByText('Automated')).toBeInTheDocument()
   })
 
   it('shows the raw automation key in mono under the humanized title when it differs', async () => {
@@ -359,6 +349,62 @@ describe('CaseCard', () => {
       })
 
       expect(screen.queryByText(/documented in/i)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('GitHub link', () => {
+    it('links an automated case to its file on GitHub when a repo is known', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={automatedCase}
+            githubRepo="acme/ecommerce-app"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const link = screen.getByRole('link', { name: /view file on github/i })
+      expect(link).toHaveAttribute(
+        'href',
+        'https://github.com/acme/ecommerce-app/blob/HEAD/src/features/runs/hooks/use-create-run.test.ts',
+      )
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    })
+
+    it('shows no GitHub link for a manual case even when a repo is known', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard testCase={mockCase} githubRepo="acme/ecommerce-app" onEdit={noop} onDelete={noop} />,
+        )
+      })
+
+      expect(screen.queryByRole('link', { name: /view file on github/i })).not.toBeInTheDocument()
+    })
+
+    it('shows no GitHub link when the case has no automation file path', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, automationFilePath: undefined }}
+            githubRepo="acme/ecommerce-app"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.queryByRole('link', { name: /view file on github/i })).not.toBeInTheDocument()
+    })
+
+    it('shows no GitHub link when the project has no known repo', async () => {
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />)
+      })
+
+      expect(screen.queryByRole('link', { name: /view file on github/i })).not.toBeInTheDocument()
     })
   })
 })

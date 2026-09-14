@@ -1,15 +1,17 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
 import { CaretDown, CaretRight, Clock, DotsThree, PencilSimple, Trash, Translate } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
 import { StatusChip } from '@/components/ui/status-chip'
-import { ExecutionModeBadge } from '@/components/ui/execution-mode-badge'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
+import { repositoryFileUrl } from '@/features/projects/suites/lib/repository-file-url'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import {
   deriveCaseAttention,
@@ -22,11 +24,12 @@ import { localeNameKey } from '@/features/projects/suites/lib/documentable-cases
 interface CaseCardProps {
   testCase: TestCase
   projectId?: string
+  githubRepo?: string
   onEdit: (testCase: TestCase) => void
   onDelete: (testCase: TestCase) => void
 }
 
-export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
+export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
@@ -41,6 +44,10 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
       testCase.healthSignals?.includes(signal) === true &&
       !WORKFLOW_HEALTH_SIGNALS.includes(signal),
   )
+  const githubFileUrl =
+    testCase.executionMode === 'automated'
+      ? repositoryFileUrl(githubRepo, testCase.automationFilePath)
+      : null
 
   return (
     <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
@@ -69,7 +76,24 @@ export function CaseCard({ testCase, onEdit, onDelete }: CaseCardProps) {
             v{testCase.version}
           </span>
         )}
-        <ExecutionModeBadge mode={testCase.executionMode} />
+        {githubFileUrl && (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <a
+                  href={githubFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t('suites.viewInGithub')}
+                />
+              }
+              className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+            >
+              <Image src="/logos/github.svg" alt="" width={14} height={14} aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent>{t('suites.viewInGithub')}</TooltipContent>
+          </Tooltip>
+        )}
         <PriorityBadge priority={testCase.priority} />
         {attention === null || attention === 'in-review' ? (
           <StatusChip status={testCase.state} scope="lifecycle" />
