@@ -405,8 +405,6 @@
       "noStepsDescription": "This automated case has no recorded steps — document it so its result history means something.",
       "rawNameLabel": "Raw name",
       "rawNameDescription": "This case's name is its technical identifier — rename it into something a non-engineer can read.",
-      "neverRunLabel": "Never run",
-      "neverRunDescription": "This case has never produced a result — run its suite at least once to start tracking it.",
       "flakyLabel": "Flaky",
       "flakyDescription": "This case's last 6 runs alternated pass and fail more than once — investigate before trusting its status.",
       "duplicateKeyLabel": "Duplicate key",

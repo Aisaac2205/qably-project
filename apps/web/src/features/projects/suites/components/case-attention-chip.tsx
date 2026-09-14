@@ -1,6 +1,6 @@
 'use client'
 
-import { CircleDashed, ListDashes, SealCheck, type Icon } from '@phosphor-icons/react'
+import { ListDashes, SealCheck, type Icon } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import { statusToneClassNames } from '@/components/ui/status-presentation'
 import type { CaseAttention } from '@/features/projects/suites/lib/case-attention'
@@ -26,11 +26,6 @@ const presentations: Record<
     labelKey: 'suites.caseAwaitingConfirmation',
     tone: 'warn',
     Icon: SealCheck,
-  },
-  'never-run': {
-    labelKey: 'quality.signals.neverRunLabel',
-    tone: 'muted',
-    Icon: CircleDashed,
   },
 }
 

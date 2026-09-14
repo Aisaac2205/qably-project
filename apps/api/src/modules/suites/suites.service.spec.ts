@@ -750,8 +750,9 @@ describe('SuitesService health signals', () => {
     const [suite] = await build(prisma).list(owner);
 
     expect(suite.cases[0].healthSignals).toEqual(
-      expect.arrayContaining(['no-steps', 'raw-name', 'never-run']),
+      expect.arrayContaining(['no-steps', 'raw-name']),
     );
+    expect(suite.cases[0].healthSignals).not.toContain('never-run');
   });
 
   it('rolls the case signals up into a suite-level summary, omitting zero counts', async () => {
@@ -765,7 +766,6 @@ describe('SuitesService health signals', () => {
     expect(suite.healthSummary).toEqual({
       'no-steps': 1,
       'raw-name': 1,
-      'never-run': 1,
     });
     expect(suite.healthSummary).not.toHaveProperty('flaky');
   });

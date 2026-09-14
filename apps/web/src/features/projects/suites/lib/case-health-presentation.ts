@@ -1,6 +1,5 @@
 import {
   ArrowsClockwise,
-  CircleDashed,
   Code,
   CopySimple,
   Fingerprint,
@@ -33,12 +32,6 @@ export const caseHealthSignalPresentations = {
     descriptionKey: 'quality.signals.rawNameDescription',
     Icon: Code,
   },
-  'never-run': {
-    signal: 'never-run',
-    labelKey: 'quality.signals.neverRunLabel',
-    descriptionKey: 'quality.signals.neverRunDescription',
-    Icon: CircleDashed,
-  },
   flaky: {
     signal: 'flaky',
     labelKey: 'quality.signals.flakyLabel',
@@ -62,7 +55,6 @@ export const caseHealthSignalPresentations = {
 export const CASE_HEALTH_SIGNAL_ORDER: readonly CaseHealthSignal[] = [
   'no-steps',
   'raw-name',
-  'never-run',
   'flaky',
   'duplicate-key',
   'near-duplicate-title',

@@ -4,11 +4,9 @@ export type CaseAttention =
   | 'in-review'
   | 'undocumented'
   | 'awaiting-confirmation'
-  | 'never-run'
 
 export const WORKFLOW_HEALTH_SIGNALS: readonly CaseHealthSignal[] = [
   'no-steps',
-  'never-run',
 ]
 
 function isDocumented(testCase: TestCase): boolean {
@@ -25,8 +23,6 @@ export function deriveCaseAttention(testCase: TestCase): CaseAttention | null {
   if (testCase.state === 'draft' && isDocumented(testCase)) {
     return 'awaiting-confirmation'
   }
-
-  if (testCase.healthSignals?.includes('never-run') === true) return 'never-run'
 
   return null
 }

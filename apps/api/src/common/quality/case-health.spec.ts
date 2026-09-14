@@ -89,12 +89,12 @@ describe('deriveCaseHealth — raw-name', () => {
 });
 
 describe('deriveCaseHealth — never-run', () => {
-  it('flags an automated case with no run history at all', () => {
+  it('no longer flags an automated case with no run history at all', () => {
     const health = deriveCaseHealth([
       baseCase({ executionMode: 'automated', hasAnyRun: false }),
     ]);
 
-    expect(health.get('case-1')).toContain('never-run');
+    expect(health.get('case-1')).not.toContain('never-run');
   });
 
   it('never flags an automated case that has run at least once', () => {
@@ -353,8 +353,9 @@ describe('deriveCaseHealth — combined signals', () => {
     ]);
 
     expect(health.get('case-1')).toEqual(
-      expect.arrayContaining(['no-steps', 'raw-name', 'never-run']),
+      expect.arrayContaining(['no-steps', 'raw-name']),
     );
+    expect(health.get('case-1')).not.toContain('never-run');
   });
 
   it('returns an empty signal list for a healthy case', () => {

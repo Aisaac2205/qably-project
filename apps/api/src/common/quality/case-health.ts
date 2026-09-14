@@ -63,10 +63,6 @@ function computeSingleCaseSignals(input: CaseHealthInput): CaseHealthSignal[] {
     signals.push('raw-name');
   }
 
-  if (input.executionMode === 'automated' && !input.hasAnyRun) {
-    signals.push('never-run');
-  }
-
   if (isFlaky(input.recentResults)) {
     signals.push('flaky');
   }

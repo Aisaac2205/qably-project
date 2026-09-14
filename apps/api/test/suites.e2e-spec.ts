@@ -192,12 +192,12 @@ describe('Suites (e2e)', () => {
       cases: { healthSignals: string[] }[];
     }[];
     expect(body[0].cases[0].healthSignals).toEqual(
-      expect.arrayContaining(['no-steps', 'raw-name', 'never-run']),
+      expect.arrayContaining(['no-steps', 'raw-name']),
     );
+    expect(body[0].cases[0].healthSignals).not.toContain('never-run');
     expect(body[0].healthSummary).toEqual({
       'no-steps': 1,
       'raw-name': 1,
-      'never-run': 1,
     });
   });
 

@@ -30,7 +30,7 @@ describe('deriveCaseAttention', () => {
       steps: [],
       expectedResult: '',
       state: 'draft',
-      healthSignals: ['no-steps', 'never-run'],
+      healthSignals: ['no-steps'],
     })
 
     expect(deriveCaseAttention(subject)).toBe('in-review')
@@ -41,22 +41,22 @@ describe('deriveCaseAttention', () => {
       steps: [],
       expectedResult: '',
       state: 'draft',
-      healthSignals: ['no-steps', 'never-run'],
+      healthSignals: ['no-steps'],
     })
 
     expect(deriveCaseAttention(subject)).toBe('undocumented')
   })
 
   it('asks for confirmation on a draft that already carries documentation', () => {
-    const subject = testCase({ state: 'draft', healthSignals: ['never-run'] })
+    const subject = testCase({ state: 'draft', healthSignals: [] })
 
     expect(deriveCaseAttention(subject)).toBe('awaiting-confirmation')
   })
 
-  it('falls back to never-run once the case is documented and confirmed', () => {
-    const subject = testCase({ healthSignals: ['never-run'] })
+  it('returns nothing once the case is documented and confirmed, even without run history', () => {
+    const subject = testCase({ healthSignals: [] })
 
-    expect(deriveCaseAttention(subject)).toBe('never-run')
+    expect(deriveCaseAttention(subject)).toBeNull()
   })
 
   it('leaves an undocumented manual case to its author rather than blaming Aeris', () => {

@@ -347,7 +347,7 @@ describe('CaseCard', () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
-            testCase={{ ...automatedCase, healthSignals: ['no-steps', 'never-run'] }}
+            testCase={{ ...automatedCase, healthSignals: ['no-steps'] }}
             onEdit={noop}
             onDelete={noop}
           />,
@@ -369,7 +369,7 @@ describe('CaseCard', () => {
               ...automatedCase,
               steps: ['Log in'],
               expectedResult: 'The dashboard opens',
-              healthSignals: ['never-run'],
+              healthSignals: [],
             }}
             onEdit={noop}
             onDelete={noop}

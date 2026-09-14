@@ -158,7 +158,6 @@ export interface CaseLastResult {
 export type CaseHealthSignal =
   | 'no-steps'
   | 'raw-name'
-  | 'never-run'
   | 'flaky'
   | 'duplicate-key'
   | 'near-duplicate-title'
