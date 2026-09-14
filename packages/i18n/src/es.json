@@ -326,7 +326,11 @@
     "runsKpi": "Ejecuciones · 7 d",
     "passRateKpi": "Tasa de aprobación · 7 d",
     "pendingAiKpi": "IA pendiente",
-    "coverageGapsKpi": "Brechas de cobertura",
+    "activeRunsKpi": "Ejecuciones activas",
+    "windowDays_one": "Último {{count}} día",
+    "windowDays_other": "Últimos {{count}} días",
+    "passRateTrendChart_one": "Tasa de aprobación de la última ejecución",
+    "passRateTrendChart_other": "Tasa de aprobación de las últimas {{count}} ejecuciones",
     "thProject": "Proyecto",
     "thPassRate": "Tasa de aprobación",
     "thLastRun": "Última ejecución",
@@ -359,12 +363,7 @@
     "traceabilityCalendarLabel": "Calendario de trazabilidad de {{year}}",
     "traceabilityDayEmpty": "Sin eventos el {{date}}.",
     "governanceHumanAuthority": "Se requiere autoridad humana para toda publicación",
-    "governanceTraceability": "Trazabilidad bidireccional por diseño",
-    "qualityRisks": "Riesgos de calidad y vigencia",
-    "qualityRisksSubtitle": "Señales de pruebas desactualizadas, brechas de cobertura y estabilidad",
-    "activeSignalsCount": "{{count}} señales activas",
-    "qualityRisksEmptyTitle": "Sin señales de riesgo activas todavía",
-    "qualityRisksEmptyDesc": "La detección de riesgos se completará aquí cuando haya historial de ejecuciones y evidencia de cobertura disponible para este proyecto."
+    "governanceTraceability": "Trazabilidad bidireccional por diseño"
   },
   "quality": {
     "breadcrumb": "Calidad",

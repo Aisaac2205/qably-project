@@ -30,10 +30,14 @@ describe('useDashboardStats — pure derivation', () => {
     expect(expectedKeys.length).toBe(11)
   })
 
-  it('mock store has expected seed counts for the parts still mocked', () => {
+  it('counts pending proposals from the review list, the same source the inbox reads', () => {
     __resetStore()
-    const snap = getSnapshot()
-    expect(snap.proposals.length).toBe(6)
+    const { result } = renderHook(() => useDashboardStats(), {
+      wrapper: ({ children }) => withQueryClient(children),
+    })
+    const inReview = getSnapshot().proposals.filter((p) => p.status === 'in_review').length
+    expect(result.current.pendingProposals).toBe(inReview)
+    expect(result.current.recentProposals.every((p) => p.status === 'in_review')).toBe(true)
   })
 
   it('derives run stats from the api-backed runs list, not the mock store', () => {

@@ -15,7 +15,7 @@ features/dashboard/
 │   ├── project-health-card.tsx # Per-project health summary
 │   └── recent-activity.tsx     # Runs, AI cases, pipelines feed
 ├── hooks/
-│   └── use-dashboard-stats.ts  # Derived stats from mock store
+│   └── use-dashboard-stats.ts  # Derived stats from the dashboard summary, projects and review APIs
 ├── lib/
 │   └── format.ts               # Pure formatting helpers
 ├── test/                       # Vitest + React 19 tests
@@ -24,7 +24,7 @@ features/dashboard/
 
 ## Data
 
-Uses the mock store via `useProjects()`, `useRuns()`, `useAiCases()`, `usePipelines()`, `useOrg()`. The `useDashboardStats` hook derives all computed values — no extra state.
+Every number comes from the API: `useDashboardSummary()` for the windowed run metrics and recent activity, `useProjects()` for the project table, and the review inbox's `useProposals()` for pending proposals. Nothing on this page reads the mock store. The presentational blocks (KPI card, trend chart, status chip) come from `@qably/ui/dashboard`, the same components the landing renders in its preview.
 
 ## Design
 

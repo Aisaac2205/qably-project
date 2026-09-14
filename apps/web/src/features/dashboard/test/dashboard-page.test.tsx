@@ -27,7 +27,7 @@ describe('DashboardPage', () => {
     expect(summary).toHaveTextContent('Runs')
     expect(summary).toHaveTextContent('Pass rate')
     expect(summary).toHaveTextContent('Pending AI')
-    expect(summary).toHaveTextContent('Coverage Gaps')
+    expect(summary).toHaveTextContent('Active runs')
   })
 
   it('renders the project status section', async () => {
@@ -79,11 +79,11 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders quality & freshness risks section with active signals', async () => {
+  it('shows nothing the API cannot back: no risk panel, no coverage gaps', async () => {
     await act(async () => {
       renderWithQuery(<DashboardPage />)
     })
-    expect(screen.getByRole('heading', { name: 'Quality & freshness risks' })).toBeInTheDocument()
-    expect(screen.getByText(/coverage gap in payment refunds flow/i)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Quality & freshness risks' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/coverage gap/i)).not.toBeInTheDocument()
   })
 })

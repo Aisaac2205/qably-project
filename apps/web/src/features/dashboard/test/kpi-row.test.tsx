@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { KpiRow } from '@/features/dashboard/components/kpi-row'
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { dashboardSummaryFixture } from '@/test/dashboard-api-stub'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -14,41 +15,40 @@ describe('KpiRow', () => {
     __resetStore()
   })
 
-  it('renders all 4 KPI cards', async () => {
+  it('renders four cards, every one backed by the API', async () => {
     await act(async () => {
       renderWithQuery(<KpiRow />)
     })
     expect(screen.getByText('Runs · 7d')).toBeInTheDocument()
     expect(screen.getByText('Pass rate · 7d')).toBeInTheDocument()
     expect(screen.getByText('Pending AI')).toBeInTheDocument()
-    expect(screen.getByText('Coverage Gaps')).toBeInTheDocument()
+    expect(screen.getByText('Active runs')).toBeInTheDocument()
+    expect(screen.queryByText('Coverage Gaps')).not.toBeInTheDocument()
   })
 
-  it('shows correct runs-last-7-days count from mock data', async () => {
+  it('reads the run counts from the dashboard summary', async () => {
     await act(async () => {
       renderWithQuery(<KpiRow />)
     })
-    // All 4 seeded runs started within 7 days of MOCK_NOW.
-    const values = screen.getAllByText('4')
-    expect(values.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText(String(dashboardSummaryFixture.runsInWindow))).toBeInTheDocument()
+    expect(screen.getByText('Active runs').closest('a')).toHaveTextContent(
+      String(dashboardSummaryFixture.activeRuns),
+    )
   })
 
-  it('shows correct pending AI count from mock data', async () => {
+  it('counts pending proposals from the review list the inbox uses', async () => {
     await act(async () => {
       renderWithQuery(<KpiRow />)
     })
-    // Five of the six seeded proposals are in_review.
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
-  it('shows correct coverage gaps count from mock data', async () => {
+  it('lays the cards out two per row on a phone and four on a wide container', async () => {
     await act(async () => {
       renderWithQuery(<KpiRow />)
     })
-    // 2 seeded coverage gaps for proj-1.
-    const values = screen.getAllByText('2')
-    expect(values.length).toBeGreaterThanOrEqual(1)
+    const grid = screen.getByLabelText('Quality overview').querySelector('dl')
+    expect(grid).toHaveClass('grid-cols-2')
+    expect(grid).toHaveClass('@2xl:grid-cols-4')
   })
 })
-
-
