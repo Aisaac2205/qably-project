@@ -816,6 +816,7 @@
     "confirmDocumentationTitle_one": "{{count}} caso documentado espera tu confirmación.",
     "confirmDocumentationTitle_other": "{{count}} casos documentados esperan tu confirmación.",
     "confirmDocumentationHint": "Al confirmar, esos casos pasan a formar parte del set oficial de la suite.",
+    "confirmDocumentationSelectAll": "Seleccionar todo",
     "confirmDocumentationAction_one": "Confirmar {{count}} caso",
     "confirmDocumentationAction_other": "Confirmar {{count}} casos",
     "confirmingDocumentation": "Confirmando…",

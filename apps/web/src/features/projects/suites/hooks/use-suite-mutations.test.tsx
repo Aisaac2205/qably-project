@@ -105,7 +105,26 @@ describe('useConfirmDocumentation', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: projectKeys.detail('proj-1'),
     })
-    expect(confirm).toHaveBeenCalledWith('suite-1')
+    expect(confirm).toHaveBeenCalledWith('suite-1', undefined)
+  })
+
+  it('forwards the selected case ids to the API call', async () => {
+    const { client } = setup()
+    const { result } = renderHook(() => useConfirmDocumentation(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    result.current.mutate({
+      suiteId: 'suite-1',
+      projectId: 'proj-1',
+      caseIds: ['case-1', 'case-2'],
+    })
+
+    await waitFor(() => {
+      expect(confirm).toHaveBeenCalledWith('suite-1', ['case-1', 'case-2'])
+    })
   })
 })
 

@@ -71,9 +71,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     return result
   })
   const confirmDocumentation = useConfirmDocumentation()
-  const confirmation = useConfirmDocumentationState(async () => {
+  const confirmation = useConfirmDocumentationState(async (caseIds: string[]) => {
     try {
-      const outcome = await confirmDocumentation.mutateAsync({ suiteId, projectId })
+      const outcome = await confirmDocumentation.mutateAsync({ suiteId, projectId, caseIds })
       notify.success(t('suites.confirmDocumentationDone', { count: outcome.confirmedCount }), {
         description:
           outcome.skippedCount > 0

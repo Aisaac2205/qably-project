@@ -134,8 +134,14 @@ export function useConfirmDocumentation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ suiteId }: { suiteId: string; projectId: string }) =>
-      confirmDocumentation(suiteId),
+    mutationFn: ({
+      suiteId,
+      caseIds,
+    }: {
+      suiteId: string
+      projectId: string
+      caseIds?: string[]
+    }) => confirmDocumentation(suiteId, caseIds),
     onSuccess: async (_result, { suiteId, projectId }) => {
       await invalidateSuites()
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })

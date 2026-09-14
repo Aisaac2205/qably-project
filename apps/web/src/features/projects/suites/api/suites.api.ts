@@ -129,10 +129,11 @@ export function documentSuite(
 
 export function confirmDocumentation(
   suiteId: string,
+  caseIds?: string[],
 ): Promise<ConfirmDocumentationResult> {
   return apiRequest<ConfirmDocumentationResult>(
     `/suites/${suiteId}/confirm-documentation`,
-    { method: 'POST' },
+    { method: 'POST', body: caseIds === undefined ? undefined : { caseIds } },
   )
 }
 

@@ -45,7 +45,7 @@ function Panel({
   onConfirm,
 }: {
   cases: TestCase[]
-  onConfirm: () => Promise<ConfirmDocumentationResult>
+  onConfirm: (caseIds: string[]) => Promise<ConfirmDocumentationResult>
 }) {
   const confirmation = useConfirmDocumentationState(onConfirm)
   return <ConfirmDocumentation cases={cases} confirmation={confirmation} />
@@ -151,6 +151,82 @@ describe('ConfirmDocumentation', () => {
       expect(within(dialog).getByRole('button', { name: /confirm 1 case$/i })).toBeEnabled()
     })
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('checks every case by default and sends all ids when nothing is unchecked', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn().mockResolvedValue(result())
+
+    renderWithQuery(
+      <Panel cases={[testCase({ id: 'tc-1' }), testCase({ id: 'tc-2' })]} onConfirm={onConfirm} />,
+    )
+    await user.click(screen.getByRole('button', { name: /confirm 2 cases/i }))
+    const dialog = screen.getByRole('dialog')
+
+    const checkboxes = within(dialog).getAllByRole('checkbox')
+    expect(checkboxes.every((box) => (box as HTMLInputElement).checked)).toBe(true)
+
+    await user.click(within(dialog).getByRole('button', { name: /confirm 2 cases/i }))
+
+    expect(onConfirm).toHaveBeenCalledWith(['tc-1', 'tc-2'], expect.anything())
+  })
+
+  it('sends only the checked case ids once one is unchecked', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn().mockResolvedValue(result())
+
+    renderWithQuery(
+      <Panel
+        cases={[
+          testCase({ id: 'tc-1', name: 'Empties the cart' }),
+          testCase({ id: 'tc-2', name: 'Applies a discount code' }),
+        ]}
+        onConfirm={onConfirm}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /confirm 2 cases/i }))
+    const dialog = screen.getByRole('dialog')
+
+    await user.click(within(dialog).getByRole('checkbox', { name: /applies a discount code/i }))
+    await user.click(within(dialog).getByRole('button', { name: /confirm 1 case$/i }))
+
+    expect(onConfirm).toHaveBeenCalledWith(['tc-1'], expect.anything())
+  })
+
+  it('disables the confirm action once every case is unchecked', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+
+    renderWithQuery(<Panel cases={[testCase({ id: 'tc-1', name: 'Empties the cart' })]} onConfirm={onConfirm} />)
+    await user.click(screen.getByRole('button', { name: /confirm 1 case$/i }))
+    const dialog = screen.getByRole('dialog')
+
+    await user.click(within(dialog).getByRole('checkbox', { name: /empties the cart/i }))
+
+    expect(within(dialog).getByRole('button', { name: /confirm/i })).toBeDisabled()
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('marks the select-all checkbox as mixed once only some cases are checked', async () => {
+    const user = userEvent.setup()
+
+    renderWithQuery(
+      <Panel
+        cases={[
+          testCase({ id: 'tc-1', name: 'Empties the cart' }),
+          testCase({ id: 'tc-2', name: 'Applies a discount code' }),
+        ]}
+        onConfirm={vi.fn()}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /confirm 2 cases/i }))
+    const dialog = screen.getByRole('dialog')
+    const selectAll = within(dialog).getByRole('checkbox', { name: /select all/i })
+    expect(selectAll).toHaveAttribute('aria-checked', 'true')
+
+    await user.click(within(dialog).getByRole('checkbox', { name: /applies a discount code/i }))
+
+    expect(selectAll).toHaveAttribute('aria-checked', 'mixed')
   })
 
   it('never renders its own status or alert text, leaving outcome and error feedback to the toaster', async () => {

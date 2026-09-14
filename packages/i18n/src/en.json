@@ -817,6 +817,7 @@
     "confirmDocumentationTitle_one": "{{count}} documented case is waiting for your confirmation.",
     "confirmDocumentationTitle_other": "{{count}} documented cases are waiting for your confirmation.",
     "confirmDocumentationHint": "Confirming makes those cases part of the suite's official set.",
+    "confirmDocumentationSelectAll": "Select all",
     "confirmDocumentationAction_one": "Confirm {{count}} case",
     "confirmDocumentationAction_other": "Confirm {{count}} cases",
     "confirmingDocumentation": "Confirming…",

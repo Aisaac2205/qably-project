@@ -141,6 +141,13 @@ describe('suites.api', () => {
     expect(init.body).toBeUndefined()
   })
 
+  it('sends the selected case ids as a plain JSON object', async () => {
+    await confirmDocumentation('suite-1', ['case-1', 'case-2'])
+
+    const [, init] = lastCall()
+    expect(init.body).toBe('{"caseIds":["case-1","case-2"]}')
+  })
+
   it('sends the project document mode as a plain JSON object, not a doubly-encoded string', async () => {
     await documentProject('proj-1', 'undocumented')
 
