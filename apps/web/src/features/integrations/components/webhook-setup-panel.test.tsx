@@ -54,7 +54,7 @@ describe('WebhookSetupPanel', () => {
   it('gives every copy control an accessible name identifying what it copies', () => {
     render(<WebhookSetupPanel provider="GITHUB" secret={"s".repeat(64)} />)
 
-    expect(screen.getByRole('button', { name: 'Copy payload URL' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy destination URL' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy secret' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy content type' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Copy events' })).toBeInTheDocument()

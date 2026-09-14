@@ -160,7 +160,7 @@ describe('ProjectRepositoryPage', () => {
   it('presents the ingestion metadata with the commit that produced it', async () => {
     await renderPage()
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Ingestion' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Received changes' })).toBeInTheDocument()
     expect(screen.getByText('Completed')).toBeInTheDocument()
     expect(screen.getByText('Webhook')).toBeInTheDocument()
     expect(screen.getByText('8f3c2a1')).toBeInTheDocument()
@@ -278,7 +278,7 @@ describe('ProjectRepositoryPage', () => {
 
     await renderPage()
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Ingesta' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Cambios recibidos' })).toBeInTheDocument()
     expect(screen.getByText('Completado')).toBeInTheDocument()
     expect(screen.getByText('Confirmación')).toBeInTheDocument()
     expect(screen.queryByText('Diferencia')).not.toBeInTheDocument()
@@ -314,7 +314,7 @@ describe('ProjectRepositoryPage', () => {
     await renderPage()
 
     expect(screen.getByText('No ingested changes yet')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 2, name: 'Ingestion' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Received changes' })).not.toBeInTheDocument()
     expect(screen.queryByText(/^Push to this repository/)).not.toBeInTheDocument()
     expect(screen.getByText(/Confirm that the webhook is configured/)).toBeInTheDocument()
   })
