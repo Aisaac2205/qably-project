@@ -79,6 +79,7 @@ describe('Suites (e2e)', () => {
       updateMany: jest.fn(),
       delete: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     extractedProposal: { findMany: jest.fn() },
     runCase: { findMany: jest.fn() },
@@ -105,6 +106,7 @@ describe('Suites (e2e)', () => {
     prisma.suite.update.mockResolvedValue(suiteRow);
     prisma.extractedProposal.findMany.mockResolvedValue([]);
     prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.testCase.count.mockResolvedValue(0);
     prisma.runCase.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.organization.findUnique.mockResolvedValue({
@@ -413,6 +415,34 @@ describe('Suites (e2e)', () => {
     await request(app.getHttpServer())
       .post('/suites/suite-1/confirm-documentation')
       .expect(403);
+  });
+
+  it('rejects an explicit empty case id list instead of silently confirming everything', async () => {
+    await request(app.getHttpServer())
+      .post('/suites/suite-1/confirm-documentation')
+      .send({ caseIds: [] })
+      .expect(400);
+
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('confirms only the requested case ids when a subset is given', async () => {
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-documented', currentVersionId: 'version-1' },
+    ]);
+    prisma.testCase.count.mockResolvedValue(1);
+
+    const response = await request(app.getHttpServer())
+      .post('/suites/suite-1/confirm-documentation')
+      .send({ caseIds: ['case-documented'] })
+      .expect(201);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        confirmedCaseIds: ['case-documented'],
+        confirmedCount: 1,
+      }),
+    );
   });
 
   it('confirming twice is not an error and confirms nothing the second time', async () => {

@@ -54,6 +54,7 @@ interface FakePrisma {
     updateMany: jest.Mock;
     delete: jest.Mock;
     findMany: jest.Mock;
+    count: jest.Mock;
   };
   runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
@@ -80,6 +81,7 @@ function createPrisma(): FakePrisma {
       updateMany: jest.fn(),
       delete: jest.fn(),
       findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
     },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
@@ -318,7 +320,7 @@ describe('SuitesService.confirmDocumentation', () => {
     { id: 'case-undocumented', currentVersionId: null },
   ];
 
-  it('flips every documented, automated draft case to active and stamps the audit trail', async () => {
+  it('flips every documented, automated draft case to active, leaving the suite unstamped while one case is still undocumented', async () => {
     const prisma = createPrisma();
     prisma.testCase.findMany.mockResolvedValue(draftCases);
 
@@ -332,13 +334,7 @@ describe('SuitesService.confirmDocumentation', () => {
       where: { id: { in: ['case-documented'] } },
       data: { state: 'active' },
     });
-    expect(prisma.suite.update).toHaveBeenCalledWith({
-      where: { id: 'suite-1' },
-      data: {
-        documentationConfirmedAt: expect.any(Date) as Date,
-        documentationConfirmedById: 'user-1',
-      },
-    });
+    expect(prisma.suite.update).not.toHaveBeenCalled();
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.confirmedCaseIds).toEqual([
       'case-documented',
@@ -348,6 +344,87 @@ describe('SuitesService.confirmDocumentation', () => {
     ]);
     expect(result.ok && result.value.confirmedCount).toBe(1);
     expect(result.ok && result.value.skippedCount).toBe(1);
+  });
+
+  it('stamps the audit trail once every automated case has left draft', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-documented', currentVersionId: 'version-1' },
+    ]);
+
+    await build(prisma).confirmDocumentation(owner, 'suite-1', 'user-1');
+
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        documentationConfirmedAt: expect.any(Date) as Date,
+        documentationConfirmedById: 'user-1',
+      },
+    });
+  });
+
+  it('confirms only the requested case ids when a subset is given', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-documented', currentVersionId: 'version-1' },
+    ]);
+    prisma.testCase.count.mockResolvedValue(1);
+
+    const result = await build(prisma).confirmDocumentation(
+      owner,
+      'suite-1',
+      'user-1',
+      ['case-documented'],
+    );
+
+    expect(prisma.testCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          suiteId: 'suite-1',
+          executionMode: 'automated',
+          state: 'draft',
+          id: { in: ['case-documented'] },
+        },
+      }),
+    );
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.confirmedCaseIds).toEqual([
+      'case-documented',
+    ]);
+  });
+
+  it('does not stamp the suite when other automated cases remain in draft outside the requested subset', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-documented', currentVersionId: 'version-1' },
+    ]);
+    prisma.testCase.count.mockResolvedValue(1);
+
+    await build(prisma).confirmDocumentation(owner, 'suite-1', 'user-1', [
+      'case-documented',
+    ]);
+
+    expect(prisma.testCase.count).toHaveBeenCalledWith({
+      where: { suiteId: 'suite-1', executionMode: 'automated', state: 'draft' },
+    });
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it('ignores case ids that belong to another suite instead of confirming them', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.testCase.count.mockResolvedValue(0);
+
+    const result = await build(prisma).confirmDocumentation(
+      owner,
+      'suite-1',
+      'user-1',
+      ['case-from-another-suite'],
+    );
+
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value.confirmedCaseIds).toEqual([]);
   });
 
   it('only queries automated draft cases in the suite', async () => {

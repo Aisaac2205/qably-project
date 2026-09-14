@@ -39,11 +39,13 @@ import type {
   SuiteView,
 } from './suites.contracts';
 import {
+  confirmDocumentationSchema,
   createCaseSchema,
   createSuiteSchema,
   listSuitesQuerySchema,
   updateCaseSchema,
   updateSuiteSchema,
+  type ConfirmDocumentationInput,
   type CreateCaseInput,
   type CreateSuiteInput,
   type ListSuitesQuery,
@@ -216,8 +218,12 @@ export class SuitesController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Body(new ZodValidationPipe(confirmDocumentationSchema))
+    body: ConfirmDocumentationInput,
   ): Promise<ConfirmDocumentationResult> {
-    return unwrap(await this.suites.confirmDocumentation(org, id, user.id));
+    return unwrap(
+      await this.suites.confirmDocumentation(org, id, user.id, body.caseIds),
+    );
   }
 
   @Post(':id/document')

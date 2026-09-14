@@ -382,6 +382,7 @@ export class SuitesService {
     org: OrgContext,
     suiteId: string,
     actorId: string,
+    caseIds?: string[],
   ): Promise<Result<ConfirmDocumentationResult, SuiteError>> {
     const existing = await this.scoped(org, suiteId);
 
@@ -393,7 +394,12 @@ export class SuitesService {
     const { confirmedCaseIds, skippedCaseIds } = await this.prisma.$transaction(
       async (tx) => {
         const candidates = await tx.testCase.findMany({
-          where: { suiteId, executionMode: 'automated', state: 'draft' },
+          where: {
+            suiteId,
+            executionMode: 'automated',
+            state: 'draft',
+            ...(caseIds !== undefined && { id: { in: caseIds } }),
+          },
           select: { id: true, currentVersionId: true },
         });
 
@@ -411,13 +417,26 @@ export class SuitesService {
           });
         }
 
-        await tx.suite.update({
-          where: { id: suiteId },
-          data: {
-            documentationConfirmedAt: confirmedAt,
-            documentationConfirmedById: actorId,
-          },
-        });
+        const remaining =
+          caseIds === undefined
+            ? skipped.length
+            : await tx.testCase.count({
+                where: {
+                  suiteId,
+                  executionMode: 'automated',
+                  state: 'draft',
+                },
+              });
+
+        if (remaining === 0) {
+          await tx.suite.update({
+            where: { id: suiteId },
+            data: {
+              documentationConfirmedAt: confirmedAt,
+              documentationConfirmedById: actorId,
+            },
+          });
+        }
 
         return {
           confirmedCaseIds: confirmed.map((candidate) => candidate.id),

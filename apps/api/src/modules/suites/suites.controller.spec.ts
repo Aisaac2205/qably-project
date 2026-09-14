@@ -162,13 +162,41 @@ describe('SuitesController.confirmDocumentation', () => {
     const result = await build(
       fakeExtraction(null),
       suites,
-    ).confirmDocumentation(org, 'suite-1', user);
+    ).confirmDocumentation(org, 'suite-1', user, {});
 
     expect(result).toEqual(report);
     expect(suites.confirmDocumentation).toHaveBeenCalledWith(
       org,
       'suite-1',
       user.id,
+      undefined,
+    );
+  });
+
+  it('forwards the requested case ids to the service', async () => {
+    const report = {
+      suiteId: 'suite-1',
+      confirmedCaseIds: ['case-1'],
+      confirmedCount: 1,
+      skippedCaseIds: [],
+      skippedCount: 0,
+      documentationConfirmedAt: '2026-09-12T00:00:00.000Z',
+      documentationConfirmedById: 'user-1',
+    };
+    const suites = fakeSuites({ ok: true, value: report });
+
+    await build(fakeExtraction(null), suites).confirmDocumentation(
+      org,
+      'suite-1',
+      user,
+      { caseIds: ['case-1'] },
+    );
+
+    expect(suites.confirmDocumentation).toHaveBeenCalledWith(
+      org,
+      'suite-1',
+      user.id,
+      ['case-1'],
     );
   });
 
@@ -180,6 +208,7 @@ describe('SuitesController.confirmDocumentation', () => {
         org,
         'suite-1',
         user,
+        {},
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -192,6 +221,7 @@ describe('SuitesController.confirmDocumentation', () => {
         org,
         'suite-1',
         user,
+        {},
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });

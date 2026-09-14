@@ -1,4 +1,5 @@
 import {
+  confirmDocumentationSchema,
   createCaseSchema,
   createSuiteSchema,
   updateCaseSchema,
@@ -71,6 +72,31 @@ describe('createCaseSchema', () => {
       createCaseSchema.safeParse({ name: 'Adds to cart', priority: 'urgent' })
         .success,
     ).toBe(false);
+  });
+});
+
+describe('confirmDocumentationSchema', () => {
+  it('defaults to no case filter when no body is sent', () => {
+    expect(confirmDocumentationSchema.parse(undefined)).toEqual({});
+  });
+
+  it('accepts an explicit list of case ids', () => {
+    expect(
+      confirmDocumentationSchema.parse({ caseIds: ['case-1', 'case-2'] }),
+    ).toEqual({ caseIds: ['case-1', 'case-2'] });
+  });
+
+  it('rejects an explicit empty array instead of silently confirming everything', () => {
+    expect(confirmDocumentationSchema.safeParse({ caseIds: [] }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects more than 500 case ids', () => {
+    const caseIds = Array.from({ length: 501 }, (_, i) => `case-${i}`);
+    expect(confirmDocumentationSchema.safeParse({ caseIds }).success).toBe(
+      false,
+    );
   });
 });
 

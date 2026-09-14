@@ -57,8 +57,15 @@ export const listSuitesQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
 });
 
+export const confirmDocumentationSchema = z
+  .object({ caseIds: z.array(z.string().min(1)).min(1).max(500).optional() })
+  .default({});
+
 export type CreateSuiteInput = z.infer<typeof createSuiteSchema>;
 export type UpdateSuiteInput = z.infer<typeof updateSuiteSchema>;
 export type CreateCaseInput = z.infer<typeof createCaseSchema>;
 export type UpdateCaseInput = z.infer<typeof updateCaseSchema>;
 export type ListSuitesQuery = z.infer<typeof listSuitesQuerySchema>;
+export type ConfirmDocumentationInput = z.infer<
+  typeof confirmDocumentationSchema
+>;
