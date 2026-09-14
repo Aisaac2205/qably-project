@@ -29,7 +29,7 @@ describe('deriveSuiteMetrics', () => {
     expect(result.status).toBe('never-run')
     expect(result.lastRun).toBeUndefined()
     expect(result.recentPassRate).toBe(0)
-    expect(result.sparkline).toEqual([])
+    expect(result.history).toEqual([])
   })
 
   it('reports never-run when the entry has a null lastRun', () => {
@@ -160,7 +160,7 @@ describe('deriveSuiteMetrics', () => {
     expect(result.status).toBe('fail')
   })
 
-  it('builds an oldest-first sparkline from only the completed trend entries', () => {
+  it('builds an oldest-first run history from only the completed trend entries', () => {
     const entry: SuiteMetricsEntry = {
       suiteId: 'suite-1',
       suiteName: 'Checkout',
@@ -176,7 +176,7 @@ describe('deriveSuiteMetrics', () => {
 
     const result = deriveSuiteMetrics(suite(), entry)
 
-    expect(result.sparkline.map((p) => p.passRate)).toEqual([0, 100])
+    expect(result.history).toEqual(['fail', 'pass'])
   })
 
   it('excludes non-terminal trend statuses when computing needs-attention with zero completed runs', () => {

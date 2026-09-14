@@ -22,7 +22,7 @@ import { StatusChip } from '@/components/ui/status-chip'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { projectRootPath, projectSuitesPath } from '../../lib/routes'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
-import { Sparkline } from './sparkline'
+import { RunHistoryStrip } from './run-history-strip'
 import { CaseCard } from './case-card'
 import { SuiteFormDialog } from './suite-form-dialog'
 import { CaseFormDialog } from './case-form-dialog'
@@ -301,13 +301,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 {suite.cases.length}
               </span>
             </div>
-            <div className="hidden sm:flex items-center gap-2 ml-auto">
-              <Sparkline
-                data={metrics.sparkline.map(({ date, passRate }) => ({ date, passRate }))}
-                tone={metrics.recentPassRate >= 70 ? 'pass' : metrics.recentPassRate > 0 ? 'warn' : 'muted'}
-                width={80}
-                height={24}
-              />
+            <div className="hidden sm:flex items-center ml-auto">
+              <RunHistoryStrip history={metrics.history} passRate={metrics.recentPassRate} showValue={false} />
             </div>
           </div>
         )}

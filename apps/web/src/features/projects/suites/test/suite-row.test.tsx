@@ -5,7 +5,7 @@ import { SuiteRow } from '@/features/projects/suites/components/suite-row'
 import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite } from '@/lib/test-utils'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
-import type { TestCase, RunSummaryRecord } from '@qably/types'
+import type { TestCase, RunSummaryRecord, RunStatus } from '@qably/types'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
@@ -51,15 +51,7 @@ const mockMetrics: SuiteMetrics = {
   suite: {} as SuiteMetrics['suite'],
   lastRun: mockRun,
   recentPassRate: 80,
-  sparkline: [
-    { date: '2026-06-10', passRate: 60, runCount: 1 },
-    { date: '2026-06-11', passRate: 70, runCount: 1 },
-    { date: '2026-06-12', passRate: 80, runCount: 1 },
-    { date: '2026-06-13', passRate: 0, runCount: 0 },
-    { date: '2026-06-14', passRate: 90, runCount: 1 },
-    { date: '2026-06-15', passRate: 85, runCount: 1 },
-    { date: '2026-06-16', passRate: 75, runCount: 1 },
-  ],
+  history: ['fail', 'pass', 'pass', 'pass', 'pass'] as RunStatus[],
   status: 'pass',
 }
 
@@ -160,11 +152,11 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.getByText('80%')).toBeInTheDocument()
   })
 
-  it('renders a sparkline SVG with role="img"', async () => {
+  it('renders a run history strip with role="img"', async () => {
     const { container } = renderWithQuery(
       <SuiteRow suite={mockSuite} metrics={metrics} />,
     )
-    expect(container.querySelector('svg[role="img"]')).toBeInTheDocument()
+    expect(container.querySelector('[role="img"]')).toBeInTheDocument()
   })
 
   it('renders the status chip', async () => {

@@ -12,7 +12,7 @@ import { TestTube, Star } from '@phosphor-icons/react'
 import type { Suite } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from '@/components/ui/status-chip'
-import { Sparkline } from './sparkline'
+import { RunHistoryStrip } from './run-history-strip'
 import { InlineEditableText } from './inline-editable-text'
 import { useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
@@ -33,7 +33,7 @@ interface SuiteRowProps {
 }
 
 function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
-  const { lastRun, recentPassRate, sparkline, status } = metrics
+  const { lastRun, recentPassRate, history, status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
   const { t, locale } = useTranslation()
   const updateSuiteMutation = useUpdateSuite()
@@ -113,19 +113,9 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         </span>
       </div>
 
-      {/* Col 5: pass rate 7d + sparkline (hidden on mobile) */}
-      <div className="hidden md:flex items-center gap-2.5 shrink-0">
-        <span
-          className={`text-sm font-mono font-semibold tabular-nums ${recentPassRate >= 70 ? 'text-pass' : recentPassRate > 0 ? 'text-warn' : 'text-muted'}`}
-        >
-          {recentPassRate}%
-        </span>
-        <Sparkline
-          data={sparkline.map(({ date, passRate }) => ({ date, passRate }))}
-          tone={recentPassRate >= 70 ? 'pass' : recentPassRate > 0 ? 'warn' : 'muted'}
-          width={64}
-          height={20}
-        />
+      {/* Col 5: run history strip (hidden on mobile) */}
+      <div className="hidden md:flex items-center shrink-0">
+        <RunHistoryStrip history={history} passRate={recentPassRate} />
       </div>
 
       {/* Col 6: status chip (visible on all sizes) */}

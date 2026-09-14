@@ -10,7 +10,7 @@ export interface DerivedSuiteMetrics {
   suite: Suite
   lastRun: SuiteMetricsLastRun | undefined
   recentPassRate: number
-  sparkline: Array<{ date: string; passRate: number; runCount: number }>
+  history: RunStatus[]
   status: SuiteRunStatus
 }
 
@@ -35,15 +35,9 @@ export function deriveSuiteMetrics(
           (completed.filter((status) => status === 'pass').length / completed.length) * 100,
         )
 
-  const sparkline = completed.map((status, index) => ({
-    date: `trend-${index}`,
-    passRate: status === 'pass' ? 100 : 0,
-    runCount: 1,
-  }))
-
   const status = deriveStatus(trend, lastRun, completed, recentPassRate)
 
-  return { suite, lastRun, recentPassRate, sparkline, status }
+  return { suite, lastRun, recentPassRate, history: completed, status }
 }
 
 function deriveStatus(
