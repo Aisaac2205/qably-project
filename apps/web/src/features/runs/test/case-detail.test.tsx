@@ -1,6 +1,7 @@
-import { render, screen, act, within } from '@testing-library/react'
+import { screen, act, within } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { CaseDetail } from '@/features/runs/components/case-detail'
+import { renderWithQuery } from '@/lib/query-test-utils'
 import type { RunCaseRecord } from '@qably/types'
 
 const mockCase: RunCaseRecord = {
@@ -36,7 +37,7 @@ const automatedCase: RunCaseRecord = {
 describe('CaseDetail (automated)', () => {
   it('renders the humanized title with the raw name in mono', async () => {
     await act(async () => {
-      render(<CaseDetail c={automatedCase} />)
+      renderWithQuery(<CaseDetail c={automatedCase} />)
     })
     expect(screen.getByText('Redirects to dashboard on valid login')).toBeInTheDocument()
     const raw = screen.getByText('useCreateRun > redirects to dashboard on valid login')
@@ -45,21 +46,21 @@ describe('CaseDetail (automated)', () => {
 
   it('shows the file path', async () => {
     await act(async () => {
-      render(<CaseDetail c={automatedCase} />)
+      renderWithQuery(<CaseDetail c={automatedCase} />)
     })
     expect(screen.getByText('src/features/runs/hooks/use-create-run.test.ts')).toBeInTheDocument()
   })
 
   it('shows the formatted duration', async () => {
     await act(async () => {
-      render(<CaseDetail c={automatedCase} />)
+      renderWithQuery(<CaseDetail c={automatedCase} />)
     })
     expect(screen.getByText(/1[.,]23\s*s|1234\s*ms/)).toBeInTheDocument()
   })
 
   it('shows failure details in a native details/summary with the failure type and message as the summary', async () => {
     await act(async () => {
-      render(<CaseDetail c={automatedCase} />)
+      renderWithQuery(<CaseDetail c={automatedCase} />)
     })
     const summary = screen.getByText(/AssertionError.*expected true to be false/)
     expect(summary.closest('summary')).not.toBeNull()
@@ -70,14 +71,14 @@ describe('CaseDetail (automated)', () => {
 
   it('shows the skip reason when the case was skipped', async () => {
     await act(async () => {
-      render(<CaseDetail c={{ ...automatedCase, status: 'skip', failureType: undefined, failureMessage: undefined, failureDetails: undefined, skipReason: 'Flaky in CI' }} />)
+      renderWithQuery(<CaseDetail c={{ ...automatedCase, status: 'skip', failureType: undefined, failureMessage: undefined, failureDetails: undefined, skipReason: 'Flaky in CI' }} />)
     })
     expect(screen.getByText('Flaky in CI')).toBeInTheDocument()
   })
 
   it('does not show technical automated fields for a manual case', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} />)
+      renderWithQuery(<CaseDetail c={mockCase} />)
     })
     expect(screen.queryByText(/AssertionError/)).not.toBeInTheDocument()
   })
@@ -86,7 +87,7 @@ describe('CaseDetail (automated)', () => {
 describe('CaseDetail', () => {
   it('does not render a steps section when the case has no steps', async () => {
     await act(async () => {
-      render(<CaseDetail c={{ ...mockCase, steps: [], expectedResult: '' }} />)
+      renderWithQuery(<CaseDetail c={{ ...mockCase, steps: [], expectedResult: '' }} />)
     })
     expect(screen.queryByText('Steps')).not.toBeInTheDocument()
     expect(screen.queryByText('Expected result')).not.toBeInTheDocument()
@@ -95,7 +96,7 @@ describe('CaseDetail', () => {
 
   it('does not render an expected result section when it is empty', async () => {
     await act(async () => {
-      render(<CaseDetail c={{ ...mockCase, expectedResult: '' }} />)
+      renderWithQuery(<CaseDetail c={{ ...mockCase, expectedResult: '' }} />)
     })
     expect(screen.getByText('Steps')).toBeInTheDocument()
     expect(screen.queryByText('Expected result')).not.toBeInTheDocument()
@@ -103,7 +104,7 @@ describe('CaseDetail', () => {
 
   it('never renders a hardcoded environment', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} projectId="proj-1" />)
+      renderWithQuery(<CaseDetail c={mockCase} projectId="proj-1" />)
     })
     expect(screen.queryByText(/staging/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/environment/i)).not.toBeInTheDocument()
@@ -111,7 +112,7 @@ describe('CaseDetail', () => {
 
   it('shows the real version of the linked official case', async () => {
     await act(async () => {
-      render(
+      renderWithQuery(
         <CaseDetail
           c={{
             ...mockCase,
@@ -137,7 +138,7 @@ describe('CaseDetail', () => {
 
   it('hides the version badge but keeps the library link for an unpublished linked case', async () => {
     await act(async () => {
-      render(
+      renderWithQuery(
         <CaseDetail
           c={{
             ...mockCase,
@@ -163,7 +164,7 @@ describe('CaseDetail', () => {
 
   it('hides the version badge and library link when the case is unlinked', async () => {
     await act(async () => {
-      render(
+      renderWithQuery(
         <CaseDetail
           c={{ ...mockCase, testCaseId: null, officialCase: null }}
           projectId="proj-1"
@@ -176,21 +177,21 @@ describe('CaseDetail', () => {
 
   it('renders case name', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} />)
+      renderWithQuery(<CaseDetail c={mockCase} />)
     })
     expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
   })
 
   it('renders status chip', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} />)
+      renderWithQuery(<CaseDetail c={mockCase} />)
     })
     expect(screen.getByText('Pass')).toBeInTheDocument()
   })
 
   it('renders steps', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} />)
+      renderWithQuery(<CaseDetail c={mockCase} />)
     })
     expect(screen.getByText('Navigate to /login')).toBeInTheDocument()
     expect(screen.getByText('Enter valid email')).toBeInTheDocument()
@@ -199,14 +200,14 @@ describe('CaseDetail', () => {
 
   it('renders expected result', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} />)
+      renderWithQuery(<CaseDetail c={mockCase} />)
     })
     expect(screen.getByText('Redirected to /dashboard')).toBeInTheDocument()
   })
 
   it('shows section headings', async () => {
     await act(async () => {
-      render(<CaseDetail c={mockCase} />)
+      renderWithQuery(<CaseDetail c={mockCase} />)
     })
     expect(screen.getByText('Steps')).toBeInTheDocument()
     expect(screen.getByText('Expected result')).toBeInTheDocument()
