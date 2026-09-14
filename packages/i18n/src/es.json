@@ -800,6 +800,7 @@
     "localeNameOther": "otro idioma",
     "documentSuiteWithAeris_one": "Documentar {{count}} caso con Aeris",
     "documentSuiteWithAeris_other": "Documentar {{count}} casos con Aeris",
+    "documentWithAerisCompact": "Documentar ({{count}})",
     "documentFilesQueued": "Aeris está documentando {{cases}} casos de {{files}} archivos.",
     "documentFilesNothingToDo": "No hay casos automatizados pendientes de documentar.",
     "documentFilesSettled_one": "Aeris documentó {{count}} caso de esta suite.",

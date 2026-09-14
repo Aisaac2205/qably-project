@@ -356,7 +356,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => {})
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
-    const aerisButton = screen.getByRole('button', { name: /document 1 case with aeris/i })
+    const aerisButton = screen.getByRole('button', { name: /document \(1\)/i })
     expect(aerisButton.className).not.toContain('border-dashed')
     expect(screen.getByRole('button', { name: /suite actions/i })).toBeInTheDocument()
   })
@@ -383,7 +383,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => {})
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
-    expect(screen.getByRole('button', { name: /document 1 case with aeris/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /document \(1\)/i })).toBeInTheDocument()
     expect(screen.queryByText(/all cases in this suite run in ci/i)).not.toBeInTheDocument()
   })
 

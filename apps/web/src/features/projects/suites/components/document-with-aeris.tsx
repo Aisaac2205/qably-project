@@ -7,6 +7,7 @@ import type { DocumentFilesResult } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
 
 export type DocumentFilesMode = 'undocumented' | 'stale-locale'
@@ -46,7 +47,7 @@ export function DocumentWithAeris({
 
   const busy = documentation.isPending || activeMode !== undefined
 
-  function renderTrigger(mode: DocumentFilesMode, icon: ReactNode, text: ReactNode) {
+  function renderTrigger(mode: DocumentFilesMode, icon: ReactNode, text: ReactNode, fullLabel?: string) {
     const isActive =
       (documentation.isPending && documentation.variables === mode) || activeMode === mode
     const content = (
@@ -55,43 +56,46 @@ export function DocumentWithAeris({
         {isActive ? t('suites.documentingFiles') : text}
       </>
     )
+    const commonProps = {
+      type: 'button' as const,
+      onClick: () => documentation.mutate(mode),
+      disabled: busy,
+    }
 
-    if (primary) {
-      return (
-        <Button
-          key={mode}
-          type="button"
-          variant="outline"
-          size="default"
-          onClick={() => documentation.mutate(mode)}
-          disabled={busy}
-          className={PRIMARY_ACTION_CLASS}
-        >
+    if (!fullLabel) {
+      return primary ? (
+        <Button key={mode} {...commonProps} variant="outline" size="default" className={PRIMARY_ACTION_CLASS}>
           {content}
         </Button>
+      ) : (
+        <button key={mode} {...commonProps} className={SECONDARY_ACTION_CLASS}>
+          {content}
+        </button>
       )
     }
 
+    const shell = primary ? (
+      <Button {...commonProps} variant="outline" size="default" className={PRIMARY_ACTION_CLASS} />
+    ) : (
+      <button {...commonProps} className={SECONDARY_ACTION_CLASS} />
+    )
+
     return (
-      <button
-        key={mode}
-        type="button"
-        onClick={() => documentation.mutate(mode)}
-        disabled={busy}
-        className={SECONDARY_ACTION_CLASS}
-      >
-        {content}
-      </button>
+      <Tooltip key={mode}>
+        <TooltipTrigger render={shell}>{content}</TooltipTrigger>
+        <TooltipContent>{fullLabel}</TooltipContent>
+      </Tooltip>
     )
   }
 
   const showUndocumented = pendingCount > 0
   const showStale = staleCount > 0
+  const compactLabel = t('suites.documentWithAerisCompact', { count: pendingCount })
 
   if (showUndocumented && showStale) {
     return (
       <div className="flex items-center gap-2">
-        {renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, label)}
+        {renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)}
         {renderTrigger(
           'stale-locale',
           <Translate size={primary ? 14 : 13} weight="bold" aria-hidden="true" />,
@@ -102,7 +106,7 @@ export function DocumentWithAeris({
   }
 
   if (showUndocumented) {
-    return renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, label)
+    return renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)
   }
 
   return renderTrigger(

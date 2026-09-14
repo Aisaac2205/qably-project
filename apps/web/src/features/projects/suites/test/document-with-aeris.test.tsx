@@ -55,10 +55,22 @@ describe('DocumentWithAeris', () => {
     const onDocument = vi.fn().mockResolvedValue(result())
 
     renderWithQuery(<DocumentPanel pendingCount={7} onDocument={onDocument} />)
-    await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
+    await user.click(screen.getByRole('button', { name: /document \(7\)/i }))
 
     await waitFor(() => expect(onDocument.mock.calls[0]?.[0]).toBe('undocumented'))
     expect(onDocument).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows the full label in a tooltip and keeps the visible text compact', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(
+      <DocumentPanel label="Document 7 cases with Aeris" pendingCount={7} onDocument={vi.fn()} />,
+    )
+
+    const trigger = screen.getByRole('button', { name: /document \(7\)/i })
+    expect(trigger).not.toHaveTextContent('Document 7 cases with Aeris')
+    await user.hover(trigger)
+    expect(await screen.findByText('Document 7 cases with Aeris')).toBeInTheDocument()
   })
 
   it('carries no status copy of its own: the button is the whole surface', () => {
@@ -79,7 +91,7 @@ describe('DocumentWithAeris pending feedback', () => {
     const { container } = renderWithQuery(
       <DocumentPanel pendingCount={5} onDocument={onDocument} />,
     )
-    await user.click(screen.getByRole('button', { name: /document suite with aeris/i }))
+    await user.click(screen.getByRole('button', { name: /document \(5\)/i }))
 
     await waitFor(() => {
       expect(container.querySelector('.spinner')).not.toBeNull()
@@ -103,7 +115,7 @@ describe('DocumentWithAeris pending feedback', () => {
     )
 
     expect(container.querySelector('.spinner')).toBeNull()
-    expect(screen.getByRole('button', { name: /document suite with aeris/i })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /document \(5\)/i })).toBeEnabled()
   })
 })
 
@@ -111,14 +123,14 @@ describe('DocumentWithAeris primary emphasis', () => {
   it('renders as a dashed secondary chip by default, beside a real primary action', () => {
     renderWithQuery(<DocumentPanel pendingCount={7} onDocument={vi.fn()} />)
 
-    const button = screen.getByRole('button', { name: /document suite with aeris/i })
+    const button = screen.getByRole('button', { name: /document \(7\)/i })
     expect(button.className).toContain('border-dashed')
   })
 
   it('renders as the primary control when it is the only actionable item in the header', () => {
     renderWithQuery(<DocumentPanel pendingCount={7} onDocument={vi.fn()} primary />)
 
-    const button = screen.getByRole('button', { name: /document suite with aeris/i })
+    const button = screen.getByRole('button', { name: /document \(7\)/i })
     expect(button.className).not.toContain('border-dashed')
     expect(button.className).toContain('font-semibold')
   })
@@ -135,7 +147,7 @@ describe('DocumentWithAeris stale locale', () => {
     await user.click(screen.getByRole('button', { name: /redocument 3 outdated/i }))
 
     await waitFor(() => expect(onDocument.mock.calls[0]?.[0]).toBe('stale-locale'))
-    expect(screen.queryByRole('button', { name: /^document suite$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /document \(\d+\)/i })).not.toBeInTheDocument()
   })
 
   it('renders both triggers when both modes apply', () => {
@@ -143,7 +155,7 @@ describe('DocumentWithAeris stale locale', () => {
       <DocumentPanel label="Document suite" pendingCount={2} staleCount={3} onDocument={vi.fn()} />,
     )
 
-    expect(screen.getByRole('button', { name: /^document suite$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /document \(2\)/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /redocument 3 outdated/i })).toBeInTheDocument()
   })
 
@@ -159,7 +171,7 @@ describe('DocumentWithAeris stale locale', () => {
     )
 
     expect(container.querySelectorAll('.spinner')).toHaveLength(1)
-    expect(screen.getByRole('button', { name: /^document suite$/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /document \(2\)/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /documenting/i })).toBeDisabled()
   })
 })

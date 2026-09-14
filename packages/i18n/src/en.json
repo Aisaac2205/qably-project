@@ -801,6 +801,7 @@
     "localeNameOther": "another language",
     "documentSuiteWithAeris_one": "Document {{count}} case with Aeris",
     "documentSuiteWithAeris_other": "Document {{count}} cases with Aeris",
+    "documentWithAerisCompact": "Document ({{count}})",
     "documentFilesQueued": "Aeris is documenting {{cases}} cases across {{files}} files.",
     "documentFilesNothingToDo": "There are no automated cases left to document.",
     "documentFilesSettled_one": "Aeris documented {{count}} case in this suite.",
