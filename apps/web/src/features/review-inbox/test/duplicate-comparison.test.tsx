@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { DuplicateComparison } from '@/features/ai-review/components/duplicate-comparison'
-import * as duplicatesApi from '@/features/ai-review/api/duplicates.api'
+import { DuplicateComparison } from '@/features/review-inbox/components/duplicate-comparison'
+import * as duplicatesApi from '@/features/review-inbox/api/duplicates.api'
 
-vi.mock('@/features/ai-review/api/duplicates.api')
+vi.mock('@/features/review-inbox/api/duplicates.api')
 
 function renderComparison(proposalId: string) {
   const client = new QueryClient({

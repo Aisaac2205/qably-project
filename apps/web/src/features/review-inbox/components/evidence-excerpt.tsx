@@ -2,7 +2,7 @@
 
 import { ChatCircleText, Code } from '@phosphor-icons/react'
 import type { Evidence } from '@qably/types'
-import { CodeSnippet } from '@/features/ai-review/components/code-snippet'
+import { CodeSnippet } from './code-snippet'
 import { useTranslation } from '@/lib/i18n'
 import { isChatRequestEvidence } from '@/features/review-inbox/lib/evidence-source'
 

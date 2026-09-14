@@ -20,7 +20,7 @@ import {
 } from '@phosphor-icons/react'
 import { Badge } from '@/components/ui/badge'
 import { EvidenceExcerpt } from '@/features/review-inbox/components/evidence-excerpt'
-import { DuplicateComparison } from '@/features/ai-review/components/duplicate-comparison'
+import { DuplicateComparison } from './duplicate-comparison'
 import { EvidenceList } from '@/components/ui/evidence-list'
 import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useProject } from '@/features/projects/hooks/use-project'

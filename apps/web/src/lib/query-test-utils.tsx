@@ -16,7 +16,7 @@ import {
 import { projectKeys } from '@/features/projects/lib/query-keys'
 import { organizationKeys } from '@/features/organizations/lib/query-keys'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
-import { duplicateKeys } from '@/features/ai-review/lib/query-keys'
+import { duplicateKeys } from '@/features/review-inbox/lib/query-keys'
 import { getSnapshot } from '@/lib/mock-store'
 import {
   PROPOSAL_STATUSES,

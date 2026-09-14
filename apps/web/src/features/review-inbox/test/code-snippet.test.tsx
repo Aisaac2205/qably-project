@@ -1,6 +1,6 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
-import { CodeSnippet } from '@/features/ai-review/components/code-snippet'
+import { CodeSnippet } from '@/features/review-inbox/components/code-snippet'
 
 describe('CodeSnippet', () => {
   it('renders code in pre/code tags', async () => {
