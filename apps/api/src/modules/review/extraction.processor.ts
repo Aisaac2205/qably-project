@@ -12,8 +12,11 @@ import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import type {
   ExtractedCase,
   ExtractedSuite,
+  ExtractionInput,
+  ExtractionOutcome,
   TestCaseExtractor,
 } from '../ai/extraction.contracts';
+import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
@@ -27,6 +30,7 @@ import {
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import { locateAndPersistAutomationFilePath } from './lib/locate-and-persist-automation-file-path';
+import { incompleteExtractionNote } from './lib/incomplete-extraction-note';
 import {
   EXTRACTION_QUEUE,
   type DocumentFileTarget,
@@ -34,10 +38,12 @@ import {
 } from './review.contracts';
 
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
+const MAX_CASE_OBSERVATIONS = 5;
 const HEAD_REF = 'HEAD';
 const NOT_ENTITLED_REASON = 'ai-not-enabled';
 const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
 const NO_TESTS_FOUND_REASON = 'no-tests-found';
+const EXTRACTION_INCOMPLETE_REASON = 'extraction-incomplete';
 const EXTRACTION_FAILED_REASON = 'extraction-failed';
 const QUOTA_EXHAUSTED_REASON = 'quota-exhausted';
 const NOT_BYOK = { isByok: false };
@@ -480,13 +486,19 @@ export class ExtractionProcessor extends WorkerHost {
 
     const locale = resolveLocale(ctx.locale);
 
-    const outcome = await this.extractor.extract({
-      filePath: ctx.filePath,
-      language: detectLanguage(ctx.filePath),
-      content: source.content,
-      locale,
-      targetAutomationKeys: ctx.targets.map((target) => target.automationKey),
-    });
+    const { outcome, incomplete, declarationCount } =
+      await this.extractWithDeclarationRetry(
+        {
+          filePath: ctx.filePath,
+          language: detectLanguage(ctx.filePath),
+          content: source.content,
+          locale,
+          targetAutomationKeys: ctx.targets.map(
+            (target) => target.automationKey,
+          ),
+        },
+        source.content,
+      );
 
     if (outcome.kind === 'provider-unavailable') {
       await this.fallbackForTargets(ctx, ctx.targets, outcome.reason);
@@ -497,11 +509,22 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
         return;
       }
-      await this.fallbackForTargets(ctx, ctx.targets, NO_TESTS_FOUND_REASON);
+      await this.fallbackForTargets(
+        ctx,
+        ctx.targets,
+        incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
+        incomplete
+          ? [incompleteExtractionNote(0, declarationCount, locale)]
+          : undefined,
+      );
       return;
     }
 
-    const deduped = dedupeByAutomationKey(outcome.cases);
+    const deduped = this.applyIncompleteExtractionNote(
+      dedupeByAutomationKey(outcome.cases),
+      declarationCount,
+      locale,
+    );
     const byAutomationKey = new Map(
       deduped.map((testCase) => [
         normalizeAutomationKey(testCase.automationKey),
@@ -545,6 +568,55 @@ export class ExtractionProcessor extends WorkerHost {
     if (unmatched.length > 0) {
       await this.fallbackForTargets(ctx, unmatched, NO_MATCHING_CASE_REASON);
     }
+  }
+
+  private async extractWithDeclarationRetry(
+    extractInput: ExtractionInput,
+    content: string,
+  ): Promise<{
+    outcome: ExtractionOutcome;
+    incomplete: boolean;
+    declarationCount: number;
+  }> {
+    const declarationCount = countTestDeclarations(
+      content,
+      extractInput.language,
+    );
+    const outcome = await this.extractor.extract(extractInput);
+
+    if (outcome.kind !== 'no-tests-found' || declarationCount === 0) {
+      return { outcome, incomplete: false, declarationCount };
+    }
+
+    const retried = await this.extractor.extract({
+      ...extractInput,
+      declarationCountHint: declarationCount,
+    });
+
+    return {
+      outcome: retried,
+      incomplete: retried.kind === 'no-tests-found',
+      declarationCount,
+    };
+  }
+
+  private applyIncompleteExtractionNote(
+    cases: readonly ExtractedCase[],
+    declarationCount: number,
+    locale: 'es' | 'en',
+  ): ExtractedCase[] {
+    if (declarationCount === 0 || cases.length >= declarationCount) {
+      return [...cases];
+    }
+
+    const note = incompleteExtractionNote(cases.length, declarationCount, locale);
+
+    return cases.map((testCase) => {
+      const observations = testCase.observations ?? [];
+      if (observations.length >= MAX_CASE_OBSERVATIONS) return testCase;
+
+      return { ...testCase, observations: [...observations, note] };
+    });
   }
 
   private async spendCreditOrFallbackForTargets(
@@ -703,6 +775,7 @@ export class ExtractionProcessor extends WorkerHost {
     ctx: DocumentFileJobContext,
     targets: readonly DocumentFileTarget[],
     reason: string,
+    observations?: string[],
   ): Promise<void> {
     for (const target of targets) {
       await this.persistManualReviewFallback(
@@ -720,6 +793,7 @@ export class ExtractionProcessor extends WorkerHost {
           locale: ctx.locale,
         },
         reason,
+        observations,
       );
     }
   }
@@ -776,15 +850,19 @@ export class ExtractionProcessor extends WorkerHost {
 
     const locale = resolveLocale(ctx.locale);
 
-    const outcome = await this.extractor.extract({
-      filePath: ctx.filePath,
-      language: detectLanguage(ctx.filePath),
-      content: source.content,
-      locale,
-      ...(ctx.onlyAutomationKey === null
-        ? {}
-        : { automationKey: ctx.onlyAutomationKey }),
-    });
+    const { outcome, incomplete, declarationCount } =
+      await this.extractWithDeclarationRetry(
+        {
+          filePath: ctx.filePath,
+          language: detectLanguage(ctx.filePath),
+          content: source.content,
+          locale,
+          ...(ctx.onlyAutomationKey === null
+            ? {}
+            : { automationKey: ctx.onlyAutomationKey }),
+        },
+        source.content,
+      );
 
     if (outcome.kind === 'provider-unavailable') {
       await this.persistManualReviewFallback(ctx, outcome.reason);
@@ -795,14 +873,28 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallback(ctx))) return;
 
       if (ctx.targetTestCaseId !== null) {
-        await this.persistManualReviewFallback(ctx, NO_TESTS_FOUND_REASON);
+        await this.persistManualReviewFallback(
+          ctx,
+          incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
+          incomplete
+            ? [incompleteExtractionNote(0, declarationCount, locale)]
+            : undefined,
+        );
         return;
       }
-      this.logger.log(`No tests found in ${ctx.filePath}`);
+      this.logger.log(
+        incomplete
+          ? `Aeris found ${declarationCount} test declaration(s) in ${ctx.filePath} but could not extract them`
+          : `No tests found in ${ctx.filePath}`,
+      );
       return;
     }
 
-    const deduped = dedupeByAutomationKey(outcome.cases);
+    const deduped = this.applyIncompleteExtractionNote(
+      dedupeByAutomationKey(outcome.cases),
+      declarationCount,
+      locale,
+    );
     const cases =
       ctx.onlyAutomationKey === null
         ? deduped
@@ -1122,6 +1214,7 @@ export class ExtractionProcessor extends WorkerHost {
   private async persistManualReviewFallback(
     ctx: JobContext,
     reason: string,
+    observations?: string[],
   ): Promise<void> {
     const existing =
       ctx.codeChangeId !== null
@@ -1159,6 +1252,9 @@ export class ExtractionProcessor extends WorkerHost {
         needsManualReview: true,
         promptVersion: EXTRACTION_PROMPT_VERSION,
         locale: ctx.locale ?? null,
+        ...(observations === undefined || observations.length === 0
+          ? {}
+          : { observations }),
       },
     });
   }

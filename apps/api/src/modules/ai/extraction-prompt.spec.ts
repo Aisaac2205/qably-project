@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v7');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v8');
   });
 });
 
@@ -93,6 +93,33 @@ describe('buildSystemInstruction', () => {
       expect(instruction).toContain(TARGET_CASES_OPEN);
       expect(instruction).toContain('"automationKey"');
     }
+  });
+
+  it('enumerates the extra JUnit annotations, Kotlin backtick names and *.each tables', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+
+      expect(instruction).toContain('@ParameterizedTest');
+      expect(instruction).toContain('@RepeatedTest');
+      expect(instruction).toContain('@TestFactory');
+      expect(instruction).toContain('@TestTemplate');
+      expect(instruction).toContain('@Nested');
+      expect(instruction).toContain('it.each');
+      expect(instruction).toContain('test.each');
+      expect(instruction).toContain('describe.each');
+    }
+  });
+
+  it('adds a declaration-count sentence naming the count only when a hint is given', () => {
+    expect(buildSystemInstruction('en')).not.toContain(
+      'The file contains 5 test declarations',
+    );
+    expect(buildSystemInstruction('en', false, 5)).toContain(
+      'The file contains 5 test declarations',
+    );
+    expect(buildSystemInstruction('es', false, 5)).toContain(
+      'El archivo contiene 5 declaraciones de prueba',
+    );
   });
 });
 

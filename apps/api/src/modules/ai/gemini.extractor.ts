@@ -136,6 +136,7 @@ export class GeminiExtractor implements TestCaseExtractor {
           systemInstruction: buildSystemInstruction(
             input.locale,
             (input.targetAutomationKeys?.length ?? 0) > 0,
+            input.declarationCountHint,
           ),
           responseMimeType: 'application/json',
           responseJsonSchema: RESPONSE_JSON_SCHEMA,

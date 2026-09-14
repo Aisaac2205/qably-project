@@ -57,6 +57,7 @@ export interface ExtractionInput {
   readonly automationKey?: string;
   readonly targetAutomationKeys?: readonly string[];
   readonly locale: 'es' | 'en';
+  readonly declarationCountHint?: number;
 }
 
 export interface TokenUsage {

@@ -104,13 +104,22 @@ When every step — the three in `resolveAutomationFilePath` and the tree locato
 | Organization is not entitled to AI (see below) | code-change and document-case | `ai-not-enabled` |
 | `SourceReader` could not read the file | code-change and document-case | the reader's reason (e.g. `http-404`, `timeout`, `fetch-failed`) |
 | Credit decrement failed after a successful model call (race with another job) | code-change and document-case | `ai-not-enabled` |
-| Model reports no test declarations at all | **document-case only** | `no-tests-found` |
+| Model reports no test declarations, and the source genuinely has none (`countTestDeclarations` agrees) | **document-case only** | `no-tests-found` |
+| Model reports no test declarations, but `countTestDeclarations` found some in the source — even after one retry with the count named in the prompt | **document-case only** | `extraction-incomplete` |
 | Model returns cases, but none match the target case's `automationKey` | **document-case only** | `automation-key-not-found` |
 | Model call fails (invalid credentials, timeout, schema violation, empty response) | code-change and document-case | the provider's reason (e.g. `invalid-credentials`) |
 | An uncaught error is thrown anywhere in the extraction path | code-change and document-case | `extraction-failed` |
 | The platform's daily Aeris budget is spent | all three job kinds | `quota-exhausted` |
 
 For a **code-change** job, "no test declarations found" and "no case for a specific key" do not apply — a code-change extraction persists whatever cases the model found, with no single case to match against. A document-case job always targets exactly one existing automated case, so any outcome that doesn't produce that case ends in the fallback instead of silently doing nothing.
+
+### Trusting the source over the model when it reports zero
+
+A model call answering `no-tests-found` is ambiguous: the file might genuinely have no tests, or the model might have missed them. `countTestDeclarations` (`apps/api/src/modules/ai/count-test-declarations.ts`) is a cheap, deterministic, regex-based count of test declarations per language (`it`/`test` including `.only`/`.skip`/`.each` and its template-literal form for JS/TS, `@Test`/`@ParameterizedTest`/`@RepeatedTest`/`@TestFactory`/`@TestTemplate` for Java/Kotlin, `def test_...` for pytest, `TEST`/`TEST_F`/`TEST_P` for gtest, `func Test...` for Go) — it never parses or validates code, so it cannot be fooled the way an LLM's own confidence can, but it also cannot fully replace it, which is exactly why it only ever gates a retry rather than replacing extraction itself.
+
+`ExtractionProcessor.extractWithDeclarationRetry` runs this count once alongside the first model call. When the model says `no-tests-found` and the count is zero, the two agree and the processor keeps the plain `no-tests-found` fallback — no retry, since there's nothing to find. When the model says `no-tests-found` but the count is greater than zero, the processor retries the same file exactly once, with a sentence appended to the system instruction naming the count (`extraction-v8`, `buildSystemInstruction`'s `declarationCountHint` parameter). If the retry still comes back empty, the fallback proposal carries `extraction-incomplete` instead of `no-tests-found` — a distinct reason, because the two mean different things to a reviewer: one says "there was nothing to document," the other says "Aeris saw evidence of tests here and still could not document them, look closer."
+
+When the retry (or the first call) returns fewer cases than the count, extraction did not fail but it likely did not finish — `ExtractionProcessor.applyIncompleteExtractionNote` appends an observation naming both numbers (`"Aeris extracted 2 of 5 test declarations found in this file."`) onto every case in that batch, using the same `observations` mechanism the model's own advisory notes use, so the discrepancy is visible on the proposal instead of silently passing as a complete extraction.
 
 ## File-level documentation
 

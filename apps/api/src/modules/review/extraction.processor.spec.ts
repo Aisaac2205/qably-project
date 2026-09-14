@@ -878,6 +878,85 @@ describe('ExtractionProcessor — document-case job', () => {
     expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-1' });
   });
 
+  const twoDeclarationsSource = () =>
+    fakeSourceReader(
+      jest.fn().mockResolvedValue({
+        kind: 'content',
+        content: "it('adds an item', () => {})\nit('removes an item', () => {})",
+        truncated: false,
+      }),
+    );
+
+  it('retries once with a declaration-count hint when the model first finds no tests but the file has some', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce({ kind: 'no-tests-found' })
+      .mockResolvedValueOnce(extractedOutcome([extractedCase()]));
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, twoDeclarationsSource(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(extract.mock.calls[1][0]).toMatchObject({
+      declarationCountHint: 2,
+    });
+    expect(prisma.extractedProposal.create).toHaveBeenCalled();
+  });
+
+  it('routes to manual review with extraction-incomplete, not no-tests-found, when the retry still finds nothing', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+    const extract = jest.fn().mockResolvedValue({ kind: 'no-tests-found' });
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, twoDeclarationsSource(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({
+      objective: 'extraction-incomplete',
+      needsManualReview: true,
+    });
+  });
+
+  it('never retries and keeps no-tests-found when the file has no test declarations at all', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+    const extract = jest.fn().mockResolvedValue({ kind: 'no-tests-found' });
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(extract).toHaveBeenCalledTimes(1);
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({ objective: 'no-tests-found' });
+  });
+
+  it('appends an observation noting how many cases were extracted out of how many declarations were found', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, twoDeclarationsSource(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data?.observations).toEqual([
+      'Aeris extracted 1 of 2 test declarations found in this file.',
+    ]);
+  });
+
   it('skips when a proposal is already pending for the case (defense in depth)', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
@@ -1276,6 +1355,40 @@ describe('ExtractionProcessor — document-file job', () => {
         expect.objectContaining({
           targetTestCaseId: 'case-2',
           objective: 'no-tests-found',
+        }),
+      ]),
+    );
+  });
+
+  it('fans an extraction-incomplete response out to every target when the file has declarations the model could not extract', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({ kind: 'no-tests-found' }),
+    );
+    const sourceReader = fakeSourceReader(
+      jest.fn().mockResolvedValue({
+        kind: 'content',
+        content: "it('adds an item', () => {})\nit('removes an item', () => {})",
+        truncated: false,
+      }),
+    );
+
+    await build(prisma, sourceReader, extractor).process(documentFileJob());
+
+    const calls = prisma.extractedProposal.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    const objectives = calls.map(([call]) => call.data);
+    expect(objectives).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          targetTestCaseId: 'case-1',
+          objective: 'extraction-incomplete',
+        }),
+        expect.objectContaining({
+          targetTestCaseId: 'case-2',
+          objective: 'extraction-incomplete',
         }),
       ]),
     );

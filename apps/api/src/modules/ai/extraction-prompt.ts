@@ -3,7 +3,7 @@ import {
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v7';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v8';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -32,7 +32,7 @@ El siguiente mensaje es el archivo, delimitado por ${FILE_CONTENT_OPEN} y ${FILE
 
 Describe solo lo que el código verifica realmente. Nunca inventes pasos de interfaz, preparación ni aserciones que no estén presentes en el archivo.
 
-Crea exactamente una entrada por cada declaración de prueba que encuentres: una llamada "it(...)" o "test(...)" (vitest/jest, incluida la salida de jest-junit), un método anotado con "@Test" (JUnit), una macro "TEST(...)"/"TEST_F(...)" (GoogleTest/gtest) o una función "def test_..." (pytest). Ignora funciones auxiliares, fixtures y declaraciones que no sean pruebas.
+Crea exactamente una entrada por cada declaración de prueba que encuentres: una llamada "it(...)" o "test(...)" (vitest/jest, incluida la salida de jest-junit) — incluidas las tablas "it.each(...)"/"test.each(...)" y "describe.each(...)", con una entrada por fila cuando los valores son literales, o una única entrada que describa la tabla en sus steps cuando no lo son; un método anotado con "@Test", "@ParameterizedTest", "@RepeatedTest", "@TestFactory" o "@TestTemplate" (JUnit), incluidos los métodos dentro de una clase "@Nested" y los métodos de Kotlin nombrados con comillas invertidas; una macro "TEST(...)"/"TEST_F(...)" (GoogleTest/gtest); o una función "def test_..." (pytest). Ignora funciones auxiliares, fixtures y declaraciones que no sean pruebas.
 
 "automationKey" debe ser el nombre exacto que el reporter emitiría en tiempo de ejecución para esa prueba, según la convención del propio framework:
 ${AUTOMATION_KEY_RULES}
@@ -55,7 +55,7 @@ The next message is the file, delimited by ${FILE_CONTENT_OPEN} and ${FILE_CONTE
 
 Describe only what the code actually verifies. Never invent UI steps, setup, or assertions that are not present in the file.
 
-Create exactly one entry per test declaration you find: an "it(...)" or "test(...)" call (vitest/jest, including jest-junit output), a "@Test" annotated method (JUnit) or a "TEST(...)"/"TEST_F(...)" macro (GoogleTest/gtest), or a "def test_..." function (pytest). Ignore helper functions, fixtures, and non-test declarations.
+Create exactly one entry per test declaration you find: an "it(...)" or "test(...)" call (vitest/jest, including jest-junit output) — including "it.each(...)"/"test.each(...)" and "describe.each(...)" tables, one entry per row when the row values are literal, or a single entry describing the table in its steps when they are not; a method annotated "@Test", "@ParameterizedTest", "@RepeatedTest", "@TestFactory" or "@TestTemplate" (JUnit), including methods inside an "@Nested" class and Kotlin methods named with backtick strings; a "TEST(...)"/"TEST_F(...)" macro (GoogleTest/gtest); or a "def test_..." function (pytest). Ignore helper functions, fixtures, and non-test declarations.
 
 "automationKey" must be the exact runtime name the test reporter would emit for that test, using the framework's own convention:
 ${AUTOMATION_KEY_RULES}
@@ -77,6 +77,13 @@ const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
   en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit. When a test in the file corresponds to one of those entries, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
 };
 
+const DECLARATION_COUNT_SENTENCE: Record<'es' | 'en', (count: number) => string> = {
+  es: (count) =>
+    `El archivo contiene ${count} declaraciones de prueba; devuelve una entrada por cada una.`,
+  en: (count) =>
+    `The file contains ${count} test declarations; return one entry for each.`,
+};
+
 const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {
   es: `Incluye además un objeto "suite" con "title" (hasta 80 caracteres), "description" (hasta 300 caracteres) y "tags" (hasta 20 etiquetas cortas en lenguaje de negocio, por ejemplo "pagos" o "autenticación") que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
   en: `Also include a "suite" object with "title" (up to 80 characters), "description" (up to 300 characters) and "tags" (up to 20 short business-language labels, for example "payments" or "authentication") summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
@@ -85,10 +92,15 @@ const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {
 export function buildSystemInstruction(
   locale: 'es' | 'en',
   hasTargets = false,
+  declarationCountHint?: number,
 ): string {
-  return hasTargets
+  const base = hasTargets
     ? `${INSTRUCTION[locale]}\n\n${TARGET_CASES_SENTENCE[locale]}\n\n${SUITE_SUMMARY_SENTENCE[locale]}`
     : INSTRUCTION[locale];
+
+  return declarationCountHint === undefined
+    ? base
+    : `${base}\n\n${DECLARATION_COUNT_SENTENCE[locale](declarationCountHint)}`;
 }
 
 function buildTargetCasesBlock(

@@ -141,6 +141,24 @@ describe('GeminiExtractor', () => {
     expect(config.systemInstruction).not.toBe(buildSystemInstruction('es'));
   });
 
+  it('tells the system instruction the declaration count only when a hint is given', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ locale: 'es', declarationCountHint: 5 }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.systemInstruction).toBe(
+      buildSystemInstruction('es', false, 5),
+    );
+    expect(config.systemInstruction).not.toBe(buildSystemInstruction('es'));
+  });
+
   it('returns no-tests-found when the model returns an empty cases array', async () => {
     const client = fakeClient(() =>
       Promise.resolve({
