@@ -1,12 +1,14 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { RepoConnectionProvider } from '@qably/types';
 import { isTestFilePath } from './lib/test-file-pattern';
-import { jaccardScore, tokenize } from './lib/tokenize';
+import { GENERIC_TOKENS, jaccardScore, tokenize } from './lib/tokenize';
 import { SourceReader } from './source-reader';
 
 const TREE_CACHE_TTL_MS = 10 * 60 * 1000;
 const TOP_CANDIDATES = 5;
 const API = 'https://api.github.com';
+const TREE_FETCH_TIMEOUT_MS = 15_000;
+const MIN_LITERAL_LENGTH = 8;
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -40,17 +42,28 @@ function descriptorText(input: LocateInput): string {
     .join(' ');
 }
 
+function isUsableLiteral(literal: string): boolean {
+  if (literal.length < MIN_LITERAL_LENGTH) return false;
+
+  const words = literal
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((word) => word.length > 0);
+
+  return words.some((word) => !GENERIC_TOKENS.has(word));
+}
+
 function titleLiteralsFrom(input: LocateInput): string[] {
   const literals = new Set<string>();
 
   if (input.automationKey !== null && input.automationKey !== undefined) {
     const segments = input.automationKey.split(' > ');
     const last = segments[segments.length - 1]?.trim();
-    if (last !== undefined && last.length > 0) literals.add(last);
+    if (last !== undefined && isUsableLiteral(last)) literals.add(last);
   }
 
   const trimmedName = input.caseName.trim();
-  if (trimmedName.length > 0) literals.add(trimmedName);
+  if (isUsableLiteral(trimmedName)) literals.add(trimmedName);
 
   return [...literals];
 }
@@ -58,6 +71,7 @@ function titleLiteralsFrom(input: LocateInput): string[] {
 @Injectable()
 export class TestFileLocator {
   private readonly cache = new Map<string, CachedTree>();
+  private readonly logger = new Logger(TestFileLocator.name);
 
   constructor(
     private readonly sourceReader: SourceReader,
@@ -68,6 +82,9 @@ export class TestFileLocator {
 
   async locate(input: LocateInput): Promise<string | null> {
     if (input.provider !== 'GITHUB') return null;
+
+    const titleLiterals = titleLiteralsFrom(input);
+    if (titleLiterals.length === 0) return null;
 
     const paths = await this.loadTestFilePaths(input);
     if (paths.length === 0) return null;
@@ -84,8 +101,6 @@ export class TestFileLocator {
       .slice(0, TOP_CANDIDATES);
 
     if (scored.length === 0) return null;
-
-    const titleLiterals = titleLiteralsFrom(input);
 
     for (const candidate of scored) {
       const source = await this.sourceReader.read({
@@ -134,12 +149,23 @@ export class TestFileLocator {
     }
 
     try {
-      const response = await this.fetchImpl(url, { headers });
+      const response = await this.fetchImpl(url, {
+        headers,
+        signal: AbortSignal.timeout(TREE_FETCH_TIMEOUT_MS),
+      });
       if (!response.ok) return [];
 
       const payload = (await response.json()) as {
         tree?: { path?: string; type?: string }[];
+        truncated?: boolean;
       };
+
+      if (payload.truncated === true) {
+        this.logger.warn(
+          `GitHub tree response truncated for ${input.owner}/${input.repo}@${input.ref}; skipping test file location`,
+        );
+        return [];
+      }
 
       return (payload.tree ?? [])
         .filter(

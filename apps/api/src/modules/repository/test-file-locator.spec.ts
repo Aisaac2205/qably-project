@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { TestFileLocator } from './test-file-locator';
 import type { SourceReader } from './source-reader';
 
@@ -193,5 +194,86 @@ describe('TestFileLocator', () => {
     expect((init.headers as Record<string, string>).Authorization).toBe(
       'Bearer token-1',
     );
+  });
+
+  it('applies a request timeout when fetching the repository tree', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(jsonResponse(fakeTree([])));
+    const locator = new TestFileLocator(fakeSourceReader(null), fetchImpl);
+
+    await locator.locate({
+      provider: 'GITHUB',
+      owner: 'acme',
+      repo: 'shop',
+      ref: 'main',
+      automationKey: 'Cart > adds an item',
+      caseName: 'adds an item',
+    });
+
+    const [, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('logs a warning and returns null instead of trusting a truncated repository tree', async () => {
+    const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const fetchImpl = jest.fn().mockResolvedValue(
+      jsonResponse({
+        tree: [{ path: 'src/cart/cart.spec.ts', type: 'blob' }],
+        truncated: true,
+      }),
+    );
+    const sourceReader = fakeSourceReader('adds an item');
+    const locator = new TestFileLocator(sourceReader, fetchImpl);
+
+    const result = await locator.locate({
+      provider: 'GITHUB',
+      owner: 'acme',
+      repo: 'shop',
+      ref: 'main',
+      automationKey: 'Cart > adds an item',
+      caseName: 'adds an item',
+    });
+
+    expect(result).toBeNull();
+    expect(warnSpy).toHaveBeenCalled();
+    const [message] = warnSpy.mock.calls[0] as [string];
+    expect(message).toContain('acme');
+    expect(message).toContain('shop');
+    expect(message).toContain('main');
+
+    warnSpy.mockRestore();
+  });
+
+  it('returns null without fetching the tree when the only candidate literal is shorter than 8 characters', async () => {
+    const fetchImpl = jest.fn();
+    const locator = new TestFileLocator(fakeSourceReader(null), fetchImpl);
+
+    const result = await locator.locate({
+      provider: 'GITHUB',
+      owner: 'acme',
+      repo: 'shop',
+      ref: 'main',
+      automationKey: null,
+      caseName: 'add',
+    });
+
+    expect(result).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('returns null without fetching the tree when every candidate literal is made only of generic tokens', async () => {
+    const fetchImpl = jest.fn();
+    const locator = new TestFileLocator(fakeSourceReader(null), fetchImpl);
+
+    const result = await locator.locate({
+      provider: 'GITHUB',
+      owner: 'acme',
+      repo: 'shop',
+      ref: 'main',
+      automationKey: null,
+      caseName: 'it should',
+    });
+
+    expect(result).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

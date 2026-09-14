@@ -1,7 +1,7 @@
 const SEPARATORS = /[/._\-\s>:]+/;
 const CAMEL_BOUNDARY = /([a-z0-9])([A-Z])/g;
 const MIN_TOKEN_LENGTH = 3;
-const GENERIC_TOKENS = new Set([
+export const GENERIC_TOKENS = new Set([
   'test',
   'spec',
   'src',

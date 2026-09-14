@@ -745,6 +745,73 @@ describe('RunsService.ingest normalized automationKey matching', () => {
   });
 });
 
+describe('RunsService.ingest ambiguous automationKey collisions', () => {
+  const collidingCases = [
+    {
+      id: 'case-1',
+      automationKey: 'Cart > adds an item',
+      name: 'Adds an item (vitest)',
+      automationFilePath: null,
+      automationClassName: null,
+      executionMode: 'automated',
+    },
+    {
+      id: 'case-2',
+      automationKey: 'Cart  adds an item',
+      name: 'Adds an item (jest)',
+      automationFilePath: null,
+      automationClassName: null,
+      executionMode: 'automated',
+    },
+  ];
+
+  it('attributes an ambiguous normalized key to the row with the exact automationKey match and leaves the colliding row untouched', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValueOnce(collidingCases);
+
+    const result = await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'Cart > adds an item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.testCase.createMany).not.toHaveBeenCalled();
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data[0].testCaseId).toBe('case-1');
+  });
+
+  it('never falls back to the normalized match for an ambiguous key and creates a new case instead of guessing', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValueOnce(collidingCases);
+
+    const result = await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'cart > adds an item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+    expect(prisma.testCase.createMany).toHaveBeenCalled();
+  });
+});
+
 describe('RunsService.ingest official case linkage', () => {
   it('projects the linked official case onto the response, since createManyAndReturn cannot select nested relations', async () => {
     const prisma = createPrisma();

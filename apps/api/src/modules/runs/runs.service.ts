@@ -311,19 +311,34 @@ export class RunsService {
       },
     })) as SuiteCaseRow[];
 
+    const byExactKey = new Map<string, SuiteCaseRow>();
     const byNormalizedKey = new Map<string, SuiteCaseRow>();
+    const ambiguousNormalizedKeys = new Set<string>();
+    const byExactName = new Map<string, SuiteCaseRow>();
     const byNormalizedName = new Map<string, SuiteCaseRow>();
+    const ambiguousNormalizedNames = new Set<string>();
     const takenNames = new Set<string>();
 
     for (const row of suiteCases) {
       takenNames.add(row.name);
+
       if (row.automationKey !== null) {
-        byNormalizedKey.set(
-          normalizeAutomationKeyForMatch(row.automationKey),
-          row,
-        );
+        byExactKey.set(row.automationKey, row);
+        const normalizedKey = normalizeAutomationKeyForMatch(row.automationKey);
+        if (byNormalizedKey.has(normalizedKey)) {
+          ambiguousNormalizedKeys.add(normalizedKey);
+        } else {
+          byNormalizedKey.set(normalizedKey, row);
+        }
       }
-      byNormalizedName.set(normalizeAutomationKeyForMatch(row.name), row);
+
+      byExactName.set(row.name, row);
+      const normalizedName = normalizeAutomationKeyForMatch(row.name);
+      if (byNormalizedName.has(normalizedName)) {
+        ambiguousNormalizedNames.add(normalizedName);
+      } else {
+        byNormalizedName.set(normalizedName, row);
+      }
     }
 
     interface CaseBackfillPatch {
@@ -340,11 +355,19 @@ export class RunsService {
       const ref = refByKey.get(key) as RawCaseRef;
       const normalized = normalizeAutomationKeyForMatch(key);
 
-      let match = byNormalizedKey.get(normalized);
+      let match = byExactKey.get(key);
       let needsKeyBackfill = false;
 
+      if (match === undefined && !ambiguousNormalizedKeys.has(normalized)) {
+        match = byNormalizedKey.get(normalized);
+      }
+
       if (match === undefined) {
-        const nameMatch = byNormalizedName.get(normalized);
+        const nameMatch =
+          byExactName.get(key) ??
+          (ambiguousNormalizedNames.has(normalized)
+            ? undefined
+            : byNormalizedName.get(normalized));
         if (
           nameMatch !== undefined &&
           nameMatch.automationKey === null &&
