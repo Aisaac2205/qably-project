@@ -7,6 +7,7 @@ import { NotificationsPublisher } from '../notifications/notifications.publisher
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
+import { normalizeAutomationKeyForMatch } from './lib/normalize-automation-key';
 import {
   CASE_READ_SELECT,
   CASE_SELECT,
@@ -54,6 +55,15 @@ interface RawCaseRef {
   name: string;
   className?: string;
   filePath?: string;
+}
+
+interface SuiteCaseRow {
+  id: string;
+  name: string;
+  automationKey: string | null;
+  automationClassName?: string | null;
+  automationFilePath?: string | null;
+  executionMode?: string;
 }
 
 interface CaseReloadTx {
@@ -289,53 +299,92 @@ export class RunsService {
     }
     const keys = [...refByKey.keys()];
 
-    const matches = await tx.testCase.findMany({
-      where: {
-        suiteId,
-        OR: [
-          { automationKey: { in: keys } },
-          {
-            automationKey: null,
-            executionMode: 'automated',
-            name: { in: keys },
-          },
-        ],
+    const suiteCases = (await tx.testCase.findMany({
+      where: { suiteId },
+      select: {
+        id: true,
+        name: true,
+        automationKey: true,
+        automationClassName: true,
+        automationFilePath: true,
+        executionMode: true,
       },
-      select: { id: true, name: true, automationKey: true },
-    });
+    })) as SuiteCaseRow[];
+
+    const byNormalizedKey = new Map<string, SuiteCaseRow>();
+    const byNormalizedName = new Map<string, SuiteCaseRow>();
+    const takenNames = new Set<string>();
+
+    for (const row of suiteCases) {
+      takenNames.add(row.name);
+      if (row.automationKey !== null) {
+        byNormalizedKey.set(
+          normalizeAutomationKeyForMatch(row.automationKey),
+          row,
+        );
+      }
+      byNormalizedName.set(normalizeAutomationKeyForMatch(row.name), row);
+    }
+
+    interface CaseBackfillPatch {
+      automationKey?: string;
+      automationFilePath?: string;
+      automationClassName?: string;
+    }
 
     const resultByKey = new Map<string, string>();
-    const legacyMatches: { id: string; name: string }[] = [];
+    const updatesById = new Map<string, CaseBackfillPatch>();
+    const missingKeys: string[] = [];
 
-    for (const match of matches) {
-      if (match.automationKey !== null) {
-        resultByKey.set(match.automationKey, match.id);
-      } else if (keys.includes(match.name)) {
-        legacyMatches.push({ id: match.id, name: match.name });
-        resultByKey.set(match.name, match.id);
+    for (const key of keys) {
+      const ref = refByKey.get(key) as RawCaseRef;
+      const normalized = normalizeAutomationKeyForMatch(key);
+
+      let match = byNormalizedKey.get(normalized);
+      let needsKeyBackfill = false;
+
+      if (match === undefined) {
+        const nameMatch = byNormalizedName.get(normalized);
+        if (
+          nameMatch !== undefined &&
+          nameMatch.automationKey === null &&
+          nameMatch.executionMode === 'automated'
+        ) {
+          match = nameMatch;
+          needsKeyBackfill = true;
+        }
+      }
+
+      if (match === undefined) {
+        missingKeys.push(key);
+        continue;
+      }
+
+      resultByKey.set(key, match.id);
+
+      const patch: CaseBackfillPatch = {};
+      if (needsKeyBackfill) patch.automationKey = key;
+      if ((match.automationFilePath ?? null) === null && ref.filePath !== undefined) {
+        patch.automationFilePath = ref.filePath;
+      }
+      if ((match.automationClassName ?? null) === null && ref.className !== undefined) {
+        patch.automationClassName = ref.className;
+      }
+
+      if (Object.keys(patch).length > 0) {
+        updatesById.set(match.id, { ...(updatesById.get(match.id) ?? {}), ...patch });
       }
     }
 
-    if (legacyMatches.length > 0) {
+    if (updatesById.size > 0) {
       await Promise.all(
-        legacyMatches.map((legacy) =>
-          tx.testCase.update({
-            where: { id: legacy.id },
-            data: { automationKey: legacy.name },
-          }),
+        [...updatesById.entries()].map(([id, data]) =>
+          tx.testCase.update({ where: { id }, data }),
         ),
       );
     }
 
-    const missingKeys = keys.filter((key) => !resultByKey.has(key));
-
     if (missingKeys.length === 0) return resultByKey;
-
-    const existingCases = await tx.testCase.findMany({
-      where: { suiteId },
-      select: { name: true },
-    });
-    const takenNames = new Set(existingCases.map((testCase) => testCase.name));
 
     const toCreate = missingKeys.map((key) => {
       const ref = refByKey.get(key) as RawCaseRef;

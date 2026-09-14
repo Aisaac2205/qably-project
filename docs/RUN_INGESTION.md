@@ -156,16 +156,32 @@ the endpoint.
 
 ## Test case linking
 
-For every reported case, Qably looks up the resolved suite's `TestCase` rows (of any state) by exact,
-case-sensitive name match. A match sets `RunCase.testCaseId`. A name with no match is adopted — see
-"Suite adoption" above — as a new `draft` `TestCase`, which is then linked the same way, so
-`RunCase.testCaseId` is never left `null` because a name was simply unrecognized; it links to a draft
-from the very first report. This is what lets a suite's test cases reflect the latest execution
-automatically, without a human updating them by hand, and without an AI writing the case for them
-either — the case exists, unofficially, until a human promotes it. The full snapshot (`name`, `steps`,
-`expectedResult`) is still stored on `RunCase` even when linked — that is deliberate audit evidence of
-what was actually reported, not redundant with the official test case, which can itself change after
-the run.
+`RunsService.ensureOfficialCases` loads every `TestCase` row of the resolved suite once (regardless of
+state or execution mode) and resolves each reported case against it in memory — it no longer filters the
+match in SQL. Two lookups run in parallel, both keyed by `normalizeAutomationKeyForMatch`
+(`apps/api/src/modules/runs/lib/normalize-automation-key.ts`): official `automationKey`, and — only for a
+row whose `automationKey` is still `null` and whose `executionMode` is `automated` — the case `name` as a
+legacy fallback. `normalizeAutomationKeyForMatch` builds on the review module's
+`normalizeAutomationKey` (trims, collapses whitespace, treats `" > "` and a plain space as the same
+join — vitest emits the former, jest-junit the latter) and additionally lowercases it, so a key that
+only changed reporter or casing still resolves to the same official case; the review module itself stays
+case-preserving on purpose, since proposal deduplication there treats a case difference as a real
+difference. A legacy name match backfills `automationKey` onto that row, same as before.
+
+A match whose `automationFilePath` or `automationClassName` is still `null` is backfilled from the
+parsed ref's `filePath`/`className` when the report carries them — a later, richer CI report can fill in
+what an earlier one left blank. An already-set field is never overwritten by a later report. All
+backfills for a run are batched into one `testCase.update` per row (merging a legacy key backfill and a
+file/class backfill together when both apply) inside the ingest transaction.
+
+A key with no match at all is adopted — see "Suite adoption" above — as a new `draft` `TestCase`, which
+is then linked the same way, so `RunCase.testCaseId` is never left `null` because a key was simply
+unrecognized; it links to a draft from the very first report. This is what lets a suite's test cases
+reflect the latest execution automatically, without a human updating them by hand, and without an AI
+writing the case for them either — the case exists, unofficially, until a human promotes it. The full
+snapshot (`name`, `steps`, `expectedResult`) is still stored on `RunCase` even when linked — that is
+deliberate audit evidence of what was actually reported, not redundant with the official test case,
+which can itself change after the run.
 
 ## Idempotency
 
