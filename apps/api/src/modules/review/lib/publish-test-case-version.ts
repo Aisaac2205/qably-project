@@ -93,6 +93,8 @@ export async function publishTestCaseVersion(
     data: {
       currentVersionId: version.id,
       name: fields.title,
+      objective: fields.objective,
+      preconditions: fields.preconditions,
       steps: fields.steps,
       expectedResult: fields.expectedResult,
       ...caseOverrides,

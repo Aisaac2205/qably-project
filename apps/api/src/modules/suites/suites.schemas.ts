@@ -3,6 +3,8 @@ import { z } from 'zod';
 const name = z.string().trim().min(1).max(120);
 const description = z.string().trim().max(1000);
 const tags = z.array(z.string().trim().min(1).max(40)).max(20);
+const objective = z.string().trim().max(500);
+const preconditions = z.array(z.string().trim().min(1).max(300)).max(20);
 const steps = z.array(z.string().trim().min(1).max(500)).max(50);
 const expectedResult = z.string().trim().max(1000);
 const priority = z.enum(['critical', 'high', 'medium', 'low']);
@@ -29,6 +31,8 @@ export const updateSuiteSchema = z
 
 export const createCaseSchema = z.object({
   name,
+  objective: objective.default(''),
+  preconditions: preconditions.default([]),
   steps: steps.default([]),
   expectedResult: expectedResult.default(''),
   priority: priority.default('medium'),
@@ -38,6 +42,8 @@ export const createCaseSchema = z.object({
 export const updateCaseSchema = z
   .object({
     name: name.optional(),
+    objective: objective.optional(),
+    preconditions: preconditions.optional(),
     steps: steps.optional(),
     expectedResult: expectedResult.optional(),
     priority: priority.optional(),

@@ -170,6 +170,8 @@ export interface TestCase {
   suiteId: string
   version: number | null
   name: string
+  objective: string
+  preconditions: string[]
   steps: string[]
   expectedResult: string
   priority: CasePriority

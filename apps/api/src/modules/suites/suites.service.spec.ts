@@ -23,6 +23,8 @@ const suiteRow = {
       id: 'case-1',
       suiteId: 'suite-1',
       name: 'Adds to cart',
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
       steps: ['open', 'add'],
       expectedResult: 'cart has one item',
       priority: 'medium' as const,
@@ -166,6 +168,18 @@ describe('SuitesService.list', () => {
 
     expect(suite.createdAt).toBe('2026-01-01T00:00:00.000Z');
     expect(suite.cases).toHaveLength(1);
+  });
+
+  it('exposes objective and preconditions on each case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].objective).toBe(
+      'Verify the cart accepts a new item',
+    );
+    expect(suite.cases[0].preconditions).toEqual(['The cart is empty']);
   });
 });
 
@@ -416,6 +430,8 @@ describe('SuitesService.confirmDocumentation', () => {
 describe('SuitesService case mutations', () => {
   const caseInput = {
     name: 'Removes from cart',
+    objective: '',
+    preconditions: [],
     steps: [],
     expectedResult: '',
     priority: 'medium' as const,
@@ -432,6 +448,41 @@ describe('SuitesService case mutations', () => {
     ];
     expect(call[0].data.position).toBe(1);
     expect(call[0].data.suiteId).toBe('suite-1');
+  });
+
+  it('forwards objective and preconditions to the created case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).addCase(owner, 'suite-1', {
+      ...caseInput,
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
+    });
+
+    const [call] = prisma.testCase.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).toMatchObject({
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
+    });
+  });
+
+  it('forwards an objective and preconditions patch to the case update', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).updateCase(owner, 'suite-1', 'case-1', {
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        objective: 'Verify the cart accepts a new item',
+        preconditions: ['The cart is empty'],
+      },
+    });
   });
 
   it('never sets execution mode or automation fields, leaving the manual default in place', async () => {

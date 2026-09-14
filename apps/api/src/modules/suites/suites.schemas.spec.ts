@@ -44,6 +44,19 @@ describe('createCaseSchema', () => {
     expect(parsed.priority).toBe('medium');
     expect(parsed.state).toBe('active');
     expect(parsed.steps).toEqual([]);
+    expect(parsed.objective).toBe('');
+    expect(parsed.preconditions).toEqual([]);
+  });
+
+  it('accepts an objective and a list of preconditions', () => {
+    const parsed = createCaseSchema.parse({
+      name: 'Adds to cart',
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
+    });
+
+    expect(parsed.objective).toBe('Verify the cart accepts a new item');
+    expect(parsed.preconditions).toEqual(['The cart is empty']);
   });
 
   it('rejects a step that is only whitespace', () => {
@@ -76,5 +89,17 @@ describe('updateCaseSchema', () => {
     });
 
     expect(parsed).toEqual({ name: 'Renamed' });
+  });
+
+  it('accepts an objective and preconditions patch', () => {
+    const parsed = updateCaseSchema.parse({
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
+    });
+
+    expect(parsed).toEqual({
+      objective: 'Verify the cart accepts a new item',
+      preconditions: ['The cart is empty'],
+    });
   });
 });

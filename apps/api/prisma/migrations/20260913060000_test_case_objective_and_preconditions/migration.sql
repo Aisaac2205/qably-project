@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "test_case" ADD COLUMN IF NOT EXISTS "objective" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "test_case" ADD COLUMN IF NOT EXISTS "preconditions" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

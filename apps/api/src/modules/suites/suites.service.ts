@@ -45,6 +45,8 @@ const CASE_SELECT = {
   id: true,
   suiteId: true,
   name: true,
+  objective: true,
+  preconditions: true,
   steps: true,
   expectedResult: true,
   priority: true,
@@ -74,6 +76,8 @@ interface CaseRow {
   id: string;
   suiteId: string;
   name: string;
+  objective: string;
+  preconditions: string[];
   steps: string[];
   expectedResult: string;
   priority: 'critical' | 'high' | 'medium' | 'low';
@@ -173,6 +177,8 @@ function toCaseView(testCase: CaseRow, orgDefaultLocale: Locale): TestCaseView {
       orgDefaultLocale,
     ),
     name: testCase.name,
+    objective: testCase.objective,
+    preconditions: testCase.preconditions,
     steps: testCase.steps,
     expectedResult: testCase.expectedResult,
     priority: testCase.priority,

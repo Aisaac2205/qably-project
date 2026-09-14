@@ -316,6 +316,8 @@ describe('ReviewService.approve', () => {
       data: {
         currentVersionId: 'version-1',
         name: 'Empties the cart',
+        objective: 'Confirm the cart resets',
+        preconditions: ['A signed-in user'],
         steps: ['Open the cart', 'Remove every item'],
         expectedResult: 'The cart shows zero items',
         priority: 'high',
@@ -344,6 +346,8 @@ describe('ReviewService.approve', () => {
       data: {
         currentVersionId: 'version-2',
         name: 'Empties the cart from the mini basket',
+        objective: 'Confirm the cart resets',
+        preconditions: ['A signed-in user'],
         steps: ['Open the mini basket', 'Remove every item'],
         expectedResult: 'The mini basket shows zero items',
         priority: 'high',
@@ -371,6 +375,8 @@ describe('ReviewService.approve', () => {
       data: {
         currentVersionId: 'version-2',
         name: 'Empties the cart',
+        objective: 'Confirm the cart resets',
+        preconditions: ['A signed-in user'],
         steps: ['Open the cart', 'Remove every item'],
         expectedResult: 'The cart shows zero items',
         priority: 'high',

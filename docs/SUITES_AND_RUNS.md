@@ -177,10 +177,20 @@ The UI hides the version badge and the library link rather than inventing them.
 
 ## Case content, and the empty case
 
-`test_case` holds a copy of its current version's `name`, `steps`, `expected_result` and `priority`;
-`test_case_version` is the immutable history. Every writer that publishes a version must update both rows
-in the same transaction — `ReviewService.publish` does. The duplication is deliberate, so the invariant
-has to be honoured by every future writer, not just that one.
+`test_case` holds a copy of its current version's `name`, `objective`, `preconditions`, `steps`,
+`expected_result` and `priority`; `test_case_version` is the immutable history. Every writer that
+publishes a version must update both rows in the same transaction. `publishTestCaseVersion`
+(`apps/api/src/modules/review/lib/publish-test-case-version.ts`) is the single choke point for this —
+both the approval flow (`ReviewService.publish`) and the direct-documentation write-through
+(`ExtractionProcessor.persistDocumentFileTargets`) call it, so the mirroring only has to be correct in
+one place. The duplication is deliberate, so the invariant has to be honoured by every future writer,
+not just that one.
+
+`objective` and `preconditions` are the IEEE 829 fields the extractor has produced since
+`extraction-v7` but that, before this, only reached `ExtractedProposal` and `TestCaseVersion` — the
+official `test_case` row (and therefore the suites read model and the case card) silently dropped them
+on every publish. Manual case create/update also accepts them now (`suites.schemas.ts`), bounded the
+same way the UI already bounds objective/precondition text.
 
 A case with no steps is a normal, expected state. Three producers create it:
 

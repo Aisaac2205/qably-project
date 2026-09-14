@@ -95,6 +95,18 @@ describe('publishTestCaseVersion', () => {
     });
   });
 
+  it('mirrors objective and preconditions onto the case update', async () => {
+    const tx = fakeTx();
+
+    await publishTestCaseVersion(tx, 'case-1', fields());
+
+    const updateCall = lastCall<UpdateCallArgs>(tx.testCase.update);
+    expect(updateCall.data).toMatchObject({
+      objective: 'Verify the cart total updates',
+      preconditions: ['The cart is empty'],
+    });
+  });
+
   it('does not touch priority or state on the case unless explicitly overridden', async () => {
     const tx = fakeTx();
 
