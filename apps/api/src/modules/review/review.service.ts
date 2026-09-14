@@ -54,6 +54,7 @@ const VIEW_SELECT = {
   observations: true,
   createdAt: true,
   evidence: { select: { title: true } },
+  targetTestCase: { select: { suiteId: true } },
 } as const;
 
 interface ViewRow {
@@ -74,6 +75,7 @@ interface ViewRow {
   observations?: unknown;
   createdAt?: Date;
   evidence: { title: string } | null;
+  targetTestCase: { suiteId: string } | null;
 }
 
 function observationsOf(raw: unknown): string[] | undefined {
@@ -127,6 +129,9 @@ function toView(row: ViewRow, possibleDuplicate = false): ProposalView {
     ...(row.targetTestCaseId === null
       ? {}
       : { targetOfficialTestCaseId: row.targetTestCaseId }),
+    ...(row.targetTestCase === null
+      ? {}
+      : { targetOfficialTestCaseSuiteId: row.targetTestCase.suiteId }),
     ...(possibleDuplicate ? { possibleDuplicate: true } : {}),
   };
 }

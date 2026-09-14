@@ -121,6 +121,8 @@ A model call answering `no-tests-found` is ambiguous: the file might genuinely h
 
 When the retry (or the first call) returns fewer cases than the count, extraction did not fail but it likely did not finish — `ExtractionProcessor.applyIncompleteExtractionNote` appends an observation naming both numbers (`"Aeris extracted 2 of 5 test declarations found in this file."`) onto every case in that batch, using the same `observations` mechanism the model's own advisory notes use, so the discrepancy is visible on the proposal instead of silently passing as a complete extraction.
 
+An `extraction-incomplete` fallback proposal is not a dead end in the review inbox: `ReviewProposalInspector` reads `targetOfficialTestCaseId`/`targetOfficialTestCaseSuiteId` — the review list now selects `targetTestCase.suiteId` alongside the existing `targetTestCaseId`, so the client knows which suite the case lives in without a second request — and, when both are present, offers a "Document again with Aeris" action that calls the same `POST /suites/:id/cases/:caseId/document` endpoint the case card's own "Document again with Aeris" row action uses (`enqueueDocumentCase`, above). The action is scoped to `extraction-incomplete` specifically: a plain `no-tests-found` fallback has nothing to retry.
+
 ## File-level documentation
 
 A repository connected for the first time arrives with every automated case already created by CI and none of them documented. Asking a reviewer to press a per-case button several hundred times is not a workflow, and it bills a model call per case for work the model does per file anyway: the extractor reads a whole test file and can return up to `MAX_EXTRACTED_CASES` cases from that one call.

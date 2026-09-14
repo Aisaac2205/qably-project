@@ -505,6 +505,7 @@ export interface ExtractedProposal {
   evidenceId: string
   needsManualReview: boolean
   targetOfficialTestCaseId?: string
+  targetOfficialTestCaseSuiteId?: string
   possibleDuplicate?: boolean
   locale?: string | null
   observations?: string[]

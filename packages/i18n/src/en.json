@@ -118,6 +118,7 @@
     "manualReviewHint": "There is nothing to publish from this proposal. Document the file by hand, or reject it.",
     "manualReviewReasonExtractionFailed": "The AI provider could not be reached, or returned a response the schema rejected.",
     "manualReviewReasonNoTestsFound": "No test declarations were found in this file.",
+    "manualReviewReasonExtractionIncomplete": "Aeris detected test declarations in this file but could not document them. Try again, or document it by hand.",
     "manualReviewReasonAiNotEnabled": "AI extraction is not enabled for this organization.",
     "manualReviewReasonAutomationKeyNotFound": "No official case matched the automation key this file reports.",
     "aerisObservations": "Aeris observations",

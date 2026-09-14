@@ -19,6 +19,7 @@ const row = {
   priority: 'high',
   evidenceId: 'evidence-1',
   targetTestCaseId: null,
+  targetTestCase: null,
   evidence: { title: 'src/cart.spec.ts' },
 };
 

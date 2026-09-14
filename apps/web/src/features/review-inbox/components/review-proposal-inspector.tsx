@@ -7,6 +7,7 @@ import {
   XCircle,
   ArrowUpRight,
   ShieldCheck,
+  Sparkle,
   Target,
   ClipboardText,
   ListNumbers,
@@ -23,6 +24,7 @@ import { DuplicateComparison } from '@/features/ai-review/components/duplicate-c
 import { EvidenceList } from '@/components/ui/evidence-list'
 import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { useProposal } from '../hooks/use-proposals'
 import { manualReviewReasonKey } from '../lib/manual-review-reason'
 import { useTranslation } from '@/lib/i18n'
@@ -65,6 +67,11 @@ export function ReviewProposalInspector({
   const manualReviewReason = needsManualReview
     ? manualReviewReasonKey(proposal.objective)
     : null
+  const documentCase = useDocumentCase()
+  const canRedocumentCase =
+    manualReviewReason === 'manualReviewReasonExtractionIncomplete' &&
+    proposal.targetOfficialTestCaseId !== undefined &&
+    proposal.targetOfficialTestCaseSuiteId !== undefined
 
   const isPending = proposal.status === 'in_review'
   const isApproved = proposal.status === 'approved'
@@ -173,6 +180,22 @@ export function ReviewProposalInspector({
             <p className="text-xs text-muted leading-relaxed">
               {t('reviewInbox.manualReviewHint')}
             </p>
+            {canRedocumentCase && (
+              <button
+                type="button"
+                onClick={() =>
+                  documentCase.mutate({
+                    suiteId: proposal.targetOfficialTestCaseSuiteId as string,
+                    caseId: proposal.targetOfficialTestCaseId as string,
+                  })
+                }
+                disabled={documentCase.isPending}
+                className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <Sparkle size={13} weight="bold" aria-hidden="true" />
+                {t('suites.redocumentCase')}
+              </button>
+            )}
           </div>
         )}
 

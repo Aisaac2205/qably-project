@@ -137,6 +137,20 @@ describe('ReviewService.list', () => {
     expect(prisma.testCase.findMany).not.toHaveBeenCalled();
   });
 
+  it('exposes the target case suite id so the client can offer to re-document it in place', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      listRow({
+        targetTestCaseId: 'case-1',
+        targetTestCase: { suiteId: 'suite-9' },
+      }),
+    ]);
+
+    const [view] = await build(prisma).list(org, {});
+
+    expect(view.targetOfficialTestCaseSuiteId).toBe('suite-9');
+  });
+
   it('leaves an untargeted proposal unflagged when nothing in the project resembles it', async () => {
     const prisma = createPrisma();
     prisma.extractedProposal.findMany.mockResolvedValue([

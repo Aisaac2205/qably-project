@@ -18,6 +18,9 @@ describe('manualReviewReasonKey', () => {
     expect(manualReviewReasonKey('quota-exhausted')).toBe(
       'manualReviewReasonQuotaExhausted',
     )
+    expect(manualReviewReasonKey('extraction-incomplete')).toBe(
+      'manualReviewReasonExtractionIncomplete',
+    )
   })
 
   it('returns null for a provider message it cannot translate', () => {
