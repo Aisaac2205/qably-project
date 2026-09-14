@@ -144,7 +144,7 @@ export function RunDetail({
 
       {isEditable ? (
         <div
-          className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 rounded-xl border border-border bg-surface shadow-xs text-xs"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 py-1 text-xs"
           aria-label={t('runs.keyboardShortcuts')}
         >
           <span className="text-xs font-semibold text-muted">
@@ -160,7 +160,7 @@ export function RunDetail({
           ))}
         </div>
       ) : (
-        <div className="flex items-start gap-2 px-4 py-2.5 rounded-xl border border-border bg-canvas/60 text-xs">
+        <div className="flex items-start gap-2 py-1 text-xs">
           <LockSimple
             size={14}
             weight="bold"

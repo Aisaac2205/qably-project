@@ -300,6 +300,73 @@ describe('RunDetail', () => {
   })
 })
 
+describe('RunDetail metadata rows', () => {
+  it('renders the commit and source metadata as inline rows, never inside a card', async () => {
+    const run = {
+      ...getFreshRun(),
+      source: 'github_actions' as const,
+      commitSha: 'b1e4d90',
+      commitMessage: 'fix: checkout button not disabling on empty cart',
+      commitAuthor: 'CI Bot',
+    }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    expect(screen.getByText('b1e4d90')).toBeInTheDocument()
+    expect(screen.getByText(/checkout button not disabling/)).toBeInTheDocument()
+    expect(document.querySelector('[data-slot="card"]')).toBeNull()
+  })
+
+  it('shows a source chip with a tooltip describing where the run came from', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip).toHaveTextContent('CI')
+    await userEvent.hover(chip)
+    expect(await screen.findByText('Reported via GitHub Actions')).toBeInTheDocument()
+  })
+
+  it('keeps the source chip focus-visible and at least 24x24px as an interactive target', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip.className).toContain('focus-visible:outline-2')
+    expect(chip.className).toMatch(/min-h-6/)
+    expect(chip.className).toMatch(/min-w-6/)
+  })
+
+  it('offers to document the selected case with Aeris when it has no documentation yet', async () => {
+    const run = getFreshRun()
+    run.cases = run.cases.map((c, i) =>
+      i === 0
+        ? {
+            ...c,
+            steps: [],
+            expectedResult: '',
+            officialCase: { id: 'tc-1', suiteId: 'suite-1', version: 1, steps: [], expectedResult: '' },
+          }
+        : c,
+    )
+    const user = userEvent.setup()
+    const api = await import('@/test/suites-api-stub')
+    const documentSpy = vi.spyOn(api, 'documentCase')
+
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    await user.click(screen.getByRole('button', { name: /document with aeris/i }))
+    expect(documentSpy).toHaveBeenCalledWith('suite-1', 'tc-1')
+  })
+})
+
 describe('RunDetail what changed', () => {
   it('lists regressed and fixed cases with links to the suite', async () => {
     const run = getFreshRun()

@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import type { RunCaseRecord } from '@qably/types'
-import { ArrowSquareOut } from '@phosphor-icons/react'
+import { ArrowSquareOut, Sparkle } from '@phosphor-icons/react'
 import { StatusChip } from './status-chip'
+import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
+import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 
 function formatDuration(ms: number, locale: string): string {
   if (ms < 1000) {
@@ -26,6 +28,7 @@ export function CaseDetail({
   const officialCase = c.officialCase
   const described = describeCase(c)
   const showRawName = described.raw !== described.title
+  const documentCase = useDocumentCase()
 
   return (
     <div className="space-y-5 p-5 sm:p-6">
@@ -116,13 +119,29 @@ export function CaseDetail({
       )}
 
       {c.steps.length === 0 && c.expectedResult === '' && (
-        <div className="space-y-1 rounded-lg border border-dashed border-border bg-canvas/40 p-3 sm:p-4">
-          <p className="text-xs font-semibold text-default">
-            {t('runs.undocumentedCase')}
-          </p>
-          <p className="text-xs text-muted leading-relaxed">
-            {t('runs.undocumentedCaseHint')}
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3 py-1">
+          <div className="space-y-1 min-w-0">
+            <p className="text-xs font-semibold text-default">
+              {t('runs.undocumentedCase')}
+            </p>
+            <p className="text-xs text-muted leading-relaxed">
+              {t('runs.undocumentedCaseHint')}
+            </p>
+          </div>
+          {officialCase && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                documentCase.mutate({ suiteId: officialCase.suiteId, caseId: officialCase.id })
+              }
+              disabled={documentCase.isPending}
+            >
+              <Sparkle size={14} aria-hidden="true" />
+              {t('runs.documentWithAeris')}
+            </Button>
+          )}
         </div>
       )}
 

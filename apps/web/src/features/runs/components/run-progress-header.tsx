@@ -2,7 +2,7 @@
 
 import type { RunRecord } from '@qably/types'
 import { GitCommit } from '@phosphor-icons/react'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
@@ -27,6 +27,12 @@ const SOURCE_LABELS: Record<string, string> = {
   github_actions: 'runs.sourceCi',
 }
 
+const SOURCE_TOOLTIP_KEYS: Record<string, string> = {
+  manual: 'runs.sourceTooltipManual',
+  api: 'runs.sourceTooltipApi',
+  github_actions: 'runs.sourceTooltipCi',
+}
+
 function computePassRate(run: RunRecord): number {
   return run.cases.length === 0
     ? 0
@@ -39,19 +45,19 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
   const passRateDisplay = formatPassRate(computePassRate(run))
   const sourceLabelKey = SOURCE_LABELS[run.source]
   const sourceLabel = sourceLabelKey ? t(sourceLabelKey) : run.source
+  const sourceTooltipKey = SOURCE_TOOLTIP_KEYS[run.source]
+  const sourceTooltip = sourceTooltipKey ? t(sourceTooltipKey) : sourceLabel
 
   return (
-    <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
-      <CardHeader className="flex-row items-center justify-between gap-4 py-4 sm:py-5 px-5 sm:px-6">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-4 py-1">
         <div className="min-w-0 flex items-center gap-3">
           <StatusChip status={run.status} />
           <div className="min-w-0 space-y-0.5">
-            <CardTitle className="text-base font-semibold text-default truncate">
+            <h2 className="text-base font-semibold leading-tight tracking-tight text-default truncate">
               {run.name}
-            </CardTitle>
-            <CardDescription className="text-xs text-muted truncate">
-              {suite?.name ?? ''}
-            </CardDescription>
+            </h2>
+            <p className="text-sm text-muted-foreground truncate">{suite?.name ?? ''}</p>
           </div>
         </div>
 
@@ -62,10 +68,15 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
               {passRateDisplay}
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs font-medium text-muted">{t('runs.source')}</div>
-            <div className="text-sm font-semibold text-default">{sourceLabel}</div>
-          </div>
+          <Tooltip>
+            <TooltipTrigger
+              data-testid="run-source-chip"
+              className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full border border-border/80 bg-canvas px-2.5 py-1 text-xs font-semibold text-default focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {sourceLabel}
+            </TooltipTrigger>
+            <TooltipContent>{sourceTooltip}</TooltipContent>
+          </Tooltip>
           <div className="hidden sm:block text-right">
             <div className="text-xs font-medium text-muted">{t('runs.started')}</div>
             <div className="text-sm text-default">{formatDate(run.startedAt)}</div>
@@ -77,39 +88,36 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
             </div>
           )}
         </div>
-      </CardHeader>
+      </div>
 
-      {/* CI commit info — only shown when run has commit metadata */}
       {run.source === 'github_actions' && run.commitSha && (
-        <CardContent className="pb-4 -mt-2">
-          <div
-            className="flex items-start gap-3 px-3 py-2.5 rounded-md bg-canvas border border-border text-sm"
-            data-testid="run-commit-info"
-          >
-            <GitCommit
-              size={16}
-              weight="duotone"
-              className="text-muted shrink-0 mt-0.5"
-              aria-hidden="true"
-            />
-            <div className="min-w-0 flex-1 space-y-0.5">
-              {run.commitMessage && (
-                <p className="text-default text-wrap-pretty line-clamp-2">
-                  {run.commitMessage}
-                </p>
+        <div
+          className="flex items-start gap-3 py-1.5"
+          data-testid="run-commit-info"
+        >
+          <GitCommit
+            size={16}
+            weight="duotone"
+            className="text-muted shrink-0 mt-0.5"
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1 space-y-0.5">
+            {run.commitMessage && (
+              <p className="text-default text-wrap-pretty line-clamp-2">
+                {run.commitMessage}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+              <span className="font-mono">{run.commitSha.slice(0, 7)}</span>
+              {run.commitAuthor && (
+                <span>
+                  {t('runs.byAuthor')}<span className="text-default">{run.commitAuthor}</span>
+                </span>
               )}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-                <span className="font-mono">{run.commitSha.slice(0, 7)}</span>
-                {run.commitAuthor && (
-                  <span>
-                    {t('runs.byAuthor')}<span className="text-default">{run.commitAuthor}</span>
-                  </span>
-                )}
-              </div>
             </div>
           </div>
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </div>
   )
 }
