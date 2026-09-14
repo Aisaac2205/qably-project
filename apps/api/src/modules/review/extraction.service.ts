@@ -167,7 +167,11 @@ export class ExtractionService {
         project: {
           select: {
             connection: {
-              select: { provider: true, repo: true, encryptedAccessToken: true },
+              select: {
+                provider: true,
+                repo: true,
+                encryptedAccessToken: true,
+              },
             },
           },
         },

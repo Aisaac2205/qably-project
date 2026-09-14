@@ -176,9 +176,7 @@ describe('SuitesService.list', () => {
 
     const [suite] = await build(prisma).list(owner);
 
-    expect(suite.cases[0].objective).toBe(
-      'Verify the cart accepts a new item',
-    );
+    expect(suite.cases[0].objective).toBe('Verify the cart accepts a new item');
     expect(suite.cases[0].preconditions).toEqual(['The cart is empty']);
   });
 });

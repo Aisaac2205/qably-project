@@ -364,15 +364,24 @@ export class RunsService {
 
       const patch: CaseBackfillPatch = {};
       if (needsKeyBackfill) patch.automationKey = key;
-      if ((match.automationFilePath ?? null) === null && ref.filePath !== undefined) {
+      if (
+        (match.automationFilePath ?? null) === null &&
+        ref.filePath !== undefined
+      ) {
         patch.automationFilePath = ref.filePath;
       }
-      if ((match.automationClassName ?? null) === null && ref.className !== undefined) {
+      if (
+        (match.automationClassName ?? null) === null &&
+        ref.className !== undefined
+      ) {
         patch.automationClassName = ref.className;
       }
 
       if (Object.keys(patch).length > 0) {
-        updatesById.set(match.id, { ...(updatesById.get(match.id) ?? {}), ...patch });
+        updatesById.set(match.id, {
+          ...(updatesById.get(match.id) ?? {}),
+          ...patch,
+        });
       }
     }
 

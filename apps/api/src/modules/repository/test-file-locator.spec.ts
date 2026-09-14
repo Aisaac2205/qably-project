@@ -15,11 +15,13 @@ function jsonResponse(body: unknown, ok = true): Response {
 
 function fakeSourceReader(content: string | null): SourceReader {
   return {
-    read: jest.fn().mockResolvedValue(
-      content === null
-        ? { kind: 'unavailable', reason: 'http-404' }
-        : { kind: 'content', content, truncated: false },
-    ),
+    read: jest
+      .fn()
+      .mockResolvedValue(
+        content === null
+          ? { kind: 'unavailable', reason: 'http-404' }
+          : { kind: 'content', content, truncated: false },
+      ),
   } as unknown as SourceReader;
 }
 
@@ -70,9 +72,11 @@ describe('TestFileLocator', () => {
   });
 
   it('never returns a non-test file even if its content matches', async () => {
-    const fetchImpl = jest.fn().mockResolvedValue(
-      jsonResponse(fakeTree([{ path: 'src/cart/cart.ts', type: 'blob' }])),
-    );
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(fakeTree([{ path: 'src/cart/cart.ts', type: 'blob' }])),
+      );
     const sourceReader = fakeSourceReader('adds an item');
     const locator = new TestFileLocator(sourceReader, fetchImpl);
 
@@ -89,11 +93,13 @@ describe('TestFileLocator', () => {
   });
 
   it('returns null when no candidate file contains the case title', async () => {
-    const fetchImpl = jest.fn().mockResolvedValue(
-      jsonResponse(
-        fakeTree([{ path: 'src/cart/cart.spec.ts', type: 'blob' }]),
-      ),
-    );
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(
+          fakeTree([{ path: 'src/cart/cart.spec.ts', type: 'blob' }]),
+        ),
+      );
     const sourceReader = fakeSourceReader('describe unrelated content here');
     const locator = new TestFileLocator(sourceReader, fetchImpl);
 
@@ -110,12 +116,19 @@ describe('TestFileLocator', () => {
   });
 
   it('never guesses when the tree has no test files that score any overlap', async () => {
-    const fetchImpl = jest.fn().mockResolvedValue(
-      jsonResponse(
-        fakeTree([{ path: 'src/unrelated/payment.spec.ts', type: 'blob' }]),
-      ),
-    );
-    const sourceReader = fakeSourceReader('does not matter');
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(
+          fakeTree([{ path: 'src/unrelated/payment.spec.ts', type: 'blob' }]),
+        ),
+      );
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'does not matter',
+      truncated: false,
+    });
+    const sourceReader = { read } as unknown as SourceReader;
     const locator = new TestFileLocator(sourceReader, fetchImpl);
 
     const result = await locator.locate({
@@ -128,15 +141,17 @@ describe('TestFileLocator', () => {
     });
 
     expect(result).toBeNull();
-    expect(sourceReader.read).not.toHaveBeenCalled();
+    expect(read).not.toHaveBeenCalled();
   });
 
   it('caches the tree per owner/repo@ref so a second lookup does not refetch', async () => {
-    const fetchImpl = jest.fn().mockResolvedValue(
-      jsonResponse(
-        fakeTree([{ path: 'src/cart/cart.spec.ts', type: 'blob' }]),
-      ),
-    );
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(
+          fakeTree([{ path: 'src/cart/cart.spec.ts', type: 'blob' }]),
+        ),
+      );
     const sourceReader = fakeSourceReader('adds an item');
     const locator = new TestFileLocator(sourceReader, fetchImpl);
 

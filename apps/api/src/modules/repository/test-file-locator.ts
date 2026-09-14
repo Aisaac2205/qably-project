@@ -28,8 +28,15 @@ interface CachedTree {
 }
 
 function descriptorText(input: LocateInput): string {
-  return [input.automationClassName, input.caseName, input.suiteName, input.automationKey]
-    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+  return [
+    input.automationClassName,
+    input.caseName,
+    input.suiteName,
+    input.automationKey,
+  ]
+    .filter(
+      (value): value is string => typeof value === 'string' && value.length > 0,
+    )
     .join(' ');
 }
 
@@ -68,7 +75,10 @@ export class TestFileLocator {
     const descriptorTokens = tokenize(descriptorText(input));
 
     const scored = paths
-      .map((path) => ({ path, score: jaccardScore(tokenize(path), descriptorTokens) }))
+      .map((path) => ({
+        path,
+        score: jaccardScore(tokenize(path), descriptorTokens),
+      }))
       .filter((candidate) => candidate.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, TOP_CANDIDATES);

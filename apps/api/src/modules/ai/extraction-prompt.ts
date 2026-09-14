@@ -77,7 +77,10 @@ const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
   en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit. When a test in the file corresponds to one of those entries, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
 };
 
-const DECLARATION_COUNT_SENTENCE: Record<'es' | 'en', (count: number) => string> = {
+const DECLARATION_COUNT_SENTENCE: Record<
+  'es' | 'en',
+  (count: number) => string
+> = {
   es: (count) =>
     `El archivo contiene ${count} declaraciones de prueba; devuelve una entrada por cada una.`,
   en: (count) =>

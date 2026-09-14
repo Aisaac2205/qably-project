@@ -609,7 +609,11 @@ export class ExtractionProcessor extends WorkerHost {
       return [...cases];
     }
 
-    const note = incompleteExtractionNote(cases.length, declarationCount, locale);
+    const note = incompleteExtractionNote(
+      cases.length,
+      declarationCount,
+      locale,
+    );
 
     return cases.map((testCase) => {
       const observations = testCase.observations ?? [];

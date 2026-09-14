@@ -882,7 +882,8 @@ describe('ExtractionProcessor — document-case job', () => {
     fakeSourceReader(
       jest.fn().mockResolvedValue({
         kind: 'content',
-        content: "it('adds an item', () => {})\nit('removes an item', () => {})",
+        content:
+          "it('adds an item', () => {})\nit('removes an item', () => {})",
         truncated: false,
       }),
     );
@@ -901,9 +902,10 @@ describe('ExtractionProcessor — document-case job', () => {
     } as never);
 
     expect(extract).toHaveBeenCalledTimes(2);
-    expect(extract.mock.calls[1][0]).toMatchObject({
-      declarationCountHint: 2,
-    });
+    const retryCall = extract.mock.calls[1] as [
+      { declarationCountHint?: number },
+    ];
+    expect(retryCall[0]).toMatchObject({ declarationCountHint: 2 });
     expect(prisma.extractedProposal.create).toHaveBeenCalled();
   });
 
@@ -1369,7 +1371,8 @@ describe('ExtractionProcessor — document-file job', () => {
     const sourceReader = fakeSourceReader(
       jest.fn().mockResolvedValue({
         kind: 'content',
-        content: "it('adds an item', () => {})\nit('removes an item', () => {})",
+        content:
+          "it('adds an item', () => {})\nit('removes an item', () => {})",
         truncated: false,
       }),
     );

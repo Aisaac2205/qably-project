@@ -31,7 +31,7 @@ describe('locateAndPersistAutomationFilePath', () => {
     const d = deps();
 
     const result = await locateAndPersistAutomationFilePath(
-      d as never,
+      d,
       input({ connection: null }),
     );
 
@@ -42,7 +42,7 @@ describe('locateAndPersistAutomationFilePath', () => {
   it('splits the repo, decrypts the token and locates against the owner/repo pair', async () => {
     const d = deps();
 
-    await locateAndPersistAutomationFilePath(d as never, input());
+    await locateAndPersistAutomationFilePath(d, input());
 
     expect(d.decrypt).toHaveBeenCalledWith('enc-token');
     expect(d.locate).toHaveBeenCalledWith({
@@ -62,7 +62,7 @@ describe('locateAndPersistAutomationFilePath', () => {
     const d = deps();
 
     await locateAndPersistAutomationFilePath(
-      d as never,
+      d,
       input({
         connection: {
           provider: 'GITHUB',
@@ -78,9 +78,11 @@ describe('locateAndPersistAutomationFilePath', () => {
   });
 
   it('persists and returns the located path when the locator finds one', async () => {
-    const d = deps({ locate: jest.fn().mockResolvedValue('src/cart/cart.spec.ts') });
+    const d = deps({
+      locate: jest.fn().mockResolvedValue('src/cart/cart.spec.ts'),
+    });
 
-    const result = await locateAndPersistAutomationFilePath(d as never, input());
+    const result = await locateAndPersistAutomationFilePath(d, input());
 
     expect(result).toBe('src/cart/cart.spec.ts');
     expect(d.persist).toHaveBeenCalledWith('case-1', 'src/cart/cart.spec.ts');
@@ -89,7 +91,7 @@ describe('locateAndPersistAutomationFilePath', () => {
   it('never persists when the locator finds nothing', async () => {
     const d = deps();
 
-    const result = await locateAndPersistAutomationFilePath(d as never, input());
+    const result = await locateAndPersistAutomationFilePath(d, input());
 
     expect(result).toBeNull();
     expect(d.persist).not.toHaveBeenCalled();

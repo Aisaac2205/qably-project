@@ -1,4 +1,7 @@
-const TEMPLATE: Record<'es' | 'en', (extracted: number, declared: number) => string> = {
+const TEMPLATE: Record<
+  'es' | 'en',
+  (extracted: number, declared: number) => string
+> = {
   es: (extracted, declared) =>
     `Aeris extrajo ${extracted} de ${declared} declaraciones de prueba encontradas en este archivo.`,
   en: (extracted, declared) =>

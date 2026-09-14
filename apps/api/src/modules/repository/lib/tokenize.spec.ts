@@ -6,9 +6,7 @@ describe('tokenize', () => {
   });
 
   it('splits camelCase boundaries, dropping the generic "Test" segment', () => {
-    expect(tokenize('CartCheckoutTest')).toEqual(
-      new Set(['cart', 'checkout']),
-    );
+    expect(tokenize('CartCheckoutTest')).toEqual(new Set(['cart', 'checkout']));
   });
 
   it('lowercases every token', () => {
@@ -45,9 +43,7 @@ describe('jaccardScore', () => {
   });
 
   it('is 0 for disjoint sets', () => {
-    expect(
-      jaccardScore(new Set(['cart']), new Set(['payment'])),
-    ).toBe(0);
+    expect(jaccardScore(new Set(['cart']), new Set(['payment']))).toBe(0);
   });
 
   it('is the intersection over union for partial overlap', () => {

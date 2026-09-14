@@ -23,7 +23,8 @@ describe('countTestDeclarations', () => {
   });
 
   it('counts it.each template literal declarations', () => {
-    const content = "it.each`\n  a | b\n  ${1} | ${2}\n`('adds $a and $b', () => {})";
+    const content =
+      "it.each`\n  a | b\n  ${1} | ${2}\n`('adds $a and $b', () => {})";
 
     expect(countTestDeclarations(content, 'typescript')).toBe(1);
   });
@@ -74,9 +75,7 @@ def test_removes_item():
   });
 
   it('returns 0 for a file with no test declarations', () => {
-    expect(countTestDeclarations('function helper() {}', 'javascript')).toBe(
-      0,
-    );
+    expect(countTestDeclarations('function helper() {}', 'javascript')).toBe(0);
   });
 
   it('returns 0 for an unrecognized language', () => {
