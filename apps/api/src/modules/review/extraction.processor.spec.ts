@@ -3,6 +3,7 @@ import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { EncryptionService } from '../../common/crypto/encryption.service';
 import type { SourceReader } from '../repository/source-reader';
+import type { TestFileLocator } from '../repository/test-file-locator';
 import type { TestCaseExtractor } from '../ai/extraction.contracts';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import { ExtractionProcessor } from './extraction.processor';
@@ -138,6 +139,12 @@ function fakeDailyBudget(
   return { tryConsume } as unknown as AiDailyBudget;
 }
 
+function fakeTestFileLocator(
+  locate: jest.Mock = jest.fn().mockResolvedValue(null),
+): TestFileLocator {
+  return { locate } as unknown as TestFileLocator;
+}
+
 function build(
   prisma: FakePrisma,
   sourceReader: SourceReader,
@@ -145,6 +152,7 @@ function build(
   encryption: EncryptionService = fakeEncryption(),
   entitlement: AiEntitlementService = fakeEntitlement(),
   dailyBudget: AiDailyBudget = fakeDailyBudget(),
+  testFileLocator: TestFileLocator = fakeTestFileLocator(),
 ) {
   return new ExtractionProcessor(
     prisma as never,
@@ -153,6 +161,7 @@ function build(
     encryption,
     entitlement,
     dailyBudget,
+    testFileLocator,
   );
 }
 
@@ -832,6 +841,41 @@ describe('ExtractionProcessor — document-case job', () => {
     } as never);
 
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('locates the file from the repository tree and persists it when nothing else resolves it', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...testCaseRow,
+      automationFilePath: null,
+    });
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+    prisma.testCase.findFirst.mockResolvedValue(null);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+    const testFileLocator = fakeTestFileLocator(
+      jest.fn().mockResolvedValue('src/cart/cart.spec.ts'),
+    );
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(),
+      testFileLocator,
+    ).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { automationFilePath: 'src/cart/cart.spec.ts' },
+    });
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({ targetTestCaseId: 'case-1' });
   });
 
   it('skips when a proposal is already pending for the case (defense in depth)', async () => {

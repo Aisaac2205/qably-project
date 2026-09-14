@@ -15,6 +15,8 @@ import type {
   TestCaseExtractor,
 } from '../ai/extraction.contracts';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
+import { splitRepo } from '../repository/lib/split-repo';
+import { TestFileLocator } from '../repository/test-file-locator';
 import { detectLanguage } from './lib/detect-language';
 import {
   isSameDocumentation,
@@ -24,6 +26,7 @@ import {
 } from './lib/publish-test-case-version';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
+import { locateAndPersistAutomationFilePath } from './lib/locate-and-persist-automation-file-path';
 import {
   EXTRACTION_QUEUE,
   type DocumentFileTarget,
@@ -180,13 +183,6 @@ function isUniqueViolation(error: unknown): boolean {
   );
 }
 
-function splitRepo(full: string): { owner: string; repo: string } {
-  const index = full.indexOf('/');
-  return index === -1
-    ? { owner: full, repo: full }
-    : { owner: full.slice(0, index), repo: full.slice(index + 1) };
-}
-
 function dedupeByAutomationKey(
   cases: readonly ExtractedCase[],
 ): ExtractedCase[] {
@@ -216,6 +212,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly encryption: EncryptionService,
     private readonly entitlement: AiEntitlementService,
     private readonly dailyBudget: AiDailyBudget,
+    private readonly testFileLocator: TestFileLocator,
   ) {
     super();
   }
@@ -291,8 +288,11 @@ export class ExtractionProcessor extends WorkerHost {
         id: true,
         projectId: true,
         suiteId: true,
+        name: true,
         automationKey: true,
         automationFilePath: true,
+        automationClassName: true,
+        suite: { select: { name: true } },
         project: {
           select: {
             organizationId: true,
@@ -319,6 +319,26 @@ export class ExtractionProcessor extends WorkerHost {
         this.prisma,
         testCase.projectId,
         testCase.automationKey,
+        testCase.automationClassName,
+      )) ??
+      (await locateAndPersistAutomationFilePath(
+        {
+          locate: (input) => this.testFileLocator.locate(input),
+          decrypt: (value) => this.encryption.decrypt(value),
+          persist: (id, path) =>
+            this.prisma.testCase
+              .update({ where: { id }, data: { automationFilePath: path } })
+              .then(() => undefined),
+        },
+        {
+          testCaseId: testCase.id,
+          automationKey: testCase.automationKey,
+          automationClassName: testCase.automationClassName,
+          caseName: testCase.name,
+          suiteName: testCase.suite?.name ?? null,
+          connection: testCase.project.connection,
+          ref: HEAD_REF,
+        },
       ));
 
     if (filePath === null) {

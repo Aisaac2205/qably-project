@@ -1,10 +1,22 @@
 import { DEFAULT_LOCALE } from '@qably/i18n';
 import { buildJobId } from '../../common/queue/job-id';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import type { EncryptionService } from '../../common/crypto/encryption.service';
+import type { TestFileLocator } from '../repository/test-file-locator';
 import {
   ExtractionService,
   MAX_DOCUMENT_FILES_PER_REQUEST,
 } from './extraction.service';
+
+function fakeEncryption(decrypt: jest.Mock = jest.fn()): EncryptionService {
+  return { decrypt } as unknown as EncryptionService;
+}
+
+function fakeTestFileLocator(
+  locate: jest.Mock = jest.fn().mockResolvedValue(null),
+): TestFileLocator {
+  return { locate } as unknown as TestFileLocator;
+}
 
 const org: OrgContext = {
   organizationId: 'org-1',
@@ -18,11 +30,11 @@ interface FakeQueue {
 }
 
 interface FakePrisma {
-  testCase: { findFirst: jest.Mock; findMany: jest.Mock };
+  testCase: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
   extractedProposal: { findFirst: jest.Mock; findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
   suite: { findFirst: jest.Mock };
-  project: { findFirst: jest.Mock };
+  project: { findFirst: jest.Mock; findUnique: jest.Mock };
 }
 
 function createQueue(): FakeQueue {
@@ -41,8 +53,13 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
         executionMode: 'automated',
         automationFilePath: 'src/cart.spec.ts',
         automationKey: 'CartTest.addsItem',
+        automationClassName: null,
+        name: 'Adds an item',
+        suite: { name: 'Checkout' },
+        project: { connection: null },
       }),
       findMany: jest.fn().mockResolvedValue([]),
+      update: jest.fn().mockResolvedValue({ id: 'case-1' }),
     },
     extractedProposal: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -60,12 +77,23 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
     },
     project: {
       findFirst: jest.fn().mockResolvedValue({ id: 'proj-1' }),
+      findUnique: jest.fn().mockResolvedValue({ connection: null }),
     },
   };
 }
 
-function build(prisma: FakePrisma, queue: FakeQueue) {
-  return new ExtractionService(prisma as never, queue as never);
+function build(
+  prisma: FakePrisma,
+  queue: FakeQueue,
+  encryption: EncryptionService = fakeEncryption(),
+  testFileLocator: TestFileLocator = fakeTestFileLocator(),
+) {
+  return new ExtractionService(
+    prisma as never,
+    queue as never,
+    encryption,
+    testFileLocator,
+  );
 }
 
 describe('ExtractionService.enqueueCodeChanges', () => {
@@ -273,6 +301,9 @@ describe('ExtractionService.enqueueDocumentCase', () => {
         executionMode: 'automated',
         automationFilePath: null,
         automationKey: 'CartTest.addsItem',
+        name: 'Adds an item',
+        suite: { name: 'Checkout' },
+        project: { connection: null },
       })
       .mockResolvedValueOnce(null);
     prisma.extractedProposal.findFirst.mockResolvedValue(null);

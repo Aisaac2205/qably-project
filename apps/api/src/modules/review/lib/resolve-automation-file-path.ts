@@ -1,4 +1,5 @@
 import type { PrismaService } from '../../../prisma/prisma.service';
+import { classNameAsTestFilePath } from './classname-as-file-path';
 
 export type AutomationPathLookup = Pick<
   PrismaService,
@@ -9,8 +10,12 @@ export async function resolveAutomationFilePath(
   prisma: AutomationPathLookup,
   projectId: string,
   automationKey: string | null,
+  automationClassName?: string | null,
 ): Promise<string | null> {
   if (automationKey === null) return null;
+
+  const fromClassName = classNameAsTestFilePath(automationClassName);
+  if (fromClassName !== null) return fromClassName;
 
   const fromRepository = await prisma.extractedProposal.findFirst({
     where: {

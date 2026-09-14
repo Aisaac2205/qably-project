@@ -7,6 +7,7 @@ import type { Env } from '../../config/env';
 import { AiModule } from '../ai/ai.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { SourceReader } from '../repository/source-reader';
+import { TestFileLocator } from '../repository/test-file-locator';
 import { ExtractionProcessor } from './extraction.processor';
 import { ExtractionService } from './extraction.service';
 import { EXTRACTION_QUEUE } from './review.contracts';
@@ -40,6 +41,7 @@ import { ReviewService } from './review.service';
     ExtractionProcessor,
     EncryptionService,
     SourceReader,
+    TestFileLocator,
   ],
   exports: [ExtractionService],
 })

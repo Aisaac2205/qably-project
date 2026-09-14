@@ -88,7 +88,10 @@ function buildExtractionService() {
     suite: {
       findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
-    project: { findFirst: jest.fn() },
+    project: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn().mockResolvedValue({ connection: null }),
+    },
     testCase: {
       findMany: jest.fn().mockResolvedValue(
         cases.map((testCase) => ({
@@ -113,8 +116,15 @@ function buildExtractionService() {
   };
 
   const queue = { add: jest.fn(), addBulk: jest.fn().mockResolvedValue([]) };
+  const encryption = { decrypt: jest.fn() };
+  const testFileLocator = { locate: jest.fn().mockResolvedValue(null) };
 
-  return new ExtractionService(prisma as never, queue as never);
+  return new ExtractionService(
+    prisma as never,
+    queue as never,
+    encryption as never,
+    testFileLocator as never,
+  );
 }
 
 describe('suite documentation counts match the enqueue outcome', () => {

@@ -72,20 +72,29 @@ That makes it unpublishable by definition, and the API enforces it: `ReviewServi
 
 The thesis rule the platform implements is that only test files already present in the repository trigger AI generation, so a document-case job must always name a file the repository side has actually seen. A case created by a JUnit ingest usually cannot name one: `automationFilePath` is only populated when the report carries `<testcase file="...">`, and Surefire, gtest and several other reporters omit that attribute.
 
-`resolveAutomationFilePath` (`apps/api/src/modules/review/lib/resolve-automation-file-path.ts`) closes that gap without guessing, by looking the path up from data the platform already owns:
+`resolveAutomationFilePath` (`apps/api/src/modules/review/lib/resolve-automation-file-path.ts`) closes that gap in three steps, each cheaper and more certain than the next:
 
-1. The most recent `ExtractedProposal` in the same project with the same `automationKey`, joined to its `CodeChange.filePath`. This is the strongest provenance: the key came from a file the repository webhook detected and Qably extracted.
-2. Failing that, a sibling `TestCase` in the same project with the same `automationKey` that already knows its path.
+1. The reported `automationClassName` itself, when it already looks like a test file path (`apps/api/src/modules/review/lib/classname-as-file-path.ts`) — some frameworks (gtest, several Python runners) report a path there instead of a bare class name. Free: no query at all.
+2. The most recent `ExtractedProposal` in the same project with the same `automationKey`, joined to its `CodeChange.filePath`. This is the strongest provenance: the key came from a file the repository webhook detected and Qably extracted.
+3. Failing that, a sibling `TestCase` in the same project with the same `automationKey` that already knows its path.
 
-Both lookups hinge on `automationKey` being identical on the ingest side and the extraction side. That is not a coincidence — the extraction prompt requires the model to emit the reporter's runtime name byte-for-byte precisely so the two pipelines can be joined here.
+Steps 2 and 3 hinge on `automationKey` being identical on the ingest side and the extraction side. That is not a coincidence — the extraction prompt requires the model to emit the reporter's runtime name byte-for-byte precisely so the two pipelines can be joined here.
 
 The two reporters Qably supports do not agree on that name. vitest's JUnit reporter joins the describe chain and the test title with `" > "`; jest-junit on its default templates joins them with a single space. The prompt states both conventions, and when a job carries a `TARGET_CASES` block it tells the model to copy each listed key verbatim rather than derive it. The processor then matches through `normalizeAutomationKey` (`apps/api/src/modules/review/lib/normalize-automation-key.ts`), which treats the two joins and any run of whitespace as the same key while keeping case. Before that, a jest-junit key stored as `Cart adds an item` never equalled the `Cart > adds an item` the model produced, and every target of the file fell through to an `automation-key-not-found` fallback.
 
-No path is ever derived from `className` or a filename heuristic. A guessed path is not evidence, and per-framework derivation rules would quietly widen the platform beyond the single validated automation framework.
-
 A case with no `automationKey` never reaches those lookups: `enqueueDocumentCase` returns `no-automation-key` (HTTP 409) before resolution is attempted, and `enqueueDocumentFiles` counts it under the skip reason of the same name. The distinction is deliberate. `no-source-file` may only be claimed after resolution actually ran and came back empty; anything else would report a cause the platform never checked.
 
-When both lookups run and neither finds anything, `enqueueDocumentCase` returns `no-source-file` (HTTP 409) and the processor logs and stops. The web surface treats that as an explanatory state rather than a failure: it tells the reviewer Qably has no test file on record for this case and offers manual documentation instead. It does not claim the repository was inspected, because it was not — both lookups read Qably's own tables.
+### Locating the file in the repository tree when nothing on record knows it
+
+When all three `resolveAutomationFilePath` steps come back empty, `enqueueDocumentCase`, `enqueueDocumentFiles` and the `document-case` processor share one more fallback before giving up: `TestFileLocator` (`apps/api/src/modules/repository/test-file-locator.ts`). It is scoring, not guessing — it never returns a path it cannot back with the file's own content:
+
+1. List the whole repository tree once (`GET /repos/{owner}/{repo}/git/trees/{ref}?recursive=1`, GitHub only), filtered down to paths that look like test files across the frameworks the extractor already recognizes (`apps/api/src/modules/repository/lib/test-file-pattern.ts` — the same pattern set `classNameAsTestFilePath` uses, plus the C++ conventions). The tree is cached per `owner/repo@ref` for ten minutes, so a batch of misses against the same commit costs one GitHub call, not one per case.
+2. Tokenize every candidate path and the case's own descriptors (`automationClassName`, case name, suite name, `automationKey`) — split on path/punctuation separators and camelCase boundaries, lowercase, drop anything shorter than three characters or generic (`test`, `spec`, `src`, `tests`, `it`, `should`) — and score each candidate by Jaccard overlap against the descriptor tokens. Take the top five candidates that score above zero.
+3. Fetch each candidate's content with `SourceReader` and accept the first one that literally contains the case's title — the last `" > "` segment of `automationKey`, or the raw case name. No content match, no answer: a well-scored filename with the wrong content inside is exactly the false positive this step exists to refuse.
+
+A path this step finds is persisted onto the case's `automationFilePath` immediately, so the search never repeats for the same case. `enqueueDocumentCase`, `enqueueDocumentFiles` and the processor each wire it through the same glue (`apps/api/src/modules/review/lib/locate-and-persist-automation-file-path.ts`), so the connection lookup, token decryption and persistence stay in one place.
+
+When every step — the three in `resolveAutomationFilePath` and the tree locator — comes back empty, `enqueueDocumentCase` returns `no-source-file` (HTTP 409) and the processor logs and stops. The web surface treats that as an explanatory state rather than a failure: it tells the reviewer Qably has no test file on record for this case and offers manual documentation instead.
 
 ### Fallback matrix
 

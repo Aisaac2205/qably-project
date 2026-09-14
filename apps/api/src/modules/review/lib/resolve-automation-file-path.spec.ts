@@ -98,4 +98,35 @@ describe('resolveAutomationFilePath', () => {
 
     expect(path).toBe('src/cart/cart.spec.ts');
   });
+
+  it('uses the automation class name directly when it already looks like a test file path', async () => {
+    const prisma = createPrisma();
+
+    const path = await resolveAutomationFilePath(
+      prisma as never,
+      'proj-1',
+      'CartTest.addsItem',
+      'src/cart/cart.spec.ts',
+    );
+
+    expect(path).toBe('src/cart/cart.spec.ts');
+    expect(prisma.extractedProposal.findFirst).not.toHaveBeenCalled();
+    expect(prisma.testCase.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('falls through to the repository lookup when the class name is not a path', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      codeChange: { filePath: 'src/cart/cart.spec.ts' },
+    });
+
+    const path = await resolveAutomationFilePath(
+      prisma as never,
+      'proj-1',
+      'CartTest.addsItem',
+      'CartTest',
+    );
+
+    expect(path).toBe('src/cart/cart.spec.ts');
+  });
 });

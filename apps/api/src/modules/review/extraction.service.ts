@@ -12,7 +12,13 @@ import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildJobId } from '../../common/queue/job-id';
+import { EncryptionService } from '../../common/crypto/encryption.service';
+import { TestFileLocator } from '../repository/test-file-locator';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
+import {
+  locateAndPersistAutomationFilePath,
+  type LocateAndPersistDeps,
+} from './lib/locate-and-persist-automation-file-path';
 import {
   EXTRACTION_QUEUE,
   type DocumentCaseError,
@@ -26,6 +32,7 @@ import {
 } from './review.contracts';
 
 const PENDING_STATUS = 'in_review';
+const HEAD_REF = 'HEAD';
 
 export const MAX_DOCUMENT_FILES_PER_REQUEST = 50;
 
@@ -39,8 +46,11 @@ interface CodeChangeCandidate {
 interface DocumentFileCandidate {
   id: string;
   projectId: string;
+  name: string;
   automationKey: string | null;
   automationFilePath: string | null;
+  automationClassName: string | null;
+  suite: { name: string } | null;
   steps: string[];
   documentationSource: string;
   currentVersion: { locale: string | null } | null;
@@ -91,7 +101,20 @@ export class ExtractionService {
     private readonly prisma: PrismaService,
     @InjectQueue(EXTRACTION_QUEUE)
     private readonly queue: Queue<ExtractionJobData>,
+    private readonly encryption: EncryptionService,
+    private readonly testFileLocator: TestFileLocator,
   ) {}
+
+  private locatorDeps(): LocateAndPersistDeps {
+    return {
+      locate: (input) => this.testFileLocator.locate(input),
+      decrypt: (value) => this.encryption.decrypt(value),
+      persist: (id, path) =>
+        this.prisma.testCase
+          .update({ where: { id }, data: { automationFilePath: path } })
+          .then(() => undefined),
+    };
+  }
 
   async enqueueCodeChanges(
     codeChanges: CodeChangeCandidate[],
@@ -138,6 +161,16 @@ export class ExtractionService {
         executionMode: true,
         automationFilePath: true,
         automationKey: true,
+        automationClassName: true,
+        name: true,
+        suite: { select: { name: true } },
+        project: {
+          select: {
+            connection: {
+              select: { provider: true, repo: true, encryptedAccessToken: true },
+            },
+          },
+        },
       },
     });
 
@@ -158,7 +191,17 @@ export class ExtractionService {
         this.prisma,
         testCase.projectId,
         testCase.automationKey,
-      ));
+        testCase.automationClassName,
+      )) ??
+      (await locateAndPersistAutomationFilePath(this.locatorDeps(), {
+        testCaseId: testCase.id,
+        automationKey: testCase.automationKey,
+        automationClassName: testCase.automationClassName,
+        caseName: testCase.name,
+        suiteName: testCase.suite?.name ?? null,
+        connection: testCase.project.connection,
+        ref: HEAD_REF,
+      }));
 
     if (filePath === null) return err('no-source-file');
 
@@ -205,8 +248,11 @@ export class ExtractionService {
       select: {
         id: true,
         projectId: true,
+        name: true,
         automationKey: true,
         automationFilePath: true,
+        automationClassName: true,
+        suite: { select: { name: true } },
         steps: true,
         documentationSource: true,
         currentVersion: { select: { locale: true } },
@@ -216,6 +262,15 @@ export class ExtractionService {
     if (rows.length === 0) {
       return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] });
     }
+
+    const connection = await this.prisma.project.findUnique({
+      where: { id: rows[0].projectId },
+      select: {
+        connection: {
+          select: { provider: true, repo: true, encryptedAccessToken: true },
+        },
+      },
+    });
 
     const pendingRows = await this.prisma.extractedProposal.findMany({
       where: {
@@ -264,7 +319,17 @@ export class ExtractionService {
           this.prisma,
           row.projectId,
           automationKey,
-        ));
+          row.automationClassName,
+        )) ??
+        (await locateAndPersistAutomationFilePath(this.locatorDeps(), {
+          testCaseId: row.id,
+          automationKey,
+          automationClassName: row.automationClassName,
+          caseName: row.name,
+          suiteName: row.suite?.name ?? null,
+          connection: connection?.connection ?? null,
+          ref: HEAD_REF,
+        }));
 
       if (filePath === null) {
         tally['no-source-file'] += 1;
