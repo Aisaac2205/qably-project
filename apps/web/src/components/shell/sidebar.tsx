@@ -23,7 +23,7 @@ import {
   GearSix,
   Play,
   ChartLine,
-  Sparkle,
+  ChatsCircle,
   Stack,
   Tray,
   CaretLeft,
@@ -35,10 +35,10 @@ import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
 import {
+  projectAerisPath,
   projectQualityPath,
   projectRootPath,
   projectSuitesPath,
-  reviewInboxPath,
 } from '@/features/projects/lib/routes'
 import { useTranslation } from '@/lib/i18n'
 
@@ -71,7 +71,7 @@ export function Sidebar() {
   const projectSubItems: NavItem[] = projectContext
     ? [
         { label: t('sidebar.repository'), href: projectRootPath(projectContext), icon: FolderSimple },
-        { label: t('sidebar.review'), href: reviewInboxPath(projectContext), icon: Sparkle },
+        { label: t('sidebar.aerisChat'), href: projectAerisPath(projectContext), icon: ChatsCircle },
         { label: t('sidebar.testLibrary'), href: projectSuitesPath(projectContext), icon: Stack },
         { label: t('sidebar.runs'), href: `/projects/${projectContext}/runs`, icon: Play },
         { label: t('sidebar.quality'), href: projectQualityPath(projectContext), icon: ChartLine },
