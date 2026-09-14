@@ -93,6 +93,7 @@
     "steps": "Steps",
     "expectedResult": "Expected result",
     "sourceSnippet": "Source snippet",
+    "chatRequestHeading": "Chat request",
     "evidenceHeading": "Evidence & Provenance",
     "possibleDuplicate": "Possible duplicate",
     "priority": "Priority",

@@ -93,6 +93,7 @@
     "steps": "Pasos",
     "expectedResult": "Resultado esperado",
     "sourceSnippet": "Fragmento de origen",
+    "chatRequestHeading": "Solicitud en el chat",
     "evidenceHeading": "Evidencia y procedencia",
     "possibleDuplicate": "Posible duplicado",
     "priority": "Prioridad",
