@@ -10,6 +10,8 @@ const mockCase: TestCase = {
   suiteId: 'suite-1',
   version: 2,
   name: 'Valid login redirects to dashboard',
+  objective: 'Confirm a valid login redirects to the dashboard',
+  preconditions: ['The user has a registered account'],
   steps: ['Navigate to /login', 'Enter valid email', 'Click Sign in'],
   expectedResult: 'Redirected to /dashboard within 1 second',
   priority: 'critical',
@@ -22,6 +24,8 @@ const automatedCase: TestCase = {
   suiteId: 'suite-1',
   version: null,
   name: 'Redirects to dashboard on valid login',
+  objective: '',
+  preconditions: [],
   steps: [],
   expectedResult: '',
   priority: 'medium',
@@ -173,6 +177,45 @@ describe('CaseCard', () => {
     const chip = screen.getByText('Active').closest('span')
     expect(chip).toHaveAttribute('data-status', 'active')
     expect(chip?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('shows the objective as a line under the title when present', async () => {
+    await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    expect(
+      screen.getByText('Confirm a valid login redirects to the dashboard'),
+    ).toBeInTheDocument()
+  })
+
+  it('shows no objective line when the case has none', async () => {
+    await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.queryByTestId('case-objective')).not.toBeInTheDocument()
+  })
+
+  it('shows preconditions count and can toggle expand', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    const toggle = screen.getByRole('button', { name: /1 precondition$/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('The user has a registered account')).toBeInTheDocument()
+  })
+
+  it('shows no preconditions disclosure when the case has none', async () => {
+    await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+    expect(screen.queryByRole('button', { name: /precondition/i })).not.toBeInTheDocument()
+  })
+
+  it('orders the disclosure toggles as preconditions, steps, expected result', async () => {
+    await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+    const buttons = screen.getAllByRole('button').filter((button) =>
+      /precondition|step|expected result/i.test(button.textContent ?? ''),
+    )
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      '1 precondition',
+      '3 steps',
+      'Expected result',
+    ])
   })
 
   it('shows steps count and can toggle expand', async () => {

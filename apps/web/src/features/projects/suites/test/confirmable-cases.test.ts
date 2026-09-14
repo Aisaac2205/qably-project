@@ -8,6 +8,8 @@ function testCase(overrides: Partial<TestCase> = {}): TestCase {
     suiteId: 'suite-1',
     version: 1,
     name: 'Checkout completes the order',
+    objective: '',
+    preconditions: [],
     steps: ['Open the cart', 'Pay'],
     expectedResult: 'The order is created',
     priority: 'high',

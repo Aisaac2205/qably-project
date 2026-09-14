@@ -24,6 +24,8 @@ export type UpdateSuitePayload = Partial<{
 
 export interface CreateCasePayload {
   name: string
+  objective?: string
+  preconditions?: string[]
   steps?: string[]
   expectedResult?: string
   priority?: CasePriority
@@ -32,6 +34,8 @@ export interface CreateCasePayload {
 
 export type UpdateCasePayload = Partial<{
   name: string
+  objective: string
+  preconditions: string[]
   steps: string[]
   expectedResult: string
   priority: CasePriority

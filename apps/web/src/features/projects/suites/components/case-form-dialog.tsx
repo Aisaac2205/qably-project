@@ -85,6 +85,10 @@ function CaseFormDialogContent({
   const [name, setName] = useState(described?.title ?? testCase?.name ?? '')
   const [priority, setPriority] = useState<CasePriority>(testCase?.priority ?? 'medium')
   const [state, setState] = useState<CaseState>(testCase?.state ?? 'active')
+  const [objective, setObjective] = useState(testCase?.objective ?? '')
+  const [preconditions, setPreconditions] = useState(
+    testCase?.preconditions.join('\n') ?? '',
+  )
   const [steps, setSteps] = useState(testCase?.steps.join('\n') ?? '')
   const [expectedResult, setExpectedResult] = useState(testCase?.expectedResult ?? '')
   const [nameError, setNameError] = useState(false)
@@ -103,11 +107,17 @@ function CaseFormDialogContent({
       .split('\n')
       .map((step) => step.trim())
       .filter(Boolean)
+    const preconditionList = preconditions
+      .split('\n')
+      .map((precondition) => precondition.trim())
+      .filter(Boolean)
 
     const payload = {
       name: trimmed,
       priority,
       state,
+      objective: objective.trim(),
+      preconditions: preconditionList,
       steps: stepList,
       expectedResult: expectedResult.trim(),
     }
@@ -203,6 +213,31 @@ function CaseFormDialogContent({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="case-objective">{t('suites.objectiveLabel')}</Label>
+            <Input
+              id="case-objective"
+              value={objective}
+              onChange={(e) => setObjective(e.target.value)}
+              placeholder={t('suites.objectivePlaceholder')}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="case-preconditions">{t('suites.preconditionsLabel')}</Label>
+            <Textarea
+              id="case-preconditions"
+              value={preconditions}
+              onChange={(e) => setPreconditions(e.target.value)}
+              placeholder={t('suites.preconditionsPlaceholder')}
+              rows={3}
+              aria-describedby="case-preconditions-hint"
+            />
+            <p id="case-preconditions-hint" className="text-xs text-muted">
+              {t('suites.preconditionsHint')}
+            </p>
           </div>
 
           <div className="grid gap-2">

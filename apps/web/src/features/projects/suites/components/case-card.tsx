@@ -31,6 +31,7 @@ interface CaseCardProps {
 
 export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
+  const [preconditionsOpen, setPreconditionsOpen] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
   const [observationsOpen, setObservationsOpen] = useState(false)
@@ -68,6 +69,11 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
               {showRawName && <span>{described.raw}</span>}
               {showRawName && testCase.automationFilePath && <span aria-hidden="true">·</span>}
               {testCase.automationFilePath && <span>{testCase.automationFilePath}</span>}
+            </p>
+          )}
+          {testCase.objective && (
+            <p data-testid="case-objective" className="mt-0.5 text-sm text-muted truncate">
+              {testCase.objective}
             </p>
           )}
         </div>
@@ -141,8 +147,20 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
         </div>
       )}
 
-      {/* Steps, Expected result, & Traceability toggles */}
+      {/* Preconditions, Steps, Expected result, & Traceability toggles */}
       <div className="flex flex-wrap items-center gap-2">
+        {testCase.preconditions.length > 0 && (
+          <button
+            onClick={() => setPreconditionsOpen(!preconditionsOpen)}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-default hover:text-primary transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-canvas/70 border border-border/70 cursor-pointer"
+            aria-expanded={preconditionsOpen}
+            type="button"
+          >
+            {preconditionsOpen ? <CaretDown size={13} weight="bold" aria-hidden="true" /> : <CaretRight size={13} weight="bold" aria-hidden="true" />}
+            {t('suites.preconditionsCount', { count: testCase.preconditions.length })}
+          </button>
+        )}
+
         {testCase.steps.length > 0 ? (
           <button
             onClick={() => setStepsOpen(!stepsOpen)}
@@ -206,6 +224,15 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
         )}
 
       </div>
+
+      {/* Expanded preconditions */}
+      {preconditionsOpen && (
+        <ul className="mt-2 text-sm text-default font-normal leading-relaxed space-y-1.5 list-disc list-inside p-3.5 rounded-lg bg-canvas border border-border/70">
+          {testCase.preconditions.map((precondition, i) => (
+            <li key={i} className="text-default font-medium">{precondition}</li>
+          ))}
+        </ul>
+      )}
 
       {/* Expanded steps */}
       {stepsOpen && (

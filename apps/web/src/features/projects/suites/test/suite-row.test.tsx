@@ -23,6 +23,8 @@ const mockCase: TestCase = {
   suiteId: 'suite-1',
   version: 1,
   name: 'Valid login',
+  objective: '',
+  preconditions: [],
   steps: ['Step 1'],
   expectedResult: 'Success',
   priority: 'critical',

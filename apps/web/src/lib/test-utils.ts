@@ -52,6 +52,8 @@ export function createMockTestCase(overrides: Partial<TestCase> = {}): TestCase 
     suiteId: overrides.suiteId ?? 'suite-1',
     version: overrides.version ?? null,
     name: overrides.name ?? 'Valid login redirects to dashboard',
+    objective: overrides.objective ?? '',
+    preconditions: overrides.preconditions ?? [],
     steps: overrides.steps ?? [],
     expectedResult: overrides.expectedResult ?? '',
     priority: overrides.priority ?? 'medium',

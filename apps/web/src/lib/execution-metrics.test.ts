@@ -309,8 +309,8 @@ describe('aggregateForProject', () => {
       organizationId: 'org-1',
       name: 'A',
       cases: [
-        { id: 'tc-1', suiteId: 'suite-1', version: 1, name: 'a', steps: [], expectedResult: '', priority: 'low', state: 'active', executionMode: 'manual' },
-        { id: 'tc-2', suiteId: 'suite-1', version: 1, name: 'b', steps: [], expectedResult: '', priority: 'low', state: 'active', executionMode: 'manual' },
+        { id: 'tc-1', suiteId: 'suite-1', version: 1, name: 'a', objective: '', preconditions: [], steps: [], expectedResult: '', priority: 'low', state: 'active', executionMode: 'manual' },
+        { id: 'tc-2', suiteId: 'suite-1', version: 1, name: 'b', objective: '', preconditions: [], steps: [], expectedResult: '', priority: 'low', state: 'active', executionMode: 'manual' },
       ],
       manualCases: 2,
       automatedCases: 0,
@@ -328,7 +328,7 @@ describe('aggregateForProject', () => {
       organizationId: 'org-1',
       name: 'B',
       cases: [
-        { id: 'tc-3', suiteId: 'suite-2', version: 1, name: 'c', steps: [], expectedResult: '', priority: 'low', state: 'active', executionMode: 'manual' },
+        { id: 'tc-3', suiteId: 'suite-2', version: 1, name: 'c', objective: '', preconditions: [], steps: [], expectedResult: '', priority: 'low', state: 'active', executionMode: 'manual' },
       ],
       manualCases: 1,
       automatedCases: 0,

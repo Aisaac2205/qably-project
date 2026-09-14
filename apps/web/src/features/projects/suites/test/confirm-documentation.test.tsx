@@ -29,6 +29,8 @@ function testCase(overrides: Partial<TestCase> = {}): TestCase {
     suiteId: 'suite-1',
     version: null,
     name: 'Empties the cart',
+    objective: '',
+    preconditions: [],
     steps: ['Open the cart', 'Remove every item'],
     expectedResult: 'The cart shows zero items',
     priority: 'medium',

@@ -47,6 +47,8 @@ const testCase: TestCase = {
   suiteId: 'suite-1',
   version: 1,
   name: 'Original case',
+  objective: '',
+  preconditions: [],
   priority: 'high',
   state: 'active',
   steps: ['Open page'],
