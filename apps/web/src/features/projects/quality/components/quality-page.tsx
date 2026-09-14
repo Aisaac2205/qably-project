@@ -9,7 +9,7 @@ import { StateView } from '@/components/ui/state-view'
 import { TraceabilitySection } from '@/features/dashboard/components/traceability-section'
 import { useDashboardSummary } from '@/features/dashboard/hooks/use-dashboard-summary'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { projectRootPath } from '@/features/projects/lib/routes'
+import { projectRootPath, reviewInboxPath } from '@/features/projects/lib/routes'
 import { useProposals } from '@/features/review-inbox/hooks/use-proposals'
 import { useRecentRuns, useRegressions, useSuiteMetricsQuery } from '@/features/runs/hooks/use-runs'
 import { useTranslation } from '@/lib/i18n'
@@ -133,7 +133,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
           label={t('quality.kpiPendingProposals')}
           value={proposalsQuery.isLoading ? '—' : pendingProposalsCount}
           icon={Sparkle}
-          href={`/projects/${projectId}/ai-review`}
+          href={reviewInboxPath(projectId)}
           accent="ai"
         />
       </dl>

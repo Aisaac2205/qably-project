@@ -111,6 +111,13 @@ describe('ReviewProposalInspector', () => {
     expect(screen.getByRole('button', { name: /approve/i })).toBeEnabled()
   })
 
+  it('gives the options button a descriptive accessible name, not a generic one', () => {
+    renderInspector(proposal())
+
+    expect(screen.getByRole('button', { name: 'Proposal options' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Opciones' })).not.toBeInTheDocument()
+  })
+
   describe('re-documenting an incomplete extraction', () => {
     it('offers to document again when the target case is known', () => {
       renderInspector(

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
 import { sendToReview } from '../api/chat.api'
 import { chatKeys } from '../lib/query-keys'
-import { projectAiReviewPath } from '@/features/projects/lib/routes'
+import { reviewInboxPath } from '@/features/projects/lib/routes'
 
 type SendState = 'idle' | 'pending' | 'error'
 
@@ -57,7 +57,7 @@ export function ChatGeneratedCaseCard({
 
       {isSent ? (
         <Link
-          href={projectAiReviewPath(projectId)}
+          href={reviewInboxPath(projectId)}
           className="inline-flex items-center gap-1 text-xs font-semibold text-ai underline underline-offset-2"
         >
           {t('aiReview.viewInReviewQueue')}

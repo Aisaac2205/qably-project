@@ -25,6 +25,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { StateView } from '@/components/ui/state-view'
 import { WebhookSetupPanel } from '@/features/integrations'
 import { useTranslation } from '@/lib/i18n'
+import { reviewInboxPath } from '@/features/projects/lib/routes'
 import { useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
 import { useProjectRepository } from '../hooks/use-project-repository'
 import { useRotateWebhookSecret } from '../hooks/use-rotate-webhook-secret'
@@ -90,7 +91,7 @@ function ChangedFileItem({
             <p className="text-sm font-semibold text-default mt-1">{proposal.title}</p>
           </div>
           <Link
-            href={`/projects/${projectId}/ai-review`}
+            href={reviewInboxPath(projectId)}
             className="mt-2 sm:mt-0 inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary underline underline-offset-2 hover:text-primary-hover focus-visible:outline-2 focus-visible:outline-primary transition-colors"
           >
             <span>{t('sidebar.aiReview')}</span>

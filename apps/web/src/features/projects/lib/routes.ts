@@ -12,6 +12,10 @@ export function projectQualityPath(projectId: string): string {
   return `/projects/${projectId}/quality`
 }
 
-export function projectAiReviewPath(projectId: string): string {
-  return `/projects/${projectId}/ai-review`
+export function projectAerisPath(projectId: string): string {
+  return `/projects/${projectId}/aeris`
+}
+
+export function reviewInboxPath(projectId: string): string {
+  return `/review-inbox?project=${projectId}`
 }

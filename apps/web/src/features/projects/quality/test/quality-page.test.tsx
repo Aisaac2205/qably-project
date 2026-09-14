@@ -277,9 +277,9 @@ describe('QualityPage', () => {
       expect(passRateLink).toHaveAttribute('href', '/projects/proj-1/runs')
     })
 
-    it('shows the pending proposals KPI linking to the AI review inbox', async () => {
+    it('shows the pending proposals KPI linking to the review inbox', async () => {
       const value = await screen.findByText('2', { selector: 'dd' })
-      expect(value.closest('a')).toHaveAttribute('href', '/projects/proj-1/ai-review')
+      expect(value.closest('a')).toHaveAttribute('href', '/review-inbox?project=proj-1')
     })
 
     it('shows the regressions KPI linking to the regressions section', async () => {

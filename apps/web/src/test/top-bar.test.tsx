@@ -113,6 +113,12 @@ describe('TopBar', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Review Inbox' })).toBeInTheDocument()
   })
 
+  it('renders a Project Chat title heading on the aeris sub-route', async () => {
+    mockPathname.mockReturnValue('/projects/proj-1/aeris')
+    await act(async () => { render(<TopBar />) })
+    expect(screen.getByRole('heading', { level: 1, name: 'Project Chat' })).toBeInTheDocument()
+  })
+
   it('renders a Projects title heading on /projects', async () => {
     mockPathname.mockReturnValue('/projects')
     render(<TopBar />)

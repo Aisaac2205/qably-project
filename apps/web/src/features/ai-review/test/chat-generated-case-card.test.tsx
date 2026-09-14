@@ -56,7 +56,7 @@ describe('ChatGeneratedCaseCard', () => {
     expect(chatApi.sendToReview).toHaveBeenCalledWith('proj-1', 'thread-1', 'message-1', 2)
     expect(await screen.findByRole('link', { name: 'View in Review Queue' })).toHaveAttribute(
       'href',
-      '/projects/proj-1/ai-review',
+      '/review-inbox?project=proj-1',
     )
   })
 

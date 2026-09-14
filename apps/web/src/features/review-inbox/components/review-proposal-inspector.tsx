@@ -29,7 +29,7 @@ import { useProposal } from '../hooks/use-proposals'
 import { manualReviewReasonKey } from '../lib/manual-review-reason'
 import { useTranslation } from '@/lib/i18n'
 import { AerisObservations } from '@/components/ui/aeris-observations'
-import { projectRootPath } from '@/features/projects/lib/routes'
+import { projectRootPath, reviewInboxPath } from '@/features/projects/lib/routes'
 
 interface ReviewProposalInspectorProps {
   proposal: ExtractedProposal
@@ -123,7 +123,7 @@ export function ReviewProposalInspector({
 
             <button
               type="button"
-              aria-label="Opciones"
+              aria-label={t('reviewInbox.proposalOptions')}
               className="rounded-lg p-1 text-muted hover:text-default hover:bg-canvas transition-colors"
             >
               <DotsThree size={20} weight="bold" aria-hidden="true" />
@@ -332,7 +332,7 @@ export function ReviewProposalInspector({
 
         {project && (
           <Link
-            href={`/projects/${project.id}/ai-review`}
+            href={reviewInboxPath(project.id)}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-default group"
           >
             <span>{t('reviewInbox.actionProjectReview')}</span>

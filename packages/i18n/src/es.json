@@ -102,6 +102,7 @@
     "actionApprove": "Aprobar y publicar",
     "actionReject": "Rechazar",
     "actionProjectReview": "Abrir en revisión de proyecto",
+    "proposalOptions": "Opciones de la propuesta",
     "approvedSuccess": "Propuesta aprobada y publicada como caso de prueba oficial versionado.",
     "rejectedSuccess": "Propuesta rechazada.",
     "recentDecisionsTitle": "Decisiones de revisión recientes",

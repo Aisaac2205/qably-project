@@ -102,6 +102,7 @@
     "actionApprove": "Approve & publish",
     "actionReject": "Reject",
     "actionProjectReview": "Open in project review",
+    "proposalOptions": "Proposal options",
     "approvedSuccess": "Proposal approved and published as official versioned test case.",
     "rejectedSuccess": "Proposal rejected.",
     "recentDecisionsTitle": "Recent review decisions",

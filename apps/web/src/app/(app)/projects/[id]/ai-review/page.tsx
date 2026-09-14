@@ -1,17 +1,10 @@
-import { Suspense } from 'react'
-import { AiReviewPage } from '@/features/ai-review/components/ai-review-page'
-import { RouteSkeleton } from '@/components/ui/route-skeleton'
+import { redirect } from 'next/navigation'
+import { projectAerisPath } from '@/features/projects/lib/routes'
 
-type Props = {
-  params: Promise<{ id: string }>
-}
+type Params = Promise<{ id: string }>
 
-export default async function AiReviewRoute({ params }: Props) {
+export default async function AiReviewRoute({ params }: { params: Params }) {
   const { id } = await params
 
-  return (
-    <Suspense fallback={<RouteSkeleton variant="list" labelKey="aiReview.loading" />}>
-      <AiReviewPage projectId={id} />
-    </Suspense>
-  )
+  redirect(projectAerisPath(id))
 }
