@@ -192,6 +192,24 @@ describe('useDocumentCase', () => {
     })
   })
 
+  it('shows the AI-not-enabled message for a 403 with that code', async () => {
+    document_.mockRejectedValueOnce(new ApiError(403, 'nope', 'ai-not-enabled'))
+    const { client } = setup()
+    const { result } = renderHook(() => useDocumentCase(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith(
+        'AI extraction is not enabled for this organization.',
+      )
+    })
+  })
+
   it('shows a generic error message for any other failure', async () => {
     document_.mockRejectedValueOnce(new Error('boom'))
     const { client } = setup()

@@ -161,6 +161,10 @@ export function useDocumentCase() {
         notify.error(t('suites.documentCaseNoSourceFile'))
         return
       }
+      if (error instanceof ApiError && error.code === 'ai-not-enabled') {
+        notify.error(t('reviewInbox.manualReviewReasonAiNotEnabled'))
+        return
+      }
       notify.error(t('suites.documentFilesError'))
     },
   })

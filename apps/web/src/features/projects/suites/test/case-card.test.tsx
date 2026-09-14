@@ -1,10 +1,12 @@
-import { screen, act, within } from '@testing-library/react'
+import { screen, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { CaseCard } from '@/features/projects/suites/components/case-card'
 import type { TestCase } from '@qably/types'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import * as suitesApi from '@/test/suites-api-stub'
+import { ApiError } from '@/lib/api-client'
+import { notify } from '@/lib/notify'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -296,6 +298,23 @@ describe('CaseCard', () => {
       await user.click(screen.getByRole('button', { name: 'Case actions' }))
 
       expect(screen.queryByText('Document again with Aeris')).not.toBeInTheDocument()
+    })
+
+    it('shows the AI-not-enabled message when re-documenting is refused for the organization', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(suitesApi, 'documentCase').mockRejectedValueOnce(
+        new ApiError(403, 'AI features are not enabled for this organization', 'ai-not-enabled'),
+      )
+      await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+
+      await user.click(screen.getByRole('button', { name: 'Case actions' }))
+      await user.click(await screen.findByText('Document again with Aeris'))
+
+      await waitFor(() => {
+        expect(notify.error).toHaveBeenCalledWith(
+          'AI extraction is not enabled for this organization.',
+        )
+      })
     })
   })
 
