@@ -5,10 +5,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight, Clock, DotsThree, PencilSimple, Trash, Translate } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, Clock, DotsThree, PencilSimple, Sparkle, Trash, Translate } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
+import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { StatusChip } from '@/components/ui/status-chip'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { repositoryFileUrl } from '@/features/projects/suites/lib/repository-file-url'
@@ -31,6 +32,7 @@ interface CaseCardProps {
 
 export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardProps) {
   const { t } = useTranslation()
+  const documentCase = useDocumentCase()
   const [preconditionsOpen, setPreconditionsOpen] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
@@ -122,6 +124,17 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
                   <PencilSimple size={14} aria-hidden="true" />
                   {t('suites.editCase')}
                 </MenuItem>
+                {testCase.executionMode === 'automated' && (
+                  <MenuItem
+                    onClick={() =>
+                      documentCase.mutate({ suiteId: testCase.suiteId, caseId: testCase.id })
+                    }
+                    className="text-ai data-[highlighted]:bg-ai-bg data-[highlighted]:text-ai"
+                  >
+                    <Sparkle size={14} aria-hidden="true" />
+                    {t('suites.redocumentCase')}
+                  </MenuItem>
+                )}
                 <MenuItem
                   onClick={() => onDelete(testCase)}
                   className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"

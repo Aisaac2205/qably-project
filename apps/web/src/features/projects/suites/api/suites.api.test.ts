@@ -5,6 +5,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  documentCase,
   documentProject,
   documentSuite,
   getSuite,
@@ -112,6 +113,14 @@ describe('suites.api', () => {
     const [url, init] = lastCall()
     expect(url).toContain('/suites/suite-1/cases/case-1')
     expect(init.method).toBe('DELETE')
+  })
+
+  it('documents a single case under its suite', async () => {
+    await documentCase('suite-1', 'case-1')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/suites/suite-1/cases/case-1/document')
+    expect(init.method).toBe('POST')
   })
 
   it('sends the document mode as a plain JSON object, not a doubly-encoded string', async () => {

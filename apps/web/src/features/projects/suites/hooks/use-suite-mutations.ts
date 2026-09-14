@@ -8,6 +8,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  documentCase,
   documentProject,
   documentSuite,
   type DocumentFilesMode,
@@ -19,6 +20,9 @@ import {
   type UpdateSuitePayload,
 } from '../api/suites.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
+import { ApiError } from '@/lib/api-client'
+import { notify } from '@/lib/notify'
+import { useTranslation } from '@/lib/i18n'
 
 function useSuiteInvalidation() {
   const queryClient = useQueryClient()
@@ -136,6 +140,28 @@ export function useConfirmDocumentation() {
       await invalidateSuites()
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       await queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
+    },
+  })
+}
+
+export function useDocumentCase() {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
+      documentCase(suiteId, caseId),
+    onSuccess: async (_result, { suiteId }) => {
+      await queryClient.invalidateQueries({ queryKey: suiteKeys.all })
+      await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
+      notify.success(t('suites.documentCaseQueued'))
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === 'no-source-file') {
+        notify.error(t('suites.documentCaseNoSourceFile'))
+        return
+      }
+      notify.error(t('suites.documentFilesError'))
     },
   })
 }

@@ -82,6 +82,10 @@ export function deleteCase(suiteId: string): Promise<Suite> {
   return getSuite(suiteId)
 }
 
+export function documentCase(): Promise<{ queued: true; jobId: string }> {
+  return Promise.resolve({ queued: true, jobId: 'job-1' })
+}
+
 export function documentSuite(): Promise<DocumentFilesResult> {
   return Promise.resolve({
     filesEnqueued: 0,

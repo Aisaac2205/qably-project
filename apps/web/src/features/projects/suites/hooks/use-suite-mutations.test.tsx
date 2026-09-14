@@ -6,27 +6,43 @@ import {
   useConfirmDocumentation,
   useCreateCase,
   useDeleteCase,
+  useDocumentCase,
   useUpdateCase,
 } from './use-suite-mutations'
 import {
   confirmDocumentation,
   createCase,
   deleteCase,
+  documentCase,
   updateCase,
 } from '../api/suites.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
+import { ApiError } from '@/lib/api-client'
+import { notify } from '@/lib/notify'
 
 vi.mock('../api/suites.api', () => ({
   createCase: vi.fn(),
   updateCase: vi.fn(),
   deleteCase: vi.fn(),
   confirmDocumentation: vi.fn(),
+  documentCase: vi.fn(),
+}))
+
+vi.mock('@/lib/notify', () => ({
+  notify: {
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    dismiss: vi.fn(),
+  },
 }))
 
 const create = vi.mocked(createCase)
 const update = vi.mocked(updateCase)
 const remove = vi.mocked(deleteCase)
 const confirm = vi.mocked(confirmDocumentation)
+const document_ = vi.mocked(documentCase)
 
 const suite: Suite = {
   id: 'suite-1',
@@ -67,6 +83,7 @@ beforeEach(() => {
     documentationConfirmedAt: '2026-09-12T10:00:00.000Z',
     documentationConfirmedById: 'user-1',
   })
+  document_.mockResolvedValue({ queued: true, jobId: 'job-1' })
 })
 
 describe('useConfirmDocumentation', () => {
@@ -134,6 +151,60 @@ describe('useUpdateCase', () => {
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: projectKeys.detail('proj-1'),
       })
+    })
+  })
+})
+
+describe('useDocumentCase', () => {
+  it('queues the case and notifies success', async () => {
+    const { client } = setup()
+    const { result } = renderHook(() => useDocumentCase(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(document_).toHaveBeenCalledWith('suite-1', 'case-1')
+    })
+    await waitFor(() => {
+      expect(notify.success).toHaveBeenCalledWith('Aeris is documenting this case.')
+    })
+  })
+
+  it('shows the no-source-file message for a 409 with that code', async () => {
+    document_.mockRejectedValueOnce(new ApiError(409, 'nope', 'no-source-file'))
+    const { client } = setup()
+    const { result } = renderHook(() => useDocumentCase(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith(
+        "Aeris has not identified this case's test file yet.",
+      )
+    })
+  })
+
+  it('shows a generic error message for any other failure', async () => {
+    document_.mockRejectedValueOnce(new Error('boom'))
+    const { client } = setup()
+    const { result } = renderHook(() => useDocumentCase(), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith('Could not queue this documentation. Try again.')
     })
   })
 })

@@ -4,6 +4,21 @@ import { describe, it, expect, vi } from 'vitest'
 import { CaseCard } from '@/features/projects/suites/components/case-card'
 import type { TestCase } from '@qably/types'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import * as suitesApi from '@/test/suites-api-stub'
+
+vi.mock('@/features/projects/suites/api/suites.api', async () =>
+  await import('@/test/suites-api-stub'),
+)
+
+vi.mock('@/lib/notify', () => ({
+  notify: {
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    dismiss: vi.fn(),
+  },
+}))
 
 const mockCase: TestCase = {
   id: 'tc-1',
@@ -260,6 +275,28 @@ describe('CaseCard', () => {
     await user.click(await screen.findByText('Delete case'))
 
     expect(onDelete).toHaveBeenCalledWith(mockCase)
+  })
+
+  describe('re-document with Aeris', () => {
+    it('offers to document again from the actions menu for an automated case', async () => {
+      const user = userEvent.setup()
+      const documentCase = vi.spyOn(suitesApi, 'documentCase')
+      await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+
+      await user.click(screen.getByRole('button', { name: 'Case actions' }))
+      await user.click(await screen.findByText('Document again with Aeris'))
+
+      expect(documentCase).toHaveBeenCalledWith('suite-1', 'tc-9')
+    })
+
+    it('does not offer to document again for a manual case', async () => {
+      const user = userEvent.setup()
+      await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+
+      await user.click(screen.getByRole('button', { name: 'Case actions' }))
+
+      expect(screen.queryByText('Document again with Aeris')).not.toBeInTheDocument()
+    })
   })
 
   describe('quality health signals', () => {

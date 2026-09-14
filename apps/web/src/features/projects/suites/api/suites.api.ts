@@ -100,6 +100,21 @@ export function deleteCase(suiteId: string, caseId: string): Promise<Suite> {
   })
 }
 
+export interface DocumentCaseResult {
+  queued: true
+  jobId: string
+}
+
+export function documentCase(
+  suiteId: string,
+  caseId: string,
+): Promise<DocumentCaseResult> {
+  return apiRequest<DocumentCaseResult>(
+    `/suites/${suiteId}/cases/${caseId}/document`,
+    { method: 'POST' },
+  )
+}
+
 export type DocumentFilesMode = 'undocumented' | 'stale-locale'
 
 export function documentSuite(
