@@ -1,11 +1,21 @@
 'use client'
 
+import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { SealCheck } from '@phosphor-icons/react'
-import type { ConfirmDocumentationResult } from '@qably/types'
+import type { ConfirmDocumentationResult, TestCase } from '@qably/types'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { useTranslation } from '@/lib/i18n'
+import { describeCase } from '@/features/projects/suites/lib/case-title'
 
 export function useConfirmDocumentationState(
   onConfirm: () => Promise<ConfirmDocumentationResult>,
@@ -18,73 +28,66 @@ export type ConfirmDocumentationMutation = ReturnType<
 >
 
 interface ConfirmDocumentationProps {
-  pendingCount: number
+  cases: TestCase[]
   confirmation: ConfirmDocumentationMutation
 }
 
-export function ConfirmDocumentation({
-  pendingCount,
-  confirmation,
-}: ConfirmDocumentationProps) {
+export function ConfirmDocumentation({ cases, confirmation }: ConfirmDocumentationProps) {
   const { t } = useTranslation()
-  const outcome = confirmation.data
+  const [open, setOpen] = useState(false)
 
-  if (pendingCount === 0 && outcome === undefined && !confirmation.isError) {
-    return null
+  if (cases.length === 0) return null
+
+  const count = cases.length
+
+  function handleConfirm() {
+    confirmation.mutate(undefined, {
+      onSuccess: () => setOpen(false),
+    })
   }
 
   return (
-    <div className="rounded-xl border border-ai/40 bg-ai-bg/50 px-4 py-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-        <div className="flex min-w-0 items-start gap-2.5">
-          <SealCheck
-            size={16}
-            weight="bold"
-            aria-hidden="true"
-            className="mt-0.5 shrink-0 text-ai"
-          />
-          <div className="min-w-0 space-y-0.5">
-            <p className="text-sm font-semibold text-default">
-              {t('suites.confirmDocumentationTitle', { count: pendingCount })}
-            </p>
-            <p className="text-xs text-muted">{t('suites.confirmDocumentationHint')}</p>
-          </div>
-        </div>
+    <>
+      <Button type="button" size="default" onClick={() => setOpen(true)} className="text-sm font-semibold">
+        <SealCheck size={14} weight="bold" aria-hidden="true" />
+        {t('suites.confirmDocumentationAction', { count })}
+      </Button>
 
-        {pendingCount > 0 && (
-          <Button
-            type="button"
-            size="default"
-            onClick={() => confirmation.mutate()}
-            disabled={confirmation.isPending}
-            className="text-sm font-semibold"
-          >
-            {confirmation.isPending && <Spinner className="mr-1.5" />}
-            {confirmation.isPending
-              ? t('suites.confirmingDocumentation')
-              : t('suites.confirmDocumentationAction')}
-          </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        {open && (
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>{t('suites.confirmDocumentationTitle', { count })}</DialogTitle>
+              <DialogDescription>{t('suites.confirmDocumentationHint')}</DialogDescription>
+            </DialogHeader>
+
+            <ul className="max-h-64 overflow-y-auto divide-y divide-border rounded-lg border border-border text-sm text-default">
+              {cases.map((testCase) => (
+                <li key={testCase.id} className="truncate px-3 py-2">
+                  {describeCase(testCase).title}
+                </li>
+              ))}
+            </ul>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setOpen(false)}
+                disabled={confirmation.isPending}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button type="button" onClick={handleConfirm} disabled={confirmation.isPending}>
+                {confirmation.isPending && <Spinner className="mr-1.5" />}
+                {confirmation.isPending
+                  ? t('suites.confirmingDocumentation')
+                  : t('suites.confirmDocumentationAction', { count })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
         )}
-      </div>
-
-      {confirmation.isError && (
-        <p role="alert" className="mt-2.5 text-xs font-medium text-fail">
-          {t('suites.confirmDocumentationError')}
-        </p>
-      )}
-
-      {outcome !== undefined && (
-        <div className="mt-2.5 space-y-0.5">
-          <p role="status" className="text-xs font-medium text-ai">
-            {t('suites.confirmDocumentationDone', { count: outcome.confirmedCount })}
-          </p>
-          {outcome.skippedCount > 0 && (
-            <p className="text-xs text-muted">
-              {t('suites.confirmDocumentationSkipped', { count: outcome.skippedCount })}
-            </p>
-          )}
-        </div>
-      )}
-    </div>
+      </Dialog>
+    </>
   )
 }

@@ -74,9 +74,12 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const confirmation = useConfirmDocumentationState(async () => {
     try {
       const outcome = await confirmDocumentation.mutateAsync({ suiteId, projectId })
-      notify.success(
-        t('suites.confirmDocumentationDone', { count: outcome.confirmedCount }),
-      )
+      notify.success(t('suites.confirmDocumentationDone', { count: outcome.confirmedCount }), {
+        description:
+          outcome.skippedCount > 0
+            ? t('suites.confirmDocumentationSkipped', { count: outcome.skippedCount })
+            : undefined,
+      })
       return outcome
     } catch (error) {
       notify.error(t('suites.confirmDocumentationError'))
@@ -142,7 +145,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   }
 
   const pendingDocCount = suite.undocumentedCount
-  const awaitingConfirmation = casesAwaitingConfirmation(suite.cases).length
+  const awaitingCases = casesAwaitingConfirmation(suite.cases)
   const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
   const cannotRunEmptySuite = suite.manualCases === 0 && suite.cases.length === 0
 
@@ -191,7 +194,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             )}
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {suite.manualCases > 0 && (
                 <Button
                   type="button"
@@ -227,6 +230,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 primary={isFullyAutomated}
                 activeMode={watchStatus === 'working' ? watchedMode : undefined}
               />
+
+              <ConfirmDocumentation cases={awaitingCases} confirmation={confirmation} />
 
               {/* Suite actions */}
               <Menu>
@@ -321,11 +326,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           </div>
         )}
       </header>
-
-      <ConfirmDocumentation
-        pendingCount={awaitingConfirmation}
-        confirmation={confirmation}
-      />
 
       {/* Case list */}
       <section className="space-y-3">

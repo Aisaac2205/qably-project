@@ -1,7 +1,7 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import type { ConfirmDocumentationResult } from '@qably/types'
+import type { ConfirmDocumentationResult, TestCase } from '@qably/types'
 import {
   ConfirmDocumentation,
   useConfirmDocumentationState,
@@ -23,141 +23,147 @@ function result(
   }
 }
 
+function testCase(overrides: Partial<TestCase> = {}): TestCase {
+  return {
+    id: 'tc-1',
+    suiteId: 'suite-1',
+    version: null,
+    name: 'Empties the cart',
+    steps: ['Open the cart', 'Remove every item'],
+    expectedResult: 'The cart shows zero items',
+    priority: 'medium',
+    state: 'draft',
+    executionMode: 'automated',
+    ...overrides,
+  }
+}
+
 function Panel({
-  pendingCount,
+  cases,
   onConfirm,
 }: {
-  pendingCount: number
+  cases: TestCase[]
   onConfirm: () => Promise<ConfirmDocumentationResult>
 }) {
   const confirmation = useConfirmDocumentationState(onConfirm)
-  return <ConfirmDocumentation pendingCount={pendingCount} confirmation={confirmation} />
+  return <ConfirmDocumentation cases={cases} confirmation={confirmation} />
 }
 
 describe('ConfirmDocumentation', () => {
-  it('says how many documented cases are waiting and offers one action', () => {
-    renderWithQuery(<Panel pendingCount={3} onConfirm={vi.fn()} />)
-
-    expect(
-      screen.getByText(/3 documented cases are waiting for your confirmation/i),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /confirm documentation/i }),
-    ).toBeInTheDocument()
-  })
-
-  it('counts a single waiting case in the singular', () => {
-    renderWithQuery(<Panel pendingCount={1} onConfirm={vi.fn()} />)
-
-    expect(
-      screen.getByText(/1 documented case is waiting for your confirmation/i),
-    ).toBeInTheDocument()
-  })
-
   it('renders nothing while no documented case is waiting', () => {
-    const { container } = renderWithQuery(<Panel pendingCount={0} onConfirm={vi.fn()} />)
+    const { container } = renderWithQuery(<Panel cases={[]} onConfirm={vi.fn()} />)
 
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('confirms once and reports the outcome in a polite live region', async () => {
+  it('offers one action naming how many documented cases are waiting', () => {
+    renderWithQuery(
+      <Panel cases={[testCase({ id: 'tc-1' }), testCase({ id: 'tc-2' }), testCase({ id: 'tc-3' })]} onConfirm={vi.fn()} />,
+    )
+
+    expect(screen.getByRole('button', { name: /confirm 3 cases/i })).toBeInTheDocument()
+  })
+
+  it('counts a single waiting case in the singular', () => {
+    renderWithQuery(<Panel cases={[testCase()]} onConfirm={vi.fn()} />)
+
+    expect(screen.getByRole('button', { name: /confirm 1 case$/i })).toBeInTheDocument()
+  })
+
+  it('opens a dialog naming every waiting case when the action is clicked', async () => {
+    const user = userEvent.setup()
+    renderWithQuery(
+      <Panel
+        cases={[
+          testCase({ id: 'tc-1', name: 'Empties the cart' }),
+          testCase({ id: 'tc-2', name: 'Applies a discount code' }),
+        ]}
+        onConfirm={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /confirm 2 cases/i }))
+
+    expect(
+      screen.getByRole('dialog', { name: /2 documented cases are waiting for your confirmation/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Empties the cart')).toBeInTheDocument()
+    expect(screen.getByText('Applies a discount code')).toBeInTheDocument()
+  })
+
+  it('closes the dialog without confirming when cancelled', async () => {
+    const user = userEvent.setup()
+    const onConfirm = vi.fn()
+    renderWithQuery(<Panel cases={[testCase()]} onConfirm={onConfirm} />)
+
+    await user.click(screen.getByRole('button', { name: /confirm 1 case$/i }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(onConfirm).not.toHaveBeenCalled()
+  })
+
+  it('confirms once and closes the dialog on success', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn().mockResolvedValue(result())
 
-    renderWithQuery(<Panel pendingCount={2} onConfirm={onConfirm} />)
-    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
+    renderWithQuery(<Panel cases={[testCase({ id: 'tc-1' }), testCase({ id: 'tc-2' })]} onConfirm={onConfirm} />)
+    await user.click(screen.getByRole('button', { name: /confirm 2 cases/i }))
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /confirm 2 cases/i }))
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent(/2 cases were confirmed/i)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
-  it('names the cases it could not confirm instead of dropping them silently', async () => {
-    const user = userEvent.setup()
-    const onConfirm = vi.fn().mockResolvedValue(
-      result({ confirmedCount: 2, skippedCaseIds: ['case-9'], skippedCount: 1 }),
-    )
-
-    renderWithQuery(<Panel pendingCount={3} onConfirm={onConfirm} />)
-    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/1 case stayed unconfirmed because it has no documentation yet/i),
-      ).toBeInTheDocument()
-    })
-  })
-
-  it('announces a failure assertively and keeps the action available', async () => {
-    const user = userEvent.setup()
-    const onConfirm = vi.fn().mockRejectedValue(new Error('network down'))
-
-    renderWithQuery(<Panel pendingCount={2} onConfirm={onConfirm} />)
-    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent(
-        /could not confirm the documentation/i,
-      )
-    })
-    expect(
-      screen.getByRole('button', { name: /confirm documentation/i }),
-    ).toBeEnabled()
-  })
-
-  it('blocks a second submission while the first is still in flight', async () => {
+  it('shows a spinner and disables the confirm button while the request is in flight', async () => {
     const user = userEvent.setup()
     const onConfirm = vi.fn().mockReturnValue(new Promise(() => {}))
 
-    renderWithQuery(<Panel pendingCount={2} onConfirm={onConfirm} />)
-    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
+    renderWithQuery(<Panel cases={[testCase()]} onConfirm={onConfirm} />)
+    await user.click(screen.getByRole('button', { name: /confirm 1 case$/i }))
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /confirm 1 case$/i }))
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /confirming/i })).toBeDisabled()
+      expect(within(dialog).getByRole('button', { name: /confirming/i })).toBeDisabled()
     })
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
-})
 
-describe('ConfirmDocumentation pending feedback', () => {
-  it('shows a spinner inside the button while the confirmation is in flight', async () => {
+  it('keeps the dialog open and the action available when confirmation fails', async () => {
     const user = userEvent.setup()
-    let release: (value: ConfirmDocumentationResult) => void = () => {}
-    const onConfirm = vi.fn(
-      () =>
-        new Promise<ConfirmDocumentationResult>((resolve) => {
-          release = resolve
-        }),
-    )
+    const onConfirm = vi.fn().mockRejectedValue(new Error('network down'))
 
-    const { container } = renderWithQuery(
-      <Panel pendingCount={3} onConfirm={onConfirm} />,
-    )
-    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
+    renderWithQuery(<Panel cases={[testCase()]} onConfirm={onConfirm} />)
+    await user.click(screen.getByRole('button', { name: /confirm 1 case$/i }))
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /confirm 1 case$/i }))
 
     await waitFor(() => {
-      expect(container.querySelector('.spinner')).not.toBeNull()
+      expect(within(dialog).getByRole('button', { name: /confirm 1 case$/i })).toBeEnabled()
     })
-
-    release(result())
-    await waitFor(() => {
-      expect(container.querySelector('.spinner')).toBeNull()
-    })
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
-  it('keeps the spinner out of the accessibility tree so the button name stays readable', async () => {
+  it('never renders its own status or alert text, leaving outcome and error feedback to the toaster', async () => {
     const user = userEvent.setup()
-    const onConfirm = vi.fn(() => new Promise<ConfirmDocumentationResult>(() => {}))
+    const onConfirm = vi.fn().mockResolvedValue(result({ skippedCount: 1 }))
 
-    const { container } = renderWithQuery(
-      <Panel pendingCount={3} onConfirm={onConfirm} />,
-    )
-    await user.click(screen.getByRole('button', { name: /confirm documentation/i }))
+    renderWithQuery(<Panel cases={[testCase()]} onConfirm={onConfirm} />)
+    await user.click(screen.getByRole('button', { name: /confirm 1 case$/i }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: /confirm 1 case$/i }))
 
     await waitFor(() => {
-      expect(container.querySelector('.spinner')).toHaveAttribute('aria-hidden', 'true')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
-    expect(screen.getByRole('button', { name: /confirming/i })).toBeInTheDocument()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })

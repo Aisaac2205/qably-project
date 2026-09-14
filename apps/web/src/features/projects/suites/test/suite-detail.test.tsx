@@ -302,10 +302,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
     expect(
-      screen.getByText(/1 documented case is waiting for your confirmation/i),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('button', { name: /confirm documentation/i }),
+      screen.getByRole('button', { name: /confirm 1 case$/i }),
     ).toBeInTheDocument()
   })
 
@@ -333,7 +330,7 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
     expect(
-      screen.queryByRole('button', { name: /confirm documentation/i }),
+      screen.queryByRole('button', { name: /confirm \d+ case/i }),
     ).not.toBeInTheDocument()
   })
 
