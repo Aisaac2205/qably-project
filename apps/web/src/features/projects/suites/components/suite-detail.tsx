@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
@@ -31,6 +31,7 @@ import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
+import { groupCasesForDisplay } from '@/features/projects/suites/lib/case-groups'
 import { HealthSignalChip } from './health-signal-chip'
 import { DocumentWithAeris, useDocumentFiles } from './document-with-aeris'
 import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
@@ -146,6 +147,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   const pendingDocCount = suite.undocumentedCount
   const awaitingCases = casesAwaitingConfirmation(suite.cases)
+  const caseGroups = groupCasesForDisplay(suite.cases)
   const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
   const cannotRunEmptySuite = suite.manualCases === 0 && suite.cases.length === 0
 
@@ -354,6 +356,31 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                   {t('suites.noCasesCta')}
                 </button>
               </div>
+            ) : caseGroups ? (
+              caseGroups.map((group) => (
+                <Fragment key={group.key}>
+                  <div className="flex items-center gap-2 py-2 px-4 sm:px-5 bg-surface-hover text-xs font-bold uppercase tracking-wide text-muted">
+                    {t(
+                      group.key === 'needsAttention'
+                        ? 'suites.caseGroupNeedsAttention'
+                        : 'suites.caseGroupDocumented',
+                    )}
+                    <span className="font-mono tabular-nums normal-case tracking-normal rounded-full border border-border bg-surface px-2 text-[11px] text-default">
+                      {group.cases.length}
+                    </span>
+                  </div>
+                  {group.cases.map((tc) => (
+                    <CaseCard
+                      key={tc.id}
+                      testCase={tc}
+                      projectId={projectId}
+                      githubRepo={project?.githubRepo}
+                      onEdit={handleEditCase}
+                      onDelete={setDeletingCase}
+                    />
+                  ))}
+                </Fragment>
+              ))
             ) : (
               suite.cases.map((tc) => (
                 <CaseCard

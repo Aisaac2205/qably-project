@@ -438,4 +438,88 @@ describe('SuiteDetail (redesigned)', () => {
       expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites')
     })
   })
+
+  describe('case list grouping', () => {
+    function documentedCase(id: string) {
+      return createMockTestCase({
+        id,
+        executionMode: 'automated',
+        state: 'active',
+        steps: ['Log in'],
+        expectedResult: 'The dashboard opens',
+      })
+    }
+
+    function undocumentedCase(id: string) {
+      return createMockTestCase({ id, executionMode: 'automated', state: 'draft' })
+    }
+
+    it('renders a short mixed suite flat, with no group headers', async () => {
+      const shortSuite = createMockSuite({
+        id: 'suite-short-mixed',
+        manualCases: 0,
+        automatedCases: 3,
+        undocumentedCount: 1,
+        cases: [documentedCase('c1'), documentedCase('c2'), undocumentedCase('c3')],
+      })
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(shortSuite)
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-short-mixed" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
+      expect(screen.queryByText('Documented')).not.toBeInTheDocument()
+    })
+
+    it('groups a large, fully documented suite under a single "Documented" header', async () => {
+      const cases = Array.from({ length: 9 }, (_, i) => documentedCase(`c${i}`))
+      const bigDocumentedSuite = createMockSuite({
+        id: 'suite-big-documented',
+        manualCases: 0,
+        automatedCases: 9,
+        undocumentedCount: 0,
+        cases,
+      })
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(bigDocumentedSuite)
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-big-documented" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
+      const heading = screen.getByText('Documented')
+      expect(heading).toBeInTheDocument()
+      expect(within(heading.parentElement as HTMLElement).getByText('9')).toBeInTheDocument()
+    })
+
+    it('splits a large mixed suite into needs-attention and documented groups', async () => {
+      const cases = [
+        ...Array.from({ length: 7 }, (_, i) => documentedCase(`d${i}`)),
+        undocumentedCase('u1'),
+        undocumentedCase('u2'),
+      ]
+      const bigMixedSuite = createMockSuite({
+        id: 'suite-big-mixed',
+        manualCases: 0,
+        automatedCases: 9,
+        undocumentedCount: 2,
+        cases,
+      })
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(bigMixedSuite)
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-big-mixed" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      const attentionHeading = screen.getByText('Needs attention')
+      const documentedHeading = screen.getByText('Documented')
+      expect(within(attentionHeading.parentElement as HTMLElement).getByText('2')).toBeInTheDocument()
+      expect(within(documentedHeading.parentElement as HTMLElement).getByText('7')).toBeInTheDocument()
+      expect(
+        attentionHeading.compareDocumentPosition(documentedHeading) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+    })
+  })
 })

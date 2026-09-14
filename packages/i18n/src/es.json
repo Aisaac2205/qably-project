@@ -793,6 +793,8 @@
     "documentCase": "Documentar este caso",
     "caseUndocumented": "Sin documentar",
     "caseAwaitingConfirmation": "Sin confirmar",
+    "caseGroupNeedsAttention": "Necesita atención",
+    "caseGroupDocumented": "Documentado",
     "documentedInLocale": "Documentado en {{locale}}",
     "redocumentStale": "Redocumentar {{count}} desactualizados",
     "localeNameEs": "español",

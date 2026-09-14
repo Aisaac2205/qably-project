@@ -794,6 +794,8 @@
     "documentCase": "Document this case",
     "caseUndocumented": "Undocumented",
     "caseAwaitingConfirmation": "Unconfirmed",
+    "caseGroupNeedsAttention": "Needs attention",
+    "caseGroupDocumented": "Documented",
     "documentedInLocale": "Documented in {{locale}}",
     "redocumentStale": "Redocument {{count}} outdated",
     "localeNameEs": "Spanish",
