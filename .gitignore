@@ -14,6 +14,7 @@ apps/api/generated/
 .atl/
 openspec/
 .playwright-mcp/
+.impeccable/
 
 # Local analysis — not for version control
 docs/superpowers/
