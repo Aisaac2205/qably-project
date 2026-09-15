@@ -370,7 +370,13 @@
     "traceabilityCalendarLabel": "{{year}} traceability calendar",
     "traceabilityDayEmpty": "No traceability events on {{date}}.",
     "governanceHumanAuthority": "Human authority required for every publication",
-    "governanceTraceability": "Bidirectional traceability by design"
+    "governanceTraceability": "Bidirectional traceability by design",
+    "filterProjects": "Filter projects by name",
+    "sortByProject": "Sort by project",
+    "sortByLastRun": "Sort by last run",
+    "sortByPassRate": "Sort by pass rate",
+    "sortBySuites": "Sort by suites",
+    "showingOf": "Showing {{count}} of {{total}}"
   },
   "quality": {
     "breadcrumb": "Quality",

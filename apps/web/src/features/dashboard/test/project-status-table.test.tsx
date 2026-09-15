@@ -1,4 +1,4 @@
-import { render, screen, act, within } from '@testing-library/react'
+import { render, screen, act, within, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ProjectActivity, ProjectListItem } from '@qably/types'
@@ -129,7 +129,9 @@ describe('ProjectStatusTable', () => {
   it('reports the pass rate once the api measures run activity', async () => {
     await renderWithProjects([{ ...projectFixtures[0], activity: activity({ healthScore: 90 }) }])
 
-    expect(screen.getByText('90%')).toBeInTheDocument()
+    const [row] = screen.getAllByRole('row').slice(1)
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[2]).toHaveTextContent('90%')
   })
 
   it('says the pass rate is not measured instead of showing 0% for an empty window', async () => {
@@ -137,8 +139,10 @@ describe('ProjectStatusTable', () => {
       { ...projectFixtures[0], activity: activity({ healthScore: null }) },
     ])
 
-    expect(screen.queryByText(/%/)).not.toBeInTheDocument()
-    expect(screen.getByText('Not measured yet')).toBeInTheDocument()
+    const [row] = screen.getAllByRole('row').slice(1)
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[2]).not.toHaveTextContent('%')
+    expect(cells[2]).toHaveTextContent('Not measured yet')
   })
 
   it('says a project has never run instead of inventing a status', async () => {
@@ -188,5 +192,95 @@ describe('ProjectStatusTable', () => {
       'href',
       '/projects/proj-1/repository',
     )
+  })
+
+  it('declares its own container context', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectStatusTable />)
+    })
+
+    const table = screen.getByRole('table', { name: 'Project status' })
+    expect(table.closest('[data-slot="card"]')).toHaveClass('@container')
+  })
+
+  it('caps the visible rows and shows a count against the full org total', async () => {
+    const projects = Array.from({ length: 9 }, (_, i) => ({
+      ...projectFixtures[0],
+      id: `p-${i}`,
+      name: `Project ${i}`,
+      activity: activity({ healthScore: 90 - i }),
+    }))
+
+    await renderWithProjects(projects)
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(6)
+    expect(screen.getByText('Showing 6 of 9')).toBeInTheDocument()
+  })
+
+  it('toggles aria-sort on the clicked column and reorders rows', async () => {
+    await renderWithProjects([
+      { ...projectFixtures[0], name: 'Zeta', activity: activity() },
+      { ...projectFixtures[1], name: 'Alpha', activity: activity() },
+    ])
+
+    const nameHeader = screen.getByRole('columnheader', { name: 'Project' })
+    expect(nameHeader).toHaveAttribute('aria-sort', 'none')
+
+    const sortButton = screen.getByRole('button', { name: 'Sort by project' })
+    await act(async () => {
+      sortButton.click()
+    })
+
+    expect(nameHeader).toHaveAttribute('aria-sort', 'ascending')
+    let rows = screen.getAllByRole('row').slice(1)
+    expect(within(rows[0]).getByText('Alpha')).toBeInTheDocument()
+
+    await act(async () => {
+      sortButton.click()
+    })
+
+    expect(nameHeader).toHaveAttribute('aria-sort', 'descending')
+    rows = screen.getAllByRole('row').slice(1)
+    expect(within(rows[0]).getByText('Zeta')).toBeInTheDocument()
+  })
+
+  it('filters by name across the full org list, surfacing a project outside the visible cap', async () => {
+    const fillers = Array.from({ length: 8 }, (_, i) => ({
+      ...projectFixtures[0],
+      id: `filler-${i}`,
+      name: `Filler ${i}`,
+      activity: activity({ healthScore: 80 - i * 5 }),
+    }))
+    const needle = {
+      ...projectFixtures[0],
+      id: 'needle',
+      name: 'Needle App',
+      activity: activity({ healthScore: 100 }),
+    }
+
+    await renderWithProjects([...fillers, needle])
+
+    expect(screen.queryByText('Needle App')).not.toBeInTheDocument()
+
+    const filterInput = screen.getByRole('searchbox', { name: 'Filter projects by name' })
+    await act(async () => {
+      fireEvent.change(filterInput, { target: { value: 'needle' } })
+    })
+
+    expect(screen.getByText('Needle App')).toBeInTheDocument()
+  })
+
+  it('marks the pass-rate and suites columns to collapse in a narrow container, with a name-cell metrics line as the fallback', async () => {
+    await renderWithProjects([{ ...projectFixtures[0], activity: activity({ aiPendingCount: 2 }) }])
+
+    const passRateHeader = screen.getByRole('columnheader', { name: 'Pass rate' })
+    const suitesHeader = screen.getByRole('columnheader', { name: 'Suites' })
+    expect(passRateHeader).toHaveClass('@max-2xl:hidden')
+    expect(suitesHeader).toHaveClass('@max-2xl:hidden')
+
+    const [row] = screen.getAllByRole('row').slice(1)
+    const metricsLine = within(row).getByTestId('project-row-metrics')
+    expect(metricsLine).toHaveClass('@2xl:hidden')
   })
 })
