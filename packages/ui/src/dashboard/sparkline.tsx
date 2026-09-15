@@ -10,6 +10,14 @@ const TONE_FILL: Record<SparklineTone, string> = {
   primary: 'fill-qb-primary',
 }
 
+const TONE_STROKE: Record<SparklineTone, string> = {
+  pass: 'stroke-qb-pass',
+  fail: 'stroke-qb-fail',
+  warn: 'stroke-qb-warn',
+  muted: 'stroke-qb-muted',
+  primary: 'stroke-qb-primary',
+}
+
 export interface SparklineProps {
   values: readonly number[]
   label: string
@@ -54,9 +62,9 @@ export function Sparkline({
       className={className ?? ''}
     >
       <Line
-        type="linear"
+        type="monotone"
         dataKey="value"
-        className="stroke-qb-muted"
+        className={TONE_STROKE[tone]}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"

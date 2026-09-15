@@ -82,12 +82,25 @@ describe('TrendChart', () => {
     expect(table).toHaveTextContent('90%')
   })
 
-  it('renders the area fill and line stroke from the qb chart line token, never a hardcoded colour', () => {
+  it('renders the line stroke from the qb chart line token, never a hardcoded colour', () => {
+    const { container } = render(<TrendChart points={points} label="Pass rate" emptyLabel="No runs yet" />)
+
+    const curve = container.querySelector('.recharts-area-curve')
+    expect(curve?.getAttribute('stroke')).toBe('var(--qb-chart-line)')
+  })
+
+  it('fills the area with a gradient of the qb chart line token, never a hardcoded colour', () => {
     const { container } = render(<TrendChart points={points} label="Pass rate" emptyLabel="No runs yet" />)
 
     const area = container.querySelector('.recharts-area-area')
-    expect(area?.getAttribute('fill')).toBe('var(--qb-chart-line)')
-    const curve = container.querySelector('.recharts-area-curve')
-    expect(curve?.getAttribute('stroke')).toBe('var(--qb-chart-line)')
+    const fill = area?.getAttribute('fill') ?? ''
+    expect(fill).toMatch(/^url\(#.+\)$/)
+
+    const gradientId = fill.slice(5, -1)
+    const stops = container.querySelectorAll(`#${CSS.escape(gradientId)} stop`)
+    expect(stops.length).toBeGreaterThan(0)
+    for (const stop of stops) {
+      expect(stop.getAttribute('stop-color')).toBe('var(--qb-chart-line)')
+    }
   })
 })

@@ -47,6 +47,7 @@ export function TrendChart({
 }: TrendChartProps) {
   const [active, setActive] = useState<number | null>(null)
   const tooltipId = useId()
+  const gradientId = useId()
 
   if (points.length === 0) {
     return <p className="py-8 text-center text-xs text-qb-muted">{emptyLabel}</p>
@@ -85,6 +86,12 @@ export function TrendChart({
           tabIndex={-1}
           margin={{ top: PLOT_TOP, right: WIDTH - PLOT_RIGHT, bottom: 0, left: PLOT_LEFT - Y_AXIS_WIDTH }}
         >
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--qb-chart-line)" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="var(--qb-chart-line)" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
           <CartesianGrid
             horizontal
             vertical={false}
@@ -110,14 +117,13 @@ export function TrendChart({
             tick={{ className: 'fill-qb-muted', fontSize: 10 }}
           />
           <Area
-            type="linear"
+            type="monotone"
             dataKey="value"
             stroke="var(--qb-chart-line)"
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
-            fill="var(--qb-chart-line)"
-            fillOpacity={0.08}
+            fill={`url(#${gradientId})`}
             isAnimationActive={false}
             activeDot={false}
             dot={(dotProps: { cx?: number; cy?: number; index?: number }) => {
