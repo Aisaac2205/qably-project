@@ -10,11 +10,24 @@ import {
 } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import { SelectSimple } from '@/components/ui/select'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StateView } from '@/components/ui/state-view'
+import { Button } from '@/components/ui/button'
 import { formatEventCount } from '../lib/format'
 import { useTraceabilityCalendar } from '../hooks/use-traceability-calendar'
 import { TraceabilityCalendar } from './traceability-calendar'
 import { describeDay } from './traceability-tooltip'
 import type { TraceabilityFilter } from '../types/traceability-calendar'
+
+function TraceabilityCalendarSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      <Skeleton className="h-4 w-40 rounded" />
+      <Skeleton className="h-28 w-full rounded-lg" />
+    </div>
+  )
+}
 
 export function TraceabilitySection({ projectId }: { projectId?: string } = {}) {
   const { t, locale } = useTranslation()
@@ -25,7 +38,7 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [activeFilter, setActiveFilter] = useState<TraceabilityFilter>('all')
 
-  const { weeks, monthLabels, totalEvents, breakdownTotals } =
+  const { weeks, monthLabels, totalEvents, breakdownTotals, isLoading, isError, retry } =
     useTraceabilityCalendar({
       year: selectedYear,
       activeFilter,
@@ -70,11 +83,12 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
   ] as const
 
   return (
-    <section
+    <Card
+      as="section"
       aria-labelledby="traceability-section-heading"
-      className="overflow-hidden rounded-xl border border-border bg-surface shadow-xs"
+      className="@container overflow-hidden"
     >
-      <div className="flex flex-col gap-3 border-b border-border bg-canvas px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+      <div className="flex flex-col gap-3 border-b border-border bg-canvas px-4 py-3.5 @md:flex-row @md:items-center @md:justify-between @md:px-5">
         <h2
           id="traceability-section-heading"
           className="text-base font-semibold tracking-[-0.015em] text-default"
@@ -106,17 +120,32 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
         </div>
       </div>
 
-      <div className="px-4 pt-4 pb-3 sm:px-5">
-        <TraceabilityCalendar
-          weeks={weeks}
-          monthLabels={monthLabels}
-          locale={locale === 'en' ? 'en' : 'es'}
-          caption={t('dashboard.traceabilityCalendarLabel', { year: selectedYear })}
-          dayLabel={(day) => describeDay(t, day)}
-          lessLabel={t('dashboard.less')}
-          moreLabel={t('dashboard.more')}
-        />
+      <div className="px-4 pt-4 pb-3 @md:px-5">
+        {isError ? (
+          <StateView
+            kind="error"
+            title={t('dashboard.loadErrorTitle')}
+            description={t('dashboard.loadErrorDescription')}
+            action={
+              <Button type="button" variant="outline" size="sm" onClick={retry}>
+                {t('common.retry')}
+              </Button>
+            }
+          />
+        ) : isLoading ? (
+          <TraceabilityCalendarSkeleton />
+        ) : (
+          <TraceabilityCalendar
+            weeks={weeks}
+            monthLabels={monthLabels}
+            locale={locale === 'en' ? 'en' : 'es'}
+            caption={t('dashboard.traceabilityCalendarLabel', { year: selectedYear })}
+            dayLabel={(day) => describeDay(t, day)}
+            lessLabel={t('dashboard.less')}
+            moreLabel={t('dashboard.more')}
+          />
+        )}
       </div>
-    </section>
+    </Card>
   )
 }

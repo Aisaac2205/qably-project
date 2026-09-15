@@ -28,6 +28,7 @@ function emptyRecord(year: number): TraceabilityCalendarRecord {
 export interface TraceabilityCalendarState extends TraceabilityCalendarData {
   readonly isLoading: boolean
   readonly isError: boolean
+  readonly retry: () => void
 }
 
 export function useTraceabilityCalendar({
@@ -57,5 +58,8 @@ export function useTraceabilityCalendar({
     activeFilter,
     isLoading: query.isLoading,
     isError: query.isError,
+    retry: () => {
+      void query.refetch()
+    },
   }
 }

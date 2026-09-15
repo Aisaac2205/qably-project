@@ -1,14 +1,24 @@
-import { screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { TraceabilitySection } from '@/features/dashboard/components/traceability-section'
 import { __resetStore } from '@/lib/mock-store'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { renderWithQuery, createTestQueryClient } from '@/lib/query-test-utils'
+import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
 import { useI18nStore } from '@/lib/i18n'
 import { traceabilityCalendarFixture } from '@/test/dashboard-api-stub'
+import { getTraceabilityCalendar } from '@/features/dashboard/api/dashboard.api'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+
+vi.mock('@/features/dashboard/api/dashboard.api', () => ({
+  getDashboardSummary: vi.fn(),
+  getTraceabilityCalendar: vi.fn(),
+}))
+
+const getTraceability = vi.mocked(getTraceabilityCalendar)
 
 vi.mock('next/link', () => ({
   default: ({
@@ -30,6 +40,7 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
   beforeEach(() => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
+    getTraceability.mockResolvedValue(traceabilityCalendarFixture)
   })
 
   it('summarises the year in a single heading line', async () => {
@@ -130,5 +141,57 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
 
     const [, yearTrigger] = screen.getAllByRole('combobox')
     expect(yearTrigger).toHaveTextContent(String(new Date().getFullYear()))
+  })
+
+  it('declares its own container context on the card surface, without the legacy shadow', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const region = screen.getByRole('region', { name: /traceability events in/i })
+    expect(region).toHaveClass('@container')
+    expect(region.className).not.toContain('shadow-xs')
+  })
+
+  it('shows a skeleton in the body while the calendar loads, keeping the header visible', async () => {
+    getTraceability.mockReturnValue(new Promise(() => {}))
+    const client = createTestQueryClient()
+    const year = new Date().getFullYear()
+    client.removeQueries({ queryKey: dashboardKeys.traceability(year, 'all') })
+
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <TraceabilitySection />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getAllByRole('combobox').length).toBe(2)
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0)
+  })
+
+  it('shows one error state with a retry action wired to the traceability query when it fails', async () => {
+    getTraceability.mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+    const year = new Date().getFullYear()
+    client.removeQueries({ queryKey: dashboardKeys.traceability(year, 'all') })
+
+    render(
+      <QueryClientProvider client={client}>
+        <TraceabilitySection />
+      </QueryClientProvider>,
+    )
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toBeInTheDocument()
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+
+    getTraceability.mockResolvedValueOnce(traceabilityCalendarFixture)
+    const retryButton = screen.getByRole('button', { name: 'Retry' })
+    await act(async () => {
+      retryButton.click()
+    })
+
+    await waitFor(() => expect(screen.getByRole('grid')).toBeInTheDocument())
   })
 })
