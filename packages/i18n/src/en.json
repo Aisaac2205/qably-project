@@ -766,6 +766,7 @@
     "manualCasesCount_other": "{{count}} manual cases",
     "sourceCi": "CI",
     "sourceManual": "Manual",
+    "sourceApi": "API",
     "newSuite": "New suite",
     "createSuite": "Create suite",
     "editSuite": "Edit suite",

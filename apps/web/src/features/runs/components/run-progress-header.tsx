@@ -4,6 +4,7 @@ import type { RunRecord } from '@qably/types'
 import { GitCommit } from '@phosphor-icons/react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
+import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { StatusChip } from './status-chip'
 import { useTranslation } from '@/lib/i18n'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
@@ -49,6 +50,7 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
   const sourceTooltipKey = SOURCE_TOOLTIP_KEYS[run.source]
   const sourceTooltip = sourceTooltipKey ? t(sourceTooltipKey) : sourceLabel
   const isCi = isCiRun(run)
+  const isManual = run.source === 'manual'
   const { title, subtitle } = runTitleParts(run, suite?.name ?? '')
 
   return (
@@ -84,12 +86,20 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
                   className={
                     isCi
                       ? 'inline-flex min-h-6 min-w-6 items-center justify-center rounded text-brand-github-actions focus-visible:outline-2 focus-visible:outline-primary'
-                      : 'inline-flex min-h-6 min-w-6 items-center justify-center rounded-full border border-border/80 bg-canvas px-2.5 py-1 text-xs font-semibold text-default focus-visible:outline-2 focus-visible:outline-primary'
+                      : isManual
+                        ? 'inline-flex min-h-6 min-w-6 items-center justify-center rounded text-primary focus-visible:outline-2 focus-visible:outline-primary'
+                        : 'inline-flex min-h-6 min-w-6 items-center justify-center rounded-full border border-border/80 bg-canvas px-2.5 py-1 text-xs font-semibold text-default focus-visible:outline-2 focus-visible:outline-primary'
                   }
                 />
               }
             >
-              {isCi ? <GithubActionsIcon className="size-4" aria-hidden="true" /> : sourceLabel}
+              {isCi ? (
+                <GithubActionsIcon className="size-4" aria-hidden="true" />
+              ) : isManual ? (
+                <QablyMarkIcon className="size-4" aria-hidden="true" />
+              ) : (
+                sourceLabel
+              )}
             </TooltipTrigger>
             <TooltipContent>{sourceTooltip}</TooltipContent>
           </Tooltip>

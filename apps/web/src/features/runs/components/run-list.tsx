@@ -14,6 +14,7 @@ import { useTranslation } from '@/lib/i18n'
 import { docsUrl } from '@/lib/docs-url'
 import { GitCommit } from '@phosphor-icons/react'
 import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
+import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { formatPassRate, isCiRun, runTitleParts } from '../lib/format'
 import { RunDeltaChip } from './run-delta-chip'
 
@@ -41,6 +42,7 @@ function RunRow({
 }) {
   const { t } = useTranslation()
   const isCi = isCiRun(run)
+  const isManual = run.source === 'manual'
   const { title, subtitle } = runTitleParts(run, run.suiteName)
 
   return (
@@ -77,6 +79,16 @@ function RunRow({
               <GithubActionsIcon className="size-5" aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent>{t('runs.sourceCi')}</TooltipContent>
+          </Tooltip>
+        ) : isManual ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={<span tabIndex={0} aria-label={t('runs.sourceManual')} />}
+              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-primary focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <QablyMarkIcon className="size-5" aria-hidden="true" />
+            </TooltipTrigger>
+            <TooltipContent>{t('runs.sourceManual')}</TooltipContent>
           </Tooltip>
         ) : (
           <Badge variant="outline" className="hidden sm:inline-flex font-normal text-xs">

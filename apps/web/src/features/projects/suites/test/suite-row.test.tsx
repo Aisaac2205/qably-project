@@ -127,6 +127,26 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.getByText(/ago/i)).toBeInTheDocument()
   })
 
+  it('shows the Qably mark, not text, for a manual last run', async () => {
+    const { container } = renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
+    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-label="Manual"]')).toBeInTheDocument()
+  })
+
+  it('shows the GitHub Actions mark, not text, for a CI last run', async () => {
+    const ciRunMetrics = { ...metrics, lastRun: { ...mockRun, source: 'github_actions' as const } }
+    const { container } = renderWithQuery(<SuiteRow suite={mockSuite} metrics={ciRunMetrics} />)
+    expect(screen.queryByText('CI')).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-label="CI"]')).toBeInTheDocument()
+  })
+
+  it('labels an api-sourced last run as API, not Manual', async () => {
+    const apiRunMetrics = { ...metrics, lastRun: { ...mockRun, source: 'api' as const } }
+    renderWithQuery(<SuiteRow suite={mockSuite} metrics={apiRunMetrics} />)
+    expect(screen.getByText('API')).toBeInTheDocument()
+    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
+  })
+
   it('renders "Never" when no last run', async () => {
     const noRunMetrics = { ...metrics, lastRun: undefined }
     await act(async () => {

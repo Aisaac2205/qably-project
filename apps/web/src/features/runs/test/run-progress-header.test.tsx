@@ -59,12 +59,14 @@ describe('RunProgressHeader', () => {
     expect(screen.getByText('Running')).toBeInTheDocument()
   })
 
-  it('renders source label', async () => {
+  it('shows the Qably mark instead of a text label on the source chip for manual runs', async () => {
     await act(async () => {
       renderWithQuery(<RunProgressHeader run={mockRun} />)
     })
-    // Source is rendered as a human-readable label: manual → Manual
-    expect(screen.getByText('Manual')).toBeInTheDocument()
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip).toHaveAttribute('aria-label', 'Manual')
+    expect(chip.querySelector('svg')).toBeInTheDocument()
+    expect(chip).not.toHaveTextContent('Manual')
   })
 
   it('renders dates', async () => {
@@ -139,12 +141,22 @@ describe('RunProgressHeader', () => {
     expect(chip.className).toContain('text-brand-github-actions')
   })
 
-  it('keeps the bordered pill for non-CI sources', async () => {
+  it('keeps the bordered pill for the api source', async () => {
     await act(async () => {
-      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'manual' }} />)
+      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'api' }} />)
     })
     const chip = screen.getByTestId('run-source-chip')
     expect(chip.className).toContain('border')
     expect(chip.className).toContain('bg-canvas')
+  })
+
+  it('shows the Qably mark as a bare icon, with no pill card, for manual runs', async () => {
+    await act(async () => {
+      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'manual' }} />)
+    })
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip.className).not.toContain('border')
+    expect(chip.className).not.toContain('bg-canvas')
+    expect(chip.className).toContain('text-primary')
   })
 })

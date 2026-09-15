@@ -166,6 +166,14 @@ describe('RunList evidence', () => {
     expect(screen.getByTitle('GitHub Actions')).toBeInTheDocument()
   })
 
+  it('shows the Qably mark instead of a text badge for a manual run', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" source="manual" />)
+    })
+    expect(screen.queryByText('manual')).not.toBeInTheDocument()
+    expect(screen.getAllByTitle('Qably').length).toBeGreaterThan(0)
+  })
+
   it('omits the delta chip when a run has nothing to compare against', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)

@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { StatusChip } from '@/components/ui/status-chip'
 import { RunHistoryStrip } from './run-history-strip'
 import { InlineEditableText } from './inline-editable-text'
+import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
+import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
@@ -117,13 +119,43 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
       </div>
 
       {/* Col 4: last run reference (hidden on mobile) */}
-      <div className="hidden md:flex flex-col items-end shrink-0 w-24">
+      <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 w-24">
         <span className="text-xs font-medium text-default">
           {formatRelative(lastRun?.startedAt, locale, t('suites.never'))}
         </span>
-        <span className="text-xs text-muted mt-0.5">
-          {lastRun?.source === 'github_actions' ? t('suites.sourceCi') : lastRun ? t('suites.sourceManual') : ''}
-        </span>
+        {lastRun && (
+          <span
+            aria-label={
+              lastRun.source === 'github_actions'
+                ? t('suites.sourceCi')
+                : lastRun.source === 'manual'
+                  ? t('suites.sourceManual')
+                  : t('suites.sourceApi')
+            }
+            title={
+              lastRun.source === 'github_actions'
+                ? t('suites.sourceCi')
+                : lastRun.source === 'manual'
+                  ? t('suites.sourceManual')
+                  : t('suites.sourceApi')
+            }
+            className={
+              lastRun.source === 'github_actions'
+                ? 'text-brand-github-actions'
+                : lastRun.source === 'manual'
+                  ? 'text-primary'
+                  : 'text-xs font-medium text-muted'
+            }
+          >
+            {lastRun.source === 'github_actions' ? (
+              <GithubActionsIcon className="size-3.5" />
+            ) : lastRun.source === 'manual' ? (
+              <QablyMarkIcon className="size-3.5" />
+            ) : (
+              t('suites.sourceApi')
+            )}
+          </span>
+        )}
       </div>
 
       {/* Col 5: run history strip (hidden on mobile) */}
