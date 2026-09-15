@@ -122,6 +122,7 @@ export function TrendChart({
             strokeLinecap="round"
             strokeLinejoin="round"
             fill={`url(#${gradientId})`}
+            fillOpacity={1}
             isAnimationActive={false}
             activeDot={false}
             dot={(dotProps: { cx?: number; cy?: number; index?: number }) => {
