@@ -252,7 +252,7 @@ describe('QualityPage', () => {
       retryButton.click()
     })
 
-    expect(await screen.findByText('82%')).toBeInTheDocument()
+    expect((await screen.findAllByText('82%')).length).toBeGreaterThan(0)
   })
 
   describe('once loaded', () => {
@@ -274,9 +274,18 @@ describe('QualityPage', () => {
     })
 
     it('shows the pass rate KPI with its value and a link to runs', async () => {
-      await screen.findByText('82%')
-      const passRateLink = screen.getByText('82%').closest('a')
-      expect(passRateLink).toHaveAttribute('href', '/projects/proj-1/runs')
+      const passRateValues = await screen.findAllByText('82%')
+      const passRateLink = passRateValues
+        .map((el) => el.closest('a'))
+        .find((a) => a?.getAttribute('href') === '/projects/proj-1/runs')
+      expect(passRateLink).toBeTruthy()
+    })
+
+    it('shows the current pass rate as a ring inside the trend section', async () => {
+      await screen.findAllByText('82%')
+      const trendHeading = screen.getByRole('heading', { name: 'Pass rate trend' })
+      const trendSection = trendHeading.closest('section') as HTMLElement
+      expect(within(trendSection).getByText('Current')).toBeInTheDocument()
     })
 
     it('shows the pending proposals KPI linking to the review inbox', async () => {

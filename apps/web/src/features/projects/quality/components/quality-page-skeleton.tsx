@@ -39,7 +39,10 @@ export function QualityPageSkeleton() {
 
       <div className="rounded-xl border border-border bg-surface p-4 shadow-card sm:p-5">
         <Skeleton className="mb-3 h-4 w-56" />
-        <Skeleton className="h-[120px] w-full" />
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <Skeleton className="size-24 shrink-0 rounded-full sm:size-28" />
+          <Skeleton className="h-[120px] min-w-0 flex-1" />
+        </div>
       </div>
 
       <div className="space-y-3">

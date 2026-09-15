@@ -13,6 +13,7 @@ import { projectRootPath, reviewInboxPath } from '@/features/projects/lib/routes
 import { useProposals } from '@/features/review-inbox/hooks/use-proposals'
 import { useRecentRuns, useRegressions, useSuiteMetricsQuery } from '@/features/runs/hooks/use-runs'
 import { useTranslation } from '@/lib/i18n'
+import { PassRateRing } from './pass-rate-ring'
 import { PassRateTrendFigure } from './pass-rate-trend-figure'
 import { RegressionsList } from './regressions-list'
 import { SuitesHealthTable } from './suites-health-table'
@@ -155,7 +156,12 @@ export function QualityPage({ projectId }: { projectId: string }) {
             onRetry={() => void recentRuns.refetch()}
           />
         ) : (
-          <PassRateTrendFigure points={trendPoints} />
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+            <PassRateRing percent={passRatePercent} label={t('quality.trendCurrentLabel')} />
+            <div className="min-w-0 flex-1">
+              <PassRateTrendFigure points={trendPoints} />
+            </div>
+          </div>
         )}
       </section>
 

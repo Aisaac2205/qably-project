@@ -426,6 +426,7 @@
     "trendEmptyDescription": "Run a suite to start tracking the pass rate trend.",
     "trendDateHeader": "Date",
     "trendPassRateHeader": "Pass rate",
+    "trendCurrentLabel": "Current",
     "regressionsHeading": "Recent regressions",
     "regressionsEmptyTitle": "No regressions",
     "regressionsEmptyDescription": "No regressions in the last {{count}} runs",
@@ -438,6 +439,7 @@
     "suitesColumnLastRun": "Last run",
     "suitesColumnPassRate": "Recent pass rate",
     "suitesColumnTrend": "Trend",
+    "suitesTrendHistoryLabel": "Recent results, oldest to newest: {{list}}",
     "suitesEmptyTitle": "No suites yet",
     "suitesEmptyDescription": "Create a suite to start tracking its health here.",
     "signals": {

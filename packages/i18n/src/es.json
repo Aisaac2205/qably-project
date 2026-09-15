@@ -426,6 +426,7 @@
     "trendEmptyDescription": "Ejecutá una suite para empezar a registrar la tendencia de tasa de aprobación.",
     "trendDateHeader": "Fecha",
     "trendPassRateHeader": "Tasa de aprobación",
+    "trendCurrentLabel": "Actual",
     "regressionsHeading": "Regresiones recientes",
     "regressionsEmptyTitle": "Sin regresiones",
     "regressionsEmptyDescription": "Sin regresiones en las últimas {{count}} corridas",
@@ -438,6 +439,7 @@
     "suitesColumnLastRun": "Última corrida",
     "suitesColumnPassRate": "Tasa de aprobación reciente",
     "suitesColumnTrend": "Tendencia",
+    "suitesTrendHistoryLabel": "Resultados recientes, de más antiguo a más reciente: {{list}}",
     "suitesEmptyTitle": "Todavía no hay suites",
     "suitesEmptyDescription": "Creá una suite para empezar a registrar su salud acá.",
     "signals": {
