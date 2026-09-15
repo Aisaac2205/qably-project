@@ -25,9 +25,10 @@ describe('DashboardPage', () => {
     const summary = screen.getByLabelText('Quality overview')
     expect(summary).toBeInTheDocument()
     expect(summary).toHaveTextContent('Runs')
-    expect(summary).toHaveTextContent('Pass rate')
+    expect(summary).toHaveTextContent('Failed test cases')
     expect(summary).toHaveTextContent('Pending AI')
     expect(summary).toHaveTextContent('Active runs')
+    expect(summary).not.toHaveTextContent('Pass rate')
   })
 
   it('renders the project status section', async () => {

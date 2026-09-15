@@ -11,6 +11,12 @@ import type {
   ExtractedProposal,
 } from '@qably/types'
 
+export interface DashboardAsyncState {
+  isLoading: boolean
+  isError: boolean
+  retry: () => void
+}
+
 export interface DashboardStats {
   totalProjects: number
   totalSuites: number
@@ -20,19 +26,26 @@ export interface DashboardStats {
   pendingProposals: number
   passRateLast7d: number
   passRateTrend: number
+  defectsDetected: number
   activeRuns: number
   projectsByHealth: Array<{ project: ProjectListItem }>
   recentRuns: RunSummaryRecord[]
   recentProposals: ExtractedProposal[]
   recentCiCommits: CiCommitActivityRecord[]
+  summaryState: DashboardAsyncState
+  projectsState: DashboardAsyncState
+  proposalsState: DashboardAsyncState
 }
 
 const RECENT_PROPOSALS_LIMIT = 5
 
 export function useDashboardStats(): DashboardStats {
-  const { projects } = useProjects()
-  const { summary } = useDashboardSummary()
-  const { proposals } = useProposals()
+  const projectsQuery = useProjects()
+  const summaryQuery = useDashboardSummary()
+  const proposalsQuery = useProposals()
+  const { projects } = projectsQuery
+  const { summary } = summaryQuery
+  const { proposals } = proposalsQuery
 
   return useMemo(() => {
     const inReview = proposals.filter((proposal) => proposal.status === 'in_review')
@@ -49,11 +62,33 @@ export function useDashboardStats(): DashboardStats {
       pendingProposals: inReview.length,
       passRateLast7d: summary ? Math.round(summary.passRate * 100) : 0,
       passRateTrend: summary ? Math.round(summary.passRateTrend * 100) : 0,
+      defectsDetected: summary?.defectsDetected ?? 0,
       activeRuns: summary?.activeRuns ?? 0,
       projectsByHealth: projects.map((project) => ({ project })),
       recentRuns: summary?.recentRuns ?? [],
       recentProposals,
       recentCiCommits: summary?.recentCiCommits ?? [],
+      summaryState: {
+        isLoading: summaryQuery.isLoading,
+        isError: summaryQuery.isError,
+        retry: () => {
+          void summaryQuery.refetch()
+        },
+      },
+      projectsState: {
+        isLoading: projectsQuery.isLoading,
+        isError: projectsQuery.isError,
+        retry: () => {
+          void projectsQuery.refetch()
+        },
+      },
+      proposalsState: {
+        isLoading: proposalsQuery.isLoading,
+        isError: proposalsQuery.isError,
+        retry: () => {
+          void proposalsQuery.refetch()
+        },
+      },
     }
-  }, [projects, summary, proposals])
+  }, [projects, summary, proposals, summaryQuery, projectsQuery, proposalsQuery])
 }
