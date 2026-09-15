@@ -112,12 +112,11 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.queryByText('Default suite')).not.toBeInTheDocument()
   })
 
-  it('renders cases count', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
-    })
-    expect(screen.getByText('1')).toBeInTheDocument()
-    expect(screen.getByText('case')).toBeInTheDocument()
+  it('renders the manual-case icon with an accessible count when the suite has only manual cases', async () => {
+    const { container } = renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
+    const composition = container.querySelector('[role="img"][aria-label*="manual"]')
+    expect(composition).toBeInTheDocument()
+    expect(composition).toHaveAttribute('aria-label', '1 manual case')
   })
 
   it('renders last run reference with relative time', async () => {
@@ -168,16 +167,18 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.getByText('Pass')).toBeInTheDocument()
   })
 
-  it('shows manual and automated counts when the suite has automated cases', async () => {
+  it('shows both the automated and manual icons with combined accessible counts for a mixed suite', async () => {
     const mixedSuite = createMockSuite({
       ...mockSuite,
       manualCases: 2,
       automatedCases: 3,
     })
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mixedSuite} metrics={{ ...metrics, suite: mixedSuite }} />)
-    })
-    expect(screen.getByText('2 · 3')).toBeInTheDocument()
+    const { container } = renderWithQuery(
+      <SuiteRow suite={mixedSuite} metrics={{ ...metrics, suite: mixedSuite }} />,
+    )
+    const composition = container.querySelector('[role="img"][aria-label*="automated"]')
+    expect(composition).toHaveAttribute('aria-label', '3 automated cases · 2 manual cases')
+    expect(container.querySelector('img[src="/logos/github.svg"]')).toBeInTheDocument()
   })
 
   it('click name enters edit mode', async () => {

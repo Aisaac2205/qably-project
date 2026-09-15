@@ -8,7 +8,8 @@
  * Mobile layout: 2 columns (icon + info + status)
  */
 import { memo } from 'react'
-import { TestTube, Star } from '@phosphor-icons/react'
+import Image from 'next/image'
+import { TestTube, Star, PencilSimple } from '@phosphor-icons/react'
 import type { Suite } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from '@/components/ui/status-chip'
@@ -87,20 +88,32 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         )}
       </div>
 
-      {/* Col 3: cases count (hidden on mobile) */}
-      <div className="hidden md:flex flex-col items-end shrink-0">
-        <span className="text-sm font-mono font-semibold text-default tabular-nums">
-          {suite.automatedCases > 0
-            ? `${suite.manualCases} · ${suite.automatedCases}`
-            : suite.cases.length}
-        </span>
-        <span className="text-xs text-muted mt-0.5">
-          {suite.automatedCases > 0
-            ? t('suites.manualAutomatedSuffix')
-            : suite.cases.length === 1
-              ? t('suites.caseSuffix_one')
-              : t('suites.caseSuffix_other')}
-        </span>
+      {/* Col 3: case composition, icon-only (hidden on mobile) */}
+      <div
+        role="img"
+        aria-label={
+          [
+            suite.automatedCases > 0
+              ? t('suites.automatedCasesCount', { count: suite.automatedCases })
+              : null,
+            suite.manualCases > 0
+              ? t('suites.manualCasesCount', { count: suite.manualCases })
+              : null,
+          ]
+            .filter((part): part is string => part !== null)
+            .join(' · ') || `${suite.cases.length} ${t('suites.caseSuffix_other')}`
+        }
+        className="hidden md:flex items-center gap-2 shrink-0"
+      >
+        {suite.automatedCases > 0 && (
+          <Image src="/logos/github.svg" alt="" width={14} height={14} aria-hidden="true" className="opacity-70" />
+        )}
+        {suite.manualCases > 0 && (
+          <PencilSimple size={14} weight="bold" aria-hidden="true" className="text-muted" />
+        )}
+        {suite.automatedCases === 0 && suite.manualCases === 0 && (
+          <span className="text-xs text-muted" aria-hidden="true">0</span>
+        )}
       </div>
 
       {/* Col 4: last run reference (hidden on mobile) */}
