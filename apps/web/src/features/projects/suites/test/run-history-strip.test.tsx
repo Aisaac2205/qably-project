@@ -45,10 +45,10 @@ describe('RunHistoryStrip', () => {
     expect(label).toMatch(/^Last 4 runs:/)
   })
 
-  it('shows the numeric pass rate in mono tabular figures', () => {
+  it('shows the numeric pass rate in tabular figures without a code-style typeface', () => {
     render(<RunHistoryStrip history={fourRuns} passRate={75} />)
     const value = screen.getByText('75%')
-    expect(value.className).toContain('font-mono')
+    expect(value.className).not.toContain('font-mono')
     expect(value.className).toContain('tabular-nums')
   })
 

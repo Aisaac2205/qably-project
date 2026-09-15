@@ -44,7 +44,7 @@ export function RunHistoryStrip({
         ))}
       </div>
       {showValue && (
-        <span aria-hidden="true" className={cn('font-mono text-sm font-semibold tabular-nums', toneClass(passRate))}>
+        <span aria-hidden="true" className={cn('text-sm font-medium tabular-nums', toneClass(passRate))}>
           {passRate}%
         </span>
       )}
