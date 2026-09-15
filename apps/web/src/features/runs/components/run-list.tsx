@@ -14,7 +14,7 @@ import { useTranslation } from '@/lib/i18n'
 import { docsUrl } from '@/lib/docs-url'
 import { GitCommit } from '@phosphor-icons/react'
 import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
-import { formatPassRate, isCiRun, runDisplayTitle } from '../lib/format'
+import { formatPassRate, isCiRun, runTitleParts } from '../lib/format'
 import { RunDeltaChip } from './run-delta-chip'
 
 const REPORT_CI_ANCHOR = 'step-4-report-ci'
@@ -41,7 +41,7 @@ function RunRow({
 }) {
   const { t } = useTranslation()
   const isCi = isCiRun(run)
-  const title = runDisplayTitle(run)
+  const { title, subtitle } = runTitleParts(run, run.suiteName)
 
   return (
     <Link
@@ -52,7 +52,7 @@ function RunRow({
         <StatusChip status={run.status} />
         <div className="min-w-0">
           <div className="text-sm font-semibold text-default truncate">{title}</div>
-          <div className="text-xs text-muted truncate mt-0.5">{run.suiteName}</div>
+          {subtitle && <div className="text-xs text-muted truncate mt-0.5">{subtitle}</div>}
           {run.commitSha && (
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted min-w-0">
               <GitCommit size={12} weight="bold" aria-hidden="true" className="shrink-0" />
@@ -72,9 +72,9 @@ function RunRow({
           <Tooltip>
             <TooltipTrigger
               render={<span tabIndex={0} aria-label={t('runs.sourceCi')} />}
-              className="hidden sm:inline-flex shrink-0 size-6 items-center justify-center rounded text-muted focus-visible:outline-2 focus-visible:outline-primary"
+              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-brand-github-actions focus-visible:outline-2 focus-visible:outline-primary"
             >
-              <GithubActionsIcon size={14} aria-hidden="true" />
+              <GithubActionsIcon className="size-5" aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent>{t('runs.sourceCi')}</TooltipContent>
           </Tooltip>

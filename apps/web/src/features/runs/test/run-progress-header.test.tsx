@@ -93,7 +93,7 @@ describe('RunProgressHeader', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
 
-  it('titles a CI run with its commit message instead of the generic run name, so the source is not stated twice', async () => {
+  it('titles a CI run with its suite name and demotes the commit message to a secondary line, matching the runs list', async () => {
     await act(async () => {
       renderWithQuery(
         <RunProgressHeader
@@ -106,15 +106,17 @@ describe('RunProgressHeader', () => {
         />,
       )
     })
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
     expect(screen.getByText('fix: checkout button not disabling on empty cart')).toBeInTheDocument()
     expect(screen.queryByText('Run #12')).not.toBeInTheDocument()
   })
 
-  it('falls back to the run name for a CI run with no commit message', async () => {
+  it('shows only the suite name, with no secondary line, for a CI run with no commit message', async () => {
     await act(async () => {
       renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'github_actions' }} />)
     })
-    expect(screen.getByText('Run #12')).toBeInTheDocument()
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
+    expect(screen.queryByText('Run #12')).not.toBeInTheDocument()
   })
 
   it('shows the GitHub Actions icon instead of a text label on the source chip for CI runs', async () => {
@@ -125,5 +127,24 @@ describe('RunProgressHeader', () => {
     expect(chip).toHaveAttribute('aria-label', 'CI')
     expect(chip.querySelector('svg')).toBeInTheDocument()
     expect(chip).not.toHaveTextContent('CI')
+  })
+
+  it('renders the CI source chip as a bare icon, with no pill card around it', async () => {
+    await act(async () => {
+      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'github_actions' }} />)
+    })
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip.className).not.toContain('border')
+    expect(chip.className).not.toContain('bg-canvas')
+    expect(chip.className).toContain('text-brand-github-actions')
+  })
+
+  it('keeps the bordered pill for non-CI sources', async () => {
+    await act(async () => {
+      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'manual' }} />)
+    })
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip.className).toContain('border')
+    expect(chip.className).toContain('bg-canvas')
   })
 })

@@ -10,15 +10,24 @@ interface RunTitleSource {
   commitMessage?: string
 }
 
+export interface RunTitleParts {
+  title: string
+  subtitle?: string
+}
+
 export function isCiRun(run: Pick<RunTitleSource, 'source'>): boolean {
   return run.source === 'github_actions'
 }
 
 /**
- * CI runs are already marked by the GitHub Actions icon, so a generic "CI #N"
- * title would just restate the source. The commit message carries the actual
- * evidence of what changed, so it takes over as the title when present.
+ * A CI push commonly produces one run per suite sharing the same commit, so
+ * the commit message repeats across rows/views and can't tell them apart —
+ * the suite is what actually differs, so it leads for CI runs, with the
+ * commit message demoted to the secondary line. Manual/API runs keep their
+ * given name as the title. Used identically by the runs list and the run
+ * detail header so a run reads the same way in both places.
  */
-export function runDisplayTitle(run: RunTitleSource): string {
-  return isCiRun(run) && run.commitMessage ? run.commitMessage : run.name
+export function runTitleParts(run: RunTitleSource, suiteName: string): RunTitleParts {
+  if (isCiRun(run)) return { title: suiteName, subtitle: run.commitMessage }
+  return { title: run.name, subtitle: suiteName }
 }

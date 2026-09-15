@@ -148,6 +148,16 @@ describe('RunList evidence', () => {
     expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
   })
 
+  it('leads a CI run with its suite name, not the commit message, so rows sharing a commit stay distinguishable', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
+    })
+    const link = screen.getByRole('link', { name: /checkout/i })
+    const title = link.querySelector('.font-semibold')
+    expect(title).toHaveTextContent('Checkout')
+    expect(screen.getByText(/checkout button not disabling/i)).toHaveClass('text-muted')
+  })
+
   it('shows the GitHub Actions icon instead of a redundant "CI" badge for a CI run', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)

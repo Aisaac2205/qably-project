@@ -32,6 +32,11 @@
   --accent-ai:         oklch(0.405 0.008 85);
   --accent-ai-bg:      oklch(0.940 0.003 85);
 
+  /* Brand marks — the real brand color of a third-party integration,
+     used only on that integration's identification icon (e.g. the
+     GitHub Actions source icon). Not a UI accent. */
+  --brand-github-actions: oklch(0.635 0.199 256);
+
   /* Status — semantic only, never for brand use */
   --status-pass:       oklch(0.45 0.15 145);
   --status-pass-bg:    oklch(0.95 0.05 145);
@@ -124,6 +129,7 @@
 
   --color-ai:                 var(--accent-ai);
   --color-ai-bg:              var(--accent-ai-bg);
+  --color-brand-github-actions: var(--brand-github-actions);
 
   --color-mesh-ink:           var(--mesh-ink);
 
