@@ -1,12 +1,13 @@
-import { render, screen, act, within } from '@testing-library/react'
+import { render, screen, act, within, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { CiCommitActivityRecord, DashboardSummaryRecord } from '@qably/types'
 import { RecentActivity } from '@/features/dashboard/components/recent-activity'
 import { __resetStore } from '@/lib/mock-store'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { renderWithQuery, createTestQueryClient } from '@/lib/query-test-utils'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
 import { dashboardSummaryFixture } from '@/test/dashboard-api-stub'
+import { getDashboardSummary } from '@/features/dashboard/api/dashboard.api'
 import { useI18nStore } from '@/lib/i18n'
 
 vi.mock('next/link', () => ({
@@ -14,12 +15,12 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-vi.mock('@/features/projects/suites/api/suites.api', async () =>
-  await import('@/test/suites-api-stub'),
-)
-vi.mock('@/features/runs/api/runs.api', async () =>
-  await import('@/test/runs-api-stub'),
-)
+vi.mock('@/features/dashboard/api/dashboard.api', () => ({
+  getDashboardSummary: vi.fn(),
+  getTraceabilityCalendar: vi.fn(),
+}))
+
+const getSummary = vi.mocked(getDashboardSummary)
 
 function ciCommit(
   overrides: Partial<CiCommitActivityRecord> = {},
@@ -58,6 +59,7 @@ async function renderWithSummary(summary: Partial<DashboardSummaryRecord>) {
 describe('RecentActivity', () => {
   beforeEach(() => {
     __resetStore()
+    getSummary.mockResolvedValue(dashboardSummaryFixture)
   })
 
   it('names the two queues after what they actually list', async () => {
@@ -159,6 +161,91 @@ describe('RecentActivity', () => {
     })
 
     expect(screen.getByLabelText('Cola de trabajo')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Operational work queue')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Work queue')).not.toBeInTheDocument()
+  })
+
+  it('links each run row to that exact run instead of a generic projects page', async () => {
+    const [firstRun] = dashboardSummaryFixture.recentRuns
+
+    await renderWithSummary({ recentRuns: [firstRun] })
+
+    const runsQueue = screen.getByLabelText('Test runs')
+    const link = within(runsQueue).getByText(firstRun.name).closest('a')
+    expect(link).toHaveAttribute('href', `/projects/${firstRun.projectId}/runs/${firstRun.id}`)
+  })
+
+  it('renders CI-commit rows without a link wrapper since they have no destination yet', async () => {
+    const commit = ciCommit()
+    await renderWithSummary({ recentCiCommits: [commit] })
+
+    const row = screen.getByText(commit.commitMessage ?? commit.shortSha)
+    expect(row.closest('a')).toBeNull()
+  })
+
+  it('shows the run subtitle straight from the run record, not from a separate suites query', async () => {
+    const [firstRun] = dashboardSummaryFixture.recentRuns
+
+    await renderWithSummary({
+      recentRuns: [
+        {
+          ...firstRun,
+          suiteId: 'suite-does-not-exist-anywhere',
+          suiteName: 'Checkout API',
+          name: 'Run #99',
+        },
+      ],
+    })
+
+    const runsQueue = screen.getByLabelText('Test runs')
+    expect(runsQueue.textContent).toContain('Checkout API')
+  })
+
+  it('shows skeleton rows in both queues while the summary loads, never stale rows', async () => {
+    getSummary.mockReturnValue(new Promise(() => {}))
+    const client = createTestQueryClient()
+    client.removeQueries({ queryKey: dashboardKeys.summary('all') })
+
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <RecentActivity />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByText('Test runs')).toBeInTheDocument()
+    expect(screen.queryByText(/Run #/)).not.toBeInTheDocument()
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0)
+  })
+
+  it('shows one error state with a retry action wired to the summary query when it fails', async () => {
+    getSummary.mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+    client.removeQueries({ queryKey: dashboardKeys.summary('all') })
+
+    render(
+      <QueryClientProvider client={client}>
+        <RecentActivity />
+      </QueryClientProvider>,
+    )
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toBeInTheDocument()
+    expect(screen.queryByText('Test runs')).not.toBeInTheDocument()
+
+    getSummary.mockResolvedValueOnce(dashboardSummaryFixture)
+    const retryButton = screen.getByRole('button', { name: 'Retry' })
+    await act(async () => {
+      retryButton.click()
+    })
+
+    await waitFor(() => expect(screen.getByText('Test runs')).toBeInTheDocument())
+  })
+
+  it('declares its own container context instead of depending on the page section width', async () => {
+    await act(async () => {
+      renderWithQuery(<RecentActivity />)
+    })
+
+    const region = screen.getByLabelText('Work queue')
+    expect(region).toHaveClass('@container')
   })
 })

@@ -4,10 +4,15 @@ import { useId } from 'react'
 import Link from 'next/link'
 import { GitCommit, Play, CaretRight } from '@phosphor-icons/react'
 import type { CiCommitActivityRecord, RunSummaryRecord } from '@qably/types'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { StateView } from '@/components/ui/state-view'
+import { Button } from '@/components/ui/button'
 import { StatusChip } from '@/components/ui/status-chip'
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stats'
 import { formatRelativeTime, type FormatLocale } from '@/features/dashboard/lib/format'
-import { useSuites } from '@/features/projects/suites/hooks/use-suites'
+import { resolveCiCommitLink, resolveRunLink } from '@/features/dashboard/lib/resolve-activity-link'
+import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
 const QUEUE_LIMIT = 4
@@ -30,7 +35,7 @@ function QueueSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex h-full min-w-0 flex-col p-5 md:p-6 md:border-r md:border-border md:last:border-r-0"
+      className="flex h-full min-w-0 flex-col p-5 @2xl:p-6 @2xl:border-r @2xl:border-border @2xl:last:border-r-0"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2
@@ -53,7 +58,7 @@ function QueueSection({
 }
 
 interface QueueRowProps {
-  href: string
+  href?: string
   icon: React.ReactNode
   title: string
   subtitle: string
@@ -61,46 +66,102 @@ interface QueueRowProps {
 }
 
 function QueueRow({ href, icon, title, subtitle, trailing }: QueueRowProps) {
-  return (
-    <Link
-      href={href}
-      className="group flex min-h-14 items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
-    >
+  const isInteractive = href !== undefined
+  const content = (
+    <>
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-canvas text-muted group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+        <div
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-lg bg-canvas text-muted transition-colors',
+            isInteractive && 'group-hover:bg-primary/10 group-hover:text-primary',
+          )}
+        >
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-xs font-medium text-default group-hover:text-primary">
+          <p
+            className={cn(
+              'truncate text-xs font-medium text-default',
+              isInteractive && 'group-hover:text-primary',
+            )}
+          >
             {title}
           </p>
           <p className="truncate text-xs text-muted">{subtitle}</p>
         </div>
       </div>
       {trailing}
+    </>
+  )
+
+  if (!isInteractive) {
+    return (
+      <div className="flex min-h-14 items-center justify-between gap-3 py-3">{content}</div>
+    )
+  }
+
+  return (
+    <Link
+      href={href}
+      className="group flex min-h-14 items-center justify-between gap-3 py-3 transition-colors hover:text-primary"
+    >
+      {content}
     </Link>
   )
 }
 
-function runSubtitle(
-  run: RunSummaryRecord,
-  suiteName: string | undefined,
-  locale: FormatLocale,
-): string {
+function QueueSkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: QUEUE_LIMIT }).map((_, index) => (
+        <div key={index} className="flex min-h-14 items-center gap-3 py-3">
+          <Skeleton className="size-8 shrink-0 rounded-lg" />
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <Skeleton className="h-3 w-3/4 rounded" />
+            <Skeleton className="h-3 w-1/2 rounded" />
+          </div>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function runSubtitle(run: RunSummaryRecord, suiteName: string, locale: FormatLocale): string {
   const time = formatRelativeTime(run.startedAt, locale)
-  if (suiteName === undefined || run.name.includes(suiteName)) return time
+  if (run.name.includes(suiteName)) return time
 
   return `${suiteName} · ${time}`
 }
 
 export function RecentActivity() {
   const stats = useDashboardStats()
-  const { suites } = useSuites()
   const { t, locale } = useTranslation()
   const timeLocale: FormatLocale = locale === 'en' ? 'en' : 'es'
   const viewAllLabel = t('common.viewAll')
+  const workQueueLabel = t('dashboard.workQueue')
 
-  const suiteNameById = new Map(suites.map((suite) => [suite.id, suite.name]))
+  if (stats.summaryState.isError) {
+    return (
+      <Card
+        as="section"
+        className="@container flex h-full flex-col overflow-hidden"
+        aria-label={workQueueLabel}
+      >
+        <StateView
+          kind="error"
+          title={t('dashboard.loadErrorTitle')}
+          description={t('dashboard.loadErrorDescription')}
+          action={
+            <Button type="button" variant="outline" size="sm" onClick={stats.summaryState.retry}>
+              {t('common.retry')}
+            </Button>
+          }
+        />
+      </Card>
+    )
+  }
+
+  const isLoading = stats.summaryState.isLoading
   const runs = stats.recentRuns.slice(0, QUEUE_LIMIT)
   const ciCommits = stats.recentCiCommits.slice(0, QUEUE_LIMIT)
 
@@ -114,22 +175,25 @@ export function RecentActivity() {
   }
 
   return (
-    <section
-      className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-xs"
-      aria-label={t('dashboard.workQueue')}
+    <Card
+      as="section"
+      className="@container flex h-full flex-col overflow-hidden"
+      aria-label={workQueueLabel}
     >
-      <div className="grid flex-1 grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
+      <div className="grid flex-1 grid-cols-1 divide-y divide-border @2xl:grid-cols-2 @2xl:divide-x @2xl:divide-y-0">
         <QueueSection title={t('dashboard.recentRuns')} viewAllLabel={viewAllLabel}>
-          {runs.length === 0 ? (
+          {isLoading ? (
+            <QueueSkeletonRows />
+          ) : runs.length === 0 ? (
             <p className="py-3 text-xs text-muted">{t('dashboard.noRuns')}</p>
           ) : (
             runs.map((run) => (
               <QueueRow
                 key={run.id}
-                href="/projects"
+                href={resolveRunLink(run)}
                 icon={<Play size={15} weight="fill" className="shrink-0" aria-hidden="true" />}
                 title={run.name}
-                subtitle={runSubtitle(run, suiteNameById.get(run.suiteId), timeLocale)}
+                subtitle={runSubtitle(run, run.suiteName, timeLocale)}
                 trailing={<StatusChip status={run.status} />}
               />
             ))
@@ -137,13 +201,15 @@ export function RecentActivity() {
         </QueueSection>
 
         <QueueSection title={t('dashboard.ciCommits')} viewAllLabel={viewAllLabel}>
-          {ciCommits.length === 0 ? (
+          {isLoading ? (
+            <QueueSkeletonRows />
+          ) : ciCommits.length === 0 ? (
             <p className="py-3 text-xs text-muted">{t('dashboard.noCiCommits')}</p>
           ) : (
             ciCommits.map((commit) => (
               <QueueRow
                 key={commit.commitSha}
-                href="/projects"
+                href={resolveCiCommitLink(commit)}
                 icon={
                   <GitCommit size={15} weight="bold" className="shrink-0" aria-hidden="true" />
                 }
@@ -155,6 +221,6 @@ export function RecentActivity() {
           )}
         </QueueSection>
       </div>
-    </section>
+    </Card>
   )
 }

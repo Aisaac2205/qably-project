@@ -2,9 +2,15 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
-function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+type CardTag = 'div' | 'section' | 'article'
+
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  as?: CardTag
+}
+
+function Card({ className, as: Component = 'div', ...props }: CardProps) {
   return (
-    <div
+    <Component
       data-slot="card"
       className={cn(
         'bg-card text-card-foreground rounded-xl border border-border shadow-card',
@@ -25,9 +31,15 @@ function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement
   )
 }
 
-function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
+type CardTitleTag = 'h2' | 'h3'
+
+interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement> {
+  as?: CardTitleTag
+}
+
+function CardTitle({ className, as: Component = 'h3', ...props }: CardTitleProps) {
   return (
-    <h3
+    <Component
       data-slot="card-title"
       className={cn('text-base font-semibold leading-tight tracking-tight', className)}
       {...props}
