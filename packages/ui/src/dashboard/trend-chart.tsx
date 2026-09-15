@@ -68,10 +68,8 @@ export function TrendChart({
   const activePoint = active === null ? null : points[active]
   const activeCoord = active === null ? null : coords[active]
 
-  const chartData = points.map((point) => ({ id: point.id, label: point.label, value: point.value }))
-  const xTicks = points
-    .filter((_, index) => labelledIndexes.has(index))
-    .map((point) => point.label)
+  const chartData = points.map((point, index) => ({ id: point.id, label: point.label, index, value: point.value }))
+  const xTicks = Array.from(labelledIndexes)
 
   return (
     <div className={`relative ${className ?? ''}`}>
@@ -108,10 +106,10 @@ export function TrendChart({
             tick={{ className: 'fill-qb-muted tabular-nums', fontSize: 10 }}
           />
           <XAxis
-            dataKey="label"
+            dataKey="index"
             height={X_AXIS_HEIGHT}
             ticks={xTicks}
-            interval="preserveStartEnd"
+            tickFormatter={(index: number) => points[index]?.label ?? ''}
             axisLine={false}
             tickLine={false}
             tick={{ className: 'fill-qb-muted', fontSize: 10 }}
