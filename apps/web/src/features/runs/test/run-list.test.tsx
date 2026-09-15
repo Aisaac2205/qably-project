@@ -20,10 +20,10 @@ describe('RunList', () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
-    // proj-1 has 4 runs: run-12, run-11, run-10, run-9
+    // proj-1 has 4 runs: run-12, run-11, run-10 (CI, titled by its commit message), run-9
     expect(screen.getByText('Run #12')).toBeInTheDocument()
     expect(screen.getByText('Run #11')).toBeInTheDocument()
-    expect(screen.getByText('Run #10')).toBeInTheDocument()
+    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
     expect(screen.getByText('Run #9')).toBeInTheDocument()
   })
 
@@ -78,8 +78,8 @@ describe('RunList', () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
     })
-    // Only run-10 has source=github_actions
-    expect(screen.getByText('Run #10')).toBeInTheDocument()
+    // Only run-10 has source=github_actions; it's titled by its commit message, not "Run #10"
+    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
     // run-11, run-9 have different sources — should NOT appear
     expect(screen.queryByText('Run #12')).not.toBeInTheDocument()
     expect(screen.queryByText('Run #11')).not.toBeInTheDocument()
@@ -90,10 +90,10 @@ describe('RunList', () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
-    // No source filter — all 4 runs visible
+    // No source filter — all 4 runs visible (run-10 is CI, titled by its commit message)
     expect(screen.getByText('Run #12')).toBeInTheDocument()
     expect(screen.getByText('Run #11')).toBeInTheDocument()
-    expect(screen.getByText('Run #10')).toBeInTheDocument()
+    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
     expect(screen.getByText('Run #9')).toBeInTheDocument()
   })
 
@@ -146,6 +146,14 @@ describe('RunList evidence', () => {
     })
     expect(screen.getByText('b1e4d90')).toBeInTheDocument()
     expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
+  })
+
+  it('shows the GitHub Actions icon instead of a redundant "CI" badge for a CI run', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
+    })
+    expect(screen.queryByText('github actions')).not.toBeInTheDocument()
+    expect(screen.getByTitle('GitHub Actions')).toBeInTheDocument()
   })
 
   it('omits the delta chip when a run has nothing to compare against', async () => {

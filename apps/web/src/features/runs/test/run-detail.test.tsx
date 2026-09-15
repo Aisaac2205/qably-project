@@ -325,7 +325,8 @@ describe('RunDetail metadata rows', () => {
     })
 
     const chip = screen.getByTestId('run-source-chip')
-    expect(chip).toHaveTextContent('CI')
+    expect(chip).toHaveAttribute('aria-label', 'CI')
+    expect(chip.querySelector('svg')).toBeInTheDocument()
     await userEvent.hover(chip)
     expect(await screen.findByText('Reported via GitHub Actions')).toBeInTheDocument()
   })

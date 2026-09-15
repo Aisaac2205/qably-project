@@ -92,4 +92,38 @@ describe('RunProgressHeader', () => {
     expect(screen.getByText('Ada Lovelace')).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
   })
+
+  it('titles a CI run with its commit message instead of the generic run name, so the source is not stated twice', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <RunProgressHeader
+          run={{
+            ...mockRun,
+            source: 'github_actions',
+            commitSha: 'abc1234',
+            commitMessage: 'fix: checkout button not disabling on empty cart',
+          }}
+        />,
+      )
+    })
+    expect(screen.getByText('fix: checkout button not disabling on empty cart')).toBeInTheDocument()
+    expect(screen.queryByText('Run #12')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the run name for a CI run with no commit message', async () => {
+    await act(async () => {
+      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'github_actions' }} />)
+    })
+    expect(screen.getByText('Run #12')).toBeInTheDocument()
+  })
+
+  it('shows the GitHub Actions icon instead of a text label on the source chip for CI runs', async () => {
+    await act(async () => {
+      renderWithQuery(<RunProgressHeader run={{ ...mockRun, source: 'github_actions' }} />)
+    })
+    const chip = screen.getByTestId('run-source-chip')
+    expect(chip).toHaveAttribute('aria-label', 'CI')
+    expect(chip.querySelector('svg')).toBeInTheDocument()
+    expect(chip).not.toHaveTextContent('CI')
+  })
 })
