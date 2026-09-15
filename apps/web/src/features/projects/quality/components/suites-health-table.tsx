@@ -5,7 +5,7 @@ import type { RunStatus, SuiteMetricsEntry } from '@qably/types'
 import { DataTable } from '@/components/ui/data-table'
 import { StateView } from '@/components/ui/state-view'
 import { StatusChip } from '@/components/ui/status-chip'
-import { getLegacyStatusPresentation, statusToneClassNames } from '@/components/ui/status-presentation'
+import { getLegacyStatusPresentation, type StatusTone } from '@/components/ui/status-presentation'
 import { useTranslation } from '@/lib/i18n'
 import { TONE_SOLID_BG_CLASSES, toneForPassRatePercent } from '../lib/tone'
 
@@ -14,7 +14,7 @@ interface SuitesHealthTableProps {
   items: SuiteMetricsEntry[]
 }
 
-const TICK_SOLID_BG_CLASSES: Record<string, string> = {
+const TICK_SOLID_BG_CLASSES: Record<StatusTone, string> = {
   pass: TONE_SOLID_BG_CLASSES.pass,
   fail: TONE_SOLID_BG_CLASSES.fail,
   warn: TONE_SOLID_BG_CLASSES.warn,
@@ -84,7 +84,7 @@ function TrendStrip({ trend }: TrendStripProps) {
               key={index}
               data-quality-trend-tick
               aria-hidden="true"
-              className={`h-4 w-1.5 rounded-full ${TICK_SOLID_BG_CLASSES[tone] ?? statusToneClassNames[tone]}`}
+              className={`h-4 w-1.5 rounded-full ${TICK_SOLID_BG_CLASSES[tone]}`}
             />
           )
         })}
