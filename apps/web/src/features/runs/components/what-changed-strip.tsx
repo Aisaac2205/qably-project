@@ -58,6 +58,8 @@ export function WhatChangedStrip({
   const { t } = useTranslation()
   const suiteHref = `/projects/${projectId}/suites/${suiteId}`
 
+  if (delta === null) return null
+
   return (
     <section
       aria-labelledby="what-changed-heading"
@@ -67,26 +69,22 @@ export function WhatChangedStrip({
         <h2 id="what-changed-heading" className="text-sm font-semibold text-default">
           {t('runs.whatChanged')}
         </h2>
-        <p className="text-xs text-muted">
-          {delta === null ? t('runs.whatChangedFirstRun') : t('runs.whatChangedHint')}
-        </p>
+        <p className="text-xs text-muted">{t('runs.whatChangedHint')}</p>
       </div>
-      {delta !== null && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <DeltaGroup
-            heading={t('runs.whatChangedRegressions')}
-            tone="fail"
-            entries={delta.regressions}
-            href={suiteHref}
-          />
-          <DeltaGroup
-            heading={t('runs.whatChangedFixes')}
-            tone="pass"
-            entries={delta.fixes}
-            href={suiteHref}
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <DeltaGroup
+          heading={t('runs.whatChangedRegressions')}
+          tone="fail"
+          entries={delta.regressions}
+          href={suiteHref}
+        />
+        <DeltaGroup
+          heading={t('runs.whatChangedFixes')}
+          tone="pass"
+          entries={delta.fixes}
+          href={suiteHref}
+        />
+      </div>
     </section>
   )
 }

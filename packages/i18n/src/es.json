@@ -621,7 +621,6 @@
     "whatChangedRegressions": "Empezaron a fallar",
     "whatChangedFixes": "Se arreglaron",
     "whatChangedNone": "Nada cambió respecto a la ejecución anterior.",
-    "whatChangedFirstRun": "Primera ejecución de esta suite: todavía no hay con qué comparar.",
     "steps": "Pasos",
     "expectedResult": "Resultado esperado",
     "noCases": "Sin casos en esta ejecución",

@@ -621,7 +621,6 @@
     "whatChangedRegressions": "Started failing",
     "whatChangedFixes": "Got fixed",
     "whatChangedNone": "Nothing changed since the previous run.",
-    "whatChangedFirstRun": "First run of this suite: nothing to compare against yet.",
     "steps": "Steps",
     "expectedResult": "Expected result",
     "noCases": "No cases in this run",

@@ -386,13 +386,13 @@ describe('RunDetail what changed', () => {
     expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-1')
   })
 
-  it('says it is the first run of the suite when there is nothing to compare', async () => {
+  it('hides the what-changed section entirely when there is nothing to compare (first run)', async () => {
     const run = getFreshRun()
     run.delta = null
     await act(async () => {
       renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
     })
 
-    expect(screen.getByText(/first run of this suite/i)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /what changed/i })).not.toBeInTheDocument()
   })
 })
