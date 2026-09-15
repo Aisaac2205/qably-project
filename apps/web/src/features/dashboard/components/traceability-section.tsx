@@ -88,7 +88,7 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
       aria-labelledby="traceability-section-heading"
       className="@container overflow-hidden"
     >
-      <div className="flex flex-col gap-3 border-b border-border bg-canvas px-4 py-3.5 @md:flex-row @md:items-center @md:justify-between @md:px-5">
+      <div className="flex flex-col gap-2.5 border-b border-border bg-canvas px-4 py-3.5 @md:flex-row @md:items-center @md:justify-between @md:px-5">
         <h2
           id="traceability-section-heading"
           className="text-base font-semibold tracking-[-0.015em] text-default"
@@ -99,12 +99,12 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
           })}
         </h2>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1">
           <SelectSimple
             options={stageOptions}
             value={activeFilter}
             onValueChange={(val) => val && setActiveFilter(val as TraceabilityFilter)}
-            triggerClassName="h-8 min-w-[168px] px-2.5 text-xs font-medium"
+            triggerClassName="h-8 min-w-[168px] border-transparent bg-transparent px-2.5 text-xs font-medium shadow-none hover:border-border hover:bg-canvas-hover"
             badgeInTrigger={false}
             iconInTrigger={false}
           />
@@ -116,7 +116,7 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
             }))}
             value={selectedYear}
             onValueChange={(val) => val && setSelectedYear(Number(val))}
-            triggerClassName="h-8 min-w-[80px] px-2.5 text-xs font-semibold"
+            triggerClassName="h-8 min-w-[80px] border-transparent bg-transparent px-2.5 text-xs font-medium shadow-none hover:border-border hover:bg-canvas-hover"
           />
         </div>
       </div>

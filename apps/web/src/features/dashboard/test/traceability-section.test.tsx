@@ -108,6 +108,18 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     expect(stageTrigger.querySelectorAll('svg')).toHaveLength(1)
   })
 
+  it('keeps the header filters visually quiet so they never outweigh the heading', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const [stageTrigger, yearTrigger] = screen.getAllByRole('combobox')
+    expect(stageTrigger).toHaveClass('border-transparent')
+    expect(yearTrigger).toHaveClass('border-transparent')
+    expect(yearTrigger).toHaveClass('font-medium')
+    expect(yearTrigger).not.toHaveClass('font-semibold')
+  })
+
   it('states the yearly total once instead of repeating it in the stage selector', async () => {
     await act(async () => {
       renderWithQuery(<TraceabilitySection />)
