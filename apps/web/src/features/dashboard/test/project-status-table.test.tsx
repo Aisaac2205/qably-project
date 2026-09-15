@@ -290,6 +290,15 @@ describe('ProjectStatusTable', () => {
     expect(screen.getByText('Needle App')).toBeInTheDocument()
   })
 
+  it('gives rows a visible hover tint using the established surface-hover token', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectStatusTable />)
+    })
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveClass('hover:bg-surface-hover/60')
+  })
+
   it('marks the pass-rate and suites columns to collapse in a narrow container, with a name-cell metrics line as the fallback', async () => {
     await renderWithProjects([{ ...projectFixtures[0], activity: activity({ aiPendingCount: 2 }) }])
 

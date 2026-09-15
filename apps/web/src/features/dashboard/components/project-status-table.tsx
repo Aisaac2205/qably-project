@@ -190,7 +190,7 @@ export function ProjectStatusTable() {
               const rowPassRateText = passRateText(activity, t)
 
               return (
-                <tr key={project.id} className="hover:bg-canvas/20 transition-colors group">
+                <tr key={project.id} className="hover:bg-surface-hover/60 transition-colors group">
                   <td className="px-5 py-3.5">
                     <Link
                       href={projectRootPath(project.id)}
