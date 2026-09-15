@@ -141,7 +141,7 @@ export function Sidebar() {
             <Link
               href="/projects"
               aria-label={`${t('sidebar.projects')}: ${project.name}`}
-              className="flex min-h-9 items-center gap-1.5 px-2 text-sm font-normal text-sidebar-fg-muted transition-colors hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              className="flex min-h-9 items-center gap-1.5 px-2 text-xs font-medium text-sidebar-fg-muted transition-all duration-150 active:scale-[0.98] hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               <CaretLeft size={18} weight="bold" aria-hidden="true" />
               {!isCollapsed && <span className="truncate">{project.name}</span>}
