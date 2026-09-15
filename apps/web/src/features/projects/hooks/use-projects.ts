@@ -18,5 +18,6 @@ export function useProjects() {
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,
+    refetch: query.refetch,
   }
 }

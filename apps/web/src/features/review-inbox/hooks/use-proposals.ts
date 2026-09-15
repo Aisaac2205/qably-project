@@ -14,6 +14,7 @@ export function useProposals(filters: ProposalFilters = {}) {
     proposals: query.data ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
+    refetch: query.refetch,
   }
 }
 

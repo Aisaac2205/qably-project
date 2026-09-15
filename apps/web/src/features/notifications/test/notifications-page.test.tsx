@@ -72,6 +72,7 @@ beforeEach(() => {
     isLoading: false,
     isError: false,
     error: null,
+    refetch: vi.fn(),
   })
   setNotifications([runFailed, connectionSecurity])
 })

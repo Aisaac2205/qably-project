@@ -53,4 +53,17 @@ describe('useProjects', () => {
     await waitFor(() => expect(result.current.isError).toBe(true))
     expect(result.current.projects).toEqual([])
   })
+
+  it('exposes a refetch function to re-trigger the query', async () => {
+    const { result } = renderHook(() => useProjects(), { wrapper })
+
+    await waitFor(() => expect(result.current.projects).toEqual([project]))
+
+    expect(typeof result.current.refetch).toBe('function')
+
+    list.mockResolvedValue([project, { ...project, id: 'p2', name: 'Billing' }])
+    await result.current.refetch()
+
+    await waitFor(() => expect(result.current.projects).toHaveLength(2))
+  })
 })
