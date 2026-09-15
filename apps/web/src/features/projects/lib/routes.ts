@@ -24,6 +24,22 @@ export function projectRunPath(projectId: string, runId: string): string {
   return `/projects/${projectId}/runs/${runId}`
 }
 
+export function suiteNewPath(projectId: string): string {
+  return `/projects/${projectId}/suites/new`
+}
+
+export function suiteEditPath(projectId: string, suiteId: string): string {
+  return `/projects/${projectId}/suites/${suiteId}/edit`
+}
+
+export function caseNewPath(projectId: string, suiteId: string): string {
+  return `/projects/${projectId}/suites/${suiteId}/cases/new`
+}
+
+export function caseEditPath(projectId: string, suiteId: string, caseId: string): string {
+  return `/projects/${projectId}/suites/${suiteId}/cases/${caseId}/edit`
+}
+
 export function reviewInboxProposalPath(proposalId: string): string {
   return `/review-inbox?proposal=${proposalId}`
 }

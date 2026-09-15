@@ -3,10 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import type { ProjectSummary, Suite, TestCase } from '@qably/types'
+import type { ProjectSummary } from '@qably/types'
 import { EditProjectDialog } from '@/features/projects/components/edit-project-dialog'
-import { CaseFormDialog } from '@/features/projects/suites/components/case-form-dialog'
-import { SuiteFormDialog } from '@/features/projects/suites/components/suite-form-dialog'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
@@ -42,37 +40,6 @@ const project: ProjectSummary = {
   technologies: ['React'],
 }
 
-const testCase: TestCase = {
-  id: 'case-1',
-  suiteId: 'suite-1',
-  version: 1,
-  name: 'Original case',
-  objective: '',
-  preconditions: [],
-  priority: 'high',
-  state: 'active',
-  steps: ['Open page'],
-  expectedResult: 'Page opens',
-  executionMode: 'manual',
-}
-
-const suite: Suite = {
-  id: 'suite-1',
-  projectId: project.id,
-  organizationId: project.organizationId,
-  name: 'Original suite',
-  description: 'Original suite description',
-  tags: ['auth'],
-  cases: [testCase],
-  manualCases: 1,
-  automatedCases: 0,
-  undocumentedCount: 0,
-  staleLocaleCount: 0,
-  isDefault: true,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  updatedAt: '2026-01-01T00:00:00.000Z',
-}
-
 describe('controlled form dialogs', () => {
   it('resets the edit project draft when the parent reopens it', async () => {
     const user = userEvent.setup()
@@ -86,28 +53,5 @@ describe('controlled form dialogs', () => {
     view.rerender(withQueryClient(<EditProjectDialog project={project} open onOpenChange={onOpenChange} />))
 
     expect(screen.getByRole('textbox', { name: /Project name/ })).toHaveValue('Original project')
-  })
-
-  it('initializes a case draft when the parent opens it', () => {
-    const onOpenChange = vi.fn()
-    const view = renderWithQuery(withQueryClient(<CaseFormDialog suiteId={suite.id} testCase={testCase} open={false} onOpenChange={onOpenChange} />))
-
-    view.rerender(withQueryClient(<CaseFormDialog suiteId={suite.id} testCase={testCase} open onOpenChange={onOpenChange} />))
-
-    expect(screen.getByLabelText('Title')).toHaveValue('Original case')
-    expect(screen.getByLabelText('Steps')).toHaveValue('Open page')
-  })
-
-  it('resets the suite create draft when the parent reopens it', async () => {
-    const user = userEvent.setup()
-    const onOpenChange = vi.fn()
-    const view = renderWithQuery(withQueryClient(<SuiteFormDialog projectId={project.id} open onOpenChange={onOpenChange} />))
-    const name = screen.getByLabelText('Name')
-
-    await user.type(name, 'Unsaved suite')
-    view.rerender(withQueryClient(<SuiteFormDialog projectId={project.id} open={false} onOpenChange={onOpenChange} />))
-    view.rerender(withQueryClient(<SuiteFormDialog projectId={project.id} open onOpenChange={onOpenChange} />))
-
-    expect(screen.getByLabelText('Name')).toHaveValue('')
   })
 })

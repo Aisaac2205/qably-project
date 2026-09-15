@@ -458,6 +458,25 @@ describe('SuiteDetail (redesigned)', () => {
     })
   })
 
+  it('navigates to the suite edit page instead of opening a modal', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    await user.click(screen.getByRole('button', { name: /suite actions/i }))
+    await user.click(await screen.findByText('Edit suite'))
+
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites/suite-1/edit')
+  })
+
+  it('the "Add case" button is a link to the create-case page', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    expect(screen.getByRole('link', { name: /add case/i })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/suites/suite-1/cases/new',
+    )
+  })
+
   describe('case list grouping', () => {
     function documentedCase(id: string) {
       return createMockTestCase({

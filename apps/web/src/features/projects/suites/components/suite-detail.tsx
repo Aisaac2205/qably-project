@@ -16,17 +16,16 @@ import {
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { StateView } from '@/components/ui/state-view'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { projectRootPath, projectSuitesPath } from '../../lib/routes'
+import { projectRootPath, projectSuitesPath, suiteEditPath, caseNewPath, caseEditPath } from '../../lib/routes'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { RunHistoryStrip } from './run-history-strip'
 import { CaseCard } from './case-card'
-import { SuiteFormDialog } from './suite-form-dialog'
-import { CaseFormDialog } from './case-form-dialog'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
+import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
@@ -91,10 +90,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const { perSuite } = useSuiteMetrics(projectId)
   const metrics = perSuite.find((m) => m.suite.id === suiteId)
 
-  const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [caseDialogOpen, setCaseDialogOpen] = useState(false)
-  const [editingCase, setEditingCase] = useState<TestCase | undefined>(undefined)
   const [deletingCase, setDeletingCase] = useState<TestCase | undefined>(undefined)
 
   const currentWatchedCount = watchedCount(suite, watchedMode)
@@ -102,16 +98,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const documentedCount = watch.documentedCountSince(currentWatchedCount)
 
   useDocumentationFeedback({ documentation, watchStatus, documentedCount })
-
-  function handleEditCase(tc: TestCase) {
-    setEditingCase(tc)
-    setCaseDialogOpen(true)
-  }
-
-  function handleAddCase() {
-    setEditingCase(undefined)
-    setCaseDialogOpen(true)
-  }
 
   if (isLoading) {
     return (
@@ -262,7 +248,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                 <MenuPortal>
                   <MenuPositioner align="end">
                     <MenuContent>
-                      <MenuItem onClick={() => setEditOpen(true)}>
+                      <MenuItem onClick={() => router.push(suiteEditPath(projectId, suite.id))}>
                         <PencilSimple size={14} aria-hidden="true" />
                         {t('suites.editSuite')}
                       </MenuItem>
@@ -354,23 +340,25 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               {suite.cases.length} {suite.cases.length === 1 ? t('suites.case_one') : t('suites.case_other')}
             </span>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={handleAddCase}>
+          <Link
+            href={caseNewPath(projectId, suite.id)}
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+          >
             <Plus size={14} weight="bold" aria-hidden="true" />
             {t('suites.addCase')}
-          </Button>
+          </Link>
         </div>
         <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
           <CardContent className="p-0 divide-y divide-border">
             {suite.cases.length === 0 ? (
               <div className="py-12 flex flex-col items-center gap-2 text-center">
                 <p className="text-sm text-muted">{t('suites.noTestCases')}</p>
-                <button
-                  type="button"
-                  onClick={handleAddCase}
+                <Link
+                  href={caseNewPath(projectId, suite.id)}
                   className="text-sm font-medium text-default hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 >
                   {t('suites.noCasesCta')}
-                </button>
+                </Link>
               </div>
             ) : caseGroups ? (
               caseGroups.map((group) => (
@@ -391,7 +379,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                       testCase={tc}
                       projectId={projectId}
                       githubRepo={project?.githubRepo}
-                      onEdit={handleEditCase}
+                      onEdit={(edited) => router.push(caseEditPath(projectId, suite.id, edited.id))}
                       onDelete={setDeletingCase}
                     />
                   ))}
@@ -404,7 +392,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                   testCase={tc}
                   projectId={projectId}
                   githubRepo={project?.githubRepo}
-                  onEdit={handleEditCase}
+                  onEdit={(edited) => router.push(caseEditPath(projectId, suite.id, edited.id))}
                   onDelete={setDeletingCase}
                 />
               ))
@@ -461,12 +449,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       )}
 
       {/* Suite dialogs */}
-      <SuiteFormDialog
-        projectId={projectId}
-        suite={suite}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-      />
       <ConfirmDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
@@ -483,12 +465,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
       />
 
       {/* Case dialogs */}
-      <CaseFormDialog
-        suiteId={suite.id}
-        testCase={editingCase}
-        open={caseDialogOpen}
-        onOpenChange={setCaseDialogOpen}
-      />
       <ConfirmDialog
         open={deletingCase !== undefined}
         onOpenChange={(open) => { if (!open) setDeletingCase(undefined) }}

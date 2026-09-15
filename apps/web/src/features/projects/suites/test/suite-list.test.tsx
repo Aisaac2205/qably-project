@@ -118,6 +118,16 @@ describe('SuiteList', () => {
     expect(link?.getAttribute('href')).toBe('/projects/proj-1/suites/suite-1')
   })
 
+  it('the "New suite" button is a link to the create-suite page, not a modal trigger', async () => {
+    await act(async () => {
+      renderWithQuery(<SuiteListForTest />)
+    })
+    expect(screen.getByRole('link', { name: /new suite/i })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/suites/new',
+    )
+  })
+
   it('shows a loading state while suites are loading, not the empty state', async () => {
     vi.mocked(useSuiteMetrics).mockReturnValueOnce({
       perSuite: [],

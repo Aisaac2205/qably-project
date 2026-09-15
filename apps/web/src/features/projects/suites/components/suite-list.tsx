@@ -12,15 +12,16 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
 import { SuiteRow } from './suite-row'
-import { SuiteFormDialog } from './suite-form-dialog'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
+import { suiteNewPath } from '@/features/projects/lib/routes'
 
 interface SuiteListProps {
   projectId: string
@@ -77,7 +78,6 @@ export function SuiteList({ projectId }: SuiteListProps) {
   const [status, setStatus] = useState<SuiteRunStatus | 'all'>('all')
   const [tag, setTag] = useState<string>('all')
   const [sort, setSort] = useState<SortKey>('recent')
-  const [createOpen, setCreateOpen] = useState(false)
 
   const availableTags = useMemo(() => {
     const set = new Set<string>()
@@ -105,18 +105,17 @@ export function SuiteList({ projectId }: SuiteListProps) {
   // Empty state 1: project has no suites at all
   if (perSuite.length === 0) {
     return (
-      <>
-        <StateView
-          kind="empty"
-          title={t('suites.noSuitesHeading')}
-          description={t('suites.createSuiteHint')}
-          action={<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+      <StateView
+        kind="empty"
+        title={t('suites.noSuitesHeading')}
+        description={t('suites.createSuiteHint')}
+        action={
+          <Link href={suiteNewPath(projectId)} className={cn(buttonVariants({ size: 'sm' }))}>
             <Plus size={14} weight="bold" aria-hidden="true" />
             {t('suites.newSuite')}
-          </Button>}
-        />
-        <SuiteFormDialog projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
-      </>
+          </Link>
+        }
+      />
     )
   }
 
@@ -138,10 +137,10 @@ export function SuiteList({ projectId }: SuiteListProps) {
             availableTags={availableTags}
           />
         </div>
-        <Button type="button" size="sm" className="shrink-0" onClick={() => setCreateOpen(true)}>
+        <Link href={suiteNewPath(projectId)} className={cn(buttonVariants({ size: 'sm' }), 'shrink-0')}>
           <Plus size={14} weight="bold" aria-hidden="true" />
           {t('suites.newSuite')}
-        </Button>
+        </Link>
       </div>
 
       {sorted.length === 0 ? (
@@ -181,8 +180,6 @@ export function SuiteList({ projectId }: SuiteListProps) {
           </CardContent>
         </Card>
       )}
-
-      <SuiteFormDialog projectId={projectId} open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }
