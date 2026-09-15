@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, useState } from 'react'
+import { Area, AreaChart as RechartsAreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 
 export interface TrendPoint {
   id: string
@@ -25,6 +26,8 @@ const PLOT_LEFT = 40
 const PLOT_RIGHT = WIDTH - 16
 const PLOT_TOP = 14
 const PLOT_BOTTOM = HEIGHT - 30
+const Y_AXIS_WIDTH = PLOT_LEFT - 16
+const X_AXIS_HEIGHT = HEIGHT - PLOT_BOTTOM
 const MARKER_RADIUS = 4
 const RING = 2
 
@@ -57,12 +60,6 @@ export function TrendChart({
   const yFor = (value: number) => PLOT_TOP + ((max - value) / span) * (PLOT_BOTTOM - PLOT_TOP)
 
   const coords = points.map((point, index) => ({ x: xFor(index), y: yFor(point.value) }))
-  const linePath = coords
-    .map((c, index) => `${index === 0 ? 'M' : 'L'} ${c.x.toFixed(2)} ${c.y.toFixed(2)}`)
-    .join(' ')
-  const last = coords[coords.length - 1] as { x: number; y: number }
-  const first = coords[0] as { x: number; y: number }
-  const areaPath = `${linePath} L ${last.x.toFixed(2)} ${PLOT_BOTTOM} L ${first.x.toFixed(2)} ${PLOT_BOTTOM} Z`
 
   const middle = Math.floor((points.length - 1) / 2)
   const labelledIndexes = new Set([0, middle, points.length - 1])
@@ -70,91 +67,80 @@ export function TrendChart({
   const activePoint = active === null ? null : points[active]
   const activeCoord = active === null ? null : coords[active]
 
+  const chartData = points.map((point) => ({ id: point.id, label: point.label, value: point.value }))
+  const xTicks = points
+    .filter((_, index) => labelledIndexes.has(index))
+    .map((point) => point.label)
+
   return (
     <div className={`relative ${className ?? ''}`}>
-      <svg
-        role="img"
-        aria-label={label}
-        viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        preserveAspectRatio="none"
-        className="block h-44 w-full"
-      >
-        {ticks.map((tick) => {
-          const y = yFor(tick)
-          return (
-            <g key={tick}>
-              <line
-                data-grid=""
-                x1={PLOT_LEFT}
-                x2={PLOT_RIGHT}
-                y1={y}
-                y2={y}
-                stroke="var(--qb-chart-grid)"
-                strokeWidth={1}
-                vectorEffect="non-scaling-stroke"
-              />
-              <text
-                x={PLOT_LEFT - 8}
-                y={y + 3}
-                textAnchor="end"
-                fontSize={10}
-                className="fill-qb-muted tabular-nums"
-              >
-                {valueFormatter(tick)}
-              </text>
-            </g>
-          )
-        })}
-
-        <path d={areaPath} fill="var(--qb-chart-line)" fillOpacity={0.08} />
-        <path
-          d={linePath}
-          fill="none"
-          stroke="var(--qb-chart-line)"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-
-        {activeCoord ? (
-          <line
-            x1={activeCoord.x}
-            x2={activeCoord.x}
-            y1={PLOT_TOP}
-            y2={PLOT_BOTTOM}
+      <div className="qb-trend-chart-scale [&_.recharts-wrapper]:!w-full [&_.recharts-wrapper]:!h-44">
+        <RechartsAreaChart
+          width={WIDTH}
+          height={HEIGHT}
+          data={chartData}
+          role="img"
+          aria-label={label}
+          accessibilityLayer={false}
+          tabIndex={-1}
+          margin={{ top: PLOT_TOP, right: WIDTH - PLOT_RIGHT, bottom: 0, left: PLOT_LEFT - Y_AXIS_WIDTH }}
+        >
+          <CartesianGrid
+            horizontal
+            vertical={false}
             stroke="var(--qb-chart-grid)"
             strokeWidth={1}
-            vectorEffect="non-scaling-stroke"
           />
-        ) : null}
-
-        <circle
-          data-marker=""
-          cx={last.x}
-          cy={last.y}
-          r={MARKER_RADIUS}
-          fill="var(--qb-chart-line)"
-          className="stroke-qb-surface"
-          strokeWidth={RING}
-          vectorEffect="non-scaling-stroke"
-        />
-
-        {points.map((point, index) =>
-          labelledIndexes.has(index) ? (
-            <text
-              key={point.id}
-              x={xFor(index)}
-              y={HEIGHT - 10}
-              textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
-              fontSize={10}
-              className="fill-qb-muted"
-            >
-              {point.label}
-            </text>
-          ) : null,
-        )}
-      </svg>
+          <YAxis
+            domain={[min, max]}
+            ticks={ticks as number[]}
+            width={Y_AXIS_WIDTH}
+            axisLine={false}
+            tickLine={false}
+            tickFormatter={(value: number) => valueFormatter(value)}
+            tick={{ className: 'fill-qb-muted tabular-nums', fontSize: 10 }}
+          />
+          <XAxis
+            dataKey="label"
+            height={X_AXIS_HEIGHT}
+            ticks={xTicks}
+            interval="preserveStartEnd"
+            axisLine={false}
+            tickLine={false}
+            tick={{ className: 'fill-qb-muted', fontSize: 10 }}
+          />
+          <Area
+            type="linear"
+            dataKey="value"
+            stroke="var(--qb-chart-line)"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="var(--qb-chart-line)"
+            fillOpacity={0.08}
+            isAnimationActive={false}
+            activeDot={false}
+            dot={(dotProps: { cx?: number; cy?: number; index?: number }) => {
+              const isLast = dotProps.index === points.length - 1
+              if (!isLast) {
+                return <g key={`dot-${dotProps.index}`} />
+              }
+              return (
+                <circle
+                  key="marker"
+                  data-marker=""
+                  cx={dotProps.cx}
+                  cy={dotProps.cy}
+                  r={MARKER_RADIUS}
+                  fill="var(--qb-chart-line)"
+                  className="stroke-qb-surface"
+                  strokeWidth={RING}
+                />
+              )
+            }}
+          />
+        </RechartsAreaChart>
+      </div>
 
       <div className="absolute inset-x-0 top-0 h-44">
         {points.map((point, index) => {

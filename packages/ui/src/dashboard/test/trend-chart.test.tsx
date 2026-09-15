@@ -26,7 +26,7 @@ describe('TrendChart', () => {
   it('draws solid hairline gridlines, never dashed ones', () => {
     const { container } = render(<TrendChart points={points} label="Pass rate" emptyLabel="No runs yet" />)
 
-    const gridlines = container.querySelectorAll('line[data-grid]')
+    const gridlines = container.querySelectorAll('.recharts-cartesian-grid-horizontal line')
     expect(gridlines.length).toBeGreaterThan(0)
     for (const line of gridlines) {
       expect(line.getAttribute('stroke-dasharray')).toBeNull()
@@ -58,11 +58,36 @@ describe('TrendChart', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('May 9')
   })
 
+  it('dismisses the tooltip on blur and on pointer leave', () => {
+    render(<TrendChart points={points} label="Pass rate" emptyLabel="No runs yet" />)
+
+    const hit = screen.getAllByRole('button')[0] as HTMLElement
+    fireEvent.pointerEnter(hit)
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+
+    fireEvent.pointerLeave(hit)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    fireEvent.focus(hit)
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    fireEvent.blur(hit)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
   it('keeps the values reachable without a pointer through a table view', () => {
     render(<TrendChart points={points} label="Pass rate" emptyLabel="No runs yet" valueFormatter={(v) => `${v}%`} />)
 
     const table = screen.getByRole('table')
     expect(table).toHaveTextContent('May 11')
     expect(table).toHaveTextContent('90%')
+  })
+
+  it('renders the area fill and line stroke from the qb chart line token, never a hardcoded colour', () => {
+    const { container } = render(<TrendChart points={points} label="Pass rate" emptyLabel="No runs yet" />)
+
+    const area = container.querySelector('.recharts-area-area')
+    expect(area?.getAttribute('fill')).toBe('var(--qb-chart-line)')
+    const curve = container.querySelector('.recharts-area-curve')
+    expect(curve?.getAttribute('stroke')).toBe('var(--qb-chart-line)')
   })
 })
