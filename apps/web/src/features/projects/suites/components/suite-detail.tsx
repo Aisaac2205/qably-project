@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Play, Star, ArrowLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
+import { Play, Star, ArrowLeft, CaretLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
 import type { Suite, TestCase } from '@qably/types'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
 import { useProject } from '@/features/projects/hooks/use-project'
@@ -153,14 +153,30 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
-      <Breadcrumbs
-        items={[
-          { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-          { label: t('suites.breadcrumbSuites'), href: projectSuitesPath(projectId) },
-          { label: suite.name },
-        ]}
-      />
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) {
+              router.back()
+            } else {
+              router.push(projectSuitesPath(projectId))
+            }
+          }}
+          aria-label={t('common.back')}
+          className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
+        >
+          <CaretLeft size={14} weight="bold" aria-hidden="true" />
+        </button>
+        <Breadcrumbs
+          items={[
+            { label: t('suites.breadcrumbProjects'), href: '/projects' },
+            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+            { label: t('suites.breadcrumbSuites'), href: projectSuitesPath(projectId) },
+            { label: suite.name },
+          ]}
+        />
+      </div>
 
       {/* Hero */}
       <header className="rounded-xl border border-border bg-surface p-5 sm:p-6 shadow-card space-y-4">

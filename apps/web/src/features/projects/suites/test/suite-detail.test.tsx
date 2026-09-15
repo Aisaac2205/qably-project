@@ -15,8 +15,9 @@ vi.mock('@/features/projects/suites/api/suites.api', async () =>
 import * as suitesApiStub from '@/test/suites-api-stub'
 
 const mockPush = vi.fn()
+const mockBack = vi.fn()
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, back: mockBack }),
 }))
 vi.mock('@/features/projects/hooks/use-project', () => ({
   useProject: () => ({
@@ -34,10 +35,28 @@ describe('SuiteDetail (redesigned)', () => {
   beforeEach(() => {
     __resetStore()
     mockPush.mockClear()
+    mockBack.mockClear()
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+  })
+
+  it('falls back to the suites list when the back button is pressed with no prior history (e.g. a deep link)', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(mockBack).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites')
+  })
+
+  it('navigates to the previous history entry when the back button is pressed and history exists', async () => {
+    const user = userEvent.setup()
+    window.history.pushState({}, '', window.location.href)
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-4" />) })
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    expect(mockBack).toHaveBeenCalledTimes(1)
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('disables the run button on a suite with no cases, while keeping it focusable', async () => {
