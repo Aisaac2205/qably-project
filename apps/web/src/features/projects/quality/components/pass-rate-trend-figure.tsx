@@ -20,6 +20,44 @@ const HEIGHT = 120
 const TOP_INSET = 6
 const BOTTOM_INSET = 6
 
+/**
+ * Catmull-Rom-to-Bezier smoothing: turns the raw point coordinates into a
+ * single smooth cubic path instead of a linear polyline, without pulling in
+ * a charting library. Returns '' when there are fewer than two points.
+ */
+function buildSmoothLinePath(xs: number[], ys: number[]): string {
+  const n = xs.length
+  if (n < 2) return ''
+
+  let d = `M ${xs[0].toFixed(2)},${ys[0].toFixed(2)}`
+  for (let i = 0; i < n - 1; i += 1) {
+    const p0x = i > 0 ? xs[i - 1] : xs[i]
+    const p0y = i > 0 ? ys[i - 1] : ys[i]
+    const p1x = xs[i]
+    const p1y = ys[i]
+    const p2x = xs[i + 1]
+    const p2y = ys[i + 1]
+    const p3x = i + 2 < n ? xs[i + 2] : xs[i + 1]
+    const p3y = i + 2 < n ? ys[i + 2] : ys[i + 1]
+
+    const cp1x = p1x + (p2x - p0x) / 6
+    const cp1y = p1y + (p2y - p0y) / 6
+    const cp2x = p2x - (p3x - p1x) / 6
+    const cp2y = p2y - (p3y - p1y) / 6
+
+    d += ` C ${cp1x.toFixed(2)},${cp1y.toFixed(2)} ${cp2x.toFixed(2)},${cp2y.toFixed(2)} ${p2x.toFixed(2)},${p2y.toFixed(2)}`
+  }
+  return d
+}
+
+/** Closes the smoothed line down to the baseline so it can be used as a fill. */
+function buildAreaPath(linePath: string, xs: number[], baselineY: number): string {
+  if (linePath === '') return ''
+  const lastX = xs[xs.length - 1].toFixed(2)
+  const firstX = xs[0].toFixed(2)
+  return `${linePath} L ${lastX},${baselineY.toFixed(2)} L ${firstX},${baselineY.toFixed(2)} Z`
+}
+
 export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
   const { t, locale } = useTranslation()
   const reactId = useId()
@@ -58,8 +96,11 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
       BOTTOM_INSET -
       (Math.max(0, Math.min(100, point.passRate)) / 100) * usableHeight,
   )
-  const polylinePoints = xs.map((x, index) => `${x.toFixed(2)},${ys[index].toFixed(2)}`).join(' ')
   const headingId = `quality-trend-heading-${reactId}`
+  const gradientId = `quality-trend-gradient-${reactId}`
+  const baselineY = HEIGHT - BOTTOM_INSET
+  const linePath = buildSmoothLinePath(xs, ys)
+  const areaPath = buildAreaPath(linePath, xs, baselineY)
 
   return (
     <figure aria-labelledby={headingId}>
@@ -78,31 +119,44 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
       >
         <line
           x1={0}
-          y1={HEIGHT - BOTTOM_INSET}
+          y1={baselineY}
           x2={WIDTH}
-          y2={HEIGHT - BOTTOM_INSET}
+          y2={baselineY}
           className="stroke-border"
           strokeWidth={1}
         />
-        <polyline
-          points={polylinePoints}
-          fill="none"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          stroke="currentColor"
-          className={TONE_TEXT_CLASSES[tone]}
-        />
-        <circle
-          cx={xs[n - 1]}
-          cy={ys[n - 1]}
-          r={4}
-          fill="currentColor"
-          stroke="var(--color-surface)"
-          strokeWidth={2}
-          className={TONE_TEXT_CLASSES[tone]}
-          aria-hidden="true"
-        />
+        <g className={TONE_TEXT_CLASSES[tone]}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="currentColor" stopOpacity={0.22} />
+              <stop offset="100%" stopColor="currentColor" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          {areaPath ? (
+            <path className="quality-trend-area" d={areaPath} fill={`url(#${gradientId})`} />
+          ) : null}
+          {linePath ? (
+            <path
+              className="quality-trend-line"
+              d={linePath}
+              fill="none"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              stroke="currentColor"
+              pathLength={1}
+            />
+          ) : null}
+          <circle
+            cx={xs[n - 1]}
+            cy={ys[n - 1]}
+            r={4}
+            fill="currentColor"
+            stroke="var(--color-surface)"
+            strokeWidth={2}
+            aria-hidden="true"
+          />
+        </g>
       </svg>
 
       <table className="sr-only">
