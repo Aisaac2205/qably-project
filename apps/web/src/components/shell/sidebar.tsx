@@ -42,6 +42,7 @@ import {
   projectSuitesPath,
 } from '@/features/projects/lib/routes'
 import { useTranslation } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 
 interface NavItem {
   label: string
@@ -91,11 +92,27 @@ export function Sidebar() {
   return (
     <ShadcnSidebar variant="sidebar" collapsible="icon" className="border-r-0! bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
-      <SidebarHeader className="h-14 justify-center p-2">
+      <SidebarHeader className={cn('justify-center p-2', isCollapsed ? undefined : 'h-14')}>
         {isCollapsed ? (
-          <div className="flex items-center justify-center">
-            <SidebarTrigger className="shrink-0" />
-          </div>
+          <>
+            <Link
+              href="/dashboard"
+              aria-label="Qably"
+              className="mx-auto flex size-8 items-center justify-center rounded-lg transition-colors hover:bg-sidebar-hover focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <Image
+                src="/icono-qably.png"
+                alt=""
+                width={24}
+                height={24}
+                className="h-6 w-6 object-contain"
+                priority
+              />
+            </Link>
+            <div className="flex items-center justify-center">
+              <SidebarTrigger className="shrink-0" />
+            </div>
+          </>
         ) : (
           <div className="flex h-10 w-full items-center justify-between gap-1.5 px-0.5">
             <Link
