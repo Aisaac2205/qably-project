@@ -3,6 +3,7 @@
 import { useId, useMemo } from 'react'
 import { useTranslation } from '@/lib/i18n'
 import { StateView } from '@/components/ui/state-view'
+import { TONE_TEXT_CLASSES, toneForPassRatePercent } from '../lib/tone'
 
 export interface TrendPoint {
   id: string
@@ -18,18 +19,6 @@ const WIDTH = 640
 const HEIGHT = 120
 const TOP_INSET = 6
 const BOTTOM_INSET = 6
-
-const TONE_CLASSES = {
-  pass: 'text-pass',
-  warn: 'text-warn',
-  fail: 'text-fail',
-} as const
-
-function toneFor(averagePassRate: number): keyof typeof TONE_CLASSES {
-  if (averagePassRate >= 70) return 'pass'
-  if (averagePassRate > 0) return 'warn'
-  return 'fail'
-}
 
 export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
   const { t, locale } = useTranslation()
@@ -58,7 +47,7 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
   const average = Math.round(
     points.reduce((sum, point) => sum + point.passRate, 0) / points.length,
   )
-  const tone = toneFor(average)
+  const tone = toneForPassRatePercent(average)
 
   const n = points.length
   const usableHeight = HEIGHT - TOP_INSET - BOTTOM_INSET
@@ -102,7 +91,7 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
           strokeLinecap="round"
           strokeLinejoin="round"
           stroke="currentColor"
-          className={TONE_CLASSES[tone]}
+          className={TONE_TEXT_CLASSES[tone]}
         />
         <circle
           cx={xs[n - 1]}
@@ -111,7 +100,7 @@ export function PassRateTrendFigure({ points }: PassRateTrendFigureProps) {
           fill="currentColor"
           stroke="var(--color-surface)"
           strokeWidth={2}
-          className={TONE_CLASSES[tone]}
+          className={TONE_TEXT_CLASSES[tone]}
           aria-hidden="true"
         />
       </svg>
