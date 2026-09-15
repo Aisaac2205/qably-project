@@ -9,3 +9,4 @@ export {
   type KpiTrend,
 } from './kpi-card'
 export { TrendChart, type TrendChartProps, type TrendPoint } from './trend-chart'
+export { StatusDonut, type StatusDonutProps, type StatusDonutSlice, type StatusDonutTone } from './status-donut'

@@ -313,6 +313,7 @@
     "greeting": "Buenos días",
     "subtitle": "Resumen de la actividad en la plataforma de QA.",
     "projectStatus": "Estado de los proyectos",
+    "projectsByStatus": "Proyectos por estado",
     "passRateTrend": "Tendencia de la tasa de aprobación",
     "recentRuns": "Ejecuciones de prueba",
     "workQueue": "Cola de trabajo",

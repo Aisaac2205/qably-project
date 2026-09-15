@@ -313,6 +313,7 @@
     "greeting": "Good morning",
     "subtitle": "Here’s what’s happening with your QA platform today.",
     "projectStatus": "Project status",
+    "projectsByStatus": "Projects by status",
     "passRateTrend": "Pass rate trend",
     "recentRuns": "Test runs",
     "workQueue": "Work queue",

@@ -2,6 +2,7 @@
 
 import { KpiRow } from './kpi-row'
 import { ProjectStatusTable } from './project-status-table'
+import { ProjectStatusDonut } from './project-status-donut'
 import { PassRateTrend } from './pass-rate-trend'
 import { PendingProposals } from './pending-ai-cases'
 import { RecentActivity } from './recent-activity'
@@ -19,7 +20,10 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-5 @md:gap-6 @3xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,1fr)]">
         <ProjectStatusTable />
-        <PassRateTrend />
+        <div className="flex flex-col gap-5 @md:gap-6">
+          <PassRateTrend />
+          <ProjectStatusDonut />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-5 @md:gap-6 @3xl:grid-cols-[minmax(0,1.28fr)_minmax(21rem,0.72fr)]">
