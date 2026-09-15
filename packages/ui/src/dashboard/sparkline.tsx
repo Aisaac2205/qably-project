@@ -1,3 +1,5 @@
+import { Line, LineChart } from 'recharts'
+
 export type SparklineTone = 'pass' | 'fail' | 'warn' | 'muted' | 'primary'
 
 const TONE_FILL: Record<SparklineTone, string> = {
@@ -21,21 +23,10 @@ const MARKER_RADIUS = 4
 const RING = 2
 const INSET = MARKER_RADIUS + RING
 
-export function sparklinePoints(
-  values: readonly number[],
-  width: number,
-  height: number,
-): { x: number; y: number }[] {
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const span = max - min
-  const usableHeight = height - INSET * 2
-  const step = values.length > 1 ? (width - INSET * 2) / (values.length - 1) : 0
-
-  return values.map((value, index) => ({
-    x: INSET + index * step,
-    y: span === 0 ? height / 2 : INSET + ((max - value) / span) * usableHeight,
-  }))
+interface SparkDotProps {
+  cx?: number
+  cy?: number
+  index?: number
 }
 
 export function Sparkline({
@@ -48,33 +39,46 @@ export function Sparkline({
 }: SparklineProps) {
   if (values.length < 2) return null
 
-  const points = sparklinePoints(values, width, height)
-  const last = points[points.length - 1] as { x: number; y: number }
+  const data = values.map((value, index) => ({ index, value }))
 
   return (
-    <svg
-      role="img"
-      aria-label={label}
-      viewBox={`0 0 ${width} ${height}`}
+    <LineChart
       width={width}
       height={height}
-      className={className}
+      data={data}
+      role="img"
+      aria-label={label}
+      accessibilityLayer={false}
+      tabIndex={-1}
+      margin={{ top: INSET, right: INSET, bottom: INSET, left: INSET }}
+      className={className ?? ''}
     >
-      <polyline
-        points={points.map((point) => `${point.x},${point.y}`).join(' ')}
-        fill="none"
+      <Line
+        type="linear"
+        dataKey="value"
         className="stroke-qb-muted"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
+        isAnimationActive={false}
+        activeDot={false}
+        dot={(dotProps: SparkDotProps) => {
+          const isLast = dotProps.index === values.length - 1
+          if (!isLast) {
+            return <g key={`dot-${dotProps.index}`} />
+          }
+          return (
+            <circle
+              key="marker"
+              cx={dotProps.cx}
+              cy={dotProps.cy}
+              r={MARKER_RADIUS}
+              className={`stroke-qb-surface ${TONE_FILL[tone]}`}
+              strokeWidth={RING}
+            />
+          )
+        }}
       />
-      <circle
-        cx={last.x}
-        cy={last.y}
-        r={MARKER_RADIUS}
-        className={`stroke-qb-surface ${TONE_FILL[tone]}`}
-        strokeWidth={RING}
-      />
-    </svg>
+    </LineChart>
   )
 }

@@ -2,6 +2,16 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { Sparkline } from '../sparkline'
 
+function pathCommandPoints(d: string): { x: number; y: number }[] {
+  return d
+    .split(/(?=[ML])/)
+    .filter(Boolean)
+    .map((segment) => {
+      const [x, y] = segment.slice(1).trim().split(',').map(Number)
+      return { x: x as number, y: y as number }
+    })
+}
+
 describe('Sparkline', () => {
   it('is an image with an accessible name, never a decorative squiggle', () => {
     render(<Sparkline values={[10, 40, 30, 60]} label="Pass rate over the last 4 runs" />)
@@ -12,7 +22,8 @@ describe('Sparkline', () => {
   it('plots one point per value and marks only the last one', () => {
     const { container } = render(<Sparkline values={[10, 40, 30, 60]} label="trend" />)
 
-    const points = container.querySelector('polyline')?.getAttribute('points')?.trim().split(/\s+/)
+    const path = container.querySelector('.recharts-line-curve')
+    const points = pathCommandPoints(path?.getAttribute('d') ?? '')
     expect(points).toHaveLength(4)
     expect(container.querySelectorAll('circle')).toHaveLength(1)
   })
@@ -20,19 +31,25 @@ describe('Sparkline', () => {
   it('draws a flat line rather than dividing by zero when every value is equal', () => {
     const { container } = render(<Sparkline values={[50, 50, 50]} label="flat" />)
 
-    const ys = container
-      .querySelector('polyline')
-      ?.getAttribute('points')
-      ?.trim()
-      .split(/\s+/)
-      .map((pair) => Number(pair.split(',')[1]))
+    const path = container.querySelector('.recharts-line-curve')
+    const points = pathCommandPoints(path?.getAttribute('d') ?? '')
+    const ys = points.map((point) => point.y)
     expect(new Set(ys).size).toBe(1)
-    expect(ys?.every((y) => Number.isFinite(y))).toBe(true)
+    expect(ys.every((y) => Number.isFinite(y))).toBe(true)
   })
 
   it('renders nothing for fewer than two values', () => {
     const { container } = render(<Sparkline values={[42]} label="single" />)
 
     expect(container).toBeEmptyDOMElement()
+  })
+
+  it('colours the last-value marker by tone while the line itself stays muted', () => {
+    const { container } = render(<Sparkline values={[10, 20, 30]} label="trend" tone="fail" />)
+
+    const marker = container.querySelector('circle')
+    expect(marker).toHaveClass('fill-qb-fail')
+    const line = container.querySelector('.recharts-line')
+    expect(line).toHaveClass('stroke-qb-muted')
   })
 })

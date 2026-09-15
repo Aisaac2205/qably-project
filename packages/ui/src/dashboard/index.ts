@@ -1,6 +1,6 @@
 export { DefaultLink, type LinkComponent, type LinkProps } from './link'
 export { StatusChip, type ChipStatus, type ChipTone, type StatusChipProps } from './status-chip'
-export { Sparkline, sparklinePoints, type SparklineProps, type SparklineTone } from './sparkline'
+export { Sparkline, type SparklineProps, type SparklineTone } from './sparkline'
 export {
   KpiCard,
   type KpiAccent,
