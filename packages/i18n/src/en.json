@@ -330,6 +330,8 @@
     "runsKpi": "Runs · 7d",
     "passRateKpi": "Pass rate · 7d",
     "defectsKpi": "Failed test cases · {{windowDays}}d",
+    "defectsSparkline_one": "Failed test cases across the last run",
+    "defectsSparkline_other": "Failed test cases across the last {{count}} runs",
     "pendingAiKpi": "Pending AI",
     "activeRunsKpi": "Active runs",
     "loadErrorTitle": "We couldn't load the dashboard",

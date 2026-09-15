@@ -1,8 +1,9 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { Play, Bug, Sparkle, CircleNotch } from '@phosphor-icons/react'
-import { KpiCard } from '@qably/ui/dashboard'
+import { KpiCard, type KpiSparkline } from '@qably/ui/dashboard'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StateView } from '@/components/ui/state-view'
@@ -11,11 +12,26 @@ import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard-stat
 import { useTranslation } from '@/lib/i18n'
 
 const SKELETON_COUNT = 4
+const MIN_SPARKLINE_POINTS = 2
 
 export function KpiRow() {
   const stats = useDashboardStats()
   const { t } = useTranslation()
   const detailsLabel = t('common.viewDetails')
+
+  const defectsSparkline: KpiSparkline | undefined = useMemo(() => {
+    const values = [...stats.recentRuns]
+      .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
+      .map((run) => run.caseCounts.fail)
+
+    if (values.length < MIN_SPARKLINE_POINTS) return undefined
+
+    return {
+      values,
+      label: t('dashboard.defectsSparkline', { count: values.length }),
+      tone: stats.defectsDetected > 0 ? 'fail' : 'muted',
+    }
+  }, [stats.recentRuns, stats.defectsDetected, t])
 
   if (stats.summaryState.isLoading) {
     return (
@@ -67,6 +83,7 @@ export function KpiRow() {
           linkComponent={Link}
           detailsLabel={detailsLabel}
           accent={stats.defectsDetected > 0 ? 'fail' : 'default'}
+          sparkline={defectsSparkline}
         />
         <KpiCard
           label={t('dashboard.pendingAiKpi')}

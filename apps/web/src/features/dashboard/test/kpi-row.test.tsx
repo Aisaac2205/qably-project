@@ -61,6 +61,19 @@ describe('KpiRow', () => {
     expect(screen.getByText('5')).toBeInTheDocument()
   })
 
+  it('draws a defects sparkline from the recent runs, coloured fail when defects exist', async () => {
+    await act(async () => {
+      renderWithQuery(<KpiRow />)
+    })
+
+    const defectsCard = screen.getByText('Failed test cases · 7d').closest('a') as HTMLElement
+    expect(dashboardSummaryFixture.recentRuns.length).toBeGreaterThanOrEqual(2)
+
+    const spark = defectsCard.querySelector('svg[role="img"]')
+    expect(spark).not.toBeNull()
+    expect(spark?.querySelector('circle')).toHaveClass('fill-qb-fail')
+  })
+
   it('lays the cards out two per row on a phone and four on a wide container', async () => {
     await act(async () => {
       renderWithQuery(<KpiRow />)

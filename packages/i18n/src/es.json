@@ -330,6 +330,8 @@
     "runsKpi": "Ejecuciones · 7 d",
     "passRateKpi": "Tasa de aprobación · 7 d",
     "defectsKpi": "Casos fallidos · {{windowDays}} d",
+    "defectsSparkline_one": "Casos fallidos en la última ejecución",
+    "defectsSparkline_other": "Casos fallidos en las últimas {{count}} ejecuciones",
     "pendingAiKpi": "IA pendiente",
     "activeRunsKpi": "Ejecuciones activas",
     "loadErrorTitle": "No pudimos cargar el panel",
