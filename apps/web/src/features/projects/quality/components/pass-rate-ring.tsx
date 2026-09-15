@@ -1,7 +1,6 @@
 import { TONE_TEXT_CLASSES, toneForPassRatePercent } from '../lib/tone'
 
 interface PassRateRingProps {
-  /** Whole-percent pass rate (0-100), the same rounded value shown in the KPI card. */
   percent: number
   label: string
 }
@@ -12,12 +11,6 @@ const RADIUS = 40
 const STROKE_WIDTH = 8
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-/**
- * A radial "current state" gauge for the pass rate: a single value read
- * instantly, next to (not instead of) the historical trend line. The
- * percentage is real, visible text — the ring itself is decorative and
- * hidden from assistive tech.
- */
 export function PassRateRing({ percent, label }: PassRateRingProps) {
   const clamped = Math.max(0, Math.min(100, Math.round(percent)))
   const tone = toneForPassRatePercent(clamped)

@@ -300,9 +300,6 @@ button:focus-visible,
   }
 }
 
-/* Quality trend line: a one-shot draw-in on mount, same pattern as
-   page-enter above. Relies on the path's pathLength="1" attribute so the
-   dash math is independent of the curve's actual geometry. */
 @keyframes quality-trend-reveal {
   from {
     stroke-dashoffset: 1;

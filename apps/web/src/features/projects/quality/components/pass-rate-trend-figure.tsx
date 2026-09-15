@@ -20,11 +20,6 @@ const HEIGHT = 120
 const TOP_INSET = 6
 const BOTTOM_INSET = 6
 
-/**
- * Catmull-Rom-to-Bezier smoothing: turns the raw point coordinates into a
- * single smooth cubic path instead of a linear polyline, without pulling in
- * a charting library. Returns '' when there are fewer than two points.
- */
 function buildSmoothLinePath(xs: number[], ys: number[]): string {
   const n = xs.length
   if (n < 2) return ''
@@ -50,7 +45,6 @@ function buildSmoothLinePath(xs: number[], ys: number[]): string {
   return d
 }
 
-/** Closes the smoothed line down to the baseline so it can be used as a fill. */
 function buildAreaPath(linePath: string, xs: number[], baselineY: number): string {
   if (linePath === '') return ''
   const lastX = xs[xs.length - 1].toFixed(2)
