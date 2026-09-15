@@ -63,6 +63,15 @@ describe('RunHistoryStrip', () => {
     expect(screen.getByRole('img')).toHaveAccessibleName(/no completed runs/i)
   })
 
+  it('caps the visible bars so the strip width stays predictable, while the aria-label keeps the full count', () => {
+    const eightRuns: RunStatus[] = ['pass', 'pass', 'fail', 'pass', 'fail', 'pass', 'pass', 'fail']
+    render(<RunHistoryStrip history={eightRuns} passRate={62} />)
+    expect(screen.getByTestId('run-history-bar-4')).toBeInTheDocument()
+    expect(screen.queryByTestId('run-history-bar-5')).not.toBeInTheDocument()
+    const label = screen.getByRole('img').getAttribute('aria-label') ?? ''
+    expect(label).toMatch(/^Last 8 runs:/)
+  })
+
   it('accepts a custom className on the root element', () => {
     render(<RunHistoryStrip history={fourRuns} passRate={75} className="ml-auto" />)
     expect(screen.getByRole('img').className).toContain('ml-auto')

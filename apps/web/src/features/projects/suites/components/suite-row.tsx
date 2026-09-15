@@ -103,13 +103,13 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
             .filter((part): part is string => part !== null)
             .join(' · ') || `${suite.cases.length} ${t('suites.caseSuffix_other')}`
         }
-        className="hidden md:flex items-center gap-2 shrink-0"
+        className="hidden md:flex items-center gap-2 shrink-0 w-12"
       >
         {suite.automatedCases > 0 && (
-          <Image src="/logos/github.svg" alt="" width={14} height={14} aria-hidden="true" className="opacity-70" />
+          <Image src="/logos/github.svg" alt="" width={18} height={18} aria-hidden="true" className="opacity-70" />
         )}
         {suite.manualCases > 0 && (
-          <PencilSimple size={14} weight="bold" aria-hidden="true" className="text-muted" />
+          <PencilSimple size={18} weight="bold" aria-hidden="true" className="text-muted" />
         )}
         {suite.automatedCases === 0 && suite.manualCases === 0 && (
           <span className="text-xs text-muted" aria-hidden="true">0</span>
@@ -127,12 +127,14 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
       </div>
 
       {/* Col 5: run history strip (hidden on mobile) */}
-      <div className="hidden md:flex items-center shrink-0">
+      <div className="hidden md:flex items-center justify-end shrink-0 w-20">
         <RunHistoryStrip history={history} passRate={recentPassRate} />
       </div>
 
-      {/* Col 6: status chip (visible on all sizes) */}
-      <div className="flex justify-end shrink-0">
+      {/* Col 6: status chip (visible on all sizes). Fixed width sized to the
+          longest status label ("Requiere atención") so this column — and
+          the 1fr name column before it — align the same way on every row. */}
+      <div className="flex justify-end shrink-0 md:w-32">
         <StatusChip status={status} />
       </div>
     </div>
