@@ -245,6 +245,25 @@ describe('ProjectStatusTable', () => {
     expect(within(rows[0]).getByText('Zeta')).toBeInTheDocument()
   })
 
+  it('makes the last-run column sortable too', async () => {
+    await renderWithProjects([
+      { ...projectFixtures[0], name: 'older', activity: activity({ lastRunAt: '2026-06-01T10:00:00Z' }) },
+      { ...projectFixtures[1], name: 'newer', activity: activity({ lastRunAt: '2026-06-16T10:00:00Z' }) },
+    ])
+
+    const lastRunHeader = screen.getByRole('columnheader', { name: 'Last run' })
+    expect(lastRunHeader).toHaveAttribute('aria-sort', 'none')
+
+    const sortButton = screen.getByRole('button', { name: 'Sort by last run' })
+    await act(async () => {
+      sortButton.click()
+    })
+
+    expect(lastRunHeader).toHaveAttribute('aria-sort', 'ascending')
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(within(rows[0]).getByText('older')).toBeInTheDocument()
+  })
+
   it('filters by name across the full org list, surfacing a project outside the visible cap', async () => {
     const fillers = Array.from({ length: 8 }, (_, i) => ({
       ...projectFixtures[0],

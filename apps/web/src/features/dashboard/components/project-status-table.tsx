@@ -151,9 +151,14 @@ export function ProjectStatusTable() {
                 onSort={handleSort}
                 className="text-xs font-medium text-muted px-5 py-3"
               />
-              <th className="text-xs font-medium text-muted px-3 py-3 @max-2xl:hidden">
-                {t('dashboard.thLastRun')}
-              </th>
+              <SortableHeader
+                sort={sort}
+                sortKey="lastRun"
+                label={t('dashboard.thLastRun')}
+                ariaLabel={t('dashboard.sortByLastRun')}
+                onSort={handleSort}
+                className="text-xs font-medium text-muted px-3 py-3 @max-2xl:hidden"
+              />
               <SortableHeader
                 sort={sort}
                 sortKey="passRate"
