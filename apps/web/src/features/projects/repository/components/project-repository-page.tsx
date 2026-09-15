@@ -6,7 +6,7 @@ import Link from 'next/link'
 import {
   ArrowRight,
   ArrowSquareOut,
-  FileCode,
+  Code,
   Sparkle,
 } from '@phosphor-icons/react'
 import type { CodeChange, Evidence } from '@qably/types'
@@ -55,9 +55,7 @@ function ChangedFileItem({
     <li className="min-w-0 rounded-2xl border border-border/70 bg-surface p-4 sm:p-5 transition-all duration-150 hover:border-border hover:shadow-xs space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-canvas border border-border/60 text-muted">
-            <FileCode size={15} />
-          </div>
+          <Code size={16} className="shrink-0 text-muted" aria-hidden="true" />
           <p className="min-w-0 break-all text-xs sm:text-sm font-semibold text-default tracking-tight">
             {change.filePath}
           </p>
