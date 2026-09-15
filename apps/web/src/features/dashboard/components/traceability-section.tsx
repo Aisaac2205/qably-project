@@ -106,6 +106,7 @@ export function TraceabilitySection({ projectId }: { projectId?: string } = {}) 
             onValueChange={(val) => val && setActiveFilter(val as TraceabilityFilter)}
             triggerClassName="h-8 min-w-[168px] px-2.5 text-xs font-medium"
             badgeInTrigger={false}
+            iconInTrigger={false}
           />
 
           <SelectSimple

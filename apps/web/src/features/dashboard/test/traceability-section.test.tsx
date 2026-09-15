@@ -99,6 +99,15 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     expect(comboboxes[1]).toHaveTextContent('2026')
   })
 
+  it('keeps the stage-select trigger icon-free, GitHub-style plain text controls', async () => {
+    await act(async () => {
+      renderWithQuery(<TraceabilitySection />)
+    })
+
+    const [stageTrigger] = screen.getAllByRole('combobox')
+    expect(stageTrigger.querySelectorAll('svg')).toHaveLength(1)
+  })
+
   it('states the yearly total once instead of repeating it in the stage selector', async () => {
     await act(async () => {
       renderWithQuery(<TraceabilitySection />)

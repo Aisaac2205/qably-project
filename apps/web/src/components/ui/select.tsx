@@ -152,6 +152,7 @@ export interface SelectSimpleProps<T = string | number | null> {
   readonly className?: string
   readonly triggerClassName?: string
   readonly badgeInTrigger?: boolean
+  readonly iconInTrigger?: boolean
 }
 
 /**
@@ -164,6 +165,7 @@ function SelectSimple<T extends string | number | null>({
   placeholder,
   triggerClassName,
   badgeInTrigger = true,
+  iconInTrigger = true,
 }: SelectSimpleProps<T>) {
   const activeOption = options.find((o) => o.value === value)
 
@@ -176,7 +178,7 @@ function SelectSimple<T extends string | number | null>({
         <SelectValue placeholder={placeholder}>
           {activeOption ? (
             <span className="flex items-center gap-1.5">
-              {activeOption.icon && (
+              {iconInTrigger && activeOption.icon && (
                 <span className="shrink-0 text-muted">{activeOption.icon}</span>
               )}
               <span>{activeOption.label}</span>
