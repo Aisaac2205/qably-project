@@ -19,3 +19,11 @@ export function projectAerisPath(projectId: string): string {
 export function reviewInboxPath(projectId: string): string {
   return `/review-inbox?project=${projectId}`
 }
+
+export function projectRunPath(projectId: string, runId: string): string {
+  return `/projects/${projectId}/runs/${runId}`
+}
+
+export function reviewInboxProposalPath(proposalId: string): string {
+  return `/review-inbox?proposal=${proposalId}`
+}
