@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
@@ -52,13 +53,21 @@ interface NavItem {
 export function Sidebar() {
   const pathname = usePathname()
   const { t } = useTranslation()
-  const { state } = useSidebar()
+  const { state, isMobile, setOpenMobile } = useSidebar()
   const currentUser = useCurrentUser()
   const isCollapsed = state === 'collapsed'
 
   const projectId = useProjectRouteId()
   const { project } = useProject(projectId ?? '')
   const projectContext = project ? projectId : null
+
+  // Route changes on mobile should dismiss the sheet — otherwise it stays
+  // open over the newly navigated page until the user closes it manually.
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }, [pathname, isMobile, setOpenMobile])
 
   const navItems: NavItem[] = [
     { label: t('sidebar.portfolio'), href: '/dashboard', icon: SquaresFour },

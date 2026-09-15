@@ -244,6 +244,29 @@ describe('Sidebar — current destinations', () => {
   })
 })
 
+describe('Sidebar — mobile navigation', () => {
+  it('closes the mobile sheet when the route changes', async () => {
+    isMobileViewport = true
+    mockPathname.mockReturnValue('/dashboard')
+    const { rerender } = await act(async () => renderSidebar({ includeTrigger: true }))
+
+    await act(async () => { screen.getByRole('button', { name: 'Toggle Sidebar' }).click() })
+    expect(screen.getByRole('dialog', { name: 'Sidebar' })).toBeInTheDocument()
+
+    mockPathname.mockReturnValue('/projects')
+    await act(async () => {
+      rerender(
+        <SidebarProvider defaultOpen>
+          <SidebarTrigger />
+          <Sidebar />
+        </SidebarProvider>,
+      )
+    })
+
+    expect(screen.queryByRole('dialog', { name: 'Sidebar' })).not.toBeInTheDocument()
+  })
+})
+
 describe('Sidebar — static sibling routes under /projects', () => {
   it('never requests a project for /projects/new', async () => {
     useProjectSpy.mockClear()
