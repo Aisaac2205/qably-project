@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useProposalDecision } from '@/features/review-inbox/hooks/use-proposal-decision'
 import { ApiError } from '@/lib/api-client'
 import * as reviewApi from '@/features/review-inbox/api/review.api'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -81,6 +82,68 @@ describe('useProposalDecision', () => {
       'proposal-1',
       expect.objectContaining({ testCaseName: 'Empties the cart', suiteId: 'suite-1' }),
     )
+  })
+
+  it('invalidates suite and project data after a successful reject, not just the review list', async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
+    vi.spyOn(reviewApi, 'rejectProposal').mockResolvedValue({ decisionId: 'decision-1' })
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      { wrapper },
+    )
+
+    act(() => {
+      result.current.reject('proposal-1')
+    })
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: suiteKeys.all }),
+      ),
+    )
+  })
+
+  it('invalidates suite and project data after a successful approve too', async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
+    vi.spyOn(reviewApi, 'approveProposal').mockResolvedValue({
+      createdNewCase: true,
+      testCaseId: 'case-1',
+      testCaseName: 'Empties the cart',
+      suiteId: 'suite-1',
+      versionId: 'version-1',
+      version: 1,
+      decisionId: 'decision-1',
+    })
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      { wrapper },
+    )
+
+    act(() => {
+      result.current.approve('proposal-1')
+    })
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: suiteKeys.all }),
+      ),
+    )
+  })
+
+  it('reports incomplete-proposal instead of a generic error when approving a proposal with no steps', async () => {
+    vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+      new ApiError(422, 'Unprocessable', 'incomplete-proposal'),
+    )
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      { wrapper },
+    )
+
+    act(() => {
+      result.current.approve('proposal-1')
+    })
+
+    await waitFor(() => expect(result.current.decisionError).toBe('incomplete-proposal'))
   })
 
   it('clears the previous decisionError when a new decision is attempted', async () => {

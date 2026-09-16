@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Info, X } from '@phosphor-icons/react'
+import { CheckCircle, Info, WarningCircle, X } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '../hooks/use-proposals'
-import { useProposalDecision } from '../hooks/use-proposal-decision'
+import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
 import { useBulkProposalDecision } from '../hooks/use-bulk-proposal-decision'
 import { bulkDecisionReasonKey, summarizeBulkResults } from '../lib/bulk-decision-reason'
 import type { BulkDecisionItemResult } from '../api/review.api'
@@ -31,7 +31,7 @@ export function ReviewInboxPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [feedbackToast, setFeedbackToast] = useState<{
     message: string
-    type: 'success' | 'info'
+    type: 'success' | 'info' | 'error'
     href?: string
     linkLabel?: string
   } | null>(null)
@@ -64,7 +64,7 @@ export function ReviewInboxPage() {
     }
   }, [activeSelectedId, filteredProposals])
 
-  const { approve, reject } = useProposalDecision({
+  const { approve, reject, decisionError } = useProposalDecision({
     onApproved: (proposalId, result) => {
       const proposal = proposals.find((p) => p.id === proposalId)
       setFeedbackToast({
@@ -87,6 +87,16 @@ export function ReviewInboxPage() {
       selectNextPending()
     },
   })
+
+  // decisionError is set (and reset to null before each attempt) inside the
+  // hook — surface it here instead of leaving a failed approve/reject silent.
+  useEffect(() => {
+    if (decisionError === null) return
+    setFeedbackToast({
+      message: t(`aiReview.${decisionErrorKey(decisionError)}`),
+      type: 'error',
+    })
+  }, [decisionError, t])
 
   const handleApprove = useCallback(
     (proposalId: string) => {
@@ -193,16 +203,20 @@ export function ReviewInboxPage() {
       <div className="shrink-0 space-y-4 empty:hidden">
         {feedbackToast && (
           <div
-            role="status"
+            role={feedbackToast.type === 'error' ? 'alert' : 'status'}
             className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs font-medium transition-all duration-200 ${
               feedbackToast.type === 'success'
                 ? 'border-pass/40 bg-pass-bg/20 text-pass'
-                : 'border-border bg-surface text-default'
+                : feedbackToast.type === 'error'
+                  ? 'border-fail/40 bg-fail-bg/20 text-fail'
+                  : 'border-border bg-surface text-default'
             }`}
           >
             <div className="flex items-center gap-2 min-w-0">
               {feedbackToast.type === 'success' ? (
                 <CheckCircle size={16} weight="fill" aria-hidden="true" />
+              ) : feedbackToast.type === 'error' ? (
+                <WarningCircle size={16} weight="fill" aria-hidden="true" />
               ) : (
                 <Info size={16} weight="fill" aria-hidden="true" />
               )}

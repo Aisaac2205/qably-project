@@ -12,6 +12,7 @@ import {
   FileText,
 } from '@phosphor-icons/react'
 import type { ProposalListItem } from '../api/review.api'
+import { manualReviewReasonKey } from '../lib/manual-review-reason'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EntityList } from '@/components/ui/entity-list'
@@ -59,6 +60,14 @@ function ReviewProposalQueueRow({
   const isPending = proposal.status === 'in_review'
   const isApproved = proposal.status === 'approved'
   const isRejected = proposal.status === 'rejected'
+
+  const needsManualReview = proposal.needsManualReview || proposal.steps.length === 0
+  const manualReviewReason = needsManualReview ? manualReviewReasonKey(proposal.objective) : null
+  const subtitle = !needsManualReview
+    ? proposal.objective
+    : manualReviewReason === null
+      ? t('reviewInbox.manualReviewReasonUnknown', { reason: proposal.objective })
+      : t(`reviewInbox.${manualReviewReason}`)
 
   const formattedDate = proposal.createdAt
     ? new Date(proposal.createdAt).toLocaleDateString(undefined, {
@@ -144,9 +153,9 @@ function ReviewProposalQueueRow({
         </div>
 
         {/* Subtitle / Objective context preview */}
-        {proposal.objective && proposal.objective !== proposal.title && (
+        {subtitle && subtitle !== proposal.title && (
           <p className="text-xs text-muted truncate mb-2.5 line-clamp-1">
-            {proposal.objective}
+            {subtitle}
           </p>
         )}
 

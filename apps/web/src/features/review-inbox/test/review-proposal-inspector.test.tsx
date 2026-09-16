@@ -83,7 +83,7 @@ describe('ReviewProposalInspector', () => {
     expect(screen.queryByText('Expected result')).not.toBeInTheDocument()
   })
 
-  it('shows the raw reason when the extraction reported something untranslated', () => {
+  it('translates a known AI-provider reason instead of showing its raw code', () => {
     renderInspector(
       proposal({
         needsManualReview: true,
@@ -93,7 +93,21 @@ describe('ReviewProposalInspector', () => {
       }),
     )
 
-    expect(screen.getByText(/invalid-credentials/)).toBeInTheDocument()
+    expect(screen.getByText(/rejected the configured credentials/i)).toBeInTheDocument()
+    expect(screen.queryByText('invalid-credentials')).not.toBeInTheDocument()
+  })
+
+  it('shows the raw reason only when the extraction reported something truly untranslated', () => {
+    renderInspector(
+      proposal({
+        needsManualReview: true,
+        objective: 'some-future-code-nobody-mapped-yet',
+        steps: [],
+        expectedResult: '',
+      }),
+    )
+
+    expect(screen.getByText(/some-future-code-nobody-mapped-yet/)).toBeInTheDocument()
   })
 
   it('refuses to offer publication for a proposal with nothing to publish', () => {

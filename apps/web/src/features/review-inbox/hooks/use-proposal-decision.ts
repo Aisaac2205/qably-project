@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { approveProposal, rejectProposal, type ApprovalResult, type RejectionResult } from '../api/review.api'
 import { reviewKeys } from '../lib/query-keys'
+import { suiteKeys, projectKeys } from '@/features/projects/lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 
 interface DecisionCallbacks {
@@ -22,6 +23,7 @@ export type DecisionErrorCode =
   | 'missing-evidence'
   | 'missing-suite'
   | 'name-taken'
+  | 'incomplete-proposal'
   | 'error'
 
 function classifyDecisionError(error: unknown): DecisionErrorCode {
@@ -31,10 +33,24 @@ function classifyDecisionError(error: unknown): DecisionErrorCode {
       case 'missing-evidence':
       case 'missing-suite':
       case 'name-taken':
+      case 'incomplete-proposal':
         return error.code
     }
   }
   return 'error'
+}
+
+const DECISION_ERROR_KEYS: Record<DecisionErrorCode, string> = {
+  'invalid-transition': 'decisionAlreadyDecided',
+  'missing-evidence': 'decisionMissingEvidence',
+  'missing-suite': 'decisionMissingSuite',
+  'name-taken': 'decisionNameTaken',
+  'incomplete-proposal': 'decisionIncompleteProposal',
+  error: 'decisionError',
+}
+
+export function decisionErrorKey(code: DecisionErrorCode): string {
+  return DECISION_ERROR_KEYS[code]
 }
 
 export function useProposalDecision({
@@ -45,14 +61,24 @@ export function useProposalDecision({
   const queryClient = useQueryClient()
   const [decisionError, setDecisionError] = useState<DecisionErrorCode | null>(null)
 
-  const invalidate = () => {
+  const invalidateReview = () => {
     void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
+  }
+
+  // A successful decision can create or update a test case (approve) or free
+  // one up from "in review" (reject) — both change what the suite/project
+  // pages show, so their caches need to be invalidated too. reviewKeys alone
+  // left the suite page serving a stale pendingProposalId after a reject.
+  const invalidateAfterDecision = () => {
+    invalidateReview()
+    void queryClient.invalidateQueries({ queryKey: suiteKeys.all })
+    void queryClient.invalidateQueries({ queryKey: projectKeys.all })
   }
 
   const handleError = (error: unknown, proposalId: string) => {
     const code = classifyDecisionError(error)
     setDecisionError(code)
-    if (code === 'invalid-transition') invalidate()
+    if (code === 'invalid-transition') invalidateReview()
     onError?.(error, proposalId)
   }
 
@@ -60,7 +86,7 @@ export function useProposalDecision({
     mutationFn: ({ proposalId, comment }: DecisionVariables) =>
       approveProposal(proposalId, comment),
     onSuccess: (result, { proposalId }) => {
-      invalidate()
+      invalidateAfterDecision()
       onApproved(proposalId, result)
     },
     onError: (error, { proposalId }) => handleError(error, proposalId),
@@ -70,7 +96,7 @@ export function useProposalDecision({
     mutationFn: ({ proposalId, comment }: DecisionVariables) =>
       rejectProposal(proposalId, comment),
     onSuccess: (result, { proposalId }) => {
-      invalidate()
+      invalidateAfterDecision()
       onRejected(proposalId, result)
     },
     onError: (error, { proposalId }) => handleError(error, proposalId),

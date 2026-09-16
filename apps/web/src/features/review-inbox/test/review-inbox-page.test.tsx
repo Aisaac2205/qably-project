@@ -5,6 +5,8 @@ import { ReviewInboxPage } from '../components/review-inbox-page'
 import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { ApiError } from '@/lib/api-client'
+import { approveProposal } from '@/features/review-inbox/api/review.api'
 
 let searchParamsQuery = ''
 
@@ -175,6 +177,21 @@ describe('ReviewInboxPage', () => {
     expect(screen.getByRole('link', { name: 'View case' })).toHaveAttribute(
       'href',
       expect.stringContaining('/suites/suite-1'),
+    )
+  })
+
+  it('shows a clear error toast instead of doing nothing when approve fails because the proposal has no steps', async () => {
+    vi.mocked(approveProposal).mockRejectedValueOnce(
+      new ApiError(422, 'Unprocessable', 'incomplete-proposal'),
+    )
+    const user = userEvent.setup()
+    renderWithQuery(<ReviewInboxPage />)
+
+    const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
+    await user.click(approveButton)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /this proposal has no steps/i,
     )
   })
 

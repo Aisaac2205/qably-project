@@ -23,8 +23,35 @@ describe('manualReviewReasonKey', () => {
     )
   })
 
-  it('returns null for a provider message it cannot translate', () => {
-    expect(manualReviewReasonKey('invalid-credentials')).toBeNull()
+  it('maps every AI-provider reason the extractor can emit, never leaving one to fall through to the raw-text fallback', () => {
+    expect(manualReviewReasonKey('not-configured')).toBe(
+      'manualReviewReasonNotConfigured',
+    )
+    expect(manualReviewReasonKey('invalid-credentials')).toBe(
+      'manualReviewReasonInvalidCredentials',
+    )
+    expect(manualReviewReasonKey('rate-limited')).toBe(
+      'manualReviewReasonRateLimited',
+    )
+    expect(manualReviewReasonKey('provider-overloaded')).toBe(
+      'manualReviewReasonProviderOverloaded',
+    )
+    expect(manualReviewReasonKey('empty-response')).toBe(
+      'manualReviewReasonEmptyResponse',
+    )
+    expect(manualReviewReasonKey('invalid-json-response')).toBe(
+      'manualReviewReasonInvalidJsonResponse',
+    )
+    expect(manualReviewReasonKey('schema-violation')).toBe(
+      'manualReviewReasonSchemaViolation',
+    )
+    expect(manualReviewReasonKey('unknown-provider-error')).toBe(
+      'manualReviewReasonUnknownProviderError',
+    )
+  })
+
+  it('returns null only for a truly unrecognized value, e.g. an empty string', () => {
     expect(manualReviewReasonKey('')).toBeNull()
+    expect(manualReviewReasonKey('something nobody wrote')).toBeNull()
   })
 })

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useBulkProposalDecision } from '@/features/review-inbox/hooks/use-bulk-proposal-decision'
 import * as reviewApi from '@/features/review-inbox/api/review.api'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({
@@ -59,5 +60,23 @@ describe('useBulkProposalDecision', () => {
     })
 
     await waitFor(() => expect(invalidateSpy).toHaveBeenCalled())
+  })
+
+  it('also invalidates suite and project data after a bulk decision, not just the review list', async () => {
+    const invalidateSpy = vi.spyOn(QueryClient.prototype, 'invalidateQueries')
+    vi.spyOn(reviewApi, 'rejectProposals').mockResolvedValue([
+      { id: 'proposal-1', outcome: 'rejected' },
+    ])
+    const { result } = renderHook(() => useBulkProposalDecision(), { wrapper })
+
+    act(() => {
+      result.current.rejectMany(['proposal-1'])
+    })
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: suiteKeys.all }),
+      ),
+    )
   })
 })
