@@ -28,6 +28,11 @@ export function isCiRun(run: Pick<RunTitleSource, 'source'>): boolean {
  * detail header so a run reads the same way in both places.
  */
 export function runTitleParts(run: RunTitleSource, suiteName: string): RunTitleParts {
-  if (isCiRun(run)) return { title: suiteName, subtitle: run.commitMessage }
-  return { title: run.name, subtitle: suiteName }
+  if (isCiRun(run)) {
+    // suiteName can arrive empty while the suite is still loading, failed to
+    // load, or was deleted (run-progress-header.tsx passes suite?.name ?? '')
+    // — fall back to the run's own name rather than rendering a blank title.
+    return { title: suiteName || run.name, subtitle: run.commitMessage }
+  }
+  return { title: run.name, subtitle: suiteName || undefined }
 }
