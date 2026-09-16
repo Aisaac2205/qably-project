@@ -61,6 +61,20 @@ interface ConnectionInfo {
   encryptedAccessToken: string | null;
 }
 
+/**
+ * Marks a provider failure that's worth a real BullMQ retry (with backoff)
+ * instead of an immediate manual-review fallback. Thrown only when the
+ * extractor reported the failure as retryable AND this isn't the job's last
+ * allowed attempt — the outer catch in runExtraction/runDocumentFileExtraction
+ * rethrows it so it reaches the queue instead of being swallowed.
+ */
+class RetryableProviderError extends Error {
+  constructor(reason: string) {
+    super(`provider-unavailable:${reason}`);
+    this.name = 'RetryableProviderError';
+  }
+}
+
 interface JobContext {
   projectId: string;
   organizationId: string;
@@ -73,6 +87,10 @@ interface JobContext {
   onlyAutomationKey: string | null;
   fallbackEvidenceId: string | null;
   locale: string | undefined;
+  /** True when BullMQ won't retry this job again after this attempt. */
+  isFinalAttempt: boolean;
+  /** True on the job's first execution — a retry means budget was already spent once for this logical extraction. */
+  isFirstAttempt: boolean;
 }
 
 interface DocumentFileJobContext {
@@ -83,6 +101,10 @@ interface DocumentFileJobContext {
   connection: ConnectionInfo | null;
   targets: DocumentFileTarget[];
   locale: string | undefined;
+  /** True when BullMQ won't retry this job again after this attempt. */
+  isFinalAttempt: boolean;
+  /** True on the job's first execution — a retry means budget was already spent once for this logical extraction. */
+  isFirstAttempt: boolean;
 }
 
 interface ExistingProposal {
@@ -224,15 +246,36 @@ export class ExtractionProcessor extends WorkerHost {
   }
 
   async process(job: Job<ExtractionJobData>): Promise<void> {
+    // job.attemptsStarted/job.opts may be absent on minimal job doubles in
+    // tests — default to "this is the only/last attempt" so a retryable
+    // failure falls back to manual review rather than throwing with nothing
+    // left to catch it.
+    const attemptsStarted = job.attemptsStarted ?? 1;
+    const maxAttempts = job.opts?.attempts ?? 1;
+    const isFinalAttempt = attemptsStarted >= maxAttempts;
+    const isFirstAttempt = attemptsStarted <= 1;
+
     if (job.data.kind === 'code-change') {
-      await this.processCodeChange(job.data.codeChangeId, job.data.locale);
+      await this.processCodeChange(
+        job.data.codeChangeId,
+        job.data.locale,
+        isFinalAttempt,
+        isFirstAttempt,
+      );
     } else if (job.data.kind === 'document-case') {
-      await this.processDocumentCase(job.data.testCaseId, job.data.locale);
+      await this.processDocumentCase(
+        job.data.testCaseId,
+        job.data.locale,
+        isFinalAttempt,
+        isFirstAttempt,
+      );
     } else {
       await this.processDocumentFile(
         job.data.filePath,
         job.data.targets,
         job.data.locale,
+        isFinalAttempt,
+        isFirstAttempt,
       );
     }
   }
@@ -240,6 +283,8 @@ export class ExtractionProcessor extends WorkerHost {
   private async processCodeChange(
     codeChangeId: string,
     locale: string | undefined,
+    isFinalAttempt: boolean,
+    isFirstAttempt: boolean,
   ): Promise<void> {
     const codeChange = await this.prisma.codeChange.findUnique({
       where: { id: codeChangeId },
@@ -281,12 +326,16 @@ export class ExtractionProcessor extends WorkerHost {
       onlyAutomationKey: null,
       fallbackEvidenceId: codeChange.evidenceId,
       locale,
+      isFinalAttempt,
+      isFirstAttempt,
     });
   }
 
   private async processDocumentCase(
     testCaseId: string,
     locale: string | undefined,
+    isFinalAttempt: boolean,
+    isFirstAttempt: boolean,
   ): Promise<void> {
     const testCase = await this.prisma.testCase.findUnique({
       where: { id: testCaseId },
@@ -368,6 +417,8 @@ export class ExtractionProcessor extends WorkerHost {
       onlyAutomationKey: testCase.automationKey,
       fallbackEvidenceId: null,
       locale,
+      isFinalAttempt,
+      isFirstAttempt,
     });
   }
 
@@ -388,6 +439,8 @@ export class ExtractionProcessor extends WorkerHost {
     filePath: string,
     targets: DocumentFileTarget[],
     locale: string | undefined,
+    isFinalAttempt: boolean,
+    isFirstAttempt: boolean,
   ): Promise<void> {
     if (targets.length === 0) return;
 
@@ -427,6 +480,8 @@ export class ExtractionProcessor extends WorkerHost {
       connection: firstTarget.project.connection,
       targets,
       locale,
+      isFinalAttempt,
+      isFirstAttempt,
     });
   }
 
@@ -436,6 +491,7 @@ export class ExtractionProcessor extends WorkerHost {
     try {
       await this.runDocumentFileExtractionUnsafe(ctx);
     } catch (error) {
+      if (error instanceof RetryableProviderError) throw error;
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Document-file extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
@@ -478,7 +534,14 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const withinBudget = await this.dailyBudget.tryConsume(NOT_BYOK);
+    // Only charge the daily budget once per logical extraction: a retry of
+    // this same job (after a retryable provider failure) already spent a
+    // unit on its first attempt, so re-checking here would double/triple
+    // count one extraction against the org's cap during a provider outage —
+    // exactly when budget should be conserved, not burned fastest.
+    const withinBudget = ctx.isFirstAttempt
+      ? await this.dailyBudget.tryConsume(NOT_BYOK)
+      : true;
     if (!withinBudget) {
       await this.fallbackForTargets(ctx, ctx.targets, QUOTA_EXHAUSTED_REASON);
       return;
@@ -501,6 +564,9 @@ export class ExtractionProcessor extends WorkerHost {
       );
 
     if (outcome.kind === 'provider-unavailable') {
+      if (outcome.retryable && !ctx.isFinalAttempt) {
+        throw new RetryableProviderError(outcome.reason);
+      }
       await this.fallbackForTargets(ctx, ctx.targets, outcome.reason);
       return;
     }
@@ -795,6 +861,8 @@ export class ExtractionProcessor extends WorkerHost {
           onlyAutomationKey: target.automationKey,
           fallbackEvidenceId: null,
           locale: ctx.locale,
+          isFinalAttempt: ctx.isFinalAttempt,
+          isFirstAttempt: ctx.isFirstAttempt,
         },
         reason,
         observations,
@@ -806,6 +874,7 @@ export class ExtractionProcessor extends WorkerHost {
     try {
       await this.runExtractionUnsafe(ctx);
     } catch (error) {
+      if (error instanceof RetryableProviderError) throw error;
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
@@ -846,7 +915,11 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const withinBudget = await this.dailyBudget.tryConsume(NOT_BYOK);
+    // See the equivalent guard in runDocumentFileExtractionUnsafe: don't
+    // re-charge the daily budget for a retry of the same logical extraction.
+    const withinBudget = ctx.isFirstAttempt
+      ? await this.dailyBudget.tryConsume(NOT_BYOK)
+      : true;
     if (!withinBudget) {
       await this.persistManualReviewFallback(ctx, QUOTA_EXHAUSTED_REASON);
       return;
@@ -869,6 +942,9 @@ export class ExtractionProcessor extends WorkerHost {
       );
 
     if (outcome.kind === 'provider-unavailable') {
+      if (outcome.retryable && !ctx.isFinalAttempt) {
+        throw new RetryableProviderError(outcome.reason);
+      }
       await this.persistManualReviewFallback(ctx, outcome.reason);
       return;
     }

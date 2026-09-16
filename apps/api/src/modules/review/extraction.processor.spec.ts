@@ -385,6 +385,7 @@ describe('ExtractionProcessor — code-change job', () => {
       jest.fn().mockResolvedValue({
         kind: 'provider-unavailable',
         reason: 'invalid-credentials',
+        retryable: false,
       }),
     );
     const spendCredit = jest.fn().mockResolvedValue(true);
@@ -1584,6 +1585,168 @@ describe('ExtractionProcessor — resilience', () => {
       needsManualReview: true,
       objective: 'extraction-failed',
     });
+  });
+});
+
+describe('ExtractionProcessor — retryable provider failures', () => {
+  it('lets a retryable provider failure propagate for BullMQ to retry, instead of falling back immediately', async () => {
+    const prisma = createPrisma();
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      }),
+    );
+
+    await expect(
+      build(prisma, fakeSourceReader(), extractor).process({
+        data: { kind: 'code-change', codeChangeId: 'change-1' },
+        attemptsStarted: 1,
+        opts: { attempts: 3 },
+      } as never),
+    ).rejects.toThrow();
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('falls back to manual review on the final attempt even when the failure is retryable', async () => {
+    const prisma = createPrisma();
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      }),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+      attemptsStarted: 3,
+      opts: { attempts: 3 },
+    } as never);
+
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({
+      needsManualReview: true,
+      objective: 'provider-overloaded',
+    });
+  });
+
+  it('falls back immediately for a non-retryable provider failure, even on the first attempt', async () => {
+    const prisma = createPrisma();
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'invalid-credentials',
+        retryable: false,
+      }),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+      attemptsStarted: 1,
+      opts: { attempts: 3 },
+    } as never);
+
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({
+      needsManualReview: true,
+      objective: 'invalid-credentials',
+    });
+  });
+
+  it('treats a job with no attempt metadata as a final attempt, falling back rather than throwing', async () => {
+    const prisma = createPrisma();
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      }),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    const createCall = lastCall(prisma.extractedProposal.create);
+    expect(createCall.data).toMatchObject({ needsManualReview: true });
+  });
+
+  it('applies the same retry-vs-fallback rule to a document-file job', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      projectId: 'project-1',
+      project: { organizationId: 'org-1', connection },
+    });
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'rate-limited',
+        retryable: true,
+      }),
+    );
+    const targets = [{ testCaseId: 'case-1', automationKey: 'Cart > adds an item' }];
+
+    await expect(
+      build(prisma, fakeSourceReader(), extractor).process({
+        data: { kind: 'document-file', filePath: 'src/cart.spec.ts', targets },
+        attemptsStarted: 1,
+        opts: { attempts: 3 },
+      } as never),
+    ).rejects.toThrow();
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('charges the daily budget on the first attempt', async () => {
+    const prisma = createPrisma();
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(tryConsume),
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+      attemptsStarted: 1,
+      opts: { attempts: 3 },
+    } as never);
+
+    expect(tryConsume).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-charge the daily budget on a retry of the same job, so a provider outage cannot burn through the org cap 3x for one extraction', async () => {
+    const prisma = createPrisma();
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(tryConsume),
+    ).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+      attemptsStarted: 2,
+      opts: { attempts: 3 },
+    } as never);
+
+    expect(tryConsume).not.toHaveBeenCalled();
+    // The retry still proceeds (budget from attempt 1 carries forward) —
+    // it isn't blocked just because the check was skipped.
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
   });
 });
 

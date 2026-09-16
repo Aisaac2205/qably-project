@@ -28,7 +28,12 @@ import { ReviewService } from './review.service';
       name: EXTRACTION_QUEUE,
       defaultJobOptions: {
         attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
+        // 2s was too short to survive a per-minute provider rate limit (the
+        // most common retryable failure — e.g. the Gemini free tier): the SDK
+        // itself already retries transient errors 3x in seconds before
+        // giving up, so a job-level retry only helps if it waits meaningfully
+        // longer. 30s exponential gives attempts at ~30s and ~60s.
+        backoff: { type: 'exponential', delay: 30_000 },
         removeOnComplete: true,
         removeOnFail: 500,
       },

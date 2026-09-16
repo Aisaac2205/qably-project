@@ -208,6 +208,7 @@ describe('GeminiExtractor', () => {
     expect(outcome).toEqual({
       kind: 'provider-unavailable',
       reason: 'empty-response',
+      retryable: false,
     });
   });
 
@@ -219,6 +220,7 @@ describe('GeminiExtractor', () => {
     expect(outcome).toEqual({
       kind: 'provider-unavailable',
       reason: 'invalid-json-response',
+      retryable: false,
     });
   });
 
@@ -232,6 +234,7 @@ describe('GeminiExtractor', () => {
     expect(outcome).toEqual({
       kind: 'provider-unavailable',
       reason: 'schema-violation',
+      retryable: false,
     });
   });
 
@@ -245,10 +248,42 @@ describe('GeminiExtractor', () => {
     expect(outcome).toEqual({
       kind: 'provider-unavailable',
       reason: 'invalid-credentials',
+      retryable: false,
     });
   });
 
-  it('returns provider-unavailable with the error message for any other failure', async () => {
+  it('returns provider-unavailable, retryable, and rate-limited when Gemini answers 429', async () => {
+    const client = fakeClient(() => {
+      throw new ApiError({ message: 'Too many requests', status: 429 });
+    });
+
+    const outcome = await new GeminiExtractor(client, env()).extract(input());
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'rate-limited',
+      retryable: true,
+    });
+  });
+
+  it.each([500, 502, 503, 504])(
+    'returns provider-unavailable, retryable, and provider-overloaded when Gemini answers %i',
+    async (status) => {
+      const client = fakeClient(() => {
+        throw new ApiError({ message: 'Service Unavailable', status });
+      });
+
+      const outcome = await new GeminiExtractor(client, env()).extract(input());
+
+      expect(outcome).toEqual({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      });
+    },
+  );
+
+  it('never leaks the raw error message as the reason for an unrecognized failure', async () => {
     const client = fakeClient(() => {
       throw new Error('network is down');
     });
@@ -257,8 +292,23 @@ describe('GeminiExtractor', () => {
 
     expect(outcome).toEqual({
       kind: 'provider-unavailable',
-      reason: 'network is down',
+      reason: 'unknown-provider-error',
+      retryable: false,
     });
+  });
+
+  it('logs the raw error message server-side even though it never reaches the outcome', async () => {
+    const client = fakeClient(() => {
+      throw new Error('network is down');
+    });
+    const extractor = new GeminiExtractor(client, env());
+    const errorSpy = jest.spyOn(extractor['logger'], 'error');
+
+    await extractor.extract(input());
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('network is down'),
+    );
   });
 });
 

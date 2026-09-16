@@ -66,6 +66,16 @@ export interface TokenUsage {
   readonly totalTokens: number;
 }
 
+export type ProviderUnavailableReason =
+  | 'not-configured'
+  | 'invalid-credentials'
+  | 'rate-limited'
+  | 'provider-overloaded'
+  | 'empty-response'
+  | 'invalid-json-response'
+  | 'schema-violation'
+  | 'unknown-provider-error';
+
 export type ExtractionOutcome =
   | {
       kind: 'extracted';
@@ -74,7 +84,12 @@ export type ExtractionOutcome =
       usage: TokenUsage;
     }
   | { kind: 'no-tests-found' }
-  | { kind: 'provider-unavailable'; reason: string };
+  | {
+      kind: 'provider-unavailable';
+      reason: ProviderUnavailableReason;
+      /** Whether a retry (with backoff) is worth attempting, vs. a permanent failure. */
+      retryable: boolean;
+    };
 
 export interface TestCaseExtractor {
   extract(

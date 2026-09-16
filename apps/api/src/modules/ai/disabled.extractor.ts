@@ -9,7 +9,8 @@ export class DisabledExtractor implements TestCaseExtractor {
   extract(): Promise<ExtractionOutcome> {
     return Promise.resolve({
       kind: 'provider-unavailable',
-      reason: 'GEMINI_API_KEY not configured',
+      reason: 'not-configured',
+      retryable: false,
     });
   }
 }

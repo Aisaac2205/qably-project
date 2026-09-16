@@ -19,6 +19,7 @@ import {
 } from './extraction.contracts';
 
 const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
+const OVERLOAD_STATUS_CODES = [408, 500, 502, 503, 504];
 const TIMEOUT_MS = 60_000;
 const RETRY_ATTEMPTS = 3;
 const TEMPERATURE = 0.2;
@@ -161,14 +162,49 @@ export class GeminiExtractor implements TestCaseExtractor {
         this.logger.warn(
           `Gemini rejected the request for ${input.filePath}: invalid credentials`,
         );
-        return { kind: 'provider-unavailable', reason: 'invalid-credentials' };
+        return {
+          kind: 'provider-unavailable',
+          reason: 'invalid-credentials',
+          retryable: false,
+        };
       }
 
-      const reason = error instanceof Error ? error.message : 'unknown-error';
+      if (error instanceof ApiError && error.status === 429) {
+        this.logger.warn(
+          `Gemini rate-limited the request for ${input.filePath}`,
+        );
+        return {
+          kind: 'provider-unavailable',
+          reason: 'rate-limited',
+          retryable: true,
+        };
+      }
+
+      if (error instanceof ApiError && OVERLOAD_STATUS_CODES.includes(error.status)) {
+        this.logger.error(
+          `Gemini returned ${error.status} for ${input.filePath} after its own internal retries`,
+        );
+        return {
+          kind: 'provider-unavailable',
+          reason: 'provider-overloaded',
+          retryable: true,
+        };
+      }
+
+      // Anything else (network failure, an ApiError with an unexpected status,
+      // a non-Error throw) is unclassified — log the raw detail server-side for
+      // debugging, but never let it leak into the reason field: that field ends
+      // up stored as an ExtractedProposal.objective and shown to the user, so it
+      // must always be one of the known ProviderUnavailableReason values.
+      const rawDetail = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
-        `Gemini extraction failed for ${input.filePath}: ${reason}`,
+        `Gemini extraction failed for ${input.filePath}: ${rawDetail}`,
       );
-      return { kind: 'provider-unavailable', reason };
+      return {
+        kind: 'provider-unavailable',
+        reason: 'unknown-provider-error',
+        retryable: false,
+      };
     }
   }
 
@@ -177,21 +213,33 @@ export class GeminiExtractor implements TestCaseExtractor {
     filePath: string,
   ): ExtractionOutcome {
     if (response.text === undefined) {
-      return { kind: 'provider-unavailable', reason: 'empty-response' };
+      return {
+        kind: 'provider-unavailable',
+        reason: 'empty-response',
+        retryable: false,
+      };
     }
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(response.text);
     } catch {
-      return { kind: 'provider-unavailable', reason: 'invalid-json-response' };
+      return {
+        kind: 'provider-unavailable',
+        reason: 'invalid-json-response',
+        retryable: false,
+      };
     }
 
     const envelope = envelopeSchema.safeParse(parsed);
 
     if (!envelope.success) {
       this.logger.warn(`Gemini response for ${filePath} had no cases array`);
-      return { kind: 'provider-unavailable', reason: 'schema-violation' };
+      return {
+        kind: 'provider-unavailable',
+        reason: 'schema-violation',
+        retryable: false,
+      };
     }
 
     const validCases: ExtractedCase[] = [];
