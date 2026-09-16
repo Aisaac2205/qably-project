@@ -29,6 +29,7 @@ import {
 import { useCreateCase, useUpdateCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { useTranslation } from '@/lib/i18n'
+import { notify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 
 const PRIORITIES: CasePriority[] = ['critical', 'high', 'medium', 'low']
@@ -103,12 +104,18 @@ export function CaseForm({
     if (isEdit) {
       updateCaseMutation.mutate(
         { suiteId, caseId: testCase.id, patch: payload },
-        { onSuccess: () => router.push(backHref) },
+        {
+          onSuccess: () => router.push(backHref),
+          onError: () => notify.error(t('suites.saveCaseError')),
+        },
       )
     } else {
       createCaseMutation.mutate(
         { suiteId, payload },
-        { onSuccess: () => router.push(backHref) },
+        {
+          onSuccess: () => router.push(backHref),
+          onError: () => notify.error(t('suites.saveCaseError')),
+        },
       )
     }
   }

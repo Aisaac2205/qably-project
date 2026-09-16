@@ -4,10 +4,21 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import type { Suite } from '@qably/types'
 import { SuiteForm } from '@/features/projects/suites/components/suite-form'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { notify } from '@/lib/notify'
 
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+}))
+
+vi.mock('@/lib/notify', () => ({
+  notify: {
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    dismiss: vi.fn(),
+  },
 }))
 
 vi.mock('@/features/projects/suites/api/suites.api', async () => {
@@ -118,5 +129,39 @@ describe('SuiteForm', () => {
       'href',
       '/projects/project-1/suites/suite-1',
     )
+  })
+
+  it('shows an error toast and does not navigate when creating a suite fails', async () => {
+    const user = userEvent.setup()
+    const { createSuite } = await import('@/features/projects/suites/api/suites.api')
+    const spy = createSuite as unknown as ReturnType<typeof vi.fn>
+    spy.mockRejectedValueOnce(new Error('network down'))
+
+    await renderWithQuery(<SuiteForm projectId="project-1" />)
+    await user.type(screen.getByLabelText('Name'), 'Payments')
+    await user.click(screen.getByRole('button', { name: 'Create suite' }))
+
+    await vi.waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith("Couldn't save the suite. Try again.")
+    })
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('shows an error toast and does not navigate when updating a suite fails', async () => {
+    const user = userEvent.setup()
+    const { updateSuite } = await import('@/features/projects/suites/api/suites.api')
+    const spy = updateSuite as unknown as ReturnType<typeof vi.fn>
+    spy.mockRejectedValueOnce(new Error('network down'))
+
+    await renderWithQuery(<SuiteForm projectId="project-1" suite={suite} />)
+    const description = screen.getByLabelText('Description')
+    await user.clear(description)
+    await user.type(description, 'Covers checkout end to end')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await vi.waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith("Couldn't save the suite. Try again.")
+    })
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })

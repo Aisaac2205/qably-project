@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useCreateSuite, useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import type { UpdateSuitePayload } from '@/features/projects/suites/api/suites.api'
 import { useTranslation } from '@/lib/i18n'
+import { notify } from '@/lib/notify'
 import { cn } from '@/lib/utils'
 import { projectSuitesPath } from '@/features/projects/lib/routes'
 
@@ -63,14 +64,23 @@ export function SuiteForm({ projectId, suite }: { projectId: string; suite?: Sui
       if (!sameTags(tagList, suite.tags)) patch.tags = tagList
 
       if (Object.keys(patch).length > 0) {
-        updateSuiteMutation.mutate({ id: suite.id, patch }, { onSuccess: () => router.push(backHref) })
+        updateSuiteMutation.mutate(
+          { id: suite.id, patch },
+          {
+            onSuccess: () => router.push(backHref),
+            onError: () => notify.error(t('suites.saveSuiteError')),
+          },
+        )
       } else {
         router.push(backHref)
       }
     } else {
       createSuiteMutation.mutate(
         { projectId, name: trimmed, description: description.trim(), tags: tagList },
-        { onSuccess: (created) => router.push(`/projects/${projectId}/suites/${created.id}`) },
+        {
+          onSuccess: (created) => router.push(`/projects/${projectId}/suites/${created.id}`),
+          onError: () => notify.error(t('suites.saveSuiteError')),
+        },
       )
     }
   }

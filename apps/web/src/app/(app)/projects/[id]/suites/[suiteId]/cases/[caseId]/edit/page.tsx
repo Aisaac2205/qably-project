@@ -11,13 +11,21 @@ type Params = Promise<{ id: string; suiteId: string; caseId: string }>
 export default function EditCasePage({ params }: { params: Params }) {
   const { id, suiteId, caseId } = use(params)
   const { t } = useTranslation()
-  const { suite, isLoading } = useSuite(suiteId)
+  const { suite, isLoading, isError } = useSuite(suiteId)
   const testCase = suite?.cases.find((c) => c.id === caseId)
 
   if (isLoading) {
     return (
       <div className="w-full px-5 py-6 sm:px-7 lg:py-8">
         <StateView kind="loading" title={t('suites.loading')} />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="w-full px-5 py-6 sm:px-7 lg:py-8">
+        <StateView kind="error" title={t('suites.caseLoadError')} focusOnMount />
       </div>
     )
   }

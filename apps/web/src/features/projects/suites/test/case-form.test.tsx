@@ -4,11 +4,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { CaseForm } from '@/features/projects/suites/components/case-form'
 import { createMockTestCase } from '@/lib/test-utils'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { notify } from '@/lib/notify'
 import * as suitesApi from '@/test/suites-api-stub'
 
 const mockPush = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+}))
+
+vi.mock('@/lib/notify', () => ({
+  notify: {
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    dismiss: vi.fn(),
+  },
 }))
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
@@ -145,5 +156,38 @@ describe('CaseForm', () => {
       'href',
       '/projects/proj-1/suites/suite-1',
     )
+  })
+
+  it('shows an error toast and does not navigate when creating a case fails', async () => {
+    const createCase = vi.spyOn(suitesApi, 'createCase').mockRejectedValueOnce(new Error('network down'))
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderWithQuery(<CaseForm projectId="proj-1" suiteId="suite-1" />)
+    })
+    await user.type(screen.getByLabelText(/title/i), 'New case')
+    await user.click(screen.getByRole('button', { name: 'Create case' }))
+
+    await vi.waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith("Couldn't save the case. Try again.")
+    })
+    expect(createCase).toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
+  })
+
+  it('shows an error toast and does not navigate when updating a case fails', async () => {
+    const testCase = createMockTestCase({ objective: 'Existing objective' })
+    vi.spyOn(suitesApi, 'updateCase').mockRejectedValueOnce(new Error('network down'))
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderWithQuery(<CaseForm projectId="proj-1" suiteId="suite-1" testCase={testCase} />)
+    })
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    await vi.waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith("Couldn't save the case. Try again.")
+    })
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })
