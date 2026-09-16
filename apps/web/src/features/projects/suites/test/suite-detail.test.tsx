@@ -468,12 +468,12 @@ describe('SuiteDetail (redesigned)', () => {
     expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites/suite-1/edit')
   })
 
-  it('the "Add case" button is a link to the create-case page', async () => {
+  it('the "Add case" button is a link to the suite edit page with a new case preselected', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
 
     expect(screen.getByRole('link', { name: /add case/i })).toHaveAttribute(
       'href',
-      '/projects/proj-1/suites/suite-1/cases/new',
+      '/projects/proj-1/suites/suite-1/edit?case=new',
     )
   })
 

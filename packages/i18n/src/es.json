@@ -877,7 +877,12 @@
     "loadError": "No se pudieron cargar las suites.",
     "suiteLoadError": "No se pudo cargar esta suite. Volvé a intentarlo.",
     "caseLoadError": "No se pudo cargar este caso. Volvé a intentarlo.",
-    "loading": "Cargando suites…"
+    "loading": "Cargando suites…",
+    "selectOrAddCaseTitle": "Ningún caso seleccionado",
+    "selectOrAddCaseHint": "Selecciona un caso de la lista para editarlo, o agrega uno nuevo.",
+    "untitledCase": "Caso sin título",
+    "backToCases": "Volver a la lista de casos",
+    "deleteCaseNamed": "Eliminar “{{name}}”"
   },
   "apiKeys": {
     "title": "Claves de API",

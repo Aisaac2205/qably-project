@@ -877,7 +877,12 @@
     "loadError": "Could not load suites.",
     "suiteLoadError": "Couldn't load this suite. Try again.",
     "caseLoadError": "Couldn't load this case. Try again.",
-    "loading": "Loading suites…"
+    "loading": "Loading suites…",
+    "selectOrAddCaseTitle": "No case selected",
+    "selectOrAddCaseHint": "Select a case from the list to edit it, or add a new one.",
+    "untitledCase": "Untitled case",
+    "backToCases": "Back to cases",
+    "deleteCaseNamed": "Delete “{{name}}”"
   },
   "apiKeys": {
     "title": "API Keys",

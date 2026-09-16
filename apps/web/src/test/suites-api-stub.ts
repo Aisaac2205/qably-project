@@ -2,13 +2,17 @@ import type {
   ConfirmDocumentationResult,
   DocumentFilesResult,
   Suite,
+  TestCase,
 } from '@qably/types'
 import { mockSuites } from '@/lib/mock-data'
+import type { CreateCasePayload, UpdateCasePayload } from '@/features/projects/suites/api/suites.api'
 
 let suites: Suite[] = structuredClone(mockSuites)
+let caseIdCounter = 0
 
 export function __resetSuitesStub(): void {
   suites = structuredClone(mockSuites)
+  caseIdCounter = 0
 }
 
 export function listSuites(projectId?: string): Promise<Suite[]> {
@@ -70,16 +74,61 @@ export function deleteSuite(id: string): Promise<void> {
   return Promise.resolve()
 }
 
-export function createCase(suiteId: string): Promise<Suite> {
-  return getSuite(suiteId)
+export function createCase(
+  suiteId: string,
+  payload: CreateCasePayload,
+): Promise<Suite> {
+  const suite = suites.find((s) => s.id === suiteId)
+  if (suite === undefined) {
+    return Promise.reject(new Error(`suite ${suiteId} not found`))
+  }
+  caseIdCounter += 1
+  const created: TestCase = {
+    id: `case-${caseIdCounter}`,
+    suiteId,
+    version: null,
+    name: payload.name,
+    objective: payload.objective ?? '',
+    preconditions: payload.preconditions ?? [],
+    steps: payload.steps ?? [],
+    expectedResult: payload.expectedResult ?? '',
+    priority: payload.priority ?? 'medium',
+    state: payload.state ?? 'active',
+    executionMode: 'manual',
+  }
+  const updated = { ...suite, cases: [...suite.cases, created] }
+  suites = suites.map((s) => (s.id === suiteId ? updated : s))
+
+  return Promise.resolve(updated)
 }
 
-export function updateCase(suiteId: string): Promise<Suite> {
-  return getSuite(suiteId)
+export function updateCase(
+  suiteId: string,
+  caseId: string,
+  patch: UpdateCasePayload,
+): Promise<Suite> {
+  const suite = suites.find((s) => s.id === suiteId)
+  if (suite === undefined) {
+    return Promise.reject(new Error(`suite ${suiteId} not found`))
+  }
+  const updated = {
+    ...suite,
+    cases: suite.cases.map((c) => (c.id === caseId ? { ...c, ...patch } : c)),
+  }
+  suites = suites.map((s) => (s.id === suiteId ? updated : s))
+
+  return Promise.resolve(updated)
 }
 
-export function deleteCase(suiteId: string): Promise<Suite> {
-  return getSuite(suiteId)
+export function deleteCase(suiteId: string, caseId: string): Promise<Suite> {
+  const suite = suites.find((s) => s.id === suiteId)
+  if (suite === undefined) {
+    return Promise.reject(new Error(`suite ${suiteId} not found`))
+  }
+  const updated = { ...suite, cases: suite.cases.filter((c) => c.id !== caseId) }
+  suites = suites.map((s) => (s.id === suiteId ? updated : s))
+
+  return Promise.resolve(updated)
 }
 
 export function documentCase(): Promise<{ queued: true; jobId: string }> {

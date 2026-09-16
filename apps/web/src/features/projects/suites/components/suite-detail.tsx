@@ -20,7 +20,13 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { StateView } from '@/components/ui/state-view'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { projectRootPath, projectSuitesPath, suiteEditPath, caseNewPath, caseEditPath } from '../../lib/routes'
+import {
+  projectRootPath,
+  projectSuitesPath,
+  suiteEditPath,
+  suiteEditNewCasePath,
+  suiteEditCasePath,
+} from '../../lib/routes'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { RunHistoryStrip } from './run-history-strip'
 import { CaseCard } from './case-card'
@@ -341,7 +347,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             </span>
           </div>
           <Link
-            href={caseNewPath(projectId, suite.id)}
+            href={suiteEditNewCasePath(projectId, suite.id)}
             className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
           >
             <Plus size={14} weight="bold" aria-hidden="true" />
@@ -354,7 +360,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               <div className="py-12 flex flex-col items-center gap-2 text-center">
                 <p className="text-sm text-muted">{t('suites.noTestCases')}</p>
                 <Link
-                  href={caseNewPath(projectId, suite.id)}
+                  href={suiteEditNewCasePath(projectId, suite.id)}
                   className="text-sm font-medium text-default hover:underline focus-visible:outline-2 focus-visible:outline-primary"
                 >
                   {t('suites.noCasesCta')}
@@ -379,7 +385,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                       testCase={tc}
                       projectId={projectId}
                       githubRepo={project?.githubRepo}
-                      onEdit={(edited) => router.push(caseEditPath(projectId, suite.id, edited.id))}
+                      onEdit={(edited) => router.push(suiteEditCasePath(projectId, suite.id, edited.id))}
                       onDelete={setDeletingCase}
                     />
                   ))}
@@ -392,7 +398,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                   testCase={tc}
                   projectId={projectId}
                   githubRepo={project?.githubRepo}
-                  onEdit={(edited) => router.push(caseEditPath(projectId, suite.id, edited.id))}
+                  onEdit={(edited) => router.push(suiteEditCasePath(projectId, suite.id, edited.id))}
                   onDelete={setDeletingCase}
                 />
               ))

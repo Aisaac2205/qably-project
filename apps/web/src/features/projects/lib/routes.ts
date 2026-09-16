@@ -40,6 +40,19 @@ export function caseEditPath(projectId: string, suiteId: string, caseId: string)
   return `/projects/${projectId}/suites/${suiteId}/cases/${caseId}/edit`
 }
 
+/**
+ * Case creation/editing lives inline on the suite edit page now — the
+ * dedicated /cases/new and /cases/:id/edit routes just redirect here with
+ * the target case preselected via ?case=.
+ */
+export function suiteEditNewCasePath(projectId: string, suiteId: string): string {
+  return `${suiteEditPath(projectId, suiteId)}?case=new`
+}
+
+export function suiteEditCasePath(projectId: string, suiteId: string, caseId: string): string {
+  return `${suiteEditPath(projectId, suiteId)}?case=${encodeURIComponent(caseId)}`
+}
+
 export function reviewInboxProposalPath(proposalId: string): string {
   return `/review-inbox?proposal=${proposalId}`
 }
