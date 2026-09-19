@@ -180,7 +180,10 @@ export class GeminiExtractor implements TestCaseExtractor {
         };
       }
 
-      if (error instanceof ApiError && OVERLOAD_STATUS_CODES.includes(error.status)) {
+      if (
+        error instanceof ApiError &&
+        OVERLOAD_STATUS_CODES.includes(error.status)
+      ) {
         this.logger.error(
           `Gemini returned ${error.status} for ${input.filePath} after its own internal retries`,
         );
@@ -196,7 +199,8 @@ export class GeminiExtractor implements TestCaseExtractor {
       // debugging, but never let it leak into the reason field: that field ends
       // up stored as an ExtractedProposal.objective and shown to the user, so it
       // must always be one of the known ProviderUnavailableReason values.
-      const rawDetail = error instanceof Error ? error.message : 'unknown-error';
+      const rawDetail =
+        error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Gemini extraction failed for ${input.filePath}: ${rawDetail}`,
       );

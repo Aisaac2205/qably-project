@@ -1687,7 +1687,9 @@ describe('ExtractionProcessor — retryable provider failures', () => {
         retryable: true,
       }),
     );
-    const targets = [{ testCaseId: 'case-1', automationKey: 'Cart > adds an item' }];
+    const targets = [
+      { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+    ];
 
     await expect(
       build(prisma, fakeSourceReader(), extractor).process({
