@@ -97,7 +97,9 @@ const calloutClasses = {
         <div class="flex flex-wrap gap-3">
           {block.items.map((item) => (
             <div class="flex items-center gap-2 rounded-xl border border-border bg-bg-elevated px-3 py-2">
-              <img src={item.src} alt={item.alt} width="20" height="20" class="size-5 shrink-0" />
+              <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary p-1">
+                <img src={item.src} alt={item.alt} width="16" height="16" class="size-4" />
+              </span>
               <span class="text-sm font-medium text-fg">{item.label}</span>
             </div>
           ))}
