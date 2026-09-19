@@ -5,7 +5,11 @@ import type { OrgContext } from '../../organizations/organizations.contracts';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DiscordChannel } from './channels/discord.channel';
 import { SlackChannel } from './channels/slack.channel';
-import type { WebhookChannel } from './channels/channel.contracts';
+import type {
+  WebhookChannel,
+  WebhookNotification,
+} from './channels/channel.contracts';
+import { NOTIFICATION_NEUTRAL_COLOR } from '../lib/notification-appearance';
 import { maskWebhookUrl } from './lib/mask-webhook-url';
 import type {
   NotificationWebhookError,
@@ -19,6 +23,15 @@ import type {
 
 export const WEBHOOK_TEST_MESSAGE =
   'Qably test notification — if you can see this, the webhook is configured correctly.';
+
+function buildTestNotification(): WebhookNotification {
+  return {
+    title: 'Qably',
+    message: WEBHOOK_TEST_MESSAGE,
+    color: NOTIFICATION_NEUTRAL_COLOR,
+    timestamp: new Date().toISOString(),
+  };
+}
 
 function canWrite(org: OrgContext): boolean {
   return org.role === 'owner' || org.role === 'admin';
@@ -107,7 +120,7 @@ export class NotificationWebhooksService {
 
     const url = this.encryption.decrypt(existing.encryptedUrl);
 
-    await this.resolveChannel(existing.type).send(url, WEBHOOK_TEST_MESSAGE);
+    await this.resolveChannel(existing.type).send(url, buildTestNotification());
 
     return ok(undefined);
   }

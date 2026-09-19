@@ -243,7 +243,12 @@ describe('NotificationWebhooksService.test', () => {
     expect(isErr(result)).toBe(false);
     expect(slack.send).toHaveBeenCalledWith(
       'https://hooks.slack.com/services/T00/B00/secrettoken',
-      expect.any(String),
+      expect.objectContaining({
+        title: expect.any(String) as string,
+        message: expect.any(String) as string,
+        color: expect.any(String) as string,
+        timestamp: expect.any(String) as string,
+      }),
     );
     expect(discord.send).not.toHaveBeenCalled();
   });

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import type { WebhookChannel } from './channel.contracts';
+import type { WebhookChannel, WebhookNotification } from './channel.contracts';
 
-const CONTENT_LIMIT = 2000;
+const TITLE_LIMIT = 256;
+const DESCRIPTION_LIMIT = 4096;
 
 function describeRetryAfter(header: string | null): string {
   if (header === null) return 'unknown delay';
@@ -11,17 +12,30 @@ function describeRetryAfter(header: string | null): string {
   return Number.isFinite(seconds) ? `${seconds}s` : header;
 }
 
+function toDecimalColor(hex: string): number {
+  return parseInt(hex.replace('#', ''), 16);
+}
+
 @Injectable()
 export class DiscordChannel implements WebhookChannel {
-  async send(url: string, content: string): Promise<void> {
+  async send(url: string, notification: WebhookNotification): Promise<void> {
     const target = new URL(url);
     target.searchParams.set('wait', 'true');
+
+    const embed = {
+      title: notification.title.slice(0, TITLE_LIMIT),
+      description: notification.message.slice(0, DESCRIPTION_LIMIT),
+      color: toDecimalColor(notification.color),
+      timestamp: notification.timestamp,
+      footer: { text: 'Qably' },
+      ...(notification.url === undefined ? {} : { url: notification.url }),
+    };
 
     const response = await fetch(target.toString(), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        content: content.slice(0, CONTENT_LIMIT),
+        embeds: [embed],
         allowed_mentions: { parse: [] },
       }),
     });

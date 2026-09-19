@@ -7,6 +7,7 @@ const runFailedEvent: NotificationJobData = {
   severity: 'high',
   payload: { runName: 'Checkout regression', suiteName: 'Checkout' },
   dedupeKey: 'run_failed:run-1',
+  projectId: 'project-1',
   runId: 'run-1',
 };
 
@@ -333,7 +334,13 @@ describe('NotificationsProcessor team webhook fan-out', () => {
 
     expect(slack.send).toHaveBeenCalledWith(
       'https://hooks.slack.com/services/x',
-      expect.any(String),
+      expect.objectContaining({
+        title: expect.any(String) as string,
+        message: expect.any(String) as string,
+        color: expect.any(String) as string,
+        timestamp: expect.any(String) as string,
+        url: 'https://app.qably.dev/projects/project-1/runs/run-1',
+      }),
     );
     expect(discord.send).not.toHaveBeenCalled();
   });
@@ -356,8 +363,11 @@ describe('NotificationsProcessor team webhook fan-out', () => {
       job(runFailedEvent),
     );
 
-    const [, message] = slack.send.mock.calls[0] as [string, string];
-    expect(message).toContain('falló');
+    const [, notification] = slack.send.mock.calls[0] as [
+      string,
+      { message: string },
+    ];
+    expect(notification.message).toContain('falló');
   });
 
   it('posts through the discord channel for a discord webhook', async () => {
@@ -378,6 +388,56 @@ describe('NotificationsProcessor team webhook fan-out', () => {
 
     expect(discord.send).toHaveBeenCalledTimes(1);
     expect(slack.send).not.toHaveBeenCalled();
+  });
+
+  it('keeps delivering to other webhooks and does not fail the job when one webhook throws', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        encryptedUrl: 'enc(https://discord.com/api/webhooks/1/token)',
+        type: 'discord',
+      },
+      {
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const mailer = createMailer();
+    const slack = createWebhookChannel();
+    const discord = createWebhookChannel();
+    discord.send.mockRejectedValue(new Error('Discord webhook failed with status 500'));
+
+    await expect(
+      build(prisma, mailer, createEncryption(), slack, discord).process(
+        job(runFailedEvent),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(discord.send).toHaveBeenCalledTimes(1);
+    expect(slack.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the url when the event has no project/run to deep-link to', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const mailer = createMailer();
+    const slack = createWebhookChannel();
+    const discord = createWebhookChannel();
+
+    await build(prisma, mailer, createEncryption(), slack, discord).process(
+      job(connectionSecurityEvent),
+    );
+
+    const [, notification] = slack.send.mock.calls[0] as [
+      string,
+      { url?: string },
+    ];
+    expect(notification.url).toBeUndefined();
   });
 
   it('never reaches org B webhooks for an event published for org A', async () => {

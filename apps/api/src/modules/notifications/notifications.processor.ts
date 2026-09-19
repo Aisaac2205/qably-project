@@ -14,7 +14,10 @@ import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { notificationDigestEmail } from '../mailer/templates/notification-digest';
-import type { WebhookChannel } from './webhooks/channels/channel.contracts';
+import type {
+  WebhookChannel,
+  WebhookNotification,
+} from './webhooks/channels/channel.contracts';
 import { DiscordChannel } from './webhooks/channels/discord.channel';
 import { SlackChannel } from './webhooks/channels/slack.channel';
 import type { NotificationJobData } from './notifications.contracts';
@@ -23,6 +26,7 @@ import {
   renderNotificationMessage,
   renderNotificationSubject,
 } from './lib/render-notification-message';
+import { notificationColor } from './lib/notification-appearance';
 
 interface RecipientRow {
   userId: string;
@@ -76,16 +80,43 @@ export class NotificationsProcessor extends WorkerHost {
       this.prisma,
       event.organizationId,
     );
-    const message = renderNotificationMessage(
-      locale,
-      event.eventType,
-      event.payload,
-    );
+    const deepLinkUrl = this.deepLink(event);
+    const notification: WebhookNotification = {
+      title: renderNotificationSubject(locale, event.eventType, event.payload),
+      message: renderNotificationMessage(
+        locale,
+        event.eventType,
+        event.payload,
+      ),
+      color: notificationColor(event.eventType),
+      timestamp: new Date().toISOString(),
+      ...(deepLinkUrl === undefined ? {} : { url: deepLinkUrl }),
+    };
 
     for (const webhook of webhooks as NotificationWebhookRow[]) {
       const url = this.encryption.decrypt(webhook.encryptedUrl);
-      await this.resolveWebhookChannel(webhook.type).send(url, message);
+
+      try {
+        await this.resolveWebhookChannel(webhook.type).send(url, notification);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to deliver ${webhook.type} notification for organization ${event.organizationId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
+  }
+
+  private deepLink(event: NotificationJobData): string | undefined {
+    if (event.projectId === undefined || event.runId === undefined) {
+      return undefined;
+    }
+
+    return new URL(
+      `/projects/${event.projectId}/runs/${event.runId}`,
+      this.env.WEB_APP_URL,
+    ).toString();
   }
 
   private resolveWebhookChannel(type: NotificationWebhookType): WebhookChannel {
