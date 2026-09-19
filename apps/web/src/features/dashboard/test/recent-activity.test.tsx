@@ -40,7 +40,9 @@ function ciCommit(
 
 async function renderWithSummary(summary: Partial<DashboardSummaryRecord>) {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: Infinity, refetchOnMount: false },
+    },
   })
   client.setQueryData(dashboardKeys.summary('all'), {
     ...dashboardSummaryFixture,
