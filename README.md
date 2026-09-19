@@ -1,95 +1,83 @@
-# Qably — AI-Native QA Management Platform
+# Qably
 
-Qably is a B2B SaaS platform that eliminates the 20-30 minute manual documentation tax QA engineers pay after writing automated tests. It watches GitHub for `.spec.ts`/`.test.ts` changes, sends them to the Claude API, and turns them into structured test cases ready to confirm in one click — on top of full QA lifecycle management: suites, manual runs, CI/CD pipeline integration, and quality reports. It competes with TestRail, Qase, and Squash TM; the differentiator is the AI layer that converts code into documentation automatically.
+Qably is a QA management platform that integrates automated test suites, execution runs, CI pipeline ingestion, and test case documentation. When test files change or test runs complete, the platform extracts structured test cases using the Google Gemini API and queues them for human confirmation. The system manages the full quality lifecycle across projects, suites, manual runs, CI reporting, and analytics.
 
-Built for QA engineers and QA leads who live in IDEs, terminals, and CI/CD pipelines — technically fluent, efficiency-driven, allergic to visual noise.
+## Monorepo Layout
 
-## Development Status
+The repository is managed as a pnpm workspace orchestrated by Turborepo.
 
-This repository is under active development, and **`apps/web` is the primary build today** — a full frontend implemented against a typed in-memory mock store, ahead of the backend. `apps/api` is scaffolded (NestJS + the target stack) but has no business logic yet. `apps/landing` is an untouched Astro starter reserved for the marketing site.
-
-## Monorepo layout
-
-pnpm workspaces orchestrated via Turborepo.
-
-| Path | Stack | Status |
+| Path | Stack | Description |
 |---|---|---|
-| `apps/web` | Next.js 16 (App Router), React 19, Tailwind v4, shadcn/ui, @base-ui/react | Active — dashboard, projects, suites, runs, AI review, settings, integrations, all built against mock data |
-| `apps/api` | NestJS 11, Prisma, Redis, BullMQ, better-auth, Anthropic SDK, Resend, Zod | Scaffolded — dependencies installed, no domain modules implemented yet |
-| `apps/landing` | Astro 6, Tailwind v4 | Not started — default starter template |
-| `packages/types` | Shared TypeScript contracts (`@qably/types`) consumed by web, and eventually api | Active |
-| `packages/config` | Shared `tsconfig.base.json` and lint config | Active |
-| `packages/ui` | Shared React component package | Early |
+| `apps/web` | Next.js 16 (App Router), React 19, Tailwind v4, TanStack Query, Zustand, Better Auth client | Primary web console for test suites, execution runs, review inbox, traceability calendars, and project settings. Communicates with `apps/api` via typed contracts and includes an in-memory mock store fallback. |
+| `apps/api` | NestJS 11, PostgreSQL, Prisma ORM, Redis, BullMQ, Better Auth, Google Gemini (`@google/genai`), Resend | Core transactional backend handling organizations, projects, test run ingestion (JSON and JUnit XML), async AI test case extraction, and webhook integrations. |
+| `apps/landing` | Astro 7, React 19 islands, Tailwind v4, Motion | Public marketing site and interactive technical documentation reader supporting Spanish (`/`) and English (`/en/`). |
+| `packages/types` | TypeScript | Shared domain models, status definitions, API request schemas, and entity contracts (`@qably/types`). |
+| `packages/ui` | React 19, Tailwind v4, Recharts | Shared dashboard analytics primitives including KPI cards, trend charts, status chips, and sparklines (`@qably/ui`). |
+| `packages/i18n` | TypeScript | Centralized localization dictionaries (`en.json`, `es.json`) and RFC 4647/7231 locale negotiation helpers (`@qably/i18n`). |
+| `packages/test-naming` | TypeScript | Shared utilities for sanitizing, formatting, and humanizing test and suite identifiers (`@qably/test-naming`). |
+| `packages/config` | TypeScript | Shared TypeScript configuration (`tsconfig.base.json`) used across the workspace (`@qably/config`). |
 
-## `apps/web` — application architecture
+## Architecture Overview
 
-Since the backend doesn't exist yet, `apps/web` owns the domain model until it's ready to swap in real HTTP calls:
+Qably isolates data ingestion into two independent channels:
 
-- **Mock-store pattern** (`src/lib/mock-store.ts` + `mock-data.ts` + `use-mock-store.ts`) — a typed, in-memory pub-sub store standing in for the real API. Readers and mutators mirror the shape the eventual NestJS endpoints will expose, so swapping in real requests later is a hook-level change, not a rewrite.
-- **Feature slices** (`src/features/*`) — `dashboard`, `projects` (suites nested inside), `runs` (reports nested inside), `ai-review`, `integrations`, `settings`, `auth`. Each slice owns its own components, hooks, and tests.
-- **Route groups** (`src/app/(app)/*`) — `dashboard`, `projects`, `settings`, `integrations`, all inside the authenticated App Router shell.
-- **App shell** — fixed 160px sidebar (global nav vs. project-context nav) + 36px top bar (breadcrumb, ⌘K search, user menu). See Design system below.
+1. **Test Run Ingestion:** CI pipelines send execution results to `POST /runs/ingest` or `POST /runs/ingest/junit` using a project API key (`Authorization: Bearer <key>`). The backend updates suite pass rates, stores failure logs, and computes health metrics.
+2. **Repository Changes:** Source code providers send push events to `POST /webhooks/scm/:provider` with HMAC signatures. The backend enqueues jobs in Redis via BullMQ, loads test file diffs, and prompts the Google Gemini API (`gemini-3.1-flash-lite`) to extract structured test proposals into the review inbox.
 
-## `apps/api` — planned backend
+The frontend (`apps/web`) communicates with `apps/api` through a centralized client that automatically attaches the current organization identifier (`x-organization-id`) and user session headers. When developing without a backend instance, the web application can run against a typed mock store.
 
-Currently the default NestJS CLI scaffold (`AppModule` / `AppController` / `AppService`) — no `projects`, `runs`, or `integrations` modules exist yet. The target architecture is already decided through the dependencies installed:
+## Design System
 
-| Dependency | Role |
-|---|---|
-| Prisma | Database ORM / schema |
-| Redis + BullMQ | Async job queue (webhook processing, AI generation jobs) |
-| `@anthropic-ai/sdk` | Claude API calls for test case extraction |
-| `better-auth` | Authentication |
-| `resend` | Transactional email |
-| `zod` | Boundary validation |
+The product interface enforces strict design constraints documented in `CLAUDE.md`:
 
-Once implemented, `apps/web`'s mock-store contracts — typed via `@qably/types` — become the target shape for real controllers, services, and repositories.
+- **Tokens Only:** All styling relies on CSS custom properties. Component files must not declare hardcoded hex, rgb, or oklch values.
+- **Typography:** Geist Sans for general interface typography and Geist Mono for code snippets and tabular metrics.
+- **Component Primitives:** Customized shadcn/ui components paired with `@phosphor-icons/react`. Third-party icon sets like Lucide are excluded.
+- **Accessibility:** Status indicators always pair distinct labels with icons so color is never the single differentiator.
 
-## Design system
+## Prerequisites
 
-Defined in `docs/superpowers/specs/2026-06-16-qably-app-shell-design.md`, enforced project-wide via `CLAUDE.md`:
-
-- **Tokens only** — every color is an OKLCH CSS custom property in `apps/web/src/app/globals.css` (`--primary`, `--bg-sidebar`, `--status-*`, …). No hardcoded hex, rgb, or oklch in components.
-- **Status clarity** — pass/fail/blocked/skip/running always pair an icon with a label, never color alone (WCAG 2.2 AA).
-- **Typography** — Geist Sans (body) + Geist Mono (code and numeric data only). No Inter.
-- **Components** — shadcn/ui (new-york), always restyled to project tokens; `@phosphor-icons/react` only, no lucide, no hand-rolled SVGs.
-
-Brand personality: precise, confident, uncluttered — a well-calibrated instrument, not a flashy startup. Anti-references: TestRail's clutter, Qase's generic blue SaaS look, and typical AI-tool purple gradients/glassmorphism.
-
-## Roadmap
-
-Tracked as implementation plans under `docs/superpowers/plans/`:
-
-1. **App shell** (`2026-06-16-qably-app-shell.md`) — sidebar, top bar, dashboard, and a runs executor with keyboard-driven P/F/S/B verdicts. Shipped.
-2. **AI Review Copilot** (`2026-07-11-ai-review-copilot.md`) — BYOK provider connections (Claude/Gemini) in Settings, a redesigned review queue with bulk-confirm, duplicate detection, coverage-gap suggestions, and a project-scoped chat that drafts new AI cases into the queue. All AI behavior is currently simulated in the mock store — no real Claude/Gemini calls yet.
-
-Both plans assume a decoupled frontend: real backend wiring (webhook ingestion → BullMQ → Claude → structured cases) replaces the mock store once `apps/api` catches up.
-
-## Development Standards
-
-1. **Strict Type Safety** — dynamic types (`any` and unchecked `unknown`) are not permitted. Input validation happens at application boundaries.
-2. **Clean NestJS Architecture** — strict separation between routing (Controllers), business logic (Services), and database access (Repositories).
-3. **Component Modularity** — React component logic follows the Single Responsibility Principle; complex local state or query operations are extracted into custom hooks.
-4. **Conventional Commits** — English, imperative mood (e.g. `feat(auth): add validation...`).
+- Node.js >= 22.12.0
+- pnpm >= 10.0.0 (version 10.33.0 is configured in `package.json`)
+- Docker (required to run PostgreSQL and Redis locally for `apps/api`)
 
 ## Getting Started
 
-### Prerequisites
-- Node.js 20+
-- pnpm 10+ (pinned via `packageManager` in the root `package.json`)
+Install workspace dependencies from the root directory:
 
-### Setup
 ```bash
 pnpm install
 ```
 
-### Development
-Starts every app's dev server concurrently via Turborepo (`web`, `api`, `landing`):
+Start all applications concurrently in development mode:
+
 ```bash
 pnpm run dev
 ```
 
-Or target a single app:
+Target a single application with the `--filter` flag:
+
 ```bash
-pnpm --filter web dev
+# Start the web console
+pnpm --filter @qably/web dev
+
+# Start the NestJS API
+pnpm --filter @qably/api start:dev
+
+# Start the landing and documentation site
+pnpm --filter @qably/landing dev
 ```
+
+## Workspace Commands
+
+The root `package.json` provides scripts that execute across all packages via Turborepo:
+
+- `pnpm run build` runs production builds for every app and package.
+- `pnpm run lint` executes ESLint across the codebase.
+- `pnpm run type-check` verifies TypeScript types across all projects.
+
+For service-specific testing and database operations, consult the README inside each application folder:
+
+- [`apps/api/README.md`](file:///c:/Users/Asus/Projects/qably/apps/api/README.md) for database migrations, queue debugging, and backend test runners.
+- [`apps/web/README.md`](file:///c:/Users/Asus/Projects/qably/apps/web/README.md) for frontend component testing and state management architecture.
+- [`apps/landing/README.md`](file:///c:/Users/Asus/Projects/qably/apps/landing/README.md) for public marketing routes, docs content, and preview islands.
