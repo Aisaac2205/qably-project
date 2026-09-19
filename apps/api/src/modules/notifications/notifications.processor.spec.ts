@@ -405,7 +405,9 @@ describe('NotificationsProcessor team webhook fan-out', () => {
     const mailer = createMailer();
     const slack = createWebhookChannel();
     const discord = createWebhookChannel();
-    discord.send.mockRejectedValue(new Error('Discord webhook failed with status 500'));
+    discord.send.mockRejectedValue(
+      new Error('Discord webhook failed with status 500'),
+    );
 
     await expect(
       build(prisma, mailer, createEncryption(), slack, discord).process(
