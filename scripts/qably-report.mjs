@@ -229,8 +229,10 @@ async function main() {
     xml = readFileSync(filePath, 'utf8');
   } catch (error) {
     console.error(
-      `::warning title=Qably report failed::could not read ${filePath}: ${error.message}`,
+      `::error title=Qably report failed::could not read ${filePath}: ${error.message}. ` +
+        'The test step likely never ran (an earlier CI step failed first), so no JUnit report was produced.',
     );
+    process.exitCode = 1;
     return;
   }
 
