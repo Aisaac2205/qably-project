@@ -671,9 +671,32 @@ model NotificationWebhook {
   eventTypes     NotificationEventType[]
   createdAt      DateTime                @default(now())
   updatedAt      DateTime                @updatedAt
+  deliveries     NotificationDelivery[]
 
   @@index([organizationId])
   @@map("notification_webhook")
+}
+
+enum NotificationDeliveryStatus {
+  sent
+  failed
+}
+
+model NotificationDelivery {
+  id             String                      @id @default(cuid())
+  organizationId String
+  eventType      NotificationEventType
+  dedupeKey      String
+  channel        NotificationWebhookType
+  webhookId      String
+  webhook        NotificationWebhook         @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  status         NotificationDeliveryStatus
+  errorMessage   String?
+  deliveredAt    DateTime                    @default(now())
+
+  @@unique([webhookId, dedupeKey])
+  @@index([organizationId, dedupeKey])
+  @@map("notification_delivery")
 }
 
 enum ChatRole {

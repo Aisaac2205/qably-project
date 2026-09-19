@@ -18,6 +18,7 @@ export type NotificationEventType =
   | 'ingestion_failed'
   | 'connection_security'
 export type NotificationWebhookType = 'slack' | 'discord'
+export type NotificationDeliveryStatus = 'sent' | 'failed'
 
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
 
@@ -412,6 +413,11 @@ export interface TraceabilityCalendarRecord {
   days: TraceabilityDayRecord[]
 }
 
+export interface NotificationDelivery {
+  channel: NotificationWebhookType
+  status: NotificationDeliveryStatus
+}
+
 export interface Notification {
   id: string
   organizationId: string
@@ -426,6 +432,7 @@ export interface Notification {
   connectionId?: string
   createdAt: string
   readAt?: string
+  deliveries: NotificationDelivery[]
 }
 
 export interface NotificationPreference {

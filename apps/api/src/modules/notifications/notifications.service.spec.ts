@@ -15,6 +15,7 @@ const row = {
   eventType: 'run_failed' as const,
   severity: 'high' as const,
   payload: { runName: 'Checkout regression' },
+  dedupeKey: 'run_failed:run-1',
   projectId: 'project-1',
   runId: 'run-1',
   testCaseId: null,
@@ -32,6 +33,7 @@ interface FakePrisma {
     updateMany: jest.Mock;
   };
   notificationPreference: { findMany: jest.Mock; upsert: jest.Mock };
+  notificationDelivery: { findMany: jest.Mock };
   user: { update: jest.Mock };
 }
 
@@ -47,6 +49,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
       upsert: jest.fn().mockResolvedValue({}),
     },
+    notificationDelivery: { findMany: jest.fn().mockResolvedValue([]) },
     user: { update: jest.fn().mockResolvedValue({}) },
   };
 }
@@ -66,6 +69,58 @@ describe('NotificationsService.list', () => {
         where: { organizationId: 'org-1', userId: 'user-1' },
       }),
     );
+  });
+
+  it('fetches deliveries in a single batched query keyed by organization and dedupeKey, not one query per row', async () => {
+    const prisma = createPrisma();
+    prisma.notification.findMany.mockResolvedValue([
+      row,
+      { ...row, id: 'notif-2', dedupeKey: 'run_completed:run-2' },
+    ]);
+
+    await build(prisma).list(org, 'user-1');
+
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.notificationDelivery.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: 'org-1',
+          dedupeKey: { in: ['run_failed:run-1', 'run_completed:run-2'] },
+        },
+      }),
+    );
+  });
+
+  it('skips the delivery query entirely when there are no notifications', async () => {
+    const prisma = createPrisma();
+    prisma.notification.findMany.mockResolvedValue([]);
+
+    await build(prisma).list(org, 'user-1');
+
+    expect(prisma.notificationDelivery.findMany).not.toHaveBeenCalled();
+  });
+
+  it('attaches each delivery to the notification sharing its dedupeKey', async () => {
+    const prisma = createPrisma();
+    prisma.notificationDelivery.findMany.mockResolvedValue([
+      { dedupeKey: 'run_failed:run-1', channel: 'slack', status: 'sent' },
+      { dedupeKey: 'run_failed:run-1', channel: 'discord', status: 'failed' },
+    ]);
+
+    const [result] = await build(prisma).list(org, 'user-1');
+
+    expect(result?.deliveries).toEqual([
+      { channel: 'slack', status: 'sent' },
+      { channel: 'discord', status: 'failed' },
+    ]);
+  });
+
+  it('returns an empty deliveries array for a notification with no webhook attempt', async () => {
+    const prisma = createPrisma();
+
+    const [result] = await build(prisma).list(org, 'user-1');
+
+    expect(result?.deliveries).toEqual([]);
   });
 });
 

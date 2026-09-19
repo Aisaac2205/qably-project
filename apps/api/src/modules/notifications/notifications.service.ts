@@ -16,6 +16,7 @@ interface NotificationRow {
   eventType: NotificationView['eventType'];
   severity: NotificationView['severity'];
   payload: unknown;
+  dedupeKey: string;
   projectId: string | null;
   runId: string | null;
   testCaseId: string | null;
@@ -25,7 +26,16 @@ interface NotificationRow {
   readAt: Date | null;
 }
 
-function toView(row: NotificationRow): NotificationView {
+interface DeliveryRow {
+  dedupeKey: string;
+  channel: NotificationView['deliveries'][number]['channel'];
+  status: NotificationView['deliveries'][number]['status'];
+}
+
+function toView(
+  row: NotificationRow,
+  deliveries: NotificationView['deliveries'],
+): NotificationView {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -42,6 +52,7 @@ function toView(row: NotificationRow): NotificationView {
     ...(row.connectionId === null ? {} : { connectionId: row.connectionId }),
     createdAt: row.createdAt.toISOString(),
     ...(row.readAt === null ? {} : { readAt: row.readAt.toISOString() }),
+    deliveries,
   };
 }
 
@@ -50,12 +61,45 @@ export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async list(org: OrgContext, userId: string): Promise<NotificationView[]> {
-    const rows = await this.prisma.notification.findMany({
+    const rows = (await this.prisma.notification.findMany({
       where: { organizationId: org.organizationId, userId },
       orderBy: { createdAt: 'desc' },
-    });
+    })) as NotificationRow[];
 
-    return (rows as NotificationRow[]).map(toView);
+    const deliveriesByDedupeKey = await this.loadDeliveries(
+      org.organizationId,
+      rows.map((row) => row.dedupeKey),
+    );
+
+    return rows.map((row) =>
+      toView(row, deliveriesByDedupeKey.get(row.dedupeKey) ?? []),
+    );
+  }
+
+  private async loadDeliveries(
+    organizationId: string,
+    dedupeKeys: string[],
+  ): Promise<Map<string, NotificationView['deliveries']>> {
+    if (dedupeKeys.length === 0) return new Map();
+
+    const rows = (await this.prisma.notificationDelivery.findMany({
+      where: {
+        organizationId,
+        dedupeKey: { in: [...new Set(dedupeKeys)] },
+      },
+      select: { dedupeKey: true, channel: true, status: true },
+    })) as DeliveryRow[];
+
+    const byDedupeKey = new Map<string, NotificationView['deliveries']>();
+
+    for (const row of rows) {
+      const existing = byDedupeKey.get(row.dedupeKey) ?? [];
+
+      existing.push({ channel: row.channel, status: row.status });
+      byDedupeKey.set(row.dedupeKey, existing);
+    }
+
+    return byDedupeKey;
   }
 
   async markRead(
@@ -67,12 +111,16 @@ export class NotificationsService {
 
     if (existing === null) return err('not-found');
 
-    const row = await this.prisma.notification.update({
+    const row = (await this.prisma.notification.update({
       where: { id },
       data: { readAt: existing.readAt ?? new Date() },
-    });
+    })) as NotificationRow;
 
-    return ok(toView(row as NotificationRow));
+    const deliveries = await this.loadDeliveries(org.organizationId, [
+      row.dedupeKey,
+    ]);
+
+    return ok(toView(row, deliveries.get(row.dedupeKey) ?? []));
   }
 
   async markAllRead(org: OrgContext, userId: string): Promise<void> {

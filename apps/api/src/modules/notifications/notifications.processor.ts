@@ -5,6 +5,7 @@ import { resolveLocale } from '@qably/i18n';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationChannel,
+  type NotificationDeliveryStatus,
   type NotificationWebhookType,
 } from '@qably/types';
 import { InjectEnv } from '../../config/config.tokens';
@@ -34,6 +35,7 @@ interface RecipientRow {
 }
 
 interface NotificationWebhookRow {
+  id: string;
   encryptedUrl: string;
   type: NotificationWebhookType;
 }
@@ -71,7 +73,7 @@ export class NotificationsProcessor extends WorkerHost {
         enabled: true,
         eventTypes: { has: event.eventType },
       },
-      select: { encryptedUrl: true, type: true },
+      select: { id: true, encryptedUrl: true, type: true },
     });
 
     if (webhooks.length === 0) return;
@@ -94,17 +96,54 @@ export class NotificationsProcessor extends WorkerHost {
     };
 
     for (const webhook of webhooks as NotificationWebhookRow[]) {
+      const existing = await this.prisma.notificationDelivery.findUnique({
+        where: {
+          webhookId_dedupeKey: {
+            webhookId: webhook.id,
+            dedupeKey: event.dedupeKey,
+          },
+        },
+        select: { status: true },
+      });
+
+      if (existing?.status === 'sent') continue;
+
       const url = this.encryption.decrypt(webhook.encryptedUrl);
+      let status: NotificationDeliveryStatus = 'sent';
+      let errorMessage: string | undefined;
 
       try {
         await this.resolveWebhookChannel(webhook.type).send(url, notification);
       } catch (error) {
+        status = 'failed';
+        errorMessage = error instanceof Error ? error.message : String(error);
         this.logger.warn(
-          `Failed to deliver ${webhook.type} notification for organization ${event.organizationId}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Failed to deliver ${webhook.type} notification for organization ${event.organizationId}: ${errorMessage}`,
         );
       }
+
+      await this.prisma.notificationDelivery.upsert({
+        where: {
+          webhookId_dedupeKey: {
+            webhookId: webhook.id,
+            dedupeKey: event.dedupeKey,
+          },
+        },
+        create: {
+          organizationId: event.organizationId,
+          eventType: event.eventType,
+          dedupeKey: event.dedupeKey,
+          channel: webhook.type,
+          webhookId: webhook.id,
+          status,
+          ...(errorMessage === undefined ? {} : { errorMessage }),
+        },
+        update: {
+          status,
+          deliveredAt: new Date(),
+          errorMessage: errorMessage ?? null,
+        },
+      });
     }
   }
 

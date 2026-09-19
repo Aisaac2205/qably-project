@@ -49,6 +49,7 @@ interface FakePrisma {
   notificationPreference: { findUnique: jest.Mock };
   notification: { upsert: jest.Mock };
   notificationWebhook: { findMany: jest.Mock };
+  notificationDelivery: { findUnique: jest.Mock; upsert: jest.Mock };
 }
 
 function createPrisma(
@@ -66,6 +67,10 @@ function createPrisma(
     notificationPreference: { findUnique: jest.fn().mockResolvedValue(null) },
     notification: { upsert: jest.fn().mockResolvedValue({}) },
     notificationWebhook: { findMany: jest.fn().mockResolvedValue([]) },
+    notificationDelivery: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      upsert: jest.fn().mockResolvedValue({}),
+    },
   };
 }
 
@@ -287,6 +292,42 @@ describe('NotificationsProcessor dedupe upsert', () => {
 });
 
 describe('NotificationsProcessor team webhook fan-out', () => {
+  it('records a sent delivery row scoped by organization, event and dedupeKey', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-slack-record',
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith({
+      where: {
+        webhookId_dedupeKey: {
+          webhookId: 'webhook-slack-record',
+          dedupeKey: 'run_failed:run-1',
+        },
+      },
+      create: {
+        organizationId: 'org-1',
+        eventType: 'run_failed',
+        dedupeKey: 'run_failed:run-1',
+        channel: 'slack',
+        webhookId: 'webhook-slack-record',
+        status: 'sent',
+      },
+      update: {
+        status: 'sent',
+        deliveredAt: expect.any(Date) as Date,
+        errorMessage: null,
+      },
+    });
+  });
+
   it('never queries webhooks without scoping by the event organizationId', async () => {
     const prisma = createPrisma([]);
     const mailer = createMailer();
@@ -320,6 +361,7 @@ describe('NotificationsProcessor team webhook fan-out', () => {
     const prisma = createPrisma([]);
     prisma.notificationWebhook.findMany.mockResolvedValue([
       {
+        id: 'webhook-slack-1',
         encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
         type: 'slack',
       },
@@ -351,6 +393,7 @@ describe('NotificationsProcessor team webhook fan-out', () => {
     ]);
     prisma.notificationWebhook.findMany.mockResolvedValue([
       {
+        id: 'webhook-slack-2',
         encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
         type: 'slack',
       },
@@ -374,6 +417,7 @@ describe('NotificationsProcessor team webhook fan-out', () => {
     const prisma = createPrisma([]);
     prisma.notificationWebhook.findMany.mockResolvedValue([
       {
+        id: 'webhook-discord-1',
         encryptedUrl: 'enc(https://discord.com/api/webhooks/1/token)',
         type: 'discord',
       },
@@ -394,10 +438,12 @@ describe('NotificationsProcessor team webhook fan-out', () => {
     const prisma = createPrisma([]);
     prisma.notificationWebhook.findMany.mockResolvedValue([
       {
+        id: 'webhook-discord-2',
         encryptedUrl: 'enc(https://discord.com/api/webhooks/1/token)',
         type: 'discord',
       },
       {
+        id: 'webhook-slack-3',
         encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
         type: 'slack',
       },
@@ -417,12 +463,95 @@ describe('NotificationsProcessor team webhook fan-out', () => {
 
     expect(discord.send).toHaveBeenCalledTimes(1);
     expect(slack.send).toHaveBeenCalledTimes(1);
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          webhookId: 'webhook-discord-2',
+          channel: 'discord',
+          status: 'failed',
+          errorMessage: 'Discord webhook failed with status 500',
+        }) as unknown,
+      }),
+    );
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          webhookId: 'webhook-slack-3',
+          channel: 'slack',
+          status: 'sent',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('does not re-send to a channel that already has a sent delivery for the same dedupeKey, since a BullMQ retry must not double-post', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-discord-retry',
+        encryptedUrl: 'enc(https://discord.com/api/webhooks/1/token)',
+        type: 'discord',
+      },
+    ]);
+    prisma.notificationDelivery.findUnique.mockResolvedValue({
+      status: 'sent',
+    });
+    const mailer = createMailer();
+    const discord = createWebhookChannel();
+
+    await build(
+      prisma,
+      mailer,
+      createEncryption(),
+      createWebhookChannel(),
+      discord,
+    ).process(job(runFailedEvent));
+
+    expect(discord.send).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.upsert).not.toHaveBeenCalled();
+  });
+
+  it('retries a channel whose prior delivery failed, since only a confirmed send should be skipped', async () => {
+    const prisma = createPrisma([]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-discord-retry-2',
+        encryptedUrl: 'enc(https://discord.com/api/webhooks/1/token)',
+        type: 'discord',
+      },
+    ]);
+    prisma.notificationDelivery.findUnique.mockResolvedValue({
+      status: 'failed',
+    });
+    const mailer = createMailer();
+    const discord = createWebhookChannel();
+
+    await build(
+      prisma,
+      mailer,
+      createEncryption(),
+      createWebhookChannel(),
+      discord,
+    ).process(job(runFailedEvent));
+
+    expect(discord.send).toHaveBeenCalledTimes(1);
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          webhookId_dedupeKey: {
+            webhookId: 'webhook-discord-retry-2',
+            dedupeKey: 'run_failed:run-1',
+          },
+        },
+      }),
+    );
   });
 
   it('omits the url when the event has no project/run to deep-link to', async () => {
     const prisma = createPrisma([]);
     prisma.notificationWebhook.findMany.mockResolvedValue([
       {
+        id: 'webhook-slack-4',
         encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
         type: 'slack',
       },
@@ -450,6 +579,7 @@ describe('NotificationsProcessor team webhook fan-out', () => {
           where.organizationId === 'org-1'
             ? [
                 {
+                  id: 'webhook-slack-org-1',
                   encryptedUrl: 'enc(https://hooks.slack.com/services/org-1)',
                   type: 'slack',
                 },
