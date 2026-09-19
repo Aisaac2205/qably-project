@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle, Info, WarningCircle, X } from '@phosphor-icons/react'
@@ -64,7 +64,7 @@ export function ReviewInboxPage() {
     }
   }, [activeSelectedId, filteredProposals])
 
-  const { approve, reject, decisionError } = useProposalDecision({
+  const { approve, reject } = useProposalDecision({
     onApproved: (proposalId, result) => {
       const proposal = proposals.find((p) => p.id === proposalId)
       setFeedbackToast({
@@ -86,17 +86,13 @@ export function ReviewInboxPage() {
       })
       selectNextPending()
     },
+    onError: (code) => {
+      setFeedbackToast({
+        message: t(`aiReview.${decisionErrorKey(code)}`),
+        type: 'error',
+      })
+    },
   })
-
-  // decisionError is set (and reset to null before each attempt) inside the
-  // hook — surface it here instead of leaving a failed approve/reject silent.
-  useEffect(() => {
-    if (decisionError === null) return
-    setFeedbackToast({
-      message: t(`aiReview.${decisionErrorKey(decisionError)}`),
-      type: 'error',
-    })
-  }, [decisionError, t])
 
   const handleApprove = useCallback(
     (proposalId: string) => {

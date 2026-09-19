@@ -10,7 +10,7 @@ import { ApiError } from '@/lib/api-client'
 interface DecisionCallbacks {
   onApproved: (proposalId: string, result: ApprovalResult) => void
   onRejected: (proposalId: string, result: RejectionResult) => void
-  onError?: (error: unknown, proposalId: string) => void
+  onError?: (code: DecisionErrorCode, proposalId: string) => void
 }
 
 interface DecisionVariables {
@@ -79,7 +79,7 @@ export function useProposalDecision({
     const code = classifyDecisionError(error)
     setDecisionError(code)
     if (code === 'invalid-transition') invalidateReview()
-    onError?.(error, proposalId)
+    onError?.(code, proposalId)
   }
 
   const approval = useMutation({
