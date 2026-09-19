@@ -35,6 +35,7 @@ export const en: DocContent = {
         'reference-env-vars',
       ],
     },
+    { label: 'Notifications', sectionIds: ['notifications-discord-slack'] },
     { label: 'Platform', sectionIds: ['platform-overview'] },
     { label: 'Help', sectionIds: ['faq'] },
   ],
@@ -747,6 +748,73 @@ response.raise_for_status()`,
             ['QABLY_API_KEY', 'yes, to report anything', 'Read by the reporter. If unset, the script logs a message and exits 0 without sending anything; it never fails the build.'],
             ['QABLY_API_BASE_URL', 'no', `Defaults to ${API_BASE_URL_TOKEN}, and is set for a self-hosted deployment or a local run against http://localhost:3001.`],
           ],
+        },
+      ],
+    },
+    {
+      id: 'notifications-discord-slack',
+      navLabel: 'Discord & Slack',
+      title: 'Notify Discord or Slack',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: "Qably can post alerts to a Discord channel or a Slack workspace whenever a run fails or passes, a case regresses, an ingestion fails, or a connection's credentials change. Qably does not host a channel of its own: the webhook is one you create and own on Discord's or Slack's side, and Qably only delivers to the URL you paste in.",
+        },
+        {
+          type: 'logoRow',
+          items: [
+            { src: '/tech-icons/discord.svg', alt: 'Discord logo', label: 'Discord' },
+            { src: '/tech-icons/slack.svg', alt: 'Slack logo', label: 'Slack' },
+          ],
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'Nothing changes on the Qably side if the webhook is deleted or regenerated on Discord or Slack — deliveries just start failing until the channel is updated with a new URL, or removed from Settings.',
+        },
+        { type: 'subheading', text: 'Get a webhook URL from Discord' },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'In the Discord server that should receive alerts, open Server Settings → Integrations → Webhooks.',
+            'Select New Webhook, choose the channel, and copy the webhook URL.',
+          ],
+        },
+        { type: 'subheading', text: 'Get a webhook URL from Slack' },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'Create a Slack app (or reuse one) at api.slack.com/apps and turn on the Incoming Webhooks feature.',
+            'Install it to the workspace, pick the channel, and copy the webhook URL Slack generates.',
+          ],
+        },
+        { type: 'subheading', text: 'Connect it to Qably' },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'In Settings → Integrations, under Team notification channels, select Add channel.',
+            'Choose Discord or Slack, name the channel, paste the webhook URL, and pick the events it should receive.',
+            'Use the send-test action on the new channel to confirm a message arrives before relying on it.',
+          ],
+        },
+        {
+          type: 'table',
+          headers: ['Event', 'Fires when'],
+          rows: [
+            ['Run failed', 'A test run finishes with at least one failing case.'],
+            ['Run completed', 'A test run finishes with every case passing.'],
+            ['Case regressed', 'A case that used to pass fails in the current run.'],
+            ['Ingestion failed', "A repository's code ingestion could not be processed."],
+            ['Connection security', "A repository connection's webhook secret or credentials change."],
+          ],
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'Setting up or changing a notification channel requires the owner or admin role in Qably. Once a channel is receiving connection security alerts, though, anyone with access to that Discord server or Slack workspace sees them — Qably does not re-check roles at delivery time, so it is worth choosing that channel with that in mind.',
         },
       ],
     },

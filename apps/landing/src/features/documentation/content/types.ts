@@ -47,6 +47,17 @@ export interface CalloutBlock {
   text: string;
 }
 
+export interface LogoRowItem {
+  src: string;
+  alt: string;
+  label: string;
+}
+
+export interface LogoRowBlock {
+  type: 'logoRow';
+  items: LogoRowItem[];
+}
+
 export type FaqAnswerBlock = ParagraphBlock | ListBlock | CodeBlock;
 
 export interface FaqBlock {
@@ -65,6 +76,7 @@ export type DocBlock =
   | CodeGroupBlock
   | TableBlock
   | CalloutBlock
+  | LogoRowBlock
   | FaqBlock;
 
 export const API_BASE_URL_TOKEN = '{{API_BASE_URL}}';

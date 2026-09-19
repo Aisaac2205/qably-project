@@ -35,6 +35,7 @@ export const es: DocContent = {
         'reference-env-vars',
       ],
     },
+    { label: 'Notificaciones', sectionIds: ['notifications-discord-slack'] },
     { label: 'Plataforma', sectionIds: ['platform-overview'] },
     { label: 'Ayuda', sectionIds: ['faq'] },
   ],
@@ -747,6 +748,73 @@ response.raise_for_status()`,
             ['QABLY_API_KEY', 'sí, para reportar algo', 'La lee el reporter. Si no está configurada, el script registra un mensaje y termina con código 0 sin enviar nada; nunca hace fallar el build.'],
             ['QABLY_API_BASE_URL', 'no', `Por defecto usa ${API_BASE_URL_TOKEN}. Se configura para un despliegue propio o una corrida local contra http://localhost:3001.`],
           ],
+        },
+      ],
+    },
+    {
+      id: 'notifications-discord-slack',
+      navLabel: 'Discord y Slack',
+      title: 'Notificar por Discord o Slack',
+      blocks: [
+        {
+          type: 'paragraph',
+          text: 'Qably puede publicar alertas en un canal de Discord o un workspace de Slack cada vez que un run falla o pasa, un caso regresiona, una ingesta falla, o cambian las credenciales de una conexión. Qably no aloja ningún canal propio: el webhook se crea y se controla del lado de Discord o de Slack, y Qably solo entrega a la URL que se pega en su configuración.',
+        },
+        {
+          type: 'logoRow',
+          items: [
+            { src: '/tech-icons/discord.svg', alt: 'Logo de Discord', label: 'Discord' },
+            { src: '/tech-icons/slack.svg', alt: 'Logo de Slack', label: 'Slack' },
+          ],
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'Del lado de Qably no cambia nada si el webhook se borra o se regenera en Discord o Slack — las entregas simplemente empiezan a fallar hasta que se actualice el canal con la URL nueva, o se lo elimine desde Configuración.',
+        },
+        { type: 'subheading', text: 'Obtener una URL de webhook de Discord' },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'En el servidor de Discord que debe recibir las alertas, se abre Configuración del servidor → Integraciones → Webhooks.',
+            'Se elige Nuevo Webhook, se selecciona el canal, y se copia la URL del webhook.',
+          ],
+        },
+        { type: 'subheading', text: 'Obtener una URL de webhook de Slack' },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'Se crea una app de Slack (o se reutiliza una existente) en api.slack.com/apps y se activa la función Incoming Webhooks.',
+            'Se instala en el workspace, se elige el canal, y se copia la URL que genera Slack.',
+          ],
+        },
+        { type: 'subheading', text: 'Conectarlo a Qably' },
+        {
+          type: 'list',
+          ordered: true,
+          items: [
+            'En Configuración → Integraciones, dentro de Canales de notificación del equipo, se selecciona Agregar canal.',
+            'Se elige Discord o Slack, se nombra el canal, se pega la URL del webhook, y se eligen los eventos que debe recibir.',
+            'Se usa la acción de enviar mensaje de prueba en el canal nuevo para confirmar que llega antes de depender de él.',
+          ],
+        },
+        {
+          type: 'table',
+          headers: ['Evento', 'Se dispara cuando'],
+          rows: [
+            ['Ejecución fallida', 'Un run de pruebas termina con al menos un caso fallido.'],
+            ['Ejecución completada', 'Un run de pruebas termina con todos los casos pasando.'],
+            ['Caso con regresión', 'Un caso que antes pasaba, falla en el run actual.'],
+            ['Ingesta fallida', 'No se pudo procesar la ingesta de código de un repositorio.'],
+            ['Seguridad de la conexión', 'Cambia el secreto de webhook o las credenciales de una conexión de repositorio.'],
+          ],
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'Configurar o cambiar un canal de notificación requiere el rol de owner o admin en Qably. Pero una vez que un canal está recibiendo alertas de seguridad de conexión, cualquiera con acceso a ese servidor de Discord o workspace de Slack las ve — Qably no vuelve a verificar roles al momento de la entrega, así que conviene elegir ese canal teniendo esto en cuenta.',
         },
       ],
     },

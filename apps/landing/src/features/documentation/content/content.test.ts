@@ -29,6 +29,9 @@ function collectBlockText(block: DocBlock, parts: string[]): void {
       parts.push(...block.headers);
       for (const row of block.rows) parts.push(...row);
       break;
+    case 'logoRow':
+      for (const item of block.items) parts.push(item.alt, item.label);
+      break;
     case 'faq':
       for (const item of block.items) {
         parts.push(item.question);
