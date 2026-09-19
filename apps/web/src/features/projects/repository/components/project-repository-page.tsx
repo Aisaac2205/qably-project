@@ -12,7 +12,6 @@ import {
 import type { CodeChange, Evidence } from '@qably/types'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -28,8 +27,7 @@ import { useTranslation } from '@/lib/i18n'
 import { reviewInboxPath } from '@/features/projects/lib/routes'
 import { useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
 import { useProjectRepository } from '../hooks/use-project-repository'
-import { useRotateWebhookSecret } from '../hooks/use-rotate-webhook-secret'
-import { WebhookSecretDialog } from './webhook-secret-dialog'
+import { WebhookSecretSection } from './webhook-secret-section'
 import { matchDeclaredTestPattern } from '../lib/test-file-patterns'
 import { TestFilePatternsEditor } from './test-file-patterns-editor'
 
@@ -113,10 +111,7 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   const { t, locale } = useTranslation()
   const { repository, isLoading, isError } = useProjectRepository(projectId)
   const [patternFilter, setPatternFilter] = useState<string>('all')
-  const [rotateOpen, setRotateOpen] = useState(false)
   const [setupOpen, setSetupOpen] = useState(false)
-  const [revealedSecret, setRevealedSecret] = useState<string | undefined>(undefined)
-  const rotateMutation = useRotateWebhookSecret(projectId)
   const source = repository?.source ?? undefined
   const batch = repository?.batch ?? undefined
   const batchChanges = repository?.codeChanges ?? []
@@ -176,39 +171,19 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-              {batch?.status === 'completed' ? (
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            {batch?.status === 'completed' ? (
+              <div className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 sm:self-auto">
                 <span className="relative flex size-2">
                   <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
                 </span>
                 <span>{t('repository.activeSync')}</span>
               </div>
-              ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setRotateOpen(true)}
-                disabled={rotateMutation.isPending}
-              >
-                {rotateMutation.isPending
-                  ? t('repository.rotating')
-                  : t('repository.rotateSecret')}
-              </Button>
-            </div>
+            ) : null}
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-3 border-t border-border/50 text-xs sm:text-sm text-muted">
-            <div className="space-y-1.5">
-              <p>{t('repository.sourceDescription')}</p>
-              {rotateMutation.isError ? (
-                <p role="alert" className="text-destructive font-medium">
-                  {t('repository.rotateError')}
-                </p>
-              ) : null}
-            </div>
+            <p>{t('repository.sourceDescription')}</p>
             <div className="shrink-0">
               <TestFilePatternsEditor
                 projectId={projectId}
@@ -224,6 +199,8 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
           description={t('repository.noSourceDescription')}
         />
       )}
+
+      {source ? <WebhookSecretSection projectId={projectId} /> : null}
 
       {batch ? (
         <section className="space-y-6" aria-labelledby="repository-ingestion-heading">
@@ -340,27 +317,6 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
           className="rounded-2xl border border-dashed border-border/70 bg-surface/50 p-8 sm:p-12 text-center"
         />
       ) : null}
-
-      <ConfirmDialog
-        open={rotateOpen}
-        onOpenChange={setRotateOpen}
-        title={t('repository.rotateConfirmTitle')}
-        description={t('repository.rotateConfirmDescription')}
-        confirmLabel={t('repository.rotateConfirmAction')}
-        onConfirm={() => {
-          rotateMutation.mutate(undefined, {
-            onSuccess: (rotated) => {
-              setRotateOpen(false)
-              setRevealedSecret(rotated.webhookSecret)
-            },
-          })
-        }}
-      />
-
-      <WebhookSecretDialog
-        secret={revealedSecret}
-        onDismiss={() => setRevealedSecret(undefined)}
-      />
 
       <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
         <DialogContent className="max-w-md">

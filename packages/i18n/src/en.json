@@ -196,6 +196,7 @@
     "subtitle": "Connected code repository and change synchronization.",
     "activeSync": "Active sync",
     "webhookSecretHeading": "Webhook secret",
+    "webhookSecretDescription": "Used to verify that webhook deliveries are genuinely sent by the repository provider.",
     "rotateSecret": "Rotate secret",
     "rotating": "Rotating…",
     "rotateConfirmTitle": "Rotate the webhook secret?",

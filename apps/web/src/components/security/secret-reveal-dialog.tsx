@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { Check, Copy } from '@phosphor-icons/react'
-import type { ApiKeyWithSecret } from '@qably/types'
 import {
   Dialog,
   DialogContent,
@@ -12,31 +11,57 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { useTranslation } from '@/lib/i18n'
 
-interface RevealTokenDialogProps {
-  apiKey: ApiKeyWithSecret | undefined
+interface SecretRevealDialogProps {
+  value: string | undefined
   onDismiss: () => void
+  title: string
+  description: string
+  valueLabel: string
+  copyAriaLabel: string
+  copiedAnnouncement: string
+  doneLabel: string
 }
 
-export function RevealTokenDialog({ apiKey, onDismiss }: RevealTokenDialogProps) {
+export function SecretRevealDialog({
+  value,
+  onDismiss,
+  title,
+  description,
+  valueLabel,
+  copyAriaLabel,
+  copiedAnnouncement,
+  doneLabel,
+}: SecretRevealDialogProps) {
   return (
-    <Dialog open={apiKey !== undefined} onOpenChange={(open) => { if (!open) onDismiss() }}>
-      {apiKey && (
-        <RevealTokenDialogContent key={apiKey.id} apiKey={apiKey} onDismiss={onDismiss} />
+    <Dialog open={value !== undefined} onOpenChange={(open) => { if (!open) onDismiss() }}>
+      {value !== undefined && (
+        <SecretRevealDialogContent
+          key={value}
+          value={value}
+          onDismiss={onDismiss}
+          title={title}
+          description={description}
+          valueLabel={valueLabel}
+          copyAriaLabel={copyAriaLabel}
+          copiedAnnouncement={copiedAnnouncement}
+          doneLabel={doneLabel}
+        />
       )}
     </Dialog>
   )
 }
 
-function RevealTokenDialogContent({
-  apiKey,
+function SecretRevealDialogContent({
+  value,
   onDismiss,
-}: {
-  apiKey: ApiKeyWithSecret
-  onDismiss: () => void
-}) {
-  const { t } = useTranslation()
+  title,
+  description,
+  valueLabel,
+  copyAriaLabel,
+  copiedAnnouncement,
+  doneLabel,
+}: Omit<SecretRevealDialogProps, 'value'> & { value: string }) {
   const [copied, setCopied] = useState(false)
 
   useEffect(() => {
@@ -47,7 +72,7 @@ function RevealTokenDialogContent({
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(apiKey.token)
+      await navigator.clipboard.writeText(value)
       setCopied(true)
     } catch {
       setCopied(false)
@@ -57,35 +82,35 @@ function RevealTokenDialogContent({
   return (
     <DialogContent className="max-w-md">
       <DialogHeader>
-        <DialogTitle>{t('apiKeys.revealTitle')}</DialogTitle>
-        <DialogDescription>{t('apiKeys.revealWarning')}</DialogDescription>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
 
       <div className="space-y-1.5">
-        <span className="text-xs font-medium text-default">{t('apiKeys.tokenLabel')}</span>
+        <span className="text-xs font-medium text-default">{valueLabel}</span>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-canvas px-3 py-2">
           <code className="min-w-0 flex-1 break-all font-mono text-xs text-default">
-            {apiKey.token}
+            {value}
           </code>
           <Button
             type="button"
             variant="outline"
             size="icon-sm"
             onClick={handleCopy}
-            aria-label={t('apiKeys.copy')}
+            aria-label={copyAriaLabel}
             autoFocus
           >
             {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
           </Button>
         </div>
         <span className="sr-only" aria-live="polite" role="status">
-          {copied ? t('apiKeys.copied') : ''}
+          {copied ? copiedAnnouncement : ''}
         </span>
       </div>
 
       <DialogFooter>
         <Button type="button" onClick={onDismiss}>
-          {t('apiKeys.done')}
+          {doneLabel}
         </Button>
       </DialogFooter>
     </DialogContent>

@@ -7,6 +7,7 @@
  * The confirm button uses the destructive (fail-token) styling so the
  * action reads as dangerous without inventing a new color.
  */
+import type { ReactNode } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,7 @@ interface ConfirmDialogProps {
   description: string
   confirmLabel?: string
   onConfirm: () => void
+  icon?: ReactNode
 }
 
 export function ConfirmDialog({
@@ -34,6 +36,7 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   onConfirm,
+  icon,
 }: ConfirmDialogProps) {
   const { t } = useTranslation()
 
@@ -46,6 +49,11 @@ export function ConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
+          {icon ? (
+            <div className="mx-auto flex size-9 items-center justify-center rounded-full bg-fail-bg text-fail sm:mx-0">
+              {icon}
+            </div>
+          ) : null}
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>

@@ -1,5 +1,6 @@
 'use client'
 
+import { Trash } from '@phosphor-icons/react'
 import type { ApiKey } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -43,6 +44,7 @@ export function ApiKeyRow({ apiKey, onRevoke }: ApiKeyRowProps) {
           size="sm"
           onClick={() => onRevoke(apiKey)}
         >
+          <Trash size={14} aria-hidden="true" />
           {t('common.revoke')}
         </Button>
       )}

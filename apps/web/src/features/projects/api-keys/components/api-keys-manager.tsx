@@ -6,7 +6,7 @@ import { useApiKeys } from '../hooks/use-api-keys'
 import { useCreateApiKey, useRevokeApiKey } from '../hooks/use-api-key-mutations'
 import { ApiKeyList } from './api-key-list'
 import { CreateApiKeyDialog } from './create-api-key-dialog'
-import { RevealTokenDialog } from './reveal-token-dialog'
+import { SecretRevealDialog } from '@/components/security/secret-reveal-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
 
@@ -51,7 +51,16 @@ export function ApiKeysManager({ projectId }: { projectId: string }) {
         error={createApiKeyMutation.isError ? t('apiKeys.createError') : undefined}
       />
 
-      <RevealTokenDialog apiKey={revealedKey} onDismiss={() => setRevealedKey(undefined)} />
+      <SecretRevealDialog
+        value={revealedKey?.token}
+        onDismiss={() => setRevealedKey(undefined)}
+        title={t('apiKeys.revealTitle')}
+        description={t('apiKeys.revealWarning')}
+        valueLabel={t('apiKeys.tokenLabel')}
+        copyAriaLabel={t('apiKeys.copy')}
+        copiedAnnouncement={t('apiKeys.copied')}
+        doneLabel={t('apiKeys.done')}
+      />
 
       <ConfirmDialog
         open={revokeTarget !== undefined}

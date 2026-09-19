@@ -196,6 +196,7 @@
     "subtitle": "Repositorio de código conectado y sincronización de cambios.",
     "activeSync": "Sincronización activa",
     "webhookSecretHeading": "Secreto del webhook",
+    "webhookSecretDescription": "Se usa para verificar que las entregas del webhook provienen realmente del proveedor del repositorio.",
     "rotateSecret": "Rotar secreto",
     "rotating": "Rotando…",
     "rotateConfirmTitle": "¿Rotar el secreto del webhook?",
