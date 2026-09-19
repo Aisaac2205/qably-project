@@ -63,7 +63,7 @@ describe('Suites (e2e)', () => {
       findUniqueOrThrow: jest.fn(),
       findUnique: jest.fn(),
     },
-    project: { findFirst: jest.fn() },
+    project: { findFirst: jest.fn(), findUnique: jest.fn() },
     suite: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -100,6 +100,7 @@ describe('Suites (e2e)', () => {
       user: { locale: 'en' },
     });
     prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.project.findUnique.mockResolvedValue({ connection: null });
     prisma.suite.findFirst.mockResolvedValue(suiteRow);
     prisma.suite.findUniqueOrThrow.mockResolvedValue(suiteRow);
     prisma.suite.create.mockResolvedValue(suiteRow);

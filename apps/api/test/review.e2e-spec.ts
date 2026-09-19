@@ -42,6 +42,7 @@ const proposalRow = {
   priority: 'high',
   evidenceId: 'evidence-1',
   targetTestCaseId: null,
+  targetTestCase: null,
   evidence: {
     id: 'evidence-1',
     projectId: 'project-1',
@@ -65,7 +66,7 @@ describe('Review (e2e)', () => {
       update: jest.fn(),
     },
     suite: { findFirst: jest.fn() },
-    testCase: { create: jest.fn(), update: jest.fn() },
+    testCase: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
     testCaseVersion: { count: jest.fn(), create: jest.fn() },
     reviewDecision: { create: jest.fn() },
     traceabilityLink: { findMany: jest.fn(), createMany: jest.fn() },
@@ -89,6 +90,7 @@ describe('Review (e2e)', () => {
     prisma.suite.findFirst.mockResolvedValue({ id: 'suite-1' });
     prisma.testCase.create.mockResolvedValue({ id: 'case-new' });
     prisma.testCase.update.mockResolvedValue({ id: 'case-new' });
+    prisma.testCase.findMany.mockResolvedValue([]);
     prisma.testCaseVersion.count.mockResolvedValue(0);
     prisma.testCaseVersion.create.mockResolvedValue({
       id: 'version-1',

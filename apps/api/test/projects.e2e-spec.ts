@@ -54,6 +54,7 @@ describe('Projects (e2e)', () => {
     project: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
@@ -84,6 +85,7 @@ describe('Projects (e2e)', () => {
       aiCredits: 10,
     });
     prisma.project.count.mockResolvedValue(0);
+    prisma.project.findUnique.mockResolvedValue({ connection: null });
     prisma.testCase.findMany.mockResolvedValue([]);
     prisma.extractedProposal.findMany.mockResolvedValue([]);
     prisma.run.findMany.mockResolvedValue([]);
