@@ -15,7 +15,7 @@ export function createAuth(
   mailer: EmailSender,
 ) {
   return betterAuth({
-    ...buildAuthOptions(env, mailer),
+    ...buildAuthOptions(env, mailer, prisma),
     database: prismaAdapter(prisma, { provider: 'postgresql' }),
   });
 }

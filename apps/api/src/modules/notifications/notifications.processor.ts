@@ -7,6 +7,8 @@ import {
   type NotificationChannel,
   type NotificationWebhookType,
 } from '@qably/types';
+import { InjectEnv } from '../../config/config.tokens';
+import type { Env } from '../../config/env';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -17,7 +19,10 @@ import { DiscordChannel } from './webhooks/channels/discord.channel';
 import { SlackChannel } from './webhooks/channels/slack.channel';
 import type { NotificationJobData } from './notifications.contracts';
 import { NOTIFICATIONS_QUEUE } from './notifications.contracts';
-import { renderNotificationMessage } from './lib/render-notification-message';
+import {
+  renderNotificationMessage,
+  renderNotificationSubject,
+} from './lib/render-notification-message';
 
 interface RecipientRow {
   userId: string;
@@ -39,6 +44,7 @@ export class NotificationsProcessor extends WorkerHost {
     private readonly encryption: EncryptionService,
     private readonly slack: SlackChannel,
     private readonly discord: DiscordChannel,
+    @InjectEnv() private readonly env: Env,
   ) {
     super();
   }
@@ -155,7 +161,21 @@ export class NotificationsProcessor extends WorkerHost {
         event.eventType,
         event.payload,
       );
-      const { subject, html } = notificationDigestEmail({ message });
+      const subject = renderNotificationSubject(
+        locale,
+        event.eventType,
+        event.payload,
+      );
+      const preferencesUrl = new URL(
+        '/settings',
+        this.env.WEB_APP_URL,
+      ).toString();
+      const { html } = notificationDigestEmail({
+        locale,
+        subject,
+        message,
+        preferencesUrl,
+      });
 
       await this.mailer.send({ to: recipient.user.email, subject, html });
     }

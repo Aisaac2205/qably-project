@@ -1,10 +1,16 @@
 import { resolveAllowedOrigins } from '../../config/origins';
 import type { Env } from '../../config/env';
+import type { PrismaService } from '../../prisma/prisma.service';
+import { resolveUserLocale } from '../../common/locale/resolve-user-locale';
 import type { EmailSender } from '../mailer/mailer.contracts';
 import { passwordResetEmail } from '../mailer/templates/password-reset';
 import { verifyEmailEmail } from '../mailer/templates/verify-email';
 
-export function buildAuthOptions(env: Env, mailer: EmailSender) {
+export function buildAuthOptions(
+  env: Env,
+  mailer: EmailSender,
+  prisma: Pick<PrismaService, 'user'>,
+) {
   return {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
@@ -18,10 +24,11 @@ export function buildAuthOptions(env: Env, mailer: EmailSender) {
         user,
         url,
       }: {
-        user: { email: string };
+        user: { id: string; email: string };
         url: string;
       }) => {
-        const { subject, html } = passwordResetEmail({ url });
+        const locale = await resolveUserLocale(prisma, user.id);
+        const { subject, html } = passwordResetEmail({ url, locale });
         await mailer.send({ to: user.email, subject, html });
       },
     },
@@ -30,10 +37,11 @@ export function buildAuthOptions(env: Env, mailer: EmailSender) {
         user,
         url,
       }: {
-        user: { email: string };
+        user: { id: string; email: string };
         url: string;
       }) => {
-        const { subject, html } = verifyEmailEmail({ url });
+        const locale = await resolveUserLocale(prisma, user.id);
+        const { subject, html } = verifyEmailEmail({ url, locale });
         await mailer.send({ to: user.email, subject, html });
       },
     },

@@ -189,6 +189,13 @@
       "case_regressed": "{{caseName}} regressed in {{suiteName}} during run \"{{runName}}\".",
       "ingestion_failed": "Ingestion failed for {{repo}}.",
       "connection_security": "{{action}} for connection {{connectionName}}."
+    },
+    "emailSubject": {
+      "run_failed": "Run \"{{runName}}\" failed",
+      "run_completed": "Run \"{{runName}}\" passed",
+      "case_regressed": "{{caseName}} regressed in {{suiteName}}",
+      "ingestion_failed": "Ingestion failed for {{repo}}",
+      "connection_security": "{{action}} for connection {{connectionName}}"
     }
   },
   "repository": {
@@ -1135,6 +1142,29 @@
       "notConnected": "Not connected",
       "connect": "Connect",
       "disconnect": "Disconnect"
+    }
+  },
+  "mailer": {
+    "layout": {
+      "brandName": "Qably",
+      "footerCopyright": "© {{year}} Qably. All rights reserved.",
+      "footerAuthNotice": "This email was sent because this address is associated with a Qably account.",
+      "footerPreferencesText": "Manage which notifications you receive:",
+      "footerPreferencesLinkText": "Notification preferences"
+    },
+    "passwordReset": {
+      "subject": "Reset your Qably password",
+      "heading": "Reset your password",
+      "body": "We received a request to reset the password for your Qably account. Click the button below to choose a new one.",
+      "cta": "Reset password",
+      "disclaimer": "If you did not request this, you can safely ignore this email."
+    },
+    "verifyEmail": {
+      "subject": "Verify your Qably email address",
+      "heading": "Verify your email",
+      "body": "Confirm this is your email address to finish setting up your Qably account.",
+      "cta": "Verify email",
+      "disclaimer": "If you did not create a Qably account, you can safely ignore this email."
     }
   }
 }

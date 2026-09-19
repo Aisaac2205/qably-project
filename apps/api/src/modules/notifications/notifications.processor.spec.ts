@@ -86,6 +86,10 @@ function createWebhookChannel() {
   return { send: jest.fn().mockResolvedValue(undefined) };
 }
 
+function createEnv() {
+  return { WEB_APP_URL: 'https://app.qably.dev' };
+}
+
 function build(
   prisma: FakePrisma,
   mailer: { send: jest.Mock },
@@ -99,6 +103,7 @@ function build(
     encryption as never,
     slack,
     discord,
+    createEnv() as never,
   );
 }
 
@@ -195,6 +200,32 @@ describe('NotificationsProcessor preference resolution', () => {
 
     const [call] = mailer.send.mock.calls as [[{ html: string; to: string }]];
     expect(call[0].html).toContain('failed');
+  });
+
+  it('sends an event-specific subject instead of a generic one', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    const [call] = mailer.send.mock.calls as [[{ subject: string }]];
+    expect(call[0].subject).toBe('Run "Checkout regression" failed');
+  });
+
+  it('links to the settings page for notification preferences', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    const [call] = mailer.send.mock.calls as [[{ html: string }]];
+    expect(call[0].html).toContain('https://app.qably.dev/settings');
   });
 });
 

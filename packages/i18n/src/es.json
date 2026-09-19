@@ -189,6 +189,13 @@
       "case_regressed": "{{caseName}} tuvo una regresión en {{suiteName}} durante la ejecución \"{{runName}}\".",
       "ingestion_failed": "La ingesta falló para {{repo}}.",
       "connection_security": "{{action}} en la conexión {{connectionName}}."
+    },
+    "emailSubject": {
+      "run_failed": "La ejecución \"{{runName}}\" falló",
+      "run_completed": "La ejecución \"{{runName}}\" pasó",
+      "case_regressed": "{{caseName}} tuvo una regresión en {{suiteName}}",
+      "ingestion_failed": "La ingesta falló para {{repo}}",
+      "connection_security": "{{action}} en la conexión {{connectionName}}"
     }
   },
   "repository": {
@@ -1135,6 +1142,29 @@
       "notConnected": "No conectado",
       "connect": "Conectar",
       "disconnect": "Desconectar"
+    }
+  },
+  "mailer": {
+    "layout": {
+      "brandName": "Qably",
+      "footerCopyright": "© {{year}} Qably. Todos los derechos reservados.",
+      "footerAuthNotice": "Este correo se envió porque esta dirección está asociada a una cuenta de Qably.",
+      "footerPreferencesText": "Administrá qué notificaciones recibís:",
+      "footerPreferencesLinkText": "Preferencias de notificaciones"
+    },
+    "passwordReset": {
+      "subject": "Restablecé tu contraseña de Qably",
+      "heading": "Restablecé tu contraseña",
+      "body": "Recibimos una solicitud para restablecer la contraseña de tu cuenta de Qably. Hacé clic en el botón de abajo para elegir una nueva.",
+      "cta": "Restablecer contraseña",
+      "disclaimer": "Si no solicitaste esto, podés ignorar este correo de forma segura."
+    },
+    "verifyEmail": {
+      "subject": "Verificá tu dirección de correo de Qably",
+      "heading": "Verificá tu correo",
+      "body": "Confirmá que esta es tu dirección de correo para terminar de configurar tu cuenta de Qably.",
+      "cta": "Verificar correo",
+      "disclaimer": "Si no creaste una cuenta de Qably, podés ignorar este correo de forma segura."
     }
   }
 }
