@@ -1,14 +1,14 @@
 import { API_BASE_URL_TOKEN, type DocContent } from './types';
 
 export const es: DocContent = {
-  pageTitle: 'Documentación — Qably',
+  pageTitle: 'Documentación | Qably',
   pageDescription:
-    'Cómo conectar un repositorio, emitir una API key y reportar resultados de CI a Qably — basado en el contrato real de la API.',
+    'Guía para conectar repositorios, generar API keys y enviar resultados de pruebas de CI a Qably según el contrato de la API.',
   breadcrumbLabel: 'Guía de integración',
   tocLabel: 'Tabla de contenidos',
   heroTitle: 'Documentación',
   heroSubtitle:
-    'Todo lo que aparece aquí coincide con la API tal como existe hoy. Si una capacidad no está documentada, todavía no existe.',
+    'Especificación técnica de la API pública de Qably. Describe los endpoints, esquemas de datos y flujos de integración disponibles.',
   copyCodeLabel: 'Copiar código',
   copiedLabel: '¡Copiado!',
   navGroups: [
@@ -36,7 +36,6 @@ export const es: DocContent = {
       ],
     },
     { label: 'Notificaciones', sectionIds: ['notifications-discord-slack'] },
-    { label: 'Plataforma', sectionIds: ['platform-overview'] },
     { label: 'Ayuda', sectionIds: ['faq'] },
   ],
   sections: [
@@ -47,12 +46,12 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Qably es una plataforma de gestión de calidad para equipos de ingeniería. No ejecuta las pruebas; un agente externo lo hace (el pipeline de CI, hoy) y envía los resultados a Qably por HTTP. Qably los recibe, los almacena y ofrece un solo lugar para ver qué se ejecutó, qué cambió en el repositorio y qué todavía falta cubrir.',
+          text: 'Qably centraliza la gestión de calidad para equipos de ingeniería. La plataforma no ejecuta pruebas directamente: los resultados se generan en pipelines externos de integración continua y se envían a Qably vía HTTP. El sistema almacena las ejecuciones y consolida el historial de cambios, suites y cobertura.',
         },
-        { type: 'subheading', text: 'Dos pipelines independientes' },
+        { type: 'subheading', text: 'Dos flujos independientes' },
         {
           type: 'paragraph',
-          text: 'Qably se alimenta de dos pipelines que nunca dependen entre sí. Conectar uno no conecta el otro, y esta es la causa más común de confusión cuando una pantalla aparece vacía.',
+          text: 'Qably procesa dos flujos de datos desacoplados. Configurar uno no activa el otro, lo cual explica por qué ciertas vistas pueden aparecer vacías inicialmente.',
         },
         {
           type: 'table',
@@ -61,29 +60,29 @@ export const es: DocContent = {
             [
               'Resultados de pruebas',
               'POST /runs/ingest',
-              'API key del proyecto, en Authorization: Bearer',
-              'Suites, casos y runs — lo que muestra el dashboard',
+              'API key del proyecto (Authorization: Bearer)',
+              'Suites, casos y ejecuciones en el panel principal',
             ],
             [
               'Cambios de código',
               'POST /webhooks/scm/:provider',
-              'Firma HMAC, sin API key',
-              'Cambios de código, lotes de ingesta y evidencia — lo que muestra la página Repository de un proyecto',
+              'Firma HMAC (sin API key)',
+              'Historial de commits, lotes de ingesta y trazabilidad en la vista Repository',
             ],
           ],
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'Un reporter de CI que envía resultados de pruebas nunca llena la página Repository, y conectar un repositorio nunca reporta un solo resultado de prueba. Cuando una pantalla se ve vacía, conviene revisar cuál pipeline debería llenarla; las preguntas frecuentes al final de esta guía cubren las causas más comunes.',
+          text: 'El envío de resultados de pruebas desde CI no alimenta la vista Repository, y conectar un repositorio no registra ejecuciones de prueba. Si una pantalla no muestra información, verifique cuál de los dos flujos debe suministrarla.',
         },
         { type: 'subheading', text: 'Requisitos previos' },
         {
           type: 'list',
           items: [
-            'Una cuenta de Qably con al menos una organización',
-            'Un repositorio en GitHub o Bitbucket — los únicos dos proveedores que Qably soporta hoy',
-            'Un pipeline de CI que pueda ejecutar un script o enviar una petición HTTP después de ejecutar las pruebas',
+            'Una cuenta en Qably con al menos una organización activa.',
+            'Un repositorio alojado en GitHub o Bitbucket (proveedores compatibles actualmente).',
+            'Un pipeline de CI con capacidad de ejecutar pruebas y enviar peticiones HTTP al concluir.',
           ],
         },
       ],
@@ -95,77 +94,76 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Cada proyecto pertenece a una sola organización y se crea desde Proyectos > Nuevo proyecto en la app web.',
+          text: 'Cada proyecto está vinculado a una organización. Para crearlo, diríjase a Proyectos > Nuevo proyecto en la consola web.',
         },
         {
           type: 'list',
           items: [
-            'Nombre — obligatorio, hasta 80 caracteres',
-            'Descripción — opcional, hasta 500 caracteres',
-            'Tecnologías — opcional; se completan automáticamente al conectar un repositorio, en el siguiente paso',
+            'Nombre (obligatorio, hasta 80 caracteres)',
+            'Descripción (opcional, hasta 500 caracteres)',
+            'Tecnologías (opcional, se autocompletan al vincular el repositorio en el siguiente paso)',
           ],
         },
         {
           type: 'paragraph',
-          text: 'No es necesario contar con un repositorio para crear un proyecto. Conectar uno, emitir una API key y reportar desde CI son tres pasos independientes, y pueden realizarse en cualquier orden.',
+          text: 'No es indispensable contar con un repositorio vinculado para inicializar el proyecto. Conectar el repositorio, generar la API key y configurar el reporte en CI son pasos independientes que pueden realizarse en cualquier orden.',
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'El proyecto nuevo se abre con suites vacías, sin runs y con un aviso de repositorio no conectado. Es el comportamiento esperado, ya que todavía no se reportó nada.',
+          text: 'Los proyectos nuevos inician sin suites registradas, sin ejecuciones y con el indicador de repositorio desconectado hasta recibir la primera carga de datos.',
         },
       ],
     },
     {
       id: 'step-2-connect-repository',
       navLabel: '2. Conectar el repositorio',
-      title: '2. Conectar el repositorio vía el webhook del SCM',
+      title: '2. Conectar el repositorio mediante el webhook del SCM',
       blocks: [
         {
           type: 'paragraph',
-          text: 'Este paso conecta el segundo pipeline. Los cambios de código llegan a Qably a través del webhook del proveedor del repositorio, y no tiene relación con la API key del paso 3.',
+          text: 'Este paso habilita el flujo de cambios de código. Qably recibe las actualizaciones mediante webhooks enviados por el proveedor del repositorio, de forma independiente a la API key del paso 3.',
         },
         { type: 'subheading', text: 'Selección del repositorio' },
         {
           type: 'list',
           ordered: true,
           items: [
-            'El inicio de sesión con GitHub (o Bitbucket) se hace una vez, si aún no se hizo. Qably lee ese token de OAuth para listar los repositorios accesibles, tanto en la cuenta personal como en las organizaciones asociadas.',
-            'En la configuración de Integraciones del proyecto, se selecciona un repositorio de la lista combinada de repositorios ya conectados y disponibles, ordenada por el push más reciente.',
-            'Elegir un repositorio sin conectar crea una conexión dentro de la organización y genera un secreto de webhook para ella. Elegir uno ya conectado reutiliza su conexión existente.',
+            'Inicie sesión con GitHub o Bitbucket si aún no lo ha hecho. Qably utiliza este token de OAuth para listar los repositorios accesibles en su cuenta personal y organizaciones asociadas.',
+            'En la sección Integraciones del proyecto, seleccione el repositorio deseado de la lista disponible, ordenada por fecha de push reciente.',
+            'Al seleccionar un repositorio no vinculado, se crea una conexión dentro de la organización y se genera su secreto de webhook. Seleccionar un repositorio previamente vinculado reutiliza la conexión existente.',
           ],
         },
         { type: 'subheading', text: 'Registro del webhook en el proveedor' },
         {
           type: 'paragraph',
-          text: 'Qably nunca registra el webhook automáticamente; se agrega una vez, en la configuración del propio repositorio.',
+          text: 'Qably no registra webhooks de forma automática en proveedores externos. Debe agregarse manualmente en la configuración del repositorio.',
         },
         {
           type: 'list',
           ordered: true,
           items: [
-            'El secreto se obtiene llamando a POST /connections/:id/webhook-secret desde la configuración de la conexión. La respuesta contiene el secreto en texto plano exactamente una vez, al crearlo y de nuevo cada vez que se rota, por lo que conviene copiarlo de inmediato.',
-            'En GitHub, el webhook se agrega desde Settings > Webhooks > Add webhook, dentro del repositorio.',
+            'Obtenga el secreto ejecutando POST /connections/:id/webhook-secret desde la interfaz de la conexión. La respuesta entrega el valor en texto plano una sola vez (al crearlo o rotarlo), por lo que debe copiarse inmediatamente.',
+            'En GitHub, acceda a Settings > Webhooks > Add webhook dentro del repositorio.',
             `Payload URL: ${API_BASE_URL_TOKEN}/webhooks/scm/github`,
             'Content type: application/json',
-            'Secret: el valor del paso anterior',
-            'Events: como mínimo push.',
-            'También conviene incluir los eventos de pull request, para que Qably registre esa actividad.',
+            'Secret: el valor obtenido en el paso anterior',
+            'Events: seleccione push como mínimo. Se recomienda marcar también pull request para registrar la actividad completa del equipo.',
           ],
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Qably verifica cada entrega contra ese secreto con una firma HMAC-SHA256 (encabezado x-hub-signature-256, con el formato sha256=<hex>) antes de aceptarla. Una firma ausente o que no coincide se rechaza directamente, nunca se ignora en silencio.',
+          text: 'Qably valida cada entrega entrante contra el secreto registrado mediante una firma HMAC-SHA256 (encabezado x-hub-signature-256 en formato sha256=<hex>). Las peticiones sin firma o con firmas inválidas se rechazan con código HTTP 401.',
         },
         {
           type: 'paragraph',
-          text: 'Las conexiones de Bitbucket funcionan igual, con el encabezado de firma propio de Bitbucket en lugar del de GitHub. GitHub y Bitbucket son los únicos dos proveedores soportados hoy.',
+          text: 'Las conexiones de Bitbucket siguen el mismo principio, utilizando el encabezado de firma propio de Bitbucket. Actualmente, GitHub y Bitbucket son los dos proveedores compatibles.',
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Una entrega exitosa aparece en el historial del webhook, del lado del proveedor. En la página Repository del proyecto, el último lote de ingesta, sus cambios de código y su evidencia aparecen después del siguiente push o pull request.',
+          text: 'Las entregas exitosas se reflejan de inmediato en el historial de webhooks del proveedor. En la vista Repository de Qably, el lote de ingesta y los cambios de código aparecerán tras el siguiente push o pull request.',
         },
       ],
     },
@@ -176,24 +174,24 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Este paso conecta el primer pipeline, una identidad que el CI puede usar para reportar resultados de pruebas, sin sesión y sin un usuario detrás.',
+          text: 'Este paso habilita el flujo de resultados de pruebas, proporcionando una credencial de máquina para que el pipeline de CI reporte ejecuciones sin requerir una sesión de usuario.',
         },
         {
           type: 'list',
           ordered: true,
           items: [
-            'Desde la configuración de API Keys del proyecto, se crea una key con un nombre descriptivo como "CI/CD Pipeline"; se requiere el rol owner o admin en la organización.',
-            'El token tiene la forma qbly_<lookupId>_<secret> y se muestra una sola vez, en la respuesta de creación, por lo que conviene copiarlo de inmediato. Qably guarda solo su hash SHA-256 y no puede volver a mostrarlo.',
-            'Se guarda como secreto en el proveedor de CI, por ejemplo un secret de repositorio en GitHub Actions llamado QABLY_API_KEY, y nunca debe subirse al repositorio.',
+            'En la pestaña API Keys del proyecto, cree una clave asignándole un nombre identificable como "CI/CD Pipeline". Esta acción requiere rol de owner o admin en la organización.',
+            'El token generado sigue la estructura qbly_<lookupId>_<secret> y se muestra una única vez en la pantalla de confirmación. Qably almacena únicamente su hash SHA-256 y no puede recuperarlo posteriormente.',
+            'Guarde el valor en su proveedor de CI. En GitHub Actions, vaya a Settings > Secrets and variables > Actions > Secrets y cree el secreto de repositorio QABLY_API_KEY. Si utiliza una URL personalizada, agregue la variable QABLY_API_BASE_URL en la pestaña Variables. Nunca incluya este token en el repositorio de código.',
           ],
         },
         {
           type: 'paragraph',
-          text: 'Una key está limitada a exactamente un proyecto y solo puede escribir resultados de ejecución para ese proyecto. No puede leer otros proyectos, listar suites ni tocar la organización; el proyecto siempre se deriva de la key, nunca de algo que envíe la petición.',
+          text: 'Cada API key tiene alcance exclusivo sobre un proyecto y únicamente permite registrar ejecuciones. No tiene permisos de lectura sobre otros proyectos ni facultades administrativas sobre la organización. El proyecto destino se infiere directamente de la clave.',
         },
         {
           type: 'paragraph',
-          text: 'Revocar una key, desde la misma pantalla, la marca como revocada sin borrarla, así los runs anteriores siguen atribuidos a ella. Un proyecto puede tener varias keys activas a la vez, lo que permite rotar una sin dejar nunca a CI sin acceso.',
+          text: 'Revocar una clave desactiva su uso de forma inmediata pero conserva los registros históricos asociados. Es posible mantener múltiples claves activas simultáneamente para facilitar la rotación sin interrumpir los pipelines de CI.',
         },
       ],
     },
@@ -204,58 +202,69 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'El reporter es un script de referencia pequeño que se agrega al repositorio de la integración, por ejemplo como scripts/qably-report.mjs. Lee un archivo JUnit XML, convierte cada <testsuite> en una llamada a POST /runs/ingest y solo necesita una variable de entorno: QABLY_API_KEY.',
-        },
-        {
-          type: 'callout',
-          tone: 'info',
-          text: 'Sin QABLY_API_KEY configurada, el script registra un mensaje y termina con código 0; nunca hace fallar el build por una integración ausente o todavía no configurada.',
+          text: 'Para conectar Qably a su integración continua, configure su ejecutor de pruebas para emitir un reporte JUnit XML y agregue un paso para enviarlo a la API de Qably con su clave secreta.',
         },
         {
           type: 'paragraph',
-          text: 'jest-junit se agrega como dependencia de desarrollo y se configura para escribir en un archivo de reporte mediante dos variables de entorno, antes de invocar el reporter. Vitest escribe JUnit XML de forma nativa, sin dependencia extra.',
+          text: 'En Jest, instale jest-junit y defina JEST_JUNIT_ADD_FILE_ATTRIBUTE: "true" para que el XML incluya la ruta de archivo de cada caso de prueba, lo que permite a Qably vincular las pruebas con el código fuente. En Vitest, el reporte JUnit se genera de forma nativa indicando el reporter correspondiente.',
         },
         {
           type: 'codeGroup',
-          label: 'Reportar resultados desde CI',
+          label: 'Flujo en GitHub Actions',
           variants: [
             {
               language: 'yaml',
               label: 'Jest',
-              code: `- name: Unit tests
+              code: `- name: Run Jest tests
   env:
     JEST_JUNIT_OUTPUT_DIR: ./reports
     JEST_JUNIT_OUTPUT_NAME: junit.xml
+    JEST_JUNIT_ADD_FILE_ATTRIBUTE: 'true'
   run: npx jest --ci --reporters=default --reporters=jest-junit
 
 - name: Report results to Qably
   if: always()
   env:
     QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
-  run: node scripts/qably-report.mjs ./reports/junit.xml`,
+  run: |
+    curl --fail --silent --request POST \\
+      "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+      --header "Authorization: Bearer $QABLY_API_KEY" \\
+      --header "Content-Type: application/xml" \\
+      --data-binary @./reports/junit.xml || true`,
             },
             {
               language: 'yaml',
               label: 'Vitest',
-              code: `- name: Unit tests
+              code: `- name: Run Vitest tests
   run: npx vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml
 
 - name: Report results to Qably
   if: always()
   env:
     QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
-  run: node scripts/qably-report.mjs ./reports/junit.xml`,
+  run: |
+    curl --fail --silent --request POST \\
+      "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+      --header "Authorization: Bearer $QABLY_API_KEY" \\
+      --header "Content-Type: application/xml" \\
+      --data-binary @./reports/junit.xml || true`,
             },
           ],
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'Ambos pasos usan if: always(). Reportar a Qably nunca condiciona el build. Una caída de Qably o una key revocada es un problema de Qably, no del pull request. El paso de pruebas en sí, no el de reporte, es el que debería hacer fallar el CI.',
+          text: 'La directiva if: always() es indispensable: garantiza que los resultados se envíen incluso si hay pruebas fallidas. El reporte hacia Qably nunca detiene el pipeline: el fallo del build debe depender del resultado de las pruebas, no del envío del reporte.',
         },
         {
           type: 'paragraph',
-          text: 'Un archivo JUnit con varios elementos <testsuite> — uno por archivo de prueba, que es como los escriben tanto jest-junit como Vitest — se convierte en una llamada a POST /runs/ingest por suite, enviadas en secuencia. El primer reporte para un nombre de suite crea esa suite en Qably automáticamente; nunca hace falta precrearla.',
+          text: 'El endpoint POST /runs/ingest/junit recibe el archivo XML directo y procesa todo en el servidor. Si el reporte contiene suites o casos no registrados previamente, Qably los crea de forma automática en ese proyecto.',
+        },
+        {
+          type: 'callout',
+          tone: 'info',
+          text: 'Idempotencia ante reintentos: al utilizar externalId con el identificador de ejecución (como github.run_id), si se reintenta un job en GitHub Actions con Re-run failed jobs, Qably actualiza la ejecución existente en lugar de registrar duplicados.',
         },
       ],
     },
@@ -266,19 +275,19 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Cada pipeline se confirma por separado, ya que uno puede funcionar mientras el otro todavía necesita atención.',
+          text: 'Cada flujo se valida de forma independiente, dado que uno puede estar recibiendo datos mientras el otro requiere ajustes de configuración.',
         },
         {
           type: 'list',
           items: [
-            'El estado de los resultados de pruebas se confirma abriendo el proyecto y localizando el run que el CI acaba de reportar. Ese estado se deriva de los casos enviados: cualquier caso fallido hace fallar el run, de lo contrario cualquier caso pendiente o en ejecución lo mantiene en ejecución, y solo pasa una vez que al menos un caso terminó en pass o skip (un run donde todos los casos están blocked igual cuenta como fail, porque nada en él se verificó realmente).',
-            'Los cambios de código solo se verifican una vez completado el paso 2. La página Repository del proyecto debe mostrar que el último lote de ingesta refleja el push o pull request más reciente.',
+            'Resultados de pruebas: abra el proyecto y verifique la ejecución recién enviada por CI. El estado general del run se deriva de sus casos: cualquier prueba fallida marca el run como fallido; casos en ejecución o pendientes lo mantienen en progreso; y se considera exitoso cuando al menos un caso pasa o se omite sin fallas acompañantes.',
+            'Cambios de código: requiere haber completado el paso 2. La vista Repository del proyecto debe reflejar el lote de ingesta correspondiente al push o pull request más reciente.',
           ],
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Si falta información, las preguntas frecuentes más abajo cubren las dos causas más comunes: un webhook que nunca se registró y un reporter de CI corriendo sin QABLY_API_KEY configurada.',
+          text: 'Si los datos no se visualizan en la interfaz, consulte la sección de preguntas frecuentes para diagnosticar webhooks no registrados o variables de entorno omitidas en CI.',
         },
       ],
     },
@@ -289,12 +298,12 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Al reporter no le importa qué lenguaje generó el reporte. Lee cualquier archivo con una estructura <testsuite>/<testcase> y deriva el estado de cada caso a partir de un elemento hijo <failure>, <error> o <skipped>, de la misma forma para cada ecosistema de abajo. El JUnit XML se genera con las herramientas propias de cada framework, y luego se apunta el reporter al archivo resultante.',
+          text: 'El backend de Qably procesa cualquier archivo con estructura estándar <testsuite>/<testcase>, extrayendo el resultado de cada prueba a partir de los elementos <failure>, <error> o <skipped>. Genere el reporte XML utilizando las herramientas nativas de su lenguaje y envíe el archivo resultante en su pipeline de CI.',
         },
         { type: 'subheading', text: 'JavaScript y TypeScript' },
         {
           type: 'paragraph',
-          text: 'Jest y Vitest ya están cubiertos en el paso anterior; aquí no cambia nada.',
+          text: 'Jest y Vitest se detallaron en el paso anterior y mantienen la misma configuración.',
         },
         {
           type: 'codeGroup',
@@ -303,68 +312,44 @@ export const es: DocContent = {
             {
               language: 'shell',
               label: 'Playwright',
-              code: `# Variable de entorno
-PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml npx playwright test --reporter=junit
-
-# Reportarlo
-node scripts/qably-report.mjs results.xml`,
+              code: 'PLAYWRIGHT_JUNIT_OUTPUT_NAME=results.xml npx playwright test --reporter=junit',
             },
             {
               language: 'shell',
               label: 'pytest',
-              code: `pytest --junitxml=report.xml
-node scripts/qably-report.mjs report.xml`,
+              code: 'pytest --junitxml=report.xml',
             },
             {
               language: 'shell',
-              label: 'Java — Maven (Surefire)',
+              label: 'Java (Maven Surefire)',
               code: `mvn test
-# escribe target/surefire-reports/TEST-*.xml, un archivo por clase de prueba
-
-for f in target/surefire-reports/TEST-*.xml; do
-  node scripts/qably-report.mjs "$f"
-done`,
+# genera target/surefire-reports/TEST-*.xml`,
             },
             {
               language: 'shell',
-              label: 'Java — Gradle',
+              label: 'Java (Gradle)',
               code: `./gradlew test
-# escribe build/test-results/test/TEST-*.xml, un archivo por clase de prueba
-
-for f in build/test-results/test/TEST-*.xml; do
-  node scripts/qably-report.mjs "$f"
-done`,
+# genera build/test-results/test/TEST-*.xml`,
             },
             {
               language: 'shell',
               label: 'PHPUnit 9 y anteriores',
-              code: `# PHPUnit 9 y anteriores
-phpunit --log-junit junit.xml
-node scripts/qably-report.mjs junit.xml`,
+              code: 'phpunit --log-junit junit.xml',
             },
             {
               language: 'shell',
               label: 'PHPUnit 10+',
-              code: `<!-- PHPUnit 10+, en phpunit.xml -->
-<logging>
-    <junit outputFile="junit.xml"/>
-</logging>
-
-# PHPUnit 10+
-phpunit -c phpunit.xml
-node scripts/qably-report.mjs junit.xml`,
+              code: 'phpunit -c phpunit.xml',
             },
             {
               language: 'shell',
               label: '.NET',
-              code: `dotnet test --logger:"junit;LogFilePath=test-result.xml"
-node scripts/qably-report.mjs test-result.xml`,
+              code: 'dotnet test --logger:"junit;LogFilePath=test-result.xml"',
             },
             {
               language: 'shell',
               label: 'Go',
-              code: `go test -v ./... 2>&1 | go-junit-report > report.xml
-node scripts/qably-report.mjs report.xml`,
+              code: 'go test -v ./... 2>&1 | go-junit-report > report.xml',
             },
           ],
         },
@@ -391,17 +376,17 @@ node scripts/qably-report.mjs report.xml`,
         {
           type: 'callout',
           tone: 'warning',
-          text: 'La invocación de abajo no fue verificada contra documentación actual — no había documentación indexada para go-junit-report al momento de escribir esta guía. Conviene revisar el propio repositorio de la herramienta antes de confiar en ella.',
+          text: 'El comando sugerido para go-junit-report debe validarse con la documentación oficial de la herramienta antes de integrarlo en entornos productivos.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'En Qably, la identidad de un caso dentro de una suite se determina por el atributo exacto name de <testcase>; el atributo classname se ignora. Por eso, dos pruebas llamadas test_login en clases distintas se resuelven como el mismo caso de prueba.',
+          text: 'En Qably, la identidad de un caso dentro de una suite se define exclusivamente por el atributo name del elemento <testcase>; el atributo classname se descarta. Por lo tanto, dos pruebas denominadas test_login en clases distintas se consolidarán bajo el mismo caso.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'pytest emite un único <testsuite name="pytest"> para toda la corrida, mientras que Jest y Vitest emiten uno por archivo de prueba. Todo lo que corre en pytest cae por defecto en una sola suite de Qably. Para una granularidad más parecida a la de Jest y Vitest, puede configurarse junit_suite_name en la configuración de pytest, o dividir la corrida; es una diferencia de valores por defecto, no un error.',
+          text: 'pytest genera de forma predeterminada un único elemento <testsuite name="pytest"> para toda la sesión de pruebas, a diferencia de Jest o Vitest, que generan uno por archivo. En consecuencia, todas las pruebas de pytest se agrupan en una única suite en Qably. Para obtener una granularidad por archivo, defina junit_suite_name en la configuración de pytest o divida la ejecución en varios comandos.',
         },
       ],
     },
@@ -412,38 +397,38 @@ node scripts/qably-report.mjs report.xml`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'Qably deriva el nombre de cada caso de prueba del nombre que reporta la herramienta que lo ejecutó, y el nombre de cada suite del archivo que lo agrupa. Nada de eso se inventa: lo que se escribe en el código es lo que se lee después en la plataforma. Por eso el nombre de una prueba deja de ser una nota interna y pasa a ser documentación que otra persona va a leer sin abrir el repositorio.',
+          text: 'Qably deriva los nombres de las pruebas y suites a partir de los identificadores emitidos por el ejecutor de pruebas y la estructura de archivos del repositorio. Los títulos definidos en el código se reflejan directamente en la plataforma, convirtiendo los nombres de las pruebas en documentación técnica accesible para todo el equipo.',
         },
         {
           type: 'paragraph',
-          text: 'Estas cuatro reglas no son obligatorias para que la integración funcione. Son las que hacen que la suite resultante se lea como documentación en lugar de como una lista de identificadores.',
+          text: 'Las siguientes pautas de diseño ayudan a estructurar suites descriptivas y legibles:',
         },
         {
           type: 'list',
           ordered: true,
           items: [
-            'Agrupa por funcionalidad, no por clase ni por archivo técnico. El bloque que contiene las pruebas debería nombrar lo que el usuario hace, por ejemplo "Carrito de compras", no "CartServiceImpl".',
-            'Escribe cada prueba como verbo más condición: "rechaza un token vacío", "acepta un token de hasta 500 caracteres". Se lee como una afirmación sobre el comportamiento del sistema.',
-            'Una prueba, un comportamiento. Un nombre que necesita la palabra "y" casi siempre describe dos casos que conviene separar.',
-            'Nombra el archivo por la funcionalidad que cubre, porque de ahí sale el nombre de la suite. Un archivo llamado como la funcionalidad produce una suite legible sin renombrarla a mano.',
+            'Agrupe por funcionalidad de negocio en lugar de estructuras técnicas o clases internas. Los bloques descriptivos deben reflejar la acción del usuario (por ejemplo, "Carrito de compras" en lugar de "CartServiceImpl").',
+            'Redacte cada prueba combinando un verbo en presente y la condición esperada: "rechaza un token vacío", "acepta un token de hasta 500 caracteres".',
+            'Limite cada prueba a un comportamiento específico. Nombres que requieren conectores como "y" suelen indicar casos compuestos que conviene independizar.',
+            'Nombre el archivo según el módulo o funcionalidad que valida, ya que este nombre define el título de la suite en Qably.',
           ],
         },
         {
           type: 'subheading',
-          text: 'Qué limpia Qably automáticamente y qué no',
+          text: 'Normalización automática de nombres',
         },
         {
           type: 'paragraph',
-          text: 'Al importar, Qably convierte identificadores técnicos en texto legible. Separa las palabras pegadas y descarta prefijos de andamiaje como "test", "spec", "prueba" o "caso", así que un nombre como testTokenNull llega a la plataforma como "Token null". Eso funciona igual en español y en inglés.',
+          text: 'Durante la ingesta, Qably formatea identificadores técnicos en texto legible separando palabras en camelCase o snake_case y omitiendo prefijos comunes como "test", "spec", "prueba" o "caso". De este modo, un identificador como testTokenNull se registra en la plataforma como "Token null".',
         },
         {
           type: 'paragraph',
-          text: 'Lo que Qably no hace es reescribir una frase que ya está redactada como frase. Un nombre como "debe rechazar un token vacío" llega prácticamente igual, solo con la primera letra en mayúscula: la plataforma no cambia el verbo ni recorta palabras. Esa es justamente la razón por la que conviene escribir el nombre ya legible desde el código, porque es el texto que se va a leer después.',
+          text: 'Si el nombre en el código ya está formulado como una oración (por ejemplo, "debe rechazar un token vacío"), Qably conserva la redacción intacta capitalizando únicamente la primera letra sin alterar el verbo ni recortar términos.',
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Lo que Qably no hace es traducir. El nombre técnico de la prueba es la llave que une el código con los resultados de cada ejecución, así que se conserva tal cual. Si tu equipo escribe las pruebas en inglés y trabaja la plataforma en español, la traducción ocurre en la documentación del caso, no en su nombre técnico.',
+          text: 'Qably no traduce el contenido de las pruebas. El identificador técnico actúa como clave de enlace entre el código fuente y el historial de ejecuciones. Si su equipo escribe pruebas en inglés pero opera la plataforma en español, las descripciones traducidas deben gestionarse en la documentación del caso, no en su identificador.',
         },
         {
           type: 'subheading',
@@ -461,7 +446,7 @@ node scripts/qably-report.mjs report.xml`,
         },
         {
           type: 'paragraph',
-          text: 'Las pruebas que ya existen no necesitan renombrarse para empezar. Qably importa lo que haya y respeta cualquier nombre que edites después: una vez que una persona corrige el título de un caso, las importaciones siguientes no lo sobrescriben.',
+          text: 'No es necesario renombrar pruebas existentes para comenzar a utilizar Qably. La plataforma importa los identificadores actuales y respeta cualquier ajuste manual posterior: si un miembro del equipo edita el título de un caso desde la consola, las importaciones subsecuentes preservan el valor modificado.',
         },
       ],
     },
@@ -472,7 +457,7 @@ node scripts/qably-report.mjs report.xml`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'Reporta los resultados de ejecución de una suite. Se autentica con Authorization: Bearer <API key del proyecto>. El proyecto y la organización vienen de la key; nada en el cuerpo puede sobrescribirlos.',
+          text: 'Registra los resultados de ejecución de una suite de pruebas. Requiere autenticación mediante el encabezado Authorization: Bearer <API key del proyecto>. El proyecto y la organización se determinan a partir de la clave.',
         },
         {
           type: 'codeGroup',
@@ -576,13 +561,13 @@ response.raise_for_status()`,
           type: 'table',
           headers: ['Campo', 'Obligatorio', 'Notas'],
           rows: [
-            ['externalId', 'sí', 'String no vacío. Es la clave de idempotencia — repetir el mismo valor actualiza en lugar de duplicar.'],
-            ['source', 'no', '"api" (por defecto) o "github_actions".'],
-            ['suiteId / suiteName', 'exactamente uno', 'Un suiteId que no resuelve devuelve 404. Un suiteName que no resuelve se adopta: la suite se crea al instante.'],
-            ['name', 'sí', 'El nombre visible del run, hasta 200 caracteres.'],
-            ['startedAt / finishedAt', 'no', 'Fechas ISO 8601 con offset explícito.'],
-            ['commitSha / commitMessage / commitAuthor', 'no', 'Metadata libre del commit, hasta 64 / 2000 / 200 caracteres.'],
-            ['cases', 'sí', 'Al menos un elemento.'],
+            ['externalId', 'sí', 'Cadena no vacía. Clave de idempotencia para actualizar ejecuciones existentes en lugar de duplicarlas.'],
+            ['source', 'no', '"api" (valor por defecto) o "github_actions".'],
+            ['suiteId / suiteName', 'exactamente uno', 'Un suiteId inexistente devuelve 404. Un suiteName inexistente crea la suite automáticamente.'],
+            ['name', 'sí', 'Nombre descriptivo de la ejecución, hasta 200 caracteres.'],
+            ['startedAt / finishedAt', 'no', 'Marcas temporales ISO 8601 con zona horaria explícita.'],
+            ['commitSha / commitMessage / commitAuthor', 'no', 'Metadatos opcionales del commit, hasta 64, 2000 y 200 caracteres respectivamente.'],
+            ['cases', 'sí', 'Arreglo con al menos un caso de prueba.'],
           ],
         },
         {
@@ -590,20 +575,20 @@ response.raise_for_status()`,
           headers: ['Campo del caso', 'Obligatorio', 'Notas'],
           rows: [
             ['name', 'sí', 'Hasta 120 caracteres.'],
-            ['suiteName', 'no', 'Por defecto usa el nombre de la suite resuelta; permite que un caso conserve una etiqueta distinta (por ejemplo un nombre de proyecto de Playwright) como evidencia de auditoría.'],
-            ['steps', 'no', 'Arreglo de strings, hasta 50 elementos de 500 caracteres cada uno. Por defecto es un arreglo vacío. JUnit XML no tiene un campo equivalente, así que los reportes convertidos desde JUnit siempre llegan con un arreglo vacío — un reporter propio que postee JSON directamente sí puede completarlo.'],
-            ['expectedResult', 'no', 'Hasta 1000 caracteres. Por defecto es un string vacío, por la misma razón que steps.'],
-            ['status', 'sí', 'Uno de pending, running, pass, fail, skip, blocked.'],
-            ['recordedAt', 'no', 'Fecha ISO 8601 con offset explícito.'],
+            ['suiteName', 'no', 'Hereda el nombre de la suite resuelta; permite conservar etiquetas adicionales (como proyectos de Playwright) para trazabilidad.'],
+            ['steps', 'no', 'Arreglo de texto de hasta 50 elementos (máximo 500 caracteres por elemento). JUnit XML no incluye este campo, por lo que llega vacío por defecto salvo cuando se envía JSON directamente.'],
+            ['expectedResult', 'no', 'Hasta 1000 caracteres. Llega vacío por defecto al importar desde JUnit XML.'],
+            ['status', 'sí', 'Valores permitidos: pending, running, pass, fail, skip, blocked.'],
+            ['recordedAt', 'no', 'Marca temporal ISO 8601 con zona horaria explícita.'],
           ],
         },
         {
           type: 'paragraph',
-          text: 'Run.status se deriva del lado del servidor, nunca se confía en lo que envía el cliente: cualquier caso fallido hace fallar el run; de lo contrario cualquier caso pendiente o en ejecución lo mantiene en ejecución; de lo contrario pasa una vez que al menos un caso está en pass o skip — un run donde todos los casos están blocked igual cuenta como fail, porque nada en él se verificó realmente.',
+          text: 'El estado general de la ejecución se evalúa en el servidor y no depende de valores calculados por el cliente. Si un caso de prueba falla, la ejecución se marca como fallida. Si existen casos pendientes o en progreso sin fallos, la ejecución permanece en estado de ejecución. La ejecución finaliza como exitosa cuando al menos un caso concluye en pass o skip. Una ejecución donde todos los casos están bloqueados se califica como fallida, ya que ninguna validación fue completada.',
         },
         {
           type: 'paragraph',
-          text: 'Repetir el mismo (proyecto, source, externalId) actualiza en lugar de duplicar: el conjunto de casos se reemplaza por completo, y la metadata opcional solo se sobrescribe cuando la repetición realmente la incluye. Responde 200 OK tanto en el primer reporte como en cada repetición.',
+          text: 'Reutilizar la combinación de proyecto, origen y externalId actualiza los datos existentes sin crear duplicados: la lista de casos se reemplaza íntegramente y los metadatos opcionales se actualizan si se incluyen en la nueva petición. El endpoint responde 200 OK tanto en la creación inicial como en actualizaciones.',
         },
       ],
     },
@@ -614,21 +599,21 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'En lugar de ejecutar un script de reporte propio, el reporte JUnit XML puede enviarse sin procesar para que Qably lo analice del lado del servidor. Misma autenticación que POST /runs/ingest.',
+          text: 'Permite enviar archivos JUnit XML en formato original para su análisis en el servidor. Utiliza las mismas credenciales de autenticación que POST /runs/ingest.',
         },
         {
           type: 'paragraph',
-          text: 'El reporte va en el cuerpo de la petición como XML crudo, con Content-Type en application/xml o text/xml (límite de 10 MB). Todo lo demás viaja como parámetros de consulta, ya que no hay un cuerpo JSON para llevarlos.',
+          text: 'El cuerpo de la petición contiene el archivo XML directo con cabecera Content-Type en application/xml o text/xml (hasta 10 MB). Los parámetros de configuración se transmiten mediante la cadena de consulta (query string).',
         },
         {
           type: 'table',
           headers: ['Parámetro de consulta', 'Obligatorio', 'Notas'],
           rows: [
-            ['externalId', 'sí', 'La misma clave de idempotencia que POST /runs/ingest.'],
-            ['source', 'no', '"api" (por defecto) o "github_actions".'],
-            ['suiteId / suiteName', 'no', 'Las mismas reglas de resolución que POST /runs/ingest. Cuando no se envía ninguno, el nombre de la suite sale del propio atributo <testsuite name="..."> del reporte.'],
-            ['name', 'no', 'Por defecto usa el nombre de suite del reporte cuando se omite.'],
-            ['startedAt / finishedAt / commitSha / commitMessage / commitAuthor', 'no', 'Los mismos campos que POST /runs/ingest.'],
+            ['externalId', 'sí', 'Clave de idempotencia idéntica a POST /runs/ingest.'],
+            ['source', 'no', '"api" (valor por defecto) o "github_actions".'],
+            ['suiteId / suiteName', 'no', 'Mismas reglas de resolución que en JSON. Si se omiten ambos, el nombre de la suite se toma del atributo name en <testsuite>.'],
+            ['name', 'no', 'Si se omite, adopta el nombre de la suite del reporte.'],
+            ['startedAt / finishedAt / commitSha / commitMessage / commitAuthor', 'no', 'Campos equivalentes a POST /runs/ingest.'],
           ],
         },
         {
@@ -643,7 +628,7 @@ response.raise_for_status()`,
         },
         {
           type: 'paragraph',
-          text: 'El nombre de un caso siempre sale de <testcase name="...">; classname solo se lee como respaldo cuando name falta por completo, algo que un JUnit real casi nunca hace. Un reporte inválido o vacío responde 400, no 500.',
+          text: 'El título de cada caso se extrae del atributo name en <testcase>. El atributo classname solo se utiliza como valor de respaldo si name está ausente. Los archivos con sintaxis XML inválida o cuerpos vacíos reciben una respuesta HTTP 400.',
         },
       ],
     },
@@ -654,13 +639,13 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: ':provider es github o bitbucket, sin distinguir mayúsculas. No hay API key en esta ruta — cada entrega se verifica contra el secreto HMAC de una conexión que coincida con el repositorio del evento.',
+          text: 'El parámetro :provider acepta los valores github o bitbucket (indistinto de mayúsculas). Este endpoint no utiliza API keys: cada entrega se valida mediante el secreto HMAC configurado para la conexión del repositorio.',
         },
         {
           type: 'table',
           headers: ['', 'GitHub', 'Bitbucket'],
           rows: [
-            ['Encabezado de firma', 'x-hub-signature-256, con formato sha256=<hex>', 'x-hub-signature, con formato sha256=<hex>'],
+            ['Encabezado de firma', 'x-hub-signature-256 (formato sha256=<hex>)', 'x-hub-signature (formato sha256=<hex>)'],
             ['Encabezado de evento', 'x-github-event: push o pull_request', 'x-event-key: repo:push, pullrequest:created o pullrequest:updated'],
             ['Encabezado de id de entrega', 'x-github-delivery', 'x-request-uuid'],
             ['Acciones de pull request manejadas', 'opened, synchronize', 'created, updated'],
@@ -670,17 +655,17 @@ response.raise_for_status()`,
           type: 'table',
           headers: ['Respuesta', 'Significado'],
           rows: [
-            ['202, { "status": "accepted" }', 'Firma verificada, evento guardado y encolado para procesarse'],
-            ['202, { "status": "duplicate" }', 'El mismo (proveedor, id de entrega) ya se procesó — las repeticiones son idempotentes'],
-            ['202, { "status": "ignored" }', 'Un proveedor reconocido y una firma válida, pero un tipo de evento que Qably no procesa'],
-            ['404', 'Proveedor desconocido en la ruta'],
-            ['401', 'La verificación de firma falló contra todas las conexiones de ese repositorio'],
-            ['400', 'El cuerpo no es JSON válido'],
+            ['202, { "status": "accepted" }', 'Firma válida. Evento almacenado y encolado para su procesamiento.'],
+            ['202, { "status": "duplicate" }', 'El par (proveedor, id de entrega) ya fue procesado. Las entregas repetidas son idempotentes.'],
+            ['202, { "status": "ignored" }', 'Firma válida pero tipo de evento no soportado por Qably.'],
+            ['404', 'Proveedor no reconocido en la ruta.'],
+            ['401', 'Fallo de verificación de firma contra las conexiones del repositorio.'],
+            ['400', 'Cuerpo de la petición inválido o JSON mal formado.'],
           ],
         },
         {
           type: 'paragraph',
-          text: 'Límite de 60 peticiones cada 60 segundos por instancia. Los eventos aceptados se encolan y se procesan de forma asíncrona — la respuesta confirma la recepción, no que el procesamiento haya terminado.',
+          text: 'Límite de tasa de 60 peticiones por minuto por instancia. Los eventos aceptados se procesan en segundo plano de manera asíncrona. La respuesta HTTP confirma la recepción correcta del evento, no la conclusión de su procesamiento.',
         },
         {
           type: 'subheading',
@@ -688,7 +673,7 @@ response.raise_for_status()`,
         },
         {
           type: 'paragraph',
-          text: 'Cada conexión guarda su propio secreto HMAC. Cuando el secreto registrado en el proveedor deja de coincidir con el que guarda Qably, todas las entregas responden 401 hasta que ambos valores vuelvan a coincidir. La rotación genera un secreto nuevo, lo guarda cifrado y lo devuelve una sola vez.',
+          text: 'Cada conexión almacena su propio secreto HMAC. Si el secreto en el proveedor difiere del registrado en Qably, las entregas responderán con código 401. Al solicitar la rotación, Qably genera un nuevo valor, lo almacena cifrado y lo retorna en la respuesta por única vez.',
         },
         {
           type: 'table',
@@ -699,12 +684,12 @@ response.raise_for_status()`,
         },
         {
           type: 'paragraph',
-          text: 'La respuesta 201 contiene { "webhookSecret": "<64 caracteres hexadecimales>" }. Ese valor no se puede volver a consultar, así que debe copiarse en la configuración del webhook del repositorio antes de descartar la respuesta. El secreto anterior deja de ser válido en el momento de la rotación. Un proyecto sin repositorio conectado responde 404.',
+          text: 'La respuesta HTTP 201 entrega el objeto { "webhookSecret": "<64 caracteres hexadecimales>" }. Este valor debe copiarse inmediatamente en la configuración del webhook en el repositorio. El secreto anterior queda invalidado al instante. Solicitar la rotación en un proyecto sin repositorio vinculado responde con código 404.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'La rotación también está disponible en la interfaz, dentro de la pestaña Repositorio de cada proyecto. Entre la rotación y el registro del nuevo valor en el proveedor, las entregas fallan con 401 y deben reenviarse desde el historial de entregas del proveedor.',
+          text: 'La rotación de secretos también está disponible desde la pestaña Repositorio en la consola de Qably. Durante el lapso entre la rotación y la actualización en el proveedor, las entregas entrantes fallarán con error 401 y deberán reenviarse desde el panel de entregas del proveedor.',
         },
       ],
     },
@@ -715,20 +700,20 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'Una key tiene la forma qbly_<lookupId>_<secret>: un prefijo fijo, un id de búsqueda público de 6 bytes usado para encontrar la fila, y un secreto de 32 bytes que es la única parte que prueba posesión. Qably guarda solo su hash SHA-256 y lo compara en tiempo constante — el token en texto plano nunca se puede recuperar después de crearlo.',
+          text: 'Las claves siguen la estructura qbly_<lookupId>_<secret>. Incorporan un prefijo constante, un identificador público de 6 bytes para ubicar el registro y un secreto criptográfico de 32 bytes para la autenticación. Qably almacena únicamente el hash SHA-256 y realiza comprobaciones en tiempo constante. El token en texto plano no puede recuperarse tras su emisión.',
         },
         {
           type: 'table',
           headers: ['Acción', 'Endpoint', 'Rol requerido'],
           rows: [
             ['Listar keys', 'GET /projects/:projectId/api-keys', 'Cualquier miembro de la organización'],
-            ['Crear una key', 'POST /projects/:projectId/api-keys, cuerpo { "name": string }', 'owner o admin'],
+            ['Crear una key', 'POST /projects/:projectId/api-keys (cuerpo: { "name": string })', 'owner o admin'],
             ['Revocar una key', 'POST /projects/:projectId/api-keys/:id/revoke', 'owner o admin'],
           ],
         },
         {
           type: 'paragraph',
-          text: 'Una key revocada nunca se borra, así que cada run anterior sigue atribuido a ella. Se utiliza en las peticiones como Authorization: Bearer qbly_<lookupId>_<secret>.',
+          text: 'Las claves revocadas permanecen archivadas en el sistema para conservar la trazabilidad de las ejecuciones históricas. Se envían en el encabezado Authorization: Bearer qbly_<lookupId>_<secret>.',
         },
       ],
     },
@@ -739,14 +724,14 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'Estas son las variables que se configuran en el CI de la integración, no la configuración de despliegue de Qably; esta guía está escrita para quienes integran y envían datos a un Qably alojado, no para quienes operan la plataforma en sí.',
+          text: 'Variables requeridas en los entornos de CI para la integración con Qably:',
         },
         {
           type: 'table',
           headers: ['Variable', 'Obligatoria', 'Notas'],
           rows: [
-            ['QABLY_API_KEY', 'sí, para reportar algo', 'La lee el reporter. Si no está configurada, el script registra un mensaje y termina con código 0 sin enviar nada; nunca hace fallar el build.'],
-            ['QABLY_API_BASE_URL', 'no', `Por defecto usa ${API_BASE_URL_TOKEN}. Se configura para un despliegue propio o una corrida local contra http://localhost:3001.`],
+            ['QABLY_API_KEY', 'sí (para reportar datos)', 'Clave de autenticación del proyecto en CI. Si no está configurada, las peticiones sin autenticar se rechazan con código 401.'],
+            ['QABLY_API_BASE_URL', 'no', `Por defecto apunta a ${API_BASE_URL_TOKEN}. Puede configurarse para instancias privadas o pruebas locales contra http://localhost:3001.`],
           ],
         },
       ],
@@ -758,7 +743,7 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'Qably puede publicar alertas en un canal de Discord o un workspace de Slack cada vez que un run falla o pasa, un caso regresiona, una ingesta falla, o cambian las credenciales de una conexión. Qably no aloja ningún canal propio: el webhook se crea y se controla del lado de Discord o de Slack, y Qably solo entrega a la URL que se pega en su configuración.',
+          text: 'Qably puede enviar alertas a canales de Discord o espacios de trabajo de Slack ante eventos de ejecuciones fallidas o exitosas, regresiones de casos, fallos de ingesta y cambios en credenciales de conexión. Los webhooks se gestionan en las plataformas de destino; Qably únicamente despacha las notificaciones hacia la URL configurada.',
         },
         {
           type: 'logoRow',
@@ -770,15 +755,15 @@ response.raise_for_status()`,
         {
           type: 'callout',
           tone: 'info',
-          text: 'Del lado de Qably no cambia nada si el webhook se borra o se regenera en Discord o Slack — las entregas simplemente empiezan a fallar hasta que se actualice el canal con la URL nueva, o se lo elimine desde Configuración.',
+          text: 'Si un webhook se elimina o regenera en Discord o Slack, las entregas fallarán hasta que se actualice la URL en la configuración de Qably o se desvincule el canal.',
         },
         { type: 'subheading', text: 'Obtener una URL de webhook de Discord' },
         {
           type: 'list',
           ordered: true,
           items: [
-            'En el servidor de Discord que debe recibir las alertas, se abre Configuración del servidor → Integraciones → Webhooks.',
-            'Se elige Nuevo Webhook, se selecciona el canal, y se copia la URL del webhook.',
+            'En el servidor de Discord donde desea recibir alertas, abra Configuración del servidor > Integraciones > Webhooks.',
+            'Seleccione Nuevo Webhook, asigne el canal deseado y copie la URL generada.',
           ],
         },
         { type: 'subheading', text: 'Obtener una URL de webhook de Slack' },
@@ -786,8 +771,8 @@ response.raise_for_status()`,
           type: 'list',
           ordered: true,
           items: [
-            'Se crea una app de Slack (o se reutiliza una existente) en api.slack.com/apps y se activa la función Incoming Webhooks.',
-            'Se instala en el workspace, se elige el canal, y se copia la URL que genera Slack.',
+            'Cree o configure una aplicación en api.slack.com/apps y active la función Incoming Webhooks.',
+            'Instale la app en su espacio de trabajo, seleccione el canal y copie la URL asignada por Slack.',
           ],
         },
         { type: 'subheading', text: 'Conectarlo a Qably' },
@@ -795,70 +780,26 @@ response.raise_for_status()`,
           type: 'list',
           ordered: true,
           items: [
-            'En Configuración → Integraciones, dentro de Canales de notificación del equipo, se selecciona Agregar canal.',
-            'Se elige Discord o Slack, se nombra el canal, se pega la URL del webhook, y se eligen los eventos que debe recibir.',
-            'Se usa la acción de enviar mensaje de prueba en el canal nuevo para confirmar que llega antes de depender de él.',
+            'En Configuración > Integraciones, dentro de Canales de notificación del equipo, seleccione Agregar canal.',
+            'Seleccione Discord o Slack, asigne un nombre al canal, pegue la URL del webhook y marque los eventos correspondientes.',
+            'Utilice la opción de envío de prueba para verificar la recepción del mensaje antes de activar el canal.',
           ],
         },
         {
           type: 'table',
           headers: ['Evento', 'Se dispara cuando'],
           rows: [
-            ['Ejecución fallida', 'Un run de pruebas termina con al menos un caso fallido.'],
-            ['Ejecución completada', 'Un run de pruebas termina con todos los casos pasando.'],
-            ['Caso con regresión', 'Un caso que antes pasaba, falla en el run actual.'],
-            ['Ingesta fallida', 'No se pudo procesar la ingesta de código de un repositorio.'],
-            ['Seguridad de la conexión', 'Cambia el secreto de webhook o las credenciales de una conexión de repositorio.'],
+            ['Ejecución fallida', 'La ejecución concluye con al menos una prueba fallida.'],
+            ['Ejecución completada', 'La ejecución concluye con todas las pruebas aprobadas.'],
+            ['Caso con regresión', 'Una prueba que previamente pasaba falla en la ejecución actual.'],
+            ['Ingesta fallida', 'Ocurre un error al procesar los cambios de código del repositorio.'],
+            ['Seguridad de la conexión', 'Se modifica el secreto del webhook o las credenciales vinculadas al repositorio.'],
           ],
         },
         {
           type: 'callout',
           tone: 'info',
-          text: 'Configurar o cambiar un canal de notificación requiere el rol de owner o admin en Qably. Pero una vez que un canal está recibiendo alertas de seguridad de conexión, cualquiera con acceso a ese servidor de Discord o workspace de Slack las ve — Qably no vuelve a verificar roles al momento de la entrega, así que conviene elegir ese canal teniendo esto en cuenta.',
-        },
-      ],
-    },
-    {
-      id: 'platform-overview',
-      navLabel: 'Visión general de la plataforma',
-      title: 'Visión general de la plataforma',
-      blocks: [
-        {
-          type: 'paragraph',
-          text: 'El backend expone la API descrita en esta guía y está organizado por dominio de negocio, con almacenamiento persistente y colas de procesamiento en segundo plano para el trabajo asíncrono. El dashboard web es la interfaz donde el equipo revisa ese estado.',
-        },
-        { type: 'subheading', text: 'Áreas del backend' },
-        {
-          type: 'table',
-          headers: ['Módulo', 'Responsabilidad'],
-          rows: [
-            ['auth', 'Sesiones e inicio de sesión con GitHub OAuth'],
-            ['organizations', 'Membresía de organización y el scope de cada petición'],
-            ['projects', 'Proyectos, límites de plan y su conexión con un repositorio'],
-            ['connections', 'Conexiones de repositorio, secretos de webhook y detección de stack a partir de los manifiestos del repositorio'],
-            ['ingestion', 'Verifica y normaliza los eventos entrantes del webhook del SCM, y los encola para procesarse'],
-            ['runs', 'Los dos endpoints de /runs/ingest, el historial de runs y casos, y la derivación de estado'],
-            ['suites', 'Suites de prueba y sus casos de prueba'],
-            ['api-keys', 'Emitir, listar y revocar API keys de proyecto'],
-            ['repository', 'Sirve los cambios de código, lotes de ingesta y evidencia que acumuló un proyecto'],
-            ['dashboard', 'Las cifras agregadas que lee el dashboard web'],
-            ['notifications', 'Publica eventos de run completado y run fallido para un proyecto'],
-            ['mailer', 'Correo transaccional, por ejemplo restablecimiento de contraseña'],
-          ],
-        },
-        {
-          type: 'paragraph',
-          text: 'El procesamiento es asíncrono: un evento aceptado se registra y se encola de inmediato, y la respuesta confirma la recepción, no que el evento ya se procesó por completo. Cada operación de dominio que puede fallar por una razón esperada (no encontrado, nombre ya usado, límite de plan alcanzado) devuelve un resultado tipado en lugar de lanzar una excepción, así el límite entre una regla de negocio esperada y un error real del servidor queda explícito.',
-        },
-        { type: 'subheading', text: 'Superficies del dashboard web' },
-        {
-          type: 'list',
-          items: [
-            'Dashboard — KPIs de tasa de aprobación de los últimos 7 días, una tabla de salud de proyectos, un calendario de trazabilidad y actividad reciente',
-            'Proyectos — creación, el selector de tecnologías y la configuración propia de cada proyecto',
-            'La pantalla de API Keys de un proyecto — crear, listar y revocar keys',
-            'La página Repository de un proyecto — los cambios de código, lotes de ingesta y evidencia que alimenta el webhook del SCM',
-          ],
+          text: 'La administración de canales de notificación requiere rol de owner o admin en la organización. Una vez activo, las alertas de seguridad de conexión serán visibles para cualquier usuario con acceso al canal o servidor de destino, ya que Qably no valida permisos en la plataforma receptora.',
         },
       ],
     },
@@ -871,47 +812,80 @@ response.raise_for_status()`,
           type: 'faq',
           items: [
             {
-              question: 'El CI recibe un 403 con una página de Cloudflare "Just a moment..."',
+              question: '¿Por qué mi pipeline de CI finaliza con éxito pero no aparece la ejecución en Qably?',
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'La API está detrás de un desafío anti-bots, y las peticiones desde IPs de datacenter (que es lo que son la mayoría de los runners de CI) reciben el desafío en lugar de pasar directo. Esto necesita una regla de WAF que salte el desafío para el hostname de la API, cubriendo tanto /runs/ingest como /webhooks/scm/* — una regla que solo cubra una de esas rutas deja el otro pipeline roto.',
+                  text: 'Verifique que la variable QABLY_API_KEY esté declarada como secreto en el entorno del job de CI y que el paso de reporte se haya ejecutado. Al incluir la directiva if: always(), el envío se realiza incluso si las pruebas fallaron.',
+                },
+                {
+                  type: 'paragraph',
+                  text: 'Confirme además que su ejecutor de pruebas generó el archivo XML en la ruta indicada antes de la petición. Si la llamada con curl devuelve un código HTTP de error (como 401 por una clave revocada o 400 por un archivo XML mal formado), revise los registros del runner para confirmar el motivo exacto.',
                 },
               ],
             },
             {
-              question: 'El CI está en verde pero no aparece nada en Qably',
+              question: '¿Cómo organiza Qably las suites y casos de prueba si no especifico identificadores manuales?',
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'Es un comportamiento intencional: una falla al reportar se registra como advertencia y nunca hace fallar el build. Conviene revisar los logs del workflow en busca de una línea ::warning:: de qably-report, y confirmar que QABLY_API_KEY esté realmente configurada como secret en el job que ejecutó el paso de reporte.',
+                  text: 'Al importar un reporte JUnit XML, Qably lee los atributos del archivo para identificar cada suite y cada caso. Si una suite con ese nombre no existe en el proyecto, el servidor la crea de inmediato y le asigna los casos correspondientes.',
+                },
+                {
+                  type: 'paragraph',
+                  text: 'No es necesario registrar previamente las pruebas en la interfaz web ni gestionar identificadores numéricos. Si envía datos mediante la API JSON en lugar de XML, use el campo suiteName para que el sistema adopte o cree la suite de forma automática.',
                 },
               ],
             },
             {
-              question: '404 — suite no encontrada',
+              question: '¿Qué sucede en Qably si reintento un job de pruebas en mi CI?',
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'Un suiteId que no resuelve se trata como error del cliente a propósito: un id explícito es una afirmación de que algo ya existe, y el endpoint nunca crea una suite a partir de uno. En su lugar, se puede enviar suiteName — un nombre que no resuelve se adopta automáticamente, creando la suite al instante.',
+                  text: 'Qably maneja reintentos de forma idempotente cuando se incluye el parámetro externalId en la llamada. Al utilizar identificadores únicos provistos por el runner (como el número de ejecución y el nombre del job en GitHub Actions), el servidor actualiza el registro existente en lugar de crear una ejecución duplicada.',
+                },
+                {
+                  type: 'paragraph',
+                  text: 'Esto garantiza que las métricas de aprobación reflejen el estado definitivo de la corrida sin distorsionar el historial del proyecto ni duplicar conteos de pruebas.',
                 },
               ],
             },
             {
-              question: 'Los casos llegan sin steps y sin expectedResult',
+              question: '¿Puedo registrar pasos individuales y resultados esperados al importar desde JUnit XML?',
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'Es esperable cuando el reporte vino de JUnit XML: el formato no tiene ninguno de los dos campos, así que tanto el reporter como POST /runs/ingest/junit envían un arreglo vacío y un string vacío para ellos. La API acepta ambos campos si un reporter propio postea JSON directamente a POST /runs/ingest con steps y expectedResult completos.',
+                  text: 'El estándar JUnit XML registra únicamente el estado final de cada prueba (aprobada, fallida u omitida), su duración y el mensaje de error o traza del fallo. Por esta razón, las importaciones desde archivos XML dejan vacíos los campos de pasos y resultados esperados.',
+                },
+                {
+                  type: 'paragraph',
+                  text: 'Para documentar procedimientos detallados con pasos individuales y resultados previstos, envíe los datos en formato JSON directamente al endpoint POST /runs/ingest, o gestione casos estructurados desde la interfaz web del proyecto.',
                 },
               ],
             },
             {
-              question: 'La página Repository de un proyecto está vacía',
+              question: '¿Por qué la sección Repository del proyecto no muestra commits ni ramas?',
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'El webhook del SCM nunca se configuró para ese proyecto; el paso 2 detalla cómo hacerlo. Reportar resultados de pruebas desde CI nunca llena la página Repository; solo el webhook lo hace.',
+                  text: 'La vista Repository se alimenta exclusivamente mediante el webhook del sistema de control de versiones (GitHub o Bitbucket). El envío de reportes de pruebas desde CI registra ejecuciones en el historial, pero no transmite el contenido de los commits ni la actividad del repositorio.',
+                },
+                {
+                  type: 'paragraph',
+                  text: 'Para ver los cambios de código y vincularlos con las corridas de pruebas, configure el webhook en los ajustes de su repositorio siguiendo el paso 2 de esta guía.',
+                },
+              ],
+            },
+            {
+              question: '¿Puede una misma API key reportar resultados a varios proyectos?',
+              answer: [
+                {
+                  type: 'paragraph',
+                  text: 'No. Cada API key tiene alcance exclusivo sobre un proyecto específico dentro de la organización. El servidor deduce el proyecto de destino a partir de la propia clave y restringe su uso a la ingesta de pruebas.',
+                },
+                {
+                  type: 'paragraph',
+                  text: 'Para entornos con múltiples proyectos o arquitecturas basadas en microservicios, genere una clave independiente para cada proyecto y configure el secreto correspondiente en sus flujos de CI.',
                 },
               ],
             },
