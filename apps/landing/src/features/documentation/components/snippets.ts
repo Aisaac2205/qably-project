@@ -23,19 +23,22 @@ curl -X POST "$URL?externalId=$RUN_ID" \\
   -H "Content-Type: application/xml" \\
   --data-binary @junit.xml`,
 
-  githubAction: `name: Tests
+  githubAction: `name: CI
 on: [push, pull_request]
 
 env:
-  QABLY: ${API_BASE_URL_TOKEN}/runs/ingest/junit
+  URL: ${API_BASE_URL_TOKEN}/runs/ingest/junit
 
 jobs:
-  tests:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm vitest --reporter=junit
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx vitest --reporter=junit
 
       - name: Report to Qably
         if: always()
@@ -43,7 +46,7 @@ jobs:
           KEY: \${{ secrets.QABLY_API_KEY }}
           ID: \${{ github.run_id }}
         run: |
-          curl -X POST "$QABLY?externalId=$ID" \\
+          curl -X POST "$URL?externalId=$ID" \\
             -H "Authorization: Bearer $KEY" \\
             -H "Content-Type: application/xml" \\
             --data-binary @junit.xml`,

@@ -202,60 +202,108 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Para conectar Qably a su integración continua, configure su ejecutor de pruebas para emitir un reporte JUnit XML y agregue un paso para enviarlo a la API de Qably con su clave secreta.',
+          text: 'Para conectar Qably a su integración continua, cree un archivo de flujo de trabajo en su repositorio (por ejemplo, .github/workflows/ci.yml). El lenguaje YAML organiza el pipeline a través de los eventos de activación on, la definición de entornos bajo jobs y la secuencia ordenada de comandos en steps para preparar el entorno, ejecutar las pruebas y enviar el reporte.',
         },
         {
           type: 'paragraph',
-          text: 'En Jest, instale jest-junit y defina JEST_JUNIT_ADD_FILE_ATTRIBUTE: "true" para que el XML incluya la ruta de archivo de cada caso de prueba, lo que permite a Qably vincular las pruebas con el código fuente. En Vitest, el reporte JUnit se genera de forma nativa indicando el reporter correspondiente.',
+          text: 'En Jest, instale jest-junit y defina JEST_JUNIT_ADD_FILE_ATTRIBUTE como "true" para que el XML incluya la ruta de archivo de cada caso de prueba, lo que permite a Qably vincular las pruebas con el código fuente. En Vitest, el reporte JUnit se genera de forma nativa indicando el reporter correspondiente en la línea de comandos.',
         },
         {
           type: 'codeGroup',
-          label: 'Flujo en GitHub Actions',
+          label: 'Flujo en GitHub Actions (.github/workflows/ci.yml)',
           variants: [
             {
               language: 'yaml',
               label: 'Jest',
-              code: `- name: Run Jest tests
-  env:
-    JEST_JUNIT_OUTPUT_DIR: ./reports
-    JEST_JUNIT_OUTPUT_NAME: junit.xml
-    JEST_JUNIT_ADD_FILE_ATTRIBUTE: 'true'
-  run: npx jest --ci --reporters=default --reporters=jest-junit
+              code: `name: CI
 
-- name: Report results to Qably
-  if: always()
-  env:
-    QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
-  run: |
-    curl --fail --silent --request POST \\
-      "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
-      --header "Authorization: Bearer $QABLY_API_KEY" \\
-      --header "Content-Type: application/xml" \\
-      --data-binary @./reports/junit.xml || true`,
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run tests and report to Qably
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Jest tests
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./reports
+          JEST_JUNIT_OUTPUT_NAME: junit.xml
+          JEST_JUNIT_ADD_FILE_ATTRIBUTE: 'true'
+        run: npx jest --ci --reporters=default --reporters=jest-junit
+
+      - name: Report results to Qably
+        if: always()
+        env:
+          QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
+        run: |
+          curl --fail --silent --request POST \\
+            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+            --header "Authorization: Bearer $QABLY_API_KEY" \\
+            --header "Content-Type: application/xml" \\
+            --data-binary @./reports/junit.xml || true`,
             },
             {
               language: 'yaml',
               label: 'Vitest',
-              code: `- name: Run Vitest tests
-  run: npx vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml
+              code: `name: CI
 
-- name: Report results to Qably
-  if: always()
-  env:
-    QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
-  run: |
-    curl --fail --silent --request POST \\
-      "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
-      --header "Authorization: Bearer $QABLY_API_KEY" \\
-      --header "Content-Type: application/xml" \\
-      --data-binary @./reports/junit.xml || true`,
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run tests and report to Qably
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Vitest tests
+        run: npx vitest run --reporter=default --reporter=junit --outputFile=./reports/junit.xml
+
+      - name: Report results to Qably
+        if: always()
+        env:
+          QABLY_API_KEY: \${{ secrets.QABLY_API_KEY }}
+        run: |
+          curl --fail --silent --request POST \\
+            "${API_BASE_URL_TOKEN}/runs/ingest/junit?externalId=gha-\${{ github.run_id }}-\${{ github.job }}&source=github_actions" \\
+            --header "Authorization: Bearer $QABLY_API_KEY" \\
+            --header "Content-Type: application/xml" \\
+            --data-binary @./reports/junit.xml || true`,
             },
           ],
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'La directiva if: always() es indispensable: garantiza que los resultados se envíen incluso si hay pruebas fallidas. El reporte hacia Qably nunca detiene el pipeline: el fallo del build debe depender del resultado de las pruebas, no del envío del reporte.',
+          text: 'La directiva if: always() en el paso de reporte es obligatoria para garantizar el envío del archivo incluso si fallaron las pruebas. El resultado del build en CI debe responder a las aserciones de la suite, sin interrumpir el registro de telemetría en Qably.',
         },
         {
           type: 'paragraph',
@@ -264,7 +312,7 @@ export const es: DocContent = {
         {
           type: 'callout',
           tone: 'info',
-          text: 'Idempotencia ante reintentos: al utilizar externalId con el identificador de ejecución (como github.run_id), si se reintenta un job en GitHub Actions con Re-run failed jobs, Qably actualiza la ejecución existente en lugar de registrar duplicados.',
+          text: 'El parámetro externalId asegura idempotencia ante reintentos de CI. Al enlazarlo con identificadores provistos por el runner (como github.run_id y github.job), reintentar un job en GitHub Actions actualiza la ejecución previa en Qably en lugar de generar registros duplicados.',
         },
       ],
     },

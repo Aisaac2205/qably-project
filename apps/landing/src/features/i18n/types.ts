@@ -76,6 +76,11 @@ export interface FeaturesTranslations {
   feature5Desc: string;
   codeCardLabel: string;
   codeCardConfidence: string;
+  cardStatusApproved: string;
+  cardIngestionSpeedLabel: string;
+  cardFlakyBadge: string;
+  cardTraceabilityRequirements: string;
+  cardTraceabilityCoverage: string;
 }
 
 export interface DocumentationTranslations {
