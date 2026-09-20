@@ -85,6 +85,7 @@ function validateGroup(
   const candidate = {
     ...query,
     externalId: group.externalId,
+    reportExternalId: query.externalId,
     suiteName: query.suiteId ? undefined : (query.suiteName ?? group.suiteName),
     name: resolveRunName(query, group),
     cases: group.cases,

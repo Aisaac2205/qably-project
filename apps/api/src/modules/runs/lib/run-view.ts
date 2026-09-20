@@ -10,6 +10,7 @@ export const RUN_SELECT = {
   status: true,
   source: true,
   externalId: true,
+  reportExternalId: true,
   startedAt: true,
   finishedAt: true,
   executedById: true,

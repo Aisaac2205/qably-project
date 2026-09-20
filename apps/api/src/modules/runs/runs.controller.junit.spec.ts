@@ -206,6 +206,34 @@ describe('RunsController.ingestJunit', () => {
     expect(jobBodies(runIngestQueue)).toHaveLength(1);
   });
 
+  it('sets reportExternalId equal to externalId when the report has exactly one suite', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(apiKey, query(), report);
+
+    const [job] = jobBodies(runIngestQueue);
+    expect(job.data.body.reportExternalId).toBe('ci-42');
+    expect(job.data.body.reportExternalId).toBe(job.data.body.externalId);
+  });
+
+  it('shares the base externalId as reportExternalId across every suite of a multi-suite report, while each keeps its own suffixed externalId', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(apiKey, query(), multiSuiteReport);
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs.map((job) => job.data.body.reportExternalId)).toEqual([
+      'ci-42',
+      'ci-42',
+      'ci-42',
+    ]);
+    const externalIds = jobs.map((job) => job.data.body.externalId);
+    expect(new Set(externalIds).size).toBe(3);
+    for (const externalId of externalIds) {
+      expect(externalId).not.toBe('ci-42');
+    }
+  });
+
   it('enqueues one job per <testsuite> when the report has several, one per file', async () => {
     const { controller, runIngestQueue } = build();
 

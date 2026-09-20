@@ -540,31 +540,33 @@ enum RunSource {
 }
 
 model Run {
-  id             String       @id @default(cuid())
-  projectId      String
-  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  suiteId        String
-  suite          Suite        @relation(fields: [suiteId], references: [id], onDelete: Cascade)
-  name           String
-  status         RunStatus    @default(pending)
-  source         RunSource
-  externalId     String?
-  startedAt      DateTime     @default(now())
-  finishedAt     DateTime?
-  executedById   String?
-  executedBy     User?        @relation(fields: [executedById], references: [id], onDelete: SetNull)
-  commitSha      String?
-  commitMessage  String?
-  commitAuthor   String?
-  cases          RunCase[]
+  id               String       @id @default(cuid())
+  projectId        String
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  suiteId          String
+  suite            Suite        @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  name             String
+  status           RunStatus    @default(pending)
+  source           RunSource
+  externalId       String?
+  reportExternalId String?
+  startedAt        DateTime     @default(now())
+  finishedAt       DateTime?
+  executedById     String?
+  executedBy       User?        @relation(fields: [executedById], references: [id], onDelete: SetNull)
+  commitSha        String?
+  commitMessage    String?
+  commitAuthor     String?
+  cases            RunCase[]
 
   @@unique([projectId, source, externalId])
   @@index([projectId, startedAt])
   @@index([organizationId])
   @@index([organizationId, startedAt])
   @@index([commitSha])
+  @@index([projectId, source, reportExternalId])
   @@map("run")
 }
 

@@ -46,6 +46,7 @@ const ingestCaseSchema = z.object({
 export const ingestRunSchema = z
   .object({
     externalId,
+    reportExternalId: externalId.optional(),
     source: runSource.default('api'),
     suiteId: z.string().min(1).optional(),
     suiteName: suiteName.optional(),

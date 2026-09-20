@@ -103,6 +103,7 @@ export class RunsService {
       input.startedAt === undefined ? new Date() : new Date(input.startedAt);
     const finishedAt =
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
+    const reportExternalId = input.reportExternalId ?? input.externalId;
 
     const { run, cases } = await this.prisma.$transaction(async (tx) => {
       const suite =
@@ -136,6 +137,7 @@ export class RunsService {
           status,
           source: input.source,
           externalId: input.externalId,
+          reportExternalId,
           startedAt,
           ...(finishedAt === undefined ? {} : { finishedAt }),
           ...(input.commitSha === undefined
@@ -152,6 +154,7 @@ export class RunsService {
           suiteId: suite.id,
           name: input.name,
           status,
+          reportExternalId,
           ...(input.startedAt === undefined ? {} : { startedAt }),
           ...(finishedAt === undefined ? {} : { finishedAt }),
           ...(input.commitSha === undefined

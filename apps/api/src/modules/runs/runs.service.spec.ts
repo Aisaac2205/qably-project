@@ -362,6 +362,53 @@ describe('RunsService.ingest idempotency', () => {
   });
 });
 
+describe('RunsService.ingest reportExternalId', () => {
+  it('defaults reportExternalId to externalId when the caller supplies none, as a plain JSON ingest does', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.run.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          reportExternalId: 'ci-run-42',
+        }) as unknown,
+        update: expect.objectContaining({
+          reportExternalId: 'ci-run-42',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('persists the caller-supplied reportExternalId when the JUnit split provides one, distinct from the suite-suffixed externalId', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      externalId: 'gha-482913-checkout-a1b2c3d4',
+      reportExternalId: 'gha-482913',
+    });
+
+    expect(prisma.run.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          projectId_source_externalId: {
+            projectId: 'project-1',
+            source: 'api',
+            externalId: 'gha-482913-checkout-a1b2c3d4',
+          },
+        },
+        create: expect.objectContaining({
+          reportExternalId: 'gha-482913',
+        }) as unknown,
+        update: expect.objectContaining({
+          reportExternalId: 'gha-482913',
+        }) as unknown,
+      }),
+    );
+  });
+});
+
 describe('RunsService.ingest test case linking', () => {
   it('links testCaseId when the automationKey matches an official test case', async () => {
     const prisma = createPrisma();
