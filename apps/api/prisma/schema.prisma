@@ -223,6 +223,11 @@ model Suite {
   ingestionKey               String?
   documentationConfirmedAt   DateTime?
   documentationConfirmedById String?
+  documentationQueuedAt      DateTime?
+  documentationOutcome       String?
+  documentationOutcomeAt     DateTime?
+  documentationMissing       String[]            @default([])
+  documentationSkipReason    String?
 
   @@unique([projectId, name])
   @@unique([projectId, ingestionKey])
@@ -232,32 +237,37 @@ model Suite {
 }
 
 model TestCase {
-  id                  String              @id @default(cuid())
-  suiteId             String
-  suite               Suite               @relation(fields: [suiteId], references: [id], onDelete: Cascade)
-  projectId           String
-  project             Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  name                String
-  objective           String              @default("")
-  preconditions       String[]            @default([])
-  steps               String[]            @default([])
-  expectedResult      String              @default("")
-  priority            CasePriority        @default(medium)
-  state               CaseState           @default(active)
-  position            Int                 @default(0)
-  currentVersionId    String?             @unique
-  currentVersion      TestCaseVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  executionMode       ExecutionMode       @default(manual)
-  automationKey       String?
-  automationClassName String?
-  automationFilePath  String?
-  documentationSource String              @default("ingestion")
-  observations        Json?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  runCases            RunCase[]
-  versions            TestCaseVersion[]   @relation("TestCaseVersions")
-  proposals           ExtractedProposal[]
+  id                      String              @id @default(cuid())
+  suiteId                 String
+  suite                   Suite               @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  projectId               String
+  project                 Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name                    String
+  objective               String              @default("")
+  preconditions           String[]            @default([])
+  steps                   String[]            @default([])
+  expectedResult          String              @default("")
+  priority                CasePriority        @default(medium)
+  state                   CaseState           @default(active)
+  position                Int                 @default(0)
+  currentVersionId        String?             @unique
+  currentVersion          TestCaseVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  executionMode           ExecutionMode       @default(manual)
+  automationKey           String?
+  automationClassName     String?
+  automationFilePath      String?
+  documentationSource     String              @default("ingestion")
+  observations            Json?
+  documentationQueuedAt   DateTime?
+  documentationOutcome    String?
+  documentationOutcomeAt  DateTime?
+  documentationMissing    String[]            @default([])
+  documentationSkipReason String?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+  runCases                RunCase[]
+  versions                TestCaseVersion[]   @relation("TestCaseVersions")
+  proposals               ExtractedProposal[]
 
   @@unique([suiteId, name])
   @@unique([suiteId, automationKey])
@@ -685,16 +695,16 @@ enum NotificationDeliveryStatus {
 }
 
 model NotificationDelivery {
-  id             String                      @id @default(cuid())
+  id             String                     @id @default(cuid())
   organizationId String
   eventType      NotificationEventType
   dedupeKey      String
   channel        NotificationWebhookType
   webhookId      String
-  webhook        NotificationWebhook         @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  webhook        NotificationWebhook        @relation(fields: [webhookId], references: [id], onDelete: Cascade)
   status         NotificationDeliveryStatus
   errorMessage   String?
-  deliveredAt    DateTime                    @default(now())
+  deliveredAt    DateTime                   @default(now())
 
   @@unique([webhookId, dedupeKey])
   @@index([organizationId, dedupeKey])
