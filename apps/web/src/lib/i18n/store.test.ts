@@ -64,4 +64,14 @@ describe('t pluralization', () => {
     expect(t('suites.case_one')).toBe('case')
     expect(t('suites.case_other')).toBe('cases')
   })
+
+  it('resolves the run report group singular and plural forms in Spanish', () => {
+    useI18nStore.setState({ locale: 'es' })
+    const { t } = useI18nStore.getState()
+
+    expect(t('runs.reportSuite', { count: 1 })).toBe('suite')
+    expect(t('runs.reportSuite', { count: 3 })).toBe('suites')
+    expect(t('runs.reportFailed', { count: 1 })).toBe('falló')
+    expect(t('runs.reportFailed', { count: 2 })).toBe('fallaron')
+  })
 })

@@ -173,6 +173,7 @@ function toSummary(run: RunRecord): RunSummaryRecord {
     status: run.status,
     source: run.source,
     externalId: run.externalId,
+    reportExternalId: run.externalId,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
     executedById: run.executedById,

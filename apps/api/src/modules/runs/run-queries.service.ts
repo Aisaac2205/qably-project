@@ -126,6 +126,7 @@ function toSummaryView(
     status: run.status,
     source: run.source,
     externalId: run.externalId ?? '',
+    reportExternalId: run.reportExternalId ?? run.externalId ?? '',
     startedAt: run.startedAt.toISOString(),
     ...(run.finishedAt === null
       ? {}

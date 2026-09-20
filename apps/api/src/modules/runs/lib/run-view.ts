@@ -65,6 +65,7 @@ export interface RunRow {
   status: RunStatus;
   source: RunSource;
   externalId: string | null;
+  reportExternalId: string | null;
   startedAt: Date;
   finishedAt: Date | null;
   executedById: string | null;

@@ -1,5 +1,6 @@
 'use client'
 
+import { Fragment } from 'react'
 import Link from 'next/link'
 import type { RunSource, RunSummaryRecord } from '@qably/types'
 import { useRunsPage } from '../hooks/use-runs'
@@ -16,6 +17,7 @@ import { GitCommit } from '@phosphor-icons/react'
 import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
 import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { formatPassRate, isCiRun, runTitleParts } from '../lib/format'
+import { groupConsecutiveRuns, type RunReportGroup } from '../lib/group-runs'
 import { RunDeltaChip } from './run-delta-chip'
 
 const REPORT_CI_ANCHOR = 'step-4-report-ci'
@@ -106,6 +108,38 @@ function RunRow({
   )
 }
 
+function RunReportGroupHeader({ group }: { group: RunReportGroup }) {
+  const { t } = useTranslation()
+  const suiteCount = group.runs.length
+  const failedCount = group.runs.filter((run) => run.status === 'fail').length
+
+  return (
+    <div
+      data-testid="run-report-group-header"
+      className="flex items-center gap-1.5 px-4 pt-3 pb-1.5 sm:px-5 text-xs text-muted"
+    >
+      <span className="sr-only">{t('runs.sourceTooltipCi')}</span>
+      <GithubActionsIcon
+        className="size-3.5 text-brand-github-actions shrink-0"
+        aria-hidden="true"
+      />
+      <span className="font-mono font-semibold tabular-nums text-default">{suiteCount}</span>
+      <span>{t('runs.reportSuite', { count: suiteCount })}</span>
+      <span aria-hidden="true">·</span>
+      {failedCount === 0 ? (
+        <span>{t('runs.reportAllPassed')}</span>
+      ) : (
+        <>
+          <span className="font-mono font-semibold tabular-nums text-default">
+            {failedCount}
+          </span>
+          <span>{t('runs.reportFailed', { count: failedCount })}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
 export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
   const { runs, hasNextPage, isFetchingNextPage, fetchNextPage } = useRunsPage(
     projectId,
@@ -139,16 +173,31 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
     )
   }
 
+  const groups = groupConsecutiveRuns(runs)
+
   return (
     <div className="space-y-4">
       <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
         <CardContent className="p-0">
           <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
-            {runs.map((r) => (
-              <li key={r.id}>
-                <RunRow run={r} projectId={projectId} />
-              </li>
-            ))}
+            {groups.map((group) =>
+              group.runs.length === 1 ? (
+                <li key={group.runs[0].id}>
+                  <RunRow run={group.runs[0]} projectId={projectId} />
+                </li>
+              ) : (
+                <Fragment key={group.key}>
+                  <li>
+                    <RunReportGroupHeader group={group} />
+                  </li>
+                  {group.runs.map((run) => (
+                    <li key={run.id}>
+                      <RunRow run={run} projectId={projectId} />
+                    </li>
+                  ))}
+                </Fragment>
+              ),
+            )}
           </EntityList>
         </CardContent>
       </Card>

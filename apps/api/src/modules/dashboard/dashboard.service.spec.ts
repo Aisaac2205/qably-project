@@ -23,6 +23,7 @@ function runSummary(
     status: 'pass',
     source: 'manual',
     externalId: '',
+    reportExternalId: '',
     startedAt: '2026-06-16T10:00:00.000Z',
     caseCounts: {
       total: 2,

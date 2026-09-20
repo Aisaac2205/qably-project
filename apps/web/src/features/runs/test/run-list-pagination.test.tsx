@@ -28,7 +28,7 @@ vi.mock('next/link', () => ({
     <a href={href} {...props}>{children}</a>,
 }))
 
-function runSummary(id: string): RunSummaryRecord {
+function runSummary(id: string, overrides: Partial<RunSummaryRecord> = {}): RunSummaryRecord {
   return {
     id,
     projectId: 'proj-1',
@@ -39,10 +39,12 @@ function runSummary(id: string): RunSummaryRecord {
     status: 'pass',
     source: 'manual',
     externalId: '',
+    reportExternalId: '',
     startedAt: '2026-06-16T10:00:00Z',
     caseCounts: { total: 1, pending: 0, running: 0, pass: 1, fail: 0, skip: 0, blocked: 0 },
     passRate: 1,
     delta: null,
+    ...overrides,
   }
 }
 

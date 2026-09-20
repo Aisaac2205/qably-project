@@ -711,7 +711,12 @@
     "duration": "Duration",
     "skipReason": "Skip reason",
     "coveredByCi": "Covered by CI",
-    "loading": "Loading runs…"
+    "loading": "Loading runs…",
+    "reportSuite_one": "suite",
+    "reportSuite_other": "suites",
+    "reportFailed_one": "failed",
+    "reportFailed_other": "failed",
+    "reportAllPassed": "all passed"
   },
   "suites": {
     "versionBadge": "v{{version}}",

@@ -300,6 +300,7 @@ export interface RunSummaryRecord {
   status: RunStatus
   source: RunSource
   externalId: string
+  reportExternalId: string
   startedAt: string
   finishedAt?: string
   executedById?: string

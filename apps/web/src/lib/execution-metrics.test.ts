@@ -38,6 +38,7 @@ function makeRun(
     status: 'pass',
     source: 'manual',
     externalId: '',
+    reportExternalId: '',
     caseCounts: EMPTY_CASE_COUNTS,
     passRate: 1,
     delta: null,

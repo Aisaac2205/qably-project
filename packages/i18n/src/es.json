@@ -711,7 +711,12 @@
     "duration": "Duración",
     "skipReason": "Motivo de omisión",
     "coveredByCi": "Cubiertos por CI",
-    "loading": "Cargando corridas…"
+    "loading": "Cargando corridas…",
+    "reportSuite_one": "suite",
+    "reportSuite_other": "suites",
+    "reportFailed_one": "falló",
+    "reportFailed_other": "fallaron",
+    "reportAllPassed": "todas pasaron"
   },
   "suites": {
     "versionBadge": "v{{version}}",

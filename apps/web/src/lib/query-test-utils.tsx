@@ -69,6 +69,7 @@ function toSummary(run: (typeof runFixtures)[number]): RunSummaryRecord {
     status: run.status,
     source: run.source,
     externalId: run.externalId,
+    reportExternalId: run.externalId,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
     executedById: run.executedById,

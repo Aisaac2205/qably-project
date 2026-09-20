@@ -17,6 +17,7 @@ function run(overrides: Partial<RunSummaryRecord> = {}): RunSummaryRecord {
     status: 'pass',
     source: 'manual',
     externalId: 'ext-1',
+    reportExternalId: 'ext-1',
     startedAt: '2026-06-16T10:00:00Z',
     caseCounts: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
     passRate: 1,

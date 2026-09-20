@@ -42,6 +42,7 @@ const mockRun: RunSummaryRecord = {
   status: 'pass',
   source: 'manual',
   externalId: '',
+  reportExternalId: '',
   startedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
   finishedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
   caseCounts: { total: 1, pending: 0, running: 0, pass: 1, fail: 0, skip: 0, blocked: 0 },
