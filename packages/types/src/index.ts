@@ -823,3 +823,5 @@ export interface ChatSendToReviewRecord {
   proposalId: string
   alreadySent?: boolean
 }
+
+export * from './documentation-completeness'

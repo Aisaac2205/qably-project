@@ -15,10 +15,12 @@
     ],
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
-        "type-check": "tsc -p tsconfig.build.json --noEmit"
+        "type-check": "tsc -p tsconfig.build.json --noEmit",
+        "test": "vitest run --maxWorkers=2"
     },
     "devDependencies": {
         "@qably/config": "workspace:*",
-        "typescript": "^5.4.0"
+        "typescript": "^5.4.0",
+        "vitest": "^4.1.9"
     }
 }
