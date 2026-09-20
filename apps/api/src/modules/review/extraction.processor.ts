@@ -28,13 +28,17 @@ import { detectLanguage } from './lib/detect-language';
 import {
   isSameDocumentation,
   publishTestCaseVersion,
+  type DocumentationStateWrite,
   type PublishTestCaseVersionFields,
   type PublishTestCaseVersionTx,
 } from './lib/publish-test-case-version';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import { locateAndPersistAutomationFilePath } from './lib/locate-and-persist-automation-file-path';
-import { incompleteExtractionNote } from './lib/incomplete-extraction-note';
+import {
+  incompleteExtractionNote,
+  incompleteTargetNote,
+} from './lib/incomplete-extraction-note';
 import {
   EXTRACTION_QUEUE,
   type DocumentFileTarget,
@@ -602,7 +606,7 @@ export class ExtractionProcessor extends WorkerHost {
       byAutomationKey,
     );
 
-    if (unmatched.length > 0 && matched.length < ctx.targets.length) {
+    if (unmatched.length > 0) {
       const retryOutcome = await this.extractor.extract({
         filePath: ctx.filePath,
         language: detectLanguage(ctx.filePath),
@@ -678,12 +682,6 @@ export class ExtractionProcessor extends WorkerHost {
     return { matched, unmatched };
   }
 
-  /**
-   * Truthful partial-extraction note (design 1.3): compares how many of the
-   * job's own targets matched, not how many test declarations exist in the
-   * file — the previous "8 of 24 declarations" note compared against the
-   * wrong denominator. No note when every target matched.
-   */
   private applyTargetIncompleteNote(
     matched: { target: DocumentFileTarget; testCase: ExtractedCase }[],
     totalTargets: number,
@@ -691,7 +689,7 @@ export class ExtractionProcessor extends WorkerHost {
   ): { target: DocumentFileTarget; testCase: ExtractedCase }[] {
     if (matched.length >= totalTargets) return matched;
 
-    const note = incompleteExtractionNote(matched.length, totalTargets, locale);
+    const note = incompleteTargetNote(matched.length, totalTargets, locale);
 
     return matched.map(({ target, testCase }) => {
       const observations = testCase.observations ?? [];
@@ -816,6 +814,16 @@ export class ExtractionProcessor extends WorkerHost {
         suiteIds.add(info.suiteId);
 
         if (info.documentationSource === HUMAN_DOCUMENTATION_SOURCE) {
+          const humanSkipState: DocumentationStateWrite = {
+            documentationOutcome: 'skipped',
+            documentationSkipReason: 'human-documented',
+            documentationOutcomeAt: new Date(),
+            documentationQueuedAt: null,
+          };
+          await tx.testCase.update({
+            where: { id: target.testCaseId },
+            data: humanSkipState,
+          });
           skippedForHumanEdit += 1;
           continue;
         }
@@ -831,6 +839,10 @@ export class ExtractionProcessor extends WorkerHost {
         };
 
         if (isSameDocumentation(info.currentVersion ?? null, nextFields)) {
+          await tx.testCase.update({
+            where: { id: target.testCaseId },
+            data: { documentationQueuedAt: null },
+          });
           skippedForIdenticalRedelivery += 1;
           continue;
         }
@@ -843,13 +855,17 @@ export class ExtractionProcessor extends WorkerHost {
           expectedResult: nextFields.expectedResult,
         });
 
-        await publishTestCaseVersion(tx, target.testCaseId, nextFields, {
-          documentationSource: AERIS_DOCUMENTATION_SOURCE,
+        const documentedState: DocumentationStateWrite = {
           documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
           documentationMissing: assessment.missing,
           documentationOutcomeAt: new Date(),
           documentationQueuedAt: null,
           documentationSkipReason: null,
+        };
+
+        await publishTestCaseVersion(tx, target.testCaseId, nextFields, {
+          documentationSource: AERIS_DOCUMENTATION_SOURCE,
+          ...documentedState,
           ...(testCase.observations === undefined
             ? {}
             : { observations: testCase.observations }),
@@ -902,6 +918,14 @@ export class ExtractionProcessor extends WorkerHost {
         tags: mergedTags,
       });
 
+      const documentedState: DocumentationStateWrite = {
+        documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
+        documentationMissing: assessment.missing,
+        documentationOutcomeAt: new Date(),
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
+      };
+
       await tx.suite.update({
         where: { id: suiteId },
         data: {
@@ -909,11 +933,7 @@ export class ExtractionProcessor extends WorkerHost {
           description: suite.description,
           tags: mergedTags,
           nameSource: AERIS_NAME_SOURCE,
-          documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
-          documentationMissing: assessment.missing,
-          documentationOutcomeAt: new Date(),
-          documentationQueuedAt: null,
-          documentationSkipReason: null,
+          ...documentedState,
         },
       });
 
@@ -943,14 +963,20 @@ export class ExtractionProcessor extends WorkerHost {
     observations?: string[],
   ): Promise<void> {
     if (targets.length > 0) {
+      const failedState: DocumentationStateWrite = {
+        documentationOutcome: 'failed',
+        documentationSkipReason: reason,
+        documentationOutcomeAt: new Date(),
+        documentationQueuedAt: null,
+      };
+
       await this.prisma.testCase.updateMany({
-        where: { id: { in: targets.map((target) => target.testCaseId) } },
-        data: {
-          documentationOutcome: 'failed',
-          documentationSkipReason: reason,
-          documentationOutcomeAt: new Date(),
-          documentationQueuedAt: null,
+        where: {
+          id: { in: targets.map((target) => target.testCaseId) },
+          documentationSource: { not: HUMAN_DOCUMENTATION_SOURCE },
+          documentationQueuedAt: { not: null },
         },
+        data: failedState,
       });
     }
 

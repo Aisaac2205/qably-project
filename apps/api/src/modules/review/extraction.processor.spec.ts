@@ -1121,7 +1121,7 @@ describe('ExtractionProcessor — document-file job', () => {
     );
   });
 
-  it('does not create a second version when the job is redelivered and the current version already matches exactly', async () => {
+  it('does not create a second version but still clears queuedAt when the job is redelivered and the current version already matches exactly', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
     const documented = extractedCase({ automationKey: 'Cart > adds an item' });
@@ -1150,7 +1150,11 @@ describe('ExtractionProcessor — document-file job', () => {
     );
 
     expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
-    expect(prisma.testCase.update).not.toHaveBeenCalled();
+    expect(prisma.testCase.update).toHaveBeenCalledTimes(1);
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { documentationQueuedAt: null },
+    });
   });
 
   it('does create a new version on redelivery when the extracted content actually changed', async () => {
@@ -1235,11 +1239,23 @@ describe('ExtractionProcessor — document-file job', () => {
       documentFileJob(),
     );
 
-    expect(prisma.testCase.update).toHaveBeenCalledTimes(1);
+    expect(prisma.testCase.update).toHaveBeenCalledTimes(2);
     expect(prisma.testCase.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'case-2' } }),
     );
     expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(1);
+
+    const humanUpdate = (
+      prisma.testCase.update.mock.calls as [
+        { where: { id: string }; data: Record<string, unknown> },
+      ][]
+    ).find(([call]) => call.where.id === 'case-1');
+    expect(humanUpdate?.[0].data).toEqual({
+      documentationOutcome: 'skipped',
+      documentationSkipReason: 'human-documented',
+      documentationOutcomeAt: expect.any(Date) as Date,
+      documentationQueuedAt: null,
+    });
   });
 
   it('spends exactly one credit for the whole chunk, not one per matched case', async () => {
@@ -1649,7 +1665,7 @@ describe('ExtractionProcessor — document-file documentation state', () => {
     });
   });
 
-  it('writes documentationOutcome=failed with the reason on every target that falls back', async () => {
+  it('writes documentationOutcome=failed with the reason on every target that falls back, excluding human rows and rows this job no longer owns', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue({
       ...firstTargetRow,
@@ -1661,7 +1677,11 @@ describe('ExtractionProcessor — document-file documentation state', () => {
     );
 
     expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['case-1', 'case-2'] } },
+      where: {
+        id: { in: ['case-1', 'case-2'] },
+        documentationSource: { not: 'human' },
+        documentationQueuedAt: { not: null },
+      },
       data: {
         documentationOutcome: 'failed',
         documentationSkipReason: 'no-connection',
@@ -1669,6 +1689,24 @@ describe('ExtractionProcessor — document-file documentation state', () => {
         documentationQueuedAt: null,
       },
     });
+  });
+
+  it('never lets fallbackForTargets clobber a human edit or an outcome a fresher job already wrote', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...firstTargetRow,
+      project: { organizationId: 'org-1', connection: null },
+    });
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(jest.fn())).process(
+      documentFileJob(),
+    );
+
+    const [call] = prisma.testCase.updateMany.mock.calls as [
+      { where: Record<string, unknown> },
+    ][];
+    expect(call[0].where.documentationSource).toEqual({ not: 'human' });
+    expect(call[0].where.documentationQueuedAt).toEqual({ not: null });
   });
 
   it('adds no incomplete note when every target matched, regardless of how many declarations the file has', async () => {
@@ -1734,8 +1772,13 @@ describe('ExtractionProcessor — document-file documentation state', () => {
       ][]
     ).find(([call]) => call.where.id === 'case-1');
     expect(case1Update?.[0].data.observations).toEqual([
-      'Aeris extracted 1 of 2 test declarations found in this file.',
+      'Aeris documented 1 of 2 test cases requested in this run.',
     ]);
+    expect(case1Update?.[0].data.observations).not.toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('declarations found in this file'),
+      ]),
+    );
 
     const fallback = lastCall(prisma.extractedProposal.create).data;
     expect(fallback).toMatchObject({

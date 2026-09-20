@@ -1,4 +1,13 @@
+import type { DocumentationOutcome } from '@qably/types';
 import type { PrismaService } from '../../../prisma/prisma.service';
+
+export interface DocumentationStateWrite {
+  documentationOutcome: DocumentationOutcome | null;
+  documentationOutcomeAt: Date | null;
+  documentationMissing?: string[];
+  documentationSkipReason: string | null;
+  documentationQueuedAt: Date | null;
+}
 
 export interface PublishTestCaseVersionFields {
   title: string;

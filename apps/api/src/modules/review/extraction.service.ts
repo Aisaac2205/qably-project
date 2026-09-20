@@ -14,6 +14,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { buildJobId } from '../../common/queue/job-id';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { TestFileLocator } from '../repository/test-file-locator';
+import type { DocumentationStateWrite } from './lib/publish-test-case-version';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import {
   locateAndPersistAutomationFilePath,
@@ -116,6 +117,17 @@ export class ExtractionService {
     });
   }
 
+  private async clearDocumentationQueued(
+    testCaseIds: readonly string[],
+  ): Promise<void> {
+    if (testCaseIds.length === 0) return;
+
+    await this.prisma.testCase.updateMany({
+      where: { id: { in: [...testCaseIds] } },
+      data: { documentationQueuedAt: null },
+    });
+  }
+
   private async persistSkippedOutcomes(skippedIds: SkippedIds): Promise<void> {
     const now = new Date();
 
@@ -123,17 +135,19 @@ export class ExtractionService {
       Object.entries(skippedIds) as [DocumentFilesSkipReason, string[]][]
     )
       .filter(([, ids]) => ids.length > 0)
-      .map(([reason, ids]) =>
-        this.prisma.testCase.updateMany({
+      .map(([reason, ids]) => {
+        const skippedState: DocumentationStateWrite = {
+          documentationOutcome: 'skipped',
+          documentationSkipReason: reason,
+          documentationOutcomeAt: now,
+          documentationQueuedAt: null,
+        };
+
+        return this.prisma.testCase.updateMany({
           where: { id: { in: ids } },
-          data: {
-            documentationOutcome: 'skipped',
-            documentationSkipReason: reason,
-            documentationOutcomeAt: now,
-            documentationQueuedAt: null,
-          },
-        }),
-      );
+          data: skippedState,
+        });
+      });
 
     await Promise.all(writes);
   }
@@ -421,8 +435,14 @@ export class ExtractionService {
       });
     }
 
-    await this.queue.addBulk(jobs);
     await this.persistDocumentationQueued(queuedCaseIds);
+
+    try {
+      await this.queue.addBulk(jobs);
+    } catch (error) {
+      await this.clearDocumentationQueued(queuedCaseIds);
+      throw error;
+    }
 
     return ok({
       filesEnqueued: files.length,

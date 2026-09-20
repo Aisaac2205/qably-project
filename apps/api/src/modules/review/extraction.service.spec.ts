@@ -794,6 +794,65 @@ describe('ExtractionService.enqueueDocumentFiles — documentation state persist
     expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
   });
 
+  it('writes documentationQueuedAt before enqueuing the jobs, not after', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-1', automationKey: 'Cart > adds an item' }),
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    const queuedCallIndex = (
+      prisma.testCase.updateMany.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]
+    ).findIndex(([call]) => call.data.documentationQueuedAt instanceof Date);
+    const queuedCallOrder =
+      prisma.testCase.updateMany.mock.invocationCallOrder[queuedCallIndex];
+    const addBulkOrder = queue.addBulk.mock.invocationCallOrder[0];
+
+    expect(queuedCallOrder).toBeLessThan(addBulkOrder);
+  });
+
+  it('clears documentationQueuedAt for the enqueued cases when addBulk throws, then rethrows', async () => {
+    const queue = createQueue();
+    queue.addBulk.mockRejectedValue(new Error('redis unavailable'));
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-1', automationKey: 'Cart > adds an item' }),
+      candidate({ id: 'case-2', automationKey: 'Cart > removes an item' }),
+    ]);
+
+    await expect(
+      build(prisma, queue).enqueueDocumentFiles(
+        org,
+        { suiteId: 'suite-1' },
+        null,
+      ),
+    ).rejects.toThrow('redis unavailable');
+
+    const clearedCall = (
+      prisma.testCase.updateMany.mock.calls as [
+        { where: { id: { in: string[] } }; data: Record<string, unknown> },
+      ][]
+    ).find(
+      ([call]) =>
+        call.data.documentationQueuedAt === null &&
+        Object.keys(call.data).length === 1,
+    );
+
+    expect(clearedCall).toBeDefined();
+    const [call] = clearedCall as [
+      { where: { id: { in: string[] } }; data: Record<string, unknown> },
+    ];
+    expect([...call.where.id.in].sort()).toEqual(['case-1', 'case-2']);
+  });
+
   it('writes a skipped outcome with the reason for a case with no resolvable source file', async () => {
     const queue = createQueue();
     const prisma = createPrisma('en');
