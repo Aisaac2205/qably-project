@@ -11,6 +11,8 @@ import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import type { IngestRunInput } from './runs.schemas';
 
 export const RUN_INGEST_QUEUE = 'run-ingest';
+export const REPORT_BATCH_TIMEOUT_JOB = 'report-batch-timeout';
+export const REPORT_BATCH_TIMEOUT_DELAY_MS = 120_000;
 
 export type RunView = RunRecord;
 export type RunCaseView = RunCaseRecord;
@@ -23,7 +25,14 @@ export type JunitIngestView = JunitIngestRecord;
 export interface RunIngestJobData {
   apiKey: ApiKeyIdentity;
   body: IngestRunInput;
+  reportSize: number;
 }
+
+export interface ReportBatchTimeoutJobData {
+  key: string;
+}
+
+export type RunQueueJobData = RunIngestJobData | ReportBatchTimeoutJobData;
 
 export type RunError = 'suite-not-found' | 'source-not-allowed';
 

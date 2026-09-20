@@ -157,7 +157,11 @@ export class RunsController {
 
     const jobs = bodies.map((body, index) => ({
       name: 'ingest',
-      data: { apiKey, body } satisfies RunIngestJobData,
+      data: {
+        apiKey,
+        body,
+        reportSize: groups.length,
+      } satisfies RunIngestJobData,
       opts: {
         jobId: buildJobId('ingest', [
           apiKey.projectId,

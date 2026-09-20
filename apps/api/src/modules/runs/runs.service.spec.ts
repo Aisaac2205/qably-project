@@ -116,11 +116,20 @@ function createNotifications() {
   return { publish: jest.fn().mockResolvedValue(undefined) };
 }
 
+function createReportBatch() {
+  return { recordAndMaybePublish: jest.fn().mockResolvedValue(undefined) };
+}
+
 function build(
   prisma: FakePrisma,
   notifications: { publish: jest.Mock } = createNotifications(),
+  reportBatch: { recordAndMaybePublish: jest.Mock } = createReportBatch(),
 ) {
-  return new RunsService(prisma as never, notifications as never);
+  return new RunsService(
+    prisma as never,
+    notifications as never,
+    reportBatch as never,
+  );
 }
 
 const baseInput: IngestRunInput = {
@@ -1054,6 +1063,89 @@ describe('RunsService.ingest notifications', () => {
       ],
     });
 
+    expect(notifications.publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('RunsService.ingest report batching', () => {
+  it('publishes directly, bypassing the report batch, when reportSize is omitted', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    const reportBatch = createReportBatch();
+
+    await build(prisma, notifications, reportBatch).ingest(apiKey, baseInput);
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'run_completed' }),
+    );
+    expect(reportBatch.recordAndMaybePublish).not.toHaveBeenCalled();
+  });
+
+  it('publishes directly, bypassing the report batch, when reportSize is 1', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    const reportBatch = createReportBatch();
+
+    await build(prisma, notifications, reportBatch).ingest(
+      apiKey,
+      baseInput,
+      1,
+    );
+
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'run_completed' }),
+    );
+    expect(reportBatch.recordAndMaybePublish).not.toHaveBeenCalled();
+  });
+
+  it('delegates to the report batch instead of publishing directly when reportSize is greater than 1', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    const reportBatch = createReportBatch();
+
+    await build(prisma, notifications, reportBatch).ingest(
+      apiKey,
+      baseInput,
+      3,
+    );
+
+    expect(notifications.publish).not.toHaveBeenCalled();
+    expect(reportBatch.recordAndMaybePublish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        source: 'api',
+        reportExternalId: 'ci-run-42',
+        reportSize: 3,
+        runId: 'run-1',
+        suiteName: 'Checkout',
+        status: 'pass',
+      }),
+    );
+  });
+
+  it('never delegates to the report batch for a non-terminal derived status, even inside a batch', async () => {
+    const prisma = createPrisma();
+    const notifications = createNotifications();
+    const reportBatch = createReportBatch();
+
+    await build(prisma, notifications, reportBatch).ingest(
+      apiKey,
+      {
+        ...baseInput,
+        cases: [
+          {
+            name: 'Adds to cart',
+            steps: [],
+            expectedResult: '',
+            status: 'running',
+          },
+        ],
+      },
+      3,
+    );
+
+    expect(reportBatch.recordAndMaybePublish).not.toHaveBeenCalled();
     expect(notifications.publish).not.toHaveBeenCalled();
   });
 });

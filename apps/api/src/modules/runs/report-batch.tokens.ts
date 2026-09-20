@@ -1,0 +1,1 @@
+export const REPORT_BATCH_REDIS = Symbol('REPORT_BATCH_REDIS');

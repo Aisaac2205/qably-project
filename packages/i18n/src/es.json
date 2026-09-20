@@ -186,6 +186,10 @@
     "events": {
       "run_failed": "La ejecución \"{{runName}}\" en {{suiteName}} falló.",
       "run_completed": "La ejecución \"{{runName}}\" en {{suiteName}} pasó.",
+      "run_completed_one": "La suite del reporte pasó.",
+      "run_completed_other": "Las {{count}} suites del reporte pasaron.",
+      "run_failed_one": "La suite del reporte falló: {{failedSuiteNames}}.",
+      "run_failed_other": "Fallaron {{failedCount}} de {{count}} suites del reporte: {{failedSuiteNames}}.",
       "case_regressed": "{{caseName}} tuvo una regresión en {{suiteName}} durante la ejecución \"{{runName}}\".",
       "ingestion_failed": "La ingesta falló para {{repo}}.",
       "connection_security": "{{action}} en la conexión {{connectionName}}."
@@ -193,6 +197,10 @@
     "emailSubject": {
       "run_failed": "La ejecución \"{{runName}}\" falló",
       "run_completed": "La ejecución \"{{runName}}\" pasó",
+      "run_completed_one": "La suite del reporte pasó",
+      "run_completed_other": "Pasaron {{count}} suites del reporte",
+      "run_failed_one": "Falló la suite del reporte",
+      "run_failed_other": "Fallaron {{failedCount}} de {{count}} suites del reporte",
       "case_regressed": "{{caseName}} tuvo una regresión en {{suiteName}}",
       "ingestion_failed": "La ingesta falló para {{repo}}",
       "connection_security": "{{action}} en la conexión {{connectionName}}"

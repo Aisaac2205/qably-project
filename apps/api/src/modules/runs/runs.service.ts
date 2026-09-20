@@ -5,6 +5,7 @@ import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { err, ok, type Result } from '../../common/result';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ReportBatchService } from './report-batch.service';
 import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
 import { normalizeAutomationKeyForMatch } from './lib/normalize-automation-key';
@@ -77,11 +78,13 @@ export class RunsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsPublisher,
+    private readonly reportBatch: ReportBatchService,
   ) {}
 
   async ingest(
     apiKey: ApiKeyIdentity,
     input: IngestRunInput,
+    reportSize = 1,
   ): Promise<Result<RunView, RunError>> {
     if (!isSourceAllowed(input.source)) return err('source-not-allowed');
 
@@ -216,15 +219,30 @@ export class RunsService {
     });
 
     if (status === 'fail' || status === 'pass') {
-      await this.notifications.publish({
-        eventType: status === 'fail' ? 'run_failed' : 'run_completed',
-        organizationId: apiKey.organizationId,
-        severity: status === 'fail' ? 'high' : 'low',
-        payload: { runName: run.name, suiteName: cases[0]?.suiteName ?? '' },
-        dedupeKey: `${status === 'fail' ? 'run_failed' : 'run_completed'}:${run.id}`,
-        projectId: apiKey.projectId,
-        runId: run.id,
-      });
+      const suiteName = cases[0]?.suiteName ?? '';
+
+      if (reportSize <= 1) {
+        await this.notifications.publish({
+          eventType: status === 'fail' ? 'run_failed' : 'run_completed',
+          organizationId: apiKey.organizationId,
+          severity: status === 'fail' ? 'high' : 'low',
+          payload: { runName: run.name, suiteName },
+          dedupeKey: `${status === 'fail' ? 'run_failed' : 'run_completed'}:${run.id}`,
+          projectId: apiKey.projectId,
+          runId: run.id,
+        });
+      } else {
+        await this.reportBatch.recordAndMaybePublish({
+          organizationId: apiKey.organizationId,
+          projectId: apiKey.projectId,
+          source: input.source,
+          reportExternalId,
+          reportSize,
+          runId: run.id,
+          suiteName,
+          status,
+        });
+      }
     }
 
     return ok(toRunView(run, cases));

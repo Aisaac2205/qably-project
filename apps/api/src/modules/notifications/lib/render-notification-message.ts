@@ -23,12 +23,29 @@ function interpolate(
   );
 }
 
+function resolveTemplateKey(
+  eventType: NotificationEventType,
+  payload: Record<string, string | number>,
+): string {
+  const count = payload.count;
+
+  if (typeof count !== 'number') return eventType;
+
+  if (eventType === 'run_completed' || eventType === 'run_failed') {
+    return `${eventType}_${count === 1 ? 'one' : 'other'}`;
+  }
+
+  return eventType;
+}
+
 export function renderNotificationMessage(
   locale: Locale,
   eventType: NotificationEventType,
   payload: Record<string, string | number>,
 ): string {
-  const template = dictionaries[locale].notifications.events[eventType];
+  const catalog = dictionaries[locale].notifications.events;
+  const template =
+    catalog[resolveTemplateKey(eventType, payload)] ?? catalog[eventType];
 
   if (template === undefined) return eventType;
 
@@ -40,7 +57,9 @@ export function renderNotificationSubject(
   eventType: NotificationEventType,
   payload: Record<string, string | number>,
 ): string {
-  const template = dictionaries[locale].notifications.emailSubject[eventType];
+  const catalog = dictionaries[locale].notifications.emailSubject;
+  const template =
+    catalog[resolveTemplateKey(eventType, payload)] ?? catalog[eventType];
 
   if (template === undefined) return eventType;
 

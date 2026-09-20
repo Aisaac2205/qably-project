@@ -322,6 +322,37 @@ describe('RunsController.ingestJunit', () => {
     expect(jobs[0].data.body.cases).toHaveLength(3);
   });
 
+  it('stamps reportSize as 1 on the single job produced by a single-suite report', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(apiKey, query(), report);
+
+    const [job] = jobBodies(runIngestQueue);
+    expect(job.data.reportSize).toBe(1);
+  });
+
+  it('stamps every job with reportSize equal to the number of suites in the report', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(apiKey, query(), multiSuiteReport);
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs.map((job) => job.data.reportSize)).toEqual([3, 3, 3]);
+  });
+
+  it('stamps reportSize as 1 when the caller pins an explicit suiteId on a multi-suite report', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ suiteId: 'suite-9' }),
+      multiSuiteReport,
+    );
+
+    const [job] = jobBodies(runIngestQueue);
+    expect(job.data.reportSize).toBe(1);
+  });
+
   it('produces the same deterministic jobId for the same project, source and externalId', async () => {
     const { controller, runIngestQueue } = build();
 

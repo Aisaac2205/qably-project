@@ -186,6 +186,10 @@
     "events": {
       "run_failed": "The run \"{{runName}}\" in {{suiteName}} failed.",
       "run_completed": "The run \"{{runName}}\" in {{suiteName}} passed.",
+      "run_completed_one": "The test suite in this report passed.",
+      "run_completed_other": "All {{count}} test suites in this report passed.",
+      "run_failed_one": "The test suite in this report failed: {{failedSuiteNames}}.",
+      "run_failed_other": "{{failedCount}} of {{count}} test suites failed: {{failedSuiteNames}}.",
       "case_regressed": "{{caseName}} regressed in {{suiteName}} during run \"{{runName}}\".",
       "ingestion_failed": "Ingestion failed for {{repo}}.",
       "connection_security": "{{action}} for connection {{connectionName}}."
@@ -193,6 +197,10 @@
     "emailSubject": {
       "run_failed": "Run \"{{runName}}\" failed",
       "run_completed": "Run \"{{runName}}\" passed",
+      "run_completed_one": "Test suite passed",
+      "run_completed_other": "{{count}} test suites passed",
+      "run_failed_one": "Test suite failed",
+      "run_failed_other": "{{failedCount}} of {{count}} test suites failed",
       "case_regressed": "{{caseName}} regressed in {{suiteName}}",
       "ingestion_failed": "Ingestion failed for {{repo}}",
       "connection_security": "{{action}} for connection {{connectionName}}"
