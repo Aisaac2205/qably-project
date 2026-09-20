@@ -169,4 +169,26 @@ describe('NotificationWebhooksPanel', () => {
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     )
   })
+
+  it('shows a clean brand logo next to each channel type, with no card wrapper', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      render(<NotificationWebhooksPanel />)
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Add channel' }))
+    const dialog = await screen.findByRole('dialog')
+
+    const triggerLogo = dialog.querySelector('img[src*="slack.svg"]')
+    expect(triggerLogo).not.toBeNull()
+    expect(triggerLogo?.closest('[class*="rounded-xl"]')).toBeNull()
+    expect(triggerLogo?.parentElement?.className).not.toMatch(/border|shadow|bg-surface/)
+
+    await user.click(within(dialog).getByLabelText('Channel'))
+    const discordOption = await screen.findByRole('option', { name: /Discord/ })
+    const optionLogo = discordOption.querySelector('img[src*="discord.svg"]')
+    expect(optionLogo).not.toBeNull()
+    expect(optionLogo?.closest('[class*="rounded-xl"]')).toBeNull()
+    expect(optionLogo?.parentElement?.className).not.toMatch(/border|shadow|bg-surface/)
+  })
 })

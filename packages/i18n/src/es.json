@@ -196,6 +196,10 @@
       "case_regressed": "{{caseName}} tuvo una regresión en {{suiteName}}",
       "ingestion_failed": "La ingesta falló para {{repo}}",
       "connection_security": "{{action}} en la conexión {{connectionName}}"
+    },
+    "delivery": {
+      "sentTo": "Se envió a {{channel}}",
+      "failedTo": "No se pudo enviar a {{channel}}"
     }
   },
   "repository": {

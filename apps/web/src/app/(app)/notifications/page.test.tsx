@@ -28,6 +28,7 @@ const runFailed: Notification = {
   projectId: 'proj-1',
   runId: 'run-12',
   createdAt: '2026-06-16T10:42:00Z',
+  deliveries: [],
 }
 
 const caseRegressed: Notification = {
@@ -41,6 +42,7 @@ const caseRegressed: Notification = {
   runId: 'run-10',
   createdAt: '2026-06-14T09:12:00Z',
   readAt: '2026-06-14T10:00:00Z',
+  deliveries: [],
 }
 
 beforeEach(() => {

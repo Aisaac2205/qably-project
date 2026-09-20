@@ -37,6 +37,7 @@ const unread: Notification = {
   projectId: 'proj-1',
   runId: 'run-12',
   createdAt: '2026-06-16T10:42:00Z',
+  deliveries: [],
 }
 
 const read: Notification = {

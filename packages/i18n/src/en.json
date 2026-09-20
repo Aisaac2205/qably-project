@@ -196,6 +196,10 @@
       "case_regressed": "{{caseName}} regressed in {{suiteName}}",
       "ingestion_failed": "Ingestion failed for {{repo}}",
       "connection_security": "{{action}} for connection {{connectionName}}"
+    },
+    "delivery": {
+      "sentTo": "Sent to {{channel}}",
+      "failedTo": "Failed to send to {{channel}}"
     }
   },
   "repository": {

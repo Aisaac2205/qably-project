@@ -11,6 +11,7 @@ function baseNotification(overrides: Partial<Notification>): Notification {
     severity: 'critical',
     payload: {},
     createdAt: '2026-06-16T10:42:00Z',
+    deliveries: [],
     ...overrides,
   }
 }

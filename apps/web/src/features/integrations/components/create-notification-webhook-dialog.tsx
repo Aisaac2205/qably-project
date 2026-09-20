@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import Image from 'next/image'
 import type { NotificationEventType, NotificationWebhookType } from '@qably/types'
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@qably/types'
 import {
@@ -18,6 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTranslation } from '@/lib/i18n'
 
 const MAX_NAME_LENGTH = 80
+
+const WEBHOOK_TYPE_LOGO: Record<NotificationWebhookType, string> = {
+  slack: '/logos/slack.svg',
+  discord: '/logos/discord.svg',
+}
 
 const EVENT_TYPES = Object.keys(
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -124,11 +130,28 @@ function CreateNotificationWebhookDialogContent({
             onValueChange={(value) => setType(value as NotificationWebhookType)}
           >
             <SelectTrigger id="webhook-type" disabled={isSubmitting}>
-              <SelectValue />
+              <SelectValue>
+                <span className="flex items-center gap-1.5">
+                  <Image
+                    src={WEBHOOK_TYPE_LOGO[type]}
+                    alt=""
+                    width={16}
+                    height={16}
+                    className="size-4 shrink-0"
+                  />
+                  <span>{t(`settings.webhooks.type${type === 'slack' ? 'Slack' : 'Discord'}`)}</span>
+                </span>
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="slack">{t('settings.webhooks.typeSlack')}</SelectItem>
-              <SelectItem value="discord">{t('settings.webhooks.typeDiscord')}</SelectItem>
+              <SelectItem value="slack">
+                <Image src={WEBHOOK_TYPE_LOGO.slack} alt="" width={16} height={16} className="size-4 shrink-0" />
+                <span>{t('settings.webhooks.typeSlack')}</span>
+              </SelectItem>
+              <SelectItem value="discord">
+                <Image src={WEBHOOK_TYPE_LOGO.discord} alt="" width={16} height={16} className="size-4 shrink-0" />
+                <span>{t('settings.webhooks.typeDiscord')}</span>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   Bell,
   WarningOctagon,
@@ -11,9 +12,10 @@ import {
   ArrowSquareOut,
   Check,
   MagnifyingGlass,
+  WarningCircle,
   X,
 } from '@phosphor-icons/react'
-import type { NotificationSeverity } from '@qably/types'
+import type { NotificationDelivery, NotificationSeverity } from '@qably/types'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
 import { resolveNotificationLink } from '@/features/notifications/lib/resolve-notification-link'
 import { useProjects } from '@/features/projects/hooks/use-projects'
@@ -59,6 +61,16 @@ const SEVERITY_CONFIG: Record<
     badgeClass: 'bg-canvas text-muted border-border/80',
     bgClass: 'bg-canvas text-muted',
   },
+}
+
+const DELIVERY_LOGO: Record<NotificationDelivery['channel'], string> = {
+  slack: '/logos/slack.svg',
+  discord: '/logos/discord.svg',
+}
+
+const DELIVERY_CHANNEL_NAME: Record<NotificationDelivery['channel'], string> = {
+  slack: 'Slack',
+  discord: 'Discord',
 }
 
 function formatDate(iso: string): string {
@@ -340,6 +352,38 @@ export function NotificationsPage() {
                       <time className="text-[11px] text-muted font-normal" dateTime={n.createdAt}>
                         {formatDate(n.createdAt)}
                       </time>
+
+                      {n.deliveries.length > 0 && (
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          {n.deliveries.map((delivery) => {
+                            const failed = delivery.status === 'failed'
+                            const label = t(
+                              failed ? 'notifications.delivery.failedTo' : 'notifications.delivery.sentTo',
+                              { channel: DELIVERY_CHANNEL_NAME[delivery.channel] },
+                            )
+
+                            return (
+                              <span key={delivery.channel} className="relative inline-flex" title={label}>
+                                <Image
+                                  src={DELIVERY_LOGO[delivery.channel]}
+                                  alt={label}
+                                  width={14}
+                                  height={14}
+                                  className={`size-3.5 ${failed ? 'opacity-40' : ''}`}
+                                />
+                                {failed && (
+                                  <WarningCircle
+                                    size={9}
+                                    weight="fill"
+                                    className="absolute -bottom-0.5 -right-0.5 text-fail"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                              </span>
+                            )
+                          })}
+                        </span>
+                      )}
                     </div>
 
                     <p
