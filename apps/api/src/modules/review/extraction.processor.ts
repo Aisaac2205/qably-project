@@ -2,7 +2,11 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
-import type { RepoConnectionProvider } from '@qably/types';
+import {
+  assessCaseDocumentation,
+  assessSuiteDocumentation,
+  type RepoConnectionProvider,
+} from '@qably/types';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
@@ -586,30 +590,37 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const deduped = this.applyIncompleteExtractionNote(
-      dedupeByAutomationKey(outcome.cases),
-      declarationCount,
-      locale,
-    );
     const byAutomationKey = new Map(
-      deduped.map((testCase) => [
+      dedupeByAutomationKey(outcome.cases).map((testCase) => [
         normalizeAutomationKey(testCase.automationKey),
         testCase,
       ]),
     );
 
-    const matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] =
-      [];
-    const unmatched: DocumentFileTarget[] = [];
+    let { matched, unmatched } = this.matchTargets(
+      ctx.targets,
+      byAutomationKey,
+    );
 
-    for (const target of ctx.targets) {
-      const testCase = byAutomationKey.get(
-        normalizeAutomationKey(target.automationKey),
-      );
-      if (testCase === undefined) {
-        unmatched.push(target);
-      } else {
-        matched.push({ target, testCase });
+    if (unmatched.length > 0 && matched.length < ctx.targets.length) {
+      const retryOutcome = await this.extractor.extract({
+        filePath: ctx.filePath,
+        language: detectLanguage(ctx.filePath),
+        content: source.content,
+        locale,
+        targetAutomationKeys: unmatched.map((target) => target.automationKey),
+      });
+
+      if (retryOutcome.kind === 'extracted') {
+        for (const testCase of dedupeByAutomationKey(retryOutcome.cases)) {
+          const key = normalizeAutomationKey(testCase.automationKey);
+          if (!byAutomationKey.has(key)) byAutomationKey.set(key, testCase);
+        }
+
+        ({ matched, unmatched } = this.matchTargets(
+          ctx.targets,
+          byAutomationKey,
+        ));
       }
     }
 
@@ -621,8 +632,14 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const persisted = await this.persistDocumentFileTargets(
+    const notedMatched = this.applyTargetIncompleteNote(
       matched,
+      ctx.targets.length,
+      locale,
+    );
+
+    const persisted = await this.persistDocumentFileTargets(
+      notedMatched,
       ctx,
       outcome.suite,
     );
@@ -634,6 +651,59 @@ export class ExtractionProcessor extends WorkerHost {
     if (unmatched.length > 0) {
       await this.fallbackForTargets(ctx, unmatched, NO_MATCHING_CASE_REASON);
     }
+  }
+
+  private matchTargets(
+    targets: readonly DocumentFileTarget[],
+    byAutomationKey: ReadonlyMap<string, ExtractedCase>,
+  ): {
+    matched: { target: DocumentFileTarget; testCase: ExtractedCase }[];
+    unmatched: DocumentFileTarget[];
+  } {
+    const matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] =
+      [];
+    const unmatched: DocumentFileTarget[] = [];
+
+    for (const target of targets) {
+      const testCase = byAutomationKey.get(
+        normalizeAutomationKey(target.automationKey),
+      );
+      if (testCase === undefined) {
+        unmatched.push(target);
+      } else {
+        matched.push({ target, testCase });
+      }
+    }
+
+    return { matched, unmatched };
+  }
+
+  /**
+   * Truthful partial-extraction note (design 1.3): compares how many of the
+   * job's own targets matched, not how many test declarations exist in the
+   * file — the previous "8 of 24 declarations" note compared against the
+   * wrong denominator. No note when every target matched.
+   */
+  private applyTargetIncompleteNote(
+    matched: { target: DocumentFileTarget; testCase: ExtractedCase }[],
+    totalTargets: number,
+    locale: 'es' | 'en',
+  ): { target: DocumentFileTarget; testCase: ExtractedCase }[] {
+    if (matched.length >= totalTargets) return matched;
+
+    const note = incompleteExtractionNote(matched.length, totalTargets, locale);
+
+    return matched.map(({ target, testCase }) => {
+      const observations = testCase.observations ?? [];
+      if (observations.length >= MAX_CASE_OBSERVATIONS) {
+        return { target, testCase };
+      }
+
+      return {
+        target,
+        testCase: { ...testCase, observations: [...observations, note] },
+      };
+    });
   }
 
   private async extractWithDeclarationRetry(
@@ -765,8 +835,21 @@ export class ExtractionProcessor extends WorkerHost {
           continue;
         }
 
+        const assessment = assessCaseDocumentation({
+          name: nextFields.title,
+          automationKey: target.automationKey,
+          objective: nextFields.objective,
+          steps: nextFields.steps,
+          expectedResult: nextFields.expectedResult,
+        });
+
         await publishTestCaseVersion(tx, target.testCaseId, nextFields, {
           documentationSource: AERIS_DOCUMENTATION_SOURCE,
+          documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
+          documentationMissing: assessment.missing,
+          documentationOutcomeAt: new Date(),
+          documentationQueuedAt: null,
+          documentationSkipReason: null,
           ...(testCase.observations === undefined
             ? {}
             : { observations: testCase.observations }),
@@ -812,13 +895,25 @@ export class ExtractionProcessor extends WorkerHost {
     await tx.$executeRawUnsafe(`SAVEPOINT ${SUITE_METADATA_SAVEPOINT}`);
 
     try {
+      const mergedTags = mergeSuiteTags(metadata.tags, suite.tags);
+      const assessment = assessSuiteDocumentation({
+        name: suite.title,
+        description: suite.description,
+        tags: mergedTags,
+      });
+
       await tx.suite.update({
         where: { id: suiteId },
         data: {
           name: suite.title,
           description: suite.description,
-          tags: mergeSuiteTags(metadata.tags, suite.tags),
+          tags: mergedTags,
           nameSource: AERIS_NAME_SOURCE,
+          documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
+          documentationMissing: assessment.missing,
+          documentationOutcomeAt: new Date(),
+          documentationQueuedAt: null,
+          documentationSkipReason: null,
         },
       });
 
@@ -847,6 +942,18 @@ export class ExtractionProcessor extends WorkerHost {
     reason: string,
     observations?: string[],
   ): Promise<void> {
+    if (targets.length > 0) {
+      await this.prisma.testCase.updateMany({
+        where: { id: { in: targets.map((target) => target.testCaseId) } },
+        data: {
+          documentationOutcome: 'failed',
+          documentationSkipReason: reason,
+          documentationOutcomeAt: new Date(),
+          documentationQueuedAt: null,
+        },
+      });
+    }
+
     for (const target of targets) {
       await this.persistManualReviewFallback(
         {

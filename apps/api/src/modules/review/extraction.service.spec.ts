@@ -30,7 +30,12 @@ interface FakeQueue {
 }
 
 interface FakePrisma {
-  testCase: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
+  testCase: {
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    update: jest.Mock;
+    updateMany: jest.Mock;
+  };
   extractedProposal: { findFirst: jest.Mock; findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
   suite: { findFirst: jest.Mock };
@@ -60,6 +65,7 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
       }),
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({ id: 'case-1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     extractedProposal: {
       findFirst: jest.fn().mockResolvedValue(null),
@@ -731,6 +737,183 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
       ok: true,
       value: { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
     });
+  });
+});
+
+describe('ExtractionService.enqueueDocumentFiles — documentation state persistence', () => {
+  function candidate(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      projectId: 'proj-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      steps: [],
+      currentVersion: null,
+      ...overrides,
+    };
+  }
+
+  it('sets documentationQueuedAt on every case actually enqueued', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-1', automationKey: 'Cart > adds an item' }),
+      candidate({ id: 'case-2', automationKey: 'Cart > removes an item' }),
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    const queuedCall = (
+      prisma.testCase.updateMany.mock.calls as [
+        { where: { id: { in: string[] } }; data: Record<string, unknown> },
+      ][]
+    ).find(([call]) => call.data.documentationQueuedAt instanceof Date);
+
+    expect(queuedCall).toBeDefined();
+    const [call] = queuedCall as [
+      { where: { id: { in: string[] } }; data: Record<string, unknown> },
+    ];
+    expect([...call.where.id.in].sort()).toEqual(['case-1', 'case-2']);
+  });
+
+  it('never writes documentationQueuedAt when nothing was enqueued', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('writes a skipped outcome with the reason for a case with no resolvable source file', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ automationFilePath: null }),
+    ]);
+    prisma.extractedProposal.findFirst.mockResolvedValue(null);
+    prisma.testCase.findFirst.mockResolvedValue(null);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-1'] } },
+      data: {
+        documentationOutcome: 'skipped',
+        documentationSkipReason: 'no-source-file',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('writes a skipped outcome for a case with an already-pending proposal', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1' },
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-1'] } },
+      data: {
+        documentationOutcome: 'skipped',
+        documentationSkipReason: 'already-pending',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('writes a skipped outcome for a case with no automation key', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ automationKey: null, automationFilePath: null }),
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-1'] } },
+      data: {
+        documentationOutcome: 'skipped',
+        documentationSkipReason: 'no-automation-key',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('writes a skipped outcome for a case a human already documented', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({
+        steps: [],
+        documentationSource: 'human',
+        currentVersion: { locale: 'en' },
+      }),
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-1'] } },
+      data: {
+        documentationOutcome: 'skipped',
+        documentationSkipReason: 'human-documented',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('never writes a skipped outcome for a case that was out of scope for this mode', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ steps: ['Open the cart'], automationKey: null }),
+    ]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1' },
+    ]);
+
+    await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
   });
 });
 

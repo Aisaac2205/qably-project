@@ -64,14 +64,14 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return chunks;
 }
 
-type SkipTally = Record<DocumentFilesSkipReason, number>;
+type SkippedIds = Record<DocumentFilesSkipReason, string[]>;
 
-function emptySkipTally(): SkipTally {
+function emptySkippedIds(): SkippedIds {
   return {
-    'no-source-file': 0,
-    'no-automation-key': 0,
-    'already-pending': 0,
-    'human-documented': 0,
+    'no-source-file': [],
+    'no-automation-key': [],
+    'already-pending': [],
+    'human-documented': [],
   };
 }
 
@@ -89,10 +89,10 @@ function toSkipReason(
   }
 }
 
-function buildSkips(tally: SkipTally): DocumentFilesSkip[] {
-  return (Object.entries(tally) as [DocumentFilesSkipReason, number][])
-    .filter(([, count]) => count > 0)
-    .map(([reason, count]) => ({ reason, count }));
+function buildSkips(skippedIds: SkippedIds): DocumentFilesSkip[] {
+  return (Object.entries(skippedIds) as [DocumentFilesSkipReason, string[]][])
+    .filter(([, ids]) => ids.length > 0)
+    .map(([reason, ids]) => ({ reason, count: ids.length }));
 }
 
 @Injectable()
@@ -104,6 +104,39 @@ export class ExtractionService {
     private readonly encryption: EncryptionService,
     private readonly testFileLocator: TestFileLocator,
   ) {}
+
+  private async persistDocumentationQueued(
+    testCaseIds: readonly string[],
+  ): Promise<void> {
+    if (testCaseIds.length === 0) return;
+
+    await this.prisma.testCase.updateMany({
+      where: { id: { in: [...testCaseIds] } },
+      data: { documentationQueuedAt: new Date() },
+    });
+  }
+
+  private async persistSkippedOutcomes(skippedIds: SkippedIds): Promise<void> {
+    const now = new Date();
+
+    const writes = (
+      Object.entries(skippedIds) as [DocumentFilesSkipReason, string[]][]
+    )
+      .filter(([, ids]) => ids.length > 0)
+      .map(([reason, ids]) =>
+        this.prisma.testCase.updateMany({
+          where: { id: { in: ids } },
+          data: {
+            documentationOutcome: 'skipped',
+            documentationSkipReason: reason,
+            documentationOutcomeAt: now,
+            documentationQueuedAt: null,
+          },
+        }),
+      );
+
+    await Promise.all(writes);
+  }
 
   private locatorDeps(): LocateAndPersistDeps {
     return {
@@ -289,12 +322,12 @@ export class ExtractionService {
         .filter((id): id is string => id !== null),
     );
 
-    const tally = emptySkipTally();
+    const skippedIds = emptySkippedIds();
     const groupedByFile = new Map<string, DocumentFileTarget[]>();
 
     for (const row of rows) {
       if (row.documentationSource === 'human') {
-        tally['human-documented'] += 1;
+        skippedIds['human-documented'].push(row.id);
         continue;
       }
 
@@ -312,7 +345,7 @@ export class ExtractionService {
 
       if (!verdict.documentable) {
         const reason = toSkipReason(verdict.reason);
-        if (reason !== null) tally[reason] += 1;
+        if (reason !== null) skippedIds[reason].push(row.id);
         continue;
       }
 
@@ -336,7 +369,7 @@ export class ExtractionService {
         }));
 
       if (filePath === null) {
-        tally['no-source-file'] += 1;
+        skippedIds['no-source-file'].push(row.id);
         continue;
       }
 
@@ -345,7 +378,8 @@ export class ExtractionService {
       groupedByFile.set(filePath, group);
     }
 
-    const casesSkipped = buildSkips(tally);
+    const casesSkipped = buildSkips(skippedIds);
+    await this.persistSkippedOutcomes(skippedIds);
 
     if (groupedByFile.size === 0) {
       return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped });
@@ -366,10 +400,12 @@ export class ExtractionService {
       data: ExtractionJobData;
       opts: { jobId: string };
     }[] = [];
+    const queuedCaseIds: string[] = [];
 
     for (const [filePath, targets] of files) {
       chunk(targets, MAX_EXTRACTED_CASES).forEach((chunkTargets, index) => {
         casesTargeted += chunkTargets.length;
+        queuedCaseIds.push(...chunkTargets.map((target) => target.testCaseId));
         jobs.push({
           name: 'document-file',
           data: {
@@ -386,6 +422,7 @@ export class ExtractionService {
     }
 
     await this.queue.addBulk(jobs);
+    await this.persistDocumentationQueued(queuedCaseIds);
 
     return ok({
       filesEnqueued: files.length,

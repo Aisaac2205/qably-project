@@ -29,6 +29,7 @@ interface FakePrisma {
     findFirst: jest.Mock;
     findMany: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
   suite: { findFirst: jest.Mock; update: jest.Mock };
@@ -74,6 +75,7 @@ function createPrisma(): FakePrisma {
         ),
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({ id: 'case-updated' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     testCaseVersion: {
       count: jest.fn().mockResolvedValue(0),
@@ -1554,6 +1556,327 @@ describe('ExtractionProcessor — document-file job', () => {
   });
 });
 
+describe('ExtractionProcessor — document-file documentation state', () => {
+  const firstTargetRow = {
+    projectId: 'project-1',
+    project: { organizationId: 'org-1', connection },
+  };
+
+  const targets = [
+    { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+    { testCaseId: 'case-2', automationKey: 'Cart > removes an item' },
+  ];
+
+  function documentFileJob(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        kind: 'document-file',
+        filePath: 'src/cart.spec.ts',
+        targets,
+        ...overrides,
+      },
+    } as never;
+  }
+
+  it('writes documentationOutcome=complete and clears queuedAt when every required field is present', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    const caseUpdateCalls = prisma.testCase.update.mock.calls as [
+      { where: { id: string }; data: Record<string, unknown> },
+    ][];
+    expect(caseUpdateCalls).toHaveLength(2);
+    for (const [call] of caseUpdateCalls) {
+      expect(call.data).toMatchObject({
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
+      });
+    }
+  });
+
+  it('writes documentationOutcome=incomplete with the missing fields when the extracted case lacks required content', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(
+        extractedOutcome([
+          extractedCase({
+            automationKey: 'Cart > adds an item',
+            objective: '',
+            expectedResult: '',
+          }),
+        ]),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({ targets: [targets[0]] }),
+    );
+
+    const [call] = prisma.testCase.update.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    expect(call[0].data).toMatchObject({
+      documentationOutcome: 'incomplete',
+      documentationMissing: expect.arrayContaining([
+        'objective',
+        'expectedResult',
+      ]) as string[],
+    });
+  });
+
+  it('writes documentationOutcome=failed with the reason on every target that falls back', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...firstTargetRow,
+      project: { organizationId: 'org-1', connection: null },
+    });
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(jest.fn())).process(
+      documentFileJob(),
+    );
+
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['case-1', 'case-2'] } },
+      data: {
+        documentationOutcome: 'failed',
+        documentationSkipReason: 'no-connection',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('adds no incomplete note when every target matched, regardless of how many declarations the file has', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const sourceReader = fakeSourceReader(
+      jest.fn().mockResolvedValue({
+        kind: 'content',
+        content:
+          "it('a', () => {})\nit('b', () => {})\nit('c', () => {})\nit('d', () => {})",
+        truncated: false,
+      }),
+    );
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, sourceReader, extractor).process(documentFileJob());
+
+    const caseUpdateCalls = prisma.testCase.update.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    for (const [call] of caseUpdateCalls) {
+      expect(call.data).not.toHaveProperty('observations');
+    }
+  });
+
+  it('adds a note fed with matched-of-target counts when the retry still cannot find every target', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+        ]),
+      )
+      .mockResolvedValueOnce({ kind: 'no-tests-found' });
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    const case1Update = (
+      prisma.testCase.update.mock.calls as [
+        { where: { id: string }; data: Record<string, unknown> },
+      ][]
+    ).find(([call]) => call.where.id === 'case-1');
+    expect(case1Update?.[0].data.observations).toEqual([
+      'Aeris extracted 1 of 2 test declarations found in this file.',
+    ]);
+
+    const fallback = lastCall(prisma.extractedProposal.create).data;
+    expect(fallback).toMatchObject({
+      targetTestCaseId: 'case-2',
+      objective: 'automation-key-not-found',
+    });
+  });
+
+  it('retries once with only the unmatched automation key, documenting both targets when the retry finds the rest', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({
+            automationKey: 'Cart > removes an item',
+            title: 'Removes an item',
+          }),
+        ]),
+      );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    const [retryArgs] = extract.mock.calls[1] as [
+      { targetAutomationKeys?: string[]; declarationCountHint?: number },
+    ];
+    expect(retryArgs.targetAutomationKeys).toEqual(['Cart > removes an item']);
+    expect(retryArgs.declarationCountHint).toBeUndefined();
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not call the extractor a second time when every target matched on the first pass', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back only the target the retry could not find either, without throwing on a retry provider failure', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+        ]),
+      )
+      .mockResolvedValueOnce({
+        kind: 'provider-unavailable',
+        reason: 'rate-limited',
+        retryable: true,
+      });
+    const extractor = fakeExtractor(extract);
+
+    await expect(
+      build(prisma, fakeSourceReader(), extractor).process(documentFileJob()),
+    ).resolves.toBeUndefined();
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    const fallback = lastCall(prisma.extractedProposal.create).data;
+    expect(fallback).toMatchObject({
+      targetTestCaseId: 'case-2',
+      objective: 'automation-key-not-found',
+    });
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('spends the credit and daily budget only once even though the retry calls the extractor twice', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+        ]),
+      )
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      );
+    const extractor = fakeExtractor(extract);
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      fakeEntitlement(jest.fn().mockResolvedValue(true), spendCredit),
+      fakeDailyBudget(tryConsume),
+    ).process(documentFileJob());
+
+    expect(tryConsume).toHaveBeenCalledTimes(1);
+    expect(spendCredit).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('ExtractionProcessor — resilience', () => {
   it('lands an uncaught error (e.g. token decryption throwing) in the manual-review fallback', async () => {
     const prisma = createPrisma();
@@ -1811,6 +2134,11 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
         description: 'Cubre agregar y quitar artículos',
         tags: ['carrito', 'compras'],
         nameSource: 'aeris',
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
       },
     });
   });
@@ -1865,6 +2193,11 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
         description: 'Cubre agregar y quitar artículos',
         tags: ['urgente', 'carrito', 'compras'],
         nameSource: 'aeris',
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
       },
     });
   });

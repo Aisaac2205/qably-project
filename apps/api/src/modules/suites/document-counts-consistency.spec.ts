@@ -104,6 +104,7 @@ function buildExtractionService() {
           executionMode: testCase.executionMode,
         })),
       ),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     extractedProposal: {
       findMany: jest
