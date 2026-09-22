@@ -761,6 +761,7 @@ describe('RunsService.ingest normalized automationKey matching', () => {
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-1' },
       data: {
+        automationKey: 'Checkout::Adds to cart',
         automationFilePath: 'e2e/checkout.spec.ts',
         automationClassName: 'Checkout',
       },
@@ -796,7 +797,10 @@ describe('RunsService.ingest normalized automationKey matching', () => {
 
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-1' },
-      data: { automationClassName: 'Checkout' },
+      data: {
+        automationKey: 'Checkout::Adds to cart',
+        automationClassName: 'Checkout',
+      },
     });
   });
 });
@@ -965,7 +969,7 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
     expect(call[0].data[0].testCaseId).toBe('case-1');
   });
 
-  it('falls back to the legacy plain-name automationKey when the composite has no match, so a pre-migration case is not orphaned', async () => {
+  it('falls back to the legacy plain-name automationKey when the composite has no match, and durably migrates the row to the composite so a later report cannot hand it to a different test', async () => {
     const prisma = createPrisma();
     prisma.testCase.findMany.mockResolvedValueOnce([
       {
@@ -991,12 +995,46 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
 
     expect(result.ok).toBe(true);
     expect(prisma.testCase.createMany).not.toHaveBeenCalled();
-    const updateCalls = prisma.testCase.update.mock.calls as [
-      { data: Record<string, unknown> },
-    ][];
-    expect(updateCalls.some(([call]) => 'automationKey' in call.data)).toBe(
-      false,
-    );
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: {
+        automationKey:
+          'tests.checkout.test_checkout::test_add_item_updates_total',
+        automationClassName: 'tests.checkout.test_checkout',
+      },
+    });
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data[0].testCaseId).toBe('case-1');
+  });
+
+  it('never throws when the legacy-row migration loses a race to a concurrent ingest that already claimed the same composite key', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValueOnce([
+      {
+        id: 'case-1',
+        automationKey: 'test_add_item_updates_total',
+        name: 'Adds an item, updates the total',
+        executionMode: 'automated',
+      },
+    ]);
+    prisma.testCase.update.mockRejectedValueOnce({ code: 'P2002' });
+
+    const result = await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'test_add_item_updates_total',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+          className: 'tests.checkout.test_checkout',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
     const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
       [{ data: { testCaseId: string | null }[] }],
     ];
@@ -1034,6 +1072,147 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
         automationKey: 'tests.checkout.test_checkout::Add item updates total',
       },
     });
+  });
+});
+
+describe('RunsService.ingest ambiguous legacy key claims', () => {
+  const legacyRow = {
+    id: 'case-legacy',
+    automationKey: 'test_add_item',
+    name: 'Add item',
+    executionMode: 'automated',
+  };
+
+  it('never links a plain case to a pre-seeded legacy row when a composite case reported alongside it shares the same bare name, and still drafts the composite under its own key', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([legacyRow])
+      .mockResolvedValueOnce([
+        {
+          id: 'draft-composite',
+          automationKey: 'tests.checkout.a::test_add_item',
+        },
+      ]);
+
+    const result = await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+        {
+          name: 'test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+          className: 'tests.checkout.a',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          automationKey: 'tests.checkout.a::test_add_item',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data.map((row) => row.testCaseId)).toEqual([
+      null,
+      'draft-composite',
+    ]);
+  });
+
+  it('drafts two composite cases under their own distinct keys instead of both claiming the same pre-seeded legacy row', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([legacyRow])
+      .mockResolvedValueOnce([
+        { id: 'draft-a', automationKey: 'tests.checkout.a::test_add_item' },
+        { id: 'draft-b', automationKey: 'tests.checkout.b::test_add_item' },
+      ]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+          className: 'tests.checkout.a',
+        },
+        {
+          name: 'test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+          className: 'tests.checkout.b',
+        },
+      ],
+    });
+
+    expect(prisma.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          automationKey: 'tests.checkout.a::test_add_item',
+        }),
+        expect.objectContaining({
+          automationKey: 'tests.checkout.b::test_add_item',
+        }),
+      ],
+      skipDuplicates: true,
+    });
+    expect(prisma.testCase.update).not.toHaveBeenCalled();
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data.map((row) => row.testCaseId)).toEqual([
+      'draft-a',
+      'draft-b',
+    ]);
+  });
+
+  it('matches the earlier-drafted composite case by its own exact key once a later report sends only that one, no longer ambiguous', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValueOnce([
+      legacyRow,
+      {
+        id: 'draft-a',
+        automationKey: 'tests.checkout.a::test_add_item',
+        name: 'test_add_item',
+        executionMode: 'automated',
+      },
+    ]);
+
+    const result = await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+          className: 'tests.checkout.a',
+        },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.testCase.createMany).not.toHaveBeenCalled();
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: { testCaseId: string | null }[] }],
+    ];
+    expect(call[0].data[0].testCaseId).toBe('draft-a');
   });
 });
 

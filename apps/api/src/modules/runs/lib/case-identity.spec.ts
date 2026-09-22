@@ -1,5 +1,6 @@
 import {
   findCaseIdentityCollisions,
+  findLegacyKeyCollisions,
   resolveCaseIdentityKey,
 } from './case-identity';
 
@@ -107,5 +108,53 @@ describe('findCaseIdentityCollisions', () => {
     ]);
 
     expect(collisions).toEqual([{ key: 'Adds to cart', count: 3 }]);
+  });
+});
+
+describe('findLegacyKeyCollisions', () => {
+  it('reports nothing when every case has a distinct bare name', () => {
+    const collisions = findLegacyKeyCollisions([
+      { name: 'test_add_item', className: 'tests.checkout.a' },
+      { name: 'test_add_item_two', className: 'tests.checkout.b' },
+    ]);
+
+    expect(collisions).toEqual([]);
+  });
+
+  it('reports nothing when two cases share a name but resolve to the same identity key, since that is a replay', () => {
+    const collisions = findLegacyKeyCollisions([
+      { name: 'Adds to cart', className: 'Checkout' },
+      { name: 'Adds to cart', className: 'Checkout' },
+    ]);
+
+    expect(collisions).toEqual([]);
+  });
+
+  it('flags two composites that share a bare name but come from different classnames', () => {
+    const collisions = findLegacyKeyCollisions([
+      { name: 'test_add_item', className: 'tests.checkout.a' },
+      { name: 'test_add_item', className: 'tests.checkout.b' },
+    ]);
+
+    expect(collisions).toEqual([{ key: 'test_add_item', count: 2 }]);
+  });
+
+  it('flags a plain case and a composite case that share the plain case bare name', () => {
+    const collisions = findLegacyKeyCollisions([
+      { name: 'test_add_item' },
+      { name: 'test_add_item', className: 'tests.checkout.a' },
+    ]);
+
+    expect(collisions).toEqual([{ key: 'test_add_item', count: 2 }]);
+  });
+
+  it('excludes an identity that is already a case identity collision from counting as a legacy claimant', () => {
+    const collisions = findLegacyKeyCollisions([
+      { name: 'test_add_item', className: 'tests.checkout' },
+      { name: 'tests.checkout::test_add_item' },
+      { name: 'test_add_item', className: 'tests.other' },
+    ]);
+
+    expect(collisions).toEqual([]);
   });
 });

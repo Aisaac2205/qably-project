@@ -10,6 +10,7 @@ import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
   findCaseIdentityCollisions,
+  findLegacyKeyCollisions,
   resolveCaseIdentityKey,
 } from './lib/case-identity';
 import { normalizeAutomationKeyForMatch } from './lib/normalize-automation-key';
@@ -379,6 +380,10 @@ export class RunsService {
       automationClassName?: string;
     }
 
+    const ambiguousLegacyKeys = new Set(
+      findLegacyKeyCollisions(cases).map((collision) => collision.key),
+    );
+
     const resultByKey = new Map<string, string>();
     const updatesById = new Map<string, CaseBackfillPatch>();
     const missingKeys: string[] = [];
@@ -387,17 +392,34 @@ export class RunsService {
       const ref = refByKey.get(key) as RawCaseRef;
       const legacyKey = ref.name;
       const usesCompositeIdentity = key !== legacyKey;
+      const legacyIsAmbiguous = ambiguousLegacyKeys.has(legacyKey);
       const normalized = normalizeAutomationKeyForMatch(key);
       const legacyNormalized = normalizeAutomationKeyForMatch(legacyKey);
 
-      let match = byExactKey.get(key);
+      let match: SuiteCaseRow | undefined;
       let needsKeyBackfill = false;
+      let claimsLegacyRow = false;
 
-      if (match === undefined && !ambiguousNormalizedKeys.has(normalized)) {
-        match = byNormalizedKey.get(normalized);
+      if (usesCompositeIdentity) {
+        match = byExactKey.get(key);
+        if (match === undefined && !ambiguousNormalizedKeys.has(normalized)) {
+          match = byNormalizedKey.get(normalized);
+        }
+      } else if (!legacyIsAmbiguous) {
+        match = byExactKey.get(key);
+        if (match === undefined && !ambiguousNormalizedKeys.has(normalized)) {
+          match = byNormalizedKey.get(normalized);
+        }
       }
 
-      if (match === undefined && usesCompositeIdentity) {
+      // Composite keys can find no match on their own composite identity
+      // when the case was first reported before composite keys existed,
+      // and the row still carries the bare-name legacy automationKey. This
+      // fallback claims that row only when this legacyKey is unambiguous —
+      // i.e. no other distinct identity in this batch also reaches it —
+      // otherwise two genuinely different tests would silently share one
+      // official case (see findLegacyKeyCollisions).
+      if (match === undefined && usesCompositeIdentity && !legacyIsAmbiguous) {
         match = byExactKey.get(legacyKey);
         if (
           match === undefined &&
@@ -405,9 +427,10 @@ export class RunsService {
         ) {
           match = byNormalizedKey.get(legacyNormalized);
         }
+        if (match !== undefined) claimsLegacyRow = true;
       }
 
-      if (match === undefined) {
+      if (match === undefined && !legacyIsAmbiguous) {
         const nameMatch =
           byExactName.get(legacyKey) ??
           (ambiguousNormalizedNames.has(legacyNormalized)
@@ -424,6 +447,13 @@ export class RunsService {
       }
 
       if (match === undefined) {
+        // A plain ref's own identity key is the bare name itself, so if the
+        // legacy key is ambiguous, drafting under that exact key would just
+        // silently re-claim whichever row already holds it (skipDuplicates
+        // makes the create a no-op, then the requery below reattaches it).
+        // Composite refs are safe to draft: their own composite key cannot
+        // collide with the contested bare-name row.
+        if (legacyIsAmbiguous && !usesCompositeIdentity) continue;
         missingKeys.push(key);
         continue;
       }
@@ -431,7 +461,7 @@ export class RunsService {
       resultByKey.set(key, match.id);
 
       const patch: CaseBackfillPatch = {};
-      if (needsKeyBackfill) patch.automationKey = key;
+      if (needsKeyBackfill || claimsLegacyRow) patch.automationKey = key;
       if (
         (match.automationFilePath ?? null) === null &&
         ref.filePath !== undefined
@@ -455,9 +485,17 @@ export class RunsService {
 
     if (updatesById.size > 0) {
       await Promise.all(
-        [...updatesById.entries()].map(([id, data]) =>
-          tx.testCase.update({ where: { id }, data }),
-        ),
+        [...updatesById.entries()].map(async ([id, data]) => {
+          try {
+            await tx.testCase.update({ where: { id }, data });
+          } catch (error) {
+            // A concurrent ingest can win the race to migrate the same
+            // legacy row's automationKey to the same composite key first;
+            // both migrations are idempotent (same target value), so the
+            // loser can safely drop the write instead of failing the run.
+            if (!isUniqueViolation(error)) throw error;
+          }
+        }),
       );
     }
 
