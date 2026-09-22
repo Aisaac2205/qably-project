@@ -56,6 +56,8 @@ const CASE_SELECT = {
   automationClassName: true,
   automationFilePath: true,
   observations: true,
+  documentationSource: true,
+  documentationOutcome: true,
   currentVersion: { select: { version: true, locale: true } },
 } as const;
 
@@ -87,6 +89,8 @@ interface CaseRow {
   automationClassName: string | null;
   automationFilePath: string | null;
   observations?: unknown;
+  documentationSource: string;
+  documentationOutcome: string | null;
   currentVersion: { version: number; locale?: string | null } | null;
 }
 
@@ -228,6 +232,7 @@ function toView(row: SuiteRow, orgDefaultLocale: Locale): SuiteView {
     automatedCases,
     undocumentedCount: 0,
     staleLocaleCount: 0,
+    incompleteCount: 0,
     cases,
   };
 }
@@ -255,6 +260,7 @@ export class SuitesService {
 
     return this.withLastResults(
       rows.map((row) => toView(row, orgDefaultLocale)),
+      rows,
       orgDefaultLocale,
     );
   }
@@ -275,6 +281,7 @@ export class SuitesService {
     return ok(
       await this.withLastResult(
         toView(row, orgDefaultLocale),
+        row,
         orgDefaultLocale,
       ),
     );
@@ -311,6 +318,7 @@ export class SuitesService {
       return ok(
         await this.withLastResult(
           toView(row, orgDefaultLocale),
+          row,
           orgDefaultLocale,
         ),
       );
@@ -357,6 +365,7 @@ export class SuitesService {
       return ok(
         await this.withLastResult(
           toView(row, orgDefaultLocale),
+          row,
           orgDefaultLocale,
         ),
       );
@@ -489,6 +498,7 @@ export class SuitesService {
     return ok(
       await this.withLastResult(
         toView(row, orgDefaultLocale),
+        row,
         orgDefaultLocale,
       ),
     );
@@ -539,6 +549,7 @@ export class SuitesService {
     return ok(
       await this.withLastResult(
         toView(row, orgDefaultLocale),
+        row,
         orgDefaultLocale,
       ),
     );
@@ -573,6 +584,7 @@ export class SuitesService {
     return ok(
       await this.withLastResult(
         toView(row, orgDefaultLocale),
+        row,
         orgDefaultLocale,
       ),
     );
@@ -580,16 +592,35 @@ export class SuitesService {
 
   private async withLastResult(
     view: SuiteView,
+    row: SuiteRow,
     orgDefaultLocale: Locale,
   ): Promise<SuiteView> {
-    const [withResult] = await this.withLastResults([view], orgDefaultLocale);
+    const [withResult] = await this.withLastResults(
+      [view],
+      [row],
+      orgDefaultLocale,
+    );
     return withResult;
   }
 
   private async withLastResults(
     views: SuiteView[],
+    rows: SuiteRow[],
     orgDefaultLocale: Locale,
   ): Promise<SuiteView[]> {
+    const docStateByCaseId = new Map<
+      string,
+      { documentationSource: string; documentationOutcome: string | null }
+    >();
+    for (const row of rows) {
+      for (const testCase of row.cases) {
+        docStateByCaseId.set(testCase.id, {
+          documentationSource: testCase.documentationSource,
+          documentationOutcome: testCase.documentationOutcome,
+        });
+      }
+    }
+
     const allCaseIds = views.flatMap((view) =>
       view.cases.map((testCase) => testCase.id),
     );
@@ -763,13 +794,22 @@ export class SuitesService {
         }
       }
 
-      const documentableCandidate = (testCase: (typeof cases)[number]) => ({
-        executionMode: testCase.executionMode,
-        steps: testCase.steps,
-        documentedLocale: testCase.documentedLocale,
-        automationKey: testCase.automationKey ?? null,
-        hasPendingProposal: testCase.pendingProposalId !== null,
-      });
+      const documentableCandidate = (testCase: (typeof cases)[number]) => {
+        const docState = docStateByCaseId.get(testCase.id);
+
+        return {
+          executionMode: testCase.executionMode,
+          steps: testCase.steps,
+          documentedLocale: testCase.documentedLocale,
+          automationKey: testCase.automationKey ?? null,
+          hasPendingProposal: testCase.pendingProposalId !== null,
+          name: testCase.name,
+          objective: testCase.objective,
+          expectedResult: testCase.expectedResult,
+          documentationSource: docState?.documentationSource ?? 'ingestion',
+          documentationOutcome: docState?.documentationOutcome ?? null,
+        };
+      };
 
       const undocumentedCount = cases.filter((testCase) =>
         isCaseDocumentable(
@@ -787,12 +827,21 @@ export class SuitesService {
         ),
       ).length;
 
+      const incompleteCount = cases.filter((testCase) =>
+        isCaseDocumentable(
+          documentableCandidate(testCase),
+          'incomplete',
+          orgDefaultLocale,
+        ),
+      ).length;
+
       return {
         ...view,
         cases,
         healthSummary,
         undocumentedCount,
         staleLocaleCount,
+        incompleteCount,
       };
     });
   }

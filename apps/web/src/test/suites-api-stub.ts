@@ -47,6 +47,7 @@ export function createSuite(payload: {
     automatedCases: 0,
     undocumentedCount: 0,
     staleLocaleCount: 0,
+    incompleteCount: 0,
     description: payload.description ?? '',
     tags: payload.tags ?? [],
     isDefault: false,

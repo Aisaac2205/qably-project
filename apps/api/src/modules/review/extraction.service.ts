@@ -53,7 +53,10 @@ interface DocumentFileCandidate {
   automationClassName: string | null;
   suite: { name: string } | null;
   steps: string[];
+  objective: string;
+  expectedResult: string;
   documentationSource: string;
+  documentationOutcome: string | null;
   currentVersion: { locale: string | null } | null;
 }
 
@@ -305,7 +308,10 @@ export class ExtractionService {
         automationClassName: true,
         suite: { select: { name: true } },
         steps: true,
+        objective: true,
+        expectedResult: true,
         documentationSource: true,
+        documentationOutcome: true,
         currentVersion: { select: { locale: true } },
       },
     })) as DocumentFileCandidate[];
@@ -352,6 +358,11 @@ export class ExtractionService {
           documentedLocale: row.currentVersion?.locale ?? null,
           automationKey: row.automationKey,
           hasPendingProposal: pendingIds.has(row.id),
+          name: row.name,
+          objective: row.objective,
+          expectedResult: row.expectedResult,
+          documentationSource: row.documentationSource,
+          documentationOutcome: row.documentationOutcome,
         },
         mode,
         orgDefaultLocale,

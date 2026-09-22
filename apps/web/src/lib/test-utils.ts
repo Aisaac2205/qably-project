@@ -20,6 +20,7 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     overrides.undocumentedCount ??
     cases.filter((c) => c.executionMode === 'automated' && c.steps.length === 0)
       .length
+  const incompleteCount = overrides.incompleteCount ?? 0
   return {
     id: overrides.id ?? 'suite-1',
     projectId: overrides.projectId ?? 'proj-1',
@@ -30,6 +31,7 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     automatedCases,
     undocumentedCount,
     staleLocaleCount,
+    incompleteCount,
     createdAt: overrides.createdAt ?? '2026-01-25T00:00:00Z',
     description: overrides.description ?? 'Login and password flows.',
     tags: overrides.tags ?? ['smoke', 'auth'],

@@ -1137,3 +1137,164 @@ describe('ExtractionService.enqueueDocumentFiles stale-locale mode', () => {
     });
   });
 });
+
+describe('ExtractionService.enqueueDocumentFiles incomplete mode', () => {
+  function candidate(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      projectId: 'proj-1',
+      name: 'Adds an item to the cart',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      steps: ['Open the cart'],
+      objective: 'Verify the cart accepts an item',
+      expectedResult: 'The cart holds one item',
+      documentationSource: 'aeris',
+      documentationOutcome: 'complete',
+      currentVersion: null,
+      ...overrides,
+    };
+  }
+
+  it('targets an automated case that is still missing a required field', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate({ objective: '' })]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { casesTargeted: 1 } });
+  });
+
+  it('never targets a fully documented case whose last outcome was complete', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('targets a case whose last outcome was skipped, even with every field present', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ documentationOutcome: 'skipped' }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { casesTargeted: 1 } });
+  });
+
+  it('targets a case whose last outcome was failed, even with every field present', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ documentationOutcome: 'failed' }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { casesTargeted: 1 } });
+  });
+
+  it('skips a case a human already documented and counts it, even when a field is missing', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ objective: '', documentationSource: 'human' }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'human-documented', count: 1 }],
+      },
+    });
+    expect(queue.addBulk).not.toHaveBeenCalled();
+  });
+
+  it('skips an incomplete candidate with a pending proposal instead of targeting it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate({ objective: '' })]);
+    prisma.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1' },
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'already-pending', count: 1 }],
+      },
+    });
+  });
+
+  it('skips an incomplete candidate with no automation key instead of targeting it', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ objective: '', automationKey: null }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+      'incomplete',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [{ reason: 'no-automation-key', count: 1 }],
+      },
+    });
+  });
+});

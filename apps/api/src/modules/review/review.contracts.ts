@@ -53,7 +53,7 @@ export type DocumentCaseError =
 
 export type DocumentFilesError = 'not-found';
 
-export type DocumentFilesMode = 'undocumented' | 'stale-locale';
+export type DocumentFilesMode = 'undocumented' | 'stale-locale' | 'incomplete';
 
 export type {
   DocumentFilesResult,

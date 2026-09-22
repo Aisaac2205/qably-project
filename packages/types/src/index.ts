@@ -198,6 +198,7 @@ export interface Suite {
   automatedCases: number
   undocumentedCount: number
   staleLocaleCount: number
+  incompleteCount: number
   createdAt: string
   description: string
   tags: string[]
@@ -540,6 +541,7 @@ export interface DocumentFilesResult {
   filesEnqueued: number
   casesTargeted: number
   casesSkipped: DocumentFilesSkip[]
+  suiteQueued?: boolean
 }
 export type DuplicateMatchReason = 'automation-key' | 'title' | 'token-overlap'
 export interface DuplicateCandidateView {

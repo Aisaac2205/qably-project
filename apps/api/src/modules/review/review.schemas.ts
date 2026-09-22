@@ -18,7 +18,9 @@ export const decisionSchema = z.object({
 
 export const documentFilesBodySchema = z
   .object({
-    mode: z.enum(['undocumented', 'stale-locale']).default('undocumented'),
+    mode: z
+      .enum(['undocumented', 'stale-locale', 'incomplete'])
+      .default('undocumented'),
   })
   .default({ mode: 'undocumented' });
 

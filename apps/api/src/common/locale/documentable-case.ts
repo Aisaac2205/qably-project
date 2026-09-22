@@ -1,7 +1,11 @@
 import type { Locale } from '@qably/i18n';
+import { assessCaseDocumentation } from '@qably/types';
 import { isLocaleStale } from './stale-locale';
 
-export type DocumentableCaseMode = 'undocumented' | 'stale-locale';
+export type DocumentableCaseMode =
+  | 'undocumented'
+  | 'stale-locale'
+  | 'incomplete';
 
 export type CaseNotDocumentableReason =
   | 'out-of-scope'
@@ -13,12 +17,20 @@ export type DocumentableCaseVerdict =
   | { documentable: true }
   | { documentable: false; reason: CaseNotDocumentableReason };
 
+const HUMAN_DOCUMENTATION_SOURCE = 'human';
+const RETRIABLE_OUTCOMES = new Set(['skipped', 'failed']);
+
 export interface DocumentableCaseCandidate {
   executionMode: string;
   steps: readonly string[];
   documentedLocale: string | null | undefined;
   automationKey: string | null | undefined;
   hasPendingProposal: boolean;
+  name: string;
+  objective: string;
+  expectedResult: string;
+  documentationSource: string;
+  documentationOutcome?: string | null;
 }
 
 const DOCUMENTABLE: DocumentableCaseVerdict = { documentable: true };
@@ -27,12 +39,35 @@ function rejected(reason: CaseNotDocumentableReason): DocumentableCaseVerdict {
   return { documentable: false, reason };
 }
 
+function isIncomplete(candidate: DocumentableCaseCandidate): boolean {
+  if (candidate.documentationSource === HUMAN_DOCUMENTATION_SOURCE) {
+    return false;
+  }
+
+  const assessment = assessCaseDocumentation({
+    name: candidate.name,
+    automationKey: candidate.automationKey,
+    objective: candidate.objective,
+    steps: candidate.steps,
+    expectedResult: candidate.expectedResult,
+  });
+
+  if (assessment.missing.length > 0) return true;
+
+  return (
+    candidate.documentationOutcome !== null &&
+    candidate.documentationOutcome !== undefined &&
+    RETRIABLE_OUTCOMES.has(candidate.documentationOutcome)
+  );
+}
+
 function matchesMode(
   candidate: DocumentableCaseCandidate,
   mode: DocumentableCaseMode,
   orgDefaultLocale: Locale,
 ): boolean {
   if (mode === 'undocumented') return candidate.steps.length === 0;
+  if (mode === 'incomplete') return isIncomplete(candidate);
 
   return (
     candidate.steps.length > 0 &&

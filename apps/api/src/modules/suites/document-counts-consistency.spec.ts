@@ -13,6 +13,7 @@ function suiteCase(overrides: Record<string, unknown> = {}) {
     id: 'case-x',
     suiteId: 'suite-1',
     name: 'Case',
+    objective: '',
     steps: [] as string[],
     expectedResult: '',
     priority: 'medium' as const,

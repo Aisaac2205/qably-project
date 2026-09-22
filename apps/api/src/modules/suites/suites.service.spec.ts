@@ -807,6 +807,7 @@ describe('SuitesService health signals', () => {
     id: 'case-2',
     suiteId: 'suite-1',
     name: 'checkout_pay',
+    objective: '',
     steps: [] as string[],
     expectedResult: '',
     priority: 'medium' as const,
@@ -1197,6 +1198,7 @@ describe('SuitesService stale-locale read model', () => {
       id,
       suiteId: 'suite-1',
       name: `Case ${id}`,
+      objective: 'Verify the flow completes',
       steps: ['open'],
       expectedResult: 'done',
       priority: 'medium' as const,
@@ -1269,5 +1271,108 @@ describe('SuitesService stale-locale read model', () => {
 
     expect(suite.staleLocaleCount).toBe(expectedCount);
     expect(suite.staleLocaleCount).toBe(2);
+  });
+});
+
+describe('SuitesService incomplete documentation read model', () => {
+  function automatedCase(id: string, overrides: Record<string, unknown> = {}) {
+    return {
+      id,
+      suiteId: 'suite-1',
+      name: `Case ${id}`,
+      objective: 'Verify the flow completes',
+      steps: ['open'],
+      expectedResult: 'done',
+      priority: 'medium' as const,
+      state: 'active' as const,
+      currentVersion: { version: 1, locale: 'en' },
+      executionMode: 'automated' as const,
+      automationKey: `key-${id}`,
+      automationClassName: null,
+      automationFilePath: null,
+      documentationSource: 'aeris',
+      documentationOutcome: 'complete',
+      ...overrides,
+    };
+  }
+
+  it('counts an automated case missing a required field as incomplete', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [automatedCase('missing-field', { objective: '' })],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.incompleteCount).toBe(1);
+  });
+
+  it('counts an automated case whose last outcome was skipped or failed, even with every field present', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          automatedCase('skipped', { documentationOutcome: 'skipped' }),
+          automatedCase('failed', { documentationOutcome: 'failed' }),
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.incompleteCount).toBe(2);
+  });
+
+  it('never counts a human-documented case as incomplete, even when a field is missing', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          automatedCase('human', {
+            objective: '',
+            documentationSource: 'human',
+          }),
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.incompleteCount).toBe(0);
+  });
+
+  it('never counts a manual case as incomplete, even when a field is missing', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          {
+            ...automatedCase('manual-looking', { objective: '' }),
+            executionMode: 'manual' as const,
+          },
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.incompleteCount).toBe(0);
+  });
+
+  it('never counts a fully documented automated case whose last outcome was complete', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      { ...suiteRow, cases: [automatedCase('complete')] },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.incompleteCount).toBe(0);
   });
 });

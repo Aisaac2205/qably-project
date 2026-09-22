@@ -54,6 +54,7 @@ const suite: Suite = {
   automatedCases: 0,
   undocumentedCount: 0,
   staleLocaleCount: 0,
+  incompleteCount: 0,
   isDefault: false,
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',

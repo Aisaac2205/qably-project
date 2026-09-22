@@ -172,6 +172,7 @@ export const mockSuites: Suite[] = [
     automatedCases: 0,
     undocumentedCount: 0,
     staleLocaleCount: 0,
+    incompleteCount: 0,
     cases: [
       {
         id: 'tc-1',
@@ -228,6 +229,7 @@ export const mockSuites: Suite[] = [
     automatedCases: 0,
     undocumentedCount: 0,
     staleLocaleCount: 0,
+    incompleteCount: 0,
     cases: [
       {
         id: 'tc-4',
@@ -284,6 +286,7 @@ export const mockSuites: Suite[] = [
     automatedCases: 0,
     undocumentedCount: 0,
     staleLocaleCount: 0,
+    incompleteCount: 0,
     cases: [
       {
         id: 'tc-7',
@@ -314,6 +317,7 @@ export const mockSuites: Suite[] = [
     automatedCases: 0,
     undocumentedCount: 0,
     staleLocaleCount: 0,
+    incompleteCount: 0,
     cases: [],
   },
 ]

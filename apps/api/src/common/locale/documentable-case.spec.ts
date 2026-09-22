@@ -12,6 +12,11 @@ function candidate(
     documentedLocale: null,
     automationKey: 'Cart.addsItem',
     hasPendingProposal: false,
+    name: 'Adds an item to the cart',
+    objective: 'Verify the cart accepts an item',
+    expectedResult: 'The cart holds one item',
+    documentationSource: 'ingestion',
+    documentationOutcome: null as string | null,
     ...overrides,
   };
 }
@@ -191,5 +196,95 @@ describe('classifyDocumentableCase', () => {
         'en',
       ),
     ).toEqual({ documentable: false, reason: 'out-of-scope' });
+  });
+});
+
+describe('classifyDocumentableCase incomplete mode', () => {
+  function completeCandidate(overrides: Record<string, unknown> = {}) {
+    return candidate({
+      steps: ['Open the cart'],
+      name: 'Adds an item to the cart',
+      objective: 'Verify the cart accepts an item',
+      expectedResult: 'The cart holds one item',
+      documentationSource: 'aeris',
+      documentationOutcome: 'complete',
+      ...overrides,
+    });
+  }
+
+  it('is documentable when a required field is still missing', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ objective: '' }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: true });
+  });
+
+  it('is out-of-scope when every field is present and the last outcome was complete', () => {
+    expect(
+      classifyDocumentableCase(completeCandidate(), 'incomplete', 'en'),
+    ).toEqual({ documentable: false, reason: 'out-of-scope' });
+  });
+
+  it('is documentable when the last outcome was skipped, even with no missing fields', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ documentationOutcome: 'skipped' }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: true });
+  });
+
+  it('is documentable when the last outcome was failed, even with no missing fields', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ documentationOutcome: 'failed' }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: true });
+  });
+
+  it('is out-of-scope for a human-documented case, regardless of missing fields', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ objective: '', documentationSource: 'human' }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'out-of-scope' });
+  });
+
+  it('excludes an incomplete candidate with no automation key', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ objective: '', automationKey: null }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'no-automation-key' });
+  });
+
+  it('excludes an incomplete candidate with a pending proposal', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ objective: '', hasPendingProposal: true }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'already-pending' });
+  });
+
+  it('excludes a manual case even when its documentation is incomplete', () => {
+    expect(
+      classifyDocumentableCase(
+        completeCandidate({ objective: '', executionMode: 'manual' }),
+        'incomplete',
+        'en',
+      ),
+    ).toEqual({ documentable: false, reason: 'not-automated' });
   });
 });
