@@ -19,7 +19,12 @@ function paramsFor(id: string, suiteId: string) {
 
 describe('EditSuitePage', () => {
   it('shows a distinct error state, not "suite not found", when the suite fails to load', async () => {
-    vi.mocked(useSuite).mockReturnValueOnce({ suite: undefined, isLoading: false, isError: true })
+    vi.mocked(useSuite).mockReturnValueOnce({
+      suite: undefined,
+      isLoading: false,
+      isError: true,
+      dataUpdatedAt: 0,
+    })
     await act(async () => {
       renderWithQuery(<EditSuitePage params={paramsFor('proj-1', 'suite-1')} />)
     })
@@ -28,7 +33,12 @@ describe('EditSuitePage', () => {
   })
 
   it('still shows "suite not found" when the suite genuinely does not exist', async () => {
-    vi.mocked(useSuite).mockReturnValueOnce({ suite: undefined, isLoading: false, isError: false })
+    vi.mocked(useSuite).mockReturnValueOnce({
+      suite: undefined,
+      isLoading: false,
+      isError: false,
+      dataUpdatedAt: 0,
+    })
     await act(async () => {
       renderWithQuery(<EditSuitePage params={paramsFor('proj-1', 'missing-suite')} />)
     })

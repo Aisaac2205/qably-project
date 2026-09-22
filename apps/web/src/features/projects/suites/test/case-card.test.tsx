@@ -495,12 +495,13 @@ describe('CaseCard', () => {
   })
 
   describe('Aeris documentation state badge', () => {
-    it('shows documenting while queued with no outcome yet, taking priority over the lifecycle state', async () => {
+    it('shows documenting while queued with no outcome yet, taking priority over the lifecycle state, with no competing "in review" link', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
             testCase={{
               ...automatedCase,
+              pendingProposalId: 'proposal-1',
               documentation: {
                 outcome: null,
                 missing: [],
@@ -516,7 +517,35 @@ describe('CaseCard', () => {
       })
 
       expect(screen.getByText('Documenting')).toBeInTheDocument()
-      expect(screen.queryByText(/^draft$/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/^undocumented$/i)).not.toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
+
+    it('shows exactly one state, and no "in review" link, when a case was skipped because it is already pending review', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              pendingProposalId: 'proposal-1',
+              documentation: {
+                outcome: 'skipped',
+                missing: [],
+                skipReason: 'already-pending',
+                queuedAt: null,
+                outcomeAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(
+        screen.getByText(/already waiting in the review inbox/i),
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
     })
 
     it('shows the missing fields for an incomplete outcome', async () => {

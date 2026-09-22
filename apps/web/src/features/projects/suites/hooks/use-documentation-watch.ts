@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   DOCUMENTATION_WATCH_WINDOW_MS,
+  beginWatch,
   deriveWatchStatus,
   documentedSince,
+  observeWatch,
   pollIntervalFor,
   type DocumentationWatch,
   type DocumentationWatchStatus,
@@ -15,6 +17,7 @@ export interface DocumentationWatchState {
   intervalFor: (isDocumenting: boolean) => number | false
   documentedCountSince: (currentCount: number | undefined) => number
   begin: (baselineCount: number) => void
+  observe: (isDocumenting: boolean) => void
   dismiss: () => void
 }
 
@@ -36,7 +39,11 @@ export function useDocumentationWatch(
   const begin = useCallback((baselineCount: number) => {
     const startedAt = Date.now()
     setNow(startedAt)
-    setWatch({ startedAt, baselineCount })
+    setWatch(beginWatch(startedAt, baselineCount))
+  }, [])
+
+  const observe = useCallback((isDocumenting: boolean) => {
+    setWatch((current) => (current === null ? current : observeWatch(current, isDocumenting)))
   }, [])
 
   const dismiss = useCallback(() => setWatch(null), [])
@@ -60,5 +67,5 @@ export function useDocumentationWatch(
     [watch],
   )
 
-  return { statusFor, intervalFor, documentedCountSince, begin, dismiss }
+  return { statusFor, intervalFor, documentedCountSince, begin, observe, dismiss }
 }

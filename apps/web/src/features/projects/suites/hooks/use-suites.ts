@@ -50,5 +50,6 @@ export function useSuite(
     suite: query.data,
     isLoading: query.isLoading,
     isError: query.isError,
+    dataUpdatedAt: query.dataUpdatedAt,
   }
 }

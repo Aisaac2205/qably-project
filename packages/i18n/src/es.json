@@ -903,6 +903,7 @@
     "caseSkippedReasonNoAutomationKey": "no está vinculado a ningún test automatizado",
     "caseSkippedReasonAlreadyPending": "ya está esperando en la bandeja de revisión",
     "caseSkippedReasonHumanDocumented": "lo documentó una persona",
+    "caseSkippedReasonUnknown": "se omitió por un motivo que esta versión todavía no reconoce",
     "caseFailed": "Error de Aeris",
     "completeSuiteWithAeris_one": "Completar {{count}} caso con Aeris",
     "completeSuiteWithAeris_other": "Completar {{count}} casos con Aeris",

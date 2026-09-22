@@ -30,12 +30,34 @@ describe('useDocumentationWatch', () => {
     expect(result.current.intervalFor(true)).toBe(DOCUMENTATION_POLL_INTERVAL_MS)
   })
 
-  it('stops polling the moment the persisted state clears', () => {
+  it('does not settle on the very first read right after begin(), before any poll confirms it', () => {
     const { result } = renderHook(() => useDocumentationWatch(WINDOW_MS))
 
     act(() => result.current.begin(7))
 
+    expect(result.current.statusFor(false)).toBe('working')
+    expect(result.current.intervalFor(false)).toBe(DOCUMENTATION_POLL_INTERVAL_MS)
+  })
+
+  it('stops polling once a poll observes the run finished after having been busy', () => {
+    const { result } = renderHook(() => useDocumentationWatch(WINDOW_MS))
+
+    act(() => result.current.begin(7))
+    act(() => result.current.observe(true))
+    act(() => result.current.observe(false))
+
     expect(result.current.intervalFor(false)).toBe(false)
+    expect(result.current.statusFor(false)).toBe('settled')
+  })
+
+  it('settles after the grace of consecutive not-busy polls when busy was never observed', () => {
+    const { result } = renderHook(() => useDocumentationWatch(WINDOW_MS))
+
+    act(() => result.current.begin(7))
+    act(() => result.current.observe(false))
+    expect(result.current.statusFor(false)).toBe('working')
+
+    act(() => result.current.observe(false))
     expect(result.current.statusFor(false)).toBe('settled')
   })
 

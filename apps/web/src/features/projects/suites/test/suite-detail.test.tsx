@@ -1,16 +1,28 @@
-import { render, screen, act, within } from '@testing-library/react'
+import { render, screen, act, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
 import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
+import { notify } from '@/lib/notify'
 
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
+
+vi.mock('@/lib/notify', () => ({
+  notify: {
+    success: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    error: vi.fn(),
+    dismiss: vi.fn(),
+  },
+}))
 
 import * as suitesApiStub from '@/test/suites-api-stub'
 
@@ -36,6 +48,8 @@ describe('SuiteDetail (redesigned)', () => {
     __resetStore()
     mockPush.mockClear()
     mockBack.mockClear()
+    vi.mocked(notify.success).mockClear()
+    vi.mocked(notify.info).mockClear()
   })
 
   afterEach(() => {
@@ -641,6 +655,136 @@ describe('SuiteDetail (redesigned)', () => {
         attentionHeading.compareDocumentPosition(documentedHeading) &
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy()
+    })
+  })
+
+  describe('Aeris documentation watch', () => {
+    const watchSuiteId = 'suite-watch'
+
+    it('announces the run as queued, then settles with the real count once a later poll confirms it', async () => {
+      const user = userEvent.setup()
+
+      const initialSuite = createMockSuite({
+        id: watchSuiteId,
+        name: 'Watched',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 1,
+        cases: [
+          createMockTestCase({ id: 'tc-watch-1', executionMode: 'automated', state: 'draft' }),
+        ],
+      })
+
+      const staleSuite = createMockSuite({
+        id: watchSuiteId,
+        name: 'Watched',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 1,
+        cases: [
+          createMockTestCase({ id: 'tc-watch-1', executionMode: 'automated', state: 'draft' }),
+        ],
+      })
+
+      const busySuite = createMockSuite({
+        id: watchSuiteId,
+        name: 'Watched',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 1,
+        cases: [
+          createMockTestCase({
+            id: 'tc-watch-1',
+            executionMode: 'automated',
+            state: 'draft',
+            documentation: {
+              outcome: null,
+              missing: [],
+              skipReason: null,
+              queuedAt: '2026-06-01T00:00:00Z',
+              outcomeAt: null,
+            },
+          }),
+        ],
+      })
+
+      const settledSuite = createMockSuite({
+        id: watchSuiteId,
+        name: 'Watched',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 0,
+        cases: [
+          createMockTestCase({
+            id: 'tc-watch-1',
+            executionMode: 'automated',
+            state: 'active',
+            steps: ['Log in'],
+            expectedResult: 'The dashboard opens',
+            documentation: {
+              outcome: 'complete',
+              missing: [],
+              skipReason: null,
+              queuedAt: '2026-06-01T00:00:00Z',
+              outcomeAt: '2026-06-01T00:05:00Z',
+            },
+          }),
+        ],
+      })
+
+      const client = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, staleTime: Infinity, refetchOnMount: false },
+          mutations: { retry: false },
+        },
+      })
+      client.setQueryData(suiteKeys.detail(watchSuiteId), initialSuite)
+
+      vi.spyOn(suitesApiStub, 'getSuite')
+        .mockResolvedValueOnce(staleSuite)
+        .mockResolvedValueOnce(busySuite)
+        .mockResolvedValue(settledSuite)
+      vi.spyOn(suitesApiStub, 'documentSuite').mockResolvedValue({
+        filesEnqueued: 1,
+        casesTargeted: 1,
+        casesSkipped: [],
+      })
+
+      await act(async () => {
+        render(
+          <QueryClientProvider client={client}>
+            <SuiteDetail projectId="proj-1" suiteId={watchSuiteId} />
+          </QueryClientProvider>,
+        )
+      })
+
+      await user.click(screen.getByRole('button', { name: /document \(1\)/i }))
+
+      await waitFor(() => {
+        expect(notify.info).toHaveBeenCalledWith(
+          'Aeris is documenting 1 cases across 1 files.',
+          undefined,
+        )
+      })
+      expect(suitesApiStub.getSuite).toHaveBeenCalledTimes(1)
+      expect(notify.success).not.toHaveBeenCalled()
+
+      await act(async () => {
+        await client.refetchQueries({ queryKey: suiteKeys.detail(watchSuiteId) })
+      })
+      expect(notify.success).not.toHaveBeenCalled()
+
+      await act(async () => {
+        await client.refetchQueries({ queryKey: suiteKeys.detail(watchSuiteId) })
+      })
+
+      await waitFor(() => {
+        expect(notify.success).toHaveBeenCalledWith('Aeris documented 1 case in this suite.')
+      })
+
+      const infoOrder = vi.mocked(notify.info).mock.invocationCallOrder[0]
+      const successOrder = vi.mocked(notify.success).mock.invocationCallOrder[0]
+      expect(infoOrder).toBeLessThan(successOrder)
     })
   })
 })

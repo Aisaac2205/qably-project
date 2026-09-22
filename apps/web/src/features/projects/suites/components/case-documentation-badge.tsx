@@ -17,6 +17,7 @@ const SKIP_REASON_KEYS: Record<string, string> = {
   'no-automation-key': 'suites.caseSkippedReasonNoAutomationKey',
   'already-pending': 'suites.caseSkippedReasonAlreadyPending',
   'human-documented': 'suites.caseSkippedReasonHumanDocumented',
+  unknown: 'suites.caseSkippedReasonUnknown',
 }
 
 const CHIP_CLASS = 'inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold'

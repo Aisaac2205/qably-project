@@ -2,10 +2,27 @@ export type DocumentationWatchStatus = 'idle' | 'working' | 'settled' | 'timed-o
 
 export const DOCUMENTATION_POLL_INTERVAL_MS = 3_000
 export const DOCUMENTATION_WATCH_WINDOW_MS = 90_000
+export const DOCUMENTATION_SETTLE_GRACE_POLLS = 2
 
 export interface DocumentationWatch {
   startedAt: number
   baselineCount: number
+  sawBusy: boolean
+  idlePolls: number
+}
+
+export function beginWatch(startedAt: number, baselineCount: number): DocumentationWatch {
+  return { startedAt, baselineCount, sawBusy: false, idlePolls: 0 }
+}
+
+export function observeWatch(
+  watch: DocumentationWatch,
+  isDocumenting: boolean,
+): DocumentationWatch {
+  if (isDocumenting) {
+    return watch.sawBusy ? watch : { ...watch, sawBusy: true }
+  }
+  return watch.sawBusy ? watch : { ...watch, idlePolls: watch.idlePolls + 1 }
 }
 
 export function deriveWatchStatus(
@@ -15,8 +32,12 @@ export function deriveWatchStatus(
   windowMs: number = DOCUMENTATION_WATCH_WINDOW_MS,
 ): DocumentationWatchStatus {
   if (watch === null) return 'idle'
-  if (!isDocumenting) return 'settled'
-  if (now - watch.startedAt >= windowMs) return 'timed-out'
+  if (isDocumenting) {
+    if (now - watch.startedAt >= windowMs) return 'timed-out'
+    return 'working'
+  }
+  if (watch.sawBusy) return 'settled'
+  if (watch.idlePolls >= DOCUMENTATION_SETTLE_GRACE_POLLS) return 'settled'
   return 'working'
 }
 

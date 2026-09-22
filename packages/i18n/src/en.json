@@ -904,6 +904,7 @@
     "caseSkippedReasonNoAutomationKey": "not linked to an automated test",
     "caseSkippedReasonAlreadyPending": "already waiting in the review inbox",
     "caseSkippedReasonHumanDocumented": "documented by a person",
+    "caseSkippedReasonUnknown": "skipped for a reason this version does not recognize yet",
     "caseFailed": "Aeris error",
     "completeSuiteWithAeris_one": "Complete {{count}} case with Aeris",
     "completeSuiteWithAeris_other": "Complete {{count}} cases with Aeris",

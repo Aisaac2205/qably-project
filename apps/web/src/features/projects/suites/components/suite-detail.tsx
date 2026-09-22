@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Play, Star, ArrowLeft, CaretLeft, DotsThreeVertical, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
@@ -66,9 +66,15 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const { t, locale } = useTranslation()
   const [watchedMode, setWatchedMode] = useState<DocumentFilesMode>('undocumented')
   const watch = useDocumentationWatch()
-  const { suite, isLoading } = useSuite(suiteId, (current) =>
+  const { observe } = watch
+  const { suite, isLoading, dataUpdatedAt } = useSuite(suiteId, (current) =>
     watch.intervalFor(isDocumentationBusy(current)),
   )
+
+  useEffect(() => {
+    if (dataUpdatedAt === 0) return
+    observe(isDocumentationBusy(suite))
+  }, [dataUpdatedAt, suite, observe])
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
   const documentSuite = useDocumentSuite()

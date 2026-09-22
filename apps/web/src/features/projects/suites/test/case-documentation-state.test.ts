@@ -88,6 +88,23 @@ describe('deriveCaseDocumentationBadge', () => {
     })
   })
 
+  it('falls back to a generic reason when the skip reason is not one of the known values', () => {
+    const subject = testCase({
+      documentation: {
+        outcome: 'skipped',
+        missing: [],
+        skipReason: 'a-future-reason-this-build-does-not-know-about',
+        queuedAt: null,
+        outcomeAt: '2026-03-01T00:00:00Z',
+      },
+    })
+
+    expect(deriveCaseDocumentationBadge(subject)).toEqual({
+      kind: 'skipped',
+      reason: 'unknown',
+    })
+  })
+
   it('reports failed', () => {
     const subject = testCase({
       documentation: {
