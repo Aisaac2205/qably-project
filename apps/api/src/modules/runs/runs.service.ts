@@ -8,6 +8,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ReportBatchService } from './report-batch.service';
 import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
+import {
+  findCaseIdentityCollisions,
+  resolveCaseIdentityKey,
+} from './lib/case-identity';
 import { normalizeAutomationKeyForMatch } from './lib/normalize-automation-key';
 import {
   CASE_READ_SELECT,
@@ -113,7 +117,7 @@ export class RunsService {
         knownSuite ??
         (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
 
-      const testCaseIdByName = await this.ensureOfficialCases(
+      const testCaseIdByIdentity = await this.ensureOfficialCases(
         tx,
         suite.id,
         apiKey.projectId,
@@ -178,7 +182,8 @@ export class RunsService {
       await tx.runCase.createManyAndReturn({
         data: input.cases.map((testCase: IngestCaseInput, index: number) => ({
           runId: run.id,
-          testCaseId: testCaseIdByName.get(testCase.name) ?? null,
+          testCaseId:
+            testCaseIdByIdentity.get(resolveCaseIdentityKey(testCase)) ?? null,
           name: testCase.name,
           suiteName: testCase.suiteName ?? suite.name,
           steps: testCase.steps,
@@ -314,9 +319,15 @@ export class RunsService {
     projectId: string,
     cases: RawCaseRef[],
   ): Promise<Map<string, string>> {
+    const collidingKeys = new Set(
+      findCaseIdentityCollisions(cases).map((collision) => collision.key),
+    );
+
     const refByKey = new Map<string, RawCaseRef>();
     for (const testCase of cases) {
-      if (!refByKey.has(testCase.name)) refByKey.set(testCase.name, testCase);
+      const identityKey = resolveCaseIdentityKey(testCase);
+      if (collidingKeys.has(identityKey)) continue;
+      if (!refByKey.has(identityKey)) refByKey.set(identityKey, testCase);
     }
     const keys = [...refByKey.keys()];
 
@@ -374,7 +385,10 @@ export class RunsService {
 
     for (const key of keys) {
       const ref = refByKey.get(key) as RawCaseRef;
+      const legacyKey = ref.name;
+      const usesCompositeIdentity = key !== legacyKey;
       const normalized = normalizeAutomationKeyForMatch(key);
+      const legacyNormalized = normalizeAutomationKeyForMatch(legacyKey);
 
       let match = byExactKey.get(key);
       let needsKeyBackfill = false;
@@ -383,12 +397,22 @@ export class RunsService {
         match = byNormalizedKey.get(normalized);
       }
 
+      if (match === undefined && usesCompositeIdentity) {
+        match = byExactKey.get(legacyKey);
+        if (
+          match === undefined &&
+          !ambiguousNormalizedKeys.has(legacyNormalized)
+        ) {
+          match = byNormalizedKey.get(legacyNormalized);
+        }
+      }
+
       if (match === undefined) {
         const nameMatch =
-          byExactName.get(key) ??
-          (ambiguousNormalizedNames.has(normalized)
+          byExactName.get(legacyKey) ??
+          (ambiguousNormalizedNames.has(legacyNormalized)
             ? undefined
-            : byNormalizedName.get(normalized));
+            : byNormalizedName.get(legacyNormalized));
         if (
           nameMatch !== undefined &&
           nameMatch.automationKey === null &&
@@ -442,7 +466,7 @@ export class RunsService {
     const toCreate = missingKeys.map((key) => {
       const ref = refByKey.get(key) as RawCaseRef;
       const humanized = humanizeTestName({
-        name: key,
+        name: ref.name,
         className: ref.className,
         filePath: ref.filePath,
       }).title;
