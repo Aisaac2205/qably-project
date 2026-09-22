@@ -7,6 +7,7 @@ import { GEMINI_CLIENT } from '../ai/ai.tokens';
 import type { TokenUsage } from '../ai/extraction.contracts';
 import type { GeminiClient } from '../ai/gemini.extractor';
 import {
+  buildCaseContextAcknowledgement,
   buildChatSystemInstruction,
   buildProjectContextAcknowledgement,
   buildProjectContextTurn,
@@ -30,6 +31,8 @@ export interface ChatReplyInput {
   message: string;
   history: ChatHistoryEntry[];
   context: ChatProjectContext;
+  /** Pre-built `<<<CASE_CONTEXT>>>` turn text, or undefined when no case is attached. */
+  caseContext?: string;
 }
 
 export type ChatReplyOutcome =
@@ -79,6 +82,7 @@ const RESPONSE_JSON_SCHEMA = {
             type: 'string',
             enum: ['critical', 'high', 'medium', 'low'],
           },
+          targetTestCaseId: { type: 'string' },
         },
         required: ['title', 'objective', 'steps', 'expectedResult', 'priority'],
       },
@@ -103,12 +107,24 @@ function toContents(input: ChatReplyInput): ContentTurn[] {
     parts: [{ text: entry.content }],
   }));
 
+  const caseContextTurns: ContentTurn[] =
+    input.caseContext === undefined || input.caseContext === ''
+      ? []
+      : [
+          { role: 'user', parts: [{ text: input.caseContext }] },
+          {
+            role: 'model',
+            parts: [{ text: buildCaseContextAcknowledgement(input.locale) }],
+          },
+        ];
+
   return [
     { role: 'user', parts: [{ text: buildProjectContextTurn(input.context) }] },
     {
       role: 'model',
       parts: [{ text: buildProjectContextAcknowledgement(input.locale) }],
     },
+    ...caseContextTurns,
     ...history,
     { role: 'user', parts: [{ text: input.message }] },
   ];

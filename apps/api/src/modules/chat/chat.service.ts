@@ -1,10 +1,16 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { resolveLocale } from '@qably/i18n';
+import { assessCaseDocumentation } from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import {
+  CaseContextBuilder,
+  type CaseContextCandidate,
+  type CaseContextConnection,
+} from './case-context-builder';
 import type { ChatProjectContext } from './chat-prompt';
 import type { ChatAssistant, ChatHistoryEntry } from './chat.assistant';
 import {
@@ -57,6 +63,50 @@ interface AttachedCaseRow {
   id: string;
   name: string;
   suite: { name: string };
+  objective: string;
+  preconditions: string[];
+  steps: string[];
+  expectedResult: string;
+  documentationSource: string;
+  automationKey: string | null;
+  automationFilePath: string | null;
+}
+
+function toCaseContextCandidate(row: AttachedCaseRow): CaseContextCandidate {
+  const assessment = assessCaseDocumentation({
+    name: row.name,
+    automationKey: row.automationKey,
+    objective: row.objective,
+    steps: row.steps,
+    expectedResult: row.expectedResult,
+  });
+
+  return {
+    id: row.id,
+    name: row.name,
+    objective: row.objective,
+    preconditions: row.preconditions,
+    steps: row.steps,
+    expectedResult: row.expectedResult,
+    documentationSource: row.documentationSource,
+    missing: assessment.missing,
+    automationKey: row.automationKey,
+    automationFilePath: row.automationFilePath,
+  };
+}
+
+function stripUnattachedTarget(
+  suggested: SuggestedCase,
+  attachedIds: ReadonlySet<string>,
+): SuggestedCase {
+  if (
+    suggested.targetTestCaseId === undefined ||
+    attachedIds.has(suggested.targetTestCaseId)
+  ) {
+    return suggested;
+  }
+
+  return { ...suggested, targetTestCaseId: undefined };
 }
 
 type TxClient = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
@@ -149,6 +199,7 @@ export class ChatService {
     private readonly prisma: PrismaService,
     @Inject(CHAT_ASSISTANT) private readonly assistant: ChatAssistant,
     private readonly entitlement: AiEntitlementService,
+    private readonly caseContextBuilder: CaseContextBuilder,
   ) {}
 
   async listThreads(
@@ -247,8 +298,9 @@ export class ChatService {
     if (thread === null) return err('thread-not-found');
 
     const caseIds = input.caseIds ?? [];
+    let attachedRows: AttachedCaseRow[] = [];
     if (caseIds.length > 0) {
-      const attachedRows = await this.findCasesInProject(projectId, caseIds);
+      attachedRows = await this.findCasesInProject(projectId, caseIds);
       if (attachedRows.length !== caseIds.length) return err('case-not-found');
     }
 
@@ -270,10 +322,18 @@ export class ChatService {
       },
     });
 
-    const [context, locale] = await Promise.all([
+    const [context, locale, connection] = await Promise.all([
       this.buildContext(projectId),
       this.resolveLocale(user.id),
+      caseIds.length > 0 ? this.findConnection(projectId) : null,
     ]);
+    const caseContext =
+      caseIds.length > 0
+        ? await this.caseContextBuilder.build(
+            attachedRows.map(toCaseContextCandidate),
+            connection,
+          )
+        : undefined;
     const outcome = await this.assistant.reply({
       locale,
       message: input.content,
@@ -284,11 +344,17 @@ export class ChatService {
           (row): ChatHistoryEntry => ({ role: row.role, content: row.content }),
         ),
       context,
+      caseContext,
     });
 
     if (outcome.kind === 'provider-unavailable') {
       return err('provider-unavailable');
     }
+
+    const attachedIdSet = new Set(caseIds);
+    const filteredCases = outcome.cases.map((suggested) =>
+      stripUnattachedTarget(suggested, attachedIdSet),
+    );
 
     const assistantRow = await this.prisma.$transaction(
       async (tx: TxClient) => {
@@ -303,7 +369,7 @@ export class ChatService {
             threadId,
             role: 'assistant',
             content: outcome.reply,
-            suggestedCases: outcome.cases,
+            suggestedCases: filteredCases,
             promptVersion: CHAT_PROMPT_VERSION,
             totalTokens: outcome.usage.totalTokens,
           },
@@ -433,8 +499,34 @@ export class ChatService {
   ): Promise<AttachedCaseRow[]> {
     return this.prisma.testCase.findMany({
       where: { id: { in: [...caseIds] }, projectId },
-      select: { id: true, name: true, suite: { select: { name: true } } },
+      select: {
+        id: true,
+        name: true,
+        suite: { select: { name: true } },
+        objective: true,
+        preconditions: true,
+        steps: true,
+        expectedResult: true,
+        documentationSource: true,
+        automationKey: true,
+        automationFilePath: true,
+      },
     });
+  }
+
+  private async findConnection(
+    projectId: string,
+  ): Promise<CaseContextConnection | null> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId },
+      select: {
+        connection: {
+          select: { provider: true, repo: true, encryptedAccessToken: true },
+        },
+      },
+    });
+
+    return project?.connection ?? null;
   }
 
   private async loadAttachedCases(
@@ -446,7 +538,7 @@ export class ChatService {
     const rows = (await this.prisma.testCase.findMany({
       where: { id: { in: uniqueIds } },
       select: { id: true, name: true, suite: { select: { name: true } } },
-    })) as AttachedCaseRow[];
+    })) as Pick<AttachedCaseRow, 'id' | 'name' | 'suite'>[];
 
     return new Map(
       rows.map((row) => [

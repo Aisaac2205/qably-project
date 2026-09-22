@@ -1,7 +1,9 @@
 import { ASSISTANT_MODEL_NAME } from '@qably/types';
+import { CASE_CONTEXT_CLOSE, CASE_CONTEXT_OPEN } from './case-context-builder';
 import {
   PROJECT_DATA_CLOSE,
   PROJECT_DATA_OPEN,
+  buildCaseContextAcknowledgement,
   buildChatSystemInstruction,
   buildProjectContextAcknowledgement,
   buildProjectContextTurn,
@@ -83,6 +85,41 @@ describe('buildChatSystemInstruction', () => {
   it('forbids revealing the provider when the user asks what model it is', () => {
     expect(buildChatSystemInstruction('es')).toContain('proveedor');
     expect(buildChatSystemInstruction('en')).toContain('provider');
+  });
+
+  it('declares the case context block as untrusted data, in the targeted mode rules', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildChatSystemInstruction(locale);
+
+      expect(instruction).toContain(CASE_CONTEXT_OPEN);
+      expect(instruction).toContain(CASE_CONTEXT_CLOSE);
+    }
+  });
+
+  it('states the instruction hierarchy over every data block by name', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildChatSystemInstruction(locale);
+
+      expect(instruction).toContain(PROJECT_DATA_OPEN);
+      expect(instruction).toContain(CASE_CONTEXT_OPEN);
+    }
+  });
+
+  it('requires the automation key to be copied byte for byte in targeted mode', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(/automationKey/);
+    expect(buildChatSystemInstruction('en')).toMatch(/automationKey/);
+  });
+
+  it('tells the assistant to say so and skip a case with no available excerpt', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(/extracto/i);
+    expect(buildChatSystemInstruction('en')).toMatch(/excerpt/i);
+  });
+});
+
+describe('buildCaseContextAcknowledgement', () => {
+  it('answers in the locale the assistant must keep', () => {
+    expect(buildCaseContextAcknowledgement('es')).toContain('español');
+    expect(buildCaseContextAcknowledgement('en')).toContain('English');
   });
 });
 

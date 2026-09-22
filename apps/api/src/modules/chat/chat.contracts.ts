@@ -1,16 +1,20 @@
 import { z } from 'zod';
 import { extractedCaseSchema } from '../ai/extraction.contracts';
 
-export const CHAT_PROMPT_VERSION = 'chat-v3';
+export const CHAT_PROMPT_VERSION = 'chat-v4';
 export const MAX_SUGGESTED_CASES = 5;
 export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;
 export const MAX_EXCERPT_LENGTH = 600;
 
-export const suggestedCaseSchema = extractedCaseSchema.omit({
-  automationKey: true,
-  sourceExcerpt: true,
-});
+export const suggestedCaseSchema = extractedCaseSchema
+  .omit({
+    automationKey: true,
+    sourceExcerpt: true,
+  })
+  .extend({
+    targetTestCaseId: z.string().cuid().optional(),
+  });
 
 export const suggestedCasesSchema = z
   .array(suggestedCaseSchema)

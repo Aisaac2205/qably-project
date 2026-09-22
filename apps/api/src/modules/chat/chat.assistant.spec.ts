@@ -82,6 +82,62 @@ describe('GeminiChatAssistant', () => {
     );
   });
 
+  it('sends the case context as a delimited turn followed by its own acknowledgement, after the project data ack and before history', async () => {
+    const { received, client } = capture();
+
+    await new GeminiChatAssistant(client, env()).reply(
+      input({
+        caseContext:
+          '<<<CASE_CONTEXT>>>\nCase ID: case-1\n<<<END_CASE_CONTEXT>>>',
+      }),
+    );
+
+    const contents = received.params.contents as Turn[];
+    expect(contents.map((turn) => turn.role)).toEqual([
+      'user',
+      'model',
+      'user',
+      'model',
+      'user',
+      'model',
+      'user',
+    ]);
+    expect(contents[2].parts[0].text).toContain('<<<CASE_CONTEXT>>>');
+    expect(contents[3].role).toBe('model');
+  });
+
+  it('omits the case context turns entirely when no case is attached', async () => {
+    const { received, client } = capture();
+
+    await new GeminiChatAssistant(client, env()).reply(input());
+
+    const contents = received.params.contents as Turn[];
+    expect(
+      contents.some((turn) => turn.parts[0].text.includes('CASE_CONTEXT')),
+    ).toBe(false);
+  });
+
+  it('accepts an optional targetTestCaseId per case in the response schema, unbounded in length', async () => {
+    const { received, client } = capture();
+
+    await new GeminiChatAssistant(client, env()).reply(input());
+
+    const config = received.params.config as {
+      responseJsonSchema: {
+        properties: {
+          cases: {
+            items: { properties: Record<string, { maxLength?: number }> };
+          };
+        };
+      };
+    };
+    const targetField =
+      config.responseJsonSchema.properties.cases.items.properties
+        .targetTestCaseId;
+    expect(targetField).toBeDefined();
+    expect(targetField.maxLength).toBeUndefined();
+  });
+
   it('keeps the history after the data turns and the message last', async () => {
     const { received, client } = capture();
 

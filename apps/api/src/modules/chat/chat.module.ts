@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { EncryptionService } from '../../common/crypto/encryption.service';
 import { ConfigModule } from '../../config/config.module';
 import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
@@ -7,6 +8,11 @@ import { AiModule } from '../ai/ai.module';
 import { GEMINI_CLIENT } from '../ai/ai.tokens';
 import type { GeminiClient } from '../ai/gemini.extractor';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { SourceReader } from '../repository/source-reader';
+import {
+  CaseContextBuilder,
+  GitDefaultRefResolver,
+} from './case-context-builder';
 import { DisabledChatAssistant, GeminiChatAssistant } from './chat.assistant';
 import { CHAT_ASSISTANT } from './chat.contracts';
 import { ChatController } from './chat.controller';
@@ -17,6 +23,10 @@ import { ChatService } from './chat.service';
   controllers: [ChatController],
   providers: [
     ChatService,
+    EncryptionService,
+    SourceReader,
+    GitDefaultRefResolver,
+    CaseContextBuilder,
     {
       provide: CHAT_ASSISTANT,
       inject: [ENV, GEMINI_CLIENT],
