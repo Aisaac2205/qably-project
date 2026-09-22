@@ -34,16 +34,27 @@ import {
   type SendToReviewView,
   type SuggestedCase,
 } from './chat.contracts';
-import type {
-  CreateThreadInput,
-  SendMessageInput,
-  SendToReviewInput,
+import {
+  MAX_ATTACHED_CASES,
+  type CreateThreadInput,
+  type SendMessageInput,
+  type SendToReviewInput,
 } from './chat.schemas';
 
 const DEFAULT_THREAD_TITLE = 'New conversation';
 const CONTEXT_CASE_LIMIT = 60;
 const CONTEXT_RUN_LIMIT = 5;
 const THREAD_LIST_LIMIT = 50;
+const UNIQUE_VIOLATION = 'P2002';
+const HUMAN_DOCUMENTATION_SOURCE = 'human';
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === UNIQUE_VIOLATION
+  );
+}
 
 const logger = new Logger('ChatService');
 
@@ -326,6 +337,8 @@ export class ChatService {
     if (thread === null) return err('thread-not-found');
 
     const caseIds = input.caseIds ?? [];
+    if (caseIds.length > MAX_ATTACHED_CASES) return err('too-many-cases');
+
     let attachedRows: AttachedCaseRow[] = [];
     if (caseIds.length > 0) {
       attachedRows = await this.findCasesInProject(projectId, caseIds);
@@ -528,47 +541,67 @@ export class ChatService {
 
     const target = await this.prisma.testCase.findFirst({
       where: { id: targetTestCaseId, projectId },
-      select: { suiteId: true, automationKey: true, automationFilePath: true },
+      select: {
+        suiteId: true,
+        automationKey: true,
+        automationFilePath: true,
+        documentationSource: true,
+      },
     });
     if (target === null) return err('case-not-found');
+    if (target.documentationSource === HUMAN_DOCUMENTATION_SOURCE) {
+      return err('human-documented');
+    }
 
     const connection = await this.findConnection(projectId);
     const evidence = await this.buildTargetedEvidence(target, connection);
 
-    const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
-      const evidenceRow = await tx.evidence.create({
-        data: {
-          projectId,
-          kind: 'SOURCE_EXCERPT',
-          title: `Chat: ${thread.title}`,
-          uri: evidence.uri,
-          excerpt: evidence.excerpt,
-        },
-        select: { id: true },
+    try {
+      const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
+        const evidenceRow = await tx.evidence.create({
+          data: {
+            projectId,
+            kind: 'SOURCE_EXCERPT',
+            title: `Chat: ${thread.title}`,
+            uri: evidence.uri,
+            excerpt: evidence.excerpt,
+          },
+          select: { id: true },
+        });
+
+        return tx.extractedProposal.create({
+          data: {
+            projectId,
+            evidenceId: evidenceRow.id,
+            suiteId: target.suiteId,
+            targetTestCaseId,
+            automationKey: target.automationKey,
+            chatCaseKey,
+            status: 'in_review',
+            title: suggested.title,
+            objective: suggested.objective,
+            preconditions: suggested.preconditions,
+            steps: suggested.steps,
+            expectedResult: suggested.expectedResult,
+            priority: suggested.priority,
+            promptVersion: CHAT_PROMPT_VERSION,
+          },
+          select: { id: true },
+        });
       });
 
-      return tx.extractedProposal.create({
-        data: {
-          projectId,
-          evidenceId: evidenceRow.id,
-          suiteId: target.suiteId,
-          targetTestCaseId,
-          automationKey: target.automationKey,
-          chatCaseKey,
-          status: 'in_review',
-          title: suggested.title,
-          objective: suggested.objective,
-          preconditions: suggested.preconditions,
-          steps: suggested.steps,
-          expectedResult: suggested.expectedResult,
-          priority: suggested.priority,
-          promptVersion: CHAT_PROMPT_VERSION,
-        },
+      return ok({ proposalId: proposal.id });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      const winner = await this.prisma.extractedProposal.findFirst({
+        where: { projectId, chatCaseKey },
         select: { id: true },
       });
-    });
+      if (winner === null) throw error;
 
-    return ok({ proposalId: proposal.id });
+      return ok({ proposalId: winner.id, alreadySent: true });
+    }
   }
 
   private async buildTargetedEvidence(

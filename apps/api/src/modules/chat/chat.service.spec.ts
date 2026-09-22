@@ -144,6 +144,7 @@ function createPrisma(): FakePrisma {
         suiteId: 'suite-1',
         automationKey: 'Checkout > rejects an expired card',
         automationFilePath: 'src/checkout.spec.ts',
+        documentationSource: 'aeris',
       }),
     },
     run: {
@@ -936,6 +937,29 @@ describe('ChatService', () => {
       expect(created.data.suggestedCases[0].targetTestCaseId).toBeUndefined();
     });
 
+    it('refuses more than MAX_ATTACHED_CASES ids even when the caller bypasses the DTO validation', async () => {
+      const prisma = createPrisma();
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        {
+          content: 'Improve these cases',
+          caseIds: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'],
+        },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'too-many-cases' });
+      expect(prisma.testCase.findMany).not.toHaveBeenCalled();
+      expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+    });
+
     it('keeps a targetTestCaseId that matches an attached case', async () => {
       const prisma = createPrisma();
       const assistant = createAssistant({
@@ -1082,6 +1106,72 @@ describe('ChatService', () => {
       );
 
       expect(result).toEqual({ ok: false, error: 'case-not-found' });
+    });
+
+    it('refuses to target a case a human already documented, with a human-documented code', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.testCase.findFirst.mockResolvedValue({
+        suiteId: 'suite-1',
+        automationKey: 'Checkout > rejects an expired card',
+        automationFilePath: 'src/checkout.spec.ts',
+        documentationSource: 'human',
+      });
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'human-documented' });
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('recovers the existing proposal instead of a raw 500 when a double submit races the unique chatCaseKey', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.extractedProposal.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'winner-proposal' });
+      prisma.extractedProposal.create.mockRejectedValue({ code: 'P2002' });
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        value: { proposalId: 'winner-proposal', alreadySent: true },
+      });
+      expect(prisma.extractedProposal.findFirst).toHaveBeenLastCalledWith(
+        containing({
+          where: { projectId: 'project-1', chatCaseKey: 'message-2:case-1' },
+        }),
+      );
     });
 
     it('keeps the qably://chat evidence uri scheme and no chatCaseKey for a non-targeted case', async () => {

@@ -1,5 +1,7 @@
 import {
+  BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -83,6 +85,16 @@ function unwrap<T>(result: Result<T, ChatError>): T {
       throw new UnprocessableEntityException({
         code: result.error,
         message: 'The stored suggested cases for this message are corrupt',
+      });
+    case 'human-documented':
+      throw new ConflictException({
+        code: result.error,
+        message: 'This case was documented by a person and cannot be targeted',
+      });
+    case 'too-many-cases':
+      throw new BadRequestException({
+        code: result.error,
+        message: 'Too many cases attached to this message',
       });
   }
 }

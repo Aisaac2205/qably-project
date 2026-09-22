@@ -114,6 +114,17 @@ describe('buildChatSystemInstruction', () => {
     expect(buildChatSystemInstruction('es')).toMatch(/extracto/i);
     expect(buildChatSystemInstruction('en')).toMatch(/excerpt/i);
   });
+
+  it('tells the assistant to discuss but never target a human-documented case', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(
+      /documentation source.*human/i,
+    );
+    expect(buildChatSystemInstruction('es')).toMatch(/targetTestCaseId/);
+    expect(buildChatSystemInstruction('en')).toMatch(
+      /documentation source.*human/i,
+    );
+    expect(buildChatSystemInstruction('en')).toMatch(/targetTestCaseId/);
+  });
 });
 
 describe('buildCaseContextAcknowledgement', () => {

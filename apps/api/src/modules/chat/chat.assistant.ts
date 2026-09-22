@@ -31,7 +31,6 @@ export interface ChatReplyInput {
   message: string;
   history: ChatHistoryEntry[];
   context: ChatProjectContext;
-  /** Pre-built `<<<CASE_CONTEXT>>>` turn text, or undefined when no case is attached. */
   caseContext?: string;
 }
 
@@ -54,30 +53,27 @@ const RETRY_ATTEMPTS = 3;
 const TEMPERATURE = 0.4;
 const MAX_OUTPUT_TOKENS = 4096;
 
-const RESPONSE_JSON_SCHEMA = {
+export const RESPONSE_JSON_SCHEMA = {
   type: 'object',
   properties: {
-    reply: { type: 'string', maxLength: MAX_REPLY_LENGTH },
+    reply: { type: 'string' },
     cases: {
       type: 'array',
       maxItems: MAX_SUGGESTED_CASES,
       items: {
         type: 'object',
         properties: {
-          title: { type: 'string', maxLength: 120 },
-          objective: { type: 'string', maxLength: 500 },
+          title: { type: 'string' },
+          objective: { type: 'string' },
           preconditions: {
             type: 'array',
-            maxItems: 10,
-            items: { type: 'string', maxLength: 300 },
+            items: { type: 'string' },
           },
           steps: {
             type: 'array',
-            minItems: 1,
-            maxItems: 20,
-            items: { type: 'string', maxLength: 300 },
+            items: { type: 'string' },
           },
-          expectedResult: { type: 'string', maxLength: 500 },
+          expectedResult: { type: 'string' },
           priority: {
             type: 'string',
             enum: ['critical', 'high', 'medium', 'low'],

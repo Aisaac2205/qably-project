@@ -66,6 +66,8 @@ export type ChatError =
   | 'missing-suite'
   | 'provider-unavailable'
   | 'ai-not-enabled'
-  | 'invalid-suggested-cases';
+  | 'invalid-suggested-cases'
+  | 'human-documented'
+  | 'too-many-cases';
 
 export const CHAT_ASSISTANT = Symbol('CHAT_ASSISTANT');

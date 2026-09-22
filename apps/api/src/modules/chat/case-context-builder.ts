@@ -340,12 +340,6 @@ export class CaseContextBuilder {
     return buildCaseContextTurn(applyMessageBudget(resolved));
   }
 
-  /**
-   * Resolves the ref and excerpt for a single case outside of a chat reply,
-   * for building an Evidence permalink when a targeted case is sent to
-   * review. Shares the same source-read and excerpt-location logic as
-   * `build()`, applied to one case instead of a batch.
-   */
   async locateForEvidence(
     candidate: EvidenceCandidate,
     connection: CaseContextConnection | null,
@@ -394,12 +388,15 @@ export class CaseContextBuilder {
     });
 
     if (source.kind === 'unavailable') {
+      const hasNoToken = connection.encryptedAccessToken === null;
+      const isAuthOrNotFound =
+        source.reason === 'http-401' ||
+        source.reason === 'http-403' ||
+        source.reason === 'http-404';
+
       return {
         kind: 'unavailable',
-        reason:
-          connection.encryptedAccessToken === null
-            ? 'no-access'
-            : source.reason,
+        reason: hasNoToken && isAuthOrNotFound ? 'no-access' : source.reason,
       };
     }
 

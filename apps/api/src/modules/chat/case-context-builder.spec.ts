@@ -180,6 +180,25 @@ describe('CaseContextBuilder', () => {
     expect(turn).toContain('no-access');
   });
 
+  it('passes through the reader failure reason without a token when it is not an auth or not-found status', async () => {
+    const read = jest
+      .fn()
+      .mockResolvedValue({ kind: 'unavailable', reason: 'timeout' });
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(read),
+      fakeEncryption(),
+      fakeRefResolver(),
+    );
+
+    const turn = await builder.build(
+      [candidate()],
+      connection({ encryptedAccessToken: null }),
+    );
+
+    expect(turn).toContain('timeout');
+    expect(turn).not.toContain('no-access');
+  });
+
   it('reports the reader failure reason when a token is present but the read still fails', async () => {
     const read = jest
       .fn()
