@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const REPORT_VERSION = '9.1.0';
+export const REPORT_VERSION = '10.0.0';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 const MAX_TESTCASES_PER_REQUEST = 10_000;
@@ -660,6 +660,39 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       totalRuns += runs;
       totalCases += cases;
       annotate('notice', 'Qably report', `${label}: ${runs} runs, ${cases} cases`, env);
+
+      const rejected = Array.isArray(outcome.body?.rejected) ? outcome.body.rejected : [];
+      for (const group of rejected) {
+        annotate(
+          'warning',
+          'Qably report rejected a group',
+          `${label}: ${group.suiteName}: ${group.reason}`,
+          env,
+        );
+        hadFailure = true;
+      }
+
+      const collisions = Array.isArray(outcome.body?.caseIdentityCollisions)
+        ? outcome.body.caseIdentityCollisions
+        : [];
+      for (const collision of collisions) {
+        annotate(
+          'warning',
+          'Qably report found a case identity collision',
+          `${label}: ${collision.suiteName}: "${collision.key}" matches ${collision.count} different cases; rename them so they stop colliding.`,
+          env,
+        );
+        hadFailure = true;
+      }
+
+      const truncatedFields =
+        outcome.body?.truncatedFields && typeof outcome.body.truncatedFields === 'object'
+          ? Object.entries(outcome.body.truncatedFields)
+          : [];
+      if (truncatedFields.length > 0) {
+        const summary = truncatedFields.map(([field, count]) => `${field}: ${count}`).join(', ');
+        annotate('notice', 'Qably report truncated fields', `${label}: ${summary}`, env);
+      }
     }
   }
 

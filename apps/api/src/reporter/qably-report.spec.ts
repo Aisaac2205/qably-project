@@ -8,6 +8,8 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { callPure, runCli } from './test-support';
+import { parseJunitXml } from '../modules/runs/lib/parse-junit-xml';
+import { groupJunitReportBySuite } from '../modules/runs/lib/group-junit-report';
 
 const smallReport = `<testsuite name="Checkout">
   <testcase name="accepts a valid card"/>
@@ -210,6 +212,26 @@ describe('countTopLevelGroups', () => {
       { fn: 'countTopLevelGroups', args: [xml] },
     ]);
     expect(count).toBe(3);
+  });
+
+  it('undercounts against the server when a top-level testsuite nests a differently-named child, a known disclosed limitation', () => {
+    const xml =
+      '<testsuites><testsuite name="a"><testcase name="a1"/>' +
+      '<testsuite name="a-nested"><testcase name="nested1"/></testsuite>' +
+      '</testsuite></testsuites>';
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(1);
+    expect(serverGroupCount).toBe(2);
+    expect(clientCount).not.toBe(serverGroupCount);
   });
 });
 
@@ -514,6 +536,108 @@ describe('CLI end-to-end against a fake ingest server', () => {
       expect(calls()).toBe(1);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('1 runs, 2 cases');
+    } finally {
+      server.close();
+    }
+  });
+
+  it('annotates a rejected group as a warning and treats it as a failure only under QABLY_FAIL_ON_ERROR', async () => {
+    const { server, url } = await createScriptedServer(() => ({
+      status: 202,
+      body: {
+        accepted: 0,
+        runs: [],
+        rejected: [{ suiteName: 'Checkout', reason: 'name: too long' }],
+        caseIdentityCollisions: [],
+        truncatedFields: {},
+      },
+    }));
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      const withoutFailOnError = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+      });
+
+      expect(withoutFailOnError.exitCode).toBe(0);
+      expect(withoutFailOnError.stdout).toContain('[warning]');
+      expect(withoutFailOnError.stdout).toContain('Checkout');
+      expect(withoutFailOnError.stdout).toContain('name: too long');
+
+      const withFailOnError = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+        QABLY_FAIL_ON_ERROR: 'true',
+      });
+
+      expect(withFailOnError.exitCode).toBe(1);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('annotates a case identity collision as a warning that also fails the job under QABLY_FAIL_ON_ERROR', async () => {
+    const { server, url } = await createScriptedServer(() => ({
+      status: 202,
+      body: {
+        accepted: 1,
+        runs: [{ externalId: 'x', suiteName: 'Checkout', jobId: 'j' }],
+        rejected: [],
+        caseIdentityCollisions: [
+          { suiteName: 'Checkout', key: 'Adds to cart', count: 2 },
+        ],
+        truncatedFields: {},
+      },
+    }));
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      const withoutFailOnError = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+      });
+
+      expect(withoutFailOnError.exitCode).toBe(0);
+      expect(withoutFailOnError.stdout).toContain('[warning]');
+      expect(withoutFailOnError.stdout).toContain('Adds to cart');
+
+      const withFailOnError = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+        QABLY_FAIL_ON_ERROR: 'true',
+      });
+
+      expect(withFailOnError.exitCode).toBe(1);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('annotates truncated field counts as a notice, never as a failure', async () => {
+    const { server, url } = await createScriptedServer(() => ({
+      status: 202,
+      body: {
+        accepted: 1,
+        runs: [{ externalId: 'x', suiteName: 'Checkout', jobId: 'j' }],
+        rejected: [],
+        caseIdentityCollisions: [],
+        truncatedFields: { name: 2, failureMessage: 1 },
+      },
+    }));
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      const result = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+        QABLY_FAIL_ON_ERROR: 'true',
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('[notice]');
+      expect(result.stdout).toContain('name: 2');
+      expect(result.stdout).toContain('failureMessage: 1');
     } finally {
       server.close();
     }
