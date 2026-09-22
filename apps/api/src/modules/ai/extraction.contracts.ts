@@ -73,12 +73,6 @@ export interface ExtractionInput {
   readonly targetAutomationKeys?: readonly string[];
   readonly locale: 'es' | 'en';
   readonly declarationCountHint?: number;
-  /**
-   * Whether to ask the model for the bonus "suite" summary alongside the
-   * extracted cases. Defaults to true; a caller sets this to false when a
-   * standalone `document-suite-metadata` job already covers the suite, so
-   * the file prompt never asks for it twice.
-   */
   readonly requestSuiteSummary?: boolean;
 }
 
