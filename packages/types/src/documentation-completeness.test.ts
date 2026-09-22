@@ -95,6 +95,34 @@ describe('assessCaseDocumentation', () => {
       'expectedResult',
     ]);
   });
+
+  it('treats a missing name as empty instead of throwing', () => {
+    const result = assessCaseDocumentation(
+      baseCase({ name: undefined as unknown as string }),
+    );
+    expect(result.missing).toContain('title');
+  });
+
+  it('treats a null objective as empty instead of throwing', () => {
+    const result = assessCaseDocumentation(
+      baseCase({ objective: null as unknown as string }),
+    );
+    expect(result.missing).toContain('objective');
+  });
+
+  it('treats a missing expectedResult as empty instead of throwing', () => {
+    const result = assessCaseDocumentation(
+      baseCase({ expectedResult: undefined as unknown as string }),
+    );
+    expect(result.missing).toContain('expectedResult');
+  });
+
+  it('treats a missing steps array as empty instead of throwing', () => {
+    const result = assessCaseDocumentation(
+      baseCase({ steps: undefined as unknown as string[] }),
+    );
+    expect(result.missing).toContain('steps');
+  });
 });
 
 function baseSuite(overrides: Partial<Parameters<typeof assessSuiteDocumentation>[0]> = {}) {
@@ -147,5 +175,26 @@ describe('assessSuiteDocumentation', () => {
     });
     expect(result.complete).toBe(false);
     expect(result.missing).toEqual(['name', 'description', 'tags']);
+  });
+
+  it('treats a missing description as empty instead of throwing', () => {
+    const result = assessSuiteDocumentation(
+      baseSuite({ description: undefined as unknown as string }),
+    );
+    expect(result.missing).toContain('description');
+  });
+
+  it('treats a missing tags array as empty instead of throwing', () => {
+    const result = assessSuiteDocumentation(
+      baseSuite({ tags: undefined as unknown as string[] }),
+    );
+    expect(result.missing).toContain('tags');
+  });
+
+  it('treats a null name as empty instead of throwing', () => {
+    const result = assessSuiteDocumentation(
+      baseSuite({ name: null as unknown as string }),
+    );
+    expect(result.missing).toContain('name');
   });
 });

@@ -28,18 +28,29 @@ export interface DocumentationState<Field extends string> {
 export type CaseDocumentationState = DocumentationState<CaseDocumentationField>;
 export type SuiteDocumentationState = DocumentationState<SuiteDocumentationField>;
 
+type MaybeText = string | null | undefined;
+type MaybeList<T> = readonly T[] | null | undefined;
+
+function toText(value: MaybeText): string {
+  return value ?? '';
+}
+
+function toList<T>(value: MaybeList<T>): readonly T[] {
+  return value ?? [];
+}
+
 export interface CaseDocumentationInput {
-  name: string;
-  automationKey: string | null | undefined;
-  objective: string;
-  steps: readonly string[];
-  expectedResult: string;
+  name: MaybeText;
+  automationKey: MaybeText;
+  objective: MaybeText;
+  steps: MaybeList<string>;
+  expectedResult: MaybeText;
 }
 
 export interface SuiteDocumentationInput {
-  name: string;
-  description: string;
-  tags: readonly string[];
+  name: MaybeText;
+  description: MaybeText;
+  tags: MaybeList<string>;
 }
 
 export function assessCaseDocumentation(
@@ -47,15 +58,17 @@ export function assessCaseDocumentation(
 ): DocumentationAssessment<CaseDocumentationField> {
   const missing: CaseDocumentationField[] = [];
 
-  const trimmedName = input.name.trim();
-  const trimmedAutomationKey = (input.automationKey ?? '').trim();
+  const trimmedName = toText(input.name).trim();
+  const trimmedAutomationKey = toText(input.automationKey).trim();
   if (trimmedName.length === 0 || trimmedName === trimmedAutomationKey) {
     missing.push('title');
   }
 
-  if (input.objective.trim().length === 0) missing.push('objective');
-  if (input.steps.length === 0) missing.push('steps');
-  if (input.expectedResult.trim().length === 0) missing.push('expectedResult');
+  if (toText(input.objective).trim().length === 0) missing.push('objective');
+  if (toList(input.steps).length === 0) missing.push('steps');
+  if (toText(input.expectedResult).trim().length === 0) {
+    missing.push('expectedResult');
+  }
 
   return { complete: missing.length === 0, missing };
 }
@@ -65,9 +78,9 @@ export function assessSuiteDocumentation(
 ): DocumentationAssessment<SuiteDocumentationField> {
   const missing: SuiteDocumentationField[] = [];
 
-  if (input.name.trim().length === 0) missing.push('name');
-  if (input.description.trim().length === 0) missing.push('description');
-  if (input.tags.length === 0) missing.push('tags');
+  if (toText(input.name).trim().length === 0) missing.push('name');
+  if (toText(input.description).trim().length === 0) missing.push('description');
+  if (toList(input.tags).length === 0) missing.push('tags');
 
   return { complete: missing.length === 0, missing };
 }
