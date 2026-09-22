@@ -74,7 +74,7 @@ interface FakePrisma {
   };
   chatMessage: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
   suite: { findMany: jest.Mock; findFirst: jest.Mock };
-  testCase: { findMany: jest.Mock };
+  testCase: { findMany: jest.Mock; findFirst: jest.Mock };
   run: { findMany: jest.Mock };
   evidence: { create: jest.Mock };
   extractedProposal: {
@@ -140,6 +140,11 @@ function createPrisma(): FakePrisma {
         }
         return Promise.resolve([{ name: 'Accepts a valid card' }]);
       }),
+      findFirst: jest.fn().mockResolvedValue({
+        suiteId: 'suite-1',
+        automationKey: 'Checkout > rejects an expired card',
+        automationFilePath: 'src/checkout.spec.ts',
+      }),
     },
     run: {
       findMany: jest
@@ -183,8 +188,17 @@ function fakeEntitlement(
 
 function fakeCaseContextBuilder(
   build: jest.Mock = jest.fn().mockResolvedValue(''),
-): CaseContextBuilder & { build: jest.Mock } {
-  return { build } as never;
+  locateForEvidence: jest.Mock = jest.fn().mockResolvedValue({
+    ref: 'sha123',
+    excerpt: {
+      kind: 'declaration',
+      excerpt: 'it("rejects an expired card", () => {})',
+      startLine: 10,
+      endLine: 12,
+    },
+  }),
+): CaseContextBuilder & { build: jest.Mock; locateForEvidence: jest.Mock } {
+  return { build, locateForEvidence } as never;
 }
 
 function build(
@@ -942,6 +956,160 @@ describe('ChatService', () => {
         data: { suggestedCases: Array<{ targetTestCaseId?: string }> };
       };
       expect(created.data.suggestedCases[0].targetTestCaseId).toBe('case-1');
+    });
+  });
+
+  describe('sending a targeted case to review', () => {
+    const targetedAssistantRow = {
+      id: 'message-2',
+      threadId: 'thread-1',
+      role: 'assistant' as const,
+      content: 'Here is the update.',
+      suggestedCases: [{ ...suggestedCase, targetTestCaseId: 'case-1' }],
+      promptVersion: CHAT_PROMPT_VERSION,
+      totalTokens: 120,
+      createdAt: new Date('2026-09-05T10:05:00.000Z'),
+    };
+
+    it('creates a proposal carrying the target suiteId, automationKey and an evidence permalink with line range and excerpt', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+      expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            targetTestCaseId: 'case-1',
+            suiteId: 'suite-1',
+            automationKey: 'Checkout > rejects an expired card',
+            chatCaseKey: 'message-2:case-1',
+          }),
+        }),
+      );
+      expect(prisma.evidence.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            uri: 'https://github.com/acme/shop/blob/sha123/src/checkout.spec.ts#L10-L12',
+            excerpt: 'it("rejects an expired card", () => {})',
+          }),
+        }),
+      );
+    });
+
+    it('is idempotent for a repeated targeted send via chatCaseKey', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.extractedProposal.findFirst.mockResolvedValue({
+        id: 'already-sent-targeted-proposal',
+      });
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          proposalId: 'already-sent-targeted-proposal',
+          alreadySent: true,
+        },
+      });
+      expect(prisma.extractedProposal.findFirst).toHaveBeenCalledWith(
+        containing({
+          where: { projectId: 'project-1', chatCaseKey: 'message-2:case-1' },
+        }),
+      );
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('returns case-not-found when the target case no longer exists in the project', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.testCase.findFirst.mockResolvedValue(null);
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'case-not-found' });
+    });
+
+    it('keeps the qably://chat evidence uri scheme and no chatCaseKey for a non-targeted case', async () => {
+      const prisma = createPrisma();
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        {
+          caseIndex: 0,
+        },
+      );
+
+      const calls = prisma.extractedProposal.create.mock.calls as unknown[][];
+      const created = calls[0][0] as { data: { chatCaseKey?: string } };
+      expect(created.data.chatCaseKey).toBeUndefined();
+      expect(prisma.evidence.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({ uri: 'qably://chat/thread-1/message-2/0' }),
+        }),
+      );
     });
   });
 });

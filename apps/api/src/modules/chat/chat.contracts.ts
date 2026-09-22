@@ -13,7 +13,7 @@ export const suggestedCaseSchema = extractedCaseSchema
     sourceExcerpt: true,
   })
   .extend({
-    targetTestCaseId: z.string().cuid().optional(),
+    targetTestCaseId: z.string().trim().min(1).optional(),
   });
 
 export const suggestedCasesSchema = z

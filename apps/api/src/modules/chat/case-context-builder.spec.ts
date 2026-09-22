@@ -290,6 +290,45 @@ describe('CaseContextBuilder', () => {
     expect(turn).toContain('const y = 2;');
   });
 
+  it('locateForEvidence resolves the ref and excerpt for a single case', async () => {
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'it("rejects an expired card", () => {})',
+      truncated: false,
+    });
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(read),
+      fakeEncryption(),
+      fakeRefResolver('sha999'),
+    );
+
+    const { ref, excerpt } = await builder.locateForEvidence(
+      {
+        automationKey: 'Checkout > rejects an expired card',
+        automationFilePath: 'src/checkout.spec.ts',
+      },
+      connection(),
+    );
+
+    expect(ref).toBe('sha999');
+    expect(excerpt.kind).toBe('declaration');
+  });
+
+  it('locateForEvidence reports unavailable when there is no connection', async () => {
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(jest.fn()),
+      fakeEncryption(),
+      fakeRefResolver(),
+    );
+
+    const { excerpt } = await builder.locateForEvidence(
+      { automationKey: 'x', automationFilePath: 'a.ts' },
+      null,
+    );
+
+    expect(excerpt.kind).toBe('unavailable');
+  });
+
   it('decrypts the connection token and passes it to the source reader', async () => {
     const read = jest.fn().mockResolvedValue({
       kind: 'content',

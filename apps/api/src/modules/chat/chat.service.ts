@@ -1,15 +1,21 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { resolveLocale } from '@qably/i18n';
-import { assessCaseDocumentation } from '@qably/types';
+import {
+  assessCaseDocumentation,
+  type RepoConnectionProvider,
+} from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { buildBlobUrl } from '../repository/source-reader';
 import {
   CaseContextBuilder,
   type CaseContextCandidate,
   type CaseContextConnection,
+  type EvidenceCandidate,
+  type ExcerptOutcome,
 } from './case-context-builder';
 import type { ChatProjectContext } from './chat-prompt';
 import type { ChatAssistant, ChatHistoryEntry } from './chat.assistant';
@@ -169,6 +175,28 @@ function chatEvidenceUri(
   caseIndex: number,
 ): string {
   return `qably://chat/${threadId}/${messageId}/${caseIndex}`;
+}
+
+function targetedChatCaseKey(
+  messageId: string,
+  targetTestCaseId: string,
+): string {
+  return `${messageId}:${targetTestCaseId}`;
+}
+
+function lineAnchor(
+  provider: RepoConnectionProvider,
+  startLine: number,
+  endLine: number,
+): string {
+  return provider === 'GITHUB'
+    ? `#L${startLine}-L${endLine}`
+    : `#lines-${startLine}:${endLine}`;
+}
+
+interface TargetedEvidence {
+  uri: string;
+  excerpt: string | null;
 }
 
 function parseChatEvidenceUri(
@@ -412,6 +440,16 @@ export class ChatService {
       read.kind === 'ok' ? read.cases[input.caseIndex] : undefined;
     if (suggested === undefined) return err('case-not-found');
 
+    if (suggested.targetTestCaseId !== undefined) {
+      return this.sendTargetedToReview(
+        projectId,
+        thread,
+        messageId,
+        suggested,
+        suggested.targetTestCaseId,
+      );
+    }
+
     const evidenceUri = chatEvidenceUri(threadId, messageId, input.caseIndex);
 
     const existingProposal = await this.prisma.extractedProposal.findFirst({
@@ -469,6 +507,110 @@ export class ChatService {
     });
 
     return ok({ proposalId: proposal.id });
+  }
+
+  private async sendTargetedToReview(
+    projectId: string,
+    thread: ThreadRow,
+    messageId: string,
+    suggested: SuggestedCase,
+    targetTestCaseId: string,
+  ): Promise<Result<SendToReviewView, ChatError>> {
+    const chatCaseKey = targetedChatCaseKey(messageId, targetTestCaseId);
+
+    const existingProposal = await this.prisma.extractedProposal.findFirst({
+      where: { projectId, chatCaseKey },
+      select: { id: true },
+    });
+    if (existingProposal !== null) {
+      return ok({ proposalId: existingProposal.id, alreadySent: true });
+    }
+
+    const target = await this.prisma.testCase.findFirst({
+      where: { id: targetTestCaseId, projectId },
+      select: { suiteId: true, automationKey: true, automationFilePath: true },
+    });
+    if (target === null) return err('case-not-found');
+
+    const connection = await this.findConnection(projectId);
+    const evidence = await this.buildTargetedEvidence(target, connection);
+
+    const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
+      const evidenceRow = await tx.evidence.create({
+        data: {
+          projectId,
+          kind: 'SOURCE_EXCERPT',
+          title: `Chat: ${thread.title}`,
+          uri: evidence.uri,
+          excerpt: evidence.excerpt,
+        },
+        select: { id: true },
+      });
+
+      return tx.extractedProposal.create({
+        data: {
+          projectId,
+          evidenceId: evidenceRow.id,
+          suiteId: target.suiteId,
+          targetTestCaseId,
+          automationKey: target.automationKey,
+          chatCaseKey,
+          status: 'in_review',
+          title: suggested.title,
+          objective: suggested.objective,
+          preconditions: suggested.preconditions,
+          steps: suggested.steps,
+          expectedResult: suggested.expectedResult,
+          priority: suggested.priority,
+          promptVersion: CHAT_PROMPT_VERSION,
+        },
+        select: { id: true },
+      });
+    });
+
+    return ok({ proposalId: proposal.id });
+  }
+
+  private async buildTargetedEvidence(
+    target: EvidenceCandidate,
+    connection: CaseContextConnection | null,
+  ): Promise<TargetedEvidence> {
+    if (connection === null || target.automationFilePath === null) {
+      return {
+        uri: target.automationFilePath ?? target.automationKey ?? 'unknown',
+        excerpt: null,
+      };
+    }
+
+    const { ref, excerpt } = await this.caseContextBuilder.locateForEvidence(
+      target,
+      connection,
+    );
+    const blobUrl = buildBlobUrl(
+      connection.provider,
+      connection.repo,
+      ref,
+      target.automationFilePath,
+    );
+
+    return this.toTargetedEvidence(connection.provider, blobUrl, excerpt);
+  }
+
+  private toTargetedEvidence(
+    provider: RepoConnectionProvider,
+    blobUrl: string,
+    excerpt: ExcerptOutcome,
+  ): TargetedEvidence {
+    if (excerpt.kind === 'declaration') {
+      return {
+        uri: `${blobUrl}${lineAnchor(provider, excerpt.startLine, excerpt.endLine)}`,
+        excerpt: excerpt.excerpt,
+      };
+    }
+    if (excerpt.kind === 'file-head') {
+      return { uri: blobUrl, excerpt: excerpt.excerpt };
+    }
+    return { uri: blobUrl, excerpt: null };
   }
 
   private async loadSentProposalIds(

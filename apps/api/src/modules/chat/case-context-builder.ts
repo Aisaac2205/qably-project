@@ -50,7 +50,14 @@ type LocatedExcerpt =
   | { kind: 'declaration'; excerpt: string; startLine: number; endLine: number }
   | { kind: 'file-head'; excerpt: string };
 
-type ExcerptOutcome = LocatedExcerpt | { kind: 'unavailable'; reason: string };
+export type ExcerptOutcome =
+  | LocatedExcerpt
+  | { kind: 'unavailable'; reason: string };
+
+export type EvidenceCandidate = Pick<
+  CaseContextCandidate,
+  'automationKey' | 'automationFilePath'
+>;
 
 interface ResolvedCase {
   candidate: CaseContextCandidate;
@@ -333,8 +340,38 @@ export class CaseContextBuilder {
     return buildCaseContextTurn(applyMessageBudget(resolved));
   }
 
+  /**
+   * Resolves the ref and excerpt for a single case outside of a chat reply,
+   * for building an Evidence permalink when a targeted case is sent to
+   * review. Shares the same source-read and excerpt-location logic as
+   * `build()`, applied to one case instead of a batch.
+   */
+  async locateForEvidence(
+    candidate: EvidenceCandidate,
+    connection: CaseContextConnection | null,
+  ): Promise<{ ref: string; excerpt: ExcerptOutcome }> {
+    const accessToken =
+      connection === null || connection.encryptedAccessToken === null
+        ? undefined
+        : this.encryption.decrypt(connection.encryptedAccessToken);
+
+    const ref =
+      connection === null
+        ? HEAD_REF
+        : await this.defaultRefResolver.resolve(connection, accessToken);
+
+    const excerpt = await this.resolveExcerpt(
+      candidate,
+      connection,
+      accessToken,
+      ref,
+    );
+
+    return { ref, excerpt };
+  }
+
   private async resolveExcerpt(
-    candidate: CaseContextCandidate,
+    candidate: EvidenceCandidate,
     connection: CaseContextConnection | null,
     accessToken: string | undefined,
     ref: string,
