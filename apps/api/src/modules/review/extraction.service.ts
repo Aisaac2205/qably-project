@@ -48,6 +48,7 @@ interface CodeChangeCandidate {
 interface DocumentFileCandidate {
   id: string;
   projectId: string;
+  suiteId: string;
   name: string;
   automationKey: string | null;
   automationFilePath: string | null;
@@ -310,6 +311,7 @@ export class ExtractionService {
       select: {
         id: true,
         projectId: true,
+        suiteId: true,
         name: true,
         automationKey: true,
         automationFilePath: true,
@@ -357,6 +359,7 @@ export class ExtractionService {
 
     const skippedIds = emptySkippedIds();
     const groupedByFile = new Map<string, DocumentFileTarget[]>();
+    const fileSuiteIds = new Map<string, Set<string>>();
 
     for (const row of rows) {
       if (row.documentationSource === 'human') {
@@ -414,6 +417,12 @@ export class ExtractionService {
       const group = groupedByFile.get(filePath) ?? [];
       group.push({ testCaseId: row.id, automationKey });
       groupedByFile.set(filePath, group);
+
+      if (typeof row.suiteId === 'string') {
+        const suiteIdsForFile = fileSuiteIds.get(filePath) ?? new Set<string>();
+        suiteIdsForFile.add(row.suiteId);
+        fileSuiteIds.set(filePath, suiteIdsForFile);
+      }
     }
 
     const casesSkipped = buildSkips(skippedIds);
@@ -441,12 +450,33 @@ export class ExtractionService {
       opts: { jobId: string };
     }[] = [];
     const queuedCaseIds: string[] = [];
-    const requestSuiteSummary = 'projectId' in scope;
+    const isProjectScope = 'projectId' in scope;
+    const incompleteSuiteIds = isProjectScope
+      ? await this.resolveIncompleteSuiteIds(
+          this.uniformSuiteIdsFor(files, fileSuiteIds),
+        )
+      : new Set<string>();
+    const claimedSuiteIds = new Set<string>();
 
     for (const [filePath, targets] of files) {
+      const suiteIdsForFile = fileSuiteIds.get(filePath);
+      const uniformSuiteId =
+        suiteIdsForFile !== undefined && suiteIdsForFile.size === 1
+          ? [...suiteIdsForFile][0]
+          : null;
+
       chunk(targets, MAX_EXTRACTED_CASES).forEach((chunkTargets, index) => {
         casesTargeted += chunkTargets.length;
         queuedCaseIds.push(...chunkTargets.map((target) => target.testCaseId));
+
+        const requestSuiteSummary =
+          isProjectScope &&
+          uniformSuiteId !== null &&
+          incompleteSuiteIds.has(uniformSuiteId) &&
+          !claimedSuiteIds.has(uniformSuiteId);
+
+        if (requestSuiteSummary) claimedSuiteIds.add(uniformSuiteId);
+
         jobs.push({
           name: 'document-file',
           data: {
@@ -485,6 +515,45 @@ export class ExtractionService {
       casesSkipped,
       ...(suiteJob !== null ? { suiteQueued: true } : {}),
     });
+  }
+
+  private uniformSuiteIdsFor(
+    files: readonly [string, DocumentFileTarget[]][],
+    fileSuiteIds: ReadonlyMap<string, Set<string>>,
+  ): string[] {
+    const suiteIds = new Set<string>();
+
+    for (const [filePath] of files) {
+      const suiteIdsForFile = fileSuiteIds.get(filePath);
+      if (suiteIdsForFile !== undefined && suiteIdsForFile.size === 1) {
+        suiteIds.add([...suiteIdsForFile][0]);
+      }
+    }
+
+    return [...suiteIds];
+  }
+
+  private async resolveIncompleteSuiteIds(
+    suiteIds: readonly string[],
+  ): Promise<Set<string>> {
+    if (suiteIds.length === 0) return new Set();
+
+    const suites = await this.prisma.suite.findMany({
+      where: { id: { in: [...suiteIds] } },
+      select: { id: true, name: true, description: true, tags: true },
+    });
+
+    const incomplete = new Set<string>();
+    for (const suite of suites) {
+      const assessment = assessSuiteDocumentation({
+        name: suite.name,
+        description: suite.description,
+        tags: suite.tags,
+      });
+      if (!assessment.complete) incomplete.add(suite.id);
+    }
+
+    return incomplete;
   }
 
   private async buildSuiteMetadataJob(

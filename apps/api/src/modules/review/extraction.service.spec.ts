@@ -38,7 +38,7 @@ interface FakePrisma {
   };
   extractedProposal: { findFirst: jest.Mock; findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
-  suite: { findFirst: jest.Mock; update: jest.Mock };
+  suite: { findFirst: jest.Mock; findMany: jest.Mock; update: jest.Mock };
   project: { findFirst: jest.Mock; findUnique: jest.Mock };
 }
 
@@ -86,6 +86,7 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
         description: 'Handles the checkout flow',
         tags: ['checkout'],
       }),
+      findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     project: {
@@ -1510,5 +1511,156 @@ describe('ExtractionService.enqueueDocumentFiles suite metadata job', () => {
       where: { id: 'suite-1' },
       data: { documentationQueuedAt: null },
     });
+  });
+});
+
+describe('ExtractionService.enqueueDocumentFiles project-scoped suite metadata producer', () => {
+  function candidate(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      projectId: 'proj-1',
+      suiteId: 'suite-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      steps: [],
+      currentVersion: null,
+      ...overrides,
+    };
+  }
+
+  function incompleteSuiteRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'suite-1',
+      name: 'Checkout',
+      description: '',
+      tags: [],
+      ...overrides,
+    };
+  }
+
+  function completeSuiteRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'suite-1',
+      name: 'Checkout',
+      description: 'Handles the checkout flow',
+      tags: ['checkout'],
+      ...overrides,
+    };
+  }
+
+  it('writes suite metadata from exactly one file job when two files in the same incomplete suite are batched by project', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        automationFilePath: 'src/cart.spec.ts',
+        automationKey: 'Cart > a',
+      }),
+      candidate({
+        id: 'case-2',
+        suiteId: 'suite-1',
+        automationFilePath: 'src/checkout.spec.ts',
+        automationKey: 'Checkout > a',
+      }),
+    ]);
+    prisma.suite.findMany.mockResolvedValue([incompleteSuiteRow()]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { filesEnqueued: 2 } });
+    expect(prisma.suite.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['suite-1'] } },
+      select: { id: true, name: true, description: true, tags: true },
+    });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    const producers = jobs.filter(
+      (job) => job.data.requestSuiteSummary === true,
+    );
+    expect(producers).toHaveLength(1);
+  });
+
+  it('never requests suite metadata for a project batch whose suite documentation is already complete', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        automationFilePath: 'src/cart.spec.ts',
+        automationKey: 'Cart > a',
+      }),
+      candidate({
+        id: 'case-2',
+        suiteId: 'suite-1',
+        automationFilePath: 'src/checkout.spec.ts',
+        automationKey: 'Checkout > a',
+      }),
+    ]);
+    prisma.suite.findMany.mockResolvedValue([completeSuiteRow()]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { filesEnqueued: 2 } });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    const producers = jobs.filter(
+      (job) => job.data.requestSuiteSummary === true,
+    );
+    expect(producers).toHaveLength(0);
+  });
+
+  it('writes suite metadata once per suite when a project batch spans two different incomplete suites', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({
+        id: 'case-1',
+        suiteId: 'suite-1',
+        automationFilePath: 'src/cart.spec.ts',
+        automationKey: 'Cart > a',
+      }),
+      candidate({
+        id: 'case-2',
+        suiteId: 'suite-2',
+        automationFilePath: 'src/checkout.spec.ts',
+        automationKey: 'Checkout > a',
+      }),
+    ]);
+    prisma.suite.findMany.mockResolvedValue([
+      incompleteSuiteRow({ id: 'suite-1', name: 'Cart' }),
+      incompleteSuiteRow({ id: 'suite-2', name: 'Checkout' }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { filesEnqueued: 2 } });
+    expect(prisma.suite.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['suite-1', 'suite-2'] } },
+      select: { id: true, name: true, description: true, tags: true },
+    });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    const producers = jobs.filter(
+      (job) => job.data.requestSuiteSummary === true,
+    );
+    expect(producers).toHaveLength(2);
   });
 });
