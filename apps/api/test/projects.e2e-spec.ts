@@ -15,6 +15,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ProjectsModule } from '../src/modules/projects/projects.module';
+import { countingUpdateMany } from './support/prisma-stub';
 import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
@@ -60,7 +61,7 @@ describe('Projects (e2e)', () => {
       delete: jest.fn(),
       count: jest.fn(),
     },
-    testCase: { findMany: jest.fn() },
+    testCase: { findMany: jest.fn(), updateMany: countingUpdateMany() },
     extractedProposal: { findMany: jest.fn() },
     run: { findMany: jest.fn(), groupBy: jest.fn() },
     runCase: { groupBy: jest.fn() },

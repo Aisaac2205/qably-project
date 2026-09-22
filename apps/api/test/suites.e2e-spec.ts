@@ -15,6 +15,7 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SuitesModule } from '../src/modules/suites/suites.module';
+import { countingUpdateMany } from './support/prisma-stub';
 import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
@@ -70,13 +71,13 @@ describe('Suites (e2e)', () => {
       findUniqueOrThrow: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: countingUpdateMany(),
       delete: jest.fn(),
     },
     testCase: {
       create: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
+      updateMany: countingUpdateMany(),
       delete: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
@@ -350,6 +351,7 @@ describe('Suites (e2e)', () => {
       filesEnqueued: 1,
       casesTargeted: 1,
       casesSkipped: [],
+      suiteQueued: true,
     });
   });
 
