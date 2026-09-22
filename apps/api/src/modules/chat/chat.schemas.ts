@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { MAX_ATTACHED_CASES } from '@qably/types';
 
-export const MAX_ATTACHED_CASES = 5;
+export { MAX_ATTACHED_CASES };
 
 export const createThreadSchema = z.object({
   title: z.string().trim().min(1).max(120).optional(),

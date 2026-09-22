@@ -804,6 +804,8 @@ export interface SuggestedCaseRecord {
   targetTestCaseId?: string
 }
 
+export const MAX_ATTACHED_CASES = 5
+
 export interface AttachedCaseRecord {
   id: string
   name: string

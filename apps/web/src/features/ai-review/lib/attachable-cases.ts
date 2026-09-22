@@ -1,6 +1,6 @@
-import type { AttachedCaseRecord, Suite } from '@qably/types'
+import { MAX_ATTACHED_CASES, type AttachedCaseRecord, type Suite } from '@qably/types'
 
-export const MAX_ATTACHED_CASES = 5
+export { MAX_ATTACHED_CASES }
 
 export function flattenAttachableCases(suites: Suite[]): AttachedCaseRecord[] {
   return suites.flatMap((suite) =>
