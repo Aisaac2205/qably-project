@@ -379,6 +379,25 @@ describe('RunsController.ingestJunit', () => {
     expect(jobs.map((job) => job.data.reportSize)).toEqual([3, 3, 3]);
   });
 
+  it('excludes rejected groups from this request contribution to reportSize, so the batch still completes', async () => {
+    const { controller, runIngestQueue } = build();
+    const partiallyInvalidReport = `<testsuites>
+      <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
+      <testsuite><testcase name="b1"/></testsuite>
+      <testsuite name="src/c.test.ts"><testcase name="c1"/></testsuite>
+    </testsuites>`;
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ reportSize: '3' }),
+      partiallyInvalidReport,
+    );
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs).toHaveLength(2);
+    expect(jobs.map((job) => job.data.reportSize)).toEqual([2, 2]);
+  });
+
   it('caps an absurd reportSize to a sane maximum', async () => {
     const { controller, runIngestQueue } = build();
 
@@ -407,29 +426,101 @@ describe('RunsController.ingestJunit', () => {
     expect(firstJob.opts.jobId).toBe(secondJob.opts.jobId);
   });
 
-  it('rejects the whole request with 400 and enqueues nothing when a group fails ingest validation', async () => {
+  it('answers 202 with every group rejected and nothing enqueued when the shared query invalidates every group, instead of throwing 400', async () => {
     const { controller, runIngestQueue } = build();
     const invalidQuery = { ...query(), name: 'x'.repeat(300) };
 
-    await expect(
-      controller.ingestJunit(apiKey, invalidQuery, multiSuiteReport),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = await controller.ingestJunit(
+      apiKey,
+      invalidQuery,
+      multiSuiteReport,
+    );
+
+    expect(result.accepted).toBe(0);
+    expect(result.runs).toEqual([]);
+    expect(result.rejected).toHaveLength(3);
     expect(runIngestQueue.addBulk).not.toHaveBeenCalled();
   });
 
-  it('names the failing suite in the validation error', async () => {
+  it('names the failing suite in the rejected entry', async () => {
     const { controller } = build();
     const invalidQuery = { ...query(), name: 'x'.repeat(300) };
 
-    try {
-      await controller.ingestJunit(apiKey, invalidQuery, report);
-      throw new Error('expected ingestJunit to throw');
-    } catch (error) {
-      expect(error).toBeInstanceOf(BadRequestException);
-      const response = (error as BadRequestException).getResponse() as {
-        message: string;
-      };
-      expect(response.message).toContain('Checkout');
-    }
+    const result = await controller.ingestJunit(apiKey, invalidQuery, report);
+
+    expect(result.rejected).toEqual([
+      expect.objectContaining({ suiteName: 'Checkout' }),
+    ]);
+    expect(result.rejected[0].reason.length).toBeGreaterThan(0);
+  });
+
+  it('accepts the valid groups and rejects only the group that fails validation, instead of an all-or-nothing 400', async () => {
+    const { controller, runIngestQueue } = build();
+    const partiallyInvalidReport = `<testsuites>
+      <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
+      <testsuite><testcase name="b1"/></testsuite>
+      <testsuite name="src/c.test.ts"><testcase name="c1"/></testsuite>
+    </testsuites>`;
+
+    const result = await controller.ingestJunit(
+      apiKey,
+      query(),
+      partiallyInvalidReport,
+    );
+
+    expect(result.accepted).toBe(2);
+    expect(result.runs.map((run) => run.suiteName)).toEqual([
+      'src/a.test.ts',
+      'src/c.test.ts',
+    ]);
+    expect(result.rejected).toHaveLength(1);
+    expect(runIngestQueue.addBulk).toHaveBeenCalledTimes(1);
+    expect(jobBodies(runIngestQueue)).toHaveLength(2);
+  });
+
+  it('surfaces a case identity collision in the 202 body without rejecting the suite', async () => {
+    const { controller, runIngestQueue } = build();
+    const collidingReport = `<testsuite name="Checkout">
+      <testcase name="tests.checkout::test_add_item"/>
+      <testcase name="test_add_item" classname="tests.checkout"/>
+    </testsuite>`;
+
+    const result = await controller.ingestJunit(
+      apiKey,
+      query(),
+      collidingReport,
+    );
+
+    expect(result.accepted).toBe(1);
+    expect(result.caseIdentityCollisions).toEqual([
+      {
+        suiteName: 'Checkout',
+        key: 'tests.checkout::test_add_item',
+        count: 2,
+      },
+    ]);
+    expect(runIngestQueue.addBulk).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports truncated field counts in the 202 body', async () => {
+    const { controller } = build();
+    const longName = 'x'.repeat(200);
+    const oversizedReport = `<testsuite name="Checkout"><testcase name="${longName}"/></testsuite>`;
+
+    const result = await controller.ingestJunit(
+      apiKey,
+      query(),
+      oversizedReport,
+    );
+
+    expect(result.truncatedFields).toEqual({ name: 1 });
+  });
+
+  it('reports no truncated fields when nothing was clipped', async () => {
+    const { controller } = build();
+
+    const result = await controller.ingestJunit(apiKey, query(), report);
+
+    expect(result.truncatedFields).toEqual({});
   });
 });

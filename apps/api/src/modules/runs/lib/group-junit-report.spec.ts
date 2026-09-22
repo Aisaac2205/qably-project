@@ -6,7 +6,12 @@ import {
 } from './group-junit-report';
 
 function report(cases: JunitReport['cases']): JunitReport {
-  return { suiteName: 'root', suiteKey: 'root', cases };
+  return {
+    suiteName: 'root',
+    suiteKey: 'root',
+    cases,
+    truncatedFieldCounts: {},
+  };
 }
 
 function suiteCase(

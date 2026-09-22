@@ -32,6 +32,7 @@ import {
   groupJunitReportBySuite,
   type JunitSuiteGroup,
 } from './lib/group-junit-report';
+import { findCaseIdentityCollisions } from './lib/case-identity';
 import { RunsService } from './runs.service';
 
 function parseJunitReport(xml: string) {
@@ -74,11 +75,15 @@ const MAX_REPORT_SIZE = 100_000;
 
 function resolveReportSize(
   requestedReportSize: number | undefined,
-  groupsInRequest: number,
+  acceptedGroupsInRequest: number,
+  rejectedGroupsInRequest: number,
 ): number {
-  if (requestedReportSize === undefined) return groupsInRequest;
+  if (requestedReportSize === undefined) return acceptedGroupsInRequest;
   return Math.min(
-    Math.max(requestedReportSize, groupsInRequest),
+    Math.max(
+      requestedReportSize - rejectedGroupsInRequest,
+      acceptedGroupsInRequest,
+    ),
     MAX_REPORT_SIZE,
   );
 }
@@ -91,10 +96,18 @@ function resolveRunName(
   return group.suiteName !== '' ? group.suiteName : query.externalId;
 }
 
+function rejectedSuiteLabel(group: JunitSuiteGroup): string {
+  return group.suiteName !== '' ? group.suiteName : group.externalId;
+}
+
+type GroupValidation =
+  | { ok: true; group: JunitSuiteGroup; body: IngestRunInput }
+  | { ok: false; suiteName: string; reason: string };
+
 function validateGroup(
   query: IngestJunitQuery,
   group: JunitSuiteGroup,
-): IngestRunInput {
+): GroupValidation {
   const candidate = {
     ...query,
     externalId: group.externalId,
@@ -107,16 +120,14 @@ function validateGroup(
   const result = ingestRunSchema.safeParse(candidate);
 
   if (!result.success) {
-    throw new BadRequestException({
-      message: `Validation failed for suite "${group.suiteName}"`,
-      issues: result.error.issues.map((issue) => ({
-        path: issue.path.join('.'),
-        message: issue.message,
-      })),
-    });
+    const reason = result.error.issues
+      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+      .join('; ');
+
+    return { ok: false, suiteName: rejectedSuiteLabel(group), reason };
   }
 
-  return result.data;
+  return { ok: true, group, body: result.data };
 }
 
 @Controller('runs')
@@ -166,10 +177,32 @@ export class RunsController {
         ]
       : groupBySuite(report, query.externalId);
 
-    const bodies = groups.map((group) => validateGroup(query, group));
-    const reportSize = resolveReportSize(query.reportSize, groups.length);
+    const validations = groups.map((group) => validateGroup(query, group));
+    const accepted = validations.filter(
+      (validation): validation is Extract<GroupValidation, { ok: true }> =>
+        validation.ok,
+    );
+    const rejected = validations
+      .filter(
+        (validation): validation is Extract<GroupValidation, { ok: false }> =>
+          !validation.ok,
+      )
+      .map(({ suiteName, reason }) => ({ suiteName, reason }));
 
-    const jobs = bodies.map((body, index) => ({
+    const caseIdentityCollisions = groups.flatMap((group) =>
+      findCaseIdentityCollisions(group.cases).map((collision) => ({
+        suiteName: rejectedSuiteLabel(group),
+        ...collision,
+      })),
+    );
+
+    const reportSize = resolveReportSize(
+      query.reportSize,
+      accepted.length,
+      rejected.length,
+    );
+
+    const jobs = accepted.map(({ body, group }) => ({
       name: 'ingest',
       data: {
         apiKey,
@@ -183,12 +216,14 @@ export class RunsController {
           body.externalId,
         ]),
       },
-      suiteName: groups[index].suiteName,
+      suiteName: group.suiteName,
     }));
 
-    await this.runIngestQueue.addBulk(
-      jobs.map(({ name, data, opts }) => ({ name, data, opts })),
-    );
+    if (jobs.length > 0) {
+      await this.runIngestQueue.addBulk(
+        jobs.map(({ name, data, opts }) => ({ name, data, opts })),
+      );
+    }
 
     return {
       accepted: jobs.length,
@@ -197,6 +232,9 @@ export class RunsController {
         suiteName: job.suiteName,
         jobId: job.opts.jobId,
       })),
+      rejected,
+      caseIdentityCollisions,
+      truncatedFields: report.truncatedFieldCounts,
     };
   }
 }

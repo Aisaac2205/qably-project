@@ -149,6 +149,64 @@ describe('parseJunitXml', () => {
     expect(Array.from(parsed.failureDetails ?? '')).toHaveLength(4000);
   });
 
+  it('reports no truncated fields when nothing was clipped', () => {
+    const report = parseJunitXml(singleSuite);
+
+    expect(report.truncatedFieldCounts).toEqual({});
+  });
+
+  it('counts a truncated case name', () => {
+    const long = 'x'.repeat(200);
+    const report = parseJunitXml(
+      `<testsuite name="S"><testcase name="${long}"/></testsuite>`,
+    );
+
+    expect(report.truncatedFieldCounts.name).toBe(1);
+  });
+
+  it('counts each truncated case name independently', () => {
+    const long = 'x'.repeat(200);
+    const report = parseJunitXml(
+      `<testsuite name="S"><testcase name="${long}a"/><testcase name="${long}b"/></testsuite>`,
+    );
+
+    expect(report.truncatedFieldCounts.name).toBe(2);
+  });
+
+  it('counts a truncated classname separately from a truncated name', () => {
+    const longName = 'x'.repeat(200);
+    const longClass = 'y'.repeat(300);
+    const report = parseJunitXml(
+      `<testsuite name="S"><testcase name="${longName}" classname="${longClass}"/></testsuite>`,
+    );
+
+    expect(report.truncatedFieldCounts.name).toBe(1);
+    expect(report.truncatedFieldCounts.className).toBe(1);
+  });
+
+  it('counts a truncated failureMessage, failureDetails and skipReason', () => {
+    const longMessage = 'm'.repeat(1200);
+    const longDetails = 'd'.repeat(4500);
+    const longSkip = 's'.repeat(600);
+    const report = parseJunitXml(`<testsuite name="S">
+      <testcase name="a"><failure message="${longMessage}">${longDetails}</failure></testcase>
+      <testcase name="b"><skipped message="${longSkip}"/></testcase>
+    </testsuite>`);
+
+    expect(report.truncatedFieldCounts.failureMessage).toBe(1);
+    expect(report.truncatedFieldCounts.failureDetails).toBe(1);
+    expect(report.truncatedFieldCounts.skipReason).toBe(1);
+  });
+
+  it('counts a suite name truncation once per distinct suite, not once per case', () => {
+    const longSuite = 'x'.repeat(200);
+    const report = parseJunitXml(
+      `<testsuite name="${longSuite}"><testcase name="a"/><testcase name="b"/></testsuite>`,
+    );
+
+    expect(report.truncatedFieldCounts.suiteName).toBe(1);
+  });
+
   it('caps durationMs at the largest 32-bit integer', () => {
     const report = parseJunitXml(
       '<testsuite name="S"><testcase name="x" time="9999999999"/></testsuite>',

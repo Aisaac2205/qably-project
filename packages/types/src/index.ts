@@ -280,9 +280,23 @@ export interface JunitIngestAcceptedRun {
   jobId: string
 }
 
+export interface JunitIngestRejectedGroup {
+  suiteName: string
+  reason: string
+}
+
+export interface JunitIngestCaseIdentityCollision {
+  suiteName: string
+  key: string
+  count: number
+}
+
 export interface JunitIngestRecord {
   accepted: number
   runs: JunitIngestAcceptedRun[]
+  rejected: JunitIngestRejectedGroup[]
+  caseIdentityCollisions: JunitIngestCaseIdentityCollision[]
+  truncatedFields: Record<string, number>
 }
 
 export interface RunCaseCounts {

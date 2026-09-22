@@ -32,6 +32,28 @@ export interface JunitReport {
   suiteName: string;
   suiteKey: string;
   cases: JunitCase[];
+  truncatedFieldCounts: Record<string, number>;
+}
+
+class TruncationCounter {
+  private readonly counts = new Map<string, number>();
+  private readonly seenSuiteKeys = new Set<string>();
+
+  track(field: string, value: string, maxLength: number): void {
+    if (Array.from(value).length > maxLength) {
+      this.counts.set(field, (this.counts.get(field) ?? 0) + 1);
+    }
+  }
+
+  trackSuiteName(rawSuiteKey: string): void {
+    if (this.seenSuiteKeys.has(rawSuiteKey)) return;
+    this.seenSuiteKeys.add(rawSuiteKey);
+    this.track('suiteName', rawSuiteKey, MAX_NAME_LENGTH);
+  }
+
+  toRecord(): Record<string, number> {
+    return Object.fromEntries(this.counts);
+  }
 }
 
 export type JunitParseErrorCode =
@@ -136,7 +158,10 @@ function parseDurationMs(rawTime: string): number | undefined {
   return Math.min(Math.round(Math.max(seconds, 0) * 1000), MAX_DURATION_MS);
 }
 
-function deriveCaseOutcome(node: RawNode): CaseOutcome {
+function deriveCaseOutcome(
+  node: RawNode,
+  counter: TruncationCounter,
+): CaseOutcome {
   const failureValue = firstChild(node, 'failure');
   const errorValue = firstChild(node, 'error');
   const skippedValue = firstChild(node, 'skipped');
@@ -146,6 +171,24 @@ function deriveCaseOutcome(node: RawNode): CaseOutcome {
     const failureType = childAttribute(failureOrError, 'type');
     const failureMessage = childAttribute(failureOrError, 'message');
     const failureDetails = childText(failureOrError);
+
+    if (failureType !== '') {
+      counter.track('failureType', failureType, MAX_CLASS_NAME_LENGTH);
+    }
+    if (failureMessage !== '') {
+      counter.track(
+        'failureMessage',
+        failureMessage,
+        MAX_FAILURE_MESSAGE_LENGTH,
+      );
+    }
+    if (failureDetails !== '') {
+      counter.track(
+        'failureDetails',
+        failureDetails,
+        MAX_FAILURE_DETAILS_LENGTH,
+      );
+    }
 
     return {
       status: 'fail',
@@ -174,6 +217,10 @@ function deriveCaseOutcome(node: RawNode): CaseOutcome {
   if (skippedValue !== undefined) {
     const skipReason =
       childAttribute(skippedValue, 'message') || childText(skippedValue);
+
+    if (skipReason !== '') {
+      counter.track('skipReason', skipReason, MAX_SKIP_REASON_LENGTH);
+    }
 
     return {
       status: 'skip',
@@ -214,6 +261,7 @@ function collectCases(
   parentSuiteKey: string,
   depth: number,
   acc: CollectedCase[],
+  counter: TruncationCounter,
 ): void {
   if (depth > MAX_TESTSUITE_DEPTH) {
     throw new JunitParseError(
@@ -227,6 +275,8 @@ function collectCases(
     ownName === '' ? parentSuiteKey : truncateTo(ownName, MAX_SUITE_KEY_LENGTH);
   const suiteName = truncate(suiteKey);
 
+  if (ownName !== '') counter.trackSuiteName(suiteKey);
+
   for (const testCase of toArray(node.testcase)) {
     if (acc.length >= MAX_TESTCASES) {
       throw new JunitParseError(
@@ -239,7 +289,7 @@ function collectCases(
   }
 
   for (const child of toArray(node.testsuite)) {
-    collectCases(child, suiteKey, depth + 1, acc);
+    collectCases(child, suiteKey, depth + 1, acc, counter);
   }
 }
 
@@ -272,8 +322,9 @@ export function parseJunitXml(xml: string): JunitReport {
     );
   }
 
+  const counter = new TruncationCounter();
   const collected: CollectedCase[] = [];
-  collectCases(root, '', 1, collected);
+  collectCases(root, '', 1, collected, counter);
 
   const cases: JunitCase[] = [];
 
@@ -281,10 +332,18 @@ export function parseJunitXml(xml: string): JunitReport {
     const name = readAttribute(raw, 'name') || readAttribute(raw, 'classname');
     if (name === '') continue;
 
-    const outcome = deriveCaseOutcome(raw);
+    const outcome = deriveCaseOutcome(raw, counter);
     const className = readAttribute(raw, 'classname');
     const filePath = readAttribute(raw, 'file');
     const durationMs = parseDurationMs(readAttribute(raw, 'time'));
+
+    counter.track('name', name, MAX_NAME_LENGTH);
+    if (className !== '') {
+      counter.track('className', className, MAX_CLASS_NAME_LENGTH);
+    }
+    if (filePath !== '') {
+      counter.track('filePath', filePath, MAX_FILE_PATH_LENGTH);
+    }
 
     cases.push({
       name: truncate(name),
@@ -317,5 +376,6 @@ export function parseJunitXml(xml: string): JunitReport {
     suiteName: truncate(suiteKey),
     suiteKey,
     cases,
+    truncatedFieldCounts: counter.toRecord(),
   };
 }
