@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { JunitParseError, parseJunitXml } from './parse-junit-xml';
+
+const fixturePath = join(__dirname, '../../../../test/fixtures/junit-e2e.xml');
 
 const singleSuite = `<?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="Checkout" tests="4">
@@ -431,5 +435,29 @@ Expected: true</failure>
     expect(report.cases[0].failureType).toBe('AssertionError');
     expect(report.cases[0].failureMessage).toBe('expected true');
     expect(report.cases[0].failureDetails).toContain('Value of: refunded');
+  });
+
+  describe('the real e2e junit fixture', () => {
+    const xml = readFileSync(fixturePath, 'utf8');
+    const expectedCaseCount = (xml.match(/<testcase\s/g) ?? []).length;
+
+    it('drops zero cases from the fixture', () => {
+      const report = parseJunitXml(xml);
+
+      expect(report.cases).toHaveLength(expectedCaseCount);
+    });
+
+    it('never duplicates a case name within the same suite', () => {
+      const report = parseJunitXml(xml);
+
+      const seenBySuite = new Map<string, Set<string>>();
+
+      for (const testCase of report.cases) {
+        const seen = seenBySuite.get(testCase.suiteKey) ?? new Set<string>();
+        expect(seen.has(testCase.name)).toBe(false);
+        seen.add(testCase.name);
+        seenBySuite.set(testCase.suiteKey, seen);
+      }
+    });
   });
 });

@@ -439,6 +439,20 @@ blowups specifically, the 10 MB cap stops a merely large document, and the depth
 stop a well-formed-but-adversarially-shaped document from producing unbounded work downstream (one
 `Run` per group, one `RunCase` per case) even though it parsed cleanly.
 
+### Integration fixture
+
+`apps/api/test/fixtures/junit-e2e.xml` is a real jest-junit report captured from apps/api's own e2e
+suite, used by `apps/api/test/junit-e2e-fixture.e2e-spec.ts` to exercise the full ingestion path (the
+`/runs/ingest/junit` endpoint through to `RunsService.ingest`) against realistic structure instead of a
+hand-written snippet. To regenerate it: run
+`JEST_JUNIT_OUTPUT_DIR=./reports JEST_JUNIT_OUTPUT_NAME=junit-e2e.xml JEST_JUNIT_ADD_FILE_ATTRIBUTE=true npx jest --config ./test/jest-e2e.json --ci --reporters=default --reporters=jest-junit --maxWorkers=2`
+from `apps/api`, then rewrite every `<testcase>`'s `file` attribute the same way
+`scripts/qably-report.mjs`'s `repoRelativeFilePaths` does for CI (`apps/api`-relative, forward
+slashes), strip the `timestamp` attribute from each `<testsuite>` and replace any `<failure>` body with
+a short, stable placeholder — the goal is a fixture whose suite/case/file structure is real and
+reproducible, not one whose diff churns on machine paths, wall-clock timestamps or a stack trace tied to
+this run's line numbers.
+
 ### `scripts/qably-report.mjs`
 
 The script that reports CI results to Qably (invoked once per generated JUnit file, see

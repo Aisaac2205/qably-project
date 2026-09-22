@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="jest tests" tests="144" failures="8" errors="0" time="6.771">
+  <testsuite name="Projects (e2e)" errors="0" failures="1" skipped="0" time="2.554" tests="17">
+    <testcase classname="Projects (e2e) refuses every project route without a session" name="Projects (e2e) refuses every project route without a session" time="0.37" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) bootstraps an organization for a signed-in user who has none" name="Projects (e2e) bootstraps an organization for a signed-in user who has none" time="0.015" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) lists only the projects of the resolved organization" name="Projects (e2e) lists only the projects of the resolved organization" time="0.012" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) reports null activity for a project that has never run" name="Projects (e2e) reports null activity for a project that has never run" time="0.012" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) derives activity from the most recent run once runs exist" name="Projects (e2e) derives activity from the most recent run once runs exist" time="0.011" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) reports healthScore as an honest zero when every case inside the window failed" name="Projects (e2e) reports healthScore as an honest zero when every case inside the window failed" time="0.011" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) creates a project and returns 201" name="Projects (e2e) creates a project and returns 201" time="0.013" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) rejects an invalid body with 400 and the offending path" name="Projects (e2e) rejects an invalid body with 400 and the offending path" time="0.011" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) answers 409 when the project name is already used" name="Projects (e2e) answers 409 when the project name is already used" time="0.011" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) answers 403 once the plan allowance is spent" name="Projects (e2e) answers 403 once the plan allowance is spent" time="0.01" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) answers 404 for a project owned by another organization" name="Projects (e2e) answers 404 for a project owned by another organization" time="0.01" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) answers 403 when a member tries to delete" name="Projects (e2e) answers 403 when a member tries to delete" time="0.01" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) deletes with 204 when the caller owns the organization" name="Projects (e2e) deletes with 204 when the caller owns the organization" time="0.01" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) answers 403 when the organization header names a foreign organization" name="Projects (e2e) answers 403 when the organization header names a foreign organization" time="0.01" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) enqueues file-level documentation for a project and returns the counts" name="Projects (e2e) enqueues file-level documentation for a project and returns the counts" time="0.022" file="apps/api/test/projects.e2e-spec.ts">
+      <failure message="Error: expected 201 &quot;Created&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Projects (e2e) answers 403 for /document when the organization is not entitled to AI" name="Projects (e2e) answers 403 for /document when the organization is not entitled to AI" time="0.012" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Projects (e2e) answers 404 for /document when the project does not exist" name="Projects (e2e) answers 404 for /document when the project does not exist" time="0.009" file="apps/api/test/projects.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Suites (e2e)" errors="0" failures="7" skipped="0" time="2.597" tests="24">
+    <testcase classname="Suites (e2e) refuses the suite routes without a session" name="Suites (e2e) refuses the suite routes without a session" time="0.173" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) returns the suites of the caller organization with their cases" name="Suites (e2e) returns the suites of the caller organization with their cases" time="0.035" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expected 200 &quot;OK&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) exposes health signals per case and a suite-level rollup" name="Suites (e2e) exposes health signals per case and a suite-level rollup" time="0.013" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expected 200 &quot;OK&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) filters by project when the query names one" name="Suites (e2e) filters by project when the query names one" time="0.015" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) creates a suite and returns 201" name="Suites (e2e) creates a suite and returns 201" time="0.115" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expected 201 &quot;Created&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) answers 404 when the project belongs to another organization" name="Suites (e2e) answers 404 when the project belongs to another organization" time="0.012" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) rejects a body with no project" name="Suites (e2e) rejects a body with no project" time="0.013" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) answers 409 when the suite name is already used in the project" name="Suites (e2e) answers 409 when the suite name is already used in the project" time="0.011" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) promotes a suite to default and demotes its siblings" name="Suites (e2e) promotes a suite to default and demotes its siblings" time="0.012" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expected 200 &quot;OK&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) adds a case and returns the whole suite" name="Suites (e2e) adds a case and returns the whole suite" time="0.013" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expected 201 &quot;Created&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) answers 404 for a case that is not in the suite" name="Suites (e2e) answers 404 for a case that is not in the suite" time="0.011" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) promotes a draft case to active through the existing case patch" name="Suites (e2e) promotes a draft case to active through the existing case patch" time="0.011" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expected 200 &quot;OK&quot;, got 500 &quot;Internal Server Error&quot;">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) answers 403 when a member tries to delete a suite" name="Suites (e2e) answers 403 when a member tries to delete a suite" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) deletes with 204 when the caller owns the organization" name="Suites (e2e) deletes with 204 when the caller owns the organization" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) answers 403 when the organization header names a foreign organization" name="Suites (e2e) answers 403 when the organization header names a foreign organization" time="0.012" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) enqueues file-level documentation for a suite and returns the counts" name="Suites (e2e) enqueues file-level documentation for a suite and returns the counts" time="0.013" file="apps/api/test/suites.e2e-spec.ts">
+      <failure message="Error: expect(received).toEqual(expected) // deep equality">normalized for fixture stability</failure>
+    </testcase>
+    <testcase classname="Suites (e2e) answers 403 for /document when the organization is not entitled to AI" name="Suites (e2e) answers 403 for /document when the organization is not entitled to AI" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) answers 404 for /document when the suite does not exist" name="Suites (e2e) answers 404 for /document when the suite does not exist" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) confirms documented draft cases and reports what was skipped" name="Suites (e2e) confirms documented draft cases and reports what was skipped" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) answers 404 for confirm-documentation when the suite belongs to another organization" name="Suites (e2e) answers 404 for confirm-documentation when the suite belongs to another organization" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) answers 403 for confirm-documentation when a member cannot write to the suite" name="Suites (e2e) answers 403 for confirm-documentation when a member cannot write to the suite" time="0.009" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) rejects an explicit empty case id list instead of silently confirming everything" name="Suites (e2e) rejects an explicit empty case id list instead of silently confirming everything" time="0.012" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) confirms only the requested case ids when a subset is given" name="Suites (e2e) confirms only the requested case ids when a subset is given" time="0.017" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Suites (e2e) confirming twice is not an error and confirms nothing the second time" name="Suites (e2e) confirming twice is not an error and confirms nothing the second time" time="0.01" file="apps/api/test/suites.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Dashboard (e2e)" errors="0" failures="0" skipped="0" time="0.734" tests="11">
+    <testcase classname="Dashboard (e2e) refuses the dashboard summary route without a session" name="Dashboard (e2e) refuses the dashboard summary route without a session" time="0.078" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) answers 403 when the organization header names a foreign organization" name="Dashboard (e2e) answers 403 when the organization header names a foreign organization" time="0.029" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) answers 404 when the requested project is outside the organization" name="Dashboard (e2e) answers 404 when the requested project is outside the organization" time="0.027" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) returns a summary with counts, pass rate, window and recent runs" name="Dashboard (e2e) returns a summary with counts, pass rate, window and recent runs" time="0.033" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) scopes the summary to a single project when projectId is given" name="Dashboard (e2e) scopes the summary to a single project when projectId is given" time="0.034" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) rejects an empty projectId query parameter" name="Dashboard (e2e) rejects an empty projectId query parameter" time="0.027" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) returns a traceability calendar for the requested year" name="Dashboard (e2e) returns a traceability calendar for the requested year" time="0.016" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) rejects a traceability request without a year" name="Dashboard (e2e) rejects a traceability request without a year" time="0.015" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) rejects a traceability year outside the supported range" name="Dashboard (e2e) rejects a traceability year outside the supported range" time="0.013" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) answers 404 when the traceability project is outside the organization" name="Dashboard (e2e) answers 404 when the traceability project is outside the organization" time="0.012" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Dashboard (e2e) refuses the traceability route without a session" name="Dashboard (e2e) refuses the traceability route without a session" time="0.013" file="apps/api/test/dashboard.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Connections (e2e)" errors="0" failures="0" skipped="0" time="0.745" tests="23">
+    <testcase classname="Connections (e2e) refuses the connection routes without a session" name="Connections (e2e) refuses the connection routes without a session" time="0.072" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) returns the connections of the caller organization" name="Connections (e2e) returns the connections of the caller organization" time="0.017" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) never leaks the token when listing connections" name="Connections (e2e) never leaks the token when listing connections" time="0.023" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) creates a connection without ever accepting a pasted token" name="Connections (e2e) creates a connection without ever accepting a pasted token" time="0.025" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) returns a single connection without leaking the token" name="Connections (e2e) returns a single connection without leaking the token" time="0.014" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) rejects a body with an unsupported provider" name="Connections (e2e) rejects a body with an unsupported provider" time="0.02" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 409 when the connection already exists for that repo" name="Connections (e2e) answers 409 when the connection already exists for that repo" time="0.018" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 404 for a connection owned by another organization" name="Connections (e2e) answers 404 for a connection owned by another organization" time="0.01" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 403 when a member tries to create a connection" name="Connections (e2e) answers 403 when a member tries to create a connection" time="0.033" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 403 when a member tries to delete a connection" name="Connections (e2e) answers 403 when a member tries to delete a connection" time="0.024" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) deletes with 204 when the caller owns the organization" name="Connections (e2e) deletes with 204 when the caller owns the organization" time="0.02" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) refuses an update that only carries a token" name="Connections (e2e) refuses an update that only carries a token" time="0.015" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) returns the webhook secret once when creating a connection" name="Connections (e2e) returns the webhook secret once when creating a connection" time="0.011" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) never returns the webhook secret when reading a connection" name="Connections (e2e) never returns the webhook secret when reading a connection" time="0.011" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) rotates the webhook secret and returns only the new value" name="Connections (e2e) rotates the webhook secret and returns only the new value" time="0.01" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 403 when a member tries to rotate the webhook secret" name="Connections (e2e) answers 403 when a member tries to rotate the webhook secret" time="0.01" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 404 when rotating a connection of another organization" name="Connections (e2e) answers 404 when rotating a connection of another organization" time="0.009" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers 403 when the organization header names a foreign organization" name="Connections (e2e) answers 403 when the organization header names a foreign organization" time="0.01" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) lists the repositories the signed in user can reach on github" name="Connections (e2e) lists the repositories the signed in user can reach on github" time="0.011" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) does not mistake the repo listing route for a connection id" name="Connections (e2e) does not mistake the repo listing route for a connection id" time="0.01" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) detects the stack of a repository from its package.json" name="Connections (e2e) detects the stack of a repository from its package.json" time="0.011" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) answers an empty stack when the repository has no readable manifest" name="Connections (e2e) answers an empty stack when the repository has no readable manifest" time="0.009" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Connections (e2e) rejects a detection request without a repository in owner/name form" name="Connections (e2e) rejects a detection request without a repository in owner/name form" time="0.012" file="apps/api/test/connections.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Runs queries (e2e)" errors="0" failures="0" skipped="0" time="0.624" tests="12">
+    <testcase classname="Runs queries (e2e) refuses the run query routes without a session" name="Runs queries (e2e) refuses the run query routes without a session" time="0.061" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) answers 403 when the organization header names a foreign organization" name="Runs queries (e2e) answers 403 when the organization header names a foreign organization" time="0.02" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) answers 404 for a run belonging to another organization" name="Runs queries (e2e) answers 404 for a run belonging to another organization" time="0.013" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) lists runs of the caller organization with case counts and no full case list" name="Runs queries (e2e) lists runs of the caller organization with case counts and no full case list" time="0.015" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) filters the list by project when the query names one" name="Runs queries (e2e) filters the list by project when the query names one" time="0.012" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) returns one run with its cases ordered by position" name="Runs queries (e2e) returns one run with its cases ordered by position" time="0.013" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) starts a manual run and returns 201 with the snapshotted cases" name="Runs queries (e2e) starts a manual run and returns 201 with the snapshotted cases" time="0.016" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) answers 409 when the suite has no manual cases to run" name="Runs queries (e2e) answers 409 when the suite has no manual cases to run" time="0.015" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) answers 404 when the suite is outside the project or organization" name="Runs queries (e2e) answers 404 when the suite is outside the project or organization" time="0.012" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) patches a case status and returns the updated run" name="Runs queries (e2e) patches a case status and returns the updated run" time="0.02" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) rejects an invalid case status" name="Runs queries (e2e) rejects an invalid case status" time="0.013" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs queries (e2e) answers 404 when the case does not belong to the run" name="Runs queries (e2e) answers 404 when the case does not belong to the run" time="0.013" file="apps/api/test/runs-queries.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Review (e2e)" errors="0" failures="0" skipped="0" time="0.637" tests="14">
+    <testcase classname="Review (e2e) refuses the review routes without a session" name="Review (e2e) refuses the review routes without a session" time="0.078" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) lists the proposals of the caller organization" name="Review (e2e) lists the proposals of the caller organization" time="0.012" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) rejects an unknown status filter" name="Review (e2e) rejects an unknown status filter" time="0.014" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) returns the proposal detail with evidence in the frontend contract shape" name="Review (e2e) returns the proposal detail with evidence in the frontend contract shape" time="0.018" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) answers 404 for a proposal outside the resolved organization" name="Review (e2e) answers 404 for a proposal outside the resolved organization" time="0.02" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) publishes the official case when approving" name="Review (e2e) publishes the official case when approving" time="0.024" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) bulk-approves the ids in the request body" name="Review (e2e) bulk-approves the ids in the request body" time="0.012" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) bulk-approves a mixed batch, skipping an already-decided proposal with its reason" name="Review (e2e) bulk-approves a mixed batch, skipping an already-decided proposal with its reason" time="0.022" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) rejects a bulk request over the 100-id bound" name="Review (e2e) rejects a bulk request over the 100-id bound" time="0.01" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) takes the actor from the session, never from the body" name="Review (e2e) takes the actor from the session, never from the body" time="0.01" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) answers 409 when the proposal was already decided" name="Review (e2e) answers 409 when the proposal was already decided" time="0.01" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) answers 422 when the backing evidence is gone" name="Review (e2e) answers 422 when the backing evidence is gone" time="0.01" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) answers 409 when the title collides with another case in the suite" name="Review (e2e) answers 409 when the title collides with another case in the suite" time="0.01" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Review (e2e) records a rejection without publishing an official case" name="Review (e2e) records a rejection without publishing an official case" time="0.01" file="apps/api/test/review.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="SCM webhook ingestion (e2e)" errors="0" failures="0" skipped="0" time="0.669" tests="7">
+    <testcase classname="SCM webhook ingestion (e2e) accepts a correctly signed push without a session" name="SCM webhook ingestion (e2e) accepts a correctly signed push without a session" time="0.063" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+    <testcase classname="SCM webhook ingestion (e2e) answers 401 when the signature does not match any connection secret" name="SCM webhook ingestion (e2e) answers 401 when the signature does not match any connection secret" time="0.013" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+    <testcase classname="SCM webhook ingestion (e2e) answers 401 when the body was altered after signing" name="SCM webhook ingestion (e2e) answers 401 when the body was altered after signing" time="0.012" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+    <testcase classname="SCM webhook ingestion (e2e) answers 404 for a provider with no adapter" name="SCM webhook ingestion (e2e) answers 404 for a provider with no adapter" time="0.046" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+    <testcase classname="SCM webhook ingestion (e2e) answers 202 without queueing when the delivery was already stored" name="SCM webhook ingestion (e2e) answers 202 without queueing when the delivery was already stored" time="0.033" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+    <testcase classname="SCM webhook ingestion (e2e) requeues a replayed delivery whose stored event was never queued" name="SCM webhook ingestion (e2e) requeues a replayed delivery whose stored event was never queued" time="0.021" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+    <testcase classname="SCM webhook ingestion (e2e) answers 202 without persisting an event type it does not handle" name="SCM webhook ingestion (e2e) answers 202 without persisting an event type it does not handle" time="0.015" file="apps/api/test/ingestion.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Runs ingestion (e2e)" errors="0" failures="0" skipped="0" time="0.706" tests="10">
+    <testcase classname="Runs ingestion (e2e) rejects a request without an authorization header" name="Runs ingestion (e2e) rejects a request without an authorization header" time="0.095" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) rejects a garbage bearer token" name="Runs ingestion (e2e) rejects a garbage bearer token" time="0.035" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) rejects a revoked api key" name="Runs ingestion (e2e) rejects a revoked api key" time="0.023" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) ingests a run with a real api key and answers 200" name="Runs ingestion (e2e) ingests a run with a real api key and answers 200" time="0.016" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) replays the same externalId idempotently into a single run" name="Runs ingestion (e2e) replays the same externalId idempotently into a single run" time="0.017" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) answers 404 when the suite does not belong to the api key project" name="Runs ingestion (e2e) answers 404 when the suite does not belong to the api key project" time="0.013" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) rejects source manual with a 400" name="Runs ingestion (e2e) rejects source manual with a 400" time="0.014" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) rejects a payload without cases" name="Runs ingestion (e2e) rejects a payload without cases" time="0.013" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) adopts an unknown suiteName instead of 404ing, creating the suite and draft cases" name="Runs ingestion (e2e) adopts an unknown suiteName instead of 404ing, creating the suite and draft cases" time="0.015" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Runs ingestion (e2e) still 404s when suiteId is given and does not resolve, even though suiteName would adopt" name="Runs ingestion (e2e) still 404s when suiteId is given and does not resolve, even though suiteName would adopt" time="0.021" file="apps/api/test/runs.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Auth (e2e)" errors="0" failures="0" skipped="0" time="0.417" tests="6">
+    <testcase classname="Auth (e2e) rejects a protected route with 401 when no session is present" name="Auth (e2e) rejects a protected route with 401 when no session is present" time="0.089" file="apps/api/test/auth.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Auth (e2e) serves a protected route with the authenticated user when a session is present" name="Auth (e2e) serves a protected route with the authenticated user when a session is present" time="0.009" file="apps/api/test/auth.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Auth (e2e) persists the chosen locale and returns the updated user" name="Auth (e2e) persists the chosen locale and returns the updated user" time="0.02" file="apps/api/test/auth.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Auth (e2e) rejects a locale outside the supported set" name="Auth (e2e) rejects a locale outside the supported set" time="0.012" file="apps/api/test/auth.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Auth (e2e) leaves the public health route reachable without a session" name="Auth (e2e) leaves the public health route reachable without a session" time="0.011" file="apps/api/test/auth.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Auth (e2e) rejects a protected route when the session reader throws" name="Auth (e2e) rejects a protected route when the session reader throws" time="0.011" file="apps/api/test/auth.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Repository (e2e)" errors="0" failures="0" skipped="0" time="0.548" tests="3">
+    <testcase classname="Repository (e2e) refuses the repository route without a session" name="Repository (e2e) refuses the repository route without a session" time="0.098" file="apps/api/test/repository.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Repository (e2e) returns the source, the latest batch, its changes and evidence" name="Repository (e2e) returns the source, the latest batch, its changes and evidence" time="0.024" file="apps/api/test/repository.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Repository (e2e) answers 404 for a project outside the resolved organization" name="Repository (e2e) answers 404 for a project outside the resolved organization" time="0.021" file="apps/api/test/repository.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Health (e2e)" errors="0" failures="0" skipped="0" time="0.303" tests="3">
+    <testcase classname="Health (e2e) returns 200 and an ok report when the database answers" name="Health (e2e) returns 200 and an ok report when the database answers" time="0.077" file="apps/api/test/health.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Health (e2e) returns 200 and a degraded report when the database is unreachable" name="Health (e2e) returns 200 and a degraded report when the database is unreachable" time="0.008" file="apps/api/test/health.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Health (e2e) answers 404 through the exception filter for an unknown route" name="Health (e2e) answers 404 through the exception filter for an unknown route" time="0.004" file="apps/api/test/health.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="Api keys (e2e)" errors="0" failures="0" skipped="0" time="0.403" tests="8">
+    <testcase classname="Api keys (e2e) refuses the api key routes without a session" name="Api keys (e2e) refuses the api key routes without a session" time="0.074" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) lists the keys of the project without the stored hash" name="Api keys (e2e) lists the keys of the project without the stored hash" time="0.008" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) answers 404 for a project outside the caller organization" name="Api keys (e2e) answers 404 for a project outside the caller organization" time="0.007" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) returns the plaintext token once when issuing a key" name="Api keys (e2e) returns the plaintext token once when issuing a key" time="0.012" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) rejects an unnamed key" name="Api keys (e2e) rejects an unnamed key" time="0.008" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) forbids a member from issuing a key" name="Api keys (e2e) forbids a member from issuing a key" time="0.007" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) revokes a key without deleting it" name="Api keys (e2e) revokes a key without deleting it" time="0.007" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+    <testcase classname="Api keys (e2e) answers 404 when revoking a key of another project" name="Api keys (e2e) answers 404 when revoking a key of another project" time="0.007" file="apps/api/test/api-keys.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+  <testsuite name="CORS (e2e)" errors="0" failures="0" skipped="0" time="0.31" tests="6">
+    <testcase classname="CORS (e2e) allows the web app origin to send credentials" name="CORS (e2e) allows the web app origin to send credentials" time="0.028" file="apps/api/test/cors.e2e-spec.ts">
+    </testcase>
+    <testcase classname="CORS (e2e) answers the preflight a credentialed fetch sends first" name="CORS (e2e) answers the preflight a credentialed fetch sends first" time="0.005" file="apps/api/test/cors.e2e-spec.ts">
+    </testcase>
+    <testcase classname="CORS (e2e) varies on Origin so a proxy cannot serve one origin the other answer" name="CORS (e2e) varies on Origin so a proxy cannot serve one origin the other answer" time="0.004" file="apps/api/test/cors.e2e-spec.ts">
+    </testcase>
+    <testcase classname="CORS (e2e) does not grant an unknown origin" name="CORS (e2e) does not grant an unknown origin" time="0.004" file="apps/api/test/cors.e2e-spec.ts">
+    </testcase>
+    <testcase classname="CORS (e2e) no longer grants the api its own origin" name="CORS (e2e) no longer grants the api its own origin" time="0.014" file="apps/api/test/cors.e2e-spec.ts">
+    </testcase>
+    <testcase classname="CORS headers on a body-parser rejection (e2e) carries access-control-allow-origin on the 400 the JSON body parser produces" name="CORS headers on a body-parser rejection (e2e) carries access-control-allow-origin on the 400 the JSON body parser produces" time="0.01" file="apps/api/test/cors.e2e-spec.ts">
+    </testcase>
+  </testsuite>
+</testsuites>
