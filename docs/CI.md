@@ -196,13 +196,22 @@ invocation.
 ### The response is `202`, not `200` — reporting is asynchronous
 
 `POST /runs/ingest/junit` answers `202 Accepted` with `{ "accepted": <count>, "runs": [{ "externalId",
-"suiteName", "jobId" }, ...] }` — see `docs/RUN_INGESTION.md`'s "Response — `202 Accepted`,
-asynchronous" for the full contract. The script logs `accepted` and each entry's `externalId` from
-that body; it does not, and cannot, know whether the run each `jobId` refers to has actually been
-written by the time the script exits, because ingestion happens on a worker after the HTTP response
-is sent. This is not a regression from an older synchronous contract — it is a deliberate design so
-that a slow ingestion (suite adoption, case linking) never adds latency to the CI job that is
-reporting it.
+"suiteName", "jobId" }, ...], "rejected": [{ "suiteName", "reason" }, ...], "caseIdentityCollisions":
+[{ "suiteName", "key", "count" }, ...], "truncatedFields": { "<field>": <count>, ... } }` — see
+`docs/RUN_INGESTION.md`'s "Response — `202 Accepted`, asynchronous" for the full contract. The
+script logs `accepted` and each entry's `externalId` from that body; it does not, and cannot, know
+whether the run each `jobId` refers to has actually been written by the time the script exits,
+because ingestion happens on a worker after the HTTP response is sent. This is not a regression
+from an older synchronous contract — it is a deliberate design so that a slow ingestion (suite
+adoption, case linking) never adds latency to the CI job that is reporting it.
+
+Since unit 10, acceptance is per suite group, not all-or-nothing: a report with several `<testsuite>`
+elements can have some groups queued and others rejected in the same response — the script prints one
+`::warning::` per rejected group (suite name and reason) and one per case identity collision (two
+differently-reported cases resolving to the same key — see `docs/RUN_INGESTION.md`'s "Case identity"),
+turning the job into a failure only when `QABLY_FAIL_ON_ERROR=true`. A non-empty `truncatedFields`
+prints as a single `::notice::` per request — it means some field the server stores was clipped to its
+length limit, not that anything was dropped or rejected, so it never fails the job on its own.
 
 ### Rate limits and retries
 

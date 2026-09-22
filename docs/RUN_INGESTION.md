@@ -183,6 +183,36 @@ snapshot (`name`, `steps`, `expectedResult`) is still stored on `RunCase` even w
 deliberate audit evidence of what was actually reported, not redundant with the official test case,
 which can itself change after the run.
 
+### Case identity — `classname` + `name`
+
+A reported case's identity — the key `ensureOfficialCases` matches and creates against — is not always
+its raw `name`. When the report carries a `className` that is not (up to truncation) the same string as
+`name` or a prefix of it, the identity becomes the composite `${className}::${name}`
+(`apps/api/src/modules/runs/lib/case-identity.ts`, `resolveCaseIdentityKey`). This is what lets pytest
+and Maven surefire reports — where `classname` is a separate, meaningful package/module path
+(`tests.checkout.test_checkout`) and `name` alone (`test_add_item`) is ambiguous across files — create
+one official case per file, not one shared case for every file that happens to have a
+`test_add_item`. jest-junit and vitest, which already report `classname` equal to (or a prefix of)
+`name`, are unaffected: the identity stays the plain `name`, exactly as before this changed. The prefix
+comparison is truncation-aware — `name` truncates at 120 characters and `classname` at 250, so a title
+over 120 characters where both fields were originally identical is still recognized as the same case,
+not misread as a composite.
+
+**New cases only.** An existing `TestCase.automationKey` is never rewritten to add a classname prefix
+it didn't already have. Matching tries the composite identity first, then the legacy (name-only) key
+second — the same two-step migration pattern `Suite.ingestionKey` already uses — so a case whose
+`automationKey` was recorded before this change keeps matching every later report exactly as it did
+before, with no backfill of the richer key.
+
+**Collisions are never merged silently.** If two differently-reported cases (different `name`,
+different `className`, or both) resolve to the identical identity key within the same suite,
+`findCaseIdentityCollisions` catches it before either one touches the database: neither is matched
+to an existing official case, neither creates a new one, and both keep `RunCase.testCaseId: null`
+rather than one silently overwriting or absorbing the other. `POST /runs/ingest/junit` also runs the
+same check per suite group before enqueuing, and lists any collision in the response's
+`caseIdentityCollisions` (see "Response" above) — the group itself is still accepted and queued, only
+the colliding cases are left unlinked until a human renames one of them.
+
 ## Idempotency
 
 Replaying the same `(projectId, source, externalId)` does not create a second run. The endpoint
@@ -282,7 +312,7 @@ Content-Type: application/xml
 | `suiteId` / `suiteName` | no | Pins the report to one existing (or adopted) suite and turns off the per-suite split — see below. Passing `suiteId` skips suite-name derivation from the XML entirely. |
 | `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
 | `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
-| `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: raised to at least this request's own group count if under-reported, and capped at 100,000 if absurdly large. It is never trusted blindly. |
+| `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own accepted groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: reduced by this request's own rejected-group count (so a rejected group never blocks the batch notification from completing), then raised to at least this request's own accepted-group count if still under that, and capped at 100,000 if absurdly large. It is never trusted blindly. |
 
 ### Response — `202 Accepted`, asynchronous
 
@@ -293,16 +323,22 @@ notification — happens later, on a worker, off the request path:
 
 ```json
 {
-  "accepted": 3,
+  "accepted": 2,
   "runs": [
     { "externalId": "gha-482913-a1b2c3d4", "suiteName": "src/a.test.ts", "jobId": "project_123:github_actions:gha-482913-a1b2c3d4" },
-    { "externalId": "gha-482913-e5f6a7b8", "suiteName": "src/b.test.ts", "jobId": "project_123:github_actions:gha-482913-e5f6a7b8" },
     { "externalId": "gha-482913-c9d0e1f2", "suiteName": "src/c.test.ts", "jobId": "project_123:github_actions:gha-482913-c9d0e1f2" }
-  ]
+  ],
+  "rejected": [
+    { "suiteName": "src/b.test.ts", "reason": "suiteName: String must contain at least 1 character(s)" }
+  ],
+  "caseIdentityCollisions": [
+    { "suiteName": "src/a.test.ts", "key": "tests.checkout::test_add_item", "count": 2 }
+  ],
+  "truncatedFields": { "name": 1 }
 }
 ```
 
-- `accepted` — how many jobs were enqueued (one per suite group).
+- `accepted` — how many jobs were enqueued (one per accepted suite group).
 - `runs[].externalId` — the per-run externalId, exactly as described in "One run per `<testsuite>`"
   below.
 - `runs[].suiteName` — the run's suite name, before truncation-driven ambiguity: the first case's
@@ -312,13 +348,25 @@ notification — happens later, on a worker, off the request path:
   `(projectId, source, externalId)` produces the same `jobId`, so a duplicate delivery of the same
   report (a GitHub Actions re-run, a network retry) collides with the still-queued or still-processing
   job for that run instead of enqueuing a second one.
+- `rejected[].suiteName` / `rejected[].reason` — a group that failed the same `ingestRunSchema`
+  validation `POST /runs/ingest` uses, and was therefore never enqueued. `suiteName` falls back to the
+  group's externalId when the suite name itself is what's empty or invalid.
+- `caseIdentityCollisions[]` — see "Case identity" below. A collision never rejects the suite; the
+  colliding cases still ingest as `RunCase` rows, just with `testCaseId: null`.
+- `truncatedFields` — a count per field name of how many values were clipped to their length limit
+  while parsing this request's XML (see the "Request body" table above for each limit). Never a
+  rejection reason on its own.
 
-**Validation still happens synchronously, all-or-nothing.** Every group's ingest payload is built and
-validated with the same schema `POST /runs/ingest` uses (`ingestRunSchema`) *before* anything is
-enqueued. If any one group fails validation, the whole request is rejected with `400` — naming the
-offending suite and the Zod validation issue — and **nothing is enqueued**, not even the groups that
-would have validated. A caller either gets every run from a report queued, or none of them; it never
-has to reconcile a partial success.
+**Validation happens synchronously, per suite group, not all-or-nothing.** Every group's ingest
+payload is built and validated with the same schema `POST /runs/ingest` uses (`ingestRunSchema`)
+*before* anything is enqueued. A group that fails validation is skipped — its `suiteName` and reason
+go into the `rejected` array — while every other, valid group in the same report is still enqueued
+normally. The response is still `202`, never `400`, for a per-group validation failure; a caller
+reconciles partial acceptance by reading `rejected`, not by retrying the whole report. Only a
+structural problem in the XML itself (invalid XML, no `<testcase>` anywhere, nesting past 32 levels,
+more than 10,000 cases, or grouping into more than 500 distinct suites — see "What the parser reads"
+below) still answers `400` and enqueues nothing, because there is no group to build a per-suite result
+from in the first place.
 
 **The run is not necessarily visible the instant the request returns.** `202` means "accepted for
 processing", not "processed". A worker (`RunIngestProcessor`, `apps/api/src/modules/runs/run-ingest.processor.ts`)
@@ -417,7 +465,10 @@ A report is capped at 10,000 `<testcase>` elements; beyond that the request is r
 processed partially. The request body itself is capped at 10 MB (`main.ts`). Every string field
 above is truncated to the limit in the table in "Request body", never rejected for being long — only
 structural problems (invalid XML, no `<testcase>` elements anywhere, nesting past 32 levels, more
-than 10,000 cases, or grouping into more than 500 distinct suites) fail the request.
+than 10,000 cases, or grouping into more than 500 distinct suites) fail the request. Every truncation
+across the whole parsed report is counted per field name and returned as `truncatedFields` in the
+`202` body (see "Response" above) — a value being clipped is never silent, even though it never
+rejects anything on its own.
 
 ### Security limits
 
@@ -488,7 +539,33 @@ in spirit; reporting failures never fail the CI job unless `QABLY_FAIL_ON_ERROR=
 `docs/CI.md`). Each outbound attempt is also bounded by a request timeout (`AbortSignal.timeout`,
 60s by default, overridable with `QABLY_REPORT_TIMEOUT_MS`) — a hanging server is treated as a
 retryable network error exactly like a connection failure, instead of blocking the CI job
-indefinitely.
+indefinitely. Since unit 10 the reporter also reads `rejected`, `caseIdentityCollisions` and
+`truncatedFields` off the same `202` body and prints one `::warning::` per rejected group and per
+case identity collision, and one `::notice::` per request that truncated at least one field — see
+`docs/CI.md` for the exact wording and the `QABLY_FAIL_ON_ERROR` interaction.
+
+**Known limitation, disclosed not fixed**: `countTopLevelGroups` counts top-level `<testsuite>`
+blocks by depth, matching the server's `groupJunitReportBySuite` (which groups by `suiteKey`) in the
+common flat-structure case, but undercounts when a top-level block itself nests a further,
+differently-named `<testsuite>` — the server splits that into two distinct groups, the client still
+sees one top-level block and reports `reportSize: 1` for it. A regression test
+(`qably-report.spec.ts`, "undercounts against the server...") pins the exact discrepancy against the
+server's own `groupJunitReportBySuite` rather than leaving it undocumented. Fixing it would mean
+re-implementing the server's `suiteKey` grouping algorithm — which walks the parsed, nested XML tree —
+inside a zero-dependency, regex-based reporter script; that is a large enough undertaking to warrant
+its own unit rather than a fix folded into this one. jest-junit, vitest's junit reporter, pytest and
+Maven surefire — the reporters this endpoint targets — do not nest `<testsuite>` inside `<testsuite>`
+with different names in practice, so the gap is real but not exercised by the reporters Qably
+currently documents.
+
+**A bare `<testsuite>` root that is oversized has no `<testsuite>` boundary to split on** (see
+`buildSplitRequests` above: `oversizedUnsplittable: true`) and is sent as a single, over-cap request,
+annotated with a warning rather than refused client-side — the server still enforces its own caps and
+answers `400` if the request truly cannot be processed. Splitting a single oversized `<testsuite>`
+by testcase, instead of by suite boundary, was considered and rejected for this unit: it would need
+the server to merge several partial-case uploads into one run (the current ingest transaction always
+replaces a run's full case set, `runCase.deleteMany` then recreate — see "Idempotency" above), which
+is a server-side change, not a reporter one, and out of scope here.
 
 ## SCM ingestion queue retry policy
 
