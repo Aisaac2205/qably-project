@@ -1383,8 +1383,66 @@ describe('ExtractionService.enqueueDocumentFiles suite metadata job', () => {
       { data: Record<string, unknown> }[],
     ];
     expect(jobs).toHaveLength(1);
-    expect(jobs[0].data.requestSuiteSummary).toBe(true);
+    expect(jobs[0].data.requestSuiteSummary).toBe(false);
     expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it('requests no suite summary from any file job in a multi-file batch when the suite is already complete', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-1', automationFilePath: 'src/cart.spec.ts' }),
+      candidate({ id: 'case-2', automationFilePath: 'src/checkout.spec.ts' }),
+    ]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.value.suiteQueued).toBeUndefined();
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    expect(jobs).toHaveLength(2);
+    for (const job of jobs) {
+      expect(job.data.kind).toBe('document-file');
+      expect(job.data.requestSuiteSummary).toBe(false);
+    }
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it('lets only the standalone suite job produce metadata in a multi-file batch when the suite is incomplete', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([
+      candidate({ id: 'case-1', automationFilePath: 'src/cart.spec.ts' }),
+      candidate({ id: 'case-2', automationFilePath: 'src/checkout.spec.ts' }),
+    ]);
+    prisma.suite.findFirst.mockResolvedValue(incompleteSuite());
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { suiteQueued: true } });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    const fileJobs = jobs.filter((job) => job.data.kind === 'document-file');
+    const suiteJobs = jobs.filter(
+      (job) => job.data.kind === 'document-suite-metadata',
+    );
+    expect(fileJobs).toHaveLength(2);
+    expect(suiteJobs).toHaveLength(1);
+    for (const job of fileJobs) {
+      expect(job.data.requestSuiteSummary).toBe(false);
+    }
   });
 
   it('adds the suite-metadata job alone when there are no case targets', async () => {
