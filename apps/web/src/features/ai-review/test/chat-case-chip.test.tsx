@@ -37,4 +37,16 @@ describe('ChatCaseChip', () => {
 
     expect(onRemove).toHaveBeenCalledWith('tc-1')
   })
+
+  it('gives the remove control at least a 24x24 CSS px hit area', async () => {
+    await act(async () => {
+      render(<ChatCaseChip attachedCase={attachedCase} onRemove={vi.fn()} />)
+    })
+
+    const removeButton = screen.getByRole('button', {
+      name: 'Remove Valid login redirects to dashboard',
+    })
+
+    expect(removeButton).toHaveClass('size-6')
+  })
 })

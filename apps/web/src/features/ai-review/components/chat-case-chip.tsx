@@ -25,7 +25,7 @@ export function ChatCaseChip({
           type="button"
           onClick={() => onRemove(attachedCase.id)}
           aria-label={t('aiReview.chatRemoveCase', { name: attachedCase.name })}
-          className="shrink-0 rounded-full p-0.5 text-ai/70 hover:text-ai hover:bg-ai/10 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ai/40"
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-ai/70 hover:text-ai hover:bg-ai/10 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-ai/40"
         >
           <X size={11} weight="bold" aria-hidden="true" />
         </button>
