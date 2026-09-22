@@ -258,11 +258,6 @@ export class GeminiExtractor implements TestCaseExtractor {
       };
     }
 
-    // Anything else (network failure, an ApiError with an unexpected status,
-    // a non-Error throw) is unclassified — log the raw detail server-side for
-    // debugging, but never let it leak into the reason field: that field ends
-    // up stored as an ExtractedProposal.objective and shown to the user, so it
-    // must always be one of the known ProviderUnavailableReason values.
     const rawDetail = error instanceof Error ? error.message : 'unknown-error';
     this.logger.error(`Gemini ${what} failed for ${context}: ${rawDetail}`);
     return {

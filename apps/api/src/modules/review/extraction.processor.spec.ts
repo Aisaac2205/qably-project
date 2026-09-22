@@ -2188,7 +2188,6 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
         documentationOutcome: 'complete',
         documentationMissing: [],
         documentationOutcomeAt: expect.any(Date) as Date,
-        documentationQueuedAt: null,
         documentationSkipReason: null,
       },
     });
@@ -2247,7 +2246,6 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
         documentationOutcome: 'complete',
         documentationMissing: [],
         documentationOutcomeAt: expect.any(Date) as Date,
-        documentationQueuedAt: null,
         documentationSkipReason: null,
       },
     });
@@ -2519,8 +2517,8 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
       suiteMetadataJob(),
     );
 
-    expect(prisma.suite.update).toHaveBeenCalledWith({
-      where: { id: 'suite-1' },
+    expect(prisma.suite.updateMany).toHaveBeenCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
       data: {
         name: 'Checkout',
         nameSource: 'aeris',
@@ -2552,8 +2550,8 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
       suiteMetadataJob(),
     );
 
-    expect(prisma.suite.update).toHaveBeenCalledWith({
-      where: { id: 'suite-1' },
+    expect(prisma.suite.updateMany).toHaveBeenCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
       data: {
         description: 'Covers the checkout flow',
         tags: ['checkout'],
@@ -2581,10 +2579,107 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
       suiteMetadataJob(),
     );
 
-    expect(lastCall(prisma.suite.update).data?.tags).toEqual([
+    expect(lastCall(prisma.suite.updateMany).data?.tags).toEqual([
       'urgent',
       'checkout',
     ]);
+  });
+
+  it('caps the merged tag list at 20, keeping every existing tag and only as many new Aeris tags as fit', async () => {
+    const prisma = createPrisma();
+    const existingTags = Array.from({ length: 18 }, (_, i) => `existing-${i}`);
+    prisma.suite.findFirst
+      .mockReset()
+      .mockResolvedValue(suiteRow({ tags: existingTags }));
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { name: 'checkout_flow', nameSource: 'ingestion', tags: existingTags },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(
+        summarizedOutcome({
+          suite: {
+            title: 'Checkout',
+            description: 'Covers the checkout flow',
+            tags: ['new-1', 'new-2', 'new-3', 'new-4', 'new-5'],
+          },
+        }),
+      ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    const tags = lastCall(prisma.suite.updateMany).data?.tags as string[];
+    expect(tags).toHaveLength(20);
+    expect(tags.slice(0, 18)).toEqual(existingTags);
+    expect(tags.slice(18)).toEqual(['new-1', 'new-2']);
+  });
+
+  it('does not spend a credit or write anything when the suite is deleted before the row lock', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    prisma.$queryRawUnsafe.mockResolvedValue([]);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const entitlement = fakeEntitlement(
+      jest.fn().mockResolvedValue(true),
+      spendCredit,
+    );
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await expect(
+      build(
+        prisma,
+        fakeSourceReader(),
+        extractor,
+        fakeEncryption(),
+        entitlement,
+      ).process(suiteMetadataJob()),
+    ).resolves.toBeUndefined();
+
+    expect(spendCredit).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+    expect(prisma.suite.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not spend a credit or write anything when a fresher execution already cleared documentationQueuedAt', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      {
+        name: 'checkout_flow',
+        nameSource: 'ingestion',
+        tags: [],
+        documentationQueuedAt: null,
+      },
+    ]);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const entitlement = fakeEntitlement(
+      jest.fn().mockResolvedValue(true),
+      spendCredit,
+    );
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await expect(
+      build(
+        prisma,
+        fakeSourceReader(),
+        extractor,
+        fakeEncryption(),
+        entitlement,
+      ).process(suiteMetadataJob()),
+    ).resolves.toBeUndefined();
+
+    expect(spendCredit).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+    expect(prisma.suite.updateMany).not.toHaveBeenCalled();
   });
 
   it('skips entirely, with a human-documented outcome, when the name is human-chosen and the suite is already fully documented', async () => {
@@ -2777,7 +2872,7 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
     prisma.$queryRawUnsafe.mockResolvedValue([
       { name: 'checkout_flow', nameSource: 'ingestion', tags: [] },
     ]);
-    prisma.suite.update.mockRejectedValueOnce({ code: 'P2002' });
+    prisma.suite.updateMany.mockRejectedValueOnce({ code: 'P2002' });
     const extractor = fakeExtractor(
       jest.fn(),
       jest.fn().mockResolvedValue(summarizedOutcome()),
@@ -2796,8 +2891,8 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
         expect.stringContaining('ROLLBACK TO SAVEPOINT'),
       ]),
     );
-    expect(prisma.suite.update).toHaveBeenLastCalledWith({
-      where: { id: 'suite-1' },
+    expect(prisma.suite.updateMany).toHaveBeenLastCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
       data: {
         description: 'Covers the checkout flow',
         tags: ['checkout'],
@@ -2808,5 +2903,22 @@ describe('ExtractionProcessor — document-suite-metadata job', () => {
         documentationSkipReason: null,
       },
     });
+  });
+});
+
+describe('ExtractionProcessor — process dispatch exhaustiveness', () => {
+  it('throws instead of silently routing an unrecognized job kind to suite-metadata handling', async () => {
+    const prisma = createPrisma();
+    const job = {
+      data: { kind: 'not-a-real-kind', locale: 'en' },
+      attemptsStarted: 1,
+      opts: { attempts: 1 },
+    } as never;
+
+    await expect(
+      build(prisma, fakeSourceReader(), fakeExtractor(jest.fn())).process(job),
+    ).rejects.toThrow();
+
+    expect(prisma.suite.findFirst).not.toHaveBeenCalled();
   });
 });

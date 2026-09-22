@@ -7,6 +7,7 @@ import {
   assessSuiteDocumentation,
   type RepoConnectionProvider,
 } from '@qably/types';
+import { assertNever } from '../../common/assert-never';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
@@ -64,6 +65,7 @@ const AERIS_NAME_SOURCE = 'aeris';
 const SUITE_METADATA_SAVEPOINT = 'suite_metadata';
 const SUITE_SUMMARY_SAVEPOINT = 'suite_summary_metadata';
 const SUITE_SUMMARY_MAX_CASES = 60;
+const SUITE_TAG_CAP = 20;
 const SUITE_STATES_FOR_SUMMARY = ['active', 'draft'] as const;
 
 interface ConnectionInfo {
@@ -141,6 +143,7 @@ interface TxClient extends PublishTestCaseVersionTx {
   suite: {
     findFirst: PrismaService['suite']['findFirst'];
     update: PrismaService['suite']['update'];
+    updateMany: PrismaService['suite']['updateMany'];
   };
   testCase: {
     findFirst: PrismaService['testCase']['findFirst'];
@@ -197,6 +200,7 @@ interface SuiteSummaryLock {
   name: string;
   nameSource: string;
   tags: string[];
+  documentationQueuedAt: Date | null | undefined;
 }
 
 async function lockSuiteForSummary(
@@ -204,16 +208,26 @@ async function lockSuiteForSummary(
   suiteId: string,
 ): Promise<SuiteSummaryLock | null> {
   const rows = await tx.$queryRawUnsafe<
-    { name: string; nameSource: string; tags: string[] | null }[]
+    {
+      name: string;
+      nameSource: string;
+      tags: string[] | null;
+      documentationQueuedAt?: Date | null;
+    }[]
   >(
-    `SELECT name, "nameSource", tags FROM "suite" WHERE id = $1 FOR UPDATE`,
+    `SELECT name, "nameSource", tags, "documentationQueuedAt" FROM "suite" WHERE id = $1 FOR UPDATE`,
     suiteId,
   );
 
   const row = rows[0];
   if (row === undefined) return null;
 
-  return { name: row.name, nameSource: row.nameSource, tags: row.tags ?? [] };
+  return {
+    name: row.name,
+    nameSource: row.nameSource,
+    tags: row.tags ?? [],
+    documentationQueuedAt: row.documentationQueuedAt,
+  };
 }
 
 /**
@@ -225,10 +239,13 @@ function mergeSuiteTags(
   existing: readonly string[],
   proposed: readonly string[],
 ): string[] {
-  const seen = new Set(existing);
   const merged = [...existing];
+  if (merged.length >= SUITE_TAG_CAP) return merged.slice(0, SUITE_TAG_CAP);
+
+  const seen = new Set(existing);
 
   for (const tag of proposed) {
+    if (merged.length >= SUITE_TAG_CAP) break;
     if (seen.has(tag)) continue;
     seen.add(tag);
     merged.push(tag);
@@ -289,35 +306,42 @@ export class ExtractionProcessor extends WorkerHost {
     const isFinalAttempt = attemptsStarted >= maxAttempts;
     const isFirstAttempt = attemptsStarted <= 1;
 
-    if (job.data.kind === 'code-change') {
-      await this.processCodeChange(
-        job.data.codeChangeId,
-        job.data.locale,
-        isFinalAttempt,
-        isFirstAttempt,
-      );
-    } else if (job.data.kind === 'document-case') {
-      await this.processDocumentCase(
-        job.data.testCaseId,
-        job.data.locale,
-        isFinalAttempt,
-        isFirstAttempt,
-      );
-    } else if (job.data.kind === 'document-file') {
-      await this.processDocumentFile(
-        job.data.filePath,
-        job.data.targets,
-        job.data.locale,
-        isFinalAttempt,
-        isFirstAttempt,
-      );
-    } else {
-      await this.processDocumentSuiteMetadata(
-        job.data.suiteId,
-        job.data.locale,
-        isFinalAttempt,
-        isFirstAttempt,
-      );
+    switch (job.data.kind) {
+      case 'code-change':
+        await this.processCodeChange(
+          job.data.codeChangeId,
+          job.data.locale,
+          isFinalAttempt,
+          isFirstAttempt,
+        );
+        return;
+      case 'document-case':
+        await this.processDocumentCase(
+          job.data.testCaseId,
+          job.data.locale,
+          isFinalAttempt,
+          isFirstAttempt,
+        );
+        return;
+      case 'document-file':
+        await this.processDocumentFile(
+          job.data.filePath,
+          job.data.targets,
+          job.data.locale,
+          isFinalAttempt,
+          isFirstAttempt,
+        );
+        return;
+      case 'document-suite-metadata':
+        await this.processDocumentSuiteMetadata(
+          job.data.suiteId,
+          job.data.locale,
+          isFinalAttempt,
+          isFirstAttempt,
+        );
+        return;
+      default:
+        assertNever(job.data);
     }
   }
 
@@ -548,8 +572,6 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    // See the equivalent guard in runDocumentFileExtractionUnsafe: don't
-    // re-charge the daily budget for a retry of the same logical extraction.
     const withinBudget = isFirstAttempt
       ? await this.dailyBudget.tryConsume(NOT_BYOK)
       : true;
@@ -611,11 +633,12 @@ export class ExtractionProcessor extends WorkerHost {
     summary: { title: string; description: string; tags: string[] },
   ): Promise<boolean> {
     return this.prisma.$transaction(async (tx: TxClient) => {
-      const spent = await this.entitlement.spendCredit(organizationId, tx);
-      if (!spent) return false;
-
       const locked = await lockSuiteForSummary(tx, suiteId);
       if (locked === null) return true;
+      if (locked.documentationQueuedAt === null) return true;
+
+      const spent = await this.entitlement.spendCredit(organizationId, tx);
+      if (!spent) return false;
 
       const mergedTags = mergeSuiteTags(locked.tags, summary.tags);
       const nameChanged = locked.nameSource !== HUMAN_NAME_SOURCE;
@@ -641,11 +664,16 @@ export class ExtractionProcessor extends WorkerHost {
         ...documentedState,
       };
 
+      const ownershipWhere = {
+        id: suiteId,
+        documentationQueuedAt: { not: null },
+      };
+
       await tx.$executeRawUnsafe(`SAVEPOINT ${SUITE_SUMMARY_SAVEPOINT}`);
 
       try {
-        await tx.suite.update({
-          where: { id: suiteId },
+        await tx.suite.updateMany({
+          where: ownershipWhere,
           data: nameChanged
             ? {
                 ...baseData,
@@ -673,7 +701,7 @@ export class ExtractionProcessor extends WorkerHost {
           `Skipped renaming suite ${suiteId} to "${summary.title}": the proposed name collides with another suite in this project`,
         );
 
-        await tx.suite.update({ where: { id: suiteId }, data: baseData });
+        await tx.suite.updateMany({ where: ownershipWhere, data: baseData });
         return true;
       }
     });
@@ -1154,11 +1182,13 @@ export class ExtractionProcessor extends WorkerHost {
         tags: mergedTags,
       });
 
-      const documentedState: DocumentationStateWrite = {
+      const documentedState: Omit<
+        DocumentationStateWrite,
+        'documentationQueuedAt'
+      > = {
         documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
         documentationMissing: assessment.missing,
         documentationOutcomeAt: new Date(),
-        documentationQueuedAt: null,
         documentationSkipReason: null,
       };
 
