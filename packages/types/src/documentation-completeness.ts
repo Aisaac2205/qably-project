@@ -39,6 +39,10 @@ function toList<T>(value: MaybeList<T>): readonly T[] {
   return value ?? [];
 }
 
+export function normalizeTitleForComparison(value: MaybeText): string {
+  return toText(value).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 export interface CaseDocumentationInput {
   name: MaybeText;
   automationKey: MaybeText;
@@ -59,8 +63,11 @@ export function assessCaseDocumentation(
   const missing: CaseDocumentationField[] = [];
 
   const trimmedName = toText(input.name).trim();
-  const trimmedAutomationKey = toText(input.automationKey).trim();
-  if (trimmedName.length === 0 || trimmedName === trimmedAutomationKey) {
+  if (
+    trimmedName.length === 0 ||
+    normalizeTitleForComparison(input.name) ===
+      normalizeTitleForComparison(input.automationKey)
+  ) {
     missing.push('title');
   }
 

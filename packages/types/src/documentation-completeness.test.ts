@@ -47,6 +47,20 @@ describe('assessCaseDocumentation', () => {
     expect(result.missing).not.toContain('title');
   });
 
+  it('flags title missing when the name equals the automationKey after case-insensitive normalization', () => {
+    const result = assessCaseDocumentation(
+      baseCase({ name: 'CART > ADDS AN ITEM', automationKey: 'Cart > adds an item' }),
+    );
+    expect(result.missing).toContain('title');
+  });
+
+  it('flags title missing when the name equals the automationKey after collapsing internal whitespace', () => {
+    const result = assessCaseDocumentation(
+      baseCase({ name: 'Cart  >   adds   an item', automationKey: 'Cart > adds an item' }),
+    );
+    expect(result.missing).toContain('title');
+  });
+
   it('flags title missing when automationKey is null and name is empty', () => {
     const result = assessCaseDocumentation(
       baseCase({ name: '', automationKey: null }),

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeTitleForComparison } from '@qably/types';
 
 export const MAX_SOURCE_CONTENT_LENGTH = 60_000;
 export const MAX_EXTRACTED_CASES = 20;
@@ -27,7 +28,9 @@ export const extractedCaseObjectSchema = z.object({
 });
 
 export const extractedCaseSchema = extractedCaseObjectSchema.refine(
-  (data) => data.title.trim() !== data.automationKey.trim(),
+  (data) =>
+    normalizeTitleForComparison(data.title) !==
+    normalizeTitleForComparison(data.automationKey),
   {
     message: 'title must be different from the raw automationKey',
     path: ['title'],

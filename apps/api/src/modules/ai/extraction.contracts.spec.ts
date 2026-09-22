@@ -122,6 +122,28 @@ describe('extractedCaseSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects a title equal to the automationKey after case-insensitive normalization', () => {
+    const result = extractedCaseSchema.safeParse(
+      validCase({
+        automationKey: 'CartTest > adds an item',
+        title: 'CARTTEST > ADDS AN ITEM',
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a title equal to the automationKey after collapsing internal whitespace', () => {
+    const result = extractedCaseSchema.safeParse(
+      validCase({
+        automationKey: 'CartTest > adds an item',
+        title: 'CartTest  >   adds  an item',
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
   it('accepts a title that differs from the automationKey', () => {
     const result = extractedCaseSchema.safeParse(
       validCase({
