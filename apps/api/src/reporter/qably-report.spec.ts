@@ -214,7 +214,7 @@ describe('countTopLevelGroups', () => {
     expect(count).toBe(3);
   });
 
-  it('undercounts against the server when a top-level testsuite nests a differently-named child, a known disclosed limitation', () => {
+  it('matches the server when a top-level testsuite nests a differently-named child, instead of undercounting it', () => {
     const xml =
       '<testsuites><testsuite name="a"><testcase name="a1"/>' +
       '<testsuite name="a-nested"><testcase name="nested1"/></testsuite>' +
@@ -229,9 +229,96 @@ describe('countTopLevelGroups', () => {
       'external-id',
     ).length;
 
+    expect(clientCount).toBe(2);
+    expect(clientCount).toBe(serverGroupCount);
+  });
+
+  it('matches the server for a bare <testsuite> root that nests a differently-named child', () => {
+    const xml =
+      '<testsuite name="a"><testcase name="a1"/>' +
+      '<testsuite name="a-nested"><testcase name="nested1"/></testsuite>' +
+      '</testsuite>';
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(serverGroupCount);
+  });
+
+  it('matches the server for a pytest-style report with several classname-nested testsuites two levels deep', () => {
+    const xml = `<testsuites name="pytest">
+      <testsuite name="tests.checkout.test_checkout">
+        <testsuite name="tests.checkout.test_checkout.TestAddItem">
+          <testcase name="test_add_item"/>
+          <testcase name="test_add_item_twice"/>
+        </testsuite>
+        <testsuite name="tests.checkout.test_checkout.TestRemoveItem">
+          <testcase name="test_remove_item"/>
+        </testsuite>
+      </testsuite>
+      <testsuite name="tests.cart.test_cart">
+        <testcase name="test_add_to_cart"/>
+      </testsuite>
+    </testsuites>`;
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(serverGroupCount);
+  });
+
+  it('matches the server for a surefire-style report with an unnamed nested testsuite inheriting its parent suite key', () => {
+    const xml = `<testsuites>
+      <testsuite name="com.qably.CheckoutTest">
+        <testcase name="addsItem"/>
+        <testsuite>
+          <testcase name="removesItem"/>
+        </testsuite>
+      </testsuite>
+    </testsuites>`;
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
     expect(clientCount).toBe(1);
-    expect(serverGroupCount).toBe(2);
-    expect(clientCount).not.toBe(serverGroupCount);
+    expect(clientCount).toBe(serverGroupCount);
+  });
+
+  it('merges two identically-named nested testsuites into a single group, exactly like the server', () => {
+    const xml = `<testsuites>
+      <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
+      <testsuite name="src/a.test.ts"><testcase name="a2"/></testsuite>
+    </testsuites>`;
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(1);
+    expect(clientCount).toBe(serverGroupCount);
   });
 });
 

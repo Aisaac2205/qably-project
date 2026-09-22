@@ -124,9 +124,126 @@ export function findTopLevelTestsuiteBlocks(xml) {
   };
 }
 
+const MAX_SUITE_KEY_LENGTH = 500;
+const MAX_SUITE_KEY_DEPTH = 32;
+
+function truncateToCodePoints(value, maxLength) {
+  const codePoints = Array.from(value);
+  return codePoints.length <= maxLength ? value : codePoints.slice(0, maxLength).join('');
+}
+
+function readOwnNameAttribute(openTag) {
+  const match = /\sname\s*=\s*"([^"]*)"/.exec(openTag);
+  return match === null ? '' : match[1];
+}
+
+// Splits `fragment` into its direct `<testsuite>` children (each as
+// { openTag, inner, selfClosing }, respecting nesting depth) plus the text
+// outside of any of those children — mirrors the depth-tracking scan in
+// findTopLevelTestsuiteBlocks, generalized to work on any XML fragment, not
+// only the body of a <testsuites> root.
+function splitChildTestsuiteBlocks(fragment) {
+  const masked = maskCdataAndComments(fragment);
+  const tagPattern = /<testsuite\b[^>]*?(\/)?>|<\/testsuite\s*>/gi;
+  const children = [];
+  const outsideRanges = [];
+  let depth = 0;
+  let openInfo = null;
+  let outsideStart = 0;
+  let match;
+
+  while ((match = tagPattern.exec(masked)) !== null) {
+    const isClose = match[0].startsWith('</');
+    const isSelfClosing = !isClose && match[1] === '/';
+
+    if (depth === 0 && openInfo === null) {
+      outsideRanges.push([outsideStart, match.index]);
+    }
+
+    if (isClose) {
+      if (depth > 0) depth -= 1;
+      if (depth === 0 && openInfo !== null) {
+        children.push({
+          openTag: openInfo.tag,
+          inner: fragment.slice(openInfo.innerStart, match.index),
+          selfClosing: false,
+        });
+        openInfo = null;
+        outsideStart = match.index + match[0].length;
+      }
+      continue;
+    }
+
+    if (depth === 0) {
+      if (isSelfClosing) {
+        children.push({ openTag: match[0], inner: '', selfClosing: true });
+        outsideStart = match.index + match[0].length;
+      } else {
+        openInfo = { tag: match[0], innerStart: match.index + match[0].length };
+        depth += 1;
+      }
+    } else if (!isSelfClosing) {
+      depth += 1;
+    }
+  }
+
+  if (openInfo === null) outsideRanges.push([outsideStart, fragment.length]);
+
+  const outsideText = outsideRanges.map(([start, end]) => fragment.slice(start, end)).join('');
+
+  return { children, outsideText };
+}
+
+// Ports the server's own grouping rule (parse-junit-xml.ts's collectCases,
+// group-junit-report.ts's groupJunitReportBySuite) into this zero-dependency
+// script: a <testsuite> with its own `name` attribute starts a new suite
+// key; one without inherits its closest ancestor's key. Two nodes anywhere
+// in the document that resolve to the identical suite key merge into one
+// group, in first-seen order — exactly like the server's suiteKey Map.
+function collectGroupSuiteKeys(openTag, inner, parentSuiteKey, depth, seen, order) {
+  if (depth > MAX_SUITE_KEY_DEPTH) return;
+
+  const ownName = readOwnNameAttribute(openTag);
+  const suiteKey =
+    ownName === '' ? parentSuiteKey : truncateToCodePoints(ownName, MAX_SUITE_KEY_LENGTH);
+
+  const { children, outsideText } = splitChildTestsuiteBlocks(inner);
+  const hasDirectTestcase = /<testcase\b/i.test(maskCdataAndComments(outsideText));
+
+  if (hasDirectTestcase && !seen.has(suiteKey)) {
+    seen.add(suiteKey);
+    order.push(suiteKey);
+  }
+
+  for (const child of children) {
+    collectGroupSuiteKeys(child.openTag, child.inner, suiteKey, depth + 1, seen, order);
+  }
+}
+
 export function countTopLevelGroups(xml) {
-  const structure = findTopLevelTestsuiteBlocks(xml);
-  return structure === null ? 1 : Math.max(structure.blocks.length, 1);
+  const masked = maskCdataAndComments(xml);
+  const suitesRootMatch = /<testsuites\b[^>]*>/i.exec(masked);
+  let rootOpenTag;
+  let rootInner;
+
+  if (suitesRootMatch !== null) {
+    rootOpenTag = suitesRootMatch[0];
+    const bodyStart = suitesRootMatch.index + suitesRootMatch[0].length;
+    const rootCloseMatch = /<\/testsuites\s*>/i.exec(masked.slice(bodyStart));
+    const bodyEnd = rootCloseMatch === null ? xml.length : bodyStart + rootCloseMatch.index;
+    rootInner = xml.slice(bodyStart, bodyEnd);
+  } else {
+    const { children } = splitChildTestsuiteBlocks(xml);
+    if (children.length === 0) return 1;
+    rootOpenTag = children[0].openTag;
+    rootInner = children[0].inner;
+  }
+
+  const seen = new Set();
+  const order = [];
+  collectGroupSuiteKeys(rootOpenTag, rootInner, '', 1, seen, order);
+
+  return Math.max(order.length, 1);
 }
 
 function packTestsuiteBlocks(blocks, caps) {
