@@ -42,6 +42,13 @@ export type ExtractionJobData =
       filePath: string;
       targets: DocumentFileTarget[];
       locale: Locale;
+      /**
+       * False when a standalone `document-suite-metadata` job is already
+       * queued for this file's suite in the same request, so the file
+       * prompt does not ask for the bonus suite summary twice. Defaults to
+       * true when absent.
+       */
+      requestSuiteSummary?: boolean;
     }
   | { kind: 'document-suite-metadata'; suiteId: string; locale: Locale };
 

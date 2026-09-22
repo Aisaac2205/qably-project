@@ -159,6 +159,7 @@ export class GeminiExtractor implements TestCaseExtractor {
             input.locale,
             (input.targetAutomationKeys?.length ?? 0) > 0,
             input.declarationCountHint,
+            input.requestSuiteSummary ?? true,
           ),
           responseMimeType: 'application/json',
           responseJsonSchema: RESPONSE_JSON_SCHEMA,

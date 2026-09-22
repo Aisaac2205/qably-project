@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v8');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v9');
   });
 });
 
@@ -120,6 +120,77 @@ describe('buildSystemInstruction', () => {
     expect(buildSystemInstruction('es', false, 5)).toContain(
       'El archivo contiene 5 declaraciones de prueba',
     );
+  });
+
+  it('requires a title different from the raw automation key, in every mode', () => {
+    for (const locale of ['es', 'en'] as const) {
+      for (const hasTargets of [false, true]) {
+        const instruction = buildSystemInstruction(locale, hasTargets);
+        expect(instruction).toContain('"title"');
+        expect(instruction).toContain('"automationKey"');
+      }
+    }
+
+    expect(buildSystemInstruction('es')).toContain(
+      'distinto de "automationKey"',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'different from "automationKey"',
+    );
+  });
+
+  it('extracts only the declarations in the one-entry-per-declaration rule when there are no targets', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      'Crea exactamente una entrada por cada declaración',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'Create exactly one entry per test declaration',
+    );
+  });
+
+  it('replaces the one-entry-per-declaration rule with a targets-only rule when targets are present', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale, true);
+
+      expect(instruction).not.toContain(
+        locale === 'es'
+          ? 'Crea exactamente una entrada por cada declaración'
+          : 'Create exactly one entry per test declaration',
+      );
+    }
+
+    expect(buildSystemInstruction('es', true)).toContain(
+      'Extrae únicamente las declaraciones de prueba',
+    );
+    expect(buildSystemInstruction('en', true)).toContain(
+      'Extract only the test declarations',
+    );
+  });
+
+  it('drops the suite summary sentence when a standalone suite job is already queued', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const withSuiteJob = buildSystemInstruction(
+        locale,
+        true,
+        undefined,
+        false,
+      );
+      const withoutSuiteJob = buildSystemInstruction(
+        locale,
+        true,
+        undefined,
+        true,
+      );
+
+      expect(withSuiteJob).not.toContain('"suite"');
+      expect(withoutSuiteJob).toContain('"suite"');
+    }
+  });
+
+  it('keeps requesting the suite summary bonus by default when targets are present', () => {
+    for (const locale of ['es', 'en'] as const) {
+      expect(buildSystemInstruction(locale, true)).toContain('"suite"');
+    }
   });
 });
 

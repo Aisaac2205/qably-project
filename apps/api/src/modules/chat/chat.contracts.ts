@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { extractedCaseSchema } from '../ai/extraction.contracts';
+import { extractedCaseObjectSchema } from '../ai/extraction.contracts';
 
 export const CHAT_PROMPT_VERSION = 'chat-v4';
 export const MAX_SUGGESTED_CASES = 5;
@@ -7,7 +7,7 @@ export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;
 export const MAX_EXCERPT_LENGTH = 600;
 
-export const suggestedCaseSchema = extractedCaseSchema
+export const suggestedCaseSchema = extractedCaseObjectSchema
   .omit({
     automationKey: true,
     sourceExcerpt: true,

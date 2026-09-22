@@ -78,3 +78,11 @@ The defenses that actually bound the damage are the ones outside the prompt, and
 - The reply is rendered as text (`chat-message-bubble.tsx` renders `message.content` inside a `<p className="whitespace-pre-wrap">`), never as HTML, so an injected `<script>` or `<img onerror>` is displayed rather than executed.
 
 Treat the prompt hardening as raising the cost of an attack and preserving the audit trail, not as immunity. `CHAT_PROMPT_VERSION` is stamped on every stored assistant message; bump it whenever the prompt changes, or the audit trail lies about what produced a given answer.
+
+## extraction-v9 and the targeted-cases and suite-summary sentences
+
+`extraction-v9` keeps the same untrusted-data handling as `extraction-v8` and adds two rules that do not touch trust boundaries: the model must return a `title` that differs from the raw `automationKey` (re-checked by Zod, `extraction.contracts.ts`), and a job that carries a `TARGET_CASES` block now extracts only those declarations instead of every declaration in the file — the older "one entry per declaration" instruction is scoped to jobs that carry no targets. `suite-summary-v1` already carried the same spotlighting and escaping as the chat and extraction prompts (`<<<SUITE_CASES>>>` delimiters, `sanitizeUntrustedText`, `stripBlockDelimiters`) since it shipped; this pass confirmed it rather than changing it.
+
+`CHAT_PROMPT_VERSION` stayed at `chat-v4`: its wording already satisfied every rule in this document — instruction hierarchy stated once, the untrusted-content rule covering both `PROJECT_DATA` and `CASE_CONTEXT`, the targeted-mode rules (only attached cases, byte-for-byte `automationKey`, steps and expected result bounded to what the excerpt shows, no case for an unavailable excerpt), never claiming publication, never naming the provider — when re-checked against the design. No wording changed, so the persisted `promptVersion` on existing messages stays accurate without a bump.
+
+A manual integration spec (`apps/api/src/modules/ai/gemini.extractor.integration.spec.ts`, see `AI_EXTRACTION.md`) now exercises all three prompts — `extraction-v9`, `suite-summary-v1` and `chat-v4` — against the real provider with small synthetic fixtures, gated on `GEMINI_API_KEY` and run only locally by whoever holds the key.

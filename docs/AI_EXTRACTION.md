@@ -41,7 +41,8 @@ A `401`/`403` from the API (invalid key) is never retried and immediately resolv
 - `SourceReader` percent-encodes owner, repo, ref and each path segment when it builds the fetch URL, and `buildBlobUrl` does the same for the human-facing `Evidence.uri` shown to reviewers — a file path or branch name containing a space, `#` or other reserved character never breaks either link.
 - The model may return at most **20 cases** per file (`MAX_EXTRACTED_CASES`, `apps/api/src/modules/ai/extraction.contracts.ts`).
 - Each case field is length-bounded (title ≤120, objective/expectedResult ≤500, steps 1–20 × ≤300, preconditions ≤10 × ≤300, sourceExcerpt ≤600) and validated with Zod (`extractedCaseSchema`) before it is persisted. A case that violates the schema is dropped and counted, not persisted — it never fails the rest of the batch.
-- Those bounds live **only** in Zod. The JSON schema sent to the provider (`RESPONSE_JSON_SCHEMA`) names the fields, the enum and the required list, and caps only the top-level `cases` array at `MAX_EXTRACTED_CASES`. It carries no `maxLength` and no nested `minItems`/`maxItems`, because Gemini compiles the response schema into a constrained-decoding automaton and rejects one with string length limits and nested array limits as "too many states for serving" (HTTP 400; `gemini-3.1-flash-lite` reports it only as a generic `INVALID_ARGUMENT`). With the bounded schema in place every real extraction failed before the first token was generated, while the unit suite stayed green because it never calls the provider. `gemini.response-schema.spec.ts` pins the invariant so a future "tighten the schema" change cannot silently reintroduce it; the manual integration spec is the only check that talks to the real model.
+- Those bounds live **only** in Zod. The JSON schema sent to the provider (`RESPONSE_JSON_SCHEMA`) names the fields, the enum and the required list, and caps only the top-level `cases` array at `MAX_EXTRACTED_CASES`. It carries no `maxLength` and no nested `minItems`/`maxItems`, because Gemini compiles the response schema into a constrained-decoding automaton and rejects one with string length limits and nested array limits as "too many states for serving" (HTTP 400; `gemini-3.1-flash-lite` reports it only as a generic `INVALID_ARGUMENT`). With the bounded schema in place every real extraction failed before the first token was generated, while the unit suite stayed green because it never calls the provider. `gemini.response-schema.spec.ts`, `chat.response-schema.spec.ts` and `gemini.suite-summary-response-schema.spec.ts` each pin the same invariant for their own response schema, so a future "tighten the schema" change on any of the three cannot silently reintroduce it; the manual integration spec is the only check that talks to the real model.
+- `extractedCaseSchema` also rejects a case whose `title`, once trimmed, equals its `automationKey`: a model that falls back to echoing the reporter's runtime name as the human-facing title produces a case that `assessCaseDocumentation` (`packages/types/src/documentation-completeness.ts`) already treats as an undocumented title, so extraction now refuses to persist that shape in the first place instead of writing a "documented" case that the completeness rule would immediately flag as incomplete. `extractedCaseObjectSchema` (the same fields, without that cross-field check) is what `chat.contracts.ts`'s `suggestedCaseSchema` derives from via `.omit({ automationKey: true, sourceExcerpt: true })`, since a chat suggestion that carries no `automationKey` has nothing to compare the title against.
 
 ## Cost estimate per file
 
@@ -131,6 +132,8 @@ The `document-file` job kind is that unit. `ExtractionService.enqueueDocumentFil
 
 The processor matches each returned case to a target by `automationKey`, the same join key run ingestion uses, and writes one `ExtractedProposal` per matched target. A target the model never returned gets its own `automation-key-not-found` fallback: a case that could not be documented is visible in the review inbox, never a silent omission.
 
+Since `extraction-v9`, a `document-file` job's prompt tells the model to extract only the declarations named in its `TARGET_CASES` block and ignore every other test declaration in the file; the older "one entry per declaration" instruction — still the rule for a code-change or document-case job, which never carries a target list — no longer applies once targets are present. This removes the previous conflict between that blanket instruction and the schema's `MAX_EXTRACTED_CASES` cap on a file with more declarations than a single chunk's targets.
+
 One request enqueues at most `MAX_DOCUMENT_FILES_PER_REQUEST` files. A first connection can bring thousands of undocumented cases across hundreds of files, and without a ceiling a single click would commit that many provider calls before anyone could see the bill. The response reports what was actually queued, and the action stays available while cases remain, so the rest is queued by pressing again — a bounded commitment repeated deliberately, rather than one unbounded one.
 
 The job id is `document-file:<projectId>:<filePath>:<chunkIndex>`. The project id is not decoration: two organizations routinely hold a file at the same relative path, and an id built from the path alone would let BullMQ deduplicate one organization's job against another's, leaving the second silently unprocessed while its HTTP response claimed success. Scoping it also makes a repeated identical request idempotent instead of doubling the work.
@@ -171,6 +174,8 @@ A proposed name can collide with another suite's unique name constraint within t
 Both paths also update the suite's documentation-state columns (`documentationOutcome`, `documentationMissing`, `documentationOutcomeAt`, `documentationSkipReason`) from the same completeness check case documentation uses (`assessSuiteDocumentation`).
 
 `documentationQueuedAt` marks which standalone `document-suite-metadata` execution currently owns the suite's outcome write. `persistSuiteSummary` reads it under the same row lock it writes through: if the suite no longer exists, or its `documentationQueuedAt` is already `null`, a fresher execution (a redelivered or retried job) already resolved this suite, so the current execution spends no credit and writes nothing. Otherwise it spends the credit and writes with `suite.updateMany({ where: { id, documentationQueuedAt: { not: null } } })`, so a stale execution racing behind a fresher one can never overwrite what the fresher one already wrote. The inline `document-file` path does not own that flag, since the file's job can run before, or without, any standalone suite job ever being enqueued, so `applySuiteMetadata` neither gates on `documentationQueuedAt` nor clears it.
+
+When `enqueueDocumentFiles` queues a standalone `document-suite-metadata` job alongside a batch of `document-file` jobs for the same suite (the suite-scoped request, section above), every `document-file` job in that batch carries `requestSuiteSummary: false`, and the file prompt (`extraction-v9`) drops its bonus `"suite"` sentence for that call — `GeminiExtractor.extract` still asks for it whenever no standalone job is queued for the suite, since the inline path is the only source of suite metadata in that case. This exists so the two paths never write conflicting suite metadata for the same suite from the same request; `buildSystemInstruction`'s fourth parameter (`requestSuiteSummary`, default `true`) is the switch, threaded from `ExtractionJobData`'s `document-file.requestSuiteSummary` through `ExtractionInput.requestSuiteSummary`.
 
 ### Advisory observations
 
@@ -252,8 +257,30 @@ Deletion is scoped through the same `findThread` used by every other thread oper
 
 ## Manual integration check
 
-`apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` calls the real Gemini API with a tiny fixture and asserts the response matches `extractionOutputSchema` — it never asserts exact wording, since model output is not deterministic. The `describe` block is skipped unless `GEMINI_API_KEY` is present in the environment running the test, so it never runs in CI by default and costs nothing unless explicitly invoked with a key:
+`apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` calls the real Gemini API against all three prompts this module and the chat module send — `extraction-v9` (`GeminiExtractor.extract`), `suite-summary-v1` (`GeminiExtractor.summarizeSuite`) and `chat-v4` (`GeminiChatAssistant.reply`) — with tiny synthetic fixtures written for the test (never real customer code), and asserts each response matches its Zod schema (`extractionOutputSchema`, `suiteSummarySchema`, `suggestedCasesSchema`). It never asserts exact wording, since model output is not deterministic.
+
+Every `describe` block in the file is skipped unless `GEMINI_API_KEY` is present in the environment running the test, so it never runs in CI by default and costs nothing unless explicitly invoked with a key. **This is intentional and permanent**: the key is never added to CI, and this spec is run only locally by whoever holds the key.
+
+Jest in this project does not load `.env` on its own — `dotenv/config` is only imported by `apps/api/src/main.ts`, the server entrypoint, and a plain `jest` run never executes it. The key has to be present in the shell's own environment for the one command; it does not need to be committed anywhere or exported permanently.
+
+From `apps/api`, with a real key:
+
+PowerShell:
+
+```powershell
+cd apps\api
+$env:GEMINI_API_KEY = "<your key>"
+npx jest --maxWorkers=2 gemini.extractor.integration
+Remove-Item Env:GEMINI_API_KEY
+```
+
+Git Bash:
 
 ```bash
-GEMINI_API_KEY=... pnpm --filter @qably/api test -- src/modules/ai/gemini.extractor.integration.spec.ts
+cd apps/api
+GEMINI_API_KEY="<your key>" npx jest --maxWorkers=2 gemini.extractor.integration
 ```
+
+Both forms scope the key to that single command; neither leaves it set in the shell afterwards. `GEMINI_MODEL` is optional and defaults to `gemini-3.1-flash-lite` inside the spec when unset — export it the same way, before the `npx jest` call, to point the check at a different model.
+
+A pass reports all three `describe` blocks (`GeminiExtractor (manual integration, real API)`, `GeminiExtractor.summarizeSuite (manual integration, real API)`, `GeminiChatAssistant (manual integration, real API)`) as green, no failures and no skips. Without the key, the same command reports every test in the file as skipped, never failed — that is the expected state for every CI run and for a local run with nothing exported.

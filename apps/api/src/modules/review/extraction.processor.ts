@@ -114,6 +114,7 @@ interface DocumentFileJobContext {
   connection: ConnectionInfo | null;
   targets: DocumentFileTarget[];
   locale: string | undefined;
+  requestSuiteSummary: boolean;
   /** True when BullMQ won't retry this job again after this attempt. */
   isFinalAttempt: boolean;
   /** True on the job's first execution — a retry means budget was already spent once for this logical extraction. */
@@ -328,6 +329,7 @@ export class ExtractionProcessor extends WorkerHost {
           job.data.filePath,
           job.data.targets,
           job.data.locale,
+          job.data.requestSuiteSummary ?? true,
           isFinalAttempt,
           isFirstAttempt,
         );
@@ -711,6 +713,7 @@ export class ExtractionProcessor extends WorkerHost {
     filePath: string,
     targets: DocumentFileTarget[],
     locale: string | undefined,
+    requestSuiteSummary: boolean,
     isFinalAttempt: boolean,
     isFirstAttempt: boolean,
   ): Promise<void> {
@@ -752,6 +755,7 @@ export class ExtractionProcessor extends WorkerHost {
       connection: firstTarget.project.connection,
       targets,
       locale,
+      requestSuiteSummary,
       isFinalAttempt,
       isFirstAttempt,
     });
@@ -831,6 +835,7 @@ export class ExtractionProcessor extends WorkerHost {
           targetAutomationKeys: ctx.targets.map(
             (target) => target.automationKey,
           ),
+          requestSuiteSummary: ctx.requestSuiteSummary,
         },
         source.content,
       );
@@ -877,6 +882,7 @@ export class ExtractionProcessor extends WorkerHost {
         content: source.content,
         locale,
         targetAutomationKeys: unmatched.map((target) => target.automationKey),
+        requestSuiteSummary: ctx.requestSuiteSummary,
       });
 
       if (retryOutcome.kind === 'extracted') {

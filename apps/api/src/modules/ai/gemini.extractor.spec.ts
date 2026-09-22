@@ -149,6 +149,45 @@ describe('GeminiExtractor', () => {
     expect(config.systemInstruction).not.toBe(buildSystemInstruction('es'));
   });
 
+  it('requests the suite summary bonus by default when targets are present', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ locale: 'es', targetAutomationKeys: ['Cart > adds an item'] }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.systemInstruction).toBe(buildSystemInstruction('es', true));
+  });
+
+  it('drops the suite summary bonus when the caller says a standalone suite job already covers it', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({
+        locale: 'es',
+        targetAutomationKeys: ['Cart > adds an item'],
+        requestSuiteSummary: false,
+      }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.systemInstruction).toBe(
+      buildSystemInstruction('es', true, undefined, false),
+    );
+    expect(config.systemInstruction).not.toBe(
+      buildSystemInstruction('es', true),
+    );
+  });
+
   it('tells the system instruction the declaration count only when a hint is given', async () => {
     let received: Record<string, unknown> = {};
     const client = fakeClient((params) => {

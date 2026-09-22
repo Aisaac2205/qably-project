@@ -1072,6 +1072,58 @@ describe('ExtractionProcessor — document-file job', () => {
     } as never;
   }
 
+  it('asks the extractor for the suite summary bonus by default when the job carries no explicit flag', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledWith(
+      expect.objectContaining({ requestSuiteSummary: true }),
+    );
+  });
+
+  it('tells the extractor to skip the suite summary bonus when a standalone suite job already covers it', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValue(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ]),
+      );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({ requestSuiteSummary: false }),
+    );
+
+    expect(extract).toHaveBeenCalledWith(
+      expect.objectContaining({ requestSuiteSummary: false }),
+    );
+  });
+
   it('writes the documentation directly onto each matched case, creating no proposal', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);

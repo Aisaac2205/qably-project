@@ -14,7 +14,7 @@ const listItem = (max: number) =>
     .transform((value) => value.replace(LEADING_ORDINAL, ''))
     .pipe(shortText(max));
 
-export const extractedCaseSchema = z.object({
+export const extractedCaseObjectSchema = z.object({
   automationKey: shortText(120),
   title: shortText(120),
   objective: shortText(500),
@@ -25,6 +25,14 @@ export const extractedCaseSchema = z.object({
   sourceExcerpt: shortText(600),
   observations: z.array(shortText(200)).max(5).optional(),
 });
+
+export const extractedCaseSchema = extractedCaseObjectSchema.refine(
+  (data) => data.title.trim() !== data.automationKey.trim(),
+  {
+    message: 'title must be different from the raw automationKey',
+    path: ['title'],
+  },
+);
 
 export const extractedSuiteSchema = z.object({
   title: shortText(80),
@@ -65,6 +73,13 @@ export interface ExtractionInput {
   readonly targetAutomationKeys?: readonly string[];
   readonly locale: 'es' | 'en';
   readonly declarationCountHint?: number;
+  /**
+   * Whether to ask the model for the bonus "suite" summary alongside the
+   * extracted cases. Defaults to true; a caller sets this to false when a
+   * standalone `document-suite-metadata` job already covers the suite, so
+   * the file prompt never asks for it twice.
+   */
+  readonly requestSuiteSummary?: boolean;
 }
 
 export interface TokenUsage {

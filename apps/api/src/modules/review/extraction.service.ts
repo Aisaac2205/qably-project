@@ -441,6 +441,11 @@ export class ExtractionService {
       opts: { jobId: string };
     }[] = [];
     const queuedCaseIds: string[] = [];
+    // A standalone `document-suite-metadata` job already produced by this
+    // same request covers the suite, so every `document-file` job in this
+    // batch skips asking the model for the bonus suite summary — asking
+    // twice risks two conflicting writes to the same suite.
+    const requestSuiteSummary = suiteJob === null;
 
     for (const [filePath, targets] of files) {
       chunk(targets, MAX_EXTRACTED_CASES).forEach((chunkTargets, index) => {
@@ -453,6 +458,7 @@ export class ExtractionService {
             filePath,
             targets: chunkTargets,
             locale,
+            requestSuiteSummary,
           },
           opts: {
             jobId: buildJobId('document-file', [projectId, filePath, index]),

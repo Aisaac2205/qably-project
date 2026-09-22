@@ -1348,6 +1348,7 @@ describe('ExtractionService.enqueueDocumentFiles suite metadata job', () => {
     ];
     expect(jobs).toHaveLength(2);
     expect(jobs[0].data.kind).toBe('document-file');
+    expect(jobs[0].data.requestSuiteSummary).toBe(false);
     expect(jobs[1]).toMatchObject({
       data: {
         kind: 'document-suite-metadata',
@@ -1378,8 +1379,11 @@ describe('ExtractionService.enqueueDocumentFiles suite metadata job', () => {
     expect(result).toMatchObject({ ok: true });
     if (!result.ok) return;
     expect(result.value.suiteQueued).toBeUndefined();
-    const [jobs] = queue.addBulk.mock.calls[0] as [unknown[]];
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
     expect(jobs).toHaveLength(1);
+    expect(jobs[0].data.requestSuiteSummary).toBe(true);
     expect(prisma.suite.update).not.toHaveBeenCalled();
   });
 
