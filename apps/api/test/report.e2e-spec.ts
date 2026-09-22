@@ -64,4 +64,27 @@ describe('Report (e2e)', () => {
   it('is reachable without any authentication', async () => {
     await request(app.getHttpServer()).get('/report.mjs').expect(200);
   });
+
+  it('returns 304 for If-None-Match: *, sending only cache-related headers', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/report.mjs')
+      .set('If-None-Match', '*')
+      .expect(304);
+
+    expect(response.headers['etag']).toBeDefined();
+    expect(response.headers['content-type']).toBeUndefined();
+    expect(response.headers['x-qably-report-version']).toBeUndefined();
+  });
+
+  it('returns 304 for a weak validator matching the current ETag', async () => {
+    const first = await request(app.getHttpServer())
+      .get('/report.mjs')
+      .expect(200);
+    const etag = first.headers['etag'];
+
+    await request(app.getHttpServer())
+      .get('/report.mjs')
+      .set('If-None-Match', `W/${etag}`)
+      .expect(304);
+  });
 });

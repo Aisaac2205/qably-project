@@ -49,6 +49,9 @@ jobs:
       - name: Build
         run: pnpm --filter @qably/api run build
 
+      - name: Verify the reporter asset ships in dist, byte-for-byte
+        run: diff apps/api/dist/src/reporter/qably-report.mjs apps/api/src/reporter/qably-report.mjs
+
       - name: Unit tests
         env:
           JEST_JUNIT_OUTPUT_DIR: ./reports

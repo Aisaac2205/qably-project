@@ -3,6 +3,12 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { ReportController } from './report.controller';
 
+jest.mock('node:fs/promises', () => {
+  const actual =
+    jest.requireActual<typeof import('node:fs/promises')>('node:fs/promises');
+  return { ...actual, readFile: jest.fn(actual.readFile) };
+});
+
 function buildResponse() {
   const headers: Record<string, string> = {};
   const response = {
@@ -93,12 +99,117 @@ describe('ReportController', () => {
     ).toHaveBeenCalled();
   });
 
-  it('throws if serve() is called before onModuleInit() has loaded the asset', () => {
+  it('returns 304 with only cache-related headers, never Content-Type or the version/sha headers', async () => {
+    const controller = new ReportController();
+    await controller.onModuleInit();
+    const first = buildResponse();
+    controller.serve({ headers: {} } as never, first.response);
+    const etag = first.headers['ETag'];
+
+    const second = buildResponse();
+    controller.serve(
+      { headers: { 'if-none-match': etag } } as never,
+      second.response,
+    );
+
+    expect(second.headers['ETag']).toBe(etag);
+    expect(second.headers['Cache-Control']).toBeDefined();
+    expect(second.headers['Content-Type']).toBeUndefined();
+    expect(second.headers['X-Qably-Report-Version']).toBeUndefined();
+    expect(second.headers['X-Qably-Report-Sha256']).toBeUndefined();
+  });
+
+  it('returns 304 when If-None-Match is a weak validator for the current ETag', async () => {
+    const controller = new ReportController();
+    await controller.onModuleInit();
+    const first = buildResponse();
+    controller.serve({ headers: {} } as never, first.response);
+    const etag = first.headers['ETag'];
+
+    const second = buildResponse();
+    controller.serve(
+      { headers: { 'if-none-match': `W/${etag}` } } as never,
+      second.response,
+    );
+
+    expect(
+      (second.response as unknown as { status: jest.Mock }).status,
+    ).toHaveBeenCalledWith(304);
+  });
+
+  it('returns 304 when If-None-Match is a comma-separated list containing the current ETag', async () => {
+    const controller = new ReportController();
+    await controller.onModuleInit();
+    const first = buildResponse();
+    controller.serve({ headers: {} } as never, first.response);
+    const etag = first.headers['ETag'];
+
+    const second = buildResponse();
+    controller.serve(
+      {
+        headers: { 'if-none-match': `"stale-1", ${etag}, "stale-2"` },
+      } as never,
+      second.response,
+    );
+
+    expect(
+      (second.response as unknown as { status: jest.Mock }).status,
+    ).toHaveBeenCalledWith(304);
+  });
+
+  it('returns 304 when If-None-Match is *', async () => {
+    const controller = new ReportController();
+    await controller.onModuleInit();
+    const { response } = buildResponse();
+
+    controller.serve({ headers: { 'if-none-match': '*' } } as never, response);
+
+    expect(
+      (response as unknown as { status: jest.Mock }).status,
+    ).toHaveBeenCalledWith(304);
+  });
+
+  it('returns 200 when If-None-Match is a comma-separated list that does not contain the current ETag', async () => {
+    const controller = new ReportController();
+    await controller.onModuleInit();
+    const { response } = buildResponse();
+
+    controller.serve(
+      { headers: { 'if-none-match': '"stale-1", "stale-2"' } } as never,
+      response,
+    );
+
+    expect(
+      (response as unknown as { status: jest.Mock }).status,
+    ).toHaveBeenCalledWith(200);
+  });
+
+  it('answers 503 without crashing when serve() is called before the asset has loaded', () => {
     const controller = new ReportController();
     const { response } = buildResponse();
 
     expect(() =>
       controller.serve({ headers: {} } as never, response),
-    ).toThrow();
+    ).not.toThrow();
+
+    expect(
+      (response as unknown as { status: jest.Mock }).status,
+    ).toHaveBeenCalledWith(503);
+  });
+
+  it('does not crash onModuleInit and degrades to 503 on this route when the asset fails to load', async () => {
+    const readFileMock = readFile as jest.MockedFunction<typeof readFile>;
+    readFileMock.mockRejectedValueOnce(new Error('ENOENT: no such file'));
+
+    const controller = new ReportController();
+
+    await expect(controller.onModuleInit()).resolves.toBeUndefined();
+
+    const { response } = buildResponse();
+    controller.serve({ headers: {} } as never, response);
+
+    expect(
+      (response as unknown as { status: jest.Mock }).status,
+    ).toHaveBeenCalledWith(503);
   });
 });
