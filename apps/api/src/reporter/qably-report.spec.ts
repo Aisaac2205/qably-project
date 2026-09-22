@@ -54,6 +54,47 @@ describe('findTopLevelTestsuiteBlocks', () => {
     expect(result.blocks[0]).toContain('nested');
     expect(result.blocks[1]).toBe('<testsuite name="b"/>');
   });
+
+  it('does not let a fake </testsuite> inside a CDATA section corrupt the block boundaries', () => {
+    const xml =
+      '<testsuites>' +
+      '<testsuite name="a"><testcase name="a1"><system-out><![CDATA[fake </testsuite> marker]]></system-out></testcase></testsuite>' +
+      '<testsuite name="b"><testcase name="b1"/></testsuite>' +
+      '</testsuites>';
+
+    const [result] = callPure<[{ blocks: string[] }]>([
+      { fn: 'findTopLevelTestsuiteBlocks', args: [xml] },
+    ]);
+
+    expect(result.blocks).toHaveLength(2);
+    expect(result.blocks[0]).toContain('fake </testsuite> marker');
+    expect(result.blocks[0]).toContain('name="a1"');
+    expect(result.blocks[0].endsWith('</testsuite>')).toBe(true);
+    expect(result.blocks[1]).toBe(
+      '<testsuite name="b"><testcase name="b1"/></testsuite>',
+    );
+  });
+
+  it('does not let a fake <testsuite> tag inside an XML comment corrupt the block boundaries', () => {
+    const xml =
+      '<testsuites>' +
+      '<testsuite name="a"><testcase name="a1"/></testsuite>' +
+      '<!-- <testsuite name="fake"><testcase name="x"/></testsuite> -->' +
+      '<testsuite name="b"><testcase name="b1"/></testsuite>' +
+      '</testsuites>';
+
+    const [result] = callPure<[{ blocks: string[] }]>([
+      { fn: 'findTopLevelTestsuiteBlocks', args: [xml] },
+    ]);
+
+    expect(result.blocks).toHaveLength(2);
+    expect(result.blocks[0]).toBe(
+      '<testsuite name="a"><testcase name="a1"/></testsuite>',
+    );
+    expect(result.blocks[1]).toBe(
+      '<testsuite name="b"><testcase name="b1"/></testsuite>',
+    );
+  });
 });
 
 describe('buildSplitRequests', () => {
@@ -151,6 +192,27 @@ describe('buildSplitRequests', () => {
   });
 });
 
+describe('countTopLevelGroups', () => {
+  it('returns 1 for a bare <testsuite> root', () => {
+    const [count] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [smallReport] },
+    ]);
+    expect(count).toBe(1);
+  });
+
+  it('counts the top-level <testsuite> children of a <testsuites> root', () => {
+    const xml =
+      '<testsuites><testsuite name="a"><testcase name="a1"/></testsuite>' +
+      '<testsuite name="b"><testcase name="b1"/></testsuite>' +
+      '<testsuite name="c"><testcase name="c1"/></testsuite></testsuites>';
+
+    const [count] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+    expect(count).toBe(3);
+  });
+});
+
 describe('buildRequestExternalId', () => {
   it('leaves the externalId unchanged when there is only one request', () => {
     const [id] = callPure<[string]>([
@@ -204,6 +266,42 @@ describe('deriveWorkspacePrefix and repoRelativeFilePaths', () => {
   });
 });
 
+describe('evaluateBaseUrlSecurity', () => {
+  it('treats an https origin as secure', () => {
+    const [result] = callPure<[{ secure: boolean }]>([
+      { fn: 'evaluateBaseUrlSecurity', args: ['https://api.qably.dev'] },
+    ]);
+    expect(result.secure).toBe(true);
+  });
+
+  it.each([
+    'http://localhost:3001',
+    'http://127.0.0.1:3001',
+    'http://[::1]:3001',
+  ])('treats %s as secure even over plain http', (baseUrl) => {
+    const [result] = callPure<[{ secure: boolean }]>([
+      { fn: 'evaluateBaseUrlSecurity', args: [baseUrl] },
+    ]);
+    expect(result.secure).toBe(true);
+  });
+
+  it('flags a non-https, non-local origin as insecure with a reason', () => {
+    const [result] = callPure<[{ secure: boolean; reason?: string }]>([
+      { fn: 'evaluateBaseUrlSecurity', args: ['http://qably.dev'] },
+    ]);
+    expect(result.secure).toBe(false);
+    expect(result.reason).toEqual(expect.stringContaining('qably.dev'));
+  });
+
+  it('flags an unparsable base url as insecure with a reason', () => {
+    const [result] = callPure<[{ secure: boolean; reason?: string }]>([
+      { fn: 'evaluateBaseUrlSecurity', args: ['not a url'] },
+    ]);
+    expect(result.secure).toBe(false);
+    expect(result.reason).toBeDefined();
+  });
+});
+
 describe('buildIngestUrl', () => {
   it('includes only defined params and omits empty ones', () => {
     const [href] = callPure<[string]>([
@@ -238,35 +336,91 @@ describe('resolveInputPaths', () => {
     writeFileSync(join(dir, 'reports', 'a.xml'), smallReport);
     writeFileSync(join(dir, 'reports', 'b.xml'), smallReport);
     writeFileSync(join(dir, 'reports', 'ignore.txt'), 'not xml');
+    mkdirSync(join(dir, 'reports', 'unit'));
+    writeFileSync(join(dir, 'reports', 'unit', 'junit.xml'), smallReport);
+    mkdirSync(join(dir, 'reports', 'unit', 'nested'));
+    writeFileSync(
+      join(dir, 'reports', 'unit', 'nested', 'deep.xml'),
+      smallReport,
+    );
+    mkdirSync(join(dir, 'empty-reports'));
   });
 
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('lists every *.xml file directly inside a directory argument', () => {
-    const [files] = callPure<[string[]]>([
+  it('lists every *.xml file directly inside a directory argument, recursing into subdirectories', () => {
+    const [result] = callPure<[{ files: string[]; emptyArgs: string[] }]>([
       { fn: 'resolveInputPaths', args: [[join(dir, 'reports')], dir] },
     ]);
-    expect(files.sort()).toEqual(
-      [join(dir, 'reports', 'a.xml'), join(dir, 'reports', 'b.xml')].sort(),
+    expect(result.files.sort()).toEqual(
+      [
+        join(dir, 'reports', 'a.xml'),
+        join(dir, 'reports', 'b.xml'),
+        join(dir, 'reports', 'unit', 'junit.xml'),
+        join(dir, 'reports', 'unit', 'nested', 'deep.xml'),
+      ].sort(),
     );
+    expect(result.emptyArgs).toEqual([]);
+  });
+
+  it('returns the same file list on repeated calls, sorted deterministically', () => {
+    const [first] = callPure<[{ files: string[] }]>([
+      { fn: 'resolveInputPaths', args: [[join(dir, 'reports')], dir] },
+    ]);
+    const [second] = callPure<[{ files: string[] }]>([
+      { fn: 'resolveInputPaths', args: [[join(dir, 'reports')], dir] },
+    ]);
+    expect(first.files).toEqual(second.files);
   });
 
   it('expands a glob pattern to matching files', () => {
     const pattern = join(dir, 'reports', '*.xml').replace(/\\/g, '/');
-    const [files] = callPure<[string[]]>([
+    const [result] = callPure<[{ files: string[]; emptyArgs: string[] }]>([
       { fn: 'resolveInputPaths', args: [[pattern], dir] },
     ]);
-    expect(files).toHaveLength(2);
+    expect(result.files).toHaveLength(2);
+    expect(result.emptyArgs).toEqual([]);
   });
 
   it('passes through a literal path even when the file does not exist, for the caller to warn on', () => {
     const missing = join(dir, 'reports', 'missing.xml');
-    const [files] = callPure<[string[]]>([
+    const [result] = callPure<[{ files: string[]; emptyArgs: string[] }]>([
       { fn: 'resolveInputPaths', args: [[missing], dir] },
     ]);
-    expect(files).toEqual([missing]);
+    expect(result.files).toEqual([missing]);
+    expect(result.emptyArgs).toEqual([]);
+  });
+
+  it('reports an argument that resolves to zero files as an empty argument, without dropping matches from other arguments', () => {
+    const [result] = callPure<[{ files: string[]; emptyArgs: string[] }]>([
+      {
+        fn: 'resolveInputPaths',
+        args: [[join(dir, 'reports'), join(dir, 'empty-reports')], dir],
+      },
+    ]);
+    expect(result.files.sort()).toEqual(
+      [
+        join(dir, 'reports', 'a.xml'),
+        join(dir, 'reports', 'b.xml'),
+        join(dir, 'reports', 'unit', 'junit.xml'),
+        join(dir, 'reports', 'unit', 'nested', 'deep.xml'),
+      ].sort(),
+    );
+    expect(result.emptyArgs).toEqual([join(dir, 'empty-reports')]);
+  });
+
+  it('reports a glob that matches nothing as an empty argument', () => {
+    const pattern = join(dir, 'reports', '*.does-not-exist').replace(
+      /\\/g,
+      '/',
+    );
+    const [result] = callPure<[{ files: string[]; emptyArgs: string[] }]>([
+      { fn: 'resolveInputPaths', args: [[pattern], dir] },
+    ]);
+    expect(result.files).toEqual([]);
+    expect(result.emptyArgs).toEqual([pattern]);
   });
 });
 
@@ -305,6 +459,21 @@ function createScriptedServer(
         url: `http://127.0.0.1:${port}`,
         calls: () => callCount,
       });
+    });
+  });
+}
+
+function createHangingServer(): Promise<{ server: Server; url: string }> {
+  const server = createServer((req: IncomingMessage) => {
+    req.on('data', () => {});
+  });
+
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port =
+        typeof address === 'object' && address !== null ? address.port : 0;
+      resolve({ server, url: `http://127.0.0.1:${port}` });
     });
   });
 }
@@ -449,6 +618,24 @@ describe('CLI end-to-end against a fake ingest server', () => {
     }
   }, 30_000);
 
+  it('treats a hanging response as a retryable network error via the fetch timeout, and eventually gives up', async () => {
+    const { server, url } = await createHangingServer();
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      const result = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+        QABLY_REPORT_TIMEOUT_MS: '100',
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('[warning]');
+    } finally {
+      server.close();
+    }
+  }, 20_000);
+
   it('never fails the job on a network error and reports it as a warning', async () => {
     const filePath = writeReport(dir, 'report.xml', smallReport);
     const result = await runCli([filePath], {
@@ -459,6 +646,18 @@ describe('CLI end-to-end against a fake ingest server', () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain('[warning]');
   }, 30_000);
+
+  it('refuses to send the api key over an insecure, non-local QABLY_API_BASE_URL when QABLY_FAIL_ON_ERROR=true', async () => {
+    const filePath = writeReport(dir, 'report.xml', smallReport);
+    const result = await runCli([filePath], {
+      QABLY_API_KEY: 'key',
+      QABLY_API_BASE_URL: 'http://example.invalid',
+      QABLY_FAIL_ON_ERROR: 'true',
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toContain('[error]');
+  }, 10_000);
 
   it('warns and exits 0 when QABLY_API_KEY is missing, without calling the server', async () => {
     const { server, url, calls } = await createScriptedServer(() => ({
@@ -519,6 +718,72 @@ describe('CLI end-to-end against a fake ingest server', () => {
     }
   });
 
+  it('warns about an argument that matched zero files while still reporting the ones that did match', async () => {
+    const { server, url, calls } = await createScriptedServer(() => ({
+      status: 202,
+      body: { accepted: 1, runs: [] },
+    }));
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      mkdirSync(join(dir, 'empty-dir'));
+      const result = await runCli([filePath, join(dir, 'empty-dir')], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+      });
+
+      expect(calls()).toBe(1);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain('[warning]');
+      expect(result.stdout).toContain('matched no report files');
+    } finally {
+      server.close();
+    }
+  });
+
+  it('fails the job for an argument that matched zero files when QABLY_FAIL_ON_ERROR=true', async () => {
+    const { server, url } = await createScriptedServer(() => ({
+      status: 202,
+      body: { accepted: 1, runs: [] },
+    }));
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      mkdirSync(join(dir, 'empty-dir-2'));
+      const result = await runCli([filePath, join(dir, 'empty-dir-2')], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+        QABLY_FAIL_ON_ERROR: 'true',
+      });
+
+      expect(result.exitCode).toBe(1);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('recurses into a nested reports directory and reports every xml file found, including subdirectories', async () => {
+    const { server, url, calls } = await createScriptedServer(() => ({
+      status: 202,
+      body: { accepted: 1, runs: [] },
+    }));
+
+    try {
+      mkdirSync(join(dir, 'reports', 'unit'), { recursive: true });
+      writeReport(dir, 'reports/a.xml', smallReport);
+      writeReport(dir, 'reports/unit/junit.xml', smallReport);
+      const result = await runCli([join(dir, 'reports')], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+      });
+
+      expect(calls()).toBe(2);
+      expect(result.exitCode).toBe(0);
+    } finally {
+      server.close();
+    }
+  });
+
   it('resolves a glob argument and reports every matched file', async () => {
     const { server, url, calls } = await createScriptedServer(() => ({
       status: 202,
@@ -567,6 +832,35 @@ describe('CLI end-to-end against a fake ingest server', () => {
       expect(new Set(externalIds).size).toBe(2);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('splitting into 2 requests');
+    } finally {
+      server.close();
+    }
+  }, 15_000);
+
+  it('carries the same total reportSize on every chunk of a split report, so the server can aggregate one notification for the whole file', async () => {
+    const reportSizes: string[] = [];
+    const { server, url, calls } = await createScriptedServer((_, req) => {
+      const requestUrl = new URL(req.url ?? '', 'http://localhost');
+      reportSizes.push(requestUrl.searchParams.get('reportSize') ?? '');
+      return { status: 202, body: { accepted: 1, runs: [] } };
+    });
+
+    try {
+      const suites = Array.from({ length: 501 }, (_, i) => i)
+        .map(
+          (i) => `<testsuite name="s${i}"><testcase name="c${i}"/></testsuite>`,
+        )
+        .join('');
+      const oversized = `<testsuites>${suites}</testsuites>`;
+      const filePath = writeReport(dir, 'oversized.xml', oversized);
+      const result = await runCli([filePath], {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+      });
+
+      expect(calls()).toBe(2);
+      expect(reportSizes).toEqual(['501', '501']);
+      expect(result.exitCode).toBe(0);
     } finally {
       server.close();
     }

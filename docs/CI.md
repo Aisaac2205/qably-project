@@ -13,10 +13,14 @@ build and test.
 1. `pnpm --filter @qably/api run type-check` — `tsc --noEmit`.
 2. `pnpm --filter @qably/api run lint` — eslint.
 3. `pnpm --filter @qably/api run build` — `nest build`.
-4. `pnpm --filter @qably/api run test` — unit tests (jest, `src/**/*.spec.ts`).
-5. `pnpm --filter @qably/api run test:e2e` — e2e tests (jest, `test/**/*.e2e-spec.ts`).
-6. Report unit and e2e results to Qably (see below), regardless of whether the tests passed.
-7. Upload the JUnit XML files as a workflow artifact.
+4. `diff apps/api/dist/src/reporter/qably-report.mjs apps/api/src/reporter/qably-report.mjs` — fails
+   the job if the built reporter asset (served at `GET /report.mjs`, see below) is missing or stale,
+   instead of letting a broken `nest-cli.json` asset copy ship silently and only surface as a 503 in
+   production.
+5. `pnpm --filter @qably/api run test` — unit tests (jest, `src/**/*.spec.ts`).
+6. `pnpm --filter @qably/api run test:e2e` — e2e tests (jest, `test/**/*.e2e-spec.ts`).
+7. Report unit and e2e results to Qably (see below), regardless of whether the tests passed.
+8. Upload the JUnit XML files as a workflow artifact.
 
 The `api` job needs no database, no Redis and no other external service. Every e2e spec
 overrides `PrismaService` with `jest.fn()` mocks via `Test.createTestingModule().overrideProvider`,
@@ -148,6 +152,14 @@ retries, splitting and annotations against a fake server before this step ever r
 `apps/api/test/report.e2e-spec.ts`, which asserts it serves the exact same bytes as the checked-out
 source file plus a matching `X-Qably-Report-Sha256`.
 
+If the asset fails to load at boot (`ReportController.onModuleInit`, `apps/api/src/reporter/report.controller.ts`)
+— a missing file, a bad deploy — the whole API no longer fails to start over it: the failure is
+logged and `GET /report.mjs` answers `503` on just that route until it is fixed. `If-None-Match` is
+handled per RFC 9110: a comma-separated list of validators, the `*` wildcard, and weak (`W/"..."`)
+validators are all honoured, and a `304` response carries only the cache-related headers
+(`Cache-Control`, `ETag`), never `Content-Type` or the version/sha headers that only make sense on a
+body.
+
 The script reads `QABLY_API_KEY` (a GitHub Actions **secret**) from the environment. **If it is
 unset, the script logs a message and exits 0 without doing anything.** This is deliberate: the
 Qably API is not deployed yet — `https://api.qably.dev` resolves through Cloudflare to Railway but
@@ -161,6 +173,25 @@ The API origin defaults to `https://api.qably.dev` (`DEFAULT_API_BASE_URL` in th
 supplies a key and nothing else — the tool knows its own address, the same way Codecov or Sentry
 do. The project-scoped API key already identifies the organization and project, so the origin
 carries no information the key does not.
+
+An overridden `QABLY_API_BASE_URL` that is neither `https:` nor `localhost`/`127.0.0.1`/`::1` is
+treated as an untrusted origin for the secret: the script logs a `::warning::` (`evaluateBaseUrlSecurity`
+in `qably-report.mjs`) and still sends the report, unless `QABLY_FAIL_ON_ERROR=true`, in which case it
+refuses to send `QABLY_API_KEY` at all and exits `1` before making any request. This only matters for a
+deliberately misconfigured or unusual override — the default and `http://localhost:*` both pass silently.
+
+### Report paths can be files, directories or globs
+
+Every argument that is not a flag is resolved independently (`resolveInputPaths` in
+`qably-report.mjs`): a literal file path is used as-is (even if it does not exist yet, so the caller
+can warn on the read failure), a glob (`reports/*.xml`) expands to its matches, and a directory is
+walked **recursively** for every `*.xml` file it contains, up to 5 levels deep, with symlink loops
+guarded against by resolving and deduplicating on `realpath`. An argument that resolves to zero
+files — an empty directory, a glob that matches nothing — is annotated with its own `::warning::`
+("matched no report files") rather than silently vanishing from the report; a workflow using
+`QABLY_FAIL_ON_ERROR=true` fails on that condition like any other reporting failure, and one
+argument matching nothing never drops files matched by the *other* arguments in the same
+invocation.
 
 ### The response is `202`, not `200` — reporting is asynchronous
 
@@ -192,6 +223,12 @@ reporter retries with exponential backoff instead of dropping the file, up to 4 
 `429` honours the `Retry-After` header the throttler sends (in seconds) when present. A file is
 only reported as failed, via a `::warning::` annotation, once every retry is exhausted; a non-429
 `4xx` (a genuinely bad request) is never retried.
+
+Each attempt is bounded by a request timeout (`AbortSignal.timeout`), 60 seconds by default and
+overridable with `QABLY_REPORT_TIMEOUT_MS`. A hung connection — the API accepting the socket but
+never responding — is treated exactly like a network error: it counts as one of the 4 attempts and
+is retried with the same backoff, instead of leaving the CI job blocked indefinitely on a single
+stuck request.
 
 Because one request already carries a whole file — the server splits it into runs internally, not
 the script — this budget is now sized against **the number of report files a workflow generates**

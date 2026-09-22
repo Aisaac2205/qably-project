@@ -1,10 +1,10 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const REPORT_VERSION = '9.0.0';
+export const REPORT_VERSION = '9.1.0';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 const MAX_TESTCASES_PER_REQUEST = 10_000;
@@ -14,6 +14,16 @@ const RETRY_BASE_MS = 300;
 const RETRY_MAX_MS = 5_000;
 const RETRY_JITTER_MS = 100;
 const DEFAULT_THROTTLE_WAIT_SECONDS = 3;
+const MAX_DIRECTORY_DEPTH = 5;
+const DEFAULT_FETCH_TIMEOUT_MS = 60_000;
+
+function resolveFetchTimeoutMs(env) {
+  const raw = env.QABLY_REPORT_TIMEOUT_MS;
+  if (raw === undefined) return DEFAULT_FETCH_TIMEOUT_MS;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FETCH_TIMEOUT_MS;
+}
 
 function slugify(value) {
   const slug = value
@@ -59,14 +69,22 @@ export function countTestcases(xml) {
   return matches === null ? 0 : matches.length;
 }
 
+function maskCdataAndComments(xml) {
+  return xml
+    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, (match) => ' '.repeat(match.length))
+    .replace(/<!--[\s\S]*?-->/g, (match) => ' '.repeat(match.length));
+}
+
 export function findTopLevelTestsuiteBlocks(xml) {
-  const rootOpen = /<testsuites\b[^>]*>/i.exec(xml);
+  const masked = maskCdataAndComments(xml);
+  const rootOpen = /<testsuites\b[^>]*>/i.exec(masked);
   if (rootOpen === null) return null;
 
   const bodyStart = rootOpen.index + rootOpen[0].length;
-  const rootClose = /<\/testsuites\s*>/i.exec(xml.slice(bodyStart));
+  const rootClose = /<\/testsuites\s*>/i.exec(masked.slice(bodyStart));
   const bodyEnd = rootClose === null ? xml.length : bodyStart + rootClose.index;
   const body = xml.slice(bodyStart, bodyEnd);
+  const maskedBody = masked.slice(bodyStart, bodyEnd);
 
   const tagPattern = /<testsuite\b[^>]*?(\/)?>|<\/testsuite\s*>/gi;
   const blocks = [];
@@ -74,7 +92,7 @@ export function findTopLevelTestsuiteBlocks(xml) {
   let blockStart = -1;
   let match;
 
-  while ((match = tagPattern.exec(body)) !== null) {
+  while ((match = tagPattern.exec(maskedBody)) !== null) {
     const isClose = match[0].startsWith('</');
     const isSelfClosing = !isClose && match[1] === '/';
 
@@ -89,7 +107,7 @@ export function findTopLevelTestsuiteBlocks(xml) {
 
     if (depth === 0) {
       if (isSelfClosing) {
-        blocks.push(match[0]);
+        blocks.push(body.slice(match.index, match.index + match[0].length));
       } else {
         blockStart = match.index;
         depth += 1;
@@ -104,6 +122,11 @@ export function findTopLevelTestsuiteBlocks(xml) {
     suffix: xml.slice(bodyEnd),
     blocks,
   };
+}
+
+export function countTopLevelGroups(xml) {
+  const structure = findTopLevelTestsuiteBlocks(xml);
+  return structure === null ? 1 : Math.max(structure.blocks.length, 1);
 }
 
 function packTestsuiteBlocks(blocks, caps) {
@@ -157,6 +180,27 @@ export function buildSplitRequests(xml, caps = {}) {
 export function buildRequestExternalId(baseExternalId, index, total, singleGroup) {
   if (total <= 1 || !singleGroup) return baseExternalId;
   return `${baseExternalId}-p${index + 1}`;
+}
+
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+export function evaluateBaseUrlSecurity(baseUrl) {
+  let parsed;
+
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    return { secure: false, reason: `QABLY_API_BASE_URL is not a valid URL: ${baseUrl}` };
+  }
+
+  if (parsed.protocol === 'https:' || LOCAL_HOSTNAMES.has(parsed.hostname)) {
+    return { secure: true };
+  }
+
+  return {
+    secure: false,
+    reason: `QABLY_API_BASE_URL (${baseUrl}) is not https and is not localhost/127.0.0.1/::1; sending the API key there is not trusted.`,
+  };
 }
 
 function isGlobPattern(value) {
@@ -237,39 +281,82 @@ async function expandGlob(pattern, cwd) {
   return results.sort();
 }
 
-export async function resolveInputPaths(args, cwd = process.cwd()) {
-  const resolved = [];
+async function collectXmlFilesRecursive(dirPath, depth, visitedRealPaths) {
+  if (depth > MAX_DIRECTORY_DEPTH) return [];
 
-  for (const arg of args) {
-    if (isGlobPattern(arg)) {
-      resolved.push(...(await expandGlob(arg, cwd)));
-      continue;
-    }
+  let realDirPath;
 
-    const fullPath = isAbsolute(arg) ? arg : join(cwd, arg);
-    let stats;
-
-    try {
-      stats = await stat(fullPath);
-    } catch {
-      resolved.push(fullPath);
-      continue;
-    }
-
-    if (stats.isDirectory()) {
-      const entries = await readdir(fullPath, { withFileTypes: true });
-      const xmlFiles = entries
-        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.xml'))
-        .map((entry) => join(fullPath, entry.name))
-        .sort();
-      resolved.push(...xmlFiles);
-      continue;
-    }
-
-    resolved.push(fullPath);
+  try {
+    realDirPath = await realpath(dirPath);
+  } catch {
+    return [];
   }
 
-  return [...new Set(resolved)];
+  if (visitedRealPaths.has(realDirPath)) return [];
+  visitedRealPaths.add(realDirPath);
+
+  let entries;
+
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const files = [];
+
+  for (const entry of entries) {
+    const entryPath = join(dirPath, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(
+        ...(await collectXmlFilesRecursive(entryPath, depth + 1, visitedRealPaths)),
+      );
+    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.xml')) {
+      files.push(entryPath);
+    }
+  }
+
+  return files;
+}
+
+async function resolveOneArg(arg, cwd) {
+  if (isGlobPattern(arg)) {
+    return await expandGlob(arg, cwd);
+  }
+
+  const fullPath = isAbsolute(arg) ? arg : join(cwd, arg);
+  let stats;
+
+  try {
+    stats = await stat(fullPath);
+  } catch {
+    return [fullPath];
+  }
+
+  if (stats.isDirectory()) {
+    const files = await collectXmlFilesRecursive(fullPath, 1, new Set());
+    return files.sort();
+  }
+
+  return [fullPath];
+}
+
+export async function resolveInputPaths(args, cwd = process.cwd()) {
+  const files = [];
+  const emptyArgs = [];
+
+  for (const arg of args) {
+    const matched = await resolveOneArg(arg, cwd);
+
+    if (matched.length === 0) {
+      emptyArgs.push(arg);
+    } else {
+      files.push(...matched);
+    }
+  }
+
+  return { files: [...new Set(files)], emptyArgs };
 }
 
 export function buildFileExternalId(filePath, context) {
@@ -361,8 +448,10 @@ export async function postJunitChunk({
   fetchImpl = fetch,
   sleepImpl = sleep,
   maxAttempts = MAX_ATTEMPTS,
+  env = process.env,
 }) {
   let lastOutcome = { ok: false, retryable: true, reason: 'no attempts made' };
+  const timeoutMs = resolveFetchTimeoutMs(env);
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     let response;
@@ -375,6 +464,7 @@ export async function postJunitChunk({
           'Content-Type': 'application/xml',
         },
         body: xml,
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (error) {
       lastOutcome = {
@@ -465,7 +555,29 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     return { exitCode: failOnError ? 1 : 0, runs: 0, cases: 0 };
   }
 
-  const files = await resolveInputPaths(args);
+  const baseUrlSecurity = evaluateBaseUrlSecurity(baseUrl);
+
+  if (!baseUrlSecurity.secure) {
+    if (failOnError) {
+      annotate(
+        'error',
+        'Qably report',
+        `${baseUrlSecurity.reason} Refusing to send QABLY_API_KEY because QABLY_FAIL_ON_ERROR=true.`,
+        env,
+      );
+      return { exitCode: 1, runs: 0, cases: 0 };
+    }
+
+    annotate('warning', 'Qably report', baseUrlSecurity.reason, env);
+  }
+
+  const { files, emptyArgs } = await resolveInputPaths(args);
+  let hadFailure = false;
+
+  for (const arg of emptyArgs) {
+    annotate('warning', 'Qably report', `${arg} matched no report files.`, env);
+    hadFailure = true;
+  }
 
   if (files.length === 0) {
     annotate('warning', 'Qably report', 'no report files matched the given paths.', env);
@@ -475,7 +587,6 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const context = buildContext(env);
   let totalRuns = 0;
   let totalCases = 0;
-  let hadFailure = false;
 
   for (const filePath of files) {
     let xml;
@@ -497,6 +608,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     const body = repoRelativeFilePaths(xml, prefix);
     const baseExternalId = buildFileExternalId(filePath, context);
     const requests = buildSplitRequests(body);
+    const totalGroups = countTopLevelGroups(body);
 
     if (requests.length > 1) {
       annotate(
@@ -527,9 +639,15 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         commitSha: context.commit.commitSha,
         commitMessage: context.commit.commitMessage,
         commitAuthor: context.commit.commitAuthor,
+        reportSize: String(totalGroups),
       });
 
-      const outcome = await postJunitChunk({ url, apiKey, xml: request.xml });
+      const outcome = await postJunitChunk({
+        url,
+        apiKey,
+        xml: request.xml,
+        env,
+      });
 
       if (!outcome.ok) {
         annotate('warning', 'Qably report failed', `${label}: ${outcome.reason}`, env);
