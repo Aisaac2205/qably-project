@@ -117,7 +117,19 @@ function createPrisma(): FakePrisma {
       findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     testCase: {
-      findMany: jest.fn().mockResolvedValue([{ name: 'Accepts a valid card' }]),
+      findMany: jest.fn().mockImplementation((args: { where: unknown }) => {
+        const where = args.where as { id?: unknown };
+        if (where.id !== undefined) {
+          return Promise.resolve([
+            {
+              id: 'case-1',
+              name: 'Rejects an expired card',
+              suite: { name: 'Checkout' },
+            },
+          ]);
+        }
+        return Promise.resolve([{ name: 'Accepts a valid card' }]);
+      }),
     },
     run: {
       findMany: jest
@@ -683,5 +695,112 @@ describe('ChatService', () => {
 
     expect(prisma.extractedProposal.findMany).not.toHaveBeenCalled();
     expect(prisma.evidence.create).not.toHaveBeenCalled();
+  });
+
+  describe('attached cases', () => {
+    it('rejects a case id that does not belong to the project', async () => {
+      const prisma = createPrisma();
+      prisma.testCase.findMany.mockImplementation(
+        (args: { where: { id?: unknown } }) =>
+          args.where.id !== undefined
+            ? Promise.resolve([])
+            : Promise.resolve([{ name: 'Accepts a valid card' }]),
+      );
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        { content: 'Improve this case', caseIds: ['case-outside-project'] },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'case-not-found' });
+      expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('persists the attached case ids on the user message', async () => {
+      const prisma = createPrisma();
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [],
+        usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      });
+      const service = build(prisma, assistant);
+
+      await service.sendMessage(org, user, 'project-1', 'thread-1', {
+        content: 'Improve this case',
+        caseIds: ['case-1'],
+      });
+
+      expect(prisma.chatMessage.create).toHaveBeenNthCalledWith(
+        1,
+        containing({
+          data: containing({
+            role: 'user',
+            attachedCaseIds: ['case-1'],
+          }),
+        }),
+      );
+    });
+
+    it('stores an empty attachedCaseIds array when no case is attached', async () => {
+      const prisma = createPrisma();
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      await service.sendMessage(org, user, 'project-1', 'thread-1', {
+        content: 'Hello',
+      });
+
+      expect(prisma.chatMessage.create).toHaveBeenCalledWith(
+        containing({ data: containing({ attachedCaseIds: [] }) }),
+      );
+    });
+
+    it('exposes attachedCases with id, name and suiteName on the message read model', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findMany.mockResolvedValue([
+        { ...userRow, attachedCaseIds: ['case-1'] },
+        assistantRow,
+      ]);
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.getThread(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        value: containing({
+          messages: [
+            containing({
+              id: 'message-1',
+              attachedCases: [
+                {
+                  id: 'case-1',
+                  name: 'Rejects an expired card',
+                  suiteName: 'Checkout',
+                },
+              ],
+            }),
+            containing({ id: 'message-2', attachedCases: [] }),
+          ],
+        }),
+      });
+    });
   });
 });

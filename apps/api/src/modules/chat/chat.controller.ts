@@ -61,7 +61,8 @@ function unwrap<T>(result: Result<T, ChatError>): T {
     case 'case-not-found':
       throw new NotFoundException({
         code: result.error,
-        message: 'The assistant did not suggest a case at that position',
+        message:
+          'The requested case was not found in this project, or the assistant did not suggest one at that position',
       });
     case 'missing-suite':
       throw new UnprocessableEntityException({

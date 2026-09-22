@@ -801,6 +801,13 @@ export interface SuggestedCaseRecord {
   steps: string[]
   expectedResult: string
   priority: CasePriority
+  targetTestCaseId?: string
+}
+
+export interface AttachedCaseRecord {
+  id: string
+  name: string
+  suiteName: string
 }
 
 export interface ChatThreadRecord {
@@ -817,6 +824,7 @@ export interface ChatMessageRecord {
   role: ChatRole
   content: string
   suggestedCases: SuggestedCaseRecord[]
+  attachedCases?: AttachedCaseRecord[]
   createdAt: string
   sentProposalIds?: Record<number, string>
 }

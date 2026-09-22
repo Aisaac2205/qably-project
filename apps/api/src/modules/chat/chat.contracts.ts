@@ -20,6 +20,12 @@ export type SuggestedCase = z.infer<typeof suggestedCaseSchema>;
 
 export type ChatRole = 'user' | 'assistant';
 
+export interface AttachedCaseView {
+  id: string;
+  name: string;
+  suiteName: string;
+}
+
 export interface ChatThreadView {
   id: string;
   projectId: string;
@@ -34,6 +40,7 @@ export interface ChatMessageView {
   role: ChatRole;
   content: string;
   suggestedCases: SuggestedCase[];
+  attachedCases: AttachedCaseView[];
   createdAt: string;
   sentProposalIds?: Record<number, string>;
 }

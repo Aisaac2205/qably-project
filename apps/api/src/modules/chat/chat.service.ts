@@ -13,6 +13,7 @@ import {
   MAX_EXCERPT_LENGTH,
   MAX_HISTORY_MESSAGES,
   suggestedCasesSchema,
+  type AttachedCaseView,
   type ChatError,
   type ChatMessageView,
   type ChatRole,
@@ -48,7 +49,14 @@ interface MessageRow {
   role: ChatRole;
   content: string;
   suggestedCases: unknown;
+  attachedCaseIds?: string[];
   createdAt: Date;
+}
+
+interface AttachedCaseRow {
+  id: string;
+  name: string;
+  suite: { name: string };
 }
 
 type TxClient = Parameters<Parameters<PrismaService['$transaction']>[0]>[0];
@@ -80,6 +88,7 @@ function toThreadView(row: ThreadRow): ChatThreadView {
 function toMessageView(
   row: MessageRow,
   sentProposalIds?: Record<number, string>,
+  attachedCasesById?: ReadonlyMap<string, AttachedCaseView>,
 ): ChatMessageView {
   const read = readSuggestedCases(row.suggestedCases);
 
@@ -87,12 +96,18 @@ function toMessageView(
     logger.warn(`Corrupt suggestedCases JSON on chat message ${row.id}`);
   }
 
+  const attachedCases = (row.attachedCaseIds ?? []).flatMap((id) => {
+    const attachedCase = attachedCasesById?.get(id);
+    return attachedCase === undefined ? [] : [attachedCase];
+  });
+
   return {
     id: row.id,
     threadId: row.threadId,
     role: row.role,
     content: row.content,
     suggestedCases: read.kind === 'ok' ? read.cases : [],
+    attachedCases,
     createdAt: row.createdAt.toISOString(),
     ...(sentProposalIds !== undefined ? { sentProposalIds } : {}),
   };
@@ -183,18 +198,26 @@ export class ChatService {
     const thread = await this.findThread(org, user, projectId, threadId);
     if (thread === null) return err('thread-not-found');
 
-    const [messages, sentProposalIdsByMessage] = await Promise.all([
-      this.prisma.chatMessage.findMany({
-        where: { threadId },
-        orderBy: { createdAt: 'asc' },
-      }),
+    const messages = await this.prisma.chatMessage.findMany({
+      where: { threadId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const [sentProposalIdsByMessage, attachedCasesById] = await Promise.all([
       this.loadSentProposalIds(projectId, threadId),
+      this.loadAttachedCases(
+        messages.flatMap((row) => row.attachedCaseIds ?? []),
+      ),
     ]);
 
     return ok({
       ...toThreadView(thread),
       messages: messages.map((row) =>
-        toMessageView(row, sentProposalIdsByMessage.get(row.id)),
+        toMessageView(
+          row,
+          sentProposalIdsByMessage.get(row.id),
+          attachedCasesById,
+        ),
       ),
     });
   }
@@ -223,6 +246,12 @@ export class ChatService {
     const thread = await this.findThread(org, user, projectId, threadId);
     if (thread === null) return err('thread-not-found');
 
+    const caseIds = input.caseIds ?? [];
+    if (caseIds.length > 0) {
+      const attachedRows = await this.findCasesInProject(projectId, caseIds);
+      if (attachedRows.length !== caseIds.length) return err('case-not-found');
+    }
+
     const history = await this.prisma.chatMessage.findMany({
       where: { threadId },
       orderBy: { createdAt: 'desc' },
@@ -233,7 +262,12 @@ export class ChatService {
     );
 
     await this.prisma.chatMessage.create({
-      data: { threadId, role: 'user', content: input.content },
+      data: {
+        threadId,
+        role: 'user',
+        content: input.content,
+        attachedCaseIds: caseIds,
+      },
     });
 
     const [context, locale] = await Promise.all([
@@ -391,6 +425,35 @@ export class ChatService {
       map.set(parsed.messageId, existing);
     }
     return map;
+  }
+
+  private async findCasesInProject(
+    projectId: string,
+    caseIds: readonly string[],
+  ): Promise<AttachedCaseRow[]> {
+    return this.prisma.testCase.findMany({
+      where: { id: { in: [...caseIds] }, projectId },
+      select: { id: true, name: true, suite: { select: { name: true } } },
+    });
+  }
+
+  private async loadAttachedCases(
+    caseIds: readonly string[],
+  ): Promise<Map<string, AttachedCaseView>> {
+    const uniqueIds = [...new Set(caseIds)];
+    if (uniqueIds.length === 0) return new Map();
+
+    const rows = (await this.prisma.testCase.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, name: true, suite: { select: { name: true } } },
+    })) as AttachedCaseRow[];
+
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        { id: row.id, name: row.name, suiteName: row.suite.name },
+      ]),
+    );
   }
 
   private findProject(
