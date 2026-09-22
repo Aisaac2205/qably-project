@@ -119,6 +119,7 @@ export const ingestJunitQuerySchema = z.object({
   commitSha: commitSha.optional(),
   commitMessage: commitMessage.optional(),
   commitAuthor: commitAuthor.optional(),
+  reportSize: z.coerce.number().int().positive().optional(),
 });
 
 export type IngestJunitQuery = z.infer<typeof ingestJunitQuerySchema>;

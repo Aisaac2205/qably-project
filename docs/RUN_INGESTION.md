@@ -282,6 +282,7 @@ Content-Type: application/xml
 | `suiteId` / `suiteName` | no | Pins the report to one existing (or adopted) suite and turns off the per-suite split — see below. Passing `suiteId` skips suite-name derivation from the XML entirely. |
 | `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
 | `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
+| `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: raised to at least this request's own group count if under-reported, and capped at 100,000 if absurdly large. It is never trusted blindly. |
 
 ### Response — `202 Accepted`, asynchronous
 
@@ -378,6 +379,14 @@ does not do that:
   distinct externalIds).
 - **A report grouping into more than 500 distinct suite keys is rejected** rather than creating an
   unbounded number of runs from one request.
+- **The report-batch notification counts the whole original report, not just one request's groups.**
+  A file the reporter has split into several `POST /runs/ingest/junit` chunks (see
+  `apps/api/src/reporter/qably-report.mjs` below) still owes exactly one aggregated notification for
+  the whole file, once every suite across every chunk has reported in. The batch size Redis tracks
+  (`ReportBatchService`, `report-batch.lua.ts`) is `reportSize` from the query when present — the
+  reporter sends the same total suite-group count on every chunk of a split file — and falls back to
+  `groups.length` (this request's own count) when absent, which is exactly right for an unsplit file
+  where one request already is the whole report.
 
 **Exception — pinning `suiteId` or `suiteName` turns the split off.** An explicit `suiteId` or
 `suiteName` is the caller stating "everything in this report belongs to this one suite" — that intent
@@ -461,18 +470,25 @@ parsing logic of its own; per-suite splitting and case identity all happen serve
 described above. The one exception is sizing: the reporter does the minimal parsing needed to
 count testcases and top-level `<testsuite>` elements, and if a file would exceed this endpoint's
 own caps (10,000 testcases or 500 groups, see above) it splits that one file into multiple requests
-along `<testsuite>` boundaries before sending, never inside a suite. In the common case, one file
-becomes one `POST /runs/ingest/junit` call, which in turn becomes one enqueued job per `<testsuite>`
-in that file. `suiteName` is left unset so the server derives and splits by it; the reporter only
-supplies `externalId` (built from the job, the run and the file path — see `docs/CI.md`; the server
-then re-derives a per-suite `externalId` from this base when the file holds more than one suite),
-`source`, and the commit metadata already read from `$GITHUB_SHA` and `git log` — there is no
-`name` parameter, the server derives each run's name from the suite it actually parsed. On success
-the reporter reads `accepted` and the `runs` array's `externalId`s from the `202` JSON response to
-log how many jobs were queued and for which runs — it does not (and cannot) know whether ingestion
-itself has finished by the time it logs. The `429`/`5xx`/network retry-with-backoff and
-`::warning`/`::notice` annotation behavior is unchanged in spirit; reporting failures never fail the
-CI job unless `QABLY_FAIL_ON_ERROR=true` is set (see `docs/CI.md`).
+along `<testsuite>` boundaries before sending, never inside a suite. Every chunk of a split file
+carries the same `reportSize` query parameter — the total top-level `<testsuite>` count of the
+*whole* original file, computed once before splitting (`countTopLevelGroups` in
+`qably-report.mjs`) — so the server can aggregate one notification for the whole report instead of
+one per chunk (see above). In the common case, one file becomes one `POST /runs/ingest/junit` call,
+which in turn becomes one enqueued job per `<testsuite>` in that file. `suiteName` is left unset so
+the server derives and splits by it; the reporter only supplies `externalId` (built from the job,
+the run and the file path — see `docs/CI.md`; the server then re-derives a per-suite `externalId`
+from this base when the file holds more than one suite), `source`, and the commit metadata already
+read from `$GITHUB_SHA` and `git log` — there is no `name` parameter, the server derives each run's
+name from the suite it actually parsed. On success the reporter reads `accepted` and the `runs`
+array's `externalId`s from the `202` JSON response to log how many jobs were queued and for which
+runs — it does not (and cannot) know whether ingestion itself has finished by the time it logs. The
+`429`/`5xx`/network retry-with-backoff and `::warning`/`::notice` annotation behavior is unchanged
+in spirit; reporting failures never fail the CI job unless `QABLY_FAIL_ON_ERROR=true` is set (see
+`docs/CI.md`). Each outbound attempt is also bounded by a request timeout (`AbortSignal.timeout`,
+60s by default, overridable with `QABLY_REPORT_TIMEOUT_MS`) — a hanging server is treated as a
+retryable network error exactly like a connection failure, instead of blocking the CI job
+indefinitely.
 
 ## SCM ingestion queue retry policy
 

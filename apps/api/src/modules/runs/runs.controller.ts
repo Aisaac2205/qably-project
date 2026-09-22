@@ -70,6 +70,19 @@ function unwrap<T>(result: Result<T, RunError>): T {
   }
 }
 
+const MAX_REPORT_SIZE = 100_000;
+
+function resolveReportSize(
+  requestedReportSize: number | undefined,
+  groupsInRequest: number,
+): number {
+  if (requestedReportSize === undefined) return groupsInRequest;
+  return Math.min(
+    Math.max(requestedReportSize, groupsInRequest),
+    MAX_REPORT_SIZE,
+  );
+}
+
 function resolveRunName(
   query: IngestJunitQuery,
   group: JunitSuiteGroup,
@@ -154,13 +167,14 @@ export class RunsController {
       : groupBySuite(report, query.externalId);
 
     const bodies = groups.map((group) => validateGroup(query, group));
+    const reportSize = resolveReportSize(query.reportSize, groups.length);
 
     const jobs = bodies.map((body, index) => ({
       name: 'ingest',
       data: {
         apiKey,
         body,
-        reportSize: groups.length,
+        reportSize,
       } satisfies RunIngestJobData,
       opts: {
         jobId: buildJobId('ingest', [

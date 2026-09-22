@@ -332,4 +332,38 @@ describe('ingestJunitQuerySchema', () => {
     expect(result.success && result.data.commitSha).toBe('a41f9c2');
     expect(result.success && result.data.commitAuthor).toBe('ci-bot');
   });
+
+  it('leaves reportSize undefined when omitted', () => {
+    const result = ingestJunitQuerySchema.safeParse({ externalId: 'ci-42' });
+
+    expect(result.success && result.data.reportSize).toBeUndefined();
+  });
+
+  it('coerces a numeric reportSize query string to a number', () => {
+    const result = ingestJunitQuerySchema.safeParse({
+      externalId: 'ci-42',
+      reportSize: '900',
+    });
+
+    expect(result.success && result.data.reportSize).toBe(900);
+  });
+
+  it('rejects a reportSize that is not a positive integer', () => {
+    expect(
+      ingestJunitQuerySchema.safeParse({ externalId: 'ci-42', reportSize: '0' })
+        .success,
+    ).toBe(false);
+    expect(
+      ingestJunitQuerySchema.safeParse({
+        externalId: 'ci-42',
+        reportSize: '1.5',
+      }).success,
+    ).toBe(false);
+    expect(
+      ingestJunitQuerySchema.safeParse({
+        externalId: 'ci-42',
+        reportSize: 'not-a-number',
+      }).success,
+    ).toBe(false);
+  });
 });

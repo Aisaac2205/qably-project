@@ -353,6 +353,47 @@ describe('RunsController.ingestJunit', () => {
     expect(job.data.reportSize).toBe(1);
   });
 
+  it('uses the query reportSize across every chunk when it covers the report and is at least this request group count', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ reportSize: '900' }),
+      multiSuiteReport,
+    );
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs.map((job) => job.data.reportSize)).toEqual([900, 900, 900]);
+  });
+
+  it('raises an under-reported reportSize up to this request own group count instead of trusting it blindly', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ reportSize: '1' }),
+      multiSuiteReport,
+    );
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs.map((job) => job.data.reportSize)).toEqual([3, 3, 3]);
+  });
+
+  it('caps an absurd reportSize to a sane maximum', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ reportSize: '999999999' }),
+      multiSuiteReport,
+    );
+
+    const jobs = jobBodies(runIngestQueue);
+    for (const job of jobs) {
+      expect(job.data.reportSize).toBeLessThanOrEqual(100_000);
+    }
+  });
+
   it('produces the same deterministic jobId for the same project, source and externalId', async () => {
     const { controller, runIngestQueue } = build();
 
