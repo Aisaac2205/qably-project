@@ -1,7 +1,8 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { resolveLocale } from '@qably/i18n';
+import { resolveLocale, type Locale } from '@qably/i18n';
+import { assessSuiteDocumentation } from '@qably/types';
 import { MAX_EXTRACTED_CASES } from '../ai/extraction.contracts';
 import {
   classifyDocumentableCase,
@@ -293,6 +294,13 @@ export class ExtractionService {
       this.prisma,
       org.organizationId,
     );
+    const locale =
+      actorLocale === null ? orgDefaultLocale : resolveLocale(actorLocale);
+
+    const suiteJob =
+      'suiteId' in scope
+        ? await this.buildSuiteMetadataJob(scope.suiteId, locale)
+        : null;
 
     const rows = (await this.prisma.testCase.findMany({
       where: {
@@ -317,7 +325,12 @@ export class ExtractionService {
     })) as DocumentFileCandidate[];
 
     if (rows.length === 0) {
-      return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] });
+      return ok(
+        await this.finalizeDocumentFiles(
+          { filesEnqueued: 0, casesTargeted: 0, casesSkipped: [] },
+          suiteJob,
+        ),
+      );
     }
 
     const connection = await this.prisma.project.findUnique({
@@ -407,11 +420,13 @@ export class ExtractionService {
     await this.persistSkippedOutcomes(skippedIds);
 
     if (groupedByFile.size === 0) {
-      return ok({ filesEnqueued: 0, casesTargeted: 0, casesSkipped });
+      return ok(
+        await this.finalizeDocumentFiles(
+          { filesEnqueued: 0, casesTargeted: 0, casesSkipped },
+          suiteJob,
+        ),
+      );
     }
-
-    const locale =
-      actorLocale === null ? orgDefaultLocale : resolveLocale(actorLocale);
 
     const projectId = rows[0].projectId;
     const files = [...groupedByFile.entries()].slice(
@@ -447,11 +462,18 @@ export class ExtractionService {
     }
 
     await this.persistDocumentationQueued(queuedCaseIds);
+    if (suiteJob !== null) {
+      await this.persistSuiteDocumentationQueued(suiteJob.suiteId);
+      jobs.push(suiteJob.job);
+    }
 
     try {
       await this.queue.addBulk(jobs);
     } catch (error) {
       await this.clearDocumentationQueued(queuedCaseIds);
+      if (suiteJob !== null) {
+        await this.clearSuiteDocumentationQueued(suiteJob.suiteId);
+      }
       throw error;
     }
 
@@ -459,7 +481,79 @@ export class ExtractionService {
       filesEnqueued: files.length,
       casesTargeted,
       casesSkipped,
+      ...(suiteJob !== null ? { suiteQueued: true } : {}),
     });
+  }
+
+  private async buildSuiteMetadataJob(
+    suiteId: string,
+    locale: Locale,
+  ): Promise<{
+    suiteId: string;
+    job: { name: string; data: ExtractionJobData; opts: { jobId: string } };
+  } | null> {
+    const suite = await this.prisma.suite.findFirst({
+      where: { id: suiteId },
+      select: { projectId: true, name: true, description: true, tags: true },
+    });
+
+    if (suite === null) return null;
+
+    const assessment = assessSuiteDocumentation({
+      name: suite.name,
+      description: suite.description,
+      tags: suite.tags,
+    });
+
+    if (assessment.complete) return null;
+
+    return {
+      suiteId,
+      job: {
+        name: 'document-suite-metadata',
+        data: { kind: 'document-suite-metadata', suiteId, locale },
+        opts: {
+          jobId: buildJobId('document-suite', [suite.projectId, suiteId]),
+        },
+      },
+    };
+  }
+
+  private async persistSuiteDocumentationQueued(
+    suiteId: string,
+  ): Promise<void> {
+    await this.prisma.suite.update({
+      where: { id: suiteId },
+      data: { documentationQueuedAt: new Date() },
+    });
+  }
+
+  private async clearSuiteDocumentationQueued(suiteId: string): Promise<void> {
+    await this.prisma.suite.update({
+      where: { id: suiteId },
+      data: { documentationQueuedAt: null },
+    });
+  }
+
+  private async finalizeDocumentFiles(
+    base: DocumentFilesResult,
+    suiteJob: {
+      suiteId: string;
+      job: { name: string; data: ExtractionJobData; opts: { jobId: string } };
+    } | null,
+  ): Promise<DocumentFilesResult> {
+    if (suiteJob === null) return base;
+
+    await this.persistSuiteDocumentationQueued(suiteJob.suiteId);
+
+    try {
+      await this.queue.addBulk([suiteJob.job]);
+    } catch (error) {
+      await this.clearSuiteDocumentationQueued(suiteJob.suiteId);
+      throw error;
+    }
+
+    return { ...base, suiteQueued: true };
   }
 
   private async scopeExists(

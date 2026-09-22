@@ -38,7 +38,7 @@ interface FakePrisma {
   };
   extractedProposal: { findFirst: jest.Mock; findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
-  suite: { findFirst: jest.Mock };
+  suite: { findFirst: jest.Mock; update: jest.Mock };
   project: { findFirst: jest.Mock; findUnique: jest.Mock };
 }
 
@@ -79,7 +79,14 @@ function createPrisma(ownerLocale: string | null = null): FakePrisma {
         ),
     },
     suite: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'suite-1',
+        projectId: 'proj-1',
+        name: 'Checkout',
+        description: 'Handles the checkout flow',
+        tags: ['checkout'],
+      }),
+      update: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     project: {
       findFirst: jest.fn().mockResolvedValue({ id: 'proj-1' }),
@@ -1295,6 +1302,151 @@ describe('ExtractionService.enqueueDocumentFiles incomplete mode', () => {
         casesTargeted: 0,
         casesSkipped: [{ reason: 'no-automation-key', count: 1 }],
       },
+    });
+  });
+});
+
+describe('ExtractionService.enqueueDocumentFiles suite metadata job', () => {
+  function candidate(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'case-1',
+      projectId: 'proj-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: 'src/cart.spec.ts',
+      steps: [],
+      currentVersion: null,
+      ...overrides,
+    };
+  }
+
+  function incompleteSuite(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'suite-1',
+      projectId: 'proj-1',
+      name: 'Checkout',
+      description: '',
+      tags: [],
+      ...overrides,
+    };
+  }
+
+  it('adds a suite-metadata job after the file jobs when the suite documentation is incomplete', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.suite.findFirst.mockResolvedValue(incompleteSuite());
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true, value: { suiteQueued: true } });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown>; opts: Record<string, unknown> }[],
+    ];
+    expect(jobs).toHaveLength(2);
+    expect(jobs[0].data.kind).toBe('document-file');
+    expect(jobs[1]).toMatchObject({
+      data: {
+        kind: 'document-suite-metadata',
+        suiteId: 'suite-1',
+        locale: 'en',
+      },
+      opts: {
+        jobId: buildJobId('document-suite', ['proj-1', 'suite-1']),
+      },
+    });
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: { documentationQueuedAt: expect.any(Date) as Date },
+    });
+  });
+
+  it('never adds a suite-metadata job when the suite documentation is already complete', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.value.suiteQueued).toBeUndefined();
+    const [jobs] = queue.addBulk.mock.calls[0] as [unknown[]];
+    expect(jobs).toHaveLength(1);
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it('adds the suite-metadata job alone when there are no case targets', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.suite.findFirst.mockResolvedValue(incompleteSuite());
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        filesEnqueued: 0,
+        casesTargeted: 0,
+        casesSkipped: [],
+        suiteQueued: true,
+      },
+    });
+    const [jobs] = queue.addBulk.mock.calls[0] as [
+      { data: Record<string, unknown> }[],
+    ];
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].data.kind).toBe('document-suite-metadata');
+  });
+
+  it('never adds a suite-metadata job for a project-scoped request', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { projectId: 'proj-1' },
+      null,
+    );
+
+    expect(result).toMatchObject({ ok: true });
+    if (!result.ok) return;
+    expect(result.value.suiteQueued).toBeUndefined();
+    expect(prisma.suite.findFirst).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+  });
+
+  it("clears the suite's queued timestamp if the bulk enqueue fails", async () => {
+    const queue = createQueue();
+    queue.addBulk.mockRejectedValue(new Error('queue down'));
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.suite.findFirst.mockResolvedValue(incompleteSuite());
+
+    await expect(
+      build(prisma, queue).enqueueDocumentFiles(
+        org,
+        { suiteId: 'suite-1' },
+        null,
+      ),
+    ).rejects.toThrow('queue down');
+
+    expect(prisma.suite.update).toHaveBeenLastCalledWith({
+      where: { id: 'suite-1' },
+      data: { documentationQueuedAt: null },
     });
   });
 });

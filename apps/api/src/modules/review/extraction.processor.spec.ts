@@ -32,7 +32,7 @@ interface FakePrisma {
     updateMany: jest.Mock;
   };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
-  suite: { findFirst: jest.Mock; update: jest.Mock };
+  suite: { findFirst: jest.Mock; update: jest.Mock; updateMany: jest.Mock };
   evidence: { create: jest.Mock; update: jest.Mock };
   extractedProposal: {
     findFirst: jest.Mock;
@@ -87,6 +87,7 @@ function createPrisma(): FakePrisma {
         .mockResolvedValueOnce({ id: 'suite-by-name' })
         .mockResolvedValue({ id: 'suite-by-name' }),
       update: jest.fn().mockResolvedValue({ id: 'suite-1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     evidence: {
       create: jest.fn().mockResolvedValue({ id: 'evidence-new' }),
@@ -120,8 +121,15 @@ function fakeSourceReader(
   return { read } as unknown as SourceReader;
 }
 
-function fakeExtractor(extract: jest.Mock): TestCaseExtractor {
-  return { extract };
+function fakeExtractor(
+  extract: jest.Mock,
+  summarizeSuite: jest.Mock = jest.fn().mockResolvedValue({
+    kind: 'provider-unavailable',
+    reason: 'not-configured',
+    retryable: false,
+  }),
+): TestCaseExtractor {
+  return { extract, summarizeSuite };
 }
 
 function fakeEncryption(decrypt: jest.Mock = jest.fn()): EncryptionService {
@@ -2431,6 +2439,374 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
     expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
       needsManualReview: true,
       locale: 'en',
+    });
+  });
+});
+
+describe('ExtractionProcessor — document-suite-metadata job', () => {
+  function suiteMetadataJob(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        kind: 'document-suite-metadata',
+        suiteId: 'suite-1',
+        locale: 'en',
+      },
+      attemptsStarted: 1,
+      opts: { attempts: 3 },
+      ...overrides,
+    } as never;
+  }
+
+  function suiteRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'suite-1',
+      organizationId: 'org-1',
+      name: 'checkout_flow',
+      description: '',
+      tags: [] as string[],
+      nameSource: 'ingestion',
+      cases: [
+        { name: 'Adds an item', objective: 'Verify the cart accepts an item' },
+      ],
+      ...overrides,
+    };
+  }
+
+  function summarizedOutcome(overrides: Record<string, unknown> = {}) {
+    return {
+      kind: 'summarized' as const,
+      suite: {
+        title: 'Checkout',
+        description: 'Covers the checkout flow',
+        tags: ['checkout'],
+      },
+      usage: { promptTokens: 1, candidatesTokens: 1, totalTokens: 2 },
+      ...overrides,
+    };
+  }
+
+  it('asks the summarizer with the suite name and its active/draft case titles and objectives', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    const summarizeSuite = jest.fn().mockResolvedValue(summarizedOutcome());
+    const extractor = fakeExtractor(jest.fn(), summarizeSuite);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(summarizeSuite).toHaveBeenCalledWith({
+      suiteName: 'checkout_flow',
+      cases: [
+        { title: 'Adds an item', objective: 'Verify the cart accepts an item' },
+      ],
+      locale: 'en',
+    });
+  });
+
+  it('writes the summarized name, description and tags, stamping nameSource to aeris', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { name: 'checkout_flow', nameSource: 'ingestion', tags: [] },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        name: 'Checkout',
+        nameSource: 'aeris',
+        description: 'Covers the checkout flow',
+        tags: ['checkout'],
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
+      },
+    });
+  });
+
+  it('never overwrites a human-chosen name, but still writes description and tags', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst
+      .mockReset()
+      .mockResolvedValue(suiteRow({ nameSource: 'human', description: '' }));
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { name: 'Checkout (human name)', nameSource: 'human', tags: [] },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(prisma.suite.update).toHaveBeenCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        description: 'Covers the checkout flow',
+        tags: ['checkout'],
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
+      },
+    });
+  });
+
+  it('merges a human-added tag with the newly proposed tags instead of dropping it', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { name: 'checkout_flow', nameSource: 'ingestion', tags: ['urgent'] },
+    ]);
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(lastCall(prisma.suite.update).data?.tags).toEqual([
+      'urgent',
+      'checkout',
+    ]);
+  });
+
+  it('skips entirely, with a human-documented outcome, when the name is human-chosen and the suite is already fully documented', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(
+      suiteRow({
+        nameSource: 'human',
+        description: 'Covers the checkout flow',
+        tags: ['checkout'],
+      }),
+    );
+    const summarizeSuite = jest.fn();
+    const extractor = fakeExtractor(jest.fn(), summarizeSuite);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(summarizeSuite).not.toHaveBeenCalled();
+    expect(prisma.suite.updateMany).toHaveBeenCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
+      data: {
+        documentationOutcome: 'skipped',
+        documentationSkipReason: 'human-documented',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('still calls the summarizer when the name is human-chosen but the description is still missing', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst
+      .mockReset()
+      .mockResolvedValue(
+        suiteRow({ nameSource: 'human', description: '', tags: ['checkout'] }),
+      );
+    const summarizeSuite = jest.fn().mockResolvedValue(summarizedOutcome());
+    const extractor = fakeExtractor(jest.fn(), summarizeSuite);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(summarizeSuite).toHaveBeenCalled();
+  });
+
+  it('does nothing when the suite no longer exists', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(null);
+    const summarizeSuite = jest.fn();
+    const extractor = fakeExtractor(jest.fn(), summarizeSuite);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    expect(summarizeSuite).not.toHaveBeenCalled();
+    expect(prisma.suite.update).not.toHaveBeenCalled();
+    expect(prisma.suite.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('writes a failed outcome without calling the summarizer when the organization is not entitled', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    const summarizeSuite = jest.fn();
+    const entitlement = fakeEntitlement(jest.fn().mockResolvedValue(false));
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(jest.fn(), summarizeSuite),
+      fakeEncryption(),
+      entitlement,
+    ).process(suiteMetadataJob());
+
+    expect(summarizeSuite).not.toHaveBeenCalled();
+    expect(prisma.suite.updateMany).toHaveBeenCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
+      data: {
+        documentationOutcome: 'failed',
+        documentationSkipReason: 'ai-not-enabled',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('writes a failed outcome without calling the summarizer when the daily budget is spent', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    const summarizeSuite = jest.fn();
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(jest.fn(), summarizeSuite),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(jest.fn().mockResolvedValue(false)),
+    ).process(suiteMetadataJob());
+
+    expect(summarizeSuite).not.toHaveBeenCalled();
+    expect(prisma.suite.updateMany).toHaveBeenCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
+      data: {
+        documentationOutcome: 'failed',
+        documentationSkipReason: 'quota-exhausted',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('propagates a retryable provider failure for BullMQ to retry, instead of writing failed immediately', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      }),
+    );
+
+    await expect(
+      build(prisma, fakeSourceReader(), extractor).process(
+        suiteMetadataJob({ attemptsStarted: 1, opts: { attempts: 3 } }),
+      ),
+    ).rejects.toThrow();
+
+    expect(prisma.suite.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('writes a failed outcome with the reason on the final attempt even when the failure is retryable', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      }),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob({ attemptsStarted: 3, opts: { attempts: 3 } }),
+    );
+
+    expect(prisma.suite.updateMany).toHaveBeenCalledWith({
+      where: { id: 'suite-1', documentationQueuedAt: { not: null } },
+      data: {
+        documentationOutcome: 'failed',
+        documentationSkipReason: 'provider-overloaded',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it('spends exactly one credit for a successful summary', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const entitlement = fakeEntitlement(
+      jest.fn().mockResolvedValue(true),
+      spendCredit,
+    );
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      extractor,
+      fakeEncryption(),
+      entitlement,
+    ).process(suiteMetadataJob());
+
+    expect(spendCredit).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles a unique suite-name collision by keeping the previous name but still writing description and tags', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockReset().mockResolvedValue(suiteRow());
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { name: 'checkout_flow', nameSource: 'ingestion', tags: [] },
+    ]);
+    prisma.suite.update.mockRejectedValueOnce({ code: 'P2002' });
+    const extractor = fakeExtractor(
+      jest.fn(),
+      jest.fn().mockResolvedValue(summarizedOutcome()),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      suiteMetadataJob(),
+    );
+
+    const savepointCalls = prisma.$executeRawUnsafe.mock.calls.map(
+      ([sql]: [string]) => sql,
+    );
+    expect(savepointCalls).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('SAVEPOINT'),
+        expect.stringContaining('ROLLBACK TO SAVEPOINT'),
+      ]),
+    );
+    expect(prisma.suite.update).toHaveBeenLastCalledWith({
+      where: { id: 'suite-1' },
+      data: {
+        description: 'Covers the checkout flow',
+        tags: ['checkout'],
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
+      },
     });
   });
 });

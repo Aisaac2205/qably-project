@@ -87,7 +87,14 @@ function buildSuitesService() {
 function buildExtractionService() {
   const prisma = {
     suite: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'suite-1',
+        projectId: 'project-1',
+        name: 'Checkout',
+        description: 'Handles the checkout flow',
+        tags: ['checkout'],
+      }),
+      update: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     project: {
       findFirst: jest.fn(),

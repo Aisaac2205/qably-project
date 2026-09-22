@@ -1,12 +1,20 @@
 import { ApiError } from '@google/genai';
 import type { Env } from '../../config/env';
-import type { ExtractionInput } from './extraction.contracts';
+import type {
+  ExtractionInput,
+  SuiteSummaryInput,
+} from './extraction.contracts';
 import {
   FILE_CONTENT_CLOSE,
   FILE_CONTENT_OPEN,
   buildSystemInstruction,
 } from './extraction-prompt';
-import { GeminiExtractor, type GeminiClient } from './gemini.extractor';
+import { buildSuiteSummaryInstruction } from './suite-summary-prompt';
+import {
+  GeminiExtractor,
+  SUITE_SUMMARY_RESPONSE_JSON_SCHEMA,
+  type GeminiClient,
+} from './gemini.extractor';
 
 function env(overrides: Partial<Env> = {}): Env {
   return { GEMINI_MODEL: 'gemini-2.5-flash-lite', ...overrides } as Env;
@@ -375,5 +383,196 @@ describe('GeminiExtractor suite summary and observations', () => {
     expect(outcome.kind).toBe('extracted');
     if (outcome.kind !== 'extracted') return;
     expect(outcome.suite).toBeNull();
+  });
+});
+
+function suiteSummaryInput(overrides: Partial<SuiteSummaryInput> = {}) {
+  return {
+    suiteName: 'Checkout',
+    cases: [
+      { title: 'Adds an item', objective: 'Verify the cart accepts an item' },
+    ],
+    locale: 'en' as const,
+    ...overrides,
+  };
+}
+
+describe('GeminiExtractor.summarizeSuite', () => {
+  it('returns a summarized outcome with usage when the model returns a valid suite', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          title: 'Checkout',
+          description: 'Covers the checkout flow',
+          tags: ['payments'],
+        }),
+        usageMetadata: {
+          promptTokenCount: 40,
+          candidatesTokenCount: 20,
+          totalTokenCount: 60,
+        },
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+      suiteSummaryInput(),
+    );
+
+    expect(outcome).toEqual({
+      kind: 'summarized',
+      suite: {
+        title: 'Checkout',
+        description: 'Covers the checkout flow',
+        tags: ['payments'],
+      },
+      usage: { promptTokens: 40, candidatesTokens: 20, totalTokens: 60 },
+    });
+  });
+
+  it('sends the configured model, locale system instruction and generation config', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({
+        text: JSON.stringify({
+          title: 'Checkout',
+          description: 'Covers the checkout flow',
+          tags: ['payments'],
+        }),
+      });
+    });
+
+    await new GeminiExtractor(
+      client,
+      env({ GEMINI_MODEL: 'gemini-x' }),
+    ).summarizeSuite(suiteSummaryInput({ locale: 'es' }));
+
+    expect(received.model).toBe('gemini-x');
+    const config = received.config as Record<string, unknown>;
+    expect(config.responseMimeType).toBe('application/json');
+    expect(config.systemInstruction).toBe(buildSuiteSummaryInstruction('es'));
+  });
+
+  it('never puts a length limit or a nested item-count bound in the Gemini schema', () => {
+    const json = JSON.stringify(SUITE_SUMMARY_RESPONSE_JSON_SCHEMA);
+
+    expect(json).not.toContain('maxLength');
+    expect(json).not.toContain('minItems');
+    expect(json).not.toContain('maxItems');
+  });
+
+  it('requires title, description and tags in the Gemini schema', () => {
+    expect(SUITE_SUMMARY_RESPONSE_JSON_SCHEMA.required).toEqual([
+      'title',
+      'description',
+      'tags',
+    ]);
+  });
+
+  it('drops a response whose tags array is empty, since a suite summary needs at least one tag', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          title: 'Checkout',
+          description: 'Covers the checkout flow',
+          tags: [],
+        }),
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+      suiteSummaryInput(),
+    );
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'schema-violation',
+      retryable: false,
+    });
+  });
+
+  it('drops a response missing a required field', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({ title: 'Checkout', tags: ['payments'] }),
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+      suiteSummaryInput(),
+    );
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'schema-violation',
+      retryable: false,
+    });
+  });
+
+  it('returns provider-unavailable without retrying when the API key is invalid', async () => {
+    const client = fakeClient(() => {
+      throw new ApiError({ message: 'invalid key', status: 401 });
+    });
+
+    const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+      suiteSummaryInput(),
+    );
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'invalid-credentials',
+      retryable: false,
+    });
+  });
+
+  it('returns provider-unavailable, retryable, and rate-limited when Gemini answers 429', async () => {
+    const client = fakeClient(() => {
+      throw new ApiError({ message: 'Too many requests', status: 429 });
+    });
+
+    const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+      suiteSummaryInput(),
+    );
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'rate-limited',
+      retryable: true,
+    });
+  });
+
+  it.each([500, 502, 503, 504])(
+    'returns provider-unavailable, retryable, and provider-overloaded when Gemini answers %i',
+    async (status) => {
+      const client = fakeClient(() => {
+        throw new ApiError({ message: 'Service Unavailable', status });
+      });
+
+      const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+        suiteSummaryInput(),
+      );
+
+      expect(outcome).toEqual({
+        kind: 'provider-unavailable',
+        reason: 'provider-overloaded',
+        retryable: true,
+      });
+    },
+  );
+
+  it('never leaks the raw error message as the reason for an unrecognized failure', async () => {
+    const client = fakeClient(() => {
+      throw new Error('network is down');
+    });
+
+    const outcome = await new GeminiExtractor(client, env()).summarizeSuite(
+      suiteSummaryInput(),
+    );
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'unknown-provider-error',
+      retryable: false,
+    });
   });
 });

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const MAX_SOURCE_CONTENT_LENGTH = 60_000;
 export const MAX_EXTRACTED_CASES = 20;
 
-const shortText = (max: number) => z.string().trim().min(1).max(max);
+export const shortText = (max: number) => z.string().trim().min(1).max(max);
 
 const LEADING_ORDINAL = /^\d+[.)]\s*/;
 
@@ -32,6 +32,12 @@ export const extractedSuiteSchema = z.object({
   tags: z.array(shortText(40)).max(20).default([]),
 });
 
+export const suiteSummarySchema = z.object({
+  title: shortText(80),
+  description: shortText(300),
+  tags: z.array(shortText(40)).min(1).max(20),
+});
+
 export const extractionOutputSchema = z.object({
   cases: z.array(extractedCaseSchema).max(MAX_EXTRACTED_CASES),
   suite: extractedSuiteSchema.optional(),
@@ -39,6 +45,7 @@ export const extractionOutputSchema = z.object({
 
 export type ExtractedCase = z.infer<typeof extractedCaseSchema>;
 export type ExtractedSuite = z.infer<typeof extractedSuiteSchema>;
+export type SuiteSummary = z.infer<typeof suiteSummarySchema>;
 
 export type ExtractionLanguage =
   | 'typescript'
@@ -91,9 +98,30 @@ export type ExtractionOutcome =
       retryable: boolean;
     };
 
+export interface SuiteSummaryCaseInput {
+  readonly title: string;
+  readonly objective: string;
+}
+
+export interface SuiteSummaryInput {
+  readonly suiteName: string;
+  readonly cases: readonly SuiteSummaryCaseInput[];
+  readonly locale: 'es' | 'en';
+}
+
+export type SuiteSummaryOutcome =
+  | { kind: 'summarized'; suite: SuiteSummary; usage: TokenUsage }
+  | {
+      kind: 'provider-unavailable';
+      reason: ProviderUnavailableReason;
+      /** Whether a retry (with backoff) is worth attempting, vs. a permanent failure. */
+      retryable: boolean;
+    };
+
 export interface TestCaseExtractor {
   extract(
     input: ExtractionInput,
     signal?: AbortSignal,
   ): Promise<ExtractionOutcome>;
+  summarizeSuite(input: SuiteSummaryInput): Promise<SuiteSummaryOutcome>;
 }

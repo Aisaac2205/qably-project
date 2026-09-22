@@ -42,7 +42,8 @@ export type ExtractionJobData =
       filePath: string;
       targets: DocumentFileTarget[];
       locale: Locale;
-    };
+    }
+  | { kind: 'document-suite-metadata'; suiteId: string; locale: Locale };
 
 export type DocumentCaseError =
   | 'not-found'

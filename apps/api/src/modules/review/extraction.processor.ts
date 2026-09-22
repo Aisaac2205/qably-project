@@ -62,6 +62,9 @@ const AERIS_DOCUMENTATION_SOURCE = 'aeris';
 const HUMAN_NAME_SOURCE = 'human';
 const AERIS_NAME_SOURCE = 'aeris';
 const SUITE_METADATA_SAVEPOINT = 'suite_metadata';
+const SUITE_SUMMARY_SAVEPOINT = 'suite_summary_metadata';
+const SUITE_SUMMARY_MAX_CASES = 60;
+const SUITE_STATES_FOR_SUMMARY = ['active', 'draft'] as const;
 
 interface ConnectionInfo {
   provider: RepoConnectionProvider;
@@ -190,6 +193,29 @@ async function lockSuiteMetadata(
   return { nameSource: row.nameSource, tags: row.tags ?? [] };
 }
 
+interface SuiteSummaryLock {
+  name: string;
+  nameSource: string;
+  tags: string[];
+}
+
+async function lockSuiteForSummary(
+  tx: TxClient,
+  suiteId: string,
+): Promise<SuiteSummaryLock | null> {
+  const rows = await tx.$queryRawUnsafe<
+    { name: string; nameSource: string; tags: string[] | null }[]
+  >(
+    `SELECT name, "nameSource", tags FROM "suite" WHERE id = $1 FOR UPDATE`,
+    suiteId,
+  );
+
+  const row = rows[0];
+  if (row === undefined) return null;
+
+  return { name: row.name, nameSource: row.nameSource, tags: row.tags ?? [] };
+}
+
 /**
  * A human-added tag is never removed: the result keeps every existing tag
  * and appends any Aeris-proposed tag that is not already present. Aeris can
@@ -277,10 +303,17 @@ export class ExtractionProcessor extends WorkerHost {
         isFinalAttempt,
         isFirstAttempt,
       );
-    } else {
+    } else if (job.data.kind === 'document-file') {
       await this.processDocumentFile(
         job.data.filePath,
         job.data.targets,
+        job.data.locale,
+        isFinalAttempt,
+        isFirstAttempt,
+      );
+    } else {
+      await this.processDocumentSuiteMetadata(
+        job.data.suiteId,
         job.data.locale,
         isFinalAttempt,
         isFirstAttempt,
@@ -441,6 +474,209 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     return latest?.commitSha ?? HEAD_REF;
+  }
+
+  private async processDocumentSuiteMetadata(
+    suiteId: string,
+    locale: string | undefined,
+    isFinalAttempt: boolean,
+    isFirstAttempt: boolean,
+  ): Promise<void> {
+    try {
+      await this.processDocumentSuiteMetadataUnsafe(
+        suiteId,
+        locale,
+        isFinalAttempt,
+        isFirstAttempt,
+      );
+    } catch (error) {
+      if (error instanceof RetryableProviderError) throw error;
+      const reason = error instanceof Error ? error.message : 'unknown-error';
+      this.logger.error(
+        `Suite metadata summary for ${suiteId} failed unexpectedly: ${reason}`,
+      );
+      await this.persistSuiteOutcome(
+        suiteId,
+        'failed',
+        EXTRACTION_FAILED_REASON,
+      );
+    }
+  }
+
+  private async processDocumentSuiteMetadataUnsafe(
+    suiteId: string,
+    locale: string | undefined,
+    isFinalAttempt: boolean,
+    isFirstAttempt: boolean,
+  ): Promise<void> {
+    const suite = await this.prisma.suite.findFirst({
+      where: { id: suiteId },
+      select: {
+        id: true,
+        organizationId: true,
+        name: true,
+        description: true,
+        tags: true,
+        nameSource: true,
+        cases: {
+          where: { state: { in: [...SUITE_STATES_FOR_SUMMARY] } },
+          take: SUITE_SUMMARY_MAX_CASES,
+          select: { name: true, objective: true },
+        },
+      },
+    });
+
+    if (suite === null) {
+      this.logger.warn(`Suite ${suiteId} no longer exists`);
+      return;
+    }
+
+    const assessment = assessSuiteDocumentation({
+      name: suite.name,
+      description: suite.description,
+      tags: suite.tags,
+    });
+
+    if (suite.nameSource === HUMAN_NAME_SOURCE && assessment.complete) {
+      await this.persistSuiteOutcome(suiteId, 'skipped', 'human-documented');
+      return;
+    }
+
+    const entitled = await this.entitlement.isEntitled(suite.organizationId);
+    if (!entitled) {
+      await this.persistSuiteOutcome(suiteId, 'failed', NOT_ENTITLED_REASON);
+      return;
+    }
+
+    // See the equivalent guard in runDocumentFileExtractionUnsafe: don't
+    // re-charge the daily budget for a retry of the same logical extraction.
+    const withinBudget = isFirstAttempt
+      ? await this.dailyBudget.tryConsume(NOT_BYOK)
+      : true;
+    if (!withinBudget) {
+      await this.persistSuiteOutcome(suiteId, 'failed', QUOTA_EXHAUSTED_REASON);
+      return;
+    }
+
+    const resolvedLocale = resolveLocale(locale);
+
+    const outcome = await this.extractor.summarizeSuite({
+      suiteName: suite.name,
+      cases: suite.cases.map((testCase) => ({
+        title: testCase.name,
+        objective: testCase.objective,
+      })),
+      locale: resolvedLocale,
+    });
+
+    if (outcome.kind === 'provider-unavailable') {
+      if (outcome.retryable && !isFinalAttempt) {
+        throw new RetryableProviderError(outcome.reason);
+      }
+      await this.persistSuiteOutcome(suiteId, 'failed', outcome.reason);
+      return;
+    }
+
+    const persisted = await this.persistSuiteSummary(
+      suiteId,
+      suite.organizationId,
+      outcome.suite,
+    );
+    if (!persisted) {
+      await this.persistSuiteOutcome(suiteId, 'failed', NOT_ENTITLED_REASON);
+    }
+  }
+
+  private async persistSuiteOutcome(
+    suiteId: string,
+    outcome: 'failed' | 'skipped',
+    reason: string,
+  ): Promise<void> {
+    const state: DocumentationStateWrite = {
+      documentationOutcome: outcome,
+      documentationSkipReason: reason,
+      documentationOutcomeAt: new Date(),
+      documentationQueuedAt: null,
+    };
+
+    await this.prisma.suite.updateMany({
+      where: { id: suiteId, documentationQueuedAt: { not: null } },
+      data: state,
+    });
+  }
+
+  private async persistSuiteSummary(
+    suiteId: string,
+    organizationId: string,
+    summary: { title: string; description: string; tags: string[] },
+  ): Promise<boolean> {
+    return this.prisma.$transaction(async (tx: TxClient) => {
+      const spent = await this.entitlement.spendCredit(organizationId, tx);
+      if (!spent) return false;
+
+      const locked = await lockSuiteForSummary(tx, suiteId);
+      if (locked === null) return true;
+
+      const mergedTags = mergeSuiteTags(locked.tags, summary.tags);
+      const nameChanged = locked.nameSource !== HUMAN_NAME_SOURCE;
+      const nextName = nameChanged ? summary.title : locked.name;
+
+      const assessment = assessSuiteDocumentation({
+        name: nextName,
+        description: summary.description,
+        tags: mergedTags,
+      });
+
+      const documentedState: DocumentationStateWrite = {
+        documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
+        documentationMissing: assessment.missing,
+        documentationOutcomeAt: new Date(),
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
+      };
+
+      const baseData = {
+        description: summary.description,
+        tags: mergedTags,
+        ...documentedState,
+      };
+
+      await tx.$executeRawUnsafe(`SAVEPOINT ${SUITE_SUMMARY_SAVEPOINT}`);
+
+      try {
+        await tx.suite.update({
+          where: { id: suiteId },
+          data: nameChanged
+            ? {
+                ...baseData,
+                name: summary.title,
+                nameSource: AERIS_NAME_SOURCE,
+              }
+            : baseData,
+        });
+
+        await tx.$executeRawUnsafe(
+          `RELEASE SAVEPOINT ${SUITE_SUMMARY_SAVEPOINT}`,
+        );
+        return true;
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+
+        await tx.$executeRawUnsafe(
+          `ROLLBACK TO SAVEPOINT ${SUITE_SUMMARY_SAVEPOINT}`,
+        );
+        await tx.$executeRawUnsafe(
+          `RELEASE SAVEPOINT ${SUITE_SUMMARY_SAVEPOINT}`,
+        );
+
+        this.logger.log(
+          `Skipped renaming suite ${suiteId} to "${summary.title}": the proposed name collides with another suite in this project`,
+        );
+
+        await tx.suite.update({ where: { id: suiteId }, data: baseData });
+        return true;
+      }
+    });
   }
 
   private async processDocumentFile(
