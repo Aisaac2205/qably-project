@@ -5,7 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
-import { CaretDown, CaretRight, Clock, DotsThree, PencilSimple, Sparkle, Trash, Translate } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, ChatCircleText, Clock, DotsThree, PencilSimple, Sparkle, Trash, Translate } from '@phosphor-icons/react'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
@@ -30,9 +30,10 @@ interface CaseCardProps {
   githubRepo?: string
   onEdit: (testCase: TestCase) => void
   onDelete: (testCase: TestCase) => void
+  onImproveWithAeris?: (testCase: TestCase) => void
 }
 
-export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardProps) {
+export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWithAeris }: CaseCardProps) {
   const { t } = useTranslation()
   const documentCase = useDocumentCase()
   const [preconditionsOpen, setPreconditionsOpen] = useState(false)
@@ -133,6 +134,15 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
                   >
                     <Sparkle size={14} aria-hidden="true" />
                     {t('suites.redocumentCase')}
+                  </MenuItem>
+                )}
+                {onImproveWithAeris && (
+                  <MenuItem
+                    onClick={() => onImproveWithAeris(testCase)}
+                    className="text-ai data-[highlighted]:bg-ai-bg data-[highlighted]:text-ai"
+                  >
+                    <ChatCircleText size={14} aria-hidden="true" />
+                    {t('aiReview.improveWithAeris')}
                   </MenuItem>
                 )}
                 <MenuItem

@@ -1,8 +1,11 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { CaretLeft, ChatsCircle, NotePencil } from '@phosphor-icons/react'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
+import { flattenAttachableCases } from '@/features/ai-review/lib/attachable-cases'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useTranslation } from '@/lib/i18n'
 import { ChatMessageList } from './chat-message-list'
@@ -43,6 +46,16 @@ export function ProjectChatPanel({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(getInitialSidebarCollapsed)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const searchParams = useSearchParams()
+  const [initialCaseId] = useState(() => searchParams.get('case'))
+  const { suites } = useSuites(projectId)
+  const initialAttachedCase = useMemo(
+    () =>
+      initialCaseId === null
+        ? undefined
+        : flattenAttachableCases(suites).find((attachedCase) => attachedCase.id === initialCaseId),
+    [initialCaseId, suites],
+  )
 
   const handleToggleSidebar = () => {
     setIsSidebarCollapsed((prev) => {
@@ -158,7 +171,6 @@ export function ProjectChatPanel({
             messages={messages}
             pendingMessage={pendingMessage}
             isLoadingThread={isLoadingThread}
-            onSelectSuggestion={send}
           />
         </div>
 
@@ -171,7 +183,12 @@ export function ProjectChatPanel({
           </p>
         )}
 
-        <ChatComposer onSend={send} disabled={isSending} />
+        <ChatComposer
+          projectId={projectId}
+          onSend={send}
+          disabled={isSending}
+          initialAttachedCase={activeThreadId === null ? initialAttachedCase : undefined}
+        />
       </div>
     </div>
   )

@@ -44,6 +44,39 @@ describe('ChatMessageBubble', () => {
     expect(screen.getByText('Valid checkout completes order')).toBeInTheDocument()
   })
 
+  it('resolves the target case name for a targeted suggestion from the passed-in attached cases', async () => {
+    const message: ChatMessageRecord = {
+      id: 'm6',
+      threadId: 't1',
+      role: 'assistant',
+      content: 'Here is an updated version',
+      suggestedCases: [
+        {
+          title: 'Valid login redirects to dashboard',
+          objective: 'Verify login',
+          preconditions: [],
+          steps: ['Log in'],
+          expectedResult: 'Dashboard is shown',
+          priority: 'high',
+          targetTestCaseId: 'tc-1',
+        },
+      ],
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    await act(async () => {
+      renderWithQuery(
+        <ChatMessageBubble
+          projectId="proj-1"
+          message={message}
+          attachedCasesForProposals={[
+            { id: 'tc-1', name: 'Valid login redirects to dashboard', suiteName: 'Authentication' },
+          ]}
+        />,
+      )
+    })
+    expect(screen.getByText('Updates: Valid login redirects to dashboard')).toBeInTheDocument()
+  })
+
   it('names the model that produced an assistant reply', async () => {
     const message: ChatMessageRecord = {
       id: 'm3',
@@ -57,6 +90,23 @@ describe('ChatMessageBubble', () => {
       renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
     })
     expect(screen.getByText(ASSISTANT_MODEL_NAME)).toBeInTheDocument()
+  })
+
+  it('shows the chips for cases attached to a user message', async () => {
+    const message: ChatMessageRecord = {
+      id: 'm5',
+      threadId: 't1',
+      role: 'user',
+      content: 'Improve this case',
+      suggestedCases: [],
+      attachedCases: [{ id: 'tc-1', name: 'Valid login redirects to dashboard', suiteName: 'Authentication' }],
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    await act(async () => {
+      renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
+    })
+    expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
   })
 
   it('leaves a user message unattributed', async () => {

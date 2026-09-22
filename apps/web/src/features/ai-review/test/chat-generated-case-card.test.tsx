@@ -2,9 +2,10 @@ import { screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ChatGeneratedCaseCard } from '@/features/ai-review/components/chat-generated-case-card'
-import type { SuggestedCaseRecord } from '@qably/types'
+import type { AttachedCaseRecord, SuggestedCaseRecord } from '@qably/types'
 import * as chatApi from '@/features/ai-review/api/chat.api'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { ApiError } from '@/lib/api-client'
 
 const suggestedCase: SuggestedCaseRecord = {
   title: 'Login with 2FA shows a verification prompt',
@@ -14,6 +15,15 @@ const suggestedCase: SuggestedCaseRecord = {
   expectedResult: 'User is redirected to the dashboard',
   priority: 'high',
 }
+
+const targetedCase: SuggestedCaseRecord = {
+  ...suggestedCase,
+  targetTestCaseId: 'tc-1',
+}
+
+const attachedCases: AttachedCaseRecord[] = [
+  { id: 'tc-1', name: 'Valid login redirects to dashboard', suiteName: 'Authentication' },
+]
 
 describe('ChatGeneratedCaseCard', () => {
   afterEach(() => {
@@ -98,5 +108,94 @@ describe('ChatGeneratedCaseCard', () => {
     await user.click(screen.getByRole('button', { name: 'Send to review' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't send this case/i)
+  })
+
+  it('shows a proposal-ready state label before sending', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+        />,
+      )
+    })
+    expect(screen.getByText('Proposal ready')).toBeInTheDocument()
+  })
+
+  it('shows a sent state label once a proposal already exists', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+          sentProposalId="already-sent-proposal"
+        />,
+      )
+    })
+    expect(screen.getByText('Sent to review')).toBeInTheDocument()
+  })
+
+  it('shows a compact what-changed list for a targeted case', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={targetedCase}
+          attachedCases={attachedCases}
+        />,
+      )
+    })
+    expect(screen.getByText('What Aeris proposes')).toBeInTheDocument()
+    expect(screen.getByText('Objective')).toBeInTheDocument()
+    expect(screen.getByText('Steps')).toBeInTheDocument()
+    expect(screen.getByText('Expected result')).toBeInTheDocument()
+  })
+
+  it('shows which case a targeted proposal updates', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={targetedCase}
+          attachedCases={attachedCases}
+        />,
+      )
+    })
+    expect(screen.getByText('Updates: Valid login redirects to dashboard')).toBeInTheDocument()
+  })
+
+  it('shows a human-documented conflict message instead of the generic error', async () => {
+    vi.spyOn(chatApi, 'sendToReview').mockRejectedValue(
+      new ApiError(409, 'Conflict', 'human-documented'),
+    )
+    const user = userEvent.setup()
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={targetedCase}
+          attachedCases={attachedCases}
+        />,
+      )
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Send to review' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/documented by a person/i)
   })
 })

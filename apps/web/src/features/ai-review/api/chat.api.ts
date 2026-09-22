@@ -50,10 +50,14 @@ export function sendMessage(
   projectId: string,
   threadId: string,
   content: string,
+  caseIds: string[] = [],
 ): Promise<ChatMessageRecord> {
   return apiRequest<ChatMessageRecord>(
     `/projects/${projectId}/chat/threads/${threadId}/messages`,
-    { method: 'POST', body: { content } },
+    {
+      method: 'POST',
+      body: caseIds.length > 0 ? { content, caseIds } : { content },
+    },
   )
 }
 

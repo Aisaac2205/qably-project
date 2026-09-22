@@ -266,6 +266,39 @@ describe('CaseCard', () => {
     expect(onDelete).toHaveBeenCalledWith(mockCase)
   })
 
+  describe('improve with Aeris', () => {
+    it('calls onImproveWithAeris from the actions menu when wired', async () => {
+      const user = userEvent.setup()
+      const onImproveWithAeris = vi.fn()
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={mockCase}
+            onEdit={noop}
+            onDelete={noop}
+            onImproveWithAeris={onImproveWithAeris}
+          />,
+        )
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Case actions' }))
+      await user.click(await screen.findByText('Improve with Aeris'))
+
+      expect(onImproveWithAeris).toHaveBeenCalledWith(mockCase)
+    })
+
+    it('shows no improve-with-Aeris action when it is not wired', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Case actions' }))
+
+      expect(screen.queryByText('Improve with Aeris')).not.toBeInTheDocument()
+    })
+  })
+
   describe('re-document with Aeris', () => {
     it('offers to document again from the actions menu for an automated case', async () => {
       const user = userEvent.setup()

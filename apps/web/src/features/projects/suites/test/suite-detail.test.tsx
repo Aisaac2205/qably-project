@@ -64,6 +64,18 @@ describe('SuiteDetail (redesigned)', () => {
     expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites')
   })
 
+  it('pushes to the Aeris chat with the case attached when Improve with Aeris is chosen', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    await user.click(screen.getAllByRole('button', { name: 'Case actions' })[0])
+    await user.click(await screen.findByText('Improve with Aeris'))
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/projects\/proj-1\/aeris\?case=tc-\d+$/),
+    )
+  })
+
   it('navigates to the previous history entry when the back button is pressed and history exists', async () => {
     const user = userEvent.setup()
     window.history.pushState({}, '', window.location.href)

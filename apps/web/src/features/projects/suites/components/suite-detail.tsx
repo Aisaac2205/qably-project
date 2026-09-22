@@ -21,6 +21,7 @@ import { StateView } from '@/components/ui/state-view'
 import { StatusChip } from '@/components/ui/status-chip'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
+  projectAerisPath,
   projectRootPath,
   projectSuitesPath,
   suiteEditPath,
@@ -407,6 +408,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                       githubRepo={project?.githubRepo}
                       onEdit={(edited) => router.push(suiteEditCasePath(projectId, suite.id, edited.id))}
                       onDelete={setDeletingCase}
+                      onImproveWithAeris={(improved) =>
+                        router.push(`${projectAerisPath(projectId)}?case=${improved.id}`)
+                      }
                     />
                   ))}
                 </Fragment>
@@ -420,6 +424,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
                   githubRepo={project?.githubRepo}
                   onEdit={(edited) => router.push(suiteEditCasePath(projectId, suite.id, edited.id))}
                   onDelete={setDeletingCase}
+                  onImproveWithAeris={(improved) =>
+                    router.push(`${projectAerisPath(projectId)}?case=${improved.id}`)
+                  }
                 />
               ))
             )}

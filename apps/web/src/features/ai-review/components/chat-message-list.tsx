@@ -2,7 +2,7 @@
 
 import type { ChatMessageRecord } from '@qably/types'
 import { ChatMessageBubble } from './chat-message-bubble'
-import { ListChecks, Flask, ShieldCheck } from '@phosphor-icons/react'
+import { ChatCaseChip } from './chat-case-chip'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { useTranslation } from '@/lib/i18n'
 import { StateView } from '@/components/ui/state-view'
@@ -19,6 +19,8 @@ function pendingErrorCopy(
       return t('aiReview.chatForbidden')
     case 'too-long':
       return t('aiReview.chatMessageTooLong')
+    case 'too-many-cases':
+      return t('aiReview.chatTooManyCases')
     case 'throttled':
       return t('aiReview.chatThrottled')
     default:
@@ -31,13 +33,11 @@ export function ChatMessageList({
   messages,
   pendingMessage,
   isLoadingThread = false,
-  onSelectSuggestion,
 }: {
   projectId: string
   messages: ChatMessageRecord[]
   pendingMessage?: PendingMessage | null
   isLoadingThread?: boolean
-  onSelectSuggestion?: (prompt: string) => void
 }) {
   const { t } = useTranslation()
 
@@ -46,45 +46,16 @@ export function ChatMessageList({
   }
 
   if (messages.length === 0 && !pendingMessage) {
-    const starters = [
-      { icon: ListChecks, text: t('aiReview.promptStarter1') },
-      { icon: Flask, text: t('aiReview.promptStarter2') },
-      { icon: ShieldCheck, text: t('aiReview.promptStarter3') },
-    ]
-
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[380px] text-center p-6 sm:p-8 gap-6 select-none max-w-2xl mx-auto">
-        <div className="flex flex-col items-center gap-3">
-          <AerisIcon className="size-11 sm:size-12 shrink-0" />
-          <div className="space-y-1.5 max-w-md">
-            <h2 className="text-lg sm:text-xl font-semibold text-default tracking-tight">
-              {t('aiReview.chatGreeting')}
-            </h2>
-            <p className="text-xs sm:text-sm text-muted leading-relaxed">
-              {t('aiReview.chatEmptyHint')}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full pt-2">
-          {starters.map((starter, i) => {
-            const Icon = starter.icon
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onSelectSuggestion?.(starter.text)}
-                className="group flex flex-col items-start text-left p-3.5 rounded-xl border border-border/80 bg-surface hover:bg-surface-hover/80 hover:border-border transition-all duration-150 active:scale-[0.98] shadow-xs cursor-pointer focus-visible:outline-2 focus-visible:outline-primary"
-              >
-                <div className="size-7 rounded-lg bg-canvas text-muted group-hover:text-primary group-hover:bg-primary/10 flex items-center justify-center transition-colors mb-2">
-                  <Icon size={16} weight="regular" aria-hidden="true" />
-                </div>
-                <p className="text-xs font-medium text-default leading-snug line-clamp-3">
-                  {starter.text}
-                </p>
-              </button>
-            )
-          })}
+      <div className="flex flex-col items-center justify-center h-full min-h-[380px] text-center p-6 sm:p-8 gap-3 select-none max-w-2xl mx-auto">
+        <AerisIcon className="size-11 sm:size-12 shrink-0" />
+        <div className="space-y-1.5 max-w-md">
+          <h2 className="text-lg sm:text-xl font-semibold text-default tracking-tight">
+            {t('aiReview.chatGreeting')}
+          </h2>
+          <p className="text-xs sm:text-sm text-muted leading-relaxed">
+            {t('aiReview.chatEmptyHint')}
+          </p>
         </div>
       </div>
     )
@@ -98,12 +69,32 @@ export function ChatMessageList({
         {lastAssistantMessage ? t('aiReview.newAssistantReply') : ''}
       </div>
 
-      {messages.map((message) => (
-        <ChatMessageBubble key={message.id} projectId={projectId} message={message} />
-      ))}
+      {messages.map((message, index) => {
+        const precedingUserMessage: ChatMessageRecord | undefined =
+          message.role === 'assistant'
+            ? messages.slice(0, index).findLast((candidate) => candidate.role === 'user')
+            : undefined
+
+        return (
+          <ChatMessageBubble
+            key={message.id}
+            projectId={projectId}
+            message={message}
+            attachedCasesForProposals={precedingUserMessage?.attachedCases}
+          />
+        )
+      })}
 
       {pendingMessage && (
         <div className="flex flex-col space-y-2">
+          {pendingMessage.attachedCases && pendingMessage.attachedCases.length > 0 && (
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {pendingMessage.attachedCases.map((attachedCase) => (
+                <ChatCaseChip key={attachedCase.id} attachedCase={attachedCase} />
+              ))}
+            </div>
+          )}
+
           {pendingMessage.content && (
             <div className="flex justify-end">
               <div className="max-w-[85%] sm:max-w-[80%] bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-xs text-xs sm:text-sm">

@@ -74,6 +74,22 @@ describe('chat.api', () => {
     )
   })
 
+  it('sends a message with attached case ids', async () => {
+    await sendMessage('proj-1', 'thread-1', 'Improve this case', ['tc-1', 'tc-2'])
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(
+      JSON.stringify({ content: 'Improve this case', caseIds: ['tc-1', 'tc-2'] }),
+    )
+  })
+
+  it('omits caseIds from the body when no case is attached', async () => {
+    await sendMessage('proj-1', 'thread-1', 'Hello', [])
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(JSON.stringify({ content: 'Hello' }))
+  })
+
   it('sends a suggested case to review', async () => {
     await sendToReview('proj-1', 'thread-1', 'message-1', 2)
 

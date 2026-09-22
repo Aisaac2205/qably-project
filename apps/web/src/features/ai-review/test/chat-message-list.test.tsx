@@ -1,7 +1,8 @@
 import { render, screen, act } from '@testing-library/react'
 import { describe, it, expect } from 'vitest'
 import { ChatMessageList } from '@/features/ai-review/components/chat-message-list'
-import type { ChatMessageRecord } from '@qably/types'
+import type { AttachedCaseRecord, ChatMessageRecord } from '@qably/types'
+import { renderWithQuery } from '@/lib/query-test-utils'
 
 describe('ChatMessageList', () => {
   it('renders every message in order', async () => {
@@ -103,5 +104,86 @@ describe('ChatMessageList', () => {
       )
     })
     expect(screen.getByRole('alert')).toHaveTextContent(/too long/i)
+  })
+
+  it('shows a too-many-cases error message', async () => {
+    await act(async () => {
+      render(
+        <ChatMessageList
+          projectId="proj-1"
+          messages={[]}
+          pendingMessage={{ content: 'Hi', status: 'error', errorKind: 'too-many-cases' }}
+        />,
+      )
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent(/too many cases/i)
+  })
+
+  it('shows no prompt starter cards in the empty state', async () => {
+    await act(async () => {
+      render(<ChatMessageList projectId="proj-1" messages={[]} />)
+    })
+    expect(screen.queryByRole('button', { name: /checkout flow|coverage gaps|pending cases/i })).not.toBeInTheDocument()
+  })
+
+  it('resolves a targeted proposal against the preceding user message attached cases', async () => {
+    const attachedCase: AttachedCaseRecord = {
+      id: 'tc-1',
+      name: 'Valid login redirects to dashboard',
+      suiteName: 'Authentication',
+    }
+    const messages: ChatMessageRecord[] = [
+      {
+        id: 'm1',
+        threadId: 't1',
+        role: 'user',
+        content: 'Improve this case',
+        suggestedCases: [],
+        attachedCases: [attachedCase],
+        createdAt: '2026-01-01T00:00:00Z',
+      },
+      {
+        id: 'm2',
+        threadId: 't1',
+        role: 'assistant',
+        content: 'Here is an updated version',
+        suggestedCases: [
+          {
+            title: 'Valid login redirects to dashboard',
+            objective: 'Verify login',
+            preconditions: [],
+            steps: ['Log in'],
+            expectedResult: 'Dashboard is shown',
+            priority: 'high',
+            targetTestCaseId: 'tc-1',
+          },
+        ],
+        createdAt: '2026-01-01T00:01:00Z',
+      },
+    ]
+    await act(async () => {
+      renderWithQuery(<ChatMessageList projectId="proj-1" messages={messages} />)
+    })
+    expect(screen.getByText('Updates: Valid login redirects to dashboard')).toBeInTheDocument()
+  })
+
+  it('shows the attached case chips on the optimistic user bubble', async () => {
+    await act(async () => {
+      render(
+        <ChatMessageList
+          projectId="proj-1"
+          messages={[]}
+          pendingMessage={{
+            content: 'Improve this case',
+            status: 'sending',
+            attachedCases: [
+              { id: 'tc-1', name: 'Valid login redirects to dashboard', suiteName: 'Authentication' },
+            ],
+          }}
+        />,
+      )
+    })
+    expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
   })
 })

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useProjectChat } from '@/features/projects/test-generation/hooks/use-project-chat'
 import { ApiError } from '@/lib/api-client'
 import type {
+  AttachedCaseRecord,
   ChatMessageRecord,
   ChatThreadDetailRecord,
   ChatThreadRecord,
@@ -167,6 +168,50 @@ describe('useProjectChat', () => {
       await result.current.send('Question two')
     })
     expect(result.current.pendingMessage).toMatchObject({ errorKind: 'forbidden' })
+  })
+
+  it('sends the attached case ids and keeps the case data on the pending bubble', async () => {
+    listThreads.mockResolvedValue([])
+    createThread.mockResolvedValue(thread)
+    sendMessage.mockResolvedValue(assistantMessage)
+    getThread.mockResolvedValue(threadDetail)
+    const attachedCase: AttachedCaseRecord = {
+      id: 'tc-1',
+      name: 'Valid login redirects to dashboard',
+      suiteName: 'Authentication',
+    }
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([]))
+
+    await act(async () => {
+      await result.current.send('Improve this case', [attachedCase])
+    })
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      'proj-1',
+      'thread-1',
+      'Improve this case',
+      ['tc-1'],
+    )
+  })
+
+  it('classifies a too-many-cases 400 distinctly from a plain too-long 400', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    sendMessage.mockRejectedValue(new ApiError(400, 'Too many cases', 'too-many-cases'))
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.messages.length).toBe(2))
+
+    await act(async () => {
+      await result.current.send('Improve these cases')
+    })
+
+    expect(result.current.pendingMessage).toMatchObject({ errorKind: 'too-many-cases' })
   })
 
   it('classifies a 400 validation error as too-long', async () => {

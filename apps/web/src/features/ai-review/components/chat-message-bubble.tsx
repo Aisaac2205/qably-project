@@ -1,21 +1,32 @@
 'use client'
 
-import { ASSISTANT_MODEL_NAME, type ChatMessageRecord } from '@qably/types'
+import { ASSISTANT_MODEL_NAME, type AttachedCaseRecord, type ChatMessageRecord } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { ChatGeneratedCaseCard } from './chat-generated-case-card'
+import { ChatCaseChip } from './chat-case-chip'
 
 export function ChatMessageBubble({
   projectId,
   message,
+  attachedCasesForProposals,
 }: {
   projectId: string
   message: ChatMessageRecord
+  attachedCasesForProposals?: AttachedCaseRecord[]
 }) {
   const isUser = message.role === 'user'
+  const attachedCases = message.attachedCases ?? []
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] sm:max-w-[80%] ${isUser ? 'items-end' : 'items-start'} flex flex-col space-y-2`}>
+        {isUser && attachedCases.length > 0 && (
+          <div className="flex flex-wrap justify-end gap-1.5">
+            {attachedCases.map((attachedCase) => (
+              <ChatCaseChip key={attachedCase.id} attachedCase={attachedCase} />
+            ))}
+          </div>
+        )}
         <div
           className={`text-xs sm:text-sm leading-relaxed ${
             isUser
@@ -40,6 +51,7 @@ export function ChatMessageBubble({
               caseIndex={index}
               suggestedCase={suggestedCase}
               sentProposalId={message.sentProposalIds?.[index]}
+              attachedCases={attachedCasesForProposals}
             />
           </div>
         ))}

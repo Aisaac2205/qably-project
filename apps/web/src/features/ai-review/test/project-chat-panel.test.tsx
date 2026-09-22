@@ -4,12 +4,30 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectChatPanel } from '@/features/ai-review/components/project-chat-panel'
 import { ApiError } from '@/lib/api-client'
+import { mockSuites } from '@/lib/mock-data'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
 import {
   ASSISTANT_MODEL_NAME,
   type ChatMessageRecord,
   type ChatThreadDetailRecord,
   type ChatThreadRecord,
 } from '@qably/types'
+
+let searchParamsQuery = ''
+
+vi.mock('next/navigation', () => ({
+  useParams: () => ({}),
+  usePathname: () => '/aeris',
+  useRouter: () => ({
+    back: () => {},
+    forward: () => {},
+    prefetch: () => Promise.resolve(),
+    push: () => {},
+    refresh: () => {},
+    replace: () => {},
+  }),
+  useSearchParams: () => new URLSearchParams(searchParamsQuery),
+}))
 
 const thread: ChatThreadRecord = {
   id: 'thread-1',
@@ -63,6 +81,7 @@ function renderPanel() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
+  client.setQueryData(suiteKeys.list('proj-1'), mockSuites.filter((suite) => suite.projectId === 'proj-1'))
   return render(
     <QueryClientProvider client={client}>
       <ProjectChatPanel projectId="proj-1" />
@@ -73,6 +92,7 @@ function renderPanel() {
 describe('ProjectChatPanel', () => {
   afterEach(() => {
     vi.clearAllMocks()
+    searchParamsQuery = ''
   })
 
   it('starts a new thread and shows the assistant reply after sending a message', async () => {
@@ -85,7 +105,7 @@ describe('ProjectChatPanel', () => {
     await act(async () => {
       renderPanel()
     })
-    expect(screen.getByText('What suites have the most pending cases?')).toBeInTheDocument()
+    expect(screen.getByText(/how can I help you today/i)).toBeInTheDocument()
 
     const textarea = screen.getByRole('textbox', { name: 'Message' })
     await user.type(textarea, 'How many cases are pending?{enter}')
@@ -258,5 +278,17 @@ describe('ProjectChatPanel', () => {
     await user.click(within(drawer).getByText('How many cases are pending?'))
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('seeds the composer with the case from a ?case= deep link', async () => {
+    listThreads.mockResolvedValue([])
+    searchParamsQuery = 'case=tc-1'
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
   })
 })

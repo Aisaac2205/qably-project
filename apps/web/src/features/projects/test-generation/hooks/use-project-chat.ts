@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import type { AttachedCaseRecord } from '@qably/types'
 import {
   createThread,
   deleteThread,
@@ -18,12 +19,14 @@ export type ChatSendErrorKind =
   | 'forbidden'
   | 'throttled'
   | 'too-long'
+  | 'too-many-cases'
   | 'error'
 
 export interface PendingMessage {
   content?: string
   status: 'sending' | 'unavailable' | 'error'
   errorKind?: ChatSendErrorKind
+  attachedCases?: AttachedCaseRecord[]
 }
 
 function classifySendError(error: unknown): ChatSendErrorKind {
@@ -33,6 +36,9 @@ function classifySendError(error: unknown): ChatSendErrorKind {
     }
     if (error.code === 'ai-not-enabled') {
       return 'ai-not-enabled'
+    }
+    if (error.code === 'too-many-cases') {
+      return 'too-many-cases'
     }
     if (error.status === 403) {
       return 'forbidden'
@@ -99,13 +105,14 @@ export function useProjectChat(projectId: string) {
   )
 
   const send = useCallback(
-    async (text: string) => {
+    async (text: string, attachedCases: AttachedCaseRecord[] = []) => {
       const content = text.trim()
       if (!content) return
 
-      setPendingMessage({ content, status: 'sending' })
+      setPendingMessage({ content, status: 'sending', attachedCases })
 
       let threadId = activeThreadId
+      const caseIds = attachedCases.map((attachedCase) => attachedCase.id)
 
       try {
         if (threadId === null) {
@@ -115,7 +122,11 @@ export function useProjectChat(projectId: string) {
           void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
         }
 
-        await sendMessage(projectId, threadId, content)
+        if (caseIds.length > 0) {
+          await sendMessage(projectId, threadId, content, caseIds)
+        } else {
+          await sendMessage(projectId, threadId, content)
+        }
 
         await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
         void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
@@ -133,6 +144,7 @@ export function useProjectChat(projectId: string) {
           content,
           status: 'error',
           errorKind: kind,
+          attachedCases,
         })
       }
     },
