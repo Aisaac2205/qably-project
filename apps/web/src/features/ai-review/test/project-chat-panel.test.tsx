@@ -1,6 +1,6 @@
 import { render, screen, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProjectChatPanel } from '@/features/ai-review/components/project-chat-panel'
 import { ApiError } from '@/lib/api-client'
@@ -11,9 +11,17 @@ import {
   type ChatMessageRecord,
   type ChatThreadDetailRecord,
   type ChatThreadRecord,
+  type Suite,
 } from '@qably/types'
 
 let searchParamsQuery = ''
+
+const listSuitesMock = vi.fn()
+
+vi.mock('@/features/projects/suites/api/suites.api', () => ({
+  listSuites: (...args: unknown[]) => listSuitesMock(...args),
+  getSuite: vi.fn(),
+}))
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({}),
@@ -93,6 +101,12 @@ describe('ProjectChatPanel', () => {
   afterEach(() => {
     vi.clearAllMocks()
     searchParamsQuery = ''
+  })
+
+  beforeEach(() => {
+    listSuitesMock.mockResolvedValue(
+      mockSuites.filter((suite) => suite.projectId === 'proj-1'),
+    )
   })
 
   it('starts a new thread and shows the assistant reply after sending a message', async () => {
@@ -290,5 +304,48 @@ describe('ProjectChatPanel', () => {
 
     expect(screen.getByText('Valid login redirects to dashboard')).toBeInTheDocument()
     expect(screen.getByText('Authentication')).toBeInTheDocument()
+  })
+
+  it('seeds the composer with the deep-linked case once suites resolve from a cold cache', async () => {
+    listThreads.mockResolvedValue([])
+    searchParamsQuery = 'case=tc-1'
+    let resolveSuites: (suites: Suite[]) => void = () => {}
+    const suitesPromise = new Promise<Suite[]>((resolve) => {
+      resolveSuites = resolve
+    })
+    listSuitesMock.mockReturnValue(suitesPromise)
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+    })
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <ProjectChatPanel projectId="proj-1" />
+        </QueryClientProvider>,
+      )
+    })
+
+    expect(screen.queryByText('Valid login redirects to dashboard')).not.toBeInTheDocument()
+
+    await act(async () => {
+      resolveSuites(mockSuites.filter((suite) => suite.projectId === 'proj-1'))
+      await suitesPromise
+    })
+
+    expect(await screen.findByText('Valid login redirects to dashboard')).toBeInTheDocument()
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
+  })
+
+  it('shows no chip and does not crash when the deep-linked case id is not in the project', async () => {
+    listThreads.mockResolvedValue([])
+    searchParamsQuery = 'case=does-not-exist'
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    expect(screen.queryByText('Valid login redirects to dashboard')).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Message' })).toBeInTheDocument()
   })
 })

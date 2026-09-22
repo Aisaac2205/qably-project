@@ -48,7 +48,8 @@ export function ProjectChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
   const [initialCaseId] = useState(() => searchParams.get('case'))
-  const { suites } = useSuites(projectId)
+  const { suites, isLoading: isSuitesLoading } = useSuites(projectId)
+  const isResolvingInitialCase = initialCaseId !== null && isSuitesLoading
   const initialAttachedCase = useMemo(
     () =>
       initialCaseId === null
@@ -184,6 +185,7 @@ export function ProjectChatPanel({
         )}
 
         <ChatComposer
+          key={isResolvingInitialCase ? 'resolving-initial-case' : 'ready'}
           projectId={projectId}
           onSend={send}
           disabled={isSending}
