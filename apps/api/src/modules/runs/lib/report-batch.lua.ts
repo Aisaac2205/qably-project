@@ -7,11 +7,16 @@ local reportExternalId = ARGV[4]
 local resultField = ARGV[5]
 local resultValue = ARGV[6]
 
-local created = redis.call('HSETNX', key, 'size', sizeArg)
-if created == 1 then
+local existingSize = redis.call('HGET', key, 'size')
+local created = 0
+if existingSize == false then
+  created = 1
+  redis.call('HSET', key, 'size', sizeArg)
   redis.call('HSET', key, 'organizationId', organizationId)
   redis.call('HSET', key, 'projectId', projectId)
   redis.call('HSET', key, 'reportExternalId', reportExternalId)
+elseif tonumber(sizeArg) > tonumber(existingSize) then
+  redis.call('HSET', key, 'size', sizeArg)
 end
 redis.call('HSET', key, resultField, resultValue)
 redis.call('EXPIRE', key, 600)

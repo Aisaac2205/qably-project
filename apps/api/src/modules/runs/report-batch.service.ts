@@ -60,6 +60,17 @@ export interface RecordSuiteResultParams {
   status: 'pass' | 'fail';
 }
 
+export interface RecordRejectedResultParams {
+  organizationId: string;
+  projectId: string;
+  source: string;
+  reportExternalId: string;
+  reportSize: number;
+  groupExternalId: string;
+  suiteName: string;
+  reason: string;
+}
+
 function extractResults(raw: Record<string, string>): BatchSuiteResult[] {
   return Object.entries(raw)
     .filter(([field]) => field.startsWith(RESULT_FIELD_PREFIX))
@@ -82,10 +93,9 @@ export class ReportBatchService implements OnModuleDestroy {
   }
 
   async recordAndMaybePublish(params: RecordSuiteResultParams): Promise<void> {
-    const key = buildReportBatchKey(params);
-    const raw = await this.redis.recordReportSuiteResult(
-      key,
-      String(params.reportSize),
+    await this.recordResultAndMaybePublish(
+      buildReportBatchKey(params),
+      params.reportSize,
       params.organizationId,
       params.projectId,
       params.reportExternalId,
@@ -94,6 +104,44 @@ export class ReportBatchService implements OnModuleDestroy {
         suiteName: params.suiteName,
         status: params.status,
       } satisfies BatchSuiteResult),
+    );
+  }
+
+  async recordRejectedAndMaybePublish(
+    params: RecordRejectedResultParams,
+  ): Promise<void> {
+    await this.recordResultAndMaybePublish(
+      buildReportBatchKey(params),
+      params.reportSize,
+      params.organizationId,
+      params.projectId,
+      params.reportExternalId,
+      `${RESULT_FIELD_PREFIX}rejected:${params.groupExternalId}`,
+      JSON.stringify({
+        suiteName: params.suiteName,
+        status: 'rejected',
+        reason: params.reason,
+      } satisfies BatchSuiteResult),
+    );
+  }
+
+  private async recordResultAndMaybePublish(
+    key: string,
+    reportSize: number,
+    organizationId: string,
+    projectId: string,
+    reportExternalId: string,
+    field: string,
+    value: string,
+  ): Promise<void> {
+    const raw = await this.redis.recordReportSuiteResult(
+      key,
+      String(reportSize),
+      organizationId,
+      projectId,
+      reportExternalId,
+      field,
+      value,
     );
     const result = JSON.parse(raw) as RecordSuiteResultResult;
 
@@ -112,10 +160,9 @@ export class ReportBatchService implements OnModuleDestroy {
 
     await this.notifications.publish(
       buildBatchNotificationEvent({
-        organizationId: result.data.organizationId ?? params.organizationId,
-        projectId: result.data.projectId ?? params.projectId,
-        reportExternalId:
-          result.data.reportExternalId ?? params.reportExternalId,
+        organizationId: result.data.organizationId ?? organizationId,
+        projectId: result.data.projectId ?? projectId,
+        reportExternalId: result.data.reportExternalId ?? reportExternalId,
         results: extractResults(result.data),
       }),
     );

@@ -26,6 +26,8 @@ function createRedis() {
           hash.set('organizationId', organizationId);
           hash.set('projectId', projectId);
           hash.set('reportExternalId', reportExternalId);
+        } else if (Number(size) > Number(hash.get('size'))) {
+          hash.set('size', size);
         }
         hash.set(field, value);
         store.set(key, hash);
@@ -236,6 +238,49 @@ describe('ReportBatchService.recordAndMaybePublish', () => {
     );
   });
 
+  it('grows the locked batch size instead of completing early when a later result reports a larger total, a safety net against an undercounted client total', async () => {
+    const { service, notifications } = build();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      runId: 'run-1',
+      suiteName: 'a.test.ts',
+      status: 'pass',
+    });
+
+    expect(notifications.publish).not.toHaveBeenCalled();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 5,
+      runId: 'run-2',
+      suiteName: 'b.test.ts',
+      status: 'pass',
+    });
+
+    expect(notifications.publish).not.toHaveBeenCalled();
+
+    for (const [runId, suiteName] of [
+      ['run-3', 'c.test.ts'],
+      ['run-4', 'd.test.ts'],
+      ['run-5', 'e.test.ts'],
+    ] as const) {
+      await service.recordAndMaybePublish({
+        ...baseParams,
+        reportSize: 5,
+        runId,
+        suiteName,
+        status: 'pass',
+      });
+    }
+
+    expect(notifications.publish).toHaveBeenCalledTimes(1);
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: { count: 5 } }),
+    );
+  });
+
   it('cleans up the redis key once the batch closes', async () => {
     const { service, redis } = build();
 
@@ -253,6 +298,81 @@ describe('ReportBatchService.recordAndMaybePublish', () => {
     }
 
     expect(redis.store.size).toBe(0);
+  });
+});
+
+describe('ReportBatchService.recordRejectedAndMaybePublish', () => {
+  it('counts a rejected group toward completion alongside accepted suites', async () => {
+    const { service, notifications } = build();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      runId: 'run-1',
+      suiteName: 'a.test.ts',
+      status: 'pass',
+    });
+
+    expect(notifications.publish).not.toHaveBeenCalled();
+
+    await service.recordRejectedAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      groupExternalId: 'gha-482913-b',
+      suiteName: 'b.test.ts',
+      reason: 'suiteName: too short',
+    });
+
+    expect(notifications.publish).toHaveBeenCalledTimes(1);
+    expect(notifications.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'run_failed',
+        payload: expect.objectContaining({
+          count: 2,
+          rejectedCount: 1,
+          rejectedSuiteNames: 'b.test.ts',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('records the same rejected group idempotently when a retried request replays it, instead of double-counting', async () => {
+    const { service, redis } = build();
+
+    await service.recordRejectedAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      groupExternalId: 'gha-482913-b',
+      suiteName: 'b.test.ts',
+      reason: 'suiteName: too short',
+    });
+    await service.recordRejectedAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      groupExternalId: 'gha-482913-b',
+      suiteName: 'b.test.ts',
+      reason: 'suiteName: too short',
+    });
+
+    const [key] = redis.store.keys();
+    const resultFields = [...(redis.store.get(key)?.keys() ?? [])].filter(
+      (field) => field.startsWith('result:'),
+    );
+    expect(resultFields).toHaveLength(1);
+  });
+
+  it('enqueues the safety-net timeout job when a rejected group is the first result recorded for the batch', async () => {
+    const { service, queue } = build();
+
+    await service.recordRejectedAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      groupExternalId: 'gha-482913-b',
+      suiteName: 'b.test.ts',
+      reason: 'suiteName: too short',
+    });
+
+    expect(queue.add).toHaveBeenCalledTimes(1);
   });
 });
 

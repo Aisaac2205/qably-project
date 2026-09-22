@@ -20,11 +20,19 @@ const report = `<testsuite name="Checkout">
 function build() {
   const runs = { ingest: jest.fn() };
   const runIngestQueue = { addBulk: jest.fn().mockResolvedValue([]) };
+  const reportBatch = {
+    recordRejectedAndMaybePublish: jest.fn().mockResolvedValue(undefined),
+  };
 
   return {
-    controller: new RunsController(runs as never, runIngestQueue as never),
+    controller: new RunsController(
+      runs as never,
+      runIngestQueue as never,
+      reportBatch as never,
+    ),
     runs,
     runIngestQueue,
+    reportBatch,
   };
 }
 
@@ -379,7 +387,7 @@ describe('RunsController.ingestJunit', () => {
     expect(jobs.map((job) => job.data.reportSize)).toEqual([3, 3, 3]);
   });
 
-  it('excludes rejected groups from this request contribution to reportSize, so the batch still completes', async () => {
+  it('keeps the full client-sent reportSize on the accepted groups even when one group in this request was rejected, since the reject is now recorded into the same batch', async () => {
     const { controller, runIngestQueue } = build();
     const partiallyInvalidReport = `<testsuites>
       <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
@@ -395,7 +403,44 @@ describe('RunsController.ingestJunit', () => {
 
     const jobs = jobBodies(runIngestQueue);
     expect(jobs).toHaveLength(2);
-    expect(jobs.map((job) => job.data.reportSize)).toEqual([2, 2]);
+    expect(jobs.map((job) => job.data.reportSize)).toEqual([3, 3]);
+  });
+
+  it('records a rejected group into the report batch instead of only dropping it from reportSize, so the batch still completes without waiting for the timeout', async () => {
+    const { controller, reportBatch } = build();
+    const partiallyInvalidReport = `<testsuites>
+      <testsuite name="src/a.test.ts"><testcase name="a1"/></testsuite>
+      <testsuite><testcase name="b1"/></testsuite>
+      <testsuite name="src/c.test.ts"><testcase name="c1"/></testsuite>
+    </testsuites>`;
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ reportSize: '3' }),
+      partiallyInvalidReport,
+    );
+
+    expect(reportBatch.recordRejectedAndMaybePublish).toHaveBeenCalledTimes(1);
+    expect(reportBatch.recordRejectedAndMaybePublish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: 'org-1',
+        projectId: 'proj-1',
+        source: 'api',
+        reportExternalId: 'ci-42',
+        reportSize: 3,
+        suiteName: expect.any(String) as unknown,
+        reason: expect.any(String) as unknown,
+      }),
+    );
+  });
+
+  it('never records a rejected group into the report batch when the report has no split (reportSize 1), since there is no batch to complete', async () => {
+    const { controller, reportBatch } = build();
+    const invalidQuery = { ...query(), name: 'x'.repeat(300) };
+
+    await controller.ingestJunit(apiKey, invalidQuery, report);
+
+    expect(reportBatch.recordRejectedAndMaybePublish).not.toHaveBeenCalled();
   });
 
   it('caps an absurd reportSize to a sane maximum', async () => {

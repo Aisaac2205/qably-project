@@ -1,6 +1,7 @@
 export interface BatchSuiteResult {
   suiteName: string;
-  status: 'pass' | 'fail';
+  status: 'pass' | 'fail' | 'rejected';
+  reason?: string;
 }
 
 export interface ReportBatchKeyParts {

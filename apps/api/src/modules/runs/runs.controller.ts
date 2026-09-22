@@ -33,6 +33,7 @@ import {
   type JunitSuiteGroup,
 } from './lib/group-junit-report';
 import { findCaseIdentityCollisions } from './lib/case-identity';
+import { ReportBatchService } from './report-batch.service';
 import { RunsService } from './runs.service';
 
 function parseJunitReport(xml: string) {
@@ -75,15 +76,11 @@ const MAX_REPORT_SIZE = 100_000;
 
 function resolveReportSize(
   requestedReportSize: number | undefined,
-  acceptedGroupsInRequest: number,
-  rejectedGroupsInRequest: number,
+  groupsInRequest: number,
 ): number {
-  if (requestedReportSize === undefined) return acceptedGroupsInRequest;
+  if (requestedReportSize === undefined) return groupsInRequest;
   return Math.min(
-    Math.max(
-      requestedReportSize - rejectedGroupsInRequest,
-      acceptedGroupsInRequest,
-    ),
+    Math.max(requestedReportSize, groupsInRequest),
     MAX_REPORT_SIZE,
   );
 }
@@ -102,7 +99,7 @@ function rejectedSuiteLabel(group: JunitSuiteGroup): string {
 
 type GroupValidation =
   | { ok: true; group: JunitSuiteGroup; body: IngestRunInput }
-  | { ok: false; suiteName: string; reason: string };
+  | { ok: false; group: JunitSuiteGroup; suiteName: string; reason: string };
 
 function validateGroup(
   query: IngestJunitQuery,
@@ -124,7 +121,7 @@ function validateGroup(
       .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
       .join('; ');
 
-    return { ok: false, suiteName: rejectedSuiteLabel(group), reason };
+    return { ok: false, group, suiteName: rejectedSuiteLabel(group), reason };
   }
 
   return { ok: true, group, body: result.data };
@@ -138,6 +135,7 @@ export class RunsController {
     private readonly runs: RunsService,
     @InjectQueue(RUN_INGEST_QUEUE)
     private readonly runIngestQueue: Queue<RunIngestJobData>,
+    private readonly reportBatch: ReportBatchService,
   ) {}
 
   @Post('ingest')
@@ -182,12 +180,14 @@ export class RunsController {
       (validation): validation is Extract<GroupValidation, { ok: true }> =>
         validation.ok,
     );
-    const rejected = validations
-      .filter(
-        (validation): validation is Extract<GroupValidation, { ok: false }> =>
-          !validation.ok,
-      )
-      .map(({ suiteName, reason }) => ({ suiteName, reason }));
+    const rejections = validations.filter(
+      (validation): validation is Extract<GroupValidation, { ok: false }> =>
+        !validation.ok,
+    );
+    const rejected = rejections.map(({ suiteName, reason }) => ({
+      suiteName,
+      reason,
+    }));
 
     const caseIdentityCollisions = groups.flatMap((group) =>
       findCaseIdentityCollisions(group.cases).map((collision) => ({
@@ -198,9 +198,25 @@ export class RunsController {
 
     const reportSize = resolveReportSize(
       query.reportSize,
-      accepted.length,
-      rejected.length,
+      accepted.length + rejections.length,
     );
+
+    if (reportSize > 1 && rejections.length > 0) {
+      await Promise.all(
+        rejections.map(({ group, suiteName, reason }) =>
+          this.reportBatch.recordRejectedAndMaybePublish({
+            organizationId: apiKey.organizationId,
+            projectId: apiKey.projectId,
+            source: query.source,
+            reportExternalId: query.externalId,
+            reportSize,
+            groupExternalId: group.externalId,
+            suiteName,
+            reason,
+          }),
+        ),
+      );
+    }
 
     const jobs = accepted.map(({ body, group }) => ({
       name: 'ingest',
