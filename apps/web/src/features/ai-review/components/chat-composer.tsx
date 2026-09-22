@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type KeyboardEvent } from 'react'
+import { useMemo, useState, type KeyboardEvent } from 'react'
 import { PaperPlaneRight, Paperclip } from '@phosphor-icons/react'
 import { ASSISTANT_MODEL_NAME, type AttachedCaseRecord } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
@@ -36,7 +36,7 @@ export function ChatComposer({
   )
   const [pickerOpen, setPickerOpen] = useState(false)
   const { suites } = useSuites(projectId)
-  const availableCases = flattenAttachableCases(suites)
+  const availableCases = useMemo(() => flattenAttachableCases(suites), [suites])
   const { textareaRef, adjustHeight } = useAutoResizeTextarea({
     minHeight: MIN_HEIGHT,
     maxHeight: MAX_HEIGHT,
