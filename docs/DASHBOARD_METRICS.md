@@ -88,7 +88,8 @@ it runs inside one `Promise.all`.
 
 ### Why CI activity is grouped by commit
 
-`scripts/qably-report.mjs` posts one run per JUnit `<testsuite>`, which means one per test file. A
+The server splits each posted report into one run per JUnit `<testsuite>`, which in this repo means
+one per test file since the reporter (`apps/api/src/reporter/qably-report.mjs`) posts each file once. A
 single GitHub Actions workflow run over this repository therefore arrives as dozens of runs that
 share a `commitSha`, a `commitMessage` and a run number. Listing raw CI runs showed the same commit
 message repeated on every row while saying nothing new.

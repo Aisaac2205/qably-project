@@ -68,14 +68,14 @@ jobs:
         env:
           QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
           QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
-        run: node scripts/qably-report.mjs apps/api/reports/junit-unit.xml
+        run: node apps/api/src/reporter/qably-report.mjs apps/api/reports/junit-unit.xml
 
       - name: Report e2e results to Qably
         if: always()
         env:
           QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
           QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
-        run: node scripts/qably-report.mjs apps/api/reports/junit-e2e.xml
+        run: node apps/api/src/reporter/qably-report.mjs apps/api/reports/junit-e2e.xml
 
       - name: Upload JUnit reports
         if: always()
@@ -130,7 +130,7 @@ jobs:
         env:
           QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
           QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
-        run: node scripts/qably-report.mjs apps/web/reports/junit.xml
+        run: node apps/api/src/reporter/qably-report.mjs apps/web/reports/junit.xml
 
       - name: Upload JUnit report
         if: always()
@@ -175,7 +175,7 @@ jobs:
         env:
           QABLY_API_KEY: ${{ secrets.QABLY_API_KEY }}
           QABLY_API_BASE_URL: ${{ vars.QABLY_API_BASE_URL }}
-        run: node scripts/qably-report.mjs apps/landing/reports/junit.xml
+        run: node apps/api/src/reporter/qably-report.mjs apps/landing/reports/junit.xml
 
       - name: Upload JUnit report
         if: always()

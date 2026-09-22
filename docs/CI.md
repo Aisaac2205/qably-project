@@ -104,8 +104,9 @@ code changes are two independent pipelines, and only the report can say where a 
 
 Both reporters emit the path relative to the app they ran in (`src/...`), while the repository, the
 webhook and the extractor all speak in repository-relative paths (`apps/web/src/...`). A path
-without the workspace prefix would resolve to nothing on the provider. `scripts/qably-report.mjs`
-rewrites every `file` attribute before sending, prefixing the workspace it derives from the report's
+without the workspace prefix would resolve to nothing on the provider. The reporter (served by the
+API at `GET /report.mjs`, source at `apps/api/src/reporter/qably-report.mjs`) rewrites every `file`
+attribute before sending, prefixing the workspace it derives from the report's
 own location (`<workspace>/reports/<file>.xml`), so no reporter option has to know about the
 monorepo layout. `QABLY_REPO_PATH_PREFIX` overrides the derived prefix for layouts that do not
 follow that convention, and an empty value disables the rewrite. The rewrite is idempotent: a path
@@ -116,14 +117,36 @@ because the path is written once, when the case is first created.
 
 ## Reporting results to Qably
 
-After the tests run (successful or not — the step uses `if: always()`), each job invokes
-`scripts/qably-report.mjs` once per generated JUnit file:
+The reporter is a single self-contained, zero-dependency ES module,
+`apps/api/src/reporter/qably-report.mjs`, and it is also served straight from the API at
+`GET /report.mjs` (`Content-Type: text/javascript`, `Cache-Control`, `ETag`,
+`X-Qably-Report-Version`, and `X-Qably-Report-Sha256` so a caller can pin and verify the exact
+bytes before running them — see `docs/RUN_INGESTION.md`). A third-party CI wires it in with one
+line:
 
 ```
-node scripts/qably-report.mjs apps/api/reports/junit-unit.xml
-node scripts/qably-report.mjs apps/api/reports/junit-e2e.xml
-node scripts/qably-report.mjs apps/web/reports/junit.xml
+curl -fsSL https://api.qably.dev/report.mjs -o qably-report.mjs && node qably-report.mjs ./reports
 ```
+
+This repository's own CI does **not** do that download-and-run — it invokes the checked-out
+source directly instead, `if: always()`, once per generated JUnit file:
+
+```
+node apps/api/src/reporter/qably-report.mjs apps/api/reports/junit-unit.xml
+node apps/api/src/reporter/qably-report.mjs apps/api/reports/junit-e2e.xml
+node apps/api/src/reporter/qably-report.mjs apps/web/reports/junit.xml
+```
+
+This is a deliberate deviation from the "download the served script" pattern: fetching and
+executing code from a URL controlled by a mutable `vars.QABLY_API_BASE_URL`, in a job that also
+holds `secrets.QABLY_API_KEY` in its environment, hands code execution with that secret to
+whoever controls the origin or the variable, and it would mean CI tests the *deployed* script
+instead of the commit's. Running the source in the repo keeps the reporter itself covered by this
+same job's own `Unit tests` step (`apps/api/src/reporter/qably-report.spec.ts`), which exercises
+retries, splitting and annotations against a fake server before this step ever runs. The
+`GET /report.mjs` endpoint is still exercised on every CI run, by
+`apps/api/test/report.e2e-spec.ts`, which asserts it serves the exact same bytes as the checked-out
+source file plus a matching `X-Qably-Report-Sha256`.
 
 The script reads `QABLY_API_KEY` (a GitHub Actions **secret**) from the environment. **If it is
 unset, the script logs a message and exits 0 without doing anything.** This is deliberate: the
@@ -154,16 +177,21 @@ reporting it.
 
 `POST /runs/ingest/junit` is throttled at **30 requests per minute per credential**
 (`runs.controller.ts`), and the throttler buckets by API key rather than by IP, so every job in a
-workflow run shares one budget. The script posts **one request per JUnit file**, regardless of how
-many `<testsuite>` elements it contains or how many runs the server creates from it — see
-`docs/RUN_INGESTION.md`'s "One run per `<testsuite>`" for why splitting moved server-side. A
-workflow with, say, three report files (unit, e2e, web) spends three requests against the budget no
-matter how many suites are inside them.
+workflow run shares one budget. The reporter posts **one request per JUnit file** in the common
+case, regardless of how many `<testsuite>` elements it contains or how many runs the server
+creates from it — see `docs/RUN_INGESTION.md`'s "One run per `<testsuite>`" for why splitting
+moved server-side. A file that exceeds the server's own per-request caps (currently 10,000
+testcases or 500 distinct suites — `apps/api/src/modules/runs/lib/parse-junit-xml.ts` and
+`group-junit-report.ts`) is the one exception: the reporter splits it client-side along
+`<testsuite>` boundaries into the fewest additional requests that fit, never inside a suite. A
+workflow with, say, three report files (unit, e2e, web) spends three requests against the budget
+no matter how many suites are inside them, unless one of those files is oversized enough to split.
 
-When the API answers `429`, the script waits and retries instead of dropping the file. It honours
-the `Retry-After` header the throttler sends (in seconds); when that header is missing it falls
-back to exponential backoff starting at 10s, capped at 90s per wait, for up to
-`MAX_THROTTLE_RETRIES` retries. A file is only reported as failed once every retry is exhausted.
+When the API answers `429` or a `5xx`, or the request itself fails at the network level, the
+reporter retries with exponential backoff instead of dropping the file, up to 4 attempts total. A
+`429` honours the `Retry-After` header the throttler sends (in seconds) when present. A file is
+only reported as failed, via a `::warning::` annotation, once every retry is exhausted; a non-429
+`4xx` (a genuinely bad request) is never retried.
 
 Because one request already carries a whole file — the server splits it into runs internally, not
 the script — this budget is now sized against **the number of report files a workflow generates**
@@ -191,18 +219,22 @@ override from `vars.*`.
 
 ## JUnit ingestion — `POST /runs/ingest/junit`
 
-`scripts/qably-report.mjs` posts each generated JUnit file's **raw XML contents** as the request
-body, in a single `POST /runs/ingest/junit` call per file — it holds no XML parsing logic of its own.
-Everything that would be a JSON payload field is instead a query parameter the script builds from
-the environment:
+`apps/api/src/reporter/qably-report.mjs` posts each generated JUnit file's **raw XML contents** as
+the request body, in one `POST /runs/ingest/junit` call per file (or per split chunk for an
+oversized file, see above) — the client does only the minimal parsing needed to decide whether a
+file must be split, never full JUnit parsing. Everything that would be a JSON payload field is
+instead a query parameter the reporter builds from the environment:
 
 | Query parameter | Built from |
 | --- | --- |
 | `source` | fixed `github_actions` |
 | `externalId` | `gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>` — see below |
-| `name` | `<GITHUB_WORKFLOW> / <GITHUB_JOB> (#<GITHUB_RUN_NUMBER>)` |
 | `commitSha` | `$GITHUB_SHA` |
 | `commitMessage` / `commitAuthor` | `git log -1 --pretty=%s` / `%an` (best-effort, read locally — cheaper than parsing the event payload) |
+
+There is no `name` query parameter: the reporter leaves the run's display name for the server to
+derive from the actual `<testsuite>` it parsed (`resolveRunName` in `runs.controller.ts`), which is
+more accurate now that one file can produce several differently-named runs.
 
 The server does all the parsing: reading every `<testsuite>` and `<testcase>` (including nested
 suites), deriving each case's status from a `<failure>`/`<error>`/`<skipped>` child, and — critically
@@ -217,11 +249,14 @@ server never produces it — inventing one would misrepresent what the test runn
 gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>
 ```
 
-This is the script's own, **per-file** `externalId`, passed as a query parameter. When the file
+This is the reporter's own, **per-file** `externalId`, passed as a query parameter. When the file
 holds more than one `<testsuite>`, the server derives a further per-suite `externalId` from this
 base (`<base>-<slug(suiteName)>-<sha256(suiteName)[0:8]>`) for each run it creates — see
-`docs/RUN_INGESTION.md`. The script itself never computes a suite-level id; it does not parse the
-file, so it does not know the suite names.
+`docs/RUN_INGESTION.md`. The reporter itself never computes a suite-level id for a normal file; it
+only appends its own `-p<n>` suffix to the base `externalId` for a split chunk that the server
+would otherwise treat as a single, unqualified suite (see "Rate limits and retries" above) — an
+edge case that only exists to avoid two different chunks colliding on the server's bare-externalId
+fallback.
 
 - **`GITHUB_RUN_ID`** — identifies one workflow run. Deliberately **not** combined with
   `GITHUB_RUN_ATTEMPT`: re-running a failed job (a GitHub Actions "re-run failed jobs") keeps the
@@ -238,7 +273,7 @@ file, so it does not know the suite names.
 
 ## Suite adoption on first report
 
-`scripts/qably-report.mjs` never sends `suiteId` or `suiteName` — it lets the server derive and
+The reporter never sends `suiteId` or `suiteName` — it lets the server derive and
 split suites from the XML entirely, per `docs/RUN_INGESTION.md`. An unrecognized suite name is
 adopted once the worker processes the corresponding queued job — the suite is created, along with a
 `draft` `TestCase` for every reported case name — and the report is accepted with `202` on its very
@@ -249,10 +284,13 @@ promotes one.
 
 ### Does a failed report fail the CI job?
 
-**No.** `scripts/qably-report.mjs` never calls `process.exit(1)`; every failure path (missing
-secrets, any non-2xx response, a network error) is caught, logged as a `::warning::` annotation, and
-counted in a `1 succeeded` / `1 failed` summary line per file. The job's actual pass/fail signal
-comes entirely from the test step itself (`jest` / `vitest` exiting non-zero on a real test failure)
+**Not by default.** Every failure path (missing key, missing report file, any non-2xx response, a
+network error) is caught and logged as a `::warning::` annotation; the reporter's exit code stays
+`0`. Setting `QABLY_FAIL_ON_ERROR=true` in the
+step's environment flips that: any warning then makes the reporter exit `1`, for a team that wants
+a broken integration to be visible in the job status rather than only in the logs. This repository's
+own CI does not set it, so the job's actual pass/fail signal comes entirely from the test step
+itself (`jest` / `vitest` exiting non-zero on a real test failure)
 — reporting to Qably is a best-effort side channel, not a gate. A Qably-side outage or a revoked key
 is Qably's problem, not the pull request's. Blocking merges on the availability of an external,
 optional integration is the wrong failure mode — the uploaded JUnit artifact is still there for a

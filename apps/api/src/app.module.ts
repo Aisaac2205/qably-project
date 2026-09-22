@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './modules/projects/projects.module';
 import { RepositoryModule } from './modules/repository/repository.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { ReporterModule } from './reporter/reporter.module';
 import { ReviewModule } from './modules/review/review.module';
 import { RunsModule } from './modules/runs/runs.module';
 import { SuitesModule } from './modules/suites/suites.module';
@@ -40,6 +41,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     ReviewModule,
     ChatModule,
     DashboardModule,
+    ReporterModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: CredentialThrottlerGuard }],
 })

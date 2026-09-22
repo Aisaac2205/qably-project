@@ -447,27 +447,32 @@ suite, used by `apps/api/test/junit-e2e-fixture.e2e-spec.ts` to exercise the ful
 hand-written snippet. To regenerate it: run
 `JEST_JUNIT_OUTPUT_DIR=./reports JEST_JUNIT_OUTPUT_NAME=junit-e2e.xml JEST_JUNIT_ADD_FILE_ATTRIBUTE=true npx jest --config ./test/jest-e2e.json --ci --reporters=default --reporters=jest-junit --maxWorkers=2`
 from `apps/api`, then rewrite every `<testcase>`'s `file` attribute the same way
-`scripts/qably-report.mjs`'s `repoRelativeFilePaths` does for CI (`apps/api`-relative, forward
+`apps/api/src/reporter/qably-report.mjs`'s `repoRelativeFilePaths` does for CI (`apps/api`-relative, forward
 slashes), strip the `timestamp` attribute from each `<testsuite>` and replace any `<failure>` body with
 a short, stable placeholder — the goal is a fixture whose suite/case/file structure is real and
 reproducible, not one whose diff churns on machine paths, wall-clock timestamps or a stack trace tied to
 this run's line numbers.
 
-### `scripts/qably-report.mjs`
+### `apps/api/src/reporter/qably-report.mjs`
 
-The script that reports CI results to Qably (invoked once per generated JUnit file, see
-`docs/CI.md`) posts the file's raw contents to this endpoint in a single request — it holds no XML
-parsing or per-suite splitting logic of its own; that all happens server-side, as described above.
-One file becomes one `POST /runs/ingest/junit` call, which in turn becomes one enqueued job per
-`<testsuite>` in that file. `suiteName` is left unset so the server derives and splits by it; the
-script only supplies `externalId` (built from the job, the run and the file path — see `docs/CI.md`;
-the server then re-derives a per-suite `externalId` from this base when the file holds more than one
-suite), `source`, `name` (the workflow and job name) and the commit metadata already read from
-`$GITHUB_SHA` and `git log`. On success the script reads `accepted` and the `runs` array's
-`externalId`s from the `202` JSON response to log how many jobs were queued and for which runs — it
-does not (and cannot) know whether ingestion itself has finished by the time it logs. The existing
-`429` retry/backoff and `::warning` annotation behavior is unchanged; reporting failures never fail
-the CI job (see `main().catch(...)` in the script).
+The reporter (a zero-dependency ES module, also served at `GET /report.mjs` — see `docs/CI.md`)
+posts each file's raw contents to this endpoint in one request per file — it holds no full JUnit
+parsing logic of its own; per-suite splitting and case identity all happen server-side, as
+described above. The one exception is sizing: the reporter does the minimal parsing needed to
+count testcases and top-level `<testsuite>` elements, and if a file would exceed this endpoint's
+own caps (10,000 testcases or 500 groups, see above) it splits that one file into multiple requests
+along `<testsuite>` boundaries before sending, never inside a suite. In the common case, one file
+becomes one `POST /runs/ingest/junit` call, which in turn becomes one enqueued job per `<testsuite>`
+in that file. `suiteName` is left unset so the server derives and splits by it; the reporter only
+supplies `externalId` (built from the job, the run and the file path — see `docs/CI.md`; the server
+then re-derives a per-suite `externalId` from this base when the file holds more than one suite),
+`source`, and the commit metadata already read from `$GITHUB_SHA` and `git log` — there is no
+`name` parameter, the server derives each run's name from the suite it actually parsed. On success
+the reporter reads `accepted` and the `runs` array's `externalId`s from the `202` JSON response to
+log how many jobs were queued and for which runs — it does not (and cannot) know whether ingestion
+itself has finished by the time it logs. The `429`/`5xx`/network retry-with-backoff and
+`::warning`/`::notice` annotation behavior is unchanged in spirit; reporting failures never fail the
+CI job unless `QABLY_FAIL_ON_ERROR=true` is set (see `docs/CI.md`).
 
 ## SCM ingestion queue retry policy
 
