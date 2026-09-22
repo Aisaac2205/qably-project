@@ -1,3 +1,5 @@
+import type { CaseDocumentationState, SuiteDocumentationState } from './documentation-completeness'
+
 // ─── Status types ────────────────────────────────────────────────────────────
 
 export type CaseStatus = 'pass' | 'fail' | 'skip' | 'blocked' | 'running' | 'pending'
@@ -186,6 +188,7 @@ export interface TestCase {
   documentedLocale?: string | null
   localeStale?: boolean
   observations?: string[]
+  documentation?: CaseDocumentationState
 }
 
 export interface Suite {
@@ -205,6 +208,7 @@ export interface Suite {
   isDefault: boolean
   updatedAt: string
   healthSummary?: CaseHealthSummary
+  documentation?: SuiteDocumentationState
 }
 
 export interface RunCaseOfficialCase {

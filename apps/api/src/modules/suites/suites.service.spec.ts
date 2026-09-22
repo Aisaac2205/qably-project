@@ -1376,3 +1376,119 @@ describe('SuitesService incomplete documentation read model', () => {
     expect(suite.incompleteCount).toBe(0);
   });
 });
+
+describe('SuitesService documentation state read model', () => {
+  it('exposes the persisted documentation state on a case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          {
+            ...suiteRow.cases[0],
+            documentationSource: 'aeris',
+            documentationOutcome: 'incomplete',
+            documentationOutcomeAt: new Date('2026-03-01T00:00:00.000Z'),
+            documentationMissing: ['objective', 'steps'],
+            documentationSkipReason: null,
+            documentationQueuedAt: null,
+          },
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].documentation).toEqual({
+      outcome: 'incomplete',
+      missing: ['objective', 'steps'],
+      skipReason: null,
+      queuedAt: null,
+      outcomeAt: '2026-03-01T00:00:00.000Z',
+    });
+  });
+
+  it('reports a case still queued with no outcome yet as documenting (null outcome, queuedAt set)', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        cases: [
+          {
+            ...suiteRow.cases[0],
+            documentationSource: 'aeris',
+            documentationOutcome: null,
+            documentationOutcomeAt: null,
+            documentationMissing: [],
+            documentationSkipReason: null,
+            documentationQueuedAt: new Date('2026-03-02T00:00:00.000Z'),
+          },
+        ],
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].documentation).toEqual({
+      outcome: null,
+      missing: [],
+      skipReason: null,
+      queuedAt: '2026-03-02T00:00:00.000Z',
+      outcomeAt: null,
+    });
+  });
+
+  it('defaults a case with no documentation columns set to an empty, complete-looking state', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.cases[0].documentation).toEqual({
+      outcome: null,
+      missing: [],
+      skipReason: null,
+      queuedAt: null,
+      outcomeAt: null,
+    });
+  });
+
+  it('exposes the persisted documentation state on the suite itself', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        ...suiteRow,
+        documentationOutcome: 'skipped',
+        documentationOutcomeAt: new Date('2026-03-03T00:00:00.000Z'),
+        documentationMissing: ['tags'],
+        documentationSkipReason: 'already-pending',
+        documentationQueuedAt: null,
+      },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.documentation).toEqual({
+      outcome: 'skipped',
+      missing: ['tags'],
+      skipReason: 'already-pending',
+      queuedAt: null,
+      outcomeAt: '2026-03-03T00:00:00.000Z',
+    });
+  });
+
+  it('defaults a suite with no documentation columns set to an empty, complete-looking state', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.documentation).toEqual({
+      outcome: null,
+      missing: [],
+      skipReason: null,
+      queuedAt: null,
+      outcomeAt: null,
+    });
+  });
+});

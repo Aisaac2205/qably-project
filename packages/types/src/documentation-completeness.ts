@@ -17,6 +17,17 @@ export interface DocumentationAssessment<Field extends string> {
   missing: Field[];
 }
 
+export interface DocumentationState<Field extends string> {
+  outcome: DocumentationOutcome | null;
+  missing: Field[];
+  skipReason: string | null;
+  queuedAt: string | null;
+  outcomeAt: string | null;
+}
+
+export type CaseDocumentationState = DocumentationState<CaseDocumentationField>;
+export type SuiteDocumentationState = DocumentationState<SuiteDocumentationField>;
+
 export interface CaseDocumentationInput {
   name: string;
   automationKey: string | null | undefined;

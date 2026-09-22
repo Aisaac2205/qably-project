@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import type { Locale } from '@qably/i18n';
 import { Prisma } from '../../../generated/prisma/client';
 import type {
+  CaseDocumentationField,
   CaseHealthSummary,
   CaseLastResult,
   CaseStatus,
+  DocumentationOutcome,
+  DocumentationState,
   ExecutionMode,
+  SuiteDocumentationField,
 } from '@qably/types';
 import {
   deriveCaseHealth,
@@ -57,7 +61,11 @@ const CASE_SELECT = {
   automationFilePath: true,
   observations: true,
   documentationSource: true,
+  documentationQueuedAt: true,
   documentationOutcome: true,
+  documentationOutcomeAt: true,
+  documentationMissing: true,
+  documentationSkipReason: true,
   currentVersion: { select: { version: true, locale: true } },
 } as const;
 
@@ -71,6 +79,11 @@ const SUITE_SELECT = {
   isDefault: true,
   createdAt: true,
   updatedAt: true,
+  documentationQueuedAt: true,
+  documentationOutcome: true,
+  documentationOutcomeAt: true,
+  documentationMissing: true,
+  documentationSkipReason: true,
   cases: { select: CASE_SELECT, orderBy: { position: 'asc' } },
 } as const;
 
@@ -90,7 +103,11 @@ interface CaseRow {
   automationFilePath: string | null;
   observations?: unknown;
   documentationSource: string;
+  documentationQueuedAt: Date | null;
   documentationOutcome: string | null;
+  documentationOutcomeAt: Date | null;
+  documentationMissing: string[];
+  documentationSkipReason: string | null;
   currentVersion: { version: number; locale?: string | null } | null;
 }
 
@@ -158,6 +175,11 @@ interface SuiteRow {
   isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
+  documentationQueuedAt: Date | null;
+  documentationOutcome: string | null;
+  documentationOutcomeAt: Date | null;
+  documentationMissing: string[];
+  documentationSkipReason: string | null;
   cases: CaseRow[];
 }
 
@@ -167,6 +189,26 @@ function isUniqueViolation(error: unknown): boolean {
     error !== null &&
     (error as { code?: unknown }).code === UNIQUE_VIOLATION
   );
+}
+
+interface DocumentationColumns {
+  documentationQueuedAt: Date | null;
+  documentationOutcome: string | null;
+  documentationOutcomeAt: Date | null;
+  documentationMissing: string[];
+  documentationSkipReason: string | null;
+}
+
+function toDocumentationState<Field extends string>(
+  row: DocumentationColumns,
+): DocumentationState<Field> {
+  return {
+    outcome: (row.documentationOutcome as DocumentationOutcome | null) ?? null,
+    missing: (row.documentationMissing ?? []) as Field[],
+    skipReason: row.documentationSkipReason ?? null,
+    queuedAt: row.documentationQueuedAt?.toISOString() ?? null,
+    outcomeAt: row.documentationOutcomeAt?.toISOString() ?? null,
+  };
 }
 
 function toCaseView(testCase: CaseRow, orgDefaultLocale: Locale): TestCaseView {
@@ -188,6 +230,7 @@ function toCaseView(testCase: CaseRow, orgDefaultLocale: Locale): TestCaseView {
     priority: testCase.priority,
     state: testCase.state,
     executionMode: testCase.executionMode,
+    documentation: toDocumentationState<CaseDocumentationField>(testCase),
     ...(observationsOf(testCase.observations) === undefined
       ? {}
       : { observations: observationsOf(testCase.observations) }),
@@ -233,6 +276,7 @@ function toView(row: SuiteRow, orgDefaultLocale: Locale): SuiteView {
     undocumentedCount: 0,
     staleLocaleCount: 0,
     incompleteCount: 0,
+    documentation: toDocumentationState<SuiteDocumentationField>(row),
     cases,
   };
 }
