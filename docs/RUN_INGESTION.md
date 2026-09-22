@@ -198,11 +198,30 @@ comparison is truncation-aware — `name` truncates at 120 characters and `class
 over 120 characters where both fields were originally identical is still recognized as the same case,
 not misread as a composite.
 
-**New cases only.** An existing `TestCase.automationKey` is never rewritten to add a classname prefix
-it didn't already have. Matching tries the composite identity first, then the legacy (name-only) key
-second — the same two-step migration pattern `Suite.ingestionKey` already uses — so a case whose
-`automationKey` was recorded before this change keeps matching every later report exactly as it did
-before, with no backfill of the richer key.
+**Legacy rows are durably migrated on an unambiguous claim.** Matching tries the composite identity
+first, then falls back to the legacy (name-only) key — the same two-step migration pattern
+`Suite.ingestionKey` already uses. When that fallback finds a pre-composite row (one whose
+`automationKey` is still the bare name), it now rewrites `automationKey` to the composite the same
+transaction, exactly like `Suite.ingestionKey` gets stamped on first match: a later report for the
+same test claims the row by its own composite key directly, and the row can never be silently handed
+to a different test that happens to share the same bare name (see the next paragraph). This migration
+only happens when the fallback is unambiguous — see below.
+
+**Two identities that both reach the same legacy row is a collision, not a coin flip.** A composite
+identity's fallback to a pre-composite row, and a plain (no-`className`) identity's own key, both
+resolve through the row's bare-name `automationKey`. If more than one distinct identity reported in
+the same batch shares that bare name — a plain case and a composite case, or two composites with
+different `className`s — `findLegacyKeyCollisions`
+(`apps/api/src/modules/runs/lib/case-identity.ts`) catches it before any of them touches that row:
+none of them claims it or backfills its key. A composite identity in that situation still gets its own
+new draft case under its own distinct composite key (safe — it cannot collide with the contested bare
+name); a plain identity does not get drafted at all, because drafting under the exact bare name would
+just silently re-claim whichever row already holds it. The contested bare name is still reported in
+the response's `caseIdentityCollisions` (see "Response" above), the same field
+`findCaseIdentityCollisions` uses, so a human can rename one of the colliding tests. The migration
+above is also race-safe: a `P2002` on the migrating `testCase.update` (two concurrent ingests
+migrating the same row to the same composite key) is swallowed, since both writes are idempotent —
+same target value.
 
 **Collisions are never merged silently.** If two differently-reported cases (different `name`,
 different `className`, or both) resolve to the identical identity key within the same suite,
@@ -212,6 +231,18 @@ rather than one silently overwriting or absorbing the other. `POST /runs/ingest/
 same check per suite group before enqueuing, and lists any collision in the response's
 `caseIdentityCollisions` (see "Response" above) — the group itself is still accepted and queued, only
 the colliding cases are left unlinked until a human renames one of them.
+
+**Collisions are not persisted.** `caseIdentityCollisions` and the legacy-key collisions above exist
+only in the `202` response and the CI reporter's `::warning::` annotations — nothing is written to the
+`Run` row or any other table. A collision a human never sees (a local run, a CI log nobody reads) is
+silently forgotten once the response is gone. Making this durable needs its own design, not a field
+bolted on here: a later `/review-inbox` SDD should decide where collisions live (a column on `Run`
+versus a dedicated table — a dedicated table reads better once collisions need their own list/filter/
+resolve lifecycle independent of any one run), whether ambiguous legacy rows created a real orphaned
+`TestCase` that also needs surfacing (see the paragraph above — the contested legacy row itself is
+left untouched, not linked to anything, which is a distinct fact from "these two identities collided"),
+and how a human resolution (renaming a test, deleting a stale draft) retroactively closes the
+collisions it caused.
 
 ## Idempotency
 
@@ -312,7 +343,7 @@ Content-Type: application/xml
 | `suiteId` / `suiteName` | no | Pins the report to one existing (or adopted) suite and turns off the per-suite split — see below. Passing `suiteId` skips suite-name derivation from the XML entirely. |
 | `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
 | `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
-| `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own accepted groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: reduced by this request's own rejected-group count (so a rejected group never blocks the batch notification from completing), then raised to at least this request's own accepted-group count if still under that, and capped at 100,000 if absurdly large. It is never trusted blindly. |
+| `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own accepted-plus-rejected groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: raised to at least this request's own group count (accepted plus rejected) if still under that, and capped at 100,000 if absurdly large. It is never trusted blindly, and it is never reduced for a rejected group — see "Rejected groups still count toward the batch" below. |
 
 ### Response — `202 Accepted`, asynchronous
 
@@ -350,7 +381,9 @@ notification — happens later, on a worker, off the request path:
   job for that run instead of enqueuing a second one.
 - `rejected[].suiteName` / `rejected[].reason` — a group that failed the same `ingestRunSchema`
   validation `POST /runs/ingest` uses, and was therefore never enqueued. `suiteName` falls back to the
-  group's externalId when the suite name itself is what's empty or invalid.
+  group's externalId when the suite name itself is what's empty or invalid. See "Rejected groups still
+  count toward the batch" below for what happens to a rejected group when the report is split across
+  several requests.
 - `caseIdentityCollisions[]` — see "Case identity" below. A collision never rejects the suite; the
   colliding cases still ingest as `RunCase` rows, just with `testCaseId: null`.
 - `truncatedFields` — a count per field name of how many values were clipped to their length limit
@@ -434,7 +467,20 @@ does not do that:
   (`ReportBatchService`, `report-batch.lua.ts`) is `reportSize` from the query when present — the
   reporter sends the same total suite-group count on every chunk of a split file — and falls back to
   `groups.length` (this request's own count) when absent, which is exactly right for an unsplit file
-  where one request already is the whole report.
+  where one request already is the whole report. The locked size is not fixed forever: if a later
+  call for the same batch key reports a larger size than the one currently locked, the batch grows to
+  match instead of completing early — a safety net against any one call undercounting the true total.
+- **Rejected groups still count toward the batch.** A group that fails validation (see "Response" above)
+  is recorded into the same Redis batch as a `rejected` result, the same way an accepted group's `pass`/
+  `fail` outcome is, as soon as the controller rejects it — not just dropped from the size. This is what
+  makes the batch complete correctly when the rejecting group is not in the first chunk to arrive: before
+  this, `reportSize` was reduced by that request's own rejected-group count, but the batch's locked size
+  had already been set by whichever chunk arrived first, so a reject in a *later* chunk was invisible to
+  it and the batch only ever closed via the 120-second timeout, publishing a partial notification. The
+  aggregated notification lists rejected suite names the same way it lists failed ones
+  (`rejectedCount`/`rejectedSuiteNames` alongside `failedCount`/`failedSuiteNames` in the payload,
+  `build-batch-notification.ts`), and counts as `run_failed` whenever there is at least one rejection,
+  even with zero test failures.
 
 **Exception — pinning `suiteId` or `suiteName` turns the split off.** An explicit `suiteId` or
 `suiteName` is the caller stating "everything in this report belongs to this one suite" — that intent
@@ -524,8 +570,9 @@ own caps (10,000 testcases or 500 groups, see above) it splits that one file int
 along `<testsuite>` boundaries before sending, never inside a suite. Every chunk of a split file
 carries the same `reportSize` query parameter — the total top-level `<testsuite>` count of the
 *whole* original file, computed once before splitting (`countTopLevelGroups` in
-`qably-report.mjs`) — so the server can aggregate one notification for the whole report instead of
-one per chunk (see above). In the common case, one file becomes one `POST /runs/ingest/junit` call,
+`qably-report.mjs`, which ports the server's own `suiteKey` grouping rule — see below) — so the
+server can aggregate one notification for the whole report instead of one per chunk (see above). In
+the common case, one file becomes one `POST /runs/ingest/junit` call,
 which in turn becomes one enqueued job per `<testsuite>` in that file. `suiteName` is left unset so
 the server derives and splits by it; the reporter only supplies `externalId` (built from the job,
 the run and the file path — see `docs/CI.md`; the server then re-derives a per-suite `externalId`
@@ -544,19 +591,33 @@ indefinitely. Since unit 10 the reporter also reads `rejected`, `caseIdentityCol
 case identity collision, and one `::notice::` per request that truncated at least one field — see
 `docs/CI.md` for the exact wording and the `QABLY_FAIL_ON_ERROR` interaction.
 
-**Known limitation, disclosed not fixed**: `countTopLevelGroups` counts top-level `<testsuite>`
-blocks by depth, matching the server's `groupJunitReportBySuite` (which groups by `suiteKey`) in the
-common flat-structure case, but undercounts when a top-level block itself nests a further,
-differently-named `<testsuite>` — the server splits that into two distinct groups, the client still
-sees one top-level block and reports `reportSize: 1` for it. A regression test
-(`qably-report.spec.ts`, "undercounts against the server...") pins the exact discrepancy against the
-server's own `groupJunitReportBySuite` rather than leaving it undocumented. Fixing it would mean
-re-implementing the server's `suiteKey` grouping algorithm — which walks the parsed, nested XML tree —
-inside a zero-dependency, regex-based reporter script; that is a large enough undertaking to warrant
-its own unit rather than a fix folded into this one. jest-junit, vitest's junit reporter, pytest and
-Maven surefire — the reporters this endpoint targets — do not nest `<testsuite>` inside `<testsuite>`
-with different names in practice, so the gap is real but not exercised by the reporters Qably
-currently documents.
+**`countTopLevelGroups` ports the server's exact grouping rule, it does not approximate it.** The
+earlier implementation only looked at top-level `<testsuite>` blocks directly under `<testsuites>`,
+matching the server's `groupJunitReportBySuite` in the common flat-structure case but undercounting
+whenever a block nested a further, differently-named `<testsuite>` — the server splits that into two
+distinct groups, the client used to see one top-level block and report `reportSize: 1` for it. It now
+walks the whole document recursively, mirroring `parse-junit-xml.ts`'s `collectCases` and
+`group-junit-report.ts`'s `groupJunitReportBySuite` directly: a `<testsuite>` with its own `name`
+attribute starts a new suite key at any depth, one without inherits its closest ancestor's key, and
+two nodes anywhere in the document that resolve to the identical key merge into one group — the same
+Map-by-suiteKey-value semantics the server uses, including the "two identically-named `<testsuite>`
+nodes merge into one group" rule. This still does not require a full XML parser: the walk reuses the
+same tag-depth-tracking primitive `findTopLevelTestsuiteBlocks` already used for splitting
+(`splitChildTestsuiteBlocks` in `qably-report.mjs`), generalized to recurse into any fragment instead
+of only the `<testsuites>` root body, and to also work when the root is a bare `<testsuite>` rather
+than `<testsuites>`. A contract test (`qably-report.spec.ts`, `countTopLevelGroups`) runs the client
+function and the server's own `groupJunitReportBySuite` over the same fixtures — flat multi-suite,
+pytest-style classname nesting two levels deep, a surefire-style unnamed nested testsuite, and the
+identically-named-merge case — and asserts the counts always match, not just the one shape that used
+to diverge.
+
+**Defense in depth if a future XML shape still disagrees.** `ReportBatchService`'s Redis-backed batch
+size is no longer fixed by whichever call reaches it first: `report-batch.lua.ts`'s
+`RECORD_SUITE_RESULT_SCRIPT` now grows the locked `size` to the max of what it already has and what
+the current call reports, instead of `HSETNX`-locking it once. If some XML shape the contract test
+above does not yet cover still makes the client undercount, the batch grows to match the largest
+total any call for that key actually reported, rather than completing early and publishing a partial
+notification.
 
 **A bare `<testsuite>` root that is oversized has no `<testsuite>` boundary to split on** (see
 `buildSplitRequests` above: `oversizedUnsplittable: true`) and is sent as a single, over-cap request,
