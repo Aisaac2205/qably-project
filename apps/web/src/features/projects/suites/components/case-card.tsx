@@ -21,6 +21,8 @@ import {
 import { CaseAttentionChip } from './case-attention-chip'
 import { HealthSignalChip } from './health-signal-chip'
 import { localeNameKey } from '@/features/projects/suites/lib/documentable-cases'
+import { deriveCaseDocumentationBadge } from '@/features/projects/suites/lib/case-documentation-state'
+import { CaseDocumentationBadge } from './case-documentation-badge'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -42,6 +44,7 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
   const showRawName = described.raw !== described.title
   const staleLocale = testCase.localeStale === true
   const attention = deriveCaseAttention(testCase)
+  const documentationBadge = deriveCaseDocumentationBadge(testCase)
   const qualitySignals = CASE_HEALTH_SIGNAL_ORDER.filter(
     (signal) =>
       testCase.healthSignals?.includes(signal) === true &&
@@ -79,11 +82,6 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
             </p>
           )}
         </div>
-        {testCase.version !== null && (
-          <span className="shrink-0 whitespace-nowrap rounded bg-canvas border border-border px-1.5 py-0.5 font-mono text-[10px] font-semibold text-muted">
-            v{testCase.version}
-          </span>
-        )}
         {githubFileUrl && (
           <Tooltip>
             <TooltipTrigger
@@ -103,7 +101,9 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete }: CaseCardPro
           </Tooltip>
         )}
         <PriorityBadge priority={testCase.priority} />
-        {attention === null || attention === 'in-review' ? (
+        {documentationBadge !== null ? (
+          <CaseDocumentationBadge badge={documentationBadge} />
+        ) : attention === null || attention === 'in-review' ? (
           <StatusChip status={testCase.state} scope="lifecycle" />
         ) : (
           <CaseAttentionChip attention={attention} />

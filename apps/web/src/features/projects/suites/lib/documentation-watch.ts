@@ -10,14 +10,12 @@ export interface DocumentationWatch {
 
 export function deriveWatchStatus(
   watch: DocumentationWatch | null,
-  currentCount: number | undefined,
+  isDocumenting: boolean,
   now: number,
   windowMs: number = DOCUMENTATION_WATCH_WINDOW_MS,
 ): DocumentationWatchStatus {
   if (watch === null) return 'idle'
-  if (currentCount !== undefined && currentCount < watch.baselineCount) {
-    return 'settled'
-  }
+  if (!isDocumenting) return 'settled'
   if (now - watch.startedAt >= windowMs) return 'timed-out'
   return 'working'
 }

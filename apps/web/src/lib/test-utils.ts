@@ -38,6 +38,7 @@ export function createMockSuite(overrides: Partial<Suite> = {}): Suite {
     isDefault: overrides.isDefault ?? false,
     updatedAt: overrides.updatedAt ?? '2026-01-25T00:00:00Z',
     healthSummary: overrides.healthSummary,
+    documentation: overrides.documentation,
   }
 }
 
@@ -68,5 +69,6 @@ export function createMockTestCase(overrides: Partial<TestCase> = {}): TestCase 
     healthSignals: overrides.healthSignals,
     documentedLocale: overrides.documentedLocale,
     localeStale: overrides.localeStale,
+    documentation: overrides.documentation,
   }
 }

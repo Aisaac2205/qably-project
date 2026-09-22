@@ -11,8 +11,8 @@ import {
 } from '../lib/documentation-watch'
 
 export interface DocumentationWatchState {
-  statusFor: (currentCount: number | undefined) => DocumentationWatchStatus
-  intervalFor: (currentCount: number | undefined) => number | false
+  statusFor: (isDocumenting: boolean) => DocumentationWatchStatus
+  intervalFor: (isDocumenting: boolean) => number | false
   documentedCountSince: (currentCount: number | undefined) => number
   begin: (baselineCount: number) => void
   dismiss: () => void
@@ -42,15 +42,15 @@ export function useDocumentationWatch(
   const dismiss = useCallback(() => setWatch(null), [])
 
   const statusFor = useCallback(
-    (currentCount: number | undefined) =>
-      deriveWatchStatus(watch, currentCount, now, windowMs),
+    (isDocumenting: boolean) =>
+      deriveWatchStatus(watch, isDocumenting, now, windowMs),
     [watch, now, windowMs],
   )
 
   const intervalFor = useCallback(
-    (currentCount: number | undefined) =>
+    (isDocumenting: boolean) =>
       pollIntervalFor(
-        deriveWatchStatus(watch, currentCount, Date.now(), windowMs),
+        deriveWatchStatus(watch, isDocumenting, Date.now(), windowMs),
       ),
     [watch, windowMs],
   )

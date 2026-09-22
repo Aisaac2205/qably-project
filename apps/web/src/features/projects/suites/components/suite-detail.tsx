@@ -45,13 +45,20 @@ import { useDocumentationWatch } from '@/features/projects/suites/hooks/use-docu
 import { useDocumentationFeedback } from '@/features/projects/suites/hooks/use-documentation-feedback'
 import { notify } from '@/lib/notify'
 import type { DocumentFilesMode } from './document-with-aeris'
+import { isDocumentationBusy, isOutcomeIncomplete } from '@/features/projects/suites/lib/documentation-state'
+
+function incompleteUnitsCount(suite: Suite): number {
+  return suite.incompleteCount + (isOutcomeIncomplete(suite.documentation) ? 1 : 0)
+}
 
 function watchedCount(
   suite: Suite | undefined,
   mode: DocumentFilesMode,
 ): number | undefined {
   if (suite === undefined) return undefined
-  return mode === 'stale-locale' ? suite.staleLocaleCount : suite.undocumentedCount
+  if (mode === 'stale-locale') return suite.staleLocaleCount
+  if (mode === 'incomplete') return incompleteUnitsCount(suite)
+  return suite.undocumentedCount
 }
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
@@ -60,7 +67,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const [watchedMode, setWatchedMode] = useState<DocumentFilesMode>('undocumented')
   const watch = useDocumentationWatch()
   const { suite, isLoading } = useSuite(suiteId, (current) =>
-    watch.intervalFor(watchedCount(current, watchedMode)),
+    watch.intervalFor(isDocumentationBusy(current)),
   )
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
@@ -100,7 +107,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const [deletingCase, setDeletingCase] = useState<TestCase | undefined>(undefined)
 
   const currentWatchedCount = watchedCount(suite, watchedMode)
-  const watchStatus = watch.statusFor(currentWatchedCount)
+  const watchStatus = watch.statusFor(isDocumentationBusy(suite))
   const documentedCount = watch.documentedCountSince(currentWatchedCount)
 
   useDocumentationFeedback({ documentation, watchStatus, documentedCount })
@@ -138,6 +145,12 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   }
 
   const pendingDocCount = suite.undocumentedCount
+  const hasUndocumented = pendingDocCount > 0
+  const primaryMode: DocumentFilesMode = hasUndocumented ? 'undocumented' : 'incomplete'
+  const primaryCount = hasUndocumented ? pendingDocCount : incompleteUnitsCount(suite)
+  const primaryLabel = hasUndocumented
+    ? t('suites.documentSuiteWithAeris', { count: pendingDocCount })
+    : t('suites.completeSuiteWithAeris', { count: primaryCount })
   const awaitingCases = casesAwaitingConfirmation(suite.cases)
   const caseGroups = groupCasesForDisplay(suite.cases)
   const isFullyAutomated = suite.manualCases === 0 && suite.cases.length > 0
@@ -233,8 +246,9 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               )}
 
               <DocumentWithAeris
-                label={t('suites.documentSuiteWithAeris', { count: pendingDocCount })}
-                pendingCount={pendingDocCount}
+                label={primaryLabel}
+                pendingCount={primaryCount}
+                primaryMode={primaryMode}
                 staleCount={suite.staleLocaleCount}
                 documentation={documentation}
                 primary={isFullyAutomated}

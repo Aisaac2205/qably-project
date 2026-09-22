@@ -406,6 +406,89 @@ describe('SuiteDetail (redesigned)', () => {
     expect(screen.queryByText(/all cases in this suite run in ci/i)).not.toBeInTheDocument()
   })
 
+  describe('Aeris action label switching', () => {
+    function automatedIncompleteSuite(overrides: Partial<Parameters<typeof createMockSuite>[0]> = {}) {
+      return createMockSuite({
+        id: 'suite-incomplete',
+        name: 'Incomplete',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 0,
+        incompleteCount: 1,
+        cases: [
+          createMockTestCase({
+            id: 'tc-incomplete-1',
+            executionMode: 'automated',
+            state: 'active',
+            steps: ['open'],
+            expectedResult: 'done',
+          }),
+        ],
+        ...overrides,
+      })
+    }
+
+    it('switches to the completion label and mode once no case is undocumented but some remain incomplete', async () => {
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(automatedIncompleteSuite())
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-incomplete" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      expect(screen.getByRole('button', { name: /complete \(1\)/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^document \(\d+\)$/i })).not.toBeInTheDocument()
+    })
+
+    it('sends the incomplete mode when the completion action is triggered', async () => {
+      const user = userEvent.setup()
+      const documentSuiteSpy = vi.spyOn(suitesApiStub, 'documentSuite')
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(automatedIncompleteSuite())
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-incomplete" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      await user.click(screen.getByRole('button', { name: /complete \(1\)/i }))
+
+      await vi.waitFor(() => {
+        expect(documentSuiteSpy).toHaveBeenCalledWith('suite-incomplete', 'incomplete')
+      })
+    })
+
+    it('counts the suite itself when its own documentation is incomplete, even with no incomplete cases', async () => {
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
+        automatedIncompleteSuite({
+          incompleteCount: 0,
+          documentation: {
+            outcome: 'skipped',
+            missing: ['tags'],
+            skipReason: 'already-pending',
+            queuedAt: null,
+            outcomeAt: '2026-03-01T00:00:00Z',
+          },
+        }),
+      )
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-incomplete" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      expect(screen.getByRole('button', { name: /complete \(1\)/i })).toBeInTheDocument()
+    })
+
+    it('hides the Aeris action once nothing is undocumented, incomplete, or stale', async () => {
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
+        automatedIncompleteSuite({ incompleteCount: 0 }),
+      )
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-incomplete" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      expect(screen.queryByRole('button', { name: /document|complete/i })).not.toBeInTheDocument()
+    })
+  })
+
   it('lists automated cases with their last result under "Covered by CI"', async () => {
     const mixedSuite = createMockSuite({
       id: 'suite-mixed',

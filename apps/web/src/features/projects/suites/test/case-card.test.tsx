@@ -126,12 +126,6 @@ describe('CaseCard observations', () => {
 })
 
 describe('CaseCard', () => {
-  it('keeps the version chip from shrinking in the badge row', async () => {
-    await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
-    const chip = screen.getByText((_, element) => element?.textContent === 'v2' && element.tagName === 'SPAN')
-    expect(chip.className).toContain('shrink-0')
-  })
-
   it('shows the raw automation key in mono under the humanized title when it differs', async () => {
     await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
     expect(screen.getByText('Redirects to dashboard on valid login')).toBeInTheDocument()
@@ -149,15 +143,8 @@ describe('CaseCard', () => {
     expect(screen.getByText('src/features/runs/hooks/use-create-run.test.ts')).toBeInTheDocument()
   })
 
-  it('shows the published version of the case', async () => {
+  it('never shows a raw version chip, published or not', async () => {
     await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
-    expect(screen.getByText('v2')).toBeInTheDocument()
-  })
-
-  it('hides the version badge when the case has never been published', async () => {
-    await act(async () => {
-      renderWithQuery(<CaseCard testCase={{ ...mockCase, version: null }} onEdit={noop} onDelete={noop} />)
-    })
     expect(screen.queryByText(/^v\d/)).not.toBeInTheDocument()
   })
 
@@ -504,6 +491,127 @@ describe('CaseCard', () => {
       })
 
       expect(screen.queryByRole('link', { name: /view file on github/i })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Aeris documentation state badge', () => {
+    it('shows documenting while queued with no outcome yet, taking priority over the lifecycle state', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              documentation: {
+                outcome: null,
+                missing: [],
+                skipReason: null,
+                queuedAt: '2026-03-01T00:00:00Z',
+                outcomeAt: null,
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText('Documenting')).toBeInTheDocument()
+      expect(screen.queryByText(/^draft$/i)).not.toBeInTheDocument()
+    })
+
+    it('shows the missing fields for an incomplete outcome', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              documentation: {
+                outcome: 'incomplete',
+                missing: ['objective', 'steps'],
+                skipReason: null,
+                queuedAt: null,
+                outcomeAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText('Incomplete: missing Objective, Steps')).toBeInTheDocument()
+    })
+
+    it('shows the skip reason for a skipped outcome', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              documentation: {
+                outcome: 'skipped',
+                missing: [],
+                skipReason: 'no-source-file',
+                queuedAt: null,
+                outcomeAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(
+        screen.getByText("Skipped: Aeris hasn't identified the test file yet"),
+      ).toBeInTheDocument()
+    })
+
+    it('shows an Aeris error for a failed outcome', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              documentation: {
+                outcome: 'failed',
+                missing: [],
+                skipReason: null,
+                queuedAt: null,
+                outcomeAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText('Aeris error')).toBeInTheDocument()
+    })
+
+    it('leaves the lifecycle state untouched once the outcome is complete', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...mockCase,
+              documentation: {
+                outcome: 'complete',
+                missing: [],
+                skipReason: null,
+                queuedAt: null,
+                outcomeAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(screen.queryByText('Documenting')).not.toBeInTheDocument()
     })
   })
 })

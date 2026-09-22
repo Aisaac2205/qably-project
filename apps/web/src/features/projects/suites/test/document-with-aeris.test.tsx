@@ -16,6 +16,7 @@ function result(overrides: Partial<DocumentFilesResult> = {}): DocumentFilesResu
 function DocumentPanel({
   label = 'Document suite with Aeris',
   pendingCount,
+  primaryMode,
   staleCount,
   onDocument,
   primary,
@@ -23,6 +24,7 @@ function DocumentPanel({
 }: {
   label?: string
   pendingCount: number
+  primaryMode?: DocumentFilesMode
   staleCount?: number
   onDocument: (mode: DocumentFilesMode) => Promise<DocumentFilesResult>
   primary?: boolean
@@ -33,6 +35,7 @@ function DocumentPanel({
     <DocumentWithAeris
       label={label}
       pendingCount={pendingCount}
+      primaryMode={primaryMode}
       staleCount={staleCount}
       documentation={documentation}
       primary={primary}
@@ -71,6 +74,27 @@ describe('DocumentWithAeris', () => {
     expect(trigger).not.toHaveTextContent('Document 7 cases with Aeris')
     await user.hover(trigger)
     expect(await screen.findByText('Document 7 cases with Aeris')).toBeInTheDocument()
+  })
+
+  it('sends the incomplete mode from the primary action when the primary mode is switched', async () => {
+    const user = userEvent.setup()
+    const onDocument = vi.fn().mockResolvedValue(result())
+
+    renderWithQuery(
+      <DocumentPanel pendingCount={3} primaryMode="incomplete" onDocument={onDocument} />,
+    )
+    await user.click(screen.getByRole('button', { name: /complete \(3\)/i }))
+
+    await waitFor(() => expect(onDocument.mock.calls[0]?.[0]).toBe('incomplete'))
+  })
+
+  it('shows the complete label directly on the button, not only in the tooltip, once switched', () => {
+    renderWithQuery(
+      <DocumentPanel pendingCount={3} primaryMode="incomplete" onDocument={vi.fn()} />,
+    )
+
+    expect(screen.getByRole('button', { name: /complete \(3\)/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^document \(\d+\)$/i })).not.toBeInTheDocument()
   })
 
   it('carries no status copy of its own: the button is the whole surface', () => {

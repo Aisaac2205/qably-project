@@ -15,44 +15,26 @@ function watch(baselineCount: number) {
 
 describe('deriveWatchStatus', () => {
   it('is idle while no documentation run is outstanding', () => {
-    expect(deriveWatchStatus(null, 7, startedAt)).toBe('idle')
+    expect(deriveWatchStatus(null, false, startedAt)).toBe('idle')
   })
 
-  it('is working while the count has not moved inside the window', () => {
-    expect(deriveWatchStatus(watch(7), 7, startedAt + 5_000)).toBe('working')
+  it('is working while the suite still reports a case or itself as documenting', () => {
+    expect(deriveWatchStatus(watch(7), true, startedAt + 5_000)).toBe('working')
   })
 
-  it('settles as soon as the count the read model carries drops', () => {
-    expect(deriveWatchStatus(watch(7), 3, startedAt + 5_000)).toBe('settled')
+  it('settles as soon as the persisted state shows nothing left documenting', () => {
+    expect(deriveWatchStatus(watch(7), false, startedAt + 5_000)).toBe('settled')
   })
 
-  it('settles even when the drop arrives after the window elapsed', () => {
+  it('settles even when the persisted state clears after the window elapsed', () => {
     expect(
-      deriveWatchStatus(watch(7), 0, startedAt + DOCUMENTATION_WATCH_WINDOW_MS + 1),
+      deriveWatchStatus(watch(7), false, startedAt + DOCUMENTATION_WATCH_WINDOW_MS + 1),
     ).toBe('settled')
   })
 
-  it('stops claiming progress once the window elapses with the count unmoved', () => {
+  it('stops claiming progress once the window elapses while still documenting', () => {
     expect(
-      deriveWatchStatus(watch(7), 7, startedAt + DOCUMENTATION_WATCH_WINDOW_MS),
-    ).toBe('timed-out')
-  })
-
-  it('keeps working when new cases were ingested and the count went up instead', () => {
-    expect(deriveWatchStatus(watch(7), 9, startedAt + 5_000)).toBe('working')
-  })
-
-  it('treats a run that targeted an already-empty count as settled at zero', () => {
-    expect(deriveWatchStatus(watch(1), 0, startedAt + 1_000)).toBe('settled')
-  })
-
-  it('keeps working rather than claiming success while the suite is unknown', () => {
-    expect(deriveWatchStatus(watch(7), undefined, startedAt + 5_000)).toBe('working')
-  })
-
-  it('times out on an unknown suite too, instead of polling forever', () => {
-    expect(
-      deriveWatchStatus(watch(7), undefined, startedAt + DOCUMENTATION_WATCH_WINDOW_MS),
+      deriveWatchStatus(watch(7), true, startedAt + DOCUMENTATION_WATCH_WINDOW_MS),
     ).toBe('timed-out')
   })
 })

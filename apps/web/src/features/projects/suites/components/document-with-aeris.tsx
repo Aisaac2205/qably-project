@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
 
-export type DocumentFilesMode = 'undocumented' | 'stale-locale'
+export type DocumentFilesMode = 'undocumented' | 'stale-locale' | 'incomplete'
 
 const SECONDARY_ACTION_CLASS =
   'inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70'
@@ -27,6 +27,7 @@ export type DocumentFilesMutation = ReturnType<typeof useDocumentFiles>
 interface DocumentWithAerisProps {
   label: string
   pendingCount: number
+  primaryMode?: DocumentFilesMode
   staleCount?: number
   documentation: DocumentFilesMutation
   primary?: boolean
@@ -36,6 +37,7 @@ interface DocumentWithAerisProps {
 export function DocumentWithAeris({
   label,
   pendingCount,
+  primaryMode = 'undocumented',
   staleCount = 0,
   documentation,
   primary = false,
@@ -88,14 +90,17 @@ export function DocumentWithAeris({
     )
   }
 
-  const showUndocumented = pendingCount > 0
+  const showPrimary = pendingCount > 0
   const showStale = staleCount > 0
-  const compactLabel = t('suites.documentWithAerisCompact', { count: pendingCount })
+  const compactLabel = t(
+    primaryMode === 'incomplete' ? 'suites.completeWithAerisCompact' : 'suites.documentWithAerisCompact',
+    { count: pendingCount },
+  )
 
-  if (showUndocumented && showStale) {
+  if (showPrimary && showStale) {
     return (
       <div className="flex items-center gap-2">
-        {renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)}
+        {renderTrigger(primaryMode, <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)}
         {renderTrigger(
           'stale-locale',
           <Translate size={primary ? 14 : 13} weight="bold" aria-hidden="true" />,
@@ -105,8 +110,8 @@ export function DocumentWithAeris({
     )
   }
 
-  if (showUndocumented) {
-    return renderTrigger('undocumented', <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)
+  if (showPrimary) {
+    return renderTrigger(primaryMode, <AerisIcon size={primary ? 16 : 14} />, compactLabel, label)
   }
 
   return renderTrigger(

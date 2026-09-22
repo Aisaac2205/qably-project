@@ -115,7 +115,7 @@ export function documentCase(
   )
 }
 
-export type DocumentFilesMode = 'undocumented' | 'stale-locale'
+export type DocumentFilesMode = 'undocumented' | 'stale-locale' | 'incomplete'
 
 export function documentSuite(
   suiteId: string,
