@@ -161,6 +161,7 @@ export function ChatComposer({
         cases={availableCases}
         excludedIds={attachedCases.map((attachedCase) => attachedCase.id)}
         onSelect={handleSelectCase}
+        atCap={atAttachLimit}
       />
     </div>
   )

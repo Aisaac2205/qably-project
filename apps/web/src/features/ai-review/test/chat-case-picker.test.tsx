@@ -38,7 +38,7 @@ describe('ChatCasePicker', () => {
       )
     })
 
-    await user.type(screen.getByRole('textbox', { name: 'Search cases' }), 'checkout')
+    await user.type(screen.getByRole('combobox', { name: 'Search cases' }), 'checkout')
 
     expect(screen.getByText('Checkout with empty cart blocked')).toBeInTheDocument()
     expect(screen.queryByText('Valid login redirects to dashboard')).not.toBeInTheDocument()
@@ -52,7 +52,7 @@ describe('ChatCasePicker', () => {
       )
     })
 
-    await user.type(screen.getByRole('textbox', { name: 'Search cases' }), 'nonexistent case')
+    await user.type(screen.getByRole('combobox', { name: 'Search cases' }), 'nonexistent case')
 
     expect(screen.getByText('No cases match your search.')).toBeInTheDocument()
   })
@@ -85,6 +85,47 @@ describe('ChatCasePicker', () => {
 
     await user.click(screen.getByText('Valid login redirects to dashboard'))
 
+    expect(onSelect).toHaveBeenCalledWith(cases[0])
+  })
+
+  it('exposes combobox and listbox roles wired to each other', async () => {
+    await act(async () => {
+      render(
+        <ChatCasePicker open cases={cases} excludedIds={[]} onOpenChange={vi.fn()} onSelect={vi.fn()} />,
+      )
+    })
+
+    const input = screen.getByRole('combobox', { name: 'Search cases' })
+    const listbox = screen.getByRole('listbox')
+
+    expect(input).toHaveAttribute('aria-expanded', 'true')
+    expect(input).toHaveAttribute('aria-controls', listbox.id)
+    expect(screen.getAllByRole('option')).toHaveLength(cases.length)
+  })
+
+  it('moves the active option with ArrowDown/ArrowUp and selects it on Enter', async () => {
+    const onSelect = vi.fn()
+    const user = userEvent.setup()
+    await act(async () => {
+      render(
+        <ChatCasePicker open cases={cases} excludedIds={[]} onOpenChange={vi.fn()} onSelect={onSelect} />,
+      )
+    })
+
+    const input = screen.getByRole('combobox', { name: 'Search cases' })
+    const options = screen.getAllByRole('option')
+
+    expect(input).toHaveAttribute('aria-activedescendant', options[0].id)
+
+    await user.type(input, '{ArrowDown}')
+    expect(input).toHaveAttribute('aria-activedescendant', options[1].id)
+    expect(options[1]).toHaveAttribute('aria-selected', 'true')
+    expect(options[0]).toHaveAttribute('aria-selected', 'false')
+
+    await user.type(input, '{ArrowUp}')
+    expect(input).toHaveAttribute('aria-activedescendant', options[0].id)
+
+    await user.type(input, '{Enter}')
     expect(onSelect).toHaveBeenCalledWith(cases[0])
   })
 })
