@@ -40,7 +40,7 @@ function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
         <DeliveryBars
           points={inApp.daily}
           label={t('dashboard.channelsDeliveryLabel', { name })}
@@ -48,7 +48,7 @@ function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="flex shrink-0 items-end gap-3">
+        <div className="ml-auto flex shrink-0 items-end gap-3 sm:ml-0">
           <ChannelStat
             value={inApp.sent}
             unit={t('dashboard.channelsSentUnit', { count: inApp.sent })}
@@ -83,7 +83,7 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
         <DeliveryBars
           points={email.daily}
           label={t('dashboard.channelsDeliveryLabel', { name })}
@@ -91,7 +91,7 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="flex shrink-0 items-end gap-3">
+        <div className="ml-auto flex shrink-0 items-end gap-3 sm:ml-0">
           <ChannelStat
             value={email.sent}
             unit={t('dashboard.channelsSentUnit', { count: email.sent })}

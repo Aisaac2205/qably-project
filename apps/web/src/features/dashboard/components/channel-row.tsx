@@ -28,7 +28,7 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
+      <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
         <DeliveryBars
           points={webhook.daily}
           label={t('dashboard.channelsDeliveryLabel', { name: webhook.name })}
@@ -36,7 +36,7 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="flex shrink-0 items-end gap-3">
+        <div className="ml-auto flex shrink-0 items-end gap-3 sm:ml-0">
           <ChannelStat
             value={webhook.sent}
             unit={t('dashboard.channelsSentUnit', { count: webhook.sent })}
