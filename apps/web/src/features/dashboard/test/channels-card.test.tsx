@@ -27,6 +27,14 @@ describe('ChannelsCard', () => {
     getChannels.mockResolvedValue(dashboardChannelsFixture)
   })
 
+  it('titles the section with an h2 under the page h1', async () => {
+    await act(async () => {
+      renderWithQuery(<ChannelsCard />)
+    })
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Notification channels' })).toBeInTheDocument()
+  })
+
   it('renders one row per enabled webhook', async () => {
     await act(async () => {
       renderWithQuery(<ChannelsCard />)

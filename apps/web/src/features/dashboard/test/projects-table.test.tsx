@@ -26,6 +26,14 @@ describe('ProjectsTable', () => {
     getOverview.mockResolvedValue(dashboardOverviewFixture)
   })
 
+  it('titles the section with an h2 under the page h1', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectsTable period={30} />)
+    })
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Projects' })).toBeInTheDocument()
+  })
+
   it('sorts rows ascending by pass rate, with null pass rates last', async () => {
     await act(async () => {
       renderWithQuery(<ProjectsTable period={30} />)

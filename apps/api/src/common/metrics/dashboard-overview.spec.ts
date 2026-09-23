@@ -476,6 +476,8 @@ describe('buildDashboardOverview recent runs', () => {
         commitMessage: 'fix: retry flaky step',
         commitAuthor: 'Aisaac2205',
         passRate: 0.75,
+        casesPassed: 3,
+        casesTotal: 4,
       },
       {
         id: 'run-2',
@@ -488,6 +490,8 @@ describe('buildDashboardOverview recent runs', () => {
         source: 'manual',
         startedAt: '2026-06-09T09:00:00.000Z',
         passRate: null,
+        casesPassed: 0,
+        casesTotal: 0,
       },
     ]);
   });

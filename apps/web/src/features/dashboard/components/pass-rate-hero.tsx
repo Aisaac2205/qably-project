@@ -45,7 +45,7 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
     <div className="mx-auto w-full max-w-dashboard">
       <Card>
         <CardHeader>
-          <CardTitle>{t('dashboard.heroTitle')}</CardTitle>
+          <CardTitle as="h2">{t('dashboard.heroTitle')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isError ? (

@@ -21,6 +21,14 @@ describe('ActivityCard', () => {
     getOverview.mockResolvedValue(dashboardOverviewFixture)
   })
 
+  it('titles the section with an h2 under the page h1', async () => {
+    await act(async () => {
+      renderWithQuery(<ActivityCard period={30} />)
+    })
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Recent activity' })).toBeInTheDocument()
+  })
+
   it('renders the four most recent runs in the order the server returns', async () => {
     await act(async () => {
       renderWithQuery(<ActivityCard period={30} />)

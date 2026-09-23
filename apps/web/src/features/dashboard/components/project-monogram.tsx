@@ -1,4 +1,3 @@
-import { monogramToneClassName } from '@/features/dashboard/lib/monogram-tone'
 import { cn } from '@/lib/utils'
 
 export interface ProjectMonogramProps {
@@ -15,13 +14,13 @@ function initialsFor(name: string): string {
   return `${words[0].slice(0, 1)}${words[1].slice(0, 1)}`.toUpperCase()
 }
 
-export function ProjectMonogram({ projectId, name, className }: ProjectMonogramProps) {
+export function ProjectMonogram({ name, className }: ProjectMonogramProps) {
   return (
     <span
       aria-hidden="true"
       className={cn(
         'inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-        monogramToneClassName(projectId),
+        'bg-canvas-hover text-default',
         className,
       )}
     >

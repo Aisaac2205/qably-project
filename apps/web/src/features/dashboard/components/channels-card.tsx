@@ -35,7 +35,7 @@ export function ChannelsCard() {
   return (
     <Card as="section" aria-labelledby="channels-card-heading" className="flex h-full flex-col overflow-hidden">
       <CardHeader className="pb-4">
-        <CardTitle as="h3" id="channels-card-heading">
+        <CardTitle as="h2" id="channels-card-heading">
           {title}
         </CardTitle>
       </CardHeader>

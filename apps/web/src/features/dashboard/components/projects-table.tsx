@@ -40,7 +40,7 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
   return (
     <Card as="section" aria-labelledby="projects-table-heading" className="@container flex h-full flex-col overflow-hidden">
       <CardHeader className="pb-4">
-        <CardTitle as="h3" id="projects-table-heading">
+        <CardTitle as="h2" id="projects-table-heading">
           {title}
         </CardTitle>
       </CardHeader>

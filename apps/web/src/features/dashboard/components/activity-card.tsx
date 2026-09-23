@@ -34,7 +34,7 @@ export function ActivityCard({ period, projectId }: ActivityCardProps) {
   return (
     <Card as="section" aria-labelledby="activity-card-heading" className="flex h-full flex-col overflow-hidden">
       <CardHeader className="pb-4">
-        <CardTitle as="h3" id="activity-card-heading">
+        <CardTitle as="h2" id="activity-card-heading">
           {title}
         </CardTitle>
       </CardHeader>

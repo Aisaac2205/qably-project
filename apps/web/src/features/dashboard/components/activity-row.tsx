@@ -57,6 +57,9 @@ export function ActivityRow({ run }: ActivityRowProps) {
 
       <div className="flex shrink-0 items-center gap-3">
         <StatusChip status={run.status} />
+        <span className="text-xs text-muted tabular-nums">
+          {t('dashboard.activityPassedOf', { passed: run.casesPassed, total: run.casesTotal })}
+        </span>
         <span className="w-10 text-right text-xs font-semibold text-default tabular-nums">
           {formatKpiValue('passRate', run.passRate)}
         </span>

@@ -205,6 +205,8 @@ export const dashboardOverviewFixture: DashboardOverviewRecord = {
       commitMessage: 'fix(ci): retry throttled run reports',
       commitAuthor: 'Aisaac2205',
       passRate: 1,
+      casesPassed: 12,
+      casesTotal: 12,
     },
     {
       id: 'run-2',
@@ -218,6 +220,8 @@ export const dashboardOverviewFixture: DashboardOverviewRecord = {
       startedAt: '2026-06-16T09:00:00.000Z',
       finishedAt: '2026-06-16T09:05:00.000Z',
       passRate: 0.6,
+      casesPassed: 3,
+      casesTotal: 5,
     },
     {
       id: 'run-3',
@@ -231,6 +235,8 @@ export const dashboardOverviewFixture: DashboardOverviewRecord = {
       startedAt: '2026-06-16T08:00:00.000Z',
       finishedAt: '2026-06-16T08:04:00.000Z',
       passRate: 1,
+      casesPassed: 6,
+      casesTotal: 6,
     },
     {
       id: 'run-4',
@@ -246,6 +252,8 @@ export const dashboardOverviewFixture: DashboardOverviewRecord = {
       commitMessage: 'feat(auth): add device binding',
       commitAuthor: 'Aisaac2205',
       passRate: null,
+      casesPassed: 0,
+      casesTotal: 0,
     },
   ],
 }

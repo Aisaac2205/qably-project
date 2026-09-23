@@ -477,6 +477,8 @@ export interface DashboardRecentRun {
   commitMessage?: string
   commitAuthor?: string
   passRate: number | null
+  casesPassed: number
+  casesTotal: number
 }
 
 export interface DashboardOverviewKpis {

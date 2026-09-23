@@ -33,7 +33,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
   return (
     <Card as="section" aria-labelledby="cases-gauge-heading" className="flex h-full flex-col overflow-hidden">
       <CardHeader className="pb-4">
-        <CardTitle as="h3" id="cases-gauge-heading">
+        <CardTitle as="h2" id="cases-gauge-heading">
           {title}
         </CardTitle>
       </CardHeader>

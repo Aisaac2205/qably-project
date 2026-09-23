@@ -59,7 +59,7 @@ describe('PassRateHero', () => {
       renderWithQuery(<PassRateHero period={30} />)
     })
 
-    expect(screen.getByText('Pass rate')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Pass rate' })).toBeInTheDocument()
     const table = screen.getByRole('table', { name: 'Pass rate comparison chart' })
     expect(table).toBeInTheDocument()
     expect(within(table).getAllByText('Current period').length).toBeGreaterThan(0)

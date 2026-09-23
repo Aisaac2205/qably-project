@@ -306,6 +306,8 @@ function buildRecentRuns(rows: readonly RecentRunRow[]): DashboardRecentRun[] {
     ...(row.commitMessage === null ? {} : { commitMessage: row.commitMessage }),
     ...(row.commitAuthor === null ? {} : { commitAuthor: row.commitAuthor }),
     passRate: computePassRate(row.caseCounts),
+    casesPassed: row.caseCounts.pass,
+    casesTotal: row.caseCounts.total,
   }));
 }
 

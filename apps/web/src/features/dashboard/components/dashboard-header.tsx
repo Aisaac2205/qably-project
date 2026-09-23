@@ -24,7 +24,7 @@ export function DashboardHeader({ period, onPeriodChange }: DashboardHeaderProps
         actions={
           <SegmentedControl<PeriodValue>
             label={t('dashboard.periodLabel')}
-            semantics="tabs"
+            semantics="toggle"
             size="sm"
             value={String(period) as PeriodValue}
             onChange={(value) => onPeriodChange(Number(value) as DashboardPeriod)}

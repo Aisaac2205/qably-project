@@ -495,6 +495,8 @@ describe('Dashboard (e2e)', () => {
           commitSha?: string;
           commitMessage?: string;
           commitAuthor?: string;
+          casesPassed: number;
+          casesTotal: number;
         }[];
       };
 
@@ -505,6 +507,8 @@ describe('Dashboard (e2e)', () => {
         commitSha: runRow.commitSha,
         commitMessage: runRow.commitMessage,
         commitAuthor: runRow.commitAuthor,
+        casesPassed: 1,
+        casesTotal: 1,
       });
     });
 

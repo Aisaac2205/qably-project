@@ -15,6 +15,8 @@ function run(overrides: Partial<DashboardRecentRun>): DashboardRecentRun {
     source: 'github_actions',
     startedAt: new Date(Date.now() - 60_000).toISOString(),
     passRate: 1,
+    casesPassed: 8,
+    casesTotal: 10,
     ...overrides,
   }
 }
@@ -43,6 +45,11 @@ describe('ActivityRow', () => {
     const { container } = render(<ActivityRow run={run({ status: 'pass', passRate: 1 })} />)
     expect(container.querySelector('[data-status="pass"]')).toBeInTheDocument()
     expect(screen.getByText('100%')).toBeInTheDocument()
+  })
+
+  it('shows the passed-of-total case count', () => {
+    render(<ActivityRow run={run({ casesPassed: 8, casesTotal: 10 })} />)
+    expect(screen.getByText('8 of 10 passed')).toBeInTheDocument()
   })
 
   it('shows a dash for the pass rate of an in-flight run', () => {

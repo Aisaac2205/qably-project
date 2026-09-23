@@ -460,7 +460,7 @@
     "channelsDeliveryStatusFailed": "fallida",
     "activityTitle": "Actividad reciente",
     "activityEmptyTitle": "Sin actividad reciente",
-    "activityCommitLabel": "Commit"
+    "activityPassedOf": "{{passed}} de {{total}} aprobados"
   },
   "quality": {
     "breadcrumb": "Calidad",

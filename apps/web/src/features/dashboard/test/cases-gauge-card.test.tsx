@@ -21,6 +21,14 @@ describe('CasesGaugeCard', () => {
     getOverview.mockResolvedValue(dashboardOverviewFixture)
   })
 
+  it('titles the section with an h2 under the page h1', async () => {
+    await act(async () => {
+      renderWithQuery(<CasesGaugeCard period={30} />)
+    })
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Cases passing' })).toBeInTheDocument()
+  })
+
   it('renders a gauge with the decided pass rate of the cases in scope', async () => {
     await act(async () => {
       renderWithQuery(<CasesGaugeCard period={30} />)

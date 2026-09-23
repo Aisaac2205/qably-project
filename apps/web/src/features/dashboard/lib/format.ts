@@ -1,7 +1,3 @@
-/**
- * Dashboard formatting helpers. Pure functions — no React.
- */
-
 export type FormatLocale = 'es' | 'en'
 
 const RELATIVE_TIME_COPY = {
