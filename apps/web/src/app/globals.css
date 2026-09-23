@@ -105,6 +105,9 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
+  /* max-w-dashboard — capped content width for the dashboard redesign (D7). */
+  --container-dashboard: 1128px;
+
   /* bg-canvas, text-canvas, border-canvas */
   --color-canvas:             var(--bg);
   --color-canvas-hover:       var(--surface-hover);

@@ -61,3 +61,48 @@ export function formatEventCount(value: number, locale: 'es' | 'en'): string {
 
   return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator)
 }
+
+export function formatRunDuration(ms: number): string {
+  const totalSeconds = Math.round(Math.abs(ms) / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  return minutes === 0 ? `${seconds}s` : `${minutes}m ${seconds}s`
+}
+
+export type DashboardKpiMetric = 'passRate' | 'runs' | 'failedCases' | 'avgRunDurationMs'
+
+export function formatKpiValue(metric: DashboardKpiMetric, value: number | null): string {
+  if (value === null) return '—'
+
+  switch (metric) {
+    case 'passRate':
+      return `${Math.round(value * 100)}%`
+    case 'avgRunDurationMs':
+      return formatRunDuration(value)
+    case 'runs':
+    case 'failedCases':
+      return formatNumber(value)
+  }
+}
+
+export function formatKpiDelta(
+  metric: DashboardKpiMetric,
+  value: number | null,
+  previous: number | null,
+): string | null {
+  if (value === null || previous === null) return null
+
+  const diff = metric === 'passRate' ? Math.round(value * 100) - Math.round(previous * 100) : value - previous
+
+  if (diff === 0) {
+    return metric === 'passRate' ? '0%' : metric === 'avgRunDurationMs' ? '0s' : '0'
+  }
+
+  const sign = diff > 0 ? '+' : '-'
+  const magnitude = Math.abs(diff)
+
+  if (metric === 'passRate') return `${sign}${magnitude}%`
+  if (metric === 'avgRunDurationMs') return `${sign}${formatRunDuration(magnitude)}`
+  return `${sign}${formatNumber(magnitude)}`
+}

@@ -4,6 +4,9 @@ import {
   formatPassRate,
   formatNumber,
   formatEventCount,
+  formatRunDuration,
+  formatKpiValue,
+  formatKpiDelta,
 } from '@/features/dashboard/lib/format'
 
 describe('formatRelativeTime', () => {
@@ -112,5 +115,71 @@ describe('formatEventCount', () => {
   it('does not depend on the runtime ICU data', () => {
     const withoutIntl = formatEventCount(1000, 'es')
     expect(withoutIntl).toBe('1.000')
+  })
+})
+
+describe('formatRunDuration', () => {
+  it('renders seconds only under a minute', () => {
+    expect(formatRunDuration(45000)).toBe('45s')
+  })
+
+  it('renders minutes and seconds at or above a minute', () => {
+    expect(formatRunDuration(184000)).toBe('3m 4s')
+  })
+
+  it('handles zero', () => {
+    expect(formatRunDuration(0)).toBe('0s')
+  })
+
+  it('rounds to the nearest second', () => {
+    expect(formatRunDuration(1499)).toBe('1s')
+    expect(formatRunDuration(1500)).toBe('2s')
+  })
+})
+
+describe('formatKpiValue', () => {
+  it('formats passRate as a rounded percentage', () => {
+    expect(formatKpiValue('passRate', 0.826)).toBe('83%')
+  })
+
+  it('formats runs and failedCases as grouped counts', () => {
+    expect(formatKpiValue('runs', 1234)).toBe('1,234')
+    expect(formatKpiValue('failedCases', 6)).toBe('6')
+  })
+
+  it('formats avgRunDurationMs as a duration', () => {
+    expect(formatKpiValue('avgRunDurationMs', 184000)).toBe('3m 4s')
+  })
+
+  it('renders an em dash for a null value', () => {
+    expect(formatKpiValue('passRate', null)).toBe('—')
+    expect(formatKpiValue('avgRunDurationMs', null)).toBe('—')
+  })
+})
+
+describe('formatKpiDelta', () => {
+  it('returns null when either value or previous is unavailable', () => {
+    expect(formatKpiDelta('passRate', null, 0.5)).toBeNull()
+    expect(formatKpiDelta('runs', 10, null)).toBeNull()
+  })
+
+  it('signs a passRate delta in percentage points', () => {
+    expect(formatKpiDelta('passRate', 0.82, 0.75)).toBe('+7%')
+    expect(formatKpiDelta('passRate', 0.7, 0.9)).toBe('-20%')
+  })
+
+  it('signs a runs/failedCases delta as a whole count', () => {
+    expect(formatKpiDelta('runs', 42, 35)).toBe('+7')
+    expect(formatKpiDelta('failedCases', 6, 9)).toBe('-3')
+  })
+
+  it('signs an avgRunDurationMs delta as a duration', () => {
+    expect(formatKpiDelta('avgRunDurationMs', 184320, 210500)).toBe('-26s')
+  })
+
+  it('renders an unsigned zero when nothing changed', () => {
+    expect(formatKpiDelta('passRate', 0.5, 0.5)).toBe('0%')
+    expect(formatKpiDelta('runs', 10, 10)).toBe('0')
+    expect(formatKpiDelta('avgRunDurationMs', 1000, 1000)).toBe('0s')
   })
 })
