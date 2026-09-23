@@ -1,4 +1,5 @@
 import type { CaseStatus, RunCaseCounts } from '@qably/types';
+import { computePassRate } from '@qably/types';
 
 export const DASHBOARD_WINDOW_DAYS = 7;
 export const RECENT_RUNS_LIMIT = 5;
@@ -94,21 +95,15 @@ export function sumCaseCounts(
   return sum;
 }
 
-export function computePassRate(
-  counts: Pick<RunCaseCounts, 'pass' | 'total'>,
-): number {
-  return counts.total === 0 ? 0 : counts.pass / counts.total;
-}
+export {
+  countDecided,
+  computePassRate,
+  computePassRateTrend,
+} from '@qably/types';
 
 export function computeHealthScore(
-  counts: Pick<RunCaseCounts, 'pass' | 'total'>,
+  counts: Pick<RunCaseCounts, 'pass' | 'fail' | 'blocked'>,
 ): number | null {
-  return counts.total === 0 ? null : Math.round(computePassRate(counts) * 100);
-}
-
-export function computePassRateTrend(
-  currentPassRate: number,
-  previousPassRate: number,
-): number {
-  return currentPassRate - previousPassRate;
+  const passRate = computePassRate(counts);
+  return passRate === null ? null : Math.round(passRate * 100);
 }

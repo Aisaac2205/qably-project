@@ -305,10 +305,10 @@ describe('RunQueriesService.list', () => {
       skip: 0,
       blocked: 0,
     });
-    expect(summary.passRate).toBeCloseTo(3 / 6);
+    expect(summary.passRate).toBeCloseTo(3 / 4);
   });
 
-  it('reports a zero pass rate for a run with no cases', async () => {
+  it('reports a null pass rate, never zero, for a run with no decided cases', async () => {
     const prisma = createPrisma();
     prisma.runCase.groupBy.mockResolvedValue([]);
 
@@ -317,7 +317,7 @@ describe('RunQueriesService.list', () => {
     } = await build(prisma).list(org, {});
 
     expect(summary.caseCounts.total).toBe(0);
-    expect(summary.passRate).toBe(0);
+    expect(summary.passRate).toBeNull();
   });
 });
 

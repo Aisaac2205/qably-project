@@ -44,7 +44,7 @@ export function PassRateTrend() {
         .map((run) => ({
           id: run.id,
           label: dateFormatter.format(new Date(run.startedAt)),
-          value: Math.round(run.passRate * 100),
+          value: Math.round((run.passRate ?? 0) * 100),
         })),
     [stats.recentRuns, dateFormatter],
   )

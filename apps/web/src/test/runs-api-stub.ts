@@ -10,6 +10,7 @@ import type {
   SuiteMetricsLastRun,
   SuiteMetricsRecord,
 } from '@qably/types'
+import { computePassRate } from '@qably/types'
 import { mockSuites } from '@/lib/mock-data'
 
 const SUITE_METRICS_TREND_LIMIT = 10
@@ -28,8 +29,8 @@ function countCases(cases: RunCaseRecord[]): RunCaseCounts {
   return counts
 }
 
-function passRateOf(counts: RunCaseCounts): number {
-  return counts.total === 0 ? 0 : counts.pass / counts.total
+function passRateOf(counts: RunCaseCounts): number | null {
+  return computePassRate(counts)
 }
 
 function caseRecord(

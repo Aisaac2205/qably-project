@@ -126,41 +126,38 @@ describe('sumCaseCounts', () => {
   });
 });
 
-describe('computePassRate', () => {
-  it('divides pass by total', () => {
-    expect(computePassRate({ pass: 3, total: 6 })).toBeCloseTo(0.5);
+describe('computePassRate (re-exported from @qably/types)', () => {
+  it('divides pass by the decided count, counting blocked in the denominator', () => {
+    expect(computePassRate({ pass: 3, fail: 1, blocked: 2 })).toBeCloseTo(0.5);
   });
 
-  it('reports zero for a window with no cases instead of dividing by zero', () => {
-    expect(computePassRate({ pass: 0, total: 0 })).toBe(0);
+  it('reports null, never zero, when nothing has been decided yet', () => {
+    expect(computePassRate({ pass: 0, fail: 0, blocked: 0 })).toBeNull();
   });
 });
 
 describe('computeHealthScore', () => {
   it('renders the pass rate as a rounded percentage', () => {
-    expect(computeHealthScore({ pass: 1, total: 3 })).toBe(33);
+    expect(computeHealthScore({ pass: 1, fail: 2, blocked: 0 })).toBe(33);
   });
 
-  it('reports null, never zero, for a project with no cases in scope', () => {
-    expect(computeHealthScore({ pass: 0, total: 0 })).toBeNull();
+  it('reports null, never zero, for a project with no decided cases in scope', () => {
+    expect(computeHealthScore({ pass: 0, fail: 0, blocked: 0 })).toBeNull();
   });
 
-  it('reports an honest zero when every case in scope failed', () => {
-    expect(computeHealthScore({ pass: 0, total: 4 })).toBe(0);
+  it('reports an honest zero when every decided case in scope failed', () => {
+    expect(computeHealthScore({ pass: 0, fail: 4, blocked: 0 })).toBe(0);
   });
 });
 
-describe('computePassRateTrend', () => {
+describe('computePassRateTrend (re-exported from @qably/types)', () => {
   it('reports a positive delta when the pass rate improved', () => {
     expect(computePassRateTrend(0.9, 0.7)).toBeCloseTo(0.2);
   });
 
-  it('reports a negative delta when the pass rate regressed', () => {
-    expect(computePassRateTrend(0.5, 0.8)).toBeCloseTo(-0.3);
-  });
-
-  it('reports zero when nothing changed', () => {
-    expect(computePassRateTrend(0.6, 0.6)).toBe(0);
+  it('reports null when either side is not measured', () => {
+    expect(computePassRateTrend(null, 0.7)).toBeNull();
+    expect(computePassRateTrend(0.7, null)).toBeNull();
   });
 });
 

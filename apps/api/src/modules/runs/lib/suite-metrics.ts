@@ -19,7 +19,7 @@ export interface SuiteRef {
 export function buildSuiteMetrics(
   suites: readonly SuiteRef[],
   rankedRuns: readonly RankedRunRow[],
-  passRateByRunId: ReadonlyMap<string, number>,
+  passRateByRunId: ReadonlyMap<string, number | null>,
 ): SuiteMetricsEntry[] {
   const requested = new Set(suites.map((suite) => suite.id));
   const rowsBySuite = new Map<string, RankedRunRow[]>();
@@ -54,7 +54,7 @@ export function buildSuiteMetrics(
               ...(mostRecent.finishedAt === null
                 ? {}
                 : { finishedAt: mostRecent.finishedAt.toISOString() }),
-              passRate: passRateByRunId.get(mostRecent.id) ?? 0,
+              passRate: passRateByRunId.get(mostRecent.id) ?? null,
             },
       trend,
     };

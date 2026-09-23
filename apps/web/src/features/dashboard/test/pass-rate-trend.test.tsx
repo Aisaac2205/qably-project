@@ -37,7 +37,7 @@ describe('PassRateTrend', () => {
     await act(async () => {
       renderWithQuery(<PassRateTrend />)
     })
-    const expected = `${Math.round(dashboardSummaryFixture.passRate * 100)}%`
+    const expected = `${Math.round((dashboardSummaryFixture.passRate ?? 0) * 100)}%`
     expect(screen.getAllByText(expected).length).toBeGreaterThanOrEqual(1)
   })
 
@@ -45,7 +45,7 @@ describe('PassRateTrend', () => {
     await act(async () => {
       renderWithQuery(<PassRateTrend />)
     })
-    const trend = Math.round(dashboardSummaryFixture.passRateTrend * 100)
+    const trend = Math.round((dashboardSummaryFixture.passRateTrend ?? 0) * 100)
     expect(screen.getByText(`${trend > 0 ? '+' : ''}${trend}%`)).toBeInTheDocument()
     expect(screen.getByText('vs prior 7d')).toBeInTheDocument()
   })

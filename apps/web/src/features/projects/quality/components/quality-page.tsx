@@ -1,5 +1,6 @@
 'use client'
 
+import type { RunSummaryRecord } from '@qably/types'
 import { ChartLine, CircleNotch, Play, Sparkle, WarningCircle } from '@phosphor-icons/react'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,12 @@ interface RetryStateViewProps {
   description: string
   onRetry: () => void
   retryLabel: string
+}
+
+function hasMeasuredPassRate(
+  run: RunSummaryRecord,
+): run is RunSummaryRecord & { passRate: number } {
+  return (run.status === 'pass' || run.status === 'fail') && run.passRate !== null
 }
 
 function RetryStateView({ title, description, onRetry, retryLabel }: RetryStateViewProps) {
@@ -75,13 +82,14 @@ export function QualityPage({ projectId }: { projectId: string }) {
   }
 
   const summary = summaryQuery.summary
-  const passRatePercent = Math.round(summary.passRate * 100)
-  const passRateTrendPercent = Math.round(summary.passRateTrend * 100)
+  const passRatePercent = summary.passRate === null ? null : Math.round(summary.passRate * 100)
+  const passRateTrendPercent =
+    summary.passRateTrend === null ? null : Math.round(summary.passRateTrend * 100)
   const regressionsCount = regressionsQuery.regressions.length
   const pendingProposalsCount = proposalsQuery.proposals.length
 
   const trendPoints = recentRuns.runs
-    .filter((run) => run.status === 'pass' || run.status === 'fail')
+    .filter(hasMeasuredPassRate)
     .slice()
     .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime())
     .map((run) => ({ id: run.id, date: run.startedAt, passRate: run.passRate * 100 }))
@@ -101,14 +109,18 @@ export function QualityPage({ projectId }: { projectId: string }) {
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard
           label={t('quality.kpiPassRate')}
-          value={`${passRatePercent}%`}
+          value={passRatePercent === null ? '—' : `${passRatePercent}%`}
           icon={ChartLine}
           href={`/projects/${projectId}/runs`}
-          trend={{
-            value: passRateTrendPercent,
-            label: t('quality.kpiPassRateTrendLabel'),
-            isPercentage: true,
-          }}
+          trend={
+            passRateTrendPercent === null
+              ? undefined
+              : {
+                  value: passRateTrendPercent,
+                  label: t('quality.kpiPassRateTrendLabel'),
+                  isPercentage: true,
+                }
+          }
         />
         <KpiCard
           label={t('quality.kpiRunsInWindow')}

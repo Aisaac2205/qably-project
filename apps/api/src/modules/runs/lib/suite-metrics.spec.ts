@@ -74,14 +74,14 @@ describe('buildSuiteMetrics', () => {
     expect(entry.lastRun?.passRate).toBe(1);
   });
 
-  it('reports 0 passRate when the run id is missing from the map', () => {
+  it('reports a null passRate, never zero, when the run id is missing from the map', () => {
     const [entry] = buildSuiteMetrics(
       [{ id: 'suite-1', name: 'Checkout' }],
       [row()],
       new Map(),
     );
 
-    expect(entry.lastRun?.passRate).toBe(0);
+    expect(entry.lastRun?.passRate).toBeNull();
   });
 
   it('omits finishedAt when the run has not finished', () => {

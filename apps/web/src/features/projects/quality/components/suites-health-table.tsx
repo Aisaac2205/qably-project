@@ -12,8 +12,8 @@ interface SuitesHealthTableProps {
   items: SuiteMetricsEntry[]
 }
 
-function formatPassRate(passRate: number): string {
-  return `${Math.round(passRate * 100)}%`
+function formatPassRate(passRate: number | null): string {
+  return passRate === null ? '—' : `${Math.round(passRate * 100)}%`
 }
 
 function trendSummary(trend: RunStatus[]): string {

@@ -1,6 +1,7 @@
 'use client'
 
-import type { RunRecord } from '@qably/types'
+import type { RunCaseRecord, RunRecord } from '@qably/types'
+import { computePassRate } from '@qably/types'
 import { GitCommit } from '@phosphor-icons/react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
@@ -35,16 +36,26 @@ const SOURCE_TOOLTIP_KEYS: Record<string, string> = {
   github_actions: 'runs.sourceTooltipCi',
 }
 
-function computePassRate(run: RunRecord): number {
-  return run.cases.length === 0
-    ? 0
-    : run.cases.filter((c) => c.status === 'pass').length / run.cases.length
+function tallyDecidedCounts(cases: RunCaseRecord[]): {
+  pass: number
+  fail: number
+  blocked: number
+} {
+  return cases.reduce(
+    (counts, c) => {
+      if (c.status === 'pass') counts.pass += 1
+      if (c.status === 'fail') counts.fail += 1
+      if (c.status === 'blocked') counts.blocked += 1
+      return counts
+    },
+    { pass: 0, fail: 0, blocked: 0 },
+  )
 }
 
 export function RunProgressHeader({ run }: { run: RunRecord }) {
   const { t } = useTranslation()
   const { suite } = useSuite(run.suiteId)
-  const passRateDisplay = formatPassRate(computePassRate(run))
+  const passRateDisplay = formatPassRate(computePassRate(tallyDecidedCounts(run.cases)))
   const sourceLabelKey = SOURCE_LABELS[run.source]
   const sourceLabel = sourceLabelKey ? t(sourceLabelKey) : run.source
   const sourceTooltipKey = SOURCE_TOOLTIP_KEYS[run.source]

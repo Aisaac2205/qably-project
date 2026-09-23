@@ -4,6 +4,7 @@ import type {
   RunSummaryRecord,
   TraceabilityCalendarRecord,
 } from '@qably/types'
+import { computePassRate } from '@qably/types'
 import { runFixtures } from './runs-api-stub'
 
 function countCases(cases: { status: string }[]) {
@@ -42,7 +43,7 @@ function toSummary(run: (typeof runFixtures)[number]): RunSummaryRecord {
     commitMessage: run.commitMessage,
     commitAuthor: run.commitAuthor,
     caseCounts,
-    passRate: caseCounts.total === 0 ? 0 : caseCounts.pass / caseCounts.total,
+    passRate: computePassRate(caseCounts),
     delta: null,
   }
 }

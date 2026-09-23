@@ -254,7 +254,7 @@ export class RunQueriesService {
     }
 
     const countsByRun = buildCaseCountsByRun(groups);
-    const passRateByRunId = new Map<string, number>();
+    const passRateByRunId = new Map<string, number | null>();
     for (const runId of lastRunIds) {
       passRateByRunId.set(
         runId,

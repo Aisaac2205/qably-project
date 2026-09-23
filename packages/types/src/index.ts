@@ -327,7 +327,8 @@ export interface RunSummaryRecord {
   commitMessage?: string
   commitAuthor?: string
   caseCounts: RunCaseCounts
-  passRate: number
+  /** Fraction 0–1. `null` when the run has no decided case yet. */
+  passRate: number | null
   delta: RunDeltaCounts | null
 }
 
@@ -347,8 +348,11 @@ export interface SuiteMetricsLastRun {
   source: RunSource
   startedAt: string
   finishedAt?: string
-  /** Fraction 0–1, consistent with RunSummaryRecord.passRate. */
-  passRate: number
+  /**
+   * Fraction 0–1, consistent with RunSummaryRecord.passRate. `null` when the
+   * run has no decided case (pass/fail/blocked) yet — never a fabricated 0.
+   */
+  passRate: number | null
 }
 
 export interface SuiteMetricsEntry {
@@ -409,8 +413,10 @@ export interface DashboardSummaryRecord {
   totalRuns: number
   runsInWindow: number
   activeRuns: number
-  passRate: number
-  passRateTrend: number
+  /** Fraction 0–1. `null` when no case in the window has been decided yet. */
+  passRate: number | null
+  /** `null` when the current or previous window's rate is not measured. */
+  passRateTrend: number | null
   defectsDetected: number
   windowDays: number
   recentRuns: RunSummaryRecord[]
@@ -855,3 +861,4 @@ export interface ChatSendToReviewRecord {
 }
 
 export * from './documentation-completeness'
+export * from './pass-rate'

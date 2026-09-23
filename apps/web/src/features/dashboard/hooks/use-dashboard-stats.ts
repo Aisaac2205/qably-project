@@ -60,8 +60,10 @@ export function useDashboardStats(): DashboardStats {
       runsLast7d: summary?.runsInWindow ?? 0,
       windowDays: summary?.windowDays ?? 7,
       pendingProposals: inReview.length,
-      passRateLast7d: summary ? Math.round(summary.passRate * 100) : 0,
-      passRateTrend: summary ? Math.round(summary.passRateTrend * 100) : 0,
+      passRateLast7d:
+        summary?.passRate != null ? Math.round(summary.passRate * 100) : 0,
+      passRateTrend:
+        summary?.passRateTrend != null ? Math.round(summary.passRateTrend * 100) : 0,
       defectsDetected: summary?.defectsDetected ?? 0,
       activeRuns: summary?.activeRuns ?? 0,
       projectsByHealth: projects.map((project) => ({ project })),
