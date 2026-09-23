@@ -5,6 +5,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./utils": "./src/utils.ts",
+    "./chart": "./src/chart/index.ts",
     "./dashboard": "./src/dashboard/index.ts"
   },
   "scripts": {
