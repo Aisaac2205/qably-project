@@ -317,7 +317,7 @@ function buildRecentRuns(rows: readonly RecentRunRow[]): DashboardRecentRun[] {
 
 export function buildDashboardOverview(
   input: BuildDashboardOverviewInput,
-): DashboardOverviewRecord {
+): Omit<DashboardOverviewRecord, 'recentActivity'> {
   const currentBuckets = resolveBuckets(
     input.period,
     input.currentDayKeys,

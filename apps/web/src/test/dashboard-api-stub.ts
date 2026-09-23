@@ -1,5 +1,6 @@
 import type {
   CiCommitActivityRecord,
+  DashboardActivityEntry,
   DashboardChannelsRecord,
   DashboardOverviewRecord,
   DashboardSummaryRecord,
@@ -136,6 +137,48 @@ export function getTraceabilityCalendar(): Promise<TraceabilityCalendarRecord> {
   return Promise.resolve(traceabilityCalendarFixture)
 }
 
+export const dashboardActivityFixture: DashboardActivityEntry[] = [
+  {
+    kind: 'commit',
+    projectId: 'project-1',
+    projectName: 'Checkout Web',
+    status: 'pass',
+    source: 'github_actions',
+    occurredAt: '2026-06-16T10:00:00.000Z',
+    casesPassed: 12,
+    casesTotal: 12,
+    commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+    commitMessage: 'fix(ci): retry throttled run reports',
+    commitAuthor: 'Aisaac2205',
+    suiteCount: 2,
+  },
+  {
+    kind: 'commit',
+    projectId: 'project-2',
+    projectName: 'Mobile App',
+    status: 'running',
+    source: 'github_actions',
+    occurredAt: '2026-06-16T07:00:00.000Z',
+    casesPassed: 0,
+    casesTotal: 0,
+    commitSha: 'a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4',
+    suiteCount: 1,
+  },
+  {
+    kind: 'run',
+    projectId: 'project-2',
+    projectName: 'Mobile App',
+    status: 'fail',
+    source: 'api',
+    occurredAt: '2026-06-16T09:00:00.000Z',
+    casesPassed: 3,
+    casesTotal: 5,
+    runId: 'run-2',
+    runName: 'Auth smoke',
+    suiteName: 'Auth',
+  },
+]
+
 export const dashboardOverviewFixture: DashboardOverviewRecord = {
   period: 30,
   timeZone: 'America/Guatemala',
@@ -256,6 +299,7 @@ export const dashboardOverviewFixture: DashboardOverviewRecord = {
       casesTotal: 0,
     },
   ],
+  recentActivity: dashboardActivityFixture,
 }
 
 export function getDashboardOverview(): Promise<DashboardOverviewRecord> {

@@ -1,15 +1,9 @@
 import type { CiCommitActivityRecord, RunStatus } from '@qably/types';
+import { rollUpStatus } from './run-status-rollup';
 
 export const RECENT_CI_COMMITS_LIMIT = 4;
 
 const SHORT_SHA_LENGTH = 7;
-
-const STATUS_PRECEDENCE: readonly RunStatus[] = [
-  'fail',
-  'running',
-  'pending',
-  'pass',
-];
 
 export interface CiCommitRunRow {
   commitSha: string;
@@ -17,13 +11,6 @@ export interface CiCommitRunRow {
   commitAuthor: string | null;
   status: RunStatus;
   startedAt: Date;
-}
-
-function rollUpStatus(current: RunStatus, incoming: RunStatus): RunStatus {
-  return STATUS_PRECEDENCE.indexOf(incoming) <
-    STATUS_PRECEDENCE.indexOf(current)
-    ? incoming
-    : current;
 }
 
 export function buildCiCommitActivity(

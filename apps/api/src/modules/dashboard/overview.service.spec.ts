@@ -176,6 +176,7 @@ describe('OverviewService empty organization', () => {
     expect(result.value.kpis.avgRunDurationMs.value).toBeNull();
     expect(result.value.projects).toEqual([]);
     expect(result.value.recentRuns).toEqual([]);
+    expect(result.value.recentActivity).toEqual([]);
     expect(result.value.casesPassing).toEqual({
       total: 0,
       pending: 0,
@@ -184,6 +185,102 @@ describe('OverviewService empty organization', () => {
       fail: 0,
       skip: 0,
       blocked: 0,
+    });
+  });
+});
+
+describe('OverviewService recentActivity query scoping', () => {
+  it('bounds the activity_candidates CTE to the organization and a 200-row window', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    const call = prisma.$queryRaw.mock.calls.find(
+      ([sql]: [{ strings: string[] }]) =>
+        sql.strings.join('').includes('activity_candidates'),
+    ) as [{ strings: string[]; values: unknown[] }] | undefined;
+
+    expect(call).toBeDefined();
+    const sqlText = call?.[0].strings.join('') ?? '';
+    expect(sqlText).toContain('r."organizationId"');
+    expect(sqlText).toContain('LIMIT');
+    expect(call?.[0].values).toEqual(expect.arrayContaining(['org-1', 200]));
+  });
+
+  it('scopes the activity_candidates CTE to the given project when one is requested', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC', 'project-1');
+
+    const call = prisma.$queryRaw.mock.calls.find(
+      ([sql]: [{ strings: string[] }]) =>
+        sql.strings.join('').includes('activity_candidates'),
+    ) as [{ strings: string[]; values: unknown[] }] | undefined;
+
+    expect(call).toBeDefined();
+    const sqlText = call?.[0].strings.join('') ?? '';
+    expect(sqlText).toContain('r."projectId"');
+    expect(call?.[0].values).toEqual(
+      expect.arrayContaining(['org-1', 'project-1']),
+    );
+  });
+
+  it('skips fetching full activity runs when no candidates are found', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    expect(prisma.run.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('fetches the full runs for the chosen activity groups and returns them as recentActivity', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockImplementation((sql: { strings: string[] }) => {
+      const text = sql.strings.join('');
+      if (text.includes('activity_candidates')) {
+        return Promise.resolve([
+          {
+            projectId: 'project-1',
+            commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+            runId: 'run-1',
+            lastActivityAt: new Date('2026-06-16T10:00:00.000Z'),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+    prisma.run.findMany.mockResolvedValue([
+      {
+        id: 'run-1',
+        projectId: 'project-1',
+        project: { name: 'Checkout' },
+        suiteId: 'suite-1',
+        suite: { name: 'Checkout suite' },
+        name: 'Nightly regression',
+        status: 'pass',
+        source: 'github_actions',
+        startedAt: new Date('2026-06-16T10:00:00.000Z'),
+        finishedAt: new Date('2026-06-16T10:05:00.000Z'),
+        commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+        commitMessage: 'fix(ci): retry throttled run reports',
+        commitAuthor: 'Aisaac2205',
+      },
+    ]);
+    prisma.runCase.groupBy.mockResolvedValue([
+      { runId: 'run-1', status: 'pass', _count: { _all: 4 } },
+    ]);
+
+    const result = await build(prisma).overview(org, 7, 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.recentActivity).toHaveLength(1);
+    expect(result.value.recentActivity[0]).toMatchObject({
+      kind: 'commit',
+      commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+      projectName: 'Checkout',
+      casesPassed: 4,
+      casesTotal: 4,
     });
   });
 });

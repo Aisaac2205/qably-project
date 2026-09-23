@@ -15,6 +15,12 @@ import {
   type SeriesWindow,
 } from '../../common/metrics/dashboard-overview';
 import {
+  RECENT_ACTIVITY_CANDIDATE_LIMIT,
+  RECENT_ACTIVITY_LIMIT,
+  buildRecentActivity,
+  type RecentActivityRunRow,
+} from '../../common/metrics/recent-activity';
+import {
   buildCaseCountsByRun,
   emptyCaseCounts,
 } from '../../common/metrics/run-case-metrics';
@@ -62,6 +68,13 @@ interface RecentRunListRow {
   commitSha: string | null;
   commitMessage: string | null;
   commitAuthor: string | null;
+}
+
+interface RawActivityCandidateRow {
+  projectId: string;
+  commitSha: string | null;
+  runId: string;
+  lastActivityAt: Date;
 }
 
 function projectFilterSql(projectId?: string): Prisma.Sql {
@@ -112,6 +125,7 @@ export class OverviewService {
         testCaseCounts,
         lastRunAts,
         recentRuns,
+        activityCandidates,
       ] = await Promise.all([
         this.prisma.$queryRaw<RawCaseCountRow[]>(Prisma.sql`
           SELECT r."projectId" AS "projectId",
@@ -220,6 +234,24 @@ export class OverviewService {
             commitAuthor: true,
           },
         }),
+        this.prisma.$queryRaw<RawActivityCandidateRow[]>(Prisma.sql`
+          WITH activity_candidates AS (
+            SELECT r.id, r."projectId", r."commitSha", r."startedAt"
+              FROM "run" r
+             WHERE r."organizationId" = ${organizationId}
+               ${runProjectFilter}
+             ORDER BY r."startedAt" DESC, r.id DESC
+             LIMIT ${RECENT_ACTIVITY_CANDIDATE_LIMIT}
+          )
+          SELECT "projectId" AS "projectId",
+                 MAX("commitSha") AS "commitSha",
+                 MAX(id) AS "runId",
+                 MAX("startedAt") AS "lastActivityAt"
+            FROM activity_candidates
+           GROUP BY "projectId", COALESCE("commitSha", id::text)
+           ORDER BY "lastActivityAt" DESC
+           LIMIT ${RECENT_ACTIVITY_LIMIT}
+        `),
       ]);
 
       const recentRunRows = recentRuns as RecentRunListRow[];
@@ -232,6 +264,69 @@ export class OverviewService {
               _count: { _all: true },
             });
       const caseCountsByRun = buildCaseCountsByRun(recentRunCaseGroups);
+
+      const activityCandidateRows = activityCandidates;
+      const activityRuns =
+        activityCandidateRows.length === 0
+          ? []
+          : ((await this.prisma.run.findMany({
+              where: {
+                organizationId,
+                OR: activityCandidateRows.map((candidate) =>
+                  candidate.commitSha === null
+                    ? { id: candidate.runId }
+                    : {
+                        projectId: candidate.projectId,
+                        commitSha: candidate.commitSha,
+                      },
+                ),
+              },
+              select: {
+                id: true,
+                projectId: true,
+                project: { select: { name: true } },
+                suiteId: true,
+                suite: { select: { name: true } },
+                name: true,
+                status: true,
+                source: true,
+                startedAt: true,
+                commitSha: true,
+                commitMessage: true,
+                commitAuthor: true,
+              },
+            })) as RecentRunListRow[]);
+
+      const activityCaseGroups =
+        activityRuns.length === 0
+          ? []
+          : await this.prisma.runCase.groupBy({
+              by: ['runId', 'status'],
+              where: { runId: { in: activityRuns.map((run) => run.id) } },
+              _count: { _all: true },
+            });
+      const caseCountsByActivityRun = buildCaseCountsByRun(activityCaseGroups);
+
+      const recentActivity = buildRecentActivity(
+        activityRuns.map(
+          (run): RecentActivityRunRow => ({
+            id: run.id,
+            projectId: run.projectId,
+            projectName: run.project.name,
+            suiteId: run.suiteId,
+            suiteName: run.suite.name,
+            name: run.name,
+            source: run.source,
+            status: run.status,
+            startedAt: run.startedAt,
+            commitSha: run.commitSha,
+            commitMessage: run.commitMessage,
+            commitAuthor: run.commitAuthor,
+            caseCounts:
+              caseCountsByActivityRun.get(run.id) ?? emptyCaseCounts(),
+          }),
+        ),
+      );
 
       const record = buildDashboardOverview({
         period,
@@ -276,7 +371,7 @@ export class OverviewService {
         ),
       });
 
-      return ok(record);
+      return ok({ ...record, recentActivity });
     } catch (error) {
       if (isUnknownTimeZoneError(error)) return err('invalid-time-zone');
       throw error;

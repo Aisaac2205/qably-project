@@ -67,12 +67,16 @@ interface QueryRawFixtures {
   emailDeliveryCounts?: unknown[];
   inAppCounts?: unknown[];
   traceability?: unknown[];
+  activityCandidates?: unknown[];
 }
 
 function queryRawRouter(fixtures: QueryRawFixtures = {}) {
   return (sql: RawQueryRawSql) => {
     const text = sql.strings.join('');
 
+    if (text.includes('activity_candidates')) {
+      return Promise.resolve(fixtures.activityCandidates ?? []);
+    }
     if (text.includes('FROM "run_case" rc')) {
       return Promise.resolve(fixtures.caseCounts ?? []);
     }
@@ -541,6 +545,7 @@ describe('Dashboard (e2e)', () => {
         };
         projects: unknown[];
         recentRuns: unknown[];
+        recentActivity: unknown[];
         casesPassing: { total: number };
       };
 
@@ -550,7 +555,72 @@ describe('Dashboard (e2e)', () => {
       expect(body.kpis.avgRunDurationMs.value).toBeNull();
       expect(body.projects).toEqual([]);
       expect(body.recentRuns).toEqual([]);
+      expect(body.recentActivity).toEqual([]);
       expect(body.casesPassing.total).toBe(0);
+    });
+
+    it('groups activity by commit across suites, reporting aggregated status, cases and suite count', async () => {
+      const runA = {
+        ...runRow,
+        id: 'run-a',
+        suiteId: 'suite-1',
+        suite: { name: 'Checkout' },
+        project: { name: 'Checkout Web' },
+        status: 'fail' as const,
+        startedAt: new Date('2026-06-16T10:00:00.000Z'),
+      };
+      const runB = {
+        ...runRow,
+        id: 'run-b',
+        suiteId: 'suite-2',
+        suite: { name: 'Billing' },
+        project: { name: 'Checkout Web' },
+        status: 'pass' as const,
+        startedAt: new Date('2026-06-16T10:05:00.000Z'),
+      };
+
+      prisma.$queryRaw.mockImplementation(
+        queryRawRouter({
+          activityCandidates: [
+            {
+              projectId: 'project-1',
+              commitSha: runRow.commitSha,
+              runId: 'run-b',
+              lastActivityAt: runB.startedAt,
+            },
+          ],
+        }),
+      );
+      prisma.run.findMany.mockResolvedValue([runA, runB]);
+      prisma.runCase.groupBy.mockResolvedValue([
+        { runId: 'run-a', status: 'fail', _count: { _all: 1 } },
+        { runId: 'run-b', status: 'pass', _count: { _all: 2 } },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .expect(200);
+
+      const body = response.body as {
+        recentActivity: {
+          kind: string;
+          status: string;
+          suiteCount: number;
+          casesPassed: number;
+          casesTotal: number;
+          commitSha?: string;
+        }[];
+      };
+
+      expect(body.recentActivity).toHaveLength(1);
+      expect(body.recentActivity[0]).toMatchObject({
+        kind: 'commit',
+        status: 'fail',
+        suiteCount: 2,
+        casesPassed: 2,
+        casesTotal: 3,
+        commitSha: runRow.commitSha,
+      });
     });
 
     it('computes exactly 7 ascending calendar-day buckets across a DST transition', async () => {

@@ -486,6 +486,33 @@ export interface DashboardRecentRun {
   casesTotal: number
 }
 
+export interface DashboardActivityBase {
+  projectId: string
+  projectName: string
+  status: RunStatus
+  source: RunSource
+  occurredAt: string
+  casesPassed: number
+  casesTotal: number
+}
+
+export interface DashboardCommitActivity extends DashboardActivityBase {
+  kind: 'commit'
+  commitSha: string
+  commitMessage?: string
+  commitAuthor?: string
+  suiteCount: number
+}
+
+export interface DashboardRunActivity extends DashboardActivityBase {
+  kind: 'run'
+  runId: string
+  runName: string
+  suiteName: string
+}
+
+export type DashboardActivityEntry = DashboardCommitActivity | DashboardRunActivity
+
 export interface DashboardOverviewKpis {
   passRate: KpiMetric
   runs: KpiMetric
@@ -504,6 +531,7 @@ export interface DashboardOverviewRecord {
   casesPassing: RunCaseCounts
   projects: DashboardProjectRow[]
   recentRuns: DashboardRecentRun[]
+  recentActivity: DashboardActivityEntry[]
 }
 
 export interface DashboardChannelDailyPoint {
