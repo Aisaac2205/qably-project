@@ -94,6 +94,44 @@ describe('OverviewService organization scope', () => {
   });
 });
 
+describe('OverviewService casesPassing query scoping', () => {
+  it('scopes the casesPassing CTE to the organization on the run side too (defense in depth)', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    const casesPassingCall = prisma.$queryRaw.mock.calls.find(
+      ([sql]: [{ strings: string[] }]) =>
+        sql.strings.join('').includes('WITH latest'),
+    ) as [{ strings: string[]; values: unknown[] }] | undefined;
+
+    expect(casesPassingCall).toBeDefined();
+    const sqlText = casesPassingCall?.[0].strings.join('') ?? '';
+    expect(sqlText).toContain('r."organizationId"');
+    expect(casesPassingCall?.[0].values).toEqual(
+      expect.arrayContaining(['org-1']),
+    );
+  });
+
+  it('scopes the casesPassing CTE to the given project on the run side when a project is requested', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC', 'project-1');
+
+    const casesPassingCall = prisma.$queryRaw.mock.calls.find(
+      ([sql]: [{ strings: string[] }]) =>
+        sql.strings.join('').includes('WITH latest'),
+    ) as [{ strings: string[]; values: unknown[] }] | undefined;
+
+    expect(casesPassingCall).toBeDefined();
+    const sqlText = casesPassingCall?.[0].strings.join('') ?? '';
+    expect(sqlText).toContain('r."projectId"');
+    expect(casesPassingCall?.[0].values).toEqual(
+      expect.arrayContaining(['org-1', 'project-1']),
+    );
+  });
+});
+
 describe('OverviewService project scope', () => {
   it('returns project-not-found for a project outside the organization', async () => {
     const prisma = createPrisma();

@@ -149,8 +149,10 @@ export class OverviewService {
                    ) AS rn
               FROM "run" r
               JOIN "suite" s ON s.id = r."suiteId"
-             WHERE s."organizationId" = ${organizationId}
+             WHERE r."organizationId" = ${organizationId}
+               AND s."organizationId" = ${organizationId}
                ${suiteProjectFilter}
+               ${runProjectFilter}
                AND r.status IN ('pass', 'fail')
                AND r."finishedAt" IS NOT NULL
           )

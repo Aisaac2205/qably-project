@@ -130,42 +130,27 @@ function bucketGranularity(period: DashboardPeriod): 'day' | 'week' {
   return period === 90 ? 'week' : 'day';
 }
 
-function isoWeekStartKey(dateKey: string): string {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  const utcDate = new Date(Date.UTC(year, month - 1, day));
-  const daysSinceMonday = (utcDate.getUTCDay() + 6) % 7;
-
-  utcDate.setUTCDate(utcDate.getUTCDate() - daysSinceMonday);
-
-  const weekYear = utcDate.getUTCFullYear();
-  const weekMonth = String(utcDate.getUTCMonth() + 1).padStart(2, '0');
-  const weekDay = String(utcDate.getUTCDate()).padStart(2, '0');
-
-  return `${weekYear}-${weekMonth}-${weekDay}`;
-}
+const WEEK_CHUNK_SIZE = 7;
 
 function groupWeekly(dayAggregates: readonly DayAggregate[]): DayAggregate[] {
-  const byWeek = new Map<string, DayAggregate>();
-  const order: string[] = [];
+  const buckets: DayAggregate[] = [];
 
-  for (const day of dayAggregates) {
-    const key = isoWeekStartKey(day.date);
-    let bucket = byWeek.get(key);
+  for (let start = 0; start < dayAggregates.length; start += WEEK_CHUNK_SIZE) {
+    const chunk = dayAggregates.slice(start, start + WEEK_CHUNK_SIZE);
+    const bucket = emptyDayAggregate(chunk[0].date);
 
-    if (bucket === undefined) {
-      bucket = emptyDayAggregate(key);
-      byWeek.set(key, bucket);
-      order.push(key);
+    for (const day of chunk) {
+      bucket.counts = sumCaseCounts([bucket.counts, day.counts]);
+      bucket.runs += day.runs;
+      bucket.failedRuns += day.failedRuns;
+      bucket.finishedRuns += day.finishedRuns;
+      bucket.durationSumMs += day.durationSumMs;
     }
 
-    bucket.counts = sumCaseCounts([bucket.counts, day.counts]);
-    bucket.runs += day.runs;
-    bucket.failedRuns += day.failedRuns;
-    bucket.finishedRuns += day.finishedRuns;
-    bucket.durationSumMs += day.durationSumMs;
+    buckets.push(bucket);
   }
 
-  return order.map((key) => byWeek.get(key) as DayAggregate);
+  return buckets;
 }
 
 function resolveBuckets(

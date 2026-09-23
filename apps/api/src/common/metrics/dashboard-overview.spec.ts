@@ -87,26 +87,75 @@ describe('buildDashboardOverview daily granularity', () => {
   });
 });
 
+function daysFrom(startDate: string, count: number): string[] {
+  const [year, month, day] = startDate.split('-').map(Number);
+
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(year, month - 1, day + index));
+
+    return date.toISOString().slice(0, 10);
+  });
+}
+
 describe('buildDashboardOverview weekly granularity (period 90)', () => {
-  it('groups daily buckets into ISO weeks', () => {
+  it('produces the same number of buckets for current and previous windows', () => {
     const record = buildDashboardOverview({
       period: 90,
       zone: 'UTC',
-      currentDayKeys: [
-        '2026-06-08',
-        '2026-06-09',
-        '2026-06-10',
-        '2026-06-15',
-        '2026-06-16',
-      ],
+      currentDayKeys: daysFrom('2026-06-03', 90),
+      previousDayKeys: daysFrom('2026-03-05', 90),
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+      recentRuns: [],
+    });
+
+    expect(record.passRateSeries.current.length).toBe(
+      record.passRateSeries.previous.length,
+    );
+  });
+
+  it('chunks a 90-day window into 13 buckets, the last holding the remaining 6 days', () => {
+    const currentDayKeys = daysFrom('2026-06-03', 90);
+
+    const record = buildDashboardOverview({
+      period: 90,
+      zone: 'UTC',
+      currentDayKeys,
       previousDayKeys: [],
-      caseCountRows: [
-        caseRow({ day: '2026-06-08', status: 'pass', count: 1 }),
-        caseRow({ day: '2026-06-15', status: 'pass', count: 2 }),
-      ],
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+      recentRuns: [],
+    });
+
+    expect(record.passRateSeries.current).toHaveLength(13);
+    expect(record.passRateSeries.current[0].date).toBe(currentDayKeys[0]);
+    expect(record.passRateSeries.current[12].date).toBe(currentDayKeys[84]);
+  });
+
+  it('assigns a run on the chunk boundary day to the chunk it falls into, by index', () => {
+    const currentDayKeys = daysFrom('2026-06-03', 90);
+    const lastDayOfFirstChunk = currentDayKeys[6];
+    const firstDayOfSecondChunk = currentDayKeys[7];
+
+    const record = buildDashboardOverview({
+      period: 90,
+      zone: 'UTC',
+      currentDayKeys,
+      previousDayKeys: [],
+      caseCountRows: [],
       runCountRows: [
-        runRow({ day: '2026-06-08', runs: 1 }),
-        runRow({ day: '2026-06-15', runs: 2 }),
+        runRow({ day: lastDayOfFirstChunk, runs: 1 }),
+        runRow({ day: firstDayOfSecondChunk, runs: 5 }),
       ],
       casesPassingRows: [],
       projects: [],
@@ -116,15 +165,53 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       recentRuns: [],
     });
 
-    expect(record.passRateSeries.current).toHaveLength(2);
-    expect(record.passRateSeries.current[0]).toMatchObject({
-      date: '2026-06-08',
-      runs: 1,
+    expect(record.passRateSeries.current[0].runs).toBe(1);
+    expect(record.passRateSeries.current[1].runs).toBe(5);
+  });
+
+  it('sums only the remaining days of the window into the last partial chunk', () => {
+    const currentDayKeys = daysFrom('2026-06-03', 90);
+    const lastDay = currentDayKeys[89];
+
+    const record = buildDashboardOverview({
+      period: 90,
+      zone: 'UTC',
+      currentDayKeys,
+      previousDayKeys: [],
+      caseCountRows: [],
+      runCountRows: [runRow({ day: lastDay, runs: 3 })],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+      recentRuns: [],
     });
-    expect(record.passRateSeries.current[1]).toMatchObject({
-      date: '2026-06-15',
-      runs: 2,
+
+    expect(record.passRateSeries.current).toHaveLength(13);
+    expect(record.passRateSeries.current[12].runs).toBe(3);
+  });
+
+  it('applies the same window-anchored chunking to the KPI sparkline series', () => {
+    const currentDayKeys = daysFrom('2026-06-03', 90);
+    const previousDayKeys = daysFrom('2026-03-05', 90);
+
+    const record = buildDashboardOverview({
+      period: 90,
+      zone: 'UTC',
+      currentDayKeys,
+      previousDayKeys,
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+      recentRuns: [],
     });
+
+    expect(record.kpis.runs.series).toHaveLength(13);
   });
 });
 

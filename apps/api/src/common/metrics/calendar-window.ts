@@ -80,11 +80,6 @@ export interface CalendarDayKeys {
   previous: string[];
 }
 
-/**
- * Ordered (ascending) calendar-day keys for the current and previous
- * windows computeCalendarWindow resolves for the same period/zone/now,
- * built from the same calendar arithmetic so the two never drift apart.
- */
 export function calendarDayKeys(
   period: DashboardPeriod,
   zone: string,
