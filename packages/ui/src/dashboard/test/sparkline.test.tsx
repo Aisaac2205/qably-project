@@ -9,12 +9,29 @@ describe('Sparkline', () => {
     expect(screen.getByRole('img', { name: 'Pass rate over the last 4 runs' })).toBeInTheDocument()
   })
 
-  it('plots one point per value and marks only the last one', () => {
+  it('plots one point per value with no end dot, per the mockup', () => {
     const { container } = render(<Sparkline values={[10, 40, 30, 60]} label="trend" />)
 
     const path = container.querySelector('.recharts-area-curve')
     expect(path).toBeInTheDocument()
-    expect(container.querySelectorAll('circle')).toHaveLength(1)
+    expect(container.querySelectorAll('circle')).toHaveLength(0)
+  })
+
+  it('defaults to a 96x44 box per the mockup', () => {
+    const { container } = render(<Sparkline values={[10, 40, 30, 60]} label="trend" />)
+
+    const svg = container.querySelector('svg')
+    expect(svg).toHaveAttribute('width', '96')
+    expect(svg).toHaveAttribute('height', '44')
+  })
+
+  it('uses a thin 1.6px stroke and a soft area fill, per the mockup', () => {
+    const { container } = render(<Sparkline values={[10, 40, 30, 60]} label="trend" />)
+
+    const path = container.querySelector('.recharts-area-curve')
+    expect(path).toHaveAttribute('stroke-width', '1.6')
+    const stop = container.querySelector('linearGradient stop')
+    expect(stop).toHaveAttribute('stop-opacity', '0.08')
   })
 
   it('renders an accessible dot for a single value instead of a silent blank', () => {
@@ -45,25 +62,23 @@ describe('Sparkline', () => {
     expect(screen.getByRole('img', { name: 'trend' })).toBeInTheDocument()
   })
 
-  it('breaks the line into a gap instead of interpolating across a null value', () => {
+  it('connects across a null day so the line stays continuous, per the mockup', () => {
     const { container } = render(<Sparkline values={[10, null, 30, 60]} label="trend with a gap" />)
 
     const path = container.querySelector('.recharts-area-curve')
     const commands = (path?.getAttribute('d') ?? '').match(/M/g) ?? []
-    expect(commands.length).toBeGreaterThan(1)
+    expect(commands.length).toBe(1)
   })
 
-  it('marks the last non-null value, not the last array slot, when the series ends with a gap', () => {
+  it('renders no end-of-line marker when the series ends with a gap', () => {
     const { container } = render(<Sparkline values={[10, 40, 30, null]} label="trend ending in a gap" />)
 
-    expect(container.querySelectorAll('circle')).toHaveLength(1)
+    expect(container.querySelectorAll('circle')).toHaveLength(0)
   })
 
-  it('colours the line and the last-value marker by tone through the scoped chart variable', () => {
+  it('colours the line by tone through the scoped chart variable', () => {
     const { container } = render(<Sparkline values={[10, 20, 30]} label="trend" tone="fail" />)
 
-    const marker = container.querySelector('circle')
-    expect(marker).toHaveAttribute('fill', 'var(--color-value)')
     const path = container.querySelector('.recharts-area-curve')
     expect(path).toHaveAttribute('stroke', 'var(--color-value)')
     const style = container.querySelector('style')
@@ -82,5 +97,12 @@ describe('Sparkline', () => {
 
     const style = container.querySelector('style')
     expect(style?.innerHTML).toContain('--color-value: var(--qb-chart-compare);')
+  })
+
+  it('maps the warn tone to the warn chart token', () => {
+    const { container } = render(<Sparkline values={[10, 20, 30]} label="trend" tone="warn" />)
+
+    const style = container.querySelector('style')
+    expect(style?.innerHTML).toContain('--color-value: var(--qb-chart-warn);')
   })
 })

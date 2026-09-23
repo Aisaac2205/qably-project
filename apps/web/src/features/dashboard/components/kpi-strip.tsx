@@ -175,7 +175,7 @@ export function KpiStrip({ period, projectId }: KpiStripProps) {
             values={overview.kpis.avgRunDurationMs.series}
             label={t('dashboard.kpiSparklineLabel', { label: avgDurationLabel })}
             emptyLabel={t('dashboard.kpiSparklineEmpty')}
-            tone="muted"
+            tone="warn"
           />
         </KpiTile>
       </dl>

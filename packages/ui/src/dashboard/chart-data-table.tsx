@@ -17,7 +17,7 @@ export interface ChartDataTableProps<T> {
 
 export function ChartDataTable<T>({ caption, rows, rowKey, columns, className }: ChartDataTableProps<T>) {
   return (
-    <table className={cn('sr-only', className)}>
+    <table className={cn('sr-only table-fixed', className)}>
       <caption>{caption}</caption>
       <thead>
         <tr>

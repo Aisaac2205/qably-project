@@ -69,20 +69,20 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
         >
           <table className="w-full min-w-xl border-collapse text-left">
             <thead>
-              <tr className="border-b border-border">
-                <th scope="col" className="py-2 pr-3 text-xs font-medium text-muted">
+              <tr className="border-b border-border bg-canvas">
+                <th scope="col" className="py-2.5 pr-3 text-xs font-medium text-muted">
                   {t('dashboard.projectsColProject')}
                 </th>
-                <th scope="col" className="py-2 px-3 text-xs font-medium text-muted">
+                <th scope="col" className="py-2.5 px-3 text-xs font-medium text-muted">
                   {t('dashboard.projectsColLastRun')}
                 </th>
-                <th scope="col" className="py-2 px-3 text-center text-xs font-medium text-muted">
+                <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-muted">
                   {t('dashboard.projectsColSuites')}
                 </th>
-                <th scope="col" className="py-2 px-3 text-center text-xs font-medium text-muted">
+                <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-muted">
                   {t('dashboard.projectsColCases')}
                 </th>
-                <th scope="col" className="py-2 pl-3 text-right text-xs font-medium text-muted">
+                <th scope="col" className="py-2.5 pl-3 text-right text-xs font-medium text-muted">
                   {t('dashboard.projectsColPassRate')}
                 </th>
               </tr>
@@ -110,15 +110,15 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                         ? t('dashboard.noRuns')
                         : formatRelativeTime(project.lastRunAt, timeLocale)}
                     </td>
-                    <td className="py-2.5 px-3 text-center text-xs font-medium text-default tabular-nums">
+                    <td className="py-2.5 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.suites}
                     </td>
-                    <td className="py-2.5 px-3 text-center text-xs font-medium text-default tabular-nums">
+                    <td className="py-2.5 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.cases}
                     </td>
                     <td className="py-2.5 pl-3">
                       <div className="flex items-center justify-end gap-2">
-                        <span className="w-10 text-right text-xs font-semibold text-default tabular-nums">
+                        <span className="w-11 text-right font-mono text-xs font-semibold text-default tabular-nums">
                           {passRateText}
                         </span>
                         <PassRateBar

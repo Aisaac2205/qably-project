@@ -69,10 +69,9 @@ describe('KpiRow', () => {
     const defectsCard = screen.getByText('Failed test cases · 7d').closest('a') as HTMLElement
     expect(dashboardSummaryFixture.recentRuns.length).toBeGreaterThanOrEqual(2)
 
-    const spark = defectsCard.querySelector('svg[role="img"]')
-    expect(spark).not.toBeNull()
-    expect(spark?.querySelector('circle')).toHaveAttribute('fill', 'var(--color-value)')
     const chartRoot = defectsCard.querySelector('[data-slot="chart"]')
+    expect(chartRoot).not.toBeNull()
+    expect(chartRoot?.querySelector('.recharts-area-curve')).toHaveAttribute('stroke', 'var(--color-value)')
     expect(chartRoot?.querySelector('style')?.innerHTML).toContain('--color-value: var(--qb-chart-fail);')
   })
 

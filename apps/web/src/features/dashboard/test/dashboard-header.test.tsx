@@ -3,12 +3,16 @@ import { describe, it, expect, vi } from 'vitest'
 import { DashboardHeader } from '@/features/dashboard/components/dashboard-header'
 
 describe('DashboardHeader', () => {
-  it('renders the dashboard title and subtitle', () => {
+  it('does not render a duplicate page title, since the app shell already shows it', () => {
     render(<DashboardHeader period={30} onPeriodChange={vi.fn()} />)
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
-    expect(
-      screen.getByText('Track pass rate, activity and delivery health across every project.'),
-    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Dashboard' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+  })
+
+  it('renders the subtitle as plain muted text, not a heading', () => {
+    render(<DashboardHeader period={30} onPeriodChange={vi.fn()} />)
+    const subtitle = screen.getByText('Track pass rate, activity and delivery health across every project.')
+    expect(subtitle.tagName).toBe('P')
   })
 
   it('offers a 7/30/90 day period toggle group with 30 marked pressed by default', () => {

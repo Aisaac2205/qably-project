@@ -66,6 +66,17 @@ describe('PassRateHero', () => {
     expect(within(table).getAllByText('Previous period').length).toBeGreaterThan(0)
   })
 
+  it('shows the current pass rate and its delta next to the title, and a legend for the two series', async () => {
+    await act(async () => {
+      renderWithQuery(<PassRateHero period={30} />)
+    })
+
+    expect(screen.getByText('82%')).toBeInTheDocument()
+    expect(screen.getByText('+7%')).toBeInTheDocument()
+    expect(screen.getAllByText('Current period').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Previous period').length).toBeGreaterThan(0)
+  })
+
   it('exposes the chart as a keyboard-focusable, accessible element', async () => {
     await act(async () => {
       renderWithQuery(<PassRateHero period={30} />)
@@ -79,6 +90,12 @@ describe('PassRateHero', () => {
     const { container } = await act(async () => renderWithQuery(<PassRateHero period={30} />))
     expect(container.querySelector('.max-w-dashboard')).toBeInTheDocument()
     expect(container.innerHTML).not.toContain('max-w-[1128px]')
+  })
+
+  it('sizes the chart wrapper to a fixed 240px (h-60), per the mockup', async () => {
+    const { container } = await act(async () => renderWithQuery(<PassRateHero period={30} />))
+    expect(container.querySelector('.h-60')).toBeInTheDocument()
+    expect(container.innerHTML).not.toContain('h-48')
   })
 
   it('shows a skeleton while the overview loads, keeping the title visible', async () => {

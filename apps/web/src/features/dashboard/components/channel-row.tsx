@@ -24,7 +24,9 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
   return (
     <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <Image src={LOGO_SRC[webhook.type]} alt="" width={20} height={20} className="size-5 shrink-0" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border">
+          <Image src={LOGO_SRC[webhook.type]} alt="" width={20} height={20} className="size-5 shrink-0" />
+        </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-default">{webhook.name}</p>
           <p className="truncate text-xs text-muted">{eventTypesLabel}</p>

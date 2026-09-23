@@ -31,6 +31,23 @@ describe('ChartDataTable', () => {
     expect(table).toHaveClass('sr-only')
   })
 
+  it('uses a fixed table layout so wide sr-only content cannot force the page to scroll horizontally', () => {
+    const { container } = render(
+      <ChartDataTable
+        caption="Runs per day"
+        rows={rows}
+        rowKey={(row) => row.id}
+        columns={[
+          { key: 'label', header: 'Day', render: (row) => row.label },
+          { key: 'value', header: 'Runs', render: (row) => row.value },
+        ]}
+      />,
+    )
+
+    const table = container.querySelector('table')
+    expect(table).toHaveClass('table-fixed')
+  })
+
   it('renders one row per data point mirroring the columns', () => {
     render(
       <ChartDataTable

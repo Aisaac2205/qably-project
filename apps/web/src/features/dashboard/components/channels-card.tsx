@@ -63,7 +63,9 @@ export function ChannelsCard() {
             ))}
             {channels.email.enabled ? (
               <div className="flex items-center gap-3 px-5 py-3.5">
-                <Image src="/logos/gmail.svg" alt="" width={20} height={20} className="size-5 shrink-0" />
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border">
+                  <Image src="/logos/gmail.svg" alt="" width={20} height={20} className="size-5 shrink-0" />
+                </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-default">{t('dashboard.channelsEmailName')}</p>
                   <p className="truncate text-xs text-muted">

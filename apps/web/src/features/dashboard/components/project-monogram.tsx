@@ -19,7 +19,7 @@ export function ProjectMonogram({ name, className }: ProjectMonogramProps) {
     <span
       aria-hidden="true"
       className={cn(
-        'inline-flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+        'inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-semibold',
         'bg-canvas-hover text-default',
         className,
       )}

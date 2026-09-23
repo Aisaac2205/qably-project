@@ -408,7 +408,6 @@
     "sortByPassRate": "Ordenar por tasa de aprobación",
     "sortBySuites": "Ordenar por suites",
     "showingOf": "Mostrando {{count}} de {{total}}",
-    "headerTitle": "Dashboard",
     "headerSubtitle": "Seguimiento de la tasa de aprobación, la actividad y la salud de las entregas en todos los proyectos.",
     "periodLabel": "Período",
     "period7d": "7 d",

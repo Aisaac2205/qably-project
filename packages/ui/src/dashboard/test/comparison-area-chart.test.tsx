@@ -40,7 +40,7 @@ describe('ComparisonAreaChart', () => {
 
     expect(container.querySelector('.recharts-area-curve')).toBeInTheDocument()
     const line = container.querySelector('.recharts-line-curve')
-    expect(line).toHaveAttribute('stroke-dasharray', '4 4')
+    expect(line).toHaveAttribute('stroke-dasharray', '5 5')
   })
 
   it('breaks the current series into a gap instead of interpolating across a null day', () => {
@@ -97,5 +97,14 @@ describe('ComparisonAreaChart', () => {
       'data-touch-trigger',
       'click',
     )
+  })
+
+  it('fills its sized parent instead of relying on ResponsiveContainer to measure a 0-height ancestor', () => {
+    const { container } = render(<ComparisonAreaChart {...defaultProps} points={points} className="h-full" />)
+
+    const wrapper = container.querySelector('[data-slot="comparison-area-chart"]')
+    expect(wrapper).toHaveClass('h-full', 'w-full')
+    const chart = container.querySelector('[data-slot="chart"]')
+    expect(chart).toHaveClass('h-full', 'w-full')
   })
 })

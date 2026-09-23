@@ -39,6 +39,30 @@ describe('CasesGaugeCard', () => {
     expect(meter).toHaveAttribute('aria-valuenow', '85')
   })
 
+  it('uses font-medium and tracking-tight for the gauge value, not font-semibold, per the mockup', async () => {
+    await act(async () => {
+      renderWithQuery(<CasesGaugeCard period={30} />)
+    })
+
+    const value = screen.getByText('85%')
+    expect(value).toHaveClass('font-medium', 'tracking-tight')
+    expect(value).not.toHaveClass('font-semibold')
+  })
+
+  it('shows the failed, skipped and blocked counts in bordered stat boxes, failed and blocked coloured by tone', async () => {
+    await act(async () => {
+      renderWithQuery(<CasesGaugeCard period={30} />)
+    })
+
+    const failed = screen.getByTestId('cases-failed')
+    expect(failed).toHaveClass('text-fail')
+    expect(failed.closest('div')).toHaveClass('border')
+
+    const blocked = screen.getByTestId('cases-blocked')
+    expect(blocked).toHaveClass('text-warn')
+    expect(blocked.closest('div')).toHaveClass('border')
+  })
+
   it('shows passed of total plus the failed, skipped and blocked counts', async () => {
     await act(async () => {
       renderWithQuery(<CasesGaugeCard period={30} />)

@@ -408,7 +408,6 @@
     "sortByPassRate": "Sort by pass rate",
     "sortBySuites": "Sort by suites",
     "showingOf": "Showing {{count}} of {{total}}",
-    "headerTitle": "Dashboard",
     "headerSubtitle": "Track pass rate, activity and delivery health across every project.",
     "periodLabel": "Time period",
     "period7d": "7d",

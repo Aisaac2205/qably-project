@@ -66,7 +66,6 @@ describe('DashboardPage', () => {
     const headings = Array.from(region.querySelectorAll('h1, h2, h3')).map((node) => node.textContent)
 
     expect(headings).toEqual([
-      'Dashboard',
       'Pass rate',
       'Projects',
       'Cases passing',

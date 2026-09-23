@@ -11,6 +11,14 @@ describe('KpiTile', () => {
     expect(value).toHaveClass('tabular-nums')
   })
 
+  it('uses font-medium and tracking-tight for the value, not font-semibold, per the mockup', () => {
+    render(<KpiTile label="Pass rate" value="89%" />)
+
+    const value = screen.getByText('89%')
+    expect(value).toHaveClass('font-medium', 'tracking-tight')
+    expect(value).not.toHaveClass('font-semibold')
+  })
+
   it('renders caller-supplied children, such as a sparkline, without computing polarity itself', () => {
     render(
       <KpiTile label="Runs" value={87}>

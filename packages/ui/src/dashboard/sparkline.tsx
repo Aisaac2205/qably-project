@@ -5,13 +5,14 @@ import { Area, ComposedChart } from 'recharts'
 import { cn } from '../utils'
 import { ChartContainer, type ChartConfig } from '../chart/chart'
 
-export type SparklineTone = 'pass' | 'fail' | 'muted' | 'primary'
+export type SparklineTone = 'pass' | 'fail' | 'muted' | 'primary' | 'warn'
 
 const TONE_VAR: Record<SparklineTone, `var(--qb-chart-${string})`> = {
   primary: 'var(--qb-chart-line)',
   muted: 'var(--qb-chart-compare)',
   pass: 'var(--qb-chart-pass)',
   fail: 'var(--qb-chart-fail)',
+  warn: 'var(--qb-chart-warn)',
 }
 
 export interface SparklineProps {
@@ -25,22 +26,14 @@ export interface SparklineProps {
 }
 
 const MARKER_RADIUS = 4
-const RING = 2
-const INSET = MARKER_RADIUS + RING
-
-interface SparkDotProps {
-  cx?: number
-  cy?: number
-  index?: number
-  value?: number | null
-}
+const INSET = 3
 
 export function Sparkline({
   values,
   label,
   tone = 'primary',
-  width = 72,
-  height = 24,
+  width = 96,
+  height = 44,
   className,
   emptyLabel,
 }: SparklineProps) {
@@ -52,7 +45,6 @@ export function Sparkline({
     () => data.reduce<number[]>((found, point) => (point.value !== null ? [...found, point.index] : found), []),
     [data],
   )
-  const lastDefinedIndex = definedIndexes.length ? definedIndexes[definedIndexes.length - 1] : -1
 
   if (definedIndexes.length === 0) {
     return (
@@ -92,37 +84,22 @@ export function Sparkline({
       >
         <defs>
           <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--color-value)" stopOpacity={0.28} />
+            <stop offset="0%" stopColor="var(--color-value)" stopOpacity={0.08} />
             <stop offset="100%" stopColor="var(--color-value)" stopOpacity={0} />
           </linearGradient>
         </defs>
         <Area
           type="monotone"
           dataKey="value"
-          connectNulls={false}
+          connectNulls
           stroke="var(--color-value)"
-          strokeWidth={2}
+          strokeWidth={1.6}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill={`url(#${gradientId})`}
           isAnimationActive={false}
           activeDot={false}
-          dot={(dotProps: SparkDotProps) => {
-            if (dotProps.index !== lastDefinedIndex) {
-              return <g key={`dot-${dotProps.index}`} />
-            }
-            return (
-              <circle
-                key="marker"
-                cx={dotProps.cx}
-                cy={dotProps.cy}
-                r={MARKER_RADIUS}
-                fill="var(--color-value)"
-                className="stroke-qb-surface"
-                strokeWidth={RING}
-              />
-            )
-          }}
+          dot={false}
         />
       </ComposedChart>
     </ChartContainer>

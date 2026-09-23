@@ -57,32 +57,32 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
         ) : (
           <>
             <Gauge value={Math.round(rate * 100)} label={t('dashboard.casesGaugeLabel')}>
-              <span className="text-2xl font-semibold tabular-nums text-default">
+              <span className="text-3xl font-medium tracking-tight tabular-nums text-default">
                 {Math.round(rate * 100)}%
               </span>
             </Gauge>
-            <p className="text-xs font-medium text-default tabular-nums">
+            <p className="font-mono text-xs font-medium text-default tabular-nums">
               {t('dashboard.casesPassedOf', {
                 passed: overview.casesPassing.pass,
                 total: overview.casesPassing.total,
               })}
             </p>
             <dl className="grid w-full grid-cols-3 gap-2 text-center text-xs">
-              <div>
+              <div className="rounded-lg border border-border p-2">
                 <dt className="text-muted">{t('dashboard.casesFailedLabel')}</dt>
-                <dd data-testid="cases-failed" className="font-semibold text-default tabular-nums">
+                <dd data-testid="cases-failed" className="font-semibold text-fail tabular-nums">
                   {formatNumber(overview.casesPassing.fail)}
                 </dd>
               </div>
-              <div>
+              <div className="rounded-lg border border-border p-2">
                 <dt className="text-muted">{t('dashboard.casesSkippedLabel')}</dt>
                 <dd data-testid="cases-skipped" className="font-semibold text-default tabular-nums">
                   {formatNumber(overview.casesPassing.skip)}
                 </dd>
               </div>
-              <div>
+              <div className="rounded-lg border border-border p-2">
                 <dt className="text-muted">{t('dashboard.casesBlockedLabel')}</dt>
-                <dd data-testid="cases-blocked" className="font-semibold text-default tabular-nums">
+                <dd data-testid="cases-blocked" className="font-semibold text-warn tabular-nums">
                   {formatNumber(overview.casesPassing.blocked)}
                 </dd>
               </div>

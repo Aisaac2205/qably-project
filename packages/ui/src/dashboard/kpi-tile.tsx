@@ -25,17 +25,22 @@ const DELTA_TONE_CLASSES: Record<KpiDeltaTone, string> = {
 
 export function KpiTile({ label, value, delta, className, children }: KpiTileProps) {
   return (
-    <div className={cn('flex min-w-0 flex-col gap-2 rounded-xl border border-qb-border bg-qb-surface p-4', className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
+    <div
+      className={cn(
+        'flex min-w-0 flex-col gap-2 rounded-xl border border-qb-border bg-qb-surface px-5 py-4',
+        className,
+      )}
+    >
+      <div className="flex items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-2">
           <dt className="truncate text-xs font-medium text-qb-muted">{label}</dt>
-          <dd className="text-3xl font-semibold tracking-tight text-qb-fg tabular-nums">{value}</dd>
+          <dd className="text-2xl font-medium leading-none tracking-tight text-qb-fg tabular-nums">{value}</dd>
         </div>
         {children ? <div className="shrink-0">{children}</div> : null}
       </div>
       {delta ? (
         <div className="flex items-center gap-1.5 text-xs tabular-nums">
-          <span className={cn('font-semibold', DELTA_TONE_CLASSES[delta.tone])}>{delta.text}</span>
+          <span className={cn('font-medium', DELTA_TONE_CLASSES[delta.tone])}>{delta.text}</span>
           <span className="sr-only">{delta.srText}</span>
         </div>
       ) : null}

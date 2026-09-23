@@ -187,8 +187,16 @@ export function ComparisonAreaChart({
   const idToLabel = new Map(points.map((point) => [point.id, point.label]))
 
   return (
-    <div data-slot="comparison-area-chart" data-touch-trigger={trigger} className={cn('relative', className)}>
-      <ChartContainer config={config} initialDimension={{ width: 640, height: 224 }} className="aspect-auto">
+    <div
+      data-slot="comparison-area-chart"
+      data-touch-trigger={trigger}
+      className={cn('relative h-full w-full', className)}
+    >
+      <ChartContainer
+        config={config}
+        initialDimension={{ width: 640, height: 224 }}
+        className="aspect-auto h-full w-full"
+      >
         <ComposedChart
           data={points as ComparisonAreaPoint[]}
           accessibilityLayer
@@ -199,11 +207,11 @@ export function ComparisonAreaChart({
         >
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-current)" stopOpacity={0.32} />
-              <stop offset="100%" stopColor="var(--color-current)" stopOpacity={0.02} />
+              <stop offset="0%" stopColor="var(--color-current)" stopOpacity={0.1} />
+              <stop offset="100%" stopColor="var(--color-current)" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid horizontal vertical={false} strokeDasharray="3 3" stroke="var(--qb-chart-grid)" />
+          <CartesianGrid horizontal vertical={false} strokeDasharray="3 5" stroke="var(--qb-chart-grid)" />
           <YAxis
             domain={domain as [number, number]}
             ticks={ticks as number[]}
@@ -211,7 +219,7 @@ export function ComparisonAreaChart({
             axisLine={false}
             tickLine={false}
             tickFormatter={(value: number) => valueFormatter(value)}
-            tick={{ className: 'fill-qb-muted tabular-nums', fontSize: 10 }}
+            tick={{ className: 'fill-qb-muted font-mono tabular-nums', fontSize: 11 }}
           />
           <XAxis
             dataKey="id"
@@ -219,10 +227,10 @@ export function ComparisonAreaChart({
             tickFormatter={(id: string) => idToLabel.get(id) ?? ''}
             axisLine={false}
             tickLine={false}
-            tick={{ className: 'fill-qb-muted', fontSize: 10 }}
+            tick={{ className: 'fill-qb-muted font-mono', fontSize: 11 }}
           />
           <ChartTooltip
-            cursor={{ stroke: 'var(--qb-chart-grid)', strokeWidth: 1 }}
+            cursor={{ stroke: 'var(--qb-chart-line)', strokeOpacity: 0.18, strokeWidth: 1 }}
             trigger={trigger}
             allowEscapeViewBox={{ x: false, y: true }}
             content={(tooltipProps) => (
@@ -244,12 +252,12 @@ export function ComparisonAreaChart({
             dataKey="current"
             connectNulls={false}
             stroke="var(--color-current)"
-            strokeWidth={2}
+            strokeWidth={2.2}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill={`url(#${gradientId})`}
             isAnimationActive={false}
-            activeDot={{ r: 4, fill: 'var(--color-current)', className: 'stroke-qb-surface' }}
+            activeDot={{ r: 6, stroke: 'var(--color-current)', strokeWidth: 2.5, className: 'fill-qb-surface' }}
           />
           <Line
             type="monotone"
@@ -257,7 +265,7 @@ export function ComparisonAreaChart({
             connectNulls={false}
             stroke="var(--color-previous)"
             strokeWidth={1.5}
-            strokeDasharray="4 4"
+            strokeDasharray="5 5"
             dot={false}
             activeDot={{ r: 3, fill: 'var(--color-previous)', className: 'stroke-qb-surface' }}
             isAnimationActive={false}
