@@ -192,7 +192,10 @@
       "run_failed_other": "{{failedCount}} of {{count}} test suites failed: {{failedSuiteNames}}.",
       "case_regressed": "{{caseName}} regressed in {{suiteName}} during run \"{{runName}}\".",
       "ingestion_failed": "Ingestion failed for {{repo}}.",
-      "connection_security": "{{action}} for connection {{connectionName}}."
+      "connection_security": "{{action}} for connection {{connectionName}}.",
+      "connection_security_created": "Connection {{connectionName}} was created.",
+      "connection_security_rotated": "The webhook secret for connection {{connectionName}} was rotated.",
+      "connection_security_removed": "Connection {{connectionName}} was removed."
     },
     "emailSubject": {
       "run_failed": "Run \"{{runName}}\" failed",
@@ -203,7 +206,10 @@
       "run_failed_other": "{{failedCount}} of {{count}} test suites failed",
       "case_regressed": "{{caseName}} regressed in {{suiteName}}",
       "ingestion_failed": "Ingestion failed for {{repo}}",
-      "connection_security": "{{action}} for connection {{connectionName}}"
+      "connection_security": "{{action}} for connection {{connectionName}}",
+      "connection_security_created": "Connection {{connectionName}} created",
+      "connection_security_rotated": "Webhook secret rotated for {{connectionName}}",
+      "connection_security_removed": "Connection {{connectionName}} removed"
     },
     "delivery": {
       "sentTo": "Sent to {{channel}}",

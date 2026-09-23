@@ -15,9 +15,14 @@ const connectionSecurityEvent: NotificationJobData = {
   eventType: 'connection_security',
   organizationId: 'org-1',
   severity: 'critical',
-  payload: { action: 'Created', connectionName: 'Primary' },
+  payload: { action: 'created', connectionName: 'Primary' },
   dedupeKey: 'connection_security:connection-1:created',
   connectionId: 'connection-1',
+};
+
+const legacyConnectionSecurityEvent: NotificationJobData = {
+  ...connectionSecurityEvent,
+  payload: { action: 'Created', connectionName: 'Primary' },
 };
 
 interface FakeMember {
@@ -232,6 +237,24 @@ describe('NotificationsProcessor preference resolution', () => {
 
     const [call] = mailer.send.mock.calls as [[{ html: string }]];
     expect(call[0].html).toContain('https://app.qably.dev/settings');
+  });
+
+  it('never leaks the English connection_security action into an es recipient email, even for a legacy English payload', async () => {
+    const prisma = createPrisma([memberMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(legacyConnectionSecurityEvent));
+
+    const [call] = mailer.send.mock.calls as [
+      [{ html: string; subject: string }],
+    ];
+    expect(call[0].subject).not.toMatch(/created|rotated|removed/i);
+    expect(call[0].html).not.toMatch(/created|rotated|removed/i);
+    expect(call[0].subject).toBe('Se creó la conexión Primary');
+    expect(call[0].html).toContain('Se creó la conexión Primary.');
   });
 });
 

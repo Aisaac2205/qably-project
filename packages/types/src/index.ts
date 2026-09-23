@@ -22,6 +22,7 @@ export type NotificationEventType =
   | 'connection_security'
 export type NotificationWebhookType = 'slack' | 'discord'
 export type NotificationDeliveryStatus = 'sent' | 'failed'
+export type ConnectionSecurityAction = 'created' | 'rotated' | 'removed'
 
 export type SuiteRunStatus = 'running' | 'pass' | 'fail' | 'needs-attention' | 'never-run'
 

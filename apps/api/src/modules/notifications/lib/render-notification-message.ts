@@ -1,4 +1,4 @@
-import { en, es, type Locale } from '@qably/i18n';
+import { en, es, resolveNotificationEventKey, type Locale } from '@qably/i18n';
 import type { NotificationEventType } from '@qably/types';
 
 interface EventCatalog {
@@ -27,6 +27,10 @@ function resolveTemplateKey(
   eventType: NotificationEventType,
   payload: Record<string, string | number>,
 ): string {
+  if (eventType === 'connection_security') {
+    return resolveNotificationEventKey(eventType, payload);
+  }
+
   const count = payload.count;
 
   if (typeof count !== 'number') return eventType;

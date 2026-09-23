@@ -65,6 +65,47 @@ describe('renderNotificationMessage', () => {
 
     expect(message).toBe('The run "Checkout regression" in Checkout passed.');
   });
+
+  it('renders a per-action connection_security message in English', () => {
+    const message = renderNotificationMessage('en', 'connection_security', {
+      action: 'rotated',
+      connectionName: 'Primary',
+    });
+
+    expect(message).toBe(
+      'The webhook secret for connection Primary was rotated.',
+    );
+  });
+
+  it('renders a per-action connection_security message in Spanish, with no English leaking in', () => {
+    const message = renderNotificationMessage('es', 'connection_security', {
+      action: 'rotated',
+      connectionName: 'Primary',
+    });
+
+    expect(message).toBe(
+      'Se rotó el secreto del webhook de la conexión Primary.',
+    );
+    expect(message).not.toMatch(/rotated|created|removed/i);
+  });
+
+  it('maps a legacy English action phrase stored on old rows to the Spanish per-action template', () => {
+    const message = renderNotificationMessage('es', 'connection_security', {
+      action: 'Created',
+      connectionName: 'Primary',
+    });
+
+    expect(message).toBe('Se creó la conexión Primary.');
+  });
+
+  it('falls back to the generic template for an unrecognized action value', () => {
+    const message = renderNotificationMessage('en', 'connection_security', {
+      action: 'Something else',
+      connectionName: 'Primary',
+    });
+
+    expect(message).toBe('Something else for connection Primary.');
+  });
 });
 
 describe('renderNotificationSubject', () => {
@@ -100,6 +141,25 @@ describe('renderNotificationSubject', () => {
     });
 
     expect(subject).toBe('2 of 3 test suites failed');
+  });
+
+  it('renders a per-action connection_security subject in Spanish, with no English leaking in', () => {
+    const subject = renderNotificationSubject('es', 'connection_security', {
+      action: 'removed',
+      connectionName: 'Primary',
+    });
+
+    expect(subject).toBe('Se eliminó la conexión Primary');
+    expect(subject).not.toMatch(/created|rotated|removed/i);
+  });
+
+  it('maps a legacy English action phrase to the Spanish subject template', () => {
+    const subject = renderNotificationSubject('es', 'connection_security', {
+      action: 'Removed',
+      connectionName: 'Primary',
+    });
+
+    expect(subject).toBe('Se eliminó la conexión Primary');
   });
 
   it('falls back to the raw event type when the subject catalog is missing an entry', () => {

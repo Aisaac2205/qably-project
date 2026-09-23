@@ -15,6 +15,7 @@ import {
   WarningCircle,
   X,
 } from '@phosphor-icons/react'
+import { resolveNotificationEventKey } from '@qably/i18n'
 import type { NotificationDelivery, NotificationSeverity } from '@qably/types'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
 import { resolveNotificationLink } from '@/features/notifications/lib/resolve-notification-link'
@@ -106,7 +107,10 @@ export function NotificationsPage() {
 
   const messages = useMemo(() => {
     return new Map(
-      notifications.map((n) => [n.id, t(`notifications.events.${n.eventType}`, n.payload)]),
+      notifications.map((n) => {
+        const eventKey = resolveNotificationEventKey(n.eventType, n.payload)
+        return [n.id, t(`notifications.events.${eventKey}`, n.payload)]
+      }),
     )
   }, [notifications, t])
 

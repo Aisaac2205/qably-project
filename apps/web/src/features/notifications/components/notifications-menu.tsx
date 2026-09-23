@@ -7,6 +7,7 @@ import {
   Warning,
   WarningOctagon,
 } from '@phosphor-icons/react'
+import { resolveNotificationEventKey } from '@qably/i18n'
 import type { Notification, NotificationSeverity } from '@qably/types'
 import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
 import { useNotifications } from '@/features/notifications/hooks/use-notifications'
@@ -30,7 +31,8 @@ function NotificationItem({ notification, onRead }: {
   const { t } = useTranslation()
   const { Icon, label, className } = severityConfig[notification.severity]
   const isUnread = !notification.readAt
-  const message = t(`notifications.events.${notification.eventType}`, notification.payload)
+  const eventKey = resolveNotificationEventKey(notification.eventType, notification.payload)
+  const message = t(`notifications.events.${eventKey}`, notification.payload)
 
   return (
     <MenuItem onClick={() => onRead(notification.id)} className="items-start gap-2.5 rounded-none px-3 py-2.5">

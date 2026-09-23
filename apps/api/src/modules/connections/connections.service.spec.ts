@@ -395,6 +395,7 @@ describe('ConnectionsService connection_security notifications', () => {
         organizationId: 'org-1',
         connectionId: 'connection-1',
         dedupeKey: 'connection_security:connection-1:created',
+        payload: expect.objectContaining({ action: 'created' }) as unknown,
       }),
     );
   });
@@ -416,6 +417,7 @@ describe('ConnectionsService connection_security notifications', () => {
         eventType: 'connection_security',
         connectionId: 'connection-1',
         dedupeKey: 'connection_security:connection-1:rotated',
+        payload: expect.objectContaining({ action: 'rotated' }) as unknown,
       }),
     );
   });
@@ -436,6 +438,7 @@ describe('ConnectionsService connection_security notifications', () => {
         eventType: 'connection_security',
         connectionId: 'connection-1',
         dedupeKey: 'connection_security:connection-1:removed',
+        payload: expect.objectContaining({ action: 'removed' }) as unknown,
       }),
     );
   });

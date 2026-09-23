@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_LOCALE, parseAcceptLanguage, resolveLocale } from './index'
+import {
+  DEFAULT_LOCALE,
+  parseAcceptLanguage,
+  resolveLocale,
+  resolveNotificationEventKey,
+} from './index'
 
 describe('resolveLocale', () => {
   it('accepts a plain supported locale', () => {
@@ -47,5 +52,45 @@ describe('parseAcceptLanguage', () => {
     expect(parseAcceptLanguage(null)).toEqual([])
     expect(parseAcceptLanguage(undefined)).toEqual([])
     expect(parseAcceptLanguage('')).toEqual([])
+  })
+})
+
+describe('resolveNotificationEventKey', () => {
+  it('leaves non connection_security events untouched', () => {
+    expect(resolveNotificationEventKey('run_failed', {})).toBe('run_failed')
+  })
+
+  it('maps a known action code to its per-action key', () => {
+    expect(
+      resolveNotificationEventKey('connection_security', { action: 'created' }),
+    ).toBe('connection_security_created')
+    expect(
+      resolveNotificationEventKey('connection_security', { action: 'rotated' }),
+    ).toBe('connection_security_rotated')
+    expect(
+      resolveNotificationEventKey('connection_security', { action: 'removed' }),
+    ).toBe('connection_security_removed')
+  })
+
+  it('maps a legacy English phrase to its action code', () => {
+    expect(
+      resolveNotificationEventKey('connection_security', { action: 'Created' }),
+    ).toBe('connection_security_created')
+    expect(
+      resolveNotificationEventKey('connection_security', {
+        action: 'Rotated the webhook secret',
+      }),
+    ).toBe('connection_security_rotated')
+    expect(
+      resolveNotificationEventKey('connection_security', { action: 'Removed' }),
+    ).toBe('connection_security_removed')
+  })
+
+  it('falls back to the generic event key for an unknown action value', () => {
+    expect(
+      resolveNotificationEventKey('connection_security', {
+        action: 'Webhook secret rotated',
+      }),
+    ).toBe('connection_security')
   })
 })

@@ -19,6 +19,7 @@ import type {
   CreateConnectionInput,
   UpdateConnectionInput,
 } from './connections.schemas';
+import type { ConnectionSecurityAction } from '@qably/types';
 
 const UNIQUE_VIOLATION = 'P2002';
 
@@ -128,7 +129,10 @@ export class ConnectionsService {
         eventType: 'connection_security',
         organizationId: org.organizationId,
         severity: 'critical',
-        payload: { action: 'Created', connectionName: row.name },
+        payload: {
+          action: 'created' satisfies ConnectionSecurityAction,
+          connectionName: row.name,
+        },
         dedupeKey: `connection_security:${row.id}:created`,
         connectionId: row.id,
       });
@@ -162,7 +166,7 @@ export class ConnectionsService {
       organizationId: org.organizationId,
       severity: 'critical',
       payload: {
-        action: 'Rotated the webhook secret',
+        action: 'rotated' satisfies ConnectionSecurityAction,
         connectionName: existing.name,
       },
       dedupeKey: `connection_security:${id}:rotated`,
@@ -208,7 +212,10 @@ export class ConnectionsService {
       eventType: 'connection_security',
       organizationId: org.organizationId,
       severity: 'critical',
-      payload: { action: 'Removed', connectionName: existing.name },
+      payload: {
+        action: 'removed' satisfies ConnectionSecurityAction,
+        connectionName: existing.name,
+      },
       dedupeKey: `connection_security:${id}:removed`,
       connectionId: id,
     });

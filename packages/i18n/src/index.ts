@@ -61,4 +61,36 @@ export function resolveLocale(
   return DEFAULT_LOCALE
 }
 
+type ConnectionSecurityActionCode = 'created' | 'rotated' | 'removed'
+
+const LEGACY_CONNECTION_SECURITY_ACTIONS: Record<
+  string,
+  ConnectionSecurityActionCode
+> = {
+  Created: 'created',
+  'Rotated the webhook secret': 'rotated',
+  Removed: 'removed',
+}
+
+function normalizeConnectionSecurityAction(
+  action: unknown,
+): ConnectionSecurityActionCode | undefined {
+  if (typeof action !== 'string') return undefined
+  if (action === 'created' || action === 'rotated' || action === 'removed') {
+    return action
+  }
+
+  return LEGACY_CONNECTION_SECURITY_ACTIONS[action]
+}
+
+export function resolveNotificationEventKey(
+  eventType: string,
+  payload: Record<string, string | number>,
+): string {
+  if (eventType !== 'connection_security') return eventType
+
+  const action = normalizeConnectionSecurityAction(payload.action)
+  return action === undefined ? eventType : `connection_security_${action}`
+}
+
 export { en, es }
