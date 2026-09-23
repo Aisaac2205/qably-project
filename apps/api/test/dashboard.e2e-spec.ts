@@ -17,6 +17,7 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
+import { emulateRunsStageCountsFromCapturedSql } from './support/time-zone-bucketing-oracle';
 
 const session: SessionContext = {
   user: {
@@ -221,7 +222,7 @@ describe('Dashboard (e2e)', () => {
       .expect(400);
   });
 
-  it('returns a traceability calendar for the requested year', async () => {
+  it('returns a traceability calendar for the requested year, falling back to UTC when tz is absent', async () => {
     const response = await request(app.getHttpServer())
       .get('/dashboard/traceability?year=2026')
       .expect(200);
@@ -234,7 +235,7 @@ describe('Dashboard (e2e)', () => {
     };
 
     expect(body.year).toBe(2026);
-    expect(body.timeZone).toBe('America/Guatemala');
+    expect(body.timeZone).toBe('UTC');
     expect(body.days).toEqual([
       { date: '2026-06-16', scm: 3, proposals: 3, official: 3, runs: 3 },
     ]);
@@ -244,6 +245,21 @@ describe('Dashboard (e2e)', () => {
       official: 3,
       runs: 3,
     });
+  });
+
+  it('rejects a malformed tz on the traceability route', async () => {
+    await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026&tz=Not/AZone')
+      .expect(400);
+  });
+
+  it('honors a valid tz on the traceability route', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026&tz=America/Guatemala')
+      .expect(200);
+
+    const body = response.body as { timeZone: string };
+    expect(body.timeZone).toBe('America/Guatemala');
   });
 
   it('rejects a traceability request without a year', async () => {
@@ -272,5 +288,41 @@ describe('Dashboard (e2e)', () => {
     await request(app.getHttpServer())
       .get('/dashboard/traceability?year=2026')
       .expect(401);
+  });
+
+  it('buckets a run started at 20:00Z and one started at 02:00Z onto the same correct local day for a negative-offset zone (AT TIME ZONE direction regression)', async () => {
+    const seededRuns = [
+      { startedAt: new Date('2026-06-16T20:00:00.000Z') },
+      { startedAt: new Date('2026-06-17T02:00:00.000Z') },
+    ];
+
+    prisma.$queryRaw.mockImplementation((sql: { strings: readonly string[] }) =>
+      Promise.resolve(
+        emulateRunsStageCountsFromCapturedSql(
+          sql,
+          'America/Guatemala',
+          2026,
+          seededRuns,
+        ),
+      ),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026&tz=America/Guatemala')
+      .expect(200);
+
+    const body = response.body as {
+      days: {
+        date: string;
+        scm: number;
+        proposals: number;
+        official: number;
+        runs: number;
+      }[];
+    };
+
+    expect(body.days).toEqual([
+      { date: '2026-06-16', scm: 0, proposals: 0, official: 0, runs: 2 },
+    ]);
   });
 });

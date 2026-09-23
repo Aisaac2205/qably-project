@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { TraceabilityCalendarRecord } from '@qably/types'
+import { getBrowserTimeZone } from '@/lib/time-zone'
 import { getTraceabilityCalendar } from '../api/dashboard.api'
 import { dashboardKeys } from '../lib/query-keys'
 import { buildTraceabilityGrid } from '../lib/traceability-grid'
@@ -16,10 +17,10 @@ const MONTH_NAMES = {
   en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
 } as const
 
-function emptyRecord(year: number): TraceabilityCalendarRecord {
+function emptyRecord(year: number, timeZone: string): TraceabilityCalendarRecord {
   return {
     year,
-    timeZone: 'America/Guatemala',
+    timeZone,
     totals: { scm: 0, proposals: 0, official: 0, runs: 0 },
     days: [],
   }
@@ -37,12 +38,15 @@ export function useTraceabilityCalendar({
   locale = 'es',
   projectId,
 }: UseTraceabilityCalendarOptions = {}): TraceabilityCalendarState {
+  const tz = useMemo(() => getBrowserTimeZone(), [])
+
   const query = useQuery({
-    queryKey: dashboardKeys.traceability(year, projectId ?? 'all'),
-    queryFn: ({ signal }) => getTraceabilityCalendar(year, projectId, signal),
+    queryKey: dashboardKeys.traceability(year, projectId ?? 'all', tz),
+    queryFn: ({ signal }) =>
+      getTraceabilityCalendar(year, tz, projectId, signal),
   })
 
-  const record = query.data ?? emptyRecord(year)
+  const record = query.data ?? emptyRecord(year, tz)
 
   const grid = useMemo(
     () => buildTraceabilityGrid(record, activeFilter, MONTH_NAMES[locale], locale),

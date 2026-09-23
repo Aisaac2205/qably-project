@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { timeZoneQuerySchema } from '../../common/time-zone/time-zone-query.schema';
 
 export const dashboardSummaryQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
@@ -16,6 +17,7 @@ export const dashboardTraceabilityQuerySchema = z.object({
     .int()
     .min(TRACEABILITY_MIN_YEAR)
     .max(TRACEABILITY_MAX_YEAR),
+  tz: timeZoneQuerySchema,
 });
 
 export type DashboardTraceabilityQuery = z.infer<

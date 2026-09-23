@@ -53,7 +53,12 @@ export class DashboardController {
     query: DashboardTraceabilityQuery,
   ): Promise<TraceabilityCalendarRecord> {
     return unwrap(
-      await this.dashboard.traceability(org, query.year, query.projectId),
+      await this.dashboard.traceability(
+        org,
+        query.year,
+        query.tz,
+        query.projectId,
+      ),
     );
   }
 }

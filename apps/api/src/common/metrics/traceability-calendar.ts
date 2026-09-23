@@ -5,8 +5,6 @@ import type {
   TraceabilityStageTotals,
 } from '@qably/types';
 
-export const TRACEABILITY_TIME_ZONE = 'America/Guatemala';
-
 export type QueriedTraceabilityStage = TraceabilityStage;
 
 export interface TraceabilityDayCountRow {
@@ -36,6 +34,7 @@ function emptyTotals(): TraceabilityStageTotals {
 
 export function buildTraceabilityCalendar(
   year: number,
+  timeZone: string,
   rows: TraceabilityStageRows,
 ): TraceabilityCalendarRecord {
   const byDate = new Map<string, TraceabilityDayRecord>();
@@ -53,7 +52,7 @@ export function buildTraceabilityCalendar(
 
   return {
     year,
-    timeZone: TRACEABILITY_TIME_ZONE,
+    timeZone,
     totals,
     days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
   };

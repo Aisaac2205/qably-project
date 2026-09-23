@@ -1,5 +1,4 @@
 import {
-  TRACEABILITY_TIME_ZONE,
   buildTraceabilityCalendar,
   type TraceabilityStageRows,
 } from './traceability-calendar';
@@ -18,15 +17,20 @@ function rows(
 
 describe('buildTraceabilityCalendar', () => {
   it('reports the year and the time zone the days were bucketed in', () => {
-    const calendar = buildTraceabilityCalendar(2026, rows());
+    const calendar = buildTraceabilityCalendar(
+      2026,
+      'America/Guatemala',
+      rows(),
+    );
 
     expect(calendar.year).toBe(2026);
-    expect(calendar.timeZone).toBe(TRACEABILITY_TIME_ZONE);
+    expect(calendar.timeZone).toBe('America/Guatemala');
   });
 
   it('merges the stages of one day into a single entry', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({
         scm: [{ day: '2026-06-16', count: 2 }],
         official: [{ day: '2026-06-16', count: 5 }],
@@ -42,6 +46,7 @@ describe('buildTraceabilityCalendar', () => {
   it('reports zero for stages that had no activity on a day', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({ runs: [{ day: '2026-06-16', count: 3 }] }),
     );
 
@@ -57,6 +62,7 @@ describe('buildTraceabilityCalendar', () => {
   it('counts the proposals stage alongside the other three', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({
         proposals: [
           { day: '2026-06-16', count: 4 },
@@ -76,6 +82,7 @@ describe('buildTraceabilityCalendar', () => {
   it('still reports zero proposals on a day that had none', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({ runs: [{ day: '2026-06-16', count: 3 }] }),
     );
 
@@ -86,6 +93,7 @@ describe('buildTraceabilityCalendar', () => {
   it('omits days with no activity instead of padding the whole year', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({ runs: [{ day: '2026-06-16', count: 1 }] }),
     );
 
@@ -95,6 +103,7 @@ describe('buildTraceabilityCalendar', () => {
   it('orders days chronologically regardless of the order the stages arrived in', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({
         runs: [
           { day: '2026-12-31', count: 1 },
@@ -114,6 +123,7 @@ describe('buildTraceabilityCalendar', () => {
   it('totals each stage across the year', () => {
     const calendar = buildTraceabilityCalendar(
       2026,
+      'America/Guatemala',
       rows({
         scm: [
           { day: '2026-01-01', count: 2 },
@@ -136,7 +146,11 @@ describe('buildTraceabilityCalendar', () => {
   });
 
   it('returns an empty year rather than failing when nothing happened', () => {
-    const calendar = buildTraceabilityCalendar(2026, rows());
+    const calendar = buildTraceabilityCalendar(
+      2026,
+      'America/Guatemala',
+      rows(),
+    );
 
     expect(calendar.days).toEqual([]);
     expect(calendar.totals).toEqual({
@@ -147,7 +161,9 @@ describe('buildTraceabilityCalendar', () => {
     });
   });
 
-  it('buckets in Guatemala time so a late local evening stays on its own day', () => {
-    expect(TRACEABILITY_TIME_ZONE).toBe('America/Guatemala');
+  it('reports whichever time zone the caller resolved the request in', () => {
+    const calendar = buildTraceabilityCalendar(2026, 'Asia/Tokyo', rows());
+
+    expect(calendar.timeZone).toBe('Asia/Tokyo');
   });
 });

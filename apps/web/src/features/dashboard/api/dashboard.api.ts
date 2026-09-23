@@ -20,10 +20,11 @@ export function getDashboardSummary(
 
 export function getTraceabilityCalendar(
   year: number,
+  tz: string,
   projectId?: string,
   signal?: AbortSignal,
 ): Promise<TraceabilityCalendarRecord> {
-  const params = new URLSearchParams({ year: String(year) })
+  const params = new URLSearchParams({ year: String(year), tz })
   if (projectId !== undefined) params.set('projectId', projectId)
 
   return apiRequest<TraceabilityCalendarRecord>(

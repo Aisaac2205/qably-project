@@ -7,6 +7,7 @@ import { mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
+import { getBrowserTimeZone } from '@/lib/time-zone'
 import { computeSuiteMetrics, runFixtures, suiteNameById } from '@/test/runs-api-stub'
 import { projectFixtures } from '@/test/projects-api-stub'
 import { organizationFixtures } from '@/test/organizations-api-stub'
@@ -142,7 +143,7 @@ function seedTraceability(client: QueryClient): void {
   const record = structuredClone(traceabilityCalendarFixture)
 
   client.setQueryData(
-    dashboardKeys.traceability(record.year, 'all'),
+    dashboardKeys.traceability(record.year, 'all', getBrowserTimeZone()),
     record,
   )
 }

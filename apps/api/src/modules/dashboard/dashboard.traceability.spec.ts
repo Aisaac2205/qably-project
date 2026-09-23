@@ -35,11 +35,13 @@ function statementOf(prisma: FakePrisma, call: number): string {
   return sql.strings.join(' ');
 }
 
+const ZONE = 'America/Guatemala';
+
 describe('DashboardService.traceability', () => {
   it('queries one aggregate per stage that has a source', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(4);
   });
@@ -52,7 +54,7 @@ describe('DashboardService.traceability', () => {
       .mockResolvedValueOnce([{ day: '2026-06-16', count: 5 }])
       .mockResolvedValueOnce([{ day: '2026-06-16', count: 214 }]);
 
-    const result = await build(prisma).traceability(org, 2026);
+    const result = await build(prisma).traceability(org, 2026, ZONE);
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.days).toEqual([
@@ -69,7 +71,7 @@ describe('DashboardService.traceability', () => {
   it('counts the proposals stage from the review domain table', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     expect(statementOf(prisma, 1)).toContain('extracted_proposal');
   });
@@ -77,7 +79,7 @@ describe('DashboardService.traceability', () => {
   it('scopes every stage to the caller organization', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     for (let call = 0; call < 4; call += 1) {
       expect(paramsOf(prisma, call)).toContain('org-1');
@@ -87,7 +89,7 @@ describe('DashboardService.traceability', () => {
   it('scopes every stage to the project when one is requested', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026, 'project-1');
+    await build(prisma).traceability(org, 2026, ZONE, 'project-1');
 
     for (let call = 0; call < 4; call += 1) {
       expect(paramsOf(prisma, call)).toContain('project-1');
@@ -97,7 +99,7 @@ describe('DashboardService.traceability', () => {
   it('bounds every stage to the requested year', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     for (let call = 0; call < 4; call += 1) {
       const params = paramsOf(prisma, call);
@@ -107,19 +109,39 @@ describe('DashboardService.traceability', () => {
     }
   });
 
-  it('buckets and bounds in the configured time zone', async () => {
+  it('buckets and bounds in the requested time zone', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, 'Asia/Tokyo');
 
-    expect(paramsOf(prisma, 0)).toContain('America/Guatemala');
+    expect(paramsOf(prisma, 0)).toContain('Asia/Tokyo');
     expect(statementOf(prisma, 0)).toContain('AT TIME ZONE');
+  });
+
+  it('reads the naive UTC column through a UTC anchor before shifting into the zone, instead of misreading it as already being zone-local', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).traceability(org, 2026, ZONE);
+
+    expect(statementOf(prisma, 0)).toContain(
+      "AT TIME ZONE 'UTC') AT TIME ZONE",
+    );
+  });
+
+  it('normalizes the year bounds back to naive UTC after resolving them in the zone, so the comparison stays session-independent', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).traceability(org, 2026, ZONE);
+
+    const whereClause = statementOf(prisma, 0).split('WHERE')[1] ?? '';
+
+    expect(whereClause).toContain("AT TIME ZONE 'UTC'");
   });
 
   it('filters on the raw timestamp so the range stays index-usable', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     for (let call = 0; call < 4; call += 1) {
       expect(statementOf(prisma, call)).not.toMatch(
@@ -131,7 +153,7 @@ describe('DashboardService.traceability', () => {
   it('counts as an int so the driver never hands back a bigint', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     for (let call = 0; call < 4; call += 1) {
       expect(statementOf(prisma, call)).toContain('COUNT(*)::int');
@@ -142,7 +164,12 @@ describe('DashboardService.traceability', () => {
     const prisma = createPrisma();
     prisma.project.findFirst.mockResolvedValue(null);
 
-    const result = await build(prisma).traceability(org, 2026, 'project-x');
+    const result = await build(prisma).traceability(
+      org,
+      2026,
+      ZONE,
+      'project-x',
+    );
 
     expect(result).toEqual({ ok: false, error: 'project-not-found' });
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
@@ -151,7 +178,7 @@ describe('DashboardService.traceability', () => {
   it('never looks up a single project when none is requested', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).traceability(org, 2026);
+    await build(prisma).traceability(org, 2026, ZONE);
 
     expect(prisma.project.findFirst).not.toHaveBeenCalled();
   });
@@ -159,11 +186,19 @@ describe('DashboardService.traceability', () => {
   it('reports an empty year rather than failing when nothing happened', async () => {
     const prisma = createPrisma();
 
-    const result = await build(prisma).traceability(org, 2026);
+    const result = await build(prisma).traceability(org, 2026, ZONE);
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.days).toEqual([]);
     expect(result.ok && result.value.year).toBe(2026);
-    expect(result.ok && result.value.timeZone).toBe('America/Guatemala');
+    expect(result.ok && result.value.timeZone).toBe(ZONE);
+  });
+
+  it('reports the requested zone on the calendar record, not a hardcoded default', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).traceability(org, 2026, 'Asia/Tokyo');
+
+    expect(result.ok && result.value.timeZone).toBe('Asia/Tokyo');
   });
 });

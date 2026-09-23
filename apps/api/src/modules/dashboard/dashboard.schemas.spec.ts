@@ -77,4 +77,30 @@ describe('dashboardTraceabilityQuerySchema', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('falls back to UTC when tz is missing', () => {
+    const result = dashboardTraceabilityQuerySchema.safeParse({ year: '2026' });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.tz).toBe('UTC');
+  });
+
+  it('accepts a valid tz', () => {
+    const result = dashboardTraceabilityQuerySchema.safeParse({
+      year: '2026',
+      tz: 'America/Guatemala',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.tz).toBe('America/Guatemala');
+  });
+
+  it('rejects a malformed tz', () => {
+    expect(
+      dashboardTraceabilityQuerySchema.safeParse({
+        year: '2026',
+        tz: 'Not/AZone',
+      }).success,
+    ).toBe(false);
+  });
 });

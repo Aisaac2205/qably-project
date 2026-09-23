@@ -18,7 +18,6 @@ import {
   tallyCaseStatuses,
 } from '../../common/metrics/run-case-metrics';
 import {
-  TRACEABILITY_TIME_ZONE,
   buildTraceabilityCalendar,
   type TraceabilityDayCountRow,
 } from '../../common/metrics/traceability-calendar';
@@ -90,16 +89,15 @@ export class DashboardService {
     from: Prisma.Sql,
     scope: Prisma.Sql,
     year: number,
+    zone: string,
   ): Promise<TraceabilityDayCountRow[]> {
-    const zone = TRACEABILITY_TIME_ZONE;
-
     return this.prisma.$queryRaw<TraceabilityDayCountRow[]>(Prisma.sql`
-      SELECT to_char(${dayColumn} AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day,
+      SELECT to_char((${dayColumn} AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day,
              COUNT(*)::int AS count
         FROM ${from}
        WHERE ${scope}
-         AND ${dayColumn} >= (${`${year}-01-01`})::timestamp AT TIME ZONE ${zone}
-         AND ${dayColumn} < (${`${year + 1}-01-01`})::timestamp AT TIME ZONE ${zone}
+         AND ${dayColumn} >= ((${`${year}-01-01`})::timestamp AT TIME ZONE ${zone}) AT TIME ZONE 'UTC'
+         AND ${dayColumn} < ((${`${year + 1}-01-01`})::timestamp AT TIME ZONE ${zone}) AT TIME ZONE 'UTC'
        GROUP BY 1
     `);
   }
@@ -107,6 +105,7 @@ export class DashboardService {
   async traceability(
     org: OrgContext,
     year: number,
+    zone: string,
     projectId?: string,
   ): Promise<Result<TraceabilityCalendarRecord, DashboardError>> {
     if (projectId !== undefined) {
@@ -142,29 +141,33 @@ export class DashboardService {
         Prisma.sql`"ingestion_batch" b JOIN "project" p ON p."id" = b."projectId"`,
         Prisma.sql`p."organizationId" = ${organizationId} ${scmProject}`,
         year,
+        zone,
       ),
       this.stageCounts(
         Prisma.sql`ep."createdAt"`,
         Prisma.sql`"extracted_proposal" ep JOIN "project" p ON p."id" = ep."projectId"`,
         Prisma.sql`p."organizationId" = ${organizationId} ${proposalsProject}`,
         year,
+        zone,
       ),
       this.stageCounts(
         Prisma.sql`tc."createdAt"`,
         Prisma.sql`"test_case" tc JOIN "suite" s ON s."id" = tc."suiteId"`,
         Prisma.sql`s."organizationId" = ${organizationId} ${officialProject}`,
         year,
+        zone,
       ),
       this.stageCounts(
         Prisma.sql`r."startedAt"`,
         Prisma.sql`"run" r`,
         Prisma.sql`r."organizationId" = ${organizationId} ${runsProject}`,
         year,
+        zone,
       ),
     ]);
 
     return ok(
-      buildTraceabilityCalendar(year, { scm, proposals, official, runs }),
+      buildTraceabilityCalendar(year, zone, { scm, proposals, official, runs }),
     );
   }
 
