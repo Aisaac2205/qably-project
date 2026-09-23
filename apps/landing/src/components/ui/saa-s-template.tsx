@@ -52,6 +52,18 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
   const isEn = locale === 'en';
   const authUrl = getAuthUrl('/projects');
 
+  const [mounted, setMounted] = React.useState(false);
+  const [isDesktop, setIsDesktop] = React.useState(true);
+
+  React.useEffect(() => {
+    setMounted(true);
+    const mq = window.matchMedia('(min-width: 768px)');
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   return (
     <section
       id="getting-started"
@@ -122,12 +134,16 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
         <div className="relative z-10">
           {/* Mobile view (< md): Dedicated iPhone 16 Pro mockup */}
           <div className="block md:hidden">
-            <MobileDashboardIphone tDashboard={dashboard} locale={locale} />
+            {(!mounted || !isDesktop) && (
+              <MobileDashboardIphone tDashboard={dashboard} locale={locale} />
+            )}
           </div>
 
           {/* Desktop view (>= md): Full Desktop MacBook Window (Direct, no extra card) */}
           <div className="hidden md:block">
-            <DashboardWindowFrame tDashboard={dashboard} tHero={hero} locale={locale} />
+            {(!mounted || isDesktop) && (
+              <DashboardWindowFrame tDashboard={dashboard} tHero={hero} locale={locale} />
+            )}
           </div>
         </div>
       </motion.div>

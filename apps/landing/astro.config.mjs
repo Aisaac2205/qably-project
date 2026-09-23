@@ -10,6 +10,9 @@ const { PUBLIC_SITE_URL } = loadEnv(
 );
 
 export default defineConfig({
+  devToolbar: {
+    enabled: false,
+  },
   site: PUBLIC_SITE_URL || process.env.PUBLIC_SITE_URL || undefined,
   output: 'static',
   integrations: [react()],

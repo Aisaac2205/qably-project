@@ -104,6 +104,7 @@
   --qb-chart-pass:    oklch(0.62 0.16 145);
   --qb-chart-fail:    oklch(0.42 0.19 25);
   --qb-chart-skip:    oklch(0.62 0.00 0);
+  --qb-chart-warn:    var(--app-status-warn);
   --qb-chart-compare: var(--app-fg-muted);
 }
 

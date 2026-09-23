@@ -1,36 +1,36 @@
 import React, { useState } from 'react';
 import {
-  ArrowUp,
   BellSimple,
-  CalendarBlank,
-  CaretDown,
-  CaretRight,
   CaretUpDown,
-  CheckCircle,
-  CircleNotch,
-  ChartBar,
   FolderSimple,
   GearSix,
   LockSimple,
   Play,
+  Plug,
   SidebarSimple,
-  Sparkle,
   SquaresFour,
-  Target,
   Tray,
-  XCircle,
+  TrendUp,
 } from '@phosphor-icons/react';
 import type { Icon } from '@phosphor-icons/react';
-import { RealTraceabilityCalendar, traceabilityTotalLabel } from './RealTraceabilityCalendar';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import {
-  MOCK_DASHBOARD_STATS,
+  KpiTile,
+  Sparkline,
+  Gauge,
+  PassRateBar,
+  DeliveryBars,
+  StatusChip,
+} from '@qably/ui/dashboard';
+import { ChartContainer, ChartTooltip, type ChartConfig } from '@qably/ui/chart';
+import type { DashboardPeriod } from '@qably/types';
+import {
+  MOCK_CHANNELS,
+  MOCK_DASHBOARD_DATA,
   MOCK_DEMO_USER,
-  MOCK_PROJECTS,
-  type MockRunStatus,
+  type MockHeroPoint,
 } from '../data/mock-dashboard-data';
 import type { DashboardTranslations, HeroTranslations, Locale } from '../../i18n/types';
-
-const PREVIEW_YEAR = 2026;
 
 interface DashboardWindowFrameProps {
   tDashboard: DashboardTranslations;
@@ -47,123 +47,92 @@ function fill(template: string, values: Record<string, string | number>): string
   );
 }
 
-function statusPresentation(status: MockRunStatus, t: DashboardTranslations) {
-  if (status === 'pass') {
-    return { label: t.statusPass, icon: CheckCircle, tone: 'bg-app-pass-bg text-app-pass', animated: false };
-  }
-
-  if (status === 'fail') {
-    return { label: t.statusFail, icon: XCircle, tone: 'bg-app-fail-bg text-app-fail', animated: false };
-  }
-
-  return { label: t.statusRunning, icon: CircleNotch, tone: 'bg-app-running-bg text-app-running', animated: true };
-}
-
-function StatusChip({ status, tDashboard }: { status: MockRunStatus; tDashboard: DashboardTranslations }) {
-  const presentation = statusPresentation(status, tDashboard);
-  const StatusIcon = presentation.icon;
+function ProjectMonogram({ name }: { name: string }) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const initials =
+    words.length === 0
+      ? ''
+      : words.length === 1
+        ? words[0].slice(0, 1).toUpperCase()
+        : `${words[0].slice(0, 1)}${words[1].slice(0, 1)}`.toUpperCase();
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${presentation.tone}`}
+      aria-hidden="true"
+      className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-canvas-hover text-xs font-semibold text-app-default"
     >
-      <StatusIcon
-        size={12}
-        weight="fill"
-        aria-hidden="true"
-        className={presentation.animated ? 'animate-spin motion-reduce:animate-none' : undefined}
-      />
-      {presentation.label}
+      {initials}
     </span>
   );
 }
 
-interface KpiCardProps {
-  label: string;
-  value: string | number;
-  icon: Icon;
-  trend?: { value: number; label: string };
+function SourceIcon({ source }: { source: string }) {
+  if (source === 'github_actions') {
+    return <img src="/logos/githubactions.svg" alt="" className="size-4 shrink-0" />;
+  }
+  if (source === 'api') {
+    return <Plug size={16} weight="bold" aria-hidden="true" />;
+  }
+  return <Play size={16} weight="fill" aria-hidden="true" />;
 }
 
-function KpiCard({ label, value, icon: CardIcon, trend }: KpiCardProps) {
+function HeroTooltipContent({
+  active,
+  point,
+  seriesLabels,
+}: {
+  active?: boolean;
+  point?: MockHeroPoint;
+  seriesLabels: { current: string; previous: string };
+}) {
+  if (!active || !point) return null;
+
   return (
-    <div className="group min-h-[120px] min-w-0 rounded-xl border border-app-border bg-app-surface p-4 text-left shadow-app-card transition-[border-color,box-shadow,transform,background-color] duration-150 ease-out hover:border-app-border-strong hover:bg-app-surface-raised">
-      <div className="flex h-full flex-col justify-between">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="truncate text-xs font-medium text-app-muted transition-colors duration-150 group-hover:text-app-default">
-            {label}
-          </dt>
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-app-border/50 bg-app-surface-raised text-app-muted transition-all duration-150 group-hover:border-app-border-strong group-hover:text-app-default">
-            <CardIcon size={15} weight="regular" aria-hidden="true" />
-          </span>
-        </div>
-
-        <div className="my-2.5">
-          <dd className="text-3xl font-semibold tracking-tight tabular-nums text-app-default">{value}</dd>
-        </div>
-
-        <div className="flex min-h-5 items-center justify-between gap-2 border-t border-app-border/40 pt-2.5">
-          {trend ? (
-            <div className="flex items-center gap-1.5 text-xs tabular-nums">
-              <span className="inline-flex items-center gap-0.5 font-semibold text-app-pass">
-                <ArrowUp size={12} weight="bold" aria-hidden="true" />+{trend.value}%
-              </span>
-              <span className="truncate text-[11px] text-app-muted">{trend.label}</span>
-            </div>
-          ) : (
-            <span className="text-[11px] text-app-muted/70 transition-colors duration-150 group-hover:text-app-muted">
-              Ver detalles
-            </span>
-          )}
-
-          <CaretRight
-            size={12}
-            weight="bold"
+    <div className="grid min-w-36 gap-1.5 rounded-lg border border-qb-border/50 bg-qb-surface px-2.5 py-1.5 text-xs shadow-qb-pop">
+      <div className="font-medium text-qb-fg">{point.label}</div>
+      <div className="grid gap-1.5">
+        <div className="flex items-center gap-2">
+          <span
             aria-hidden="true"
-            className="shrink-0 text-app-muted/40 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-app-default"
+            className="size-2.5 shrink-0 rounded-[2px] bg-app-primary"
           />
+          <div className="flex flex-1 items-center justify-between gap-4">
+            <span className="text-qb-muted">{seriesLabels.current}</span>
+            <span className="font-mono font-medium tabular-nums text-qb-fg">{point.current}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="h-0 w-2.5 shrink-0 border-t-2 border-dashed border-app-muted"
+          />
+          <div className="flex flex-1 items-center justify-between gap-4">
+            <span className="text-qb-muted">{seriesLabels.previous}</span>
+            <span className="font-mono font-medium tabular-nums text-qb-fg">{point.previous}</span>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-1 border-t border-qb-border/40 pt-1.5 text-[11px] text-qb-muted">
+        <div className="flex items-center justify-between gap-4">
+          <span>Aprobados</span>
+          <span className="font-mono tabular-nums text-qb-fg">{point.passed}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span>Fallidos</span>
+          <span className="font-mono tabular-nums text-qb-fg">{point.failed}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span>Bloqueados</span>
+          <span className="font-mono tabular-nums text-qb-fg">{point.blocked}</span>
         </div>
       </div>
     </div>
   );
 }
 
-const CHART_DATA = [
-  { day: 'May 8', rate: 78 },
-  { day: 'May 9', rate: 84 },
-  { day: 'May 10', rate: 81 },
-  { day: 'May 11', rate: 86 },
-  { day: 'May 12', rate: 90 },
-  { day: 'May 13', rate: 87 },
-  { day: 'May 14', rate: 89 },
-];
-
-const CHART_WIDTH = 560;
-const CHART_HEIGHT = 172;
-const PLOT_LEFT = 36;
-const PLOT_RIGHT = 548;
-const PLOT_TOP = 12;
-const PLOT_BOTTOM = 140;
-
-function xPosition(index: number) {
-  return PLOT_LEFT + (index / (CHART_DATA.length - 1)) * (PLOT_RIGHT - PLOT_LEFT);
-}
-
-function yPosition(rate: number) {
-  return PLOT_TOP + ((100 - rate) / 100) * (PLOT_BOTTOM - PLOT_TOP);
-}
-
-const LINE_PATH = CHART_DATA.map((item, index) => {
-  const command = index === 0 ? 'M' : 'L';
-  return `${command} ${xPosition(index)} ${yPosition(item.rate)}`;
-}).join(' ');
-
-const AREA_PATH = `${LINE_PATH} L ${xPosition(CHART_DATA.length - 1)} ${PLOT_BOTTOM} L ${PLOT_LEFT} ${PLOT_BOTTOM} Z`;
-
-export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWindowFrameProps) {
+export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) {
   const [activeNav, setActiveNav] = useState<NavSection>('dashboard');
-
-  const isEn = locale === 'en';
+  const [selectedPeriod, setSelectedPeriod] = useState<DashboardPeriod>(30);
 
   const navItems: { id: NavSection; label: string; icon: Icon }[] = [
     { id: 'dashboard', label: tDashboard.navDashboard, icon: SquaresFour },
@@ -173,9 +142,19 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
     { id: 'settings', label: tDashboard.navSettings, icon: GearSix },
   ];
 
+  const seriesLabels = {
+    current: tDashboard.heroSeriesCurrent,
+    previous: tDashboard.heroSeriesPrevious,
+  };
+
+  const heroChartConfig: ChartConfig = {
+    current: { label: seriesLabels.current, color: 'var(--qb-chart-line)' },
+    previous: { label: seriesLabels.previous, color: 'var(--qb-chart-compare)' },
+  };
+
   return (
     <div className="w-full overflow-hidden rounded-2xl border border-app-border-sidebar bg-app-sidebar font-sans text-app-default shadow-[0_25px_80px_rgba(0,0,0,0.85)]">
-      {/* Browser chrome — the window that hosts the product shell */}
+      {/* Browser chrome — top window bar with domain pill */}
       <div className="flex select-none items-center justify-between border-b border-app-border-sidebar bg-app-canvas px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full bg-[#ff5f56]" aria-hidden="true" />
@@ -194,7 +173,7 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
         </div>
       </div>
 
-      {/* Product shell — mirrors the AppShell of apps/web (sidebar + inset) */}
+      {/* Product AppShell: Sidebar + Main Content Inset */}
       <div className="grid min-w-0 grid-cols-[13rem_minmax(0,1fr)] bg-app-sidebar text-left">
         <aside className="flex min-h-0 flex-col bg-app-sidebar text-app-sidebar-fg">
           <div className="flex h-14 flex-col justify-center p-2">
@@ -254,6 +233,7 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
           </div>
         </aside>
 
+        {/* Right inset: App Header + Dashboard Canvas */}
         <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-app-sidebar">
           <header className="flex h-14 shrink-0 items-center justify-between bg-app-sidebar px-4 md:px-6">
             <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -277,200 +257,450 @@ export function DashboardWindowFrame({ tDashboard, locale = 'es' }: DashboardWin
             </div>
           </header>
 
-          <main className="@container m-3 mt-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-app-surface shadow-app-pop ring-1 ring-app-border">
+          <main className="@container m-3 mt-0 flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-app-surface shadow-app-pop ring-1 ring-app-border">
             <section
               aria-label="Dashboard"
               className="w-full space-y-5 px-4 py-5 text-app-default @md:space-y-6 @md:px-6 @2xl:px-8"
             >
-              <section aria-label="Quality overview" className="min-w-0">
-                <dl className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
-                  <KpiCard label={tDashboard.runsKpi} value={MOCK_DASHBOARD_STATS.runsLast7d} icon={Play} />
-                  <KpiCard
-                    label={tDashboard.passRateKpi}
-                    value={`${MOCK_DASHBOARD_STATS.passRateLast7d}%`}
-                    icon={ChartBar}
-                    trend={{ value: MOCK_DASHBOARD_STATS.passRateTrend, label: tDashboard.vsPrior7d }}
-                  />
-                  <KpiCard
-                    label={tDashboard.pendingAiKpi}
-                    value={MOCK_DASHBOARD_STATS.pendingProposals}
-                    icon={Sparkle}
-                  />
-                  <KpiCard
-                    label={tDashboard.coverageGapsKpi}
-                    value={MOCK_DASHBOARD_STATS.coverageGapsCount}
-                    icon={Target}
-                  />
+              {/* Dashboard Header: Subtitle & Period Toggle */}
+              <div className="mx-auto flex w-full max-w-dashboard flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="max-w-2xl text-xs text-app-muted sm:text-sm">{tDashboard.headerSubtitle}</p>
+                <div className="flex shrink-0 items-center rounded-lg border border-app-border bg-app-canvas p-0.5 text-xs font-medium">
+                  {([7, 30, 90] as const).map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() => setSelectedPeriod(period)}
+                      className={`rounded-md px-2.5 py-1 transition-colors ${
+                        selectedPeriod === period
+                          ? 'bg-app-surface font-semibold text-app-default shadow-xs'
+                          : 'text-app-muted hover:text-app-default'
+                      }`}
+                    >
+                      {period === 7 ? tDashboard.period7d : period === 30 ? tDashboard.period30d : tDashboard.period90d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 1. KPI Strip: 4 KpiTiles with Sparklines */}
+              <section aria-label="KPI overview" className="mx-auto min-w-0 w-full max-w-dashboard">
+                <dl className="grid grid-cols-1 gap-3 @xs:grid-cols-2 @2xl:grid-cols-4">
+                  {/* Pass rate */}
+                  <KpiTile
+                    label={tDashboard.kpiPassRate}
+                    value={MOCK_DASHBOARD_DATA.kpis.passRate.value}
+                    delta={
+                      MOCK_DASHBOARD_DATA.kpis.passRate.delta && MOCK_DASHBOARD_DATA.kpis.passRate.deltaTone
+                        ? {
+                            text: MOCK_DASHBOARD_DATA.kpis.passRate.delta,
+                            tone: MOCK_DASHBOARD_DATA.kpis.passRate.deltaTone,
+                            srText: MOCK_DASHBOARD_DATA.kpis.passRate.srText ?? '',
+                          }
+                        : undefined
+                    }
+                  >
+                    <Sparkline
+                      values={MOCK_DASHBOARD_DATA.kpis.passRate.series}
+                      label={tDashboard.kpiPassRate}
+                      tone="pass"
+                    />
+                  </KpiTile>
+
+                  {/* Runs */}
+                  <KpiTile
+                    label={tDashboard.kpiRuns}
+                    value={MOCK_DASHBOARD_DATA.kpis.runs.value}
+                    delta={
+                      MOCK_DASHBOARD_DATA.kpis.runs.delta && MOCK_DASHBOARD_DATA.kpis.runs.deltaTone
+                        ? {
+                            text: MOCK_DASHBOARD_DATA.kpis.runs.delta,
+                            tone: MOCK_DASHBOARD_DATA.kpis.runs.deltaTone,
+                            srText: MOCK_DASHBOARD_DATA.kpis.runs.srText ?? '',
+                          }
+                        : undefined
+                    }
+                  >
+                    <Sparkline
+                      values={MOCK_DASHBOARD_DATA.kpis.runs.series}
+                      label={tDashboard.kpiRuns}
+                      tone="primary"
+                    />
+                  </KpiTile>
+
+                  {/* Failed Cases */}
+                  <KpiTile
+                    label={tDashboard.kpiFailedCases}
+                    value={MOCK_DASHBOARD_DATA.kpis.failedCases.value}
+                    delta={
+                      MOCK_DASHBOARD_DATA.kpis.failedCases.delta && MOCK_DASHBOARD_DATA.kpis.failedCases.deltaTone
+                        ? {
+                            text: MOCK_DASHBOARD_DATA.kpis.failedCases.delta,
+                            tone: MOCK_DASHBOARD_DATA.kpis.failedCases.deltaTone,
+                            srText: MOCK_DASHBOARD_DATA.kpis.failedCases.srText ?? '',
+                          }
+                        : undefined
+                    }
+                  >
+                    <Sparkline
+                      values={MOCK_DASHBOARD_DATA.kpis.failedCases.series}
+                      label={tDashboard.kpiFailedCases}
+                      tone="fail"
+                    />
+                  </KpiTile>
+
+                  {/* Avg Run Duration */}
+                  <KpiTile
+                    label={tDashboard.kpiAvgDuration}
+                    value={MOCK_DASHBOARD_DATA.kpis.avgRunDuration.value}
+                    delta={
+                      MOCK_DASHBOARD_DATA.kpis.avgRunDuration.delta && MOCK_DASHBOARD_DATA.kpis.avgRunDuration.deltaTone
+                        ? {
+                            text: MOCK_DASHBOARD_DATA.kpis.avgRunDuration.delta,
+                            tone: MOCK_DASHBOARD_DATA.kpis.avgRunDuration.deltaTone,
+                            srText: MOCK_DASHBOARD_DATA.kpis.avgRunDuration.srText ?? '',
+                          }
+                        : undefined
+                    }
+                  >
+                    <Sparkline
+                      values={MOCK_DASHBOARD_DATA.kpis.avgRunDuration.series}
+                      label={tDashboard.kpiAvgDuration}
+                      tone="warn"
+                    />
+                  </KpiTile>
                 </dl>
               </section>
 
-              <section className="rounded-xl border border-app-border bg-app-surface p-4 shadow-xs @md:p-5 @2xl:p-6">
-                <div className="flex flex-col gap-3 @lg:flex-row @lg:items-center @lg:justify-between">
-                  <h2 className="text-base font-semibold tracking-[-0.015em] text-app-default">
-                    {fill(tDashboard.traceabilityHeading, {
-                      count: traceabilityTotalLabel(isEn),
-                      year: PREVIEW_YEAR,
-                    })}
-                  </h2>
-
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="flex h-9 min-w-[175px] items-center justify-between gap-2.5 rounded-lg border border-app-border bg-app-canvas px-3 py-1.5 text-xs font-medium text-app-default shadow-xs">
-                      <span className="flex items-center gap-1.5">
-                        <span className="shrink-0 text-app-muted">
-                          <CalendarBlank size={14} weight="bold" aria-hidden="true" />
-                        </span>
-                        <span>{tDashboard.allStages}</span>
-                        <span className="inline-flex items-center justify-center rounded-full bg-app-border/60 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-app-muted">
-                          {traceabilityTotalLabel(isEn)}
-                        </span>
-                      </span>
-                      <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />
-                    </span>
-
-                    <span className="flex h-9 min-w-[84px] items-center justify-between gap-2.5 rounded-lg border border-app-border bg-app-canvas px-3 py-1.5 text-xs font-semibold text-app-default shadow-xs">
-                      <span>{PREVIEW_YEAR}</span>
-                      <CaretUpDown size={13} weight="bold" aria-hidden="true" className="shrink-0 text-app-muted" />
-                    </span>
+              {/* 2. Hero: Executed Cases Comparison Chart */}
+              <section aria-label={tDashboard.heroTitle} className="mx-auto w-full max-w-dashboard">
+                <div className="flex flex-col rounded-xl border border-app-border bg-app-surface shadow-app-card">
+                  <div className="flex flex-col gap-0.5 p-4 pb-2 sm:p-5 sm:pb-3">
+                    <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.heroTitle}</h2>
+                    <span className="text-xs text-app-muted">{MOCK_DASHBOARD_DATA.hero.rangeLabel}</span>
                   </div>
-                </div>
 
-                <div className="mt-4">
-                  <RealTraceabilityCalendar isEn={isEn} />
+                  <div className="h-56 min-h-[224px] min-w-0 px-2 sm:h-64 sm:min-h-[256px] sm:px-4">
+                    <ChartContainer
+                      config={heroChartConfig}
+                      initialDimension={{ width: 640, height: 224 }}
+                      className="aspect-auto h-full w-full min-h-[200px] min-w-0"
+                      style={{ minHeight: 200, minWidth: 0 }}
+                    >
+                      <LineChart
+                        data={MOCK_DASHBOARD_DATA.hero.points}
+                        margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
+                      >
+                        <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="var(--qb-chart-grid)" />
+                        <XAxis
+                          dataKey="label"
+                          tickLine={false}
+                          axisLine={false}
+                          tickMargin={8}
+                          tick={{ fill: 'var(--color-app-muted)', fontSize: 11 }}
+                        />
+                        <YAxis
+                          width={36}
+                          tickLine={false}
+                          axisLine={false}
+                          tick={{ fill: 'var(--color-app-muted)', fontSize: 11 }}
+                        />
+                        <ChartTooltip
+                          cursor={{ stroke: 'var(--qb-chart-line)', strokeOpacity: 0.18, strokeWidth: 1 }}
+                          content={(props) => (
+                            <HeroTooltipContent
+                              active={props.active}
+                              point={props.payload?.[0]?.payload as MockHeroPoint | undefined}
+                              seriesLabels={seriesLabels}
+                            />
+                          )}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="current"
+                          stroke="var(--qb-chart-line)"
+                          strokeWidth={2}
+                          dot={false}
+                          isAnimationActive={false}
+                          activeDot={{ r: 4, stroke: 'var(--qb-chart-line)', strokeWidth: 2, className: 'fill-app-surface' }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="previous"
+                          stroke="var(--qb-chart-compare)"
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          dot={false}
+                          isAnimationActive={false}
+                          activeDot={{ r: 3, fill: 'var(--qb-chart-compare)', className: 'stroke-app-surface' }}
+                        />
+                      </LineChart>
+                    </ChartContainer>
+                  </div>
+
+                  <div className="flex flex-col items-start gap-0.5 border-t border-app-border/40 p-4 pt-3">
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-app-default">
+                      <TrendUp size={15} weight="bold" aria-hidden="true" className="text-app-pass" />
+                      {fill(tDashboard.heroTrendText, {
+                        percent: MOCK_DASHBOARD_DATA.hero.trendPercent ?? 0,
+                        count: selectedPeriod,
+                      })}
+                    </span>
+                    <span className="text-[11px] text-app-muted">{tDashboard.heroTrendSubtitle}</span>
+                  </div>
                 </div>
               </section>
 
-              <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-[minmax(0,1.45fr)_minmax(18rem,1fr)] @md:gap-6">
-                <div className="col-span-1 flex flex-col justify-between rounded-xl border border-app-border/80 bg-app-surface shadow-app-card">
-                  <div className="flex flex-row items-center justify-between p-5 pb-4">
-                    <h3 className="text-sm font-semibold text-app-default">{tDashboard.projectStatus}</h3>
-                    <span className="text-xs font-semibold text-app-primary">{tDashboard.viewAll}</span>
-                  </div>
+              {/* 3. Row 1: Projects Table + Cases Passing Gauge */}
+              <div className="mx-auto w-full max-w-dashboard @container">
+                <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-3 @md:gap-6">
+                  {/* Projects Table (@3xl:col-span-2) */}
+                  <section
+                    aria-label={tDashboard.projectsTitle}
+                    className="min-w-0 @3xl:col-span-2 flex flex-col justify-between rounded-xl border border-app-border bg-app-surface shadow-app-card"
+                  >
+                    <div className="flex items-center justify-between p-4 pb-3 sm:p-5 sm:pb-4">
+                      <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.projectsTitle}</h2>
+                    </div>
 
-                  <div className="flex-1">
-                    <div className="w-full overflow-x-auto">
-                      <table className="w-full min-w-[400px] border-collapse text-left">
+                    <div className="flex-1 overflow-x-auto px-4 pb-4 sm:px-5">
+                      <table className="w-full min-w-[440px] border-collapse text-left">
                         <thead>
                           <tr className="border-b border-app-border bg-app-canvas/40">
-                            <th className="px-5 py-3 text-xs font-medium text-app-muted">{tDashboard.thProject}</th>
-                            <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thPassRate}</th>
-                            <th className="px-3 py-3 text-xs font-medium text-app-muted">{tDashboard.thLastRun}</th>
-                            <th className="px-3 py-3 text-center text-xs font-medium text-app-muted">
+                            <th scope="col" className="py-2.5 pr-3 text-xs font-medium text-app-muted">
+                              {tDashboard.thProject}
+                            </th>
+                            <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-app-muted">
                               {tDashboard.thSuites}
                             </th>
-                            <th className="px-5 py-3 text-center text-xs font-medium text-app-muted">
-                              {tDashboard.thAiPending}
+                            <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-app-muted">
+                              {tDashboard.thCases}
+                            </th>
+                            <th scope="col" className="py-2.5 pl-3 text-right text-xs font-medium text-app-muted">
+                              {tDashboard.thPassRate}
                             </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-app-border/60">
-                          {MOCK_PROJECTS.map((project) => (
-                            <tr key={project.id} className="transition-colors hover:bg-app-canvas/20">
-                              <td className="px-5 py-3.5">
-                                <span className="text-xs font-semibold text-app-default">{project.name}</span>
-                              </td>
-                              <td className="px-3 py-3.5">
-                                <div className="flex items-center gap-2">
-                                  <StatusChip status={project.lastRunStatus} tDashboard={tDashboard} />
-                                  <span className="font-mono text-xs font-semibold tabular-nums text-app-default">
-                                    {project.healthScore}%
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-3 py-3.5 text-xs text-app-muted">{project.lastRunAt}</td>
-                              <td className="px-3 py-3.5 text-center font-mono text-xs font-medium tabular-nums text-app-default">
-                                {project.suiteCount}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-mono text-xs font-medium tabular-nums">
-                                {project.aiPendingCount > 0 ? (
-                                  <span className="font-semibold text-app-primary">{project.aiPendingCount}</span>
-                                ) : (
-                                  <span className="text-app-muted/60">0</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
+                          {MOCK_DASHBOARD_DATA.projects.map((project) => {
+                            const pct = project.passRate === null ? null : Math.round(project.passRate * 100);
+                            return (
+                              <tr key={project.id} className="transition-colors hover:bg-app-canvas/20">
+                                <td className="py-3 pr-3">
+                                  <div className="flex min-w-0 items-center gap-2.5">
+                                    <ProjectMonogram name={project.name} />
+                                    <div className="min-w-0">
+                                      <span className="block truncate text-xs font-semibold text-app-default">
+                                        {project.name}
+                                      </span>
+                                      <span className="block text-[11px] text-app-muted">{project.lastRunText}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-xs font-medium text-app-default tabular-nums">
+                                  {project.suites}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-xs font-medium text-app-default tabular-nums">
+                                  {project.cases}
+                                </td>
+                                <td className="py-3 pl-3">
+                                  <div className="flex items-center justify-end gap-2.5">
+                                    <div className="w-24">
+                                      <PassRateBar value={pct} label={`${project.name} pass rate`} />
+                                    </div>
+                                    <span className="w-10 text-right font-mono text-xs font-semibold text-app-default tabular-nums">
+                                      {pct === null ? '—' : `${pct}%`}
+                                    </span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                </div>
+                  </section>
 
-                <div className="col-span-1 flex flex-col justify-between rounded-xl border border-app-border/80 bg-app-surface shadow-app-card">
-                  <div className="flex flex-row items-center justify-between p-5 pb-2">
-                    <h3 className="text-sm font-semibold text-app-default">{tDashboard.passRateTrend}</h3>
-                    <span className="flex items-center gap-1.5 rounded-lg border border-app-border bg-app-canvas px-2 py-1 text-xs font-semibold text-app-muted">
-                      <span>{tDashboard.trendPeriod}</span>
-                      <CaretDown size={10} aria-hidden="true" />
-                    </span>
-                  </div>
+                  {/* Cases Gauge Card (col-span-1) */}
+                  <section
+                    aria-label={tDashboard.casesTitle}
+                    className="min-w-0 flex flex-col justify-between rounded-xl border border-app-border bg-app-surface p-4 shadow-app-card sm:p-5"
+                  >
+                    <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.casesTitle}</h2>
 
-                  <div className="flex flex-1 flex-col justify-between p-5 pt-0">
-                    <div className="mb-4 flex items-baseline gap-2">
-                      <span className="text-3xl font-semibold tracking-[-0.025em] tabular-nums text-app-default">
-                        {MOCK_DASHBOARD_STATS.passRateLast7d}%
-                      </span>
-                      <div className="flex items-center gap-0.5 text-xs font-semibold tabular-nums text-app-pass">
-                        <ArrowUp size={12} weight="bold" aria-hidden="true" />
-                        <span>{MOCK_DASHBOARD_STATS.passRateTrend}%</span>
-                        <span className="ml-1 text-xs font-normal text-app-muted">{tDashboard.vsPrior7d}</span>
-                      </div>
+                    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-2">
+                      <Gauge
+                        value={MOCK_DASHBOARD_DATA.casesPassing.rate}
+                        label={tDashboard.casesGaugeLabel}
+                        width={200}
+                        height={115}
+                      >
+                        <span className="text-2xl font-medium tracking-tight tabular-nums text-app-default">
+                          {MOCK_DASHBOARD_DATA.casesPassing.rate}%
+                        </span>
+                      </Gauge>
+
+                      <p className="font-mono text-xs font-medium text-app-default tabular-nums">
+                        {fill(tDashboard.casesPassedOf, {
+                          passed: MOCK_DASHBOARD_DATA.casesPassing.pass,
+                          total: MOCK_DASHBOARD_DATA.casesPassing.total,
+                        })}
+                      </p>
+
+                      <dl className="grid w-full grid-cols-3 gap-2 text-center text-xs">
+                        <div className="rounded-lg border border-app-border p-2">
+                          <dt className="text-[11px] text-app-muted">{tDashboard.casesFailed}</dt>
+                          <dd className="font-semibold text-app-fail tabular-nums">
+                            {MOCK_DASHBOARD_DATA.casesPassing.fail}
+                          </dd>
+                        </div>
+                        <div className="rounded-lg border border-app-border p-2">
+                          <dt className="text-[11px] text-app-muted">{tDashboard.casesSkipped}</dt>
+                          <dd className="font-semibold text-app-default tabular-nums">
+                            {MOCK_DASHBOARD_DATA.casesPassing.skip}
+                          </dd>
+                        </div>
+                        <div className="rounded-lg border border-app-border p-2">
+                          <dt className="text-[11px] text-app-muted">{tDashboard.casesBlocked}</dt>
+                          <dd className="font-semibold text-app-warn tabular-nums">
+                            {MOCK_DASHBOARD_DATA.casesPassing.blocked}
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
-
-                    <svg
-                      viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-                      preserveAspectRatio="none"
-                      className="h-40 w-full"
-                      role="img"
-                      aria-label="Tendencia de aprobación de los últimos 7 días"
-                    >
-                      {[0, 25, 50, 75, 100].map((tick) => {
-                        const y = yPosition(tick);
-                        return (
-                          <g key={tick}>
-                            <line
-                              x1={PLOT_LEFT}
-                              x2={PLOT_RIGHT}
-                              y1={y}
-                              y2={y}
-                              stroke="var(--color-app-border)"
-                              strokeDasharray="3 4"
-                              vectorEffect="non-scaling-stroke"
-                            />
-                            <text x={0} y={y + 3} fontSize={9} fill="var(--color-app-muted)">
-                              {tick}%
-                            </text>
-                          </g>
-                        );
-                      })}
-
-                      <path d={AREA_PATH} fill="color-mix(in oklch, var(--color-app-default) 7%, transparent)" />
-                      <path
-                        d={LINE_PATH}
-                        fill="none"
-                        stroke="var(--color-app-default)"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        vectorEffect="non-scaling-stroke"
-                      />
-
-                      {CHART_DATA.map((item, index) => (
-                        <text
-                          key={item.day}
-                          x={xPosition(index)}
-                          y={164}
-                          textAnchor="middle"
-                          fontSize={9}
-                          fill="var(--color-app-muted)"
-                        >
-                          {item.day}
-                        </text>
-                      ))}
-                    </svg>
-                  </div>
+                  </section>
                 </div>
               </div>
 
+              {/* 4. Row 2: Channels Card + Recent Activity */}
+              <div className="mx-auto w-full max-w-dashboard @container">
+                <div className="grid grid-cols-1 gap-5 @3xl:grid-cols-2 @md:gap-6">
+                  {/* Channels Card */}
+                  <section
+                    aria-label={tDashboard.channelsTitle}
+                    className="min-w-0 flex flex-col rounded-xl border border-app-border bg-app-surface shadow-app-card"
+                  >
+                    <div className="flex items-center justify-between p-4 pb-2 sm:p-5 sm:pb-3">
+                      <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.channelsTitle}</h2>
+                    </div>
+
+                    <div className="flex flex-col divide-y divide-app-border/60">
+                      {MOCK_CHANNELS.map((ch) => (
+                        <div
+                          key={ch.id}
+                          className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+                        >
+                          <div className="flex min-w-0 items-center gap-3">
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-app-border bg-app-surface-raised">
+                              <img src={ch.iconUrl} alt="" className="size-4.5 object-contain" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-semibold text-app-default">{ch.name}</p>
+                              {ch.eventTypesLabel && (
+                                <p className="truncate text-[11px] text-app-muted">{ch.eventTypesLabel}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex shrink-0 items-center gap-3 self-end sm:self-auto">
+                            <DeliveryBars
+                              points={ch.daily}
+                              label={fill(tDashboard.channelsDeliveryLabel, { name: ch.name })}
+                              className="w-24"
+                            />
+                            <div className="flex w-20 flex-col items-end gap-0.5 tabular-nums">
+                              <span className="font-mono text-xs font-medium text-app-default">
+                                {fill(tDashboard.channelsSentCount, { count: ch.sent })}
+                              </span>
+                              {ch.unread !== undefined ? (
+                                <span className="font-mono text-[10px] text-app-muted">
+                                  {fill(tDashboard.channelsUnreadCount, { count: ch.unread })}
+                                </span>
+                              ) : ch.failed !== undefined ? (
+                                <span
+                                  className={`font-mono text-[10px] ${
+                                    ch.failed > 0 ? 'text-app-fail' : 'text-app-pass'
+                                  }`}
+                                >
+                                  {fill(tDashboard.channelsFailedCount, { count: ch.failed })}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  {/* Activity Card */}
+                  <section
+                    aria-label={tDashboard.activityTitle}
+                    className="min-w-0 flex flex-col rounded-xl border border-app-border bg-app-surface shadow-app-card"
+                  >
+                    <div className="flex items-center justify-between p-4 pb-2 sm:p-5 sm:pb-3">
+                      <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.activityTitle}</h2>
+                    </div>
+
+                    <div className="flex flex-col divide-y divide-app-border/60 px-4 pb-2 sm:px-5">
+                      {MOCK_DASHBOARD_DATA.recentRuns.map((run) => (
+                        <div key={run.id} className="flex min-w-0 items-start gap-2.5 py-3">
+                          <div
+                            role="img"
+                            aria-label={run.source}
+                            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-app-canvas text-app-muted"
+                          >
+                            <SourceIcon source={run.source} />
+                          </div>
+
+                          <div className="flex min-w-0 flex-1 flex-col gap-1">
+                            <div className="flex min-w-0 items-center justify-between gap-2">
+                              <p className="min-w-0 truncate text-xs font-medium text-app-default">
+                                <span>{run.projectName}</span>
+                                <span className="text-app-muted"> · </span>
+                                <span className="text-app-muted">{run.name}</span>
+                              </p>
+                              <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+                                <StatusChip
+                                  status={run.status}
+                                  label={
+                                    run.status === 'pass'
+                                      ? tDashboard.statusPass
+                                      : run.status === 'fail'
+                                        ? tDashboard.statusFail
+                                        : run.status === 'running'
+                                          ? tDashboard.statusRunning
+                                          : tDashboard.statusBlocked
+                                  }
+                                />
+                                <span className="text-[11px] text-app-muted tabular-nums">{run.relativeTime}</span>
+                              </div>
+                            </div>
+
+                            {run.commitSha && (
+                              <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-app-muted">
+                                <img src="/logos/github.svg" alt="" className="size-3 shrink-0 opacity-70" />
+                                <span className="shrink-0 font-mono text-app-default">
+                                  {run.commitSha.slice(0, 7)}
+                                </span>
+                                {run.commitMessage && (
+                                  <span className="min-w-0 truncate">{run.commitMessage}</span>
+                                )}
+                              </div>
+                            )}
+
+                            <span className="text-[11px] text-app-muted tabular-nums">
+                              {fill(tDashboard.activityPassedOf, {
+                                passed: run.casesPassed,
+                                total: run.casesTotal,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </div>
             </section>
           </main>
         </div>
