@@ -1,90 +1,103 @@
-import { screen, act, within } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { screen, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
+
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { dashboardOverviewFixture, dashboardChannelsFixture } from '@/test/dashboard-api-stub'
+import { getDashboardOverview, getDashboardChannels } from '@/features/dashboard/api/dashboard.api'
 
-vi.mock('@/features/projects/suites/api/suites.api', async () =>
-  await import('@/test/suites-api-stub'),
-)
+const originalResizeObserver = globalThis.ResizeObserver
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
 }))
 
+vi.mock('next/image', () => ({
+  default: ({ src, alt, ...props }: { src: string; alt: string; [k: string]: unknown }) =>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} {...props} />,
+}))
+
+vi.mock('@/features/dashboard/api/dashboard.api', () => ({
+  getDashboardOverview: vi.fn(),
+  getDashboardChannels: vi.fn(),
+}))
+
+const getOverview = vi.mocked(getDashboardOverview)
+const getChannels = vi.mocked(getDashboardChannels)
+
 describe('DashboardPage', () => {
   beforeEach(() => {
     __resetStore()
+    getOverview.mockResolvedValue(dashboardOverviewFixture)
+    getChannels.mockResolvedValue(dashboardChannelsFixture)
+    // @ts-expect-error -- intentionally undefined for this suite
+    delete globalThis.ResizeObserver
   })
 
-  it('groups the quality metrics in one labelled summary strip', async () => {
-    await act(async () => {
-      renderWithQuery(<DashboardPage />)
-    })
-    const summary = screen.getByLabelText('Quality overview')
-    expect(summary).toBeInTheDocument()
-    expect(summary).toHaveTextContent('Runs')
-    expect(summary).toHaveTextContent('Failed test cases')
-    expect(summary).toHaveTextContent('Pending AI')
-    expect(summary).toHaveTextContent('Active runs')
-    expect(summary).not.toHaveTextContent('Pass rate')
+  afterEach(() => {
+    globalThis.ResizeObserver = originalResizeObserver
   })
 
-  it('renders the project status section', async () => {
-    await act(async () => {
-      renderWithQuery(<DashboardPage />)
-    })
-    const table = screen.getByRole('table', { name: 'Project status' })
-    expect(table).toBeInTheDocument()
-    // Should show all 4 projects
-    expect(within(table).getByText('Ecommerce App')).toBeInTheDocument()
-    expect(within(table).getByText('Mobile App')).toBeInTheDocument()
-    expect(within(table).getByText('API Backend')).toBeInTheDocument()
-    expect(within(table).getByText('Admin Panel')).toBeInTheDocument()
-  })
-
-  it('renders recent activity sections', async () => {
-    await act(async () => {
-      renderWithQuery(<DashboardPage />)
-    })
-    expect(screen.getByText('Test runs')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Pending proposals' })).toBeInTheDocument()
-    expect(screen.getByText('Commits in CI')).toBeInTheDocument()
-  })
-
-  it('does not end the workspace with a decorative operational footer', async () => {
+  it('renders the header, hero, projects, gauge, channels and activity in that order', async () => {
     await act(async () => {
       renderWithQuery(<DashboardPage />)
     })
 
-    expect(screen.queryByText('All systems operational')).not.toBeInTheDocument()
+    const region = screen.getByRole('region', { name: 'Dashboard' })
+    const headings = Array.from(region.querySelectorAll('h1, h2, h3')).map((node) => node.textContent)
+
+    expect(headings).toEqual([
+      'Dashboard',
+      'Pass rate',
+      'Projects',
+      'Cases passing',
+      'Notification channels',
+      'Recent activity',
+    ])
   })
 
-  it('uses the available workspace width instead of capping the dashboard canvas', async () => {
+  it('caps content width with the dashboard token everywhere, never an arbitrary value', async () => {
+    const { container } = await act(async () => renderWithQuery(<DashboardPage />))
+    expect(container.querySelectorAll('.max-w-dashboard').length).toBeGreaterThan(0)
+    expect(container.innerHTML).not.toContain('max-w-[1128px]')
+  })
+
+  it('gives every dashboard row-grid child min-w-0 so charts can shrink inside their container', async () => {
+    const { container } = await act(async () => renderWithQuery(<DashboardPage />))
+    const grids = container.querySelectorAll('[data-testid="dashboard-row-grid"]')
+    expect(grids.length).toBe(2)
+    for (const grid of grids) {
+      for (const child of grid.children) {
+        expect(child).toHaveClass('min-w-0')
+      }
+    }
+  })
+
+  it('does not render the retired widgets it replaces', async () => {
     await act(async () => {
       renderWithQuery(<DashboardPage />)
     })
 
-    const workspace = screen.getByRole('region', { name: 'Dashboard' })
-    expect(workspace).toHaveClass('w-full')
-    expect(workspace).not.toHaveClass('max-w-[1440px]')
-  })
-
-  it('renders the traceability section with its yearly event summary', async () => {
-    await act(async () => {
-      renderWithQuery(<DashboardPage />)
-    })
-    expect(
-      screen.getByRole('heading', { name: /traceability events in 2026/i }),
-    ).toBeInTheDocument()
-  })
-
-  it('shows nothing the API cannot back: no risk panel, no coverage gaps', async () => {
-    await act(async () => {
-      renderWithQuery(<DashboardPage />)
-    })
-    expect(screen.queryByRole('heading', { name: 'Quality & freshness risks' })).not.toBeInTheDocument()
-    expect(screen.queryByText(/coverage gap/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Quality overview')).not.toBeInTheDocument()
+    expect(screen.queryByRole('table', { name: 'Project status' })).not.toBeInTheDocument()
   })
 })
