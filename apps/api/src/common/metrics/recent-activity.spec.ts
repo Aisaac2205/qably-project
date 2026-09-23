@@ -1,169 +1,151 @@
 import {
-  buildRecentActivity,
-  selectLatestRunPerSuite,
-  type RecentActivityRunRow,
+  buildActivityEntry,
+  buildRecentActivityFromAggregates,
+  rollUpStatuses,
+  type ActivityAggregateRow,
 } from './recent-activity';
 
-function row(
-  overrides: Partial<RecentActivityRunRow> = {},
-): RecentActivityRunRow {
+function aggregateRow(
+  overrides: Partial<ActivityAggregateRow> = {},
+): ActivityAggregateRow {
   return {
-    id: 'run-1',
     projectId: 'project-1',
-    projectName: 'Checkout',
-    suiteId: 'suite-1',
-    suiteName: 'Checkout suite',
-    name: 'Nightly regression',
-    source: 'github_actions',
-    status: 'pass',
-    startedAt: new Date('2026-06-16T10:00:00.000Z'),
+    activityKey: 'd2f363de80e51157947e36f40d2965404e162b21',
     commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
-    commitMessage: 'fix(ci): retry throttled run reports',
-    commitAuthor: 'Aisaac2205',
-    caseCounts: {
-      total: 4,
-      pending: 0,
-      running: 0,
-      pass: 4,
-      fail: 0,
-      skip: 0,
-      blocked: 0,
-    },
+    projectName: 'Checkout',
+    suiteCount: 1,
+    statuses: ['pass'],
+    anchorRunId: 'run-2',
+    anchorRunName: 'Nightly regression',
+    anchorSuiteName: 'Checkout suite',
+    anchorSource: 'github_actions',
+    anchorStartedAt: new Date('2026-06-16T10:10:00.000Z'),
+    anchorCommitMessage: 'fix(ci): retry throttled run reports',
+    anchorCommitAuthor: 'Aisaac2205',
+    casesPassed: 4,
+    casesTotal: 4,
     ...overrides,
   };
 }
 
-describe('buildRecentActivity', () => {
-  it('flips the commit entry to pass once the failed suite reruns and passes', () => {
-    const activity = buildRecentActivity([
-      row({
-        suiteId: 'suite-1',
-        status: 'fail',
-        startedAt: new Date('2026-06-16T10:00:00.000Z'),
-        caseCounts: {
-          total: 4,
-          pending: 0,
-          running: 0,
-          pass: 2,
-          fail: 2,
-          skip: 0,
-          blocked: 0,
-        },
-      }),
-      row({
-        id: 'run-2',
-        suiteId: 'suite-1',
-        status: 'pass',
-        startedAt: new Date('2026-06-16T10:10:00.000Z'),
-        caseCounts: {
-          total: 4,
-          pending: 0,
-          running: 0,
-          pass: 4,
-          fail: 0,
-          skip: 0,
-          blocked: 0,
-        },
-      }),
-    ]);
-
-    expect(activity).toHaveLength(1);
-    expect(activity[0]).toMatchObject({
-      kind: 'commit',
-      status: 'pass',
-      casesPassed: 4,
-      casesTotal: 4,
-    });
+describe('rollUpStatuses', () => {
+  it('rolls fail over running, pending and pass', () => {
+    expect(rollUpStatuses(['pass', 'running', 'fail', 'pending'])).toBe('fail');
   });
 
-  it('rolls a commit up to fail when one of its two latest suite runs is fail and the other is running', () => {
-    const activity = buildRecentActivity([
-      row({ suiteId: 'suite-1', status: 'running' }),
-      row({
-        id: 'run-2',
-        suiteId: 'suite-2',
-        status: 'fail',
-        startedAt: new Date('2026-06-16T10:01:00.000Z'),
-      }),
-    ]);
-
-    expect(activity).toHaveLength(1);
-    expect(activity[0].status).toBe('fail');
+  it('rolls running over pending and pass', () => {
+    expect(rollUpStatuses(['pass', 'pending', 'running'])).toBe('running');
   });
 
-  it('keeps a run without a commitSha as its own standalone entry', () => {
-    const activity = buildRecentActivity([
-      row({
-        id: 'run-standalone',
-        commitSha: null,
-        commitMessage: null,
-        commitAuthor: null,
-      }),
-      row({ id: 'run-committed' }),
-    ]);
-
-    expect(activity).toHaveLength(2);
-    const standalone = activity.find((entry) => entry.kind === 'run');
-    expect(standalone).toMatchObject({ kind: 'run', runId: 'run-standalone' });
+  it('rolls pending over pass', () => {
+    expect(rollUpStatuses(['pass', 'pending'])).toBe('pending');
   });
 
-  it('splits the same commit SHA in two projects into two separate entries', () => {
-    const activity = buildRecentActivity([
-      row({ id: 'run-a', projectId: 'project-1', projectName: 'Checkout' }),
-      row({ id: 'run-b', projectId: 'project-2', projectName: 'Billing' }),
-    ]);
-
-    expect(activity).toHaveLength(2);
-    expect(activity.map((entry) => entry.projectName).sort()).toEqual([
-      'Billing',
-      'Checkout',
-    ]);
+  it('is pass only when every status is pass', () => {
+    expect(rollUpStatuses(['pass', 'pass'])).toBe('pass');
   });
 
-  it('caps the list at 4 entries, most recent first', () => {
-    const rows = Array.from({ length: 6 }, (_, index) =>
-      row({
-        id: `run-${index}`,
-        commitSha: `sha-${index}`.padEnd(40, '0'),
-        startedAt: new Date(2026, 5, 10 + index),
-      }),
-    );
-
-    const activity = buildRecentActivity(rows);
-
-    expect(activity).toHaveLength(4);
-    expect(activity[0].occurredAt > activity[3].occurredAt).toBe(true);
-  });
-
-  it('returns an empty list when there is nothing in scope', () => {
-    expect(buildRecentActivity([])).toEqual([]);
+  it('is pass for an empty status list (identity element)', () => {
+    expect(rollUpStatuses([])).toBe('pass');
   });
 });
 
-describe('selectLatestRunPerSuite', () => {
-  it('keeps only the most recent run for each suite', () => {
-    const latest = selectLatestRunPerSuite([
-      row({
-        id: 'run-old',
-        suiteId: 'suite-1',
-        startedAt: new Date('2026-06-16T09:00:00.000Z'),
+describe('buildActivityEntry', () => {
+  it('maps a commit aggregate row to a commit entry, using the anchor for commit fields', () => {
+    const entry = buildActivityEntry(
+      aggregateRow({
+        statuses: ['fail', 'pass'],
+        suiteCount: 2,
+        casesPassed: 2,
+        casesTotal: 3,
       }),
-      row({
-        id: 'run-new',
-        suiteId: 'suite-1',
-        startedAt: new Date('2026-06-16T10:00:00.000Z'),
-      }),
-      row({
-        id: 'run-other',
-        suiteId: 'suite-2',
-        startedAt: new Date('2026-06-16T09:30:00.000Z'),
-      }),
-    ]);
+    );
 
-    expect(latest).toHaveLength(2);
-    expect(latest.map((entry) => entry.id).sort()).toEqual([
-      'run-new',
-      'run-other',
+    expect(entry).toEqual({
+      kind: 'commit',
+      projectId: 'project-1',
+      projectName: 'Checkout',
+      status: 'fail',
+      source: 'github_actions',
+      occurredAt: '2026-06-16T10:10:00.000Z',
+      casesPassed: 2,
+      casesTotal: 3,
+      commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+      suiteCount: 2,
+      commitMessage: 'fix(ci): retry throttled run reports',
+      commitAuthor: 'Aisaac2205',
+    });
+  });
+
+  it('uses the anchor run commit message and author, not any other suite run in the group', () => {
+    const entry = buildActivityEntry(
+      aggregateRow({
+        anchorCommitMessage: 'feat: add checkout retries',
+        anchorCommitAuthor: 'octocat',
+      }),
+    );
+
+    expect(entry).toMatchObject({
+      commitMessage: 'feat: add checkout retries',
+      commitAuthor: 'octocat',
+    });
+  });
+
+  it('omits commitMessage and commitAuthor when the anchor run has none', () => {
+    const entry = buildActivityEntry(
+      aggregateRow({ anchorCommitMessage: null, anchorCommitAuthor: null }),
+    );
+
+    expect(entry).not.toHaveProperty('commitMessage');
+    expect(entry).not.toHaveProperty('commitAuthor');
+  });
+
+  it('maps a standalone run aggregate row (no commitSha) to a run entry', () => {
+    const entry = buildActivityEntry(
+      aggregateRow({
+        commitSha: null,
+        activityKey: 'run-standalone',
+        anchorRunId: 'run-standalone',
+        anchorRunName: 'Manual smoke test',
+        anchorSuiteName: 'Smoke',
+      }),
+    );
+
+    expect(entry).toMatchObject({
+      kind: 'run',
+      runId: 'run-standalone',
+      runName: 'Manual smoke test',
+      suiteName: 'Smoke',
+    });
+    expect(entry).not.toHaveProperty('commitSha');
+    expect(entry).not.toHaveProperty('suiteCount');
+  });
+});
+
+describe('buildRecentActivityFromAggregates', () => {
+  it('maps every aggregate row and preserves SQL ordering', () => {
+    const rows = [
+      aggregateRow({
+        activityKey: 'sha-1',
+        commitSha: 'sha-1',
+        anchorStartedAt: new Date('2026-06-16T10:10:00.000Z'),
+      }),
+      aggregateRow({
+        activityKey: 'sha-2',
+        commitSha: 'sha-2',
+        anchorStartedAt: new Date('2026-06-16T09:00:00.000Z'),
+      }),
+    ];
+
+    const activity = buildRecentActivityFromAggregates(rows);
+
+    expect(activity.map((entry) => entry.occurredAt)).toEqual([
+      '2026-06-16T10:10:00.000Z',
+      '2026-06-16T09:00:00.000Z',
     ]);
+  });
+
+  it('returns an empty list when there are no aggregate rows', () => {
+    expect(buildRecentActivityFromAggregates([])).toEqual([]);
   });
 });

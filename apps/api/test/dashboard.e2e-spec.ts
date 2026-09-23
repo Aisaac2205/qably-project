@@ -68,6 +68,8 @@ interface QueryRawFixtures {
   inAppCounts?: unknown[];
   traceability?: unknown[];
   activityCandidates?: unknown[];
+  activityAggregate?: unknown[];
+  previousRunChain?: unknown[];
 }
 
 function queryRawRouter(fixtures: QueryRawFixtures = {}) {
@@ -76,6 +78,12 @@ function queryRawRouter(fixtures: QueryRawFixtures = {}) {
 
     if (text.includes('activity_candidates')) {
       return Promise.resolve(fixtures.activityCandidates ?? []);
+    }
+    if (text.includes('matched_runs')) {
+      return Promise.resolve(fixtures.activityAggregate ?? []);
+    }
+    if (text.includes('"previousId"')) {
+      return Promise.resolve(fixtures.previousRunChain ?? []);
     }
     if (text.includes('FROM "run_case" rc')) {
       return Promise.resolve(fixtures.caseCounts ?? []);
@@ -95,9 +103,29 @@ function queryRawRouter(fixtures: QueryRawFixtures = {}) {
     if (text.includes('FROM "notification" n')) {
       return Promise.resolve(fixtures.inAppCounts ?? []);
     }
+    if (text.includes('"ingestion_batch" b')) {
+      return Promise.resolve(
+        fixtures.traceability ?? [{ day: '2026-06-16', count: 3 }],
+      );
+    }
+    if (text.includes('"extracted_proposal" ep')) {
+      return Promise.resolve(
+        fixtures.traceability ?? [{ day: '2026-06-16', count: 3 }],
+      );
+    }
+    if (text.includes('"test_case" tc')) {
+      return Promise.resolve(
+        fixtures.traceability ?? [{ day: '2026-06-16', count: 3 }],
+      );
+    }
+    if (text.includes('FROM "run" r')) {
+      return Promise.resolve(
+        fixtures.traceability ?? [{ day: '2026-06-16', count: 3 }],
+      );
+    }
 
-    return Promise.resolve(
-      fixtures.traceability ?? [{ day: '2026-06-16', count: 3 }],
+    throw new Error(
+      `queryRawRouter: unmatched SQL, refusing to fall back to a fake fixture.\n${text}`,
     );
   };
 }
@@ -560,42 +588,37 @@ describe('Dashboard (e2e)', () => {
     });
 
     it('groups activity by commit across suites, reporting aggregated status, cases and suite count', async () => {
-      const runA = {
-        ...runRow,
-        id: 'run-a',
-        suiteId: 'suite-1',
-        suite: { name: 'Checkout' },
-        project: { name: 'Checkout Web' },
-        status: 'fail' as const,
-        startedAt: new Date('2026-06-16T10:00:00.000Z'),
-      };
-      const runB = {
-        ...runRow,
-        id: 'run-b',
-        suiteId: 'suite-2',
-        suite: { name: 'Billing' },
-        project: { name: 'Checkout Web' },
-        status: 'pass' as const,
-        startedAt: new Date('2026-06-16T10:05:00.000Z'),
-      };
-
       prisma.$queryRaw.mockImplementation(
         queryRawRouter({
           activityCandidates: [
             {
               projectId: 'project-1',
+              activityKey: runRow.commitSha,
               commitSha: runRow.commitSha,
-              runId: 'run-b',
-              lastActivityAt: runB.startedAt,
+              lastActivityAt: new Date('2026-06-16T10:05:00.000Z'),
+            },
+          ],
+          activityAggregate: [
+            {
+              projectId: 'project-1',
+              activityKey: runRow.commitSha,
+              commitSha: runRow.commitSha,
+              suiteCount: 2,
+              statuses: ['fail', 'pass'],
+              anchorRunId: 'run-b',
+              anchorRunName: 'Checkout regression',
+              anchorSuiteName: 'Billing',
+              anchorSource: 'github_actions',
+              anchorStartedAt: new Date('2026-06-16T10:05:00.000Z'),
+              anchorCommitMessage: runRow.commitMessage,
+              anchorCommitAuthor: runRow.commitAuthor,
+              projectName: 'Checkout Web',
+              casesPassed: 2,
+              casesTotal: 3,
             },
           ],
         }),
       );
-      prisma.run.findMany.mockResolvedValue([runA, runB]);
-      prisma.runCase.groupBy.mockResolvedValue([
-        { runId: 'run-a', status: 'fail', _count: { _all: 1 } },
-        { runId: 'run-b', status: 'pass', _count: { _all: 2 } },
-      ]);
 
       const response = await request(app.getHttpServer())
         .get('/dashboard/overview?period=7')

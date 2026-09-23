@@ -1,4 +1,5 @@
 import { Prisma } from '../../../generated/prisma/client';
+import { RECENT_ACTIVITY_LIMIT } from '../../common/metrics/recent-activity';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { OverviewService } from './overview.service';
 
@@ -189,51 +190,83 @@ describe('OverviewService empty organization', () => {
   });
 });
 
+function findQueryRawCall(
+  prisma: FakePrisma,
+  marker: string,
+): { strings: string[]; values: unknown[] } | undefined {
+  const calls = prisma.$queryRaw.mock.calls as [
+    { strings: string[]; values: unknown[] },
+  ][];
+  const match = calls.find(([sql]) => sql.strings.join('').includes(marker));
+
+  return match?.[0];
+}
+
 describe('OverviewService recentActivity query scoping', () => {
-  it('bounds the activity_candidates CTE to the organization and a 200-row window', async () => {
+  it('bounds the activity_candidates query to the organization and the period window, not an arbitrary row cap', async () => {
     const prisma = createPrisma();
 
     await build(prisma).overview(org, 7, 'UTC');
 
-    const call = prisma.$queryRaw.mock.calls.find(
-      ([sql]: [{ strings: string[] }]) =>
-        sql.strings.join('').includes('activity_candidates'),
-    ) as [{ strings: string[]; values: unknown[] }] | undefined;
+    const call = findQueryRawCall(prisma, 'activity_candidates');
 
     expect(call).toBeDefined();
-    const sqlText = call?.[0].strings.join('') ?? '';
+    const sqlText = call?.strings.join('') ?? '';
     expect(sqlText).toContain('r."organizationId"');
+    expect(sqlText).toContain('r."startedAt" >=');
+    expect(sqlText).toContain('r."startedAt" <');
     expect(sqlText).toContain('LIMIT');
-    expect(call?.[0].values).toEqual(expect.arrayContaining(['org-1', 200]));
+    expect(sqlText).not.toContain('200');
+    expect(call?.values).toEqual(
+      expect.arrayContaining([
+        'org-1',
+        new Date('2026-06-10T00:00:00.000Z'),
+        NOW,
+        RECENT_ACTIVITY_LIMIT,
+      ]),
+    );
   });
 
-  it('scopes the activity_candidates CTE to the given project when one is requested', async () => {
+  it('scopes the activity_candidates query to the given project when one is requested', async () => {
     const prisma = createPrisma();
 
     await build(prisma).overview(org, 7, 'UTC', 'project-1');
 
-    const call = prisma.$queryRaw.mock.calls.find(
-      ([sql]: [{ strings: string[] }]) =>
-        sql.strings.join('').includes('activity_candidates'),
-    ) as [{ strings: string[]; values: unknown[] }] | undefined;
+    const call = findQueryRawCall(prisma, 'activity_candidates');
 
     expect(call).toBeDefined();
-    const sqlText = call?.[0].strings.join('') ?? '';
+    const sqlText = call?.strings.join('') ?? '';
     expect(sqlText).toContain('r."projectId"');
-    expect(call?.[0].values).toEqual(
+    expect(call?.values).toEqual(
       expect.arrayContaining(['org-1', 'project-1']),
     );
   });
 
-  it('skips fetching full activity runs when no candidates are found', async () => {
+  it('groups candidates by project + commit, or by run id when commitSha is null', async () => {
     const prisma = createPrisma();
 
     await build(prisma).overview(org, 7, 'UTC');
 
-    expect(prisma.run.findMany).toHaveBeenCalledTimes(1);
+    const call = findQueryRawCall(prisma, 'activity_candidates');
+    const sqlText = call?.strings.join('') ?? '';
+
+    expect(sqlText).toContain(
+      'COALESCE(r."commitSha", r.id::text) AS "activityKey"',
+    );
+    expect(sqlText).toContain('GROUP BY "projectId", "activityKey"');
+    expect(sqlText).toContain('ORDER BY MAX("startedAt") DESC');
   });
 
-  it('fetches the full runs for the chosen activity groups and returns them as recentActivity', async () => {
+  it('skips the bounded aggregate query entirely when no candidates are found', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    const aggregateCall = findQueryRawCall(prisma, 'matched_runs');
+    expect(aggregateCall).toBeUndefined();
+  });
+
+  it('never fetches raw run rows for the aggregate: it queries matched_runs, never a full commit fetch', async () => {
     const prisma = createPrisma();
     prisma.$queryRaw.mockImplementation((sql: { strings: string[] }) => {
       const text = sql.strings.join('');
@@ -241,34 +274,101 @@ describe('OverviewService recentActivity query scoping', () => {
         return Promise.resolve([
           {
             projectId: 'project-1',
+            activityKey: 'd2f363de80e51157947e36f40d2965404e162b21',
             commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
-            runId: 'run-1',
             lastActivityAt: new Date('2026-06-16T10:00:00.000Z'),
           },
         ]);
       }
       return Promise.resolve([]);
     });
-    prisma.run.findMany.mockResolvedValue([
-      {
-        id: 'run-1',
-        projectId: 'project-1',
-        project: { name: 'Checkout' },
-        suiteId: 'suite-1',
-        suite: { name: 'Checkout suite' },
-        name: 'Nightly regression',
-        status: 'pass',
-        source: 'github_actions',
-        startedAt: new Date('2026-06-16T10:00:00.000Z'),
-        finishedAt: new Date('2026-06-16T10:05:00.000Z'),
-        commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
-        commitMessage: 'fix(ci): retry throttled run reports',
-        commitAuthor: 'Aisaac2205',
-      },
-    ]);
-    prisma.runCase.groupBy.mockResolvedValue([
-      { runId: 'run-1', status: 'pass', _count: { _all: 4 } },
-    ]);
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    expect(prisma.run.findMany).toHaveBeenCalledTimes(1);
+    const aggregateCall = findQueryRawCall(prisma, 'matched_runs');
+    expect(aggregateCall).toBeDefined();
+    const sqlText = aggregateCall?.strings.join('') ?? '';
+    expect(sqlText).toContain('DISTINCT ON');
+    expect(sqlText).toContain('"run_case" rc');
+    expect(sqlText).toContain(
+      '(r."projectId", COALESCE(r."commitSha", r.id::text)) IN',
+    );
+    expect(sqlText).toContain(
+      'array_agg(DISTINCT mr.status)::text[] AS "statuses"',
+    );
+  });
+
+  it('bounds the aggregate query to the same period window as the candidates query', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockImplementation((sql: { strings: string[] }) => {
+      const text = sql.strings.join('');
+      if (text.includes('activity_candidates')) {
+        return Promise.resolve([
+          {
+            projectId: 'project-1',
+            activityKey: 'run-standalone',
+            commitSha: null,
+            lastActivityAt: new Date('2026-06-16T10:00:00.000Z'),
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    const aggregateCall = findQueryRawCall(prisma, 'matched_runs');
+    const sqlText = aggregateCall?.strings.join('') ?? '';
+    expect(sqlText).toContain('r."startedAt" >=');
+    expect(sqlText).toContain('r."startedAt" <');
+    expect(aggregateCall?.values).toEqual(
+      expect.arrayContaining([
+        new Date('2026-06-10T00:00:00.000Z'),
+        NOW,
+        'project-1',
+        'run-standalone',
+      ]),
+    );
+  });
+
+  it('fetches the bounded aggregate rows for the chosen activity groups and maps them to recentActivity', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockImplementation((sql: { strings: string[] }) => {
+      const text = sql.strings.join('');
+      if (text.includes('activity_candidates')) {
+        return Promise.resolve([
+          {
+            projectId: 'project-1',
+            activityKey: 'd2f363de80e51157947e36f40d2965404e162b21',
+            commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+            lastActivityAt: new Date('2026-06-16T10:10:00.000Z'),
+          },
+        ]);
+      }
+      if (text.includes('matched_runs')) {
+        return Promise.resolve([
+          {
+            projectId: 'project-1',
+            activityKey: 'd2f363de80e51157947e36f40d2965404e162b21',
+            commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+            suiteCount: 2,
+            statuses: ['fail', 'running'],
+            anchorRunId: 'run-2',
+            anchorRunName: 'Nightly regression',
+            anchorSuiteName: 'Checkout suite',
+            anchorSource: 'github_actions',
+            anchorStartedAt: new Date('2026-06-16T10:10:00.000Z'),
+            anchorCommitMessage: 'fix(ci): retry throttled run reports',
+            anchorCommitAuthor: 'Aisaac2205',
+            projectName: 'Checkout',
+            casesPassed: 2,
+            casesTotal: 3,
+          },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
 
     const result = await build(prisma).overview(org, 7, 'UTC');
 
@@ -277,10 +377,14 @@ describe('OverviewService recentActivity query scoping', () => {
     expect(result.value.recentActivity).toHaveLength(1);
     expect(result.value.recentActivity[0]).toMatchObject({
       kind: 'commit',
+      status: 'fail',
       commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+      suiteCount: 2,
       projectName: 'Checkout',
-      casesPassed: 4,
-      casesTotal: 4,
+      commitMessage: 'fix(ci): retry throttled run reports',
+      commitAuthor: 'Aisaac2205',
+      casesPassed: 2,
+      casesTotal: 3,
     });
   });
 });

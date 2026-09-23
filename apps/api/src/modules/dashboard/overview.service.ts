@@ -15,10 +15,9 @@ import {
   type SeriesWindow,
 } from '../../common/metrics/dashboard-overview';
 import {
-  RECENT_ACTIVITY_CANDIDATE_LIMIT,
   RECENT_ACTIVITY_LIMIT,
-  buildRecentActivity,
-  type RecentActivityRunRow,
+  buildRecentActivityFromAggregates,
+  type ActivityAggregateRow,
 } from '../../common/metrics/recent-activity';
 import {
   buildCaseCountsByRun,
@@ -72,9 +71,27 @@ interface RecentRunListRow {
 
 interface RawActivityCandidateRow {
   projectId: string;
+  activityKey: string;
   commitSha: string | null;
-  runId: string;
   lastActivityAt: Date;
+}
+
+interface RawActivityAggregateRow {
+  projectId: string;
+  activityKey: string;
+  commitSha: string | null;
+  suiteCount: number;
+  statuses: ('pass' | 'fail' | 'running' | 'pending')[];
+  anchorRunId: string;
+  anchorRunName: string;
+  anchorSuiteName: string;
+  anchorSource: 'manual' | 'api' | 'github_actions';
+  anchorStartedAt: Date;
+  anchorCommitMessage: string | null;
+  anchorCommitAuthor: string | null;
+  projectName: string;
+  casesPassed: number;
+  casesTotal: number;
 }
 
 function projectFilterSql(projectId?: string): Prisma.Sql {
@@ -236,20 +253,23 @@ export class OverviewService {
         }),
         this.prisma.$queryRaw<RawActivityCandidateRow[]>(Prisma.sql`
           WITH activity_candidates AS (
-            SELECT r.id, r."projectId", r."commitSha", r."startedAt"
+            SELECT r."projectId" AS "projectId",
+                   COALESCE(r."commitSha", r.id::text) AS "activityKey",
+                   r."commitSha" AS "commitSha",
+                   r."startedAt" AS "startedAt"
               FROM "run" r
              WHERE r."organizationId" = ${organizationId}
                ${runProjectFilter}
-             ORDER BY r."startedAt" DESC, r.id DESC
-             LIMIT ${RECENT_ACTIVITY_CANDIDATE_LIMIT}
+               AND r."startedAt" >= ${window.currentStart}
+               AND r."startedAt" < ${window.currentEnd}
           )
           SELECT "projectId" AS "projectId",
+                 "activityKey" AS "activityKey",
                  MAX("commitSha") AS "commitSha",
-                 MAX(id) AS "runId",
                  MAX("startedAt") AS "lastActivityAt"
             FROM activity_candidates
-           GROUP BY "projectId", COALESCE("commitSha", id::text)
-           ORDER BY "lastActivityAt" DESC
+           GROUP BY "projectId", "activityKey"
+           ORDER BY MAX("startedAt") DESC, "activityKey" DESC
            LIMIT ${RECENT_ACTIVITY_LIMIT}
         `),
       ]);
@@ -265,65 +285,124 @@ export class OverviewService {
             });
       const caseCountsByRun = buildCaseCountsByRun(recentRunCaseGroups);
 
-      const activityCandidateRows = activityCandidates;
-      const activityRuns =
-        activityCandidateRows.length === 0
+      const activityAggregateRows =
+        activityCandidates.length === 0
           ? []
-          : ((await this.prisma.run.findMany({
-              where: {
-                organizationId,
-                OR: activityCandidateRows.map((candidate) =>
-                  candidate.commitSha === null
-                    ? { id: candidate.runId }
-                    : {
-                        projectId: candidate.projectId,
-                        commitSha: candidate.commitSha,
-                      },
-                ),
-              },
-              select: {
-                id: true,
-                projectId: true,
-                project: { select: { name: true } },
-                suiteId: true,
-                suite: { select: { name: true } },
-                name: true,
-                status: true,
-                source: true,
-                startedAt: true,
-                commitSha: true,
-                commitMessage: true,
-                commitAuthor: true,
-              },
-            })) as RecentRunListRow[]);
+          : await this.prisma.$queryRaw<RawActivityAggregateRow[]>(Prisma.sql`
+              WITH matched_runs AS (
+                SELECT DISTINCT ON (
+                         r."projectId",
+                         COALESCE(r."commitSha", r.id::text),
+                         r."suiteId"
+                       )
+                       r.id AS "runId",
+                       r."projectId" AS "projectId",
+                       COALESCE(r."commitSha", r.id::text) AS "activityKey",
+                       r."commitSha" AS "commitSha",
+                       r."commitMessage" AS "commitMessage",
+                       r."commitAuthor" AS "commitAuthor",
+                       r."suiteId" AS "suiteId",
+                       r.name AS "runName",
+                       s.name AS "suiteName",
+                       r.status AS "status",
+                       r.source AS "source",
+                       r."startedAt" AS "startedAt"
+                  FROM "run" r
+                  JOIN "suite" s ON s.id = r."suiteId"
+                 WHERE r."organizationId" = ${organizationId}
+                   ${runProjectFilter}
+                   AND r."startedAt" >= ${window.currentStart}
+                   AND r."startedAt" < ${window.currentEnd}
+                   AND (r."projectId", COALESCE(r."commitSha", r.id::text)) IN (${Prisma.join(
+                     activityCandidates.map(
+                       (candidate) =>
+                         Prisma.sql`(${candidate.projectId}, ${candidate.activityKey})`,
+                     ),
+                   )})
+                 ORDER BY r."projectId",
+                          COALESCE(r."commitSha", r.id::text),
+                          r."suiteId",
+                          r."startedAt" DESC,
+                          r.id DESC
+              ),
+              rollups AS (
+                SELECT mr."projectId" AS "projectId",
+                       mr."activityKey" AS "activityKey",
+                       mr."commitSha" AS "commitSha",
+                       COUNT(*)::int AS "suiteCount",
+                       array_agg(DISTINCT mr.status)::text[] AS "statuses"
+                  FROM matched_runs mr
+                 GROUP BY mr."projectId", mr."activityKey", mr."commitSha"
+              ),
+              anchors AS (
+                SELECT DISTINCT ON (mr."projectId", mr."activityKey")
+                       mr."projectId" AS "projectId",
+                       mr."activityKey" AS "activityKey",
+                       mr."runId" AS "anchorRunId",
+                       mr."runName" AS "anchorRunName",
+                       mr."suiteName" AS "anchorSuiteName",
+                       mr.source AS "anchorSource",
+                       mr."startedAt" AS "anchorStartedAt",
+                       mr."commitMessage" AS "anchorCommitMessage",
+                       mr."commitAuthor" AS "anchorCommitAuthor"
+                  FROM matched_runs mr
+                 ORDER BY mr."projectId",
+                          mr."activityKey",
+                          mr."startedAt" DESC,
+                          mr."runId" DESC
+              ),
+              case_counts AS (
+                SELECT mr."projectId" AS "projectId",
+                       mr."activityKey" AS "activityKey",
+                       COUNT(*) FILTER (WHERE rc.status = 'pass')::int AS "casesPassed",
+                       COUNT(rc.id)::int AS "casesTotal"
+                  FROM matched_runs mr
+                  JOIN "run_case" rc ON rc."runId" = mr."runId"
+                 GROUP BY mr."projectId", mr."activityKey"
+              )
+              SELECT rl."projectId" AS "projectId",
+                     rl."activityKey" AS "activityKey",
+                     rl."commitSha" AS "commitSha",
+                     rl."suiteCount" AS "suiteCount",
+                     rl.statuses AS "statuses",
+                     a."anchorRunId" AS "anchorRunId",
+                     a."anchorRunName" AS "anchorRunName",
+                     a."anchorSuiteName" AS "anchorSuiteName",
+                     a."anchorSource" AS "anchorSource",
+                     a."anchorStartedAt" AS "anchorStartedAt",
+                     a."anchorCommitMessage" AS "anchorCommitMessage",
+                     a."anchorCommitAuthor" AS "anchorCommitAuthor",
+                     p.name AS "projectName",
+                     COALESCE(cc."casesPassed", 0) AS "casesPassed",
+                     COALESCE(cc."casesTotal", 0) AS "casesTotal"
+                FROM rollups rl
+                JOIN anchors a
+                  ON a."projectId" = rl."projectId"
+                 AND a."activityKey" = rl."activityKey"
+                JOIN "project" p ON p.id = rl."projectId"
+                LEFT JOIN case_counts cc
+                  ON cc."projectId" = rl."projectId"
+                 AND cc."activityKey" = rl."activityKey"
+            `);
 
-      const activityCaseGroups =
-        activityRuns.length === 0
-          ? []
-          : await this.prisma.runCase.groupBy({
-              by: ['runId', 'status'],
-              where: { runId: { in: activityRuns.map((run) => run.id) } },
-              _count: { _all: true },
-            });
-      const caseCountsByActivityRun = buildCaseCountsByRun(activityCaseGroups);
-
-      const recentActivity = buildRecentActivity(
-        activityRuns.map(
-          (run): RecentActivityRunRow => ({
-            id: run.id,
-            projectId: run.projectId,
-            projectName: run.project.name,
-            suiteId: run.suiteId,
-            suiteName: run.suite.name,
-            name: run.name,
-            source: run.source,
-            status: run.status,
-            startedAt: run.startedAt,
-            commitSha: run.commitSha,
-            commitMessage: run.commitMessage,
-            commitAuthor: run.commitAuthor,
-            caseCounts:
-              caseCountsByActivityRun.get(run.id) ?? emptyCaseCounts(),
+      const recentActivity = buildRecentActivityFromAggregates(
+        activityAggregateRows.map(
+          (row): ActivityAggregateRow => ({
+            projectId: row.projectId,
+            activityKey: row.activityKey,
+            commitSha: row.commitSha,
+            projectName: row.projectName,
+            suiteCount: row.suiteCount,
+            statuses: row.statuses,
+            anchorRunId: row.anchorRunId,
+            anchorRunName: row.anchorRunName,
+            anchorSuiteName: row.anchorSuiteName,
+            anchorSource: row.anchorSource,
+            anchorStartedAt: row.anchorStartedAt,
+            anchorCommitMessage: row.anchorCommitMessage,
+            anchorCommitAuthor: row.anchorCommitAuthor,
+            casesPassed: row.casesPassed,
+            casesTotal: row.casesTotal,
           }),
         ),
       );
