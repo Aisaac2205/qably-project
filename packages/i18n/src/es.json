@@ -407,7 +407,6 @@
     "heroFooterSubtitle_one": "Casos ejecutados en el último {{count}} día",
     "heroFooterSubtitle_other": "Casos ejecutados en los últimos {{count}} días",
     "projectsTitle": "Proyectos",
-    "projectsScrollRegionLabel": "Tabla de proyectos, desplazable",
     "projectsColProject": "Proyecto",
     "projectsColLastRun": "Última ejecución",
     "projectsColSuites": "Suites",

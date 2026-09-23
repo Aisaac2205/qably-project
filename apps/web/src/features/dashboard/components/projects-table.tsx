@@ -61,25 +61,20 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
       ) : overview.projects.length === 0 ? (
         <StateView kind="empty" title={t('dashboard.projectsEmptyTitle')} />
       ) : (
-        <div
-          role="region"
-          aria-label={t('dashboard.projectsScrollRegionLabel')}
-          tabIndex={0}
-          className="overflow-x-auto px-5 pb-5"
-        >
-          <table className="w-full min-w-xl border-collapse text-left">
+        <div className="px-5 pb-5">
+          <table className="w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-border bg-canvas">
                 <th scope="col" className="py-2.5 pr-3 text-xs font-medium text-muted">
                   {t('dashboard.projectsColProject')}
                 </th>
-                <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-muted">
+                <th scope="col" className="hidden @lg:table-cell w-20 py-2.5 px-3 text-center text-xs font-medium text-muted">
                   {t('dashboard.projectsColSuites')}
                 </th>
-                <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-muted">
+                <th scope="col" className="hidden @lg:table-cell w-20 py-2.5 px-3 text-center text-xs font-medium text-muted">
                   {t('dashboard.projectsColCases')}
                 </th>
-                <th scope="col" className="py-2.5 pl-3 text-right text-xs font-medium text-muted">
+                <th scope="col" className="w-32 py-2.5 pl-3 text-right text-xs font-medium text-muted">
                   {t('dashboard.projectsColPassRate')}
                 </th>
               </tr>
@@ -111,10 +106,10 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
+                    <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.suites}
                     </td>
-                    <td className="py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
+                    <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.cases}
                     </td>
                     <td className="py-3 pl-3">

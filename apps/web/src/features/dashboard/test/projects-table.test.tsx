@@ -105,15 +105,53 @@ describe('ProjectsTable', () => {
     expect(cell?.className).toMatch(/min-w-/)
   })
 
-  it('wraps the table in a keyboard-focusable scroll region so it never overflows the page', async () => {
+  it('never wraps the table in a scrolling region', async () => {
     await act(async () => {
       renderWithQuery(<ProjectsTable period={30} />)
     })
 
-    const region = screen.getByRole('region', { name: 'Projects table, scrollable' })
-    expect(region).toHaveAttribute('tabindex', '0')
-    expect(region).toHaveClass('overflow-x-auto')
-    expect(region.querySelector('table')).not.toBeNull()
+    const table = screen.getByRole('table')
+    expect(table).toHaveClass('table-fixed')
+    expect(table.className).not.toMatch(/min-w-xl/)
+    expect(table.closest('[tabindex]')).toBeNull()
+    expect(table.closest('.overflow-x-auto')).toBeNull()
+  })
+
+  it('hides the Suites and Cases columns below the @lg container width, header and data cells together', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectsTable period={30} />)
+    })
+
+    const table = screen.getByRole('table')
+    const suitesHeader = within(table).getByRole('columnheader', { name: 'Suites' })
+    const casesHeader = within(table).getByRole('columnheader', { name: 'Cases' })
+    expect(suitesHeader).toHaveClass('hidden', '@lg:table-cell')
+    expect(casesHeader).toHaveClass('hidden', '@lg:table-cell')
+
+    const row = within(table).getByRole('link', { name: 'Checkout Web' }).closest('tr') as HTMLElement
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[1]).toHaveClass('hidden', '@lg:table-cell')
+    expect(cells[2]).toHaveClass('hidden', '@lg:table-cell')
+    expect(cells[0]).not.toHaveClass('hidden')
+    expect(cells[3]).not.toHaveClass('hidden')
+  })
+
+  it('keeps every visible header paired with a visible data cell in each row', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectsTable period={30} />)
+    })
+
+    const table = screen.getByRole('table')
+    const headers = within(table).getAllByRole('columnheader')
+    const rows = within(table).getAllByRole('row').slice(1)
+
+    rows.forEach((row) => {
+      const cells = within(row).getAllByRole('cell')
+      expect(cells).toHaveLength(headers.length)
+      headers.forEach((header, index) => {
+        expect(cells[index].className.includes('hidden')).toBe(header.className.includes('hidden'))
+      })
+    })
   })
 
   it('shows a loading state while the overview loads', async () => {

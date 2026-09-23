@@ -407,7 +407,6 @@
     "heroFooterSubtitle_one": "Executed cases over the last {{count}} day",
     "heroFooterSubtitle_other": "Executed cases over the last {{count}} days",
     "projectsTitle": "Projects",
-    "projectsScrollRegionLabel": "Projects table, scrollable",
     "projectsColProject": "Project",
     "projectsColLastRun": "Last run",
     "projectsColSuites": "Suites",
