@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { RunSource } from '@qably/types';
 import { humanizeTestName } from '@qably/test-naming';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
@@ -25,6 +25,7 @@ import type { IngestCaseInput, IngestRunInput } from './runs.schemas';
 
 const ALLOWED_SOURCES: readonly RunSource[] = ['api', 'github_actions'];
 const UNIQUE_VIOLATION = 'P2002';
+const AUTOMATION_KEY_MIGRATION_SAVEPOINT = 'automation_key_migration';
 
 function isSourceAllowed(source: RunSource): boolean {
   return ALLOWED_SOURCES.includes(source);
@@ -52,9 +53,11 @@ interface AdoptionTx {
   };
   testCase: {
     findMany: PrismaService['testCase']['findMany'];
+    findFirst: PrismaService['testCase']['findFirst'];
     createMany: PrismaService['testCase']['createMany'];
     update: PrismaService['testCase']['update'];
   };
+  $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
 }
 
 interface RawCaseRef {
@@ -80,6 +83,8 @@ interface CaseReloadTx {
 
 @Injectable()
 export class RunsService {
+  private readonly logger = new Logger(RunsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsPublisher,
@@ -374,8 +379,7 @@ export class RunsService {
       }
     }
 
-    interface CaseBackfillPatch {
-      automationKey?: string;
+    interface SafeBackfillPatch {
       automationFilePath?: string;
       automationClassName?: string;
     }
@@ -385,7 +389,8 @@ export class RunsService {
     );
 
     const resultByKey = new Map<string, string>();
-    const updatesById = new Map<string, CaseBackfillPatch>();
+    const safeBackfillById = new Map<string, SafeBackfillPatch>();
+    const keyMigrationById = new Map<string, string>();
     const missingKeys: string[] = [];
 
     for (const key of keys) {
@@ -447,38 +452,46 @@ export class RunsService {
 
       resultByKey.set(key, match.id);
 
-      const patch: CaseBackfillPatch = {};
-      if (needsKeyBackfill || claimsLegacyRow) patch.automationKey = key;
+      if (needsKeyBackfill || claimsLegacyRow) {
+        keyMigrationById.set(match.id, key);
+      }
+
+      const safePatch: SafeBackfillPatch = {};
       if (
         (match.automationFilePath ?? null) === null &&
         ref.filePath !== undefined
       ) {
-        patch.automationFilePath = ref.filePath;
+        safePatch.automationFilePath = ref.filePath;
       }
       if (
         (match.automationClassName ?? null) === null &&
         ref.className !== undefined
       ) {
-        patch.automationClassName = ref.className;
+        safePatch.automationClassName = ref.className;
       }
 
-      if (Object.keys(patch).length > 0) {
-        updatesById.set(match.id, {
-          ...(updatesById.get(match.id) ?? {}),
-          ...patch,
+      if (Object.keys(safePatch).length > 0) {
+        safeBackfillById.set(match.id, {
+          ...(safeBackfillById.get(match.id) ?? {}),
+          ...safePatch,
         });
       }
     }
 
-    if (updatesById.size > 0) {
+    if (safeBackfillById.size > 0) {
       await Promise.all(
-        [...updatesById.entries()].map(async ([id, data]) => {
-          try {
-            await tx.testCase.update({ where: { id }, data });
-          } catch (error) {
-            if (!isUniqueViolation(error)) throw error;
-          }
-        }),
+        [...safeBackfillById.entries()].map(([id, data]) =>
+          tx.testCase.update({ where: { id }, data }),
+        ),
+      );
+    }
+
+    if (keyMigrationById.size > 0) {
+      await this.migrateAutomationKeys(
+        tx,
+        suiteId,
+        keyMigrationById,
+        resultByKey,
       );
     }
 
@@ -525,5 +538,48 @@ export class RunsService {
     }
 
     return resultByKey;
+  }
+
+  private async migrateAutomationKeys(
+    tx: AdoptionTx,
+    suiteId: string,
+    keyMigrationById: Map<string, string>,
+    resultByKey: Map<string, string>,
+  ): Promise<void> {
+    for (const [id, key] of keyMigrationById) {
+      await tx.$executeRawUnsafe(
+        `SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
+      );
+
+      try {
+        await tx.testCase.update({
+          where: { id },
+          data: { automationKey: key },
+        });
+        await tx.$executeRawUnsafe(
+          `RELEASE SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
+        );
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error;
+
+        await tx.$executeRawUnsafe(
+          `ROLLBACK TO SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
+        );
+        await tx.$executeRawUnsafe(
+          `RELEASE SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
+        );
+
+        const owner = await tx.testCase.findFirst({
+          where: { suiteId, automationKey: key },
+          select: { id: true },
+        });
+
+        this.logger.warn(
+          `automation key migration for test case ${id} in suite ${suiteId} lost a race to a concurrent ingest that already claimed automationKey "${key}"; linking this run to the composite owner ${owner?.id ?? 'unknown'} instead`,
+        );
+
+        if (owner !== null) resultByKey.set(key, owner.id);
+      }
+    }
   }
 }

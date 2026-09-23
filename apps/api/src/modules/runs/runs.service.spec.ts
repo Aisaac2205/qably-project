@@ -56,6 +56,7 @@ interface FakePrisma {
   };
   testCase: {
     findMany: jest.Mock;
+    findFirst: jest.Mock;
     createMany: jest.Mock;
     update: jest.Mock;
   };
@@ -67,6 +68,7 @@ interface FakePrisma {
   };
   txRunCaseFindMany: jest.Mock;
   $transaction: jest.Mock;
+  $executeRawUnsafe: jest.Mock;
 }
 
 function createPrisma(): FakePrisma {
@@ -83,6 +85,7 @@ function createPrisma(): FakePrisma {
     },
     testCase: {
       findMany: jest.fn().mockResolvedValue(officialCases),
+      findFirst: jest.fn().mockResolvedValue(null),
       createMany: jest.fn().mockResolvedValue({ count: 0 }),
       update: jest.fn().mockResolvedValue({}),
     },
@@ -94,6 +97,7 @@ function createPrisma(): FakePrisma {
     },
     txRunCaseFindMany: jest.fn().mockResolvedValue([caseRow({})]),
     $transaction: jest.fn(),
+    $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
   };
 
   prisma.$transaction.mockImplementation((run: (tx: unknown) => unknown) =>
@@ -106,6 +110,7 @@ function createPrisma(): FakePrisma {
         createManyAndReturn: prisma.runCase.createManyAndReturn,
         findMany: prisma.txRunCaseFindMany,
       },
+      $executeRawUnsafe: prisma.$executeRawUnsafe,
     }),
   );
 
@@ -761,10 +766,13 @@ describe('RunsService.ingest normalized automationKey matching', () => {
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-1' },
       data: {
-        automationKey: 'Checkout::Adds to cart',
         automationFilePath: 'e2e/checkout.spec.ts',
         automationClassName: 'Checkout',
       },
+    });
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { automationKey: 'Checkout::Adds to cart' },
     });
   });
 
@@ -797,10 +805,11 @@ describe('RunsService.ingest normalized automationKey matching', () => {
 
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-1' },
-      data: {
-        automationKey: 'Checkout::Adds to cart',
-        automationClassName: 'Checkout',
-      },
+      data: { automationClassName: 'Checkout' },
+    });
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { automationKey: 'Checkout::Adds to cart' },
     });
   });
 });
@@ -997,10 +1006,13 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
     expect(prisma.testCase.createMany).not.toHaveBeenCalled();
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-1' },
+      data: { automationClassName: 'tests.checkout.test_checkout' },
+    });
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
       data: {
         automationKey:
           'tests.checkout.test_checkout::test_add_item_updates_total',
-        automationClassName: 'tests.checkout.test_checkout',
       },
     });
     const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
@@ -1009,7 +1021,7 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
     expect(call[0].data[0].testCaseId).toBe('case-1');
   });
 
-  it('never throws when the legacy-row migration loses a race to a concurrent ingest that already claimed the same composite key', async () => {
+  it('links this run to the composite owner instead of the stale legacy row when the legacy-row migration loses a race to a concurrent ingest that already claimed the same composite key', async () => {
     const prisma = createPrisma();
     prisma.testCase.findMany.mockResolvedValueOnce([
       {
@@ -1019,7 +1031,10 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
         executionMode: 'automated',
       },
     ]);
-    prisma.testCase.update.mockRejectedValueOnce({ code: 'P2002' });
+    prisma.testCase.update
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce({ code: 'P2002' });
+    prisma.testCase.findFirst.mockResolvedValueOnce({ id: 'case-winner' });
 
     const result = await build(prisma).ingest(apiKey, {
       ...baseInput,
@@ -1035,10 +1050,18 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
     });
 
     expect(result.ok).toBe(true);
+    expect(prisma.testCase.findFirst).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-1',
+        automationKey:
+          'tests.checkout.test_checkout::test_add_item_updates_total',
+      },
+      select: { id: true },
+    });
     const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
       [{ data: { testCaseId: string | null }[] }],
     ];
-    expect(call[0].data[0].testCaseId).toBe('case-1');
+    expect(call[0].data[0].testCaseId).toBe('case-winner');
   });
 
   it('backfills a pre-automationKey case with the composite key, not the legacy name, so future reports match the richer identity', async () => {
@@ -1067,8 +1090,11 @@ describe('RunsService.ingest case identity (composite classname + name)', () => 
 
     expect(prisma.testCase.update).toHaveBeenCalledWith({
       where: { id: 'case-1' },
+      data: { automationClassName: 'tests.checkout.test_checkout' },
+    });
+    expect(prisma.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
       data: {
-        automationClassName: 'tests.checkout.test_checkout',
         automationKey: 'tests.checkout.test_checkout::Add item updates total',
       },
     });

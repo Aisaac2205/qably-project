@@ -216,12 +216,27 @@ different `className`s — `findLegacyKeyCollisions`
 none of them claims it or backfills its key. A composite identity in that situation still gets its own
 new draft case under its own distinct composite key (safe — it cannot collide with the contested bare
 name); a plain identity does not get drafted at all, because drafting under the exact bare name would
-just silently re-claim whichever row already holds it. The contested bare name is still reported in
-the response's `caseIdentityCollisions` (see "Response" above), the same field
-`findCaseIdentityCollisions` uses, so a human can rename one of the colliding tests. The migration
-above is also race-safe: a `P2002` on the migrating `testCase.update` (two concurrent ingests
-migrating the same row to the same composite key) is swallowed, since both writes are idempotent —
-same target value.
+just silently re-claim whichever row already holds it.
+
+**This is not the same collision set as `caseIdentityCollisions`, and it is not surfaced today.**
+`findLegacyKeyCollisions` runs only inside `RunsService.ensureOfficialCases`, which executes inside
+the ingest transaction on the worker (`RunIngestProcessor`) — after `POST /runs/ingest/junit` has
+already answered `202`. The response's `caseIdentityCollisions` field (see "Response" above) is
+`findCaseIdentityCollisions` output computed synchronously in the controller, before any job is
+enqueued, and it never includes a legacy-key collision: that check has nothing to read from yet at
+that point, since it needs the suite's existing `TestCase` rows, which only load inside the worker's
+transaction. A legacy-key collision is therefore silently unlinked with no signal to the caller at
+all today — no `202` field, no `::warning::` annotation, no log line. Making this visible needs the
+same design work as the paragraph below ("Collisions are not persisted"): a later `/review-inbox` SDD
+should decide how a legacy-key collision is surfaced, alongside the in-batch collisions
+`caseIdentityCollisions` already reports.
+
+The migration itself is race-safe independently of whether a collision was reported: on a `P2002`
+from the migrating `testCase.update` (a concurrent ingest already claimed the same composite
+`automationKey` on a different row), the transaction rolls back to a savepoint, re-reads the row that
+actually owns that key in the suite, and links this run's result to that row instead — the legacy row
+being migrated is left untouched rather than silently keeping a stale link. See
+`RunsService.migrateAutomationKeys`.
 
 **Collisions are never merged silently.** If two differently-reported cases (different `name`,
 different `className`, or both) resolve to the identical identity key within the same suite,
