@@ -86,15 +86,16 @@ export function Sparkline({
       initialDimension={{ width, height }}
       width={width}
       height={height}
+      role="img"
+      aria-label={label}
       className={cn('aspect-auto', className)}
       style={{ width, height }}
     >
       <ComposedChart
         data={data}
-        role="img"
-        aria-label={label}
         accessibilityLayer={false}
         tabIndex={-1}
+        aria-hidden="true"
         margin={{ top: INSET, right: INSET, bottom: INSET, left: INSET }}
       >
         <defs>

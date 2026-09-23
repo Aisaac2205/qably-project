@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LineChart, Line } from 'recharts'
 import { ChartContainer, ChartTooltipContent, ChartLegendContent, type ChartConfig } from '../chart'
 
@@ -14,6 +14,48 @@ const data = [
 ]
 
 describe('ChartContainer', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the accessible role and label mounted when a real ResizeObserver reports a zero-size box', () => {
+    class ZeroSizeResizeObserver {
+      private readonly callback: ResizeObserverCallback
+
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback
+      }
+
+      observe() {
+        this.callback(
+          [{ contentRect: { width: 0, height: 0 } } as ResizeObserverEntry],
+          this as unknown as ResizeObserver,
+        )
+      }
+
+      unobserve() {}
+      disconnect() {}
+    }
+
+    vi.stubGlobal('ResizeObserver', ZeroSizeResizeObserver)
+
+    const { container } = render(
+      <ChartContainer
+        config={config}
+        initialDimension={{ width: 480, height: 240 }}
+        role="img"
+        aria-label="Weekly trend"
+      >
+        <LineChart data={data}>
+          <Line dataKey="current" />
+        </LineChart>
+      </ChartContainer>,
+    )
+
+    expect(screen.getByRole('img', { name: 'Weekly trend' })).toBeInTheDocument()
+    expect(container.querySelector('.recharts-surface')).not.toBeInTheDocument()
+  })
+
   it('renders its recharts child without a ResizeObserver by falling back to initialDimension', () => {
     const { container } = render(
       <ChartContainer config={config} initialDimension={{ width: 480, height: 240 }}>
