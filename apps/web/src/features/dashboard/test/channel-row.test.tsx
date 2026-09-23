@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { DashboardWebhookChannel } from '@qably/types'
+import { useI18nStore, type Locale } from '@/lib/i18n'
 import { ChannelRow } from '@/features/dashboard/components/channel-row'
 
 vi.mock('next/image', () => ({
@@ -23,6 +24,10 @@ function webhook(overrides: Partial<DashboardWebhookChannel>): DashboardWebhookC
 }
 
 describe('ChannelRow', () => {
+  beforeEach(() => {
+    useI18nStore.setState({ locale: 'en' })
+  })
+
   it('shows the official logo for the webhook type', () => {
     const { container } = render(<ChannelRow webhook={webhook({ type: 'slack' })} />)
     const image = container.querySelector('img')
@@ -41,18 +46,40 @@ describe('ChannelRow', () => {
     expect(screen.getByText('Run failed, Run completed')).toBeInTheDocument()
   })
 
-  it('shows the sent and failed totals as combined counted copy', () => {
-    render(<ChannelRow webhook={webhook({ sent: 12, failed: 2 })} />)
-    expect(screen.getByTestId('channel-sent-count')).toHaveTextContent('12 sent')
-    expect(screen.getByTestId('channel-failed-count')).toHaveTextContent('2 failed')
+  it.each<[Locale, number, string, string]>([
+    ['en', 1, '1 sent', 'sent'],
+    ['en', 0, '0 sent', 'sent'],
+    ['es', 1, '1 enviado', 'enviado'],
+    ['es', 0, '0 enviados', 'enviados'],
+  ])('announces the sent stat as one %s phrase for count %i, with "%s" as the visible unit', (locale, sent, phrase, unit) => {
+    useI18nStore.setState({ locale })
+    render(<ChannelRow webhook={webhook({ sent, failed: 2 })} />)
+
+    const stat = screen.getByTestId('channel-sent-count')
+    expect(within(stat).getByText(phrase, { selector: '.sr-only' })).toBeInTheDocument()
+    expect(within(stat).getByText(unit)).toBeInTheDocument()
   })
 
-  it('colours the failed count by fail tone when nonzero and pass tone at zero', () => {
+  it.each<[Locale, number, string, string]>([
+    ['en', 1, '1 failed', 'failed'],
+    ['en', 0, '0 failed', 'failed'],
+    ['es', 1, '1 fallido', 'fallido'],
+    ['es', 0, '0 fallidos', 'fallidos'],
+  ])('announces the failed stat as one %s phrase for count %i, with "%s" as the visible unit', (locale, failed, phrase, unit) => {
+    useI18nStore.setState({ locale })
+    render(<ChannelRow webhook={webhook({ sent: 12, failed })} />)
+
+    const stat = screen.getByTestId('channel-failed-count')
+    expect(within(stat).getByText(phrase, { selector: '.sr-only' })).toBeInTheDocument()
+    expect(within(stat).getByText(unit)).toBeInTheDocument()
+  })
+
+  it('colours the failed value by fail tone when nonzero and pass tone at zero', () => {
     const { rerender } = render(<ChannelRow webhook={webhook({ sent: 12, failed: 2 })} />)
-    expect(screen.getByTestId('channel-failed-count')).toHaveClass('text-fail')
+    expect(within(screen.getByTestId('channel-failed-count')).getByText('2')).toHaveClass('text-qb-fail')
 
     rerender(<ChannelRow webhook={webhook({ sent: 12, failed: 0 })} />)
-    expect(screen.getByTestId('channel-failed-count')).toHaveClass('text-pass')
+    expect(within(screen.getByTestId('channel-failed-count')).getByText('0')).toHaveClass('text-qb-pass')
   })
 
   it('renders the 14-day delivery bars', () => {

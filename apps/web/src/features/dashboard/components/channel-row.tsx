@@ -1,9 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import { DeliveryBars } from '@qably/ui/dashboard'
+import { ChannelStat, DeliveryBars } from '@qably/ui/dashboard'
 import type { DashboardWebhookChannel, NotificationWebhookType } from '@qably/types'
-import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
 const LOGO_SRC: Record<NotificationWebhookType, string> = {
@@ -41,16 +40,20 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="flex w-20 flex-col items-end gap-0.5 tabular-nums">
-          <span className="font-mono text-sm font-medium text-default" data-testid="channel-sent-count">
-            {t('dashboard.channelsSentCount', { count: webhook.sent })}
-          </span>
-          <span
-            className={cn('font-mono text-xs', webhook.failed > 0 ? 'text-fail' : 'text-pass')}
+        <div className="flex shrink-0 items-end gap-3">
+          <ChannelStat
+            value={webhook.sent}
+            unit={t('dashboard.channelsSentUnit', { count: webhook.sent })}
+            srText={t('dashboard.channelsSentCount', { count: webhook.sent })}
+            data-testid="channel-sent-count"
+          />
+          <ChannelStat
+            value={webhook.failed}
+            unit={t('dashboard.channelsFailedUnit', { count: webhook.failed })}
+            srText={t('dashboard.channelsFailedCount', { count: webhook.failed })}
+            tone={webhook.failed > 0 ? 'fail' : 'pass'}
             data-testid="channel-failed-count"
-          >
-            {t('dashboard.channelsFailedCount', { count: webhook.failed })}
-          </span>
+          />
         </div>
       </div>
     </div>

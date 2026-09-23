@@ -51,10 +51,10 @@ describe('ChannelsCard', () => {
 
     expect(screen.getByText('Email')).toBeInTheDocument()
     expect(screen.getByText('Case regressed, Connection security')).toBeInTheDocument()
-    const sentCounts = screen.getAllByTestId('channel-sent-count').map((el) => el.textContent)
-    const failedCounts = screen.getAllByTestId('channel-failed-count').map((el) => el.textContent)
-    expect(sentCounts).toContain('12 sent')
-    expect(failedCounts).toContain('1 failed')
+    const sentStats = screen.getAllByTestId('channel-sent-count')
+    const failedStats = screen.getAllByTestId('channel-failed-count')
+    expect(sentStats.some((stat) => within(stat).queryByText('12 sent', { selector: '.sr-only' }))).toBe(true)
+    expect(failedStats.some((stat) => within(stat).queryByText('1 failed', { selector: '.sr-only' }))).toBe(true)
     expect(
       screen.getByRole('img', { name: 'Email deliveries over the last 14 days' }),
     ).toBeInTheDocument()
@@ -84,8 +84,12 @@ describe('ChannelsCard', () => {
     })
 
     expect(screen.getByText('Qably')).toBeInTheDocument()
-    expect(screen.getByTestId('in-app-sent-count')).toHaveTextContent('9 sent')
-    expect(screen.getByTestId('in-app-unread-count')).toHaveTextContent('3 unread')
+    expect(
+      within(screen.getByTestId('in-app-sent-count')).getByText('9 sent', { selector: '.sr-only' }),
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByTestId('in-app-unread-count')).getByText('3 unread', { selector: '.sr-only' }),
+    ).toBeInTheDocument()
   })
 
   it('uses the Qably app icon, decorative, for the in-app row', async () => {

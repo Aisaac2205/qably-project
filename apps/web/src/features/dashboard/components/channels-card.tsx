@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { DeliveryBars } from '@qably/ui/dashboard'
+import { ChannelStat, DeliveryBars } from '@qably/ui/dashboard'
 import type { DashboardEmailChannel, DashboardInAppChannel } from '@qably/types'
 import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -11,7 +11,6 @@ import { useDashboardChannels } from '@/features/dashboard/hooks/use-dashboard-c
 import { resolveLastDeliveryWebhookName } from '@/features/dashboard/lib/resolve-last-delivery'
 import { formatRelativeTime, type FormatLocale } from '@/features/dashboard/lib/format'
 import { ChannelRow } from '@/features/dashboard/components/channel-row'
-import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
 const SKELETON_ROWS = 3
@@ -49,13 +48,20 @@ function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="flex w-20 flex-col items-end gap-0.5 tabular-nums">
-          <span className="font-mono text-sm font-medium text-default" data-testid="in-app-sent-count">
-            {t('dashboard.channelsSentCount', { count: inApp.sent })}
-          </span>
-          <span className="font-mono text-xs text-muted" data-testid="in-app-unread-count">
-            {t('dashboard.channelsUnreadCount', { count: inApp.unread })}
-          </span>
+        <div className="flex shrink-0 items-end gap-3">
+          <ChannelStat
+            value={inApp.sent}
+            unit={t('dashboard.channelsSentUnit', { count: inApp.sent })}
+            srText={t('dashboard.channelsSentCount', { count: inApp.sent })}
+            data-testid="in-app-sent-count"
+          />
+          <ChannelStat
+            value={inApp.unread}
+            unit={t('dashboard.channelsUnreadUnit', { count: inApp.unread })}
+            srText={t('dashboard.channelsUnreadCount', { count: inApp.unread })}
+            tone="muted"
+            data-testid="in-app-unread-count"
+          />
         </div>
       </div>
     </div>
@@ -89,16 +95,20 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="flex w-20 flex-col items-end gap-0.5 tabular-nums">
-          <span className="font-mono text-sm font-medium text-default" data-testid="channel-sent-count">
-            {t('dashboard.channelsSentCount', { count: email.sent })}
-          </span>
-          <span
-            className={cn('font-mono text-xs', email.failed > 0 ? 'text-fail' : 'text-pass')}
+        <div className="flex shrink-0 items-end gap-3">
+          <ChannelStat
+            value={email.sent}
+            unit={t('dashboard.channelsSentUnit', { count: email.sent })}
+            srText={t('dashboard.channelsSentCount', { count: email.sent })}
+            data-testid="channel-sent-count"
+          />
+          <ChannelStat
+            value={email.failed}
+            unit={t('dashboard.channelsFailedUnit', { count: email.failed })}
+            srText={t('dashboard.channelsFailedCount', { count: email.failed })}
+            tone={email.failed > 0 ? 'fail' : 'pass'}
             data-testid="channel-failed-count"
-          >
-            {t('dashboard.channelsFailedCount', { count: email.failed })}
-          </span>
+          />
         </div>
       </div>
     </div>
