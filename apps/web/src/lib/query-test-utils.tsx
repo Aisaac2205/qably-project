@@ -12,6 +12,8 @@ import { computeSuiteMetrics, runFixtures, suiteNameById } from '@/test/runs-api
 import { projectFixtures } from '@/test/projects-api-stub'
 import { organizationFixtures } from '@/test/organizations-api-stub'
 import {
+  dashboardChannelsFixture,
+  dashboardOverviewFixture,
   dashboardSummaryFixture,
   traceabilityCalendarFixture,
 } from '@/test/dashboard-api-stub'
@@ -148,6 +150,21 @@ function seedTraceability(client: QueryClient): void {
   )
 }
 
+function seedDashboardOverview(client: QueryClient): void {
+  const record = structuredClone(dashboardOverviewFixture)
+
+  client.setQueryData(
+    dashboardKeys.overview(record.period, 'all', getBrowserTimeZone()),
+    record,
+  )
+}
+
+function seedDashboardChannels(client: QueryClient): void {
+  const record = structuredClone(dashboardChannelsFixture)
+
+  client.setQueryData(dashboardKeys.channels(getBrowserTimeZone()), record)
+}
+
 function seedProposals(client: QueryClient): void {
   client.setQueryData(reviewKeys.list(), proposalListFixtures())
 
@@ -217,6 +234,8 @@ export function createTestQueryClient(): QueryClient {
   seedOrganizations(client)
   seedDashboardSummary(client)
   seedTraceability(client)
+  seedDashboardOverview(client)
+  seedDashboardChannels(client)
   seedProposals(client)
   seedDuplicates(client)
 

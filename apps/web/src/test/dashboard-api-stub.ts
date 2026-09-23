@@ -1,5 +1,7 @@
 import type {
   CiCommitActivityRecord,
+  DashboardChannelsRecord,
+  DashboardOverviewRecord,
   DashboardSummaryRecord,
   RunSummaryRecord,
   TraceabilityCalendarRecord,
@@ -132,4 +134,95 @@ export const traceabilityCalendarFixture: TraceabilityCalendarRecord = {
 
 export function getTraceabilityCalendar(): Promise<TraceabilityCalendarRecord> {
   return Promise.resolve(traceabilityCalendarFixture)
+}
+
+export const dashboardOverviewFixture: DashboardOverviewRecord = {
+  period: 30,
+  timeZone: 'America/Guatemala',
+  kpis: {
+    passRate: { value: 0.82, previous: 0.75, series: [0.8, 0.85, null, 0.9] },
+    runs: { value: 42, previous: 35, series: [10, 12, 0, 20] },
+    failedCases: { value: 6, previous: 9, series: [2, 1, 0, 3] },
+    avgRunDurationMs: {
+      value: 184320,
+      previous: 210500,
+      series: [180000, 190000, null, 185000],
+    },
+  },
+  passRateSeries: {
+    current: [
+      { date: '2026-06-13', passRate: 0.8, runs: 10, failedRuns: 2 },
+      { date: '2026-06-14', passRate: 0.85, runs: 12, failedRuns: 1 },
+      { date: '2026-06-15', passRate: null, runs: 0, failedRuns: 0 },
+      { date: '2026-06-16', passRate: 0.9, runs: 20, failedRuns: 3 },
+    ],
+    previous: [
+      { date: '2026-05-14', passRate: 0.7, runs: 8, failedRuns: 2 },
+      { date: '2026-05-15', passRate: 0.75, runs: 9, failedRuns: 2 },
+      { date: '2026-05-16', passRate: null, runs: 0, failedRuns: 0 },
+      { date: '2026-05-17', passRate: 0.78, runs: 10, failedRuns: 2 },
+    ],
+  },
+  casesPassing: { total: 120, pending: 0, running: 0, pass: 98, fail: 12, skip: 5, blocked: 5 },
+  projects: [
+    {
+      id: 'project-1',
+      name: 'Checkout Web',
+      suites: 3,
+      cases: 40,
+      passRate: 0.82,
+      lastRunAt: '2026-06-16T10:00:00.000Z',
+    },
+  ],
+  recentRuns: [
+    {
+      id: 'run-1',
+      projectId: 'project-1',
+      projectName: 'Checkout Web',
+      suiteId: 'suite-1',
+      suiteName: 'Checkout',
+      name: 'Checkout regression',
+      status: 'pass',
+      source: 'github_actions',
+      startedAt: '2026-06-16T10:00:00.000Z',
+      finishedAt: '2026-06-16T10:12:00.000Z',
+      commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
+      commitMessage: 'fix(ci): retry throttled run reports',
+      commitAuthor: 'Aisaac2205',
+      passRate: 1,
+    },
+  ],
+}
+
+export function getDashboardOverview(): Promise<DashboardOverviewRecord> {
+  return Promise.resolve(dashboardOverviewFixture)
+}
+
+export const dashboardChannelsFixture: DashboardChannelsRecord = {
+  webhooks: [
+    {
+      id: 'webhook-1',
+      type: 'slack',
+      name: 'Team Slack',
+      eventTypes: ['run_failed'],
+      sent: 12,
+      failed: 2,
+      daily: Array.from({ length: 14 }, (_, index) => ({
+        date: `2026-06-${String(index + 3).padStart(2, '0')}`,
+        sent: index === 13 ? 0 : 1,
+        failed: index === 13 ? 2 : 0,
+      })),
+    },
+  ],
+  email: { enabled: true, eventTypes: ['case_regressed', 'connection_security'] },
+  lastDelivery: {
+    webhookId: 'webhook-1',
+    eventType: 'run_failed',
+    status: 'sent',
+    deliveredAt: '2026-06-15T10:00:00.000Z',
+  },
+}
+
+export function getDashboardChannels(): Promise<DashboardChannelsRecord> {
+  return Promise.resolve(dashboardChannelsFixture)
 }
