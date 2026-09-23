@@ -39,13 +39,14 @@ describe('CasesGaugeCard', () => {
     expect(meter).toHaveAttribute('aria-valuenow', '85')
   })
 
-  it('uses font-medium and tracking-tight for the gauge value, not font-semibold, per the mockup', async () => {
+  it('uses text-2xl font-medium and tracking-tight for the gauge value, never text-3xl or font-semibold, so it never overlaps the arc', async () => {
     await act(async () => {
       renderWithQuery(<CasesGaugeCard period={30} />)
     })
 
     const value = screen.getByText('85%')
-    expect(value).toHaveClass('font-medium', 'tracking-tight')
+    expect(value).toHaveClass('text-2xl', 'font-medium', 'tracking-tight')
+    expect(value).not.toHaveClass('text-3xl')
     expect(value).not.toHaveClass('font-semibold')
   })
 

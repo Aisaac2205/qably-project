@@ -571,6 +571,63 @@ describe('Dashboard (e2e)', () => {
       ]);
     });
 
+    it('reports executed/passed/failed/blocked per day, derived from the same run_case status aggregation as passRate', async () => {
+      prisma.$queryRaw.mockImplementation(
+        queryRawRouter({
+          caseCounts: [
+            {
+              projectId: 'project-1',
+              window: 'current',
+              day: '2026-06-16',
+              status: 'pass',
+              count: 6,
+            },
+            {
+              projectId: 'project-1',
+              window: 'current',
+              day: '2026-06-16',
+              status: 'fail',
+              count: 2,
+            },
+            {
+              projectId: 'project-1',
+              window: 'current',
+              day: '2026-06-16',
+              status: 'blocked',
+              count: 1,
+            },
+          ],
+        }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .expect(200);
+
+      const body = response.body as {
+        passRateSeries: {
+          current: {
+            date: string;
+            executed: number;
+            passed: number;
+            failed: number;
+            blocked: number;
+          }[];
+        };
+      };
+
+      const day = body.passRateSeries.current.find(
+        (point) => point.date === '2026-06-16',
+      );
+
+      expect(day).toMatchObject({
+        executed: 9,
+        passed: 6,
+        failed: 2,
+        blocked: 1,
+      });
+    });
+
     it('scopes results to a single project when projectId is given', async () => {
       await request(app.getHttpServer())
         .get('/dashboard/overview?period=7&projectId=project-1')

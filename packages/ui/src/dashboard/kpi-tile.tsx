@@ -27,11 +27,11 @@ export function KpiTile({ label, value, delta, className, children }: KpiTilePro
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col rounded-xl border border-qb-border bg-qb-surface px-5 py-4',
+        '@container flex min-w-0 flex-col rounded-xl border border-qb-border bg-qb-surface px-5 py-4',
         className,
       )}
     >
-      <div className="flex items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 @[220px]:flex-row @[220px]:items-end @[220px]:justify-between">
         <div className="flex min-w-0 flex-col">
           <dd className="text-2xl font-medium leading-none tracking-tight text-qb-fg tabular-nums">{value}</dd>
           <dt className="mt-2 truncate text-xs font-medium text-qb-muted">{label}</dt>

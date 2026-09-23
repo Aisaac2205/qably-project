@@ -178,6 +178,10 @@ function toDailyPoint(bucket: DayAggregate): DailyPoint {
     passRate: computePassRate(bucket.counts),
     runs: bucket.runs,
     failedRuns: bucket.failedRuns,
+    executed: bucket.counts.total,
+    passed: bucket.counts.pass,
+    failed: bucket.counts.fail,
+    blocked: bucket.counts.blocked,
   };
 }
 

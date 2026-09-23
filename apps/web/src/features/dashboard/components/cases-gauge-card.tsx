@@ -57,7 +57,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
         ) : (
           <>
             <Gauge value={Math.round(rate * 100)} label={t('dashboard.casesGaugeLabel')}>
-              <span className="text-3xl font-medium tracking-tight tabular-nums text-default">
+              <span className="text-2xl font-medium tracking-tight tabular-nums text-default">
                 {Math.round(rate * 100)}%
               </span>
             </Gauge>

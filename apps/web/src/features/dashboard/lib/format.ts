@@ -50,6 +50,13 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat('en-US').format(n)
 }
 
+export function formatCompactNumber(value: number, locale: 'es' | 'en'): string {
+  return new Intl.NumberFormat(locale === 'es' ? 'es-ES' : 'en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
 export function formatEventCount(value: number, locale: 'es' | 'en'): string {
   const separator = locale === 'es' ? '.' : ','
   const sign = value < 0 ? '-' : ''

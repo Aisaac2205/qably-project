@@ -451,6 +451,10 @@ export interface DailyPoint {
   passRate: number | null
   runs: number
   failedRuns: number
+  executed: number
+  passed: number
+  failed: number
+  blocked: number
 }
 
 export interface DashboardProjectRow {

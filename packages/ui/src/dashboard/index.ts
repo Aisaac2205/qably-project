@@ -15,11 +15,6 @@ export {
   type ChartDataTableColumn,
   type ChartDataTableProps,
 } from './chart-data-table'
-export {
-  ComparisonAreaChart,
-  type ComparisonAreaChartProps,
-  type ComparisonAreaPoint,
-} from './comparison-area-chart'
 export { Gauge, type GaugeProps } from './gauge'
 export { PassRateBar, type PassRateBarProps } from './pass-rate-bar'
 export { DeliveryBars, type DeliveryBarPoint, type DeliveryBarsProps } from './delivery-bars'

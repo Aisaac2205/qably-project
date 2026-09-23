@@ -83,15 +83,23 @@ describe('KpiTile', () => {
     expect(screen.getByText('+5%').closest('div')).toHaveClass('mt-3')
   })
 
-  it('aligns caller-supplied children, such as a sparkline, to the bottom-right of the tile', () => {
-    const { container } = render(
+  it('stacks children below the value by default, and aligns them to the bottom-right once the tile container is at least 220px wide', () => {
+    render(
       <KpiTile label="Runs" value={87}>
         <svg data-testid="child-sparkline" />
       </KpiTile>,
     )
 
-    const row = container.querySelector('.items-end')
-    expect(row).toBeInTheDocument()
+    const sparkline = screen.getByTestId('child-sparkline')
+    const row = sparkline.parentElement?.parentElement
+    expect(row).toHaveClass('flex-col')
+    expect(row).toHaveClass('@[220px]:flex-row', '@[220px]:items-end', '@[220px]:justify-between')
     expect(row?.querySelector('[data-testid="child-sparkline"]')).toBeInTheDocument()
+  })
+
+  it('is its own container query context, so its internal layout responds to its own width, not the grid it sits in', () => {
+    const { container } = render(<KpiTile label="Runs" value={87} />)
+
+    expect(container.querySelector('.\\@container')).toBeInTheDocument()
   })
 })

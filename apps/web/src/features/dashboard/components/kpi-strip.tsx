@@ -52,7 +52,7 @@ export function KpiStrip({ period, projectId }: KpiStripProps) {
   if (isLoading) {
     return (
       <StripShell label={stripLabel}>
-        <dl className="grid grid-cols-1 gap-3 @md:grid-cols-2 @2xl:grid-cols-4">
+        <dl className="grid grid-cols-1 gap-3 @xs:grid-cols-2 @2xl:grid-cols-4">
           {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
             <Skeleton key={index} className="h-[120px] rounded-xl" />
           ))}
@@ -98,7 +98,7 @@ export function KpiStrip({ period, projectId }: KpiStripProps) {
 
   return (
     <StripShell label={stripLabel}>
-      <dl className="grid grid-cols-1 gap-3 @md:grid-cols-2 @2xl:grid-cols-4">
+      <dl className="grid grid-cols-1 gap-3 @xs:grid-cols-2 @2xl:grid-cols-4">
         <KpiTile
           label={passRateLabel}
           value={formatKpiValue('passRate', overview.kpis.passRate.value)}

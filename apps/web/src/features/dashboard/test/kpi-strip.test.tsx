@@ -58,14 +58,15 @@ describe('KpiStrip', () => {
     expect(screen.getByRole('img', { name: 'Pass rate trend over the selected period' })).toBeInTheDocument()
   })
 
-  it('lays the tiles out one per row on a narrow container, two then four as it widens', async () => {
+  it('lays the tiles out one per row on a narrow container, two columns by 390px width, four as it widens further', async () => {
     await act(async () => {
       renderWithQuery(<KpiStrip period={30} />)
     })
     const dl = document.querySelector('dl')
     expect(dl).toHaveClass('grid-cols-1')
-    expect(dl).toHaveClass('@md:grid-cols-2')
+    expect(dl).toHaveClass('@xs:grid-cols-2')
     expect(dl).toHaveClass('@2xl:grid-cols-4')
+    expect(dl).not.toHaveClass('@md:grid-cols-2')
   })
 
   it('caps content width with the dashboard token, never an arbitrary value', async () => {

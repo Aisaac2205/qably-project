@@ -48,8 +48,26 @@ describe('buildDashboardOverview daily granularity', () => {
     });
 
     expect(record.passRateSeries.current).toEqual([
-      { date: '2026-06-10', passRate: null, runs: 0, failedRuns: 0 },
-      { date: '2026-06-11', passRate: null, runs: 0, failedRuns: 0 },
+      {
+        date: '2026-06-10',
+        passRate: null,
+        runs: 0,
+        failedRuns: 0,
+        executed: 0,
+        passed: 0,
+        failed: 0,
+        blocked: 0,
+      },
+      {
+        date: '2026-06-11',
+        passRate: null,
+        runs: 0,
+        failedRuns: 0,
+        executed: 0,
+        passed: 0,
+        failed: 0,
+        blocked: 0,
+      },
     ]);
   });
 
@@ -77,12 +95,49 @@ describe('buildDashboardOverview daily granularity', () => {
       passRate: 0.75,
       runs: 4,
       failedRuns: 1,
+      executed: 4,
+      passed: 3,
+      failed: 1,
+      blocked: 0,
     });
     expect(record.passRateSeries.current[1]).toEqual({
       date: '2026-06-11',
       passRate: null,
       runs: 0,
       failedRuns: 0,
+      executed: 0,
+      passed: 0,
+      failed: 0,
+      blocked: 0,
+    });
+  });
+
+  it('reports executed/passed/failed/blocked from the same per-day run_case status aggregation as passRate, including skipped cases in executed but not in the other three', () => {
+    const record = buildDashboardOverview({
+      period: 7,
+      zone: 'UTC',
+      currentDayKeys: ['2026-06-10'],
+      previousDayKeys: [],
+      caseCountRows: [
+        caseRow({ day: '2026-06-10', status: 'pass', count: 5 }),
+        caseRow({ day: '2026-06-10', status: 'fail', count: 2 }),
+        caseRow({ day: '2026-06-10', status: 'blocked', count: 1 }),
+        caseRow({ day: '2026-06-10', status: 'skip', count: 3 }),
+      ],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+      recentRuns: [],
+    });
+
+    expect(record.passRateSeries.current[0]).toMatchObject({
+      executed: 11,
+      passed: 5,
+      failed: 2,
+      blocked: 1,
     });
   });
 });
