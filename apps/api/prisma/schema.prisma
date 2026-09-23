@@ -577,6 +577,7 @@ model Run {
   @@index([organizationId, startedAt])
   @@index([commitSha])
   @@index([projectId, source, reportExternalId])
+  @@index([suiteId, startedAt])
   @@map("run")
 }
 
@@ -708,6 +709,7 @@ model NotificationDelivery {
 
   @@unique([webhookId, dedupeKey])
   @@index([organizationId, dedupeKey])
+  @@index([organizationId, deliveredAt])
   @@map("notification_delivery")
 }
 
