@@ -499,6 +499,33 @@ export interface DashboardOverviewRecord {
   recentRuns: DashboardRecentRun[]
 }
 
+export interface DashboardChannelDailyPoint {
+  date: string
+  sent: number
+  failed: number
+}
+
+export interface DashboardWebhookChannel {
+  id: string
+  type: NotificationWebhookType
+  name: string
+  eventTypes: NotificationEventType[]
+  sent: number
+  failed: number
+  daily: DashboardChannelDailyPoint[]
+}
+
+export interface DashboardEmailChannel {
+  enabled: boolean
+  eventTypes: NotificationEventType[]
+}
+
+export interface DashboardChannelsRecord {
+  webhooks: DashboardWebhookChannel[]
+  email: DashboardEmailChannel
+  lastDelivery: string | null
+}
+
 export interface NotificationDelivery {
   channel: NotificationWebhookType
   status: NotificationDeliveryStatus

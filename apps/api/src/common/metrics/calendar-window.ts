@@ -80,6 +80,26 @@ export interface CalendarDayKeys {
   previous: string[];
 }
 
+export interface FixedCalendarWindow {
+  start: Date;
+  dayKeys: string[];
+}
+
+export function fixedCalendarWindow(
+  days: number,
+  zone: string,
+  now: Date,
+): FixedCalendarWindow {
+  const today = parseZonedDateKey(zonedDateKey(now, zone));
+  const startDate = shiftCalendarDate(today, -(days - 1));
+  const start = startOfCalendarDate(startDate, zone);
+  const dayKeys = Array.from({ length: days }, (_, index) =>
+    formatCalendarDate(shiftCalendarDate(startDate, index)),
+  );
+
+  return { start, dayKeys };
+}
+
 export function calendarDayKeys(
   period: DashboardPeriod,
   zone: string,

@@ -2,6 +2,7 @@ import {
   DASHBOARD_PERIODS,
   calendarDayKeys,
   computeCalendarWindow,
+  fixedCalendarWindow,
   isDashboardPeriod,
 } from './calendar-window';
 
@@ -101,5 +102,29 @@ describe('calendarDayKeys', () => {
 
   it('throws for a period outside 7/30/90', () => {
     expect(() => calendarDayKeys(15 as never, 'UTC', now)).toThrow();
+  });
+});
+
+describe('fixedCalendarWindow', () => {
+  const now = new Date('2026-06-16T20:00:00.000Z');
+
+  it('lists exactly `days` ascending day keys ending today', () => {
+    const { dayKeys } = fixedCalendarWindow(14, 'UTC', now);
+
+    expect(dayKeys).toHaveLength(14);
+    expect(dayKeys[0]).toBe('2026-06-03');
+    expect(dayKeys[13]).toBe('2026-06-16');
+  });
+
+  it('starts the window at local midnight (days - 1) calendar days before today', () => {
+    const { start } = fixedCalendarWindow(14, 'UTC', now);
+
+    expect(start.toISOString()).toBe('2026-06-03T00:00:00.000Z');
+  });
+
+  it('aligns the start to local midnight in a negative-offset zone', () => {
+    const { start } = fixedCalendarWindow(14, 'America/Guatemala', now);
+
+    expect(start.toISOString()).toBe('2026-06-03T06:00:00.000Z');
   });
 });

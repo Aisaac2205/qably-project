@@ -63,6 +63,7 @@ interface QueryRawFixtures {
   caseCounts?: unknown[];
   runCounts?: unknown[];
   casesPassing?: unknown[];
+  deliveryCounts?: unknown[];
   traceability?: unknown[];
 }
 
@@ -78,6 +79,9 @@ function queryRawRouter(fixtures: QueryRawFixtures = {}) {
     }
     if (text.includes('WITH latest AS')) {
       return Promise.resolve(fixtures.casesPassing ?? []);
+    }
+    if (text.includes('FROM "notification_delivery" d')) {
+      return Promise.resolve(fixtures.deliveryCounts ?? []);
     }
 
     return Promise.resolve(
@@ -97,6 +101,9 @@ describe('Dashboard (e2e)', () => {
     run: { count: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
     $queryRaw: jest.fn(),
     runCase: { groupBy: jest.fn() },
+    notificationWebhook: { findMany: jest.fn() },
+    notificationPreference: { findMany: jest.fn() },
+    notificationDelivery: { aggregate: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -138,6 +145,11 @@ describe('Dashboard (e2e)', () => {
     prisma.runCase.groupBy.mockResolvedValue([
       { runId: 'run-1', status: 'pass', _count: { _all: 1 } },
     ]);
+    prisma.notificationWebhook.findMany.mockResolvedValue([]);
+    prisma.notificationPreference.findMany.mockResolvedValue([]);
+    prisma.notificationDelivery.aggregate.mockResolvedValue({
+      _max: { deliveredAt: null },
+    });
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -563,6 +575,174 @@ describe('Dashboard (e2e)', () => {
           where: { organizationId: 'org-1', projectId: 'project-1' },
         }),
       );
+    });
+  });
+
+  describe('GET /dashboard/channels', () => {
+    const enabledWebhook = {
+      id: 'webhook-1',
+      type: 'slack' as const,
+      name: 'Team Slack',
+      eventTypes: ['run_failed'],
+    };
+    const NOW = new Date('2026-06-16T11:00:00.000Z');
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick'] });
+      jest.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('refuses the route without a session', async () => {
+      read.mockResolvedValue(null);
+
+      await request(app.getHttpServer()).get('/dashboard/channels').expect(401);
+    });
+
+    it('answers 403 when the organization header names a foreign organization', async () => {
+      prisma.orgMember.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .set('x-organization-id', 'org-someone-else')
+        .expect(403);
+    });
+
+    it('rejects a malformed tz', async () => {
+      await request(app.getHttpServer())
+        .get('/dashboard/channels?tz=Not/AZone')
+        .expect(400);
+    });
+
+    it('falls back to UTC when tz is absent and reports an empty organization without crashing', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        webhooks: unknown[];
+        email: { enabled: boolean; eventTypes: string[] };
+        lastDelivery: string | null;
+      };
+
+      expect(body.webhooks).toEqual([]);
+      expect(body.lastDelivery).toBeNull();
+    });
+
+    it('excludes a disabled webhook, returning only the enabled one', async () => {
+      prisma.notificationWebhook.findMany.mockResolvedValue([enabledWebhook]);
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        webhooks: { id: string; name: string }[];
+      };
+
+      expect(prisma.notificationWebhook.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-1', enabled: true },
+        }),
+      );
+      expect(body.webhooks).toHaveLength(1);
+      expect(body.webhooks[0]).toMatchObject({
+        id: 'webhook-1',
+        name: 'Team Slack',
+      });
+    });
+
+    it('zero-fills a webhook with no deliveries in the window', async () => {
+      prisma.notificationWebhook.findMany.mockResolvedValue([enabledWebhook]);
+      prisma.$queryRaw.mockImplementation(
+        queryRawRouter({ deliveryCounts: [] }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        webhooks: { sent: number; failed: number; daily: unknown[] }[];
+      };
+
+      expect(body.webhooks[0].sent).toBe(0);
+      expect(body.webhooks[0].failed).toBe(0);
+      expect(body.webhooks[0].daily).toHaveLength(14);
+    });
+
+    it('reports a failed-only day without inflating the sent total', async () => {
+      prisma.notificationWebhook.findMany.mockResolvedValue([enabledWebhook]);
+      prisma.$queryRaw.mockImplementation(
+        queryRawRouter({
+          deliveryCounts: [
+            {
+              webhookId: 'webhook-1',
+              day: '2026-06-16',
+              status: 'failed',
+              count: 2,
+            },
+          ],
+        }),
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        webhooks: {
+          sent: number;
+          failed: number;
+          daily: { date: string; sent: number; failed: number }[];
+        }[];
+      };
+
+      expect(body.webhooks[0].sent).toBe(0);
+      expect(body.webhooks[0].failed).toBe(2);
+      expect(
+        body.webhooks[0].daily.find((point) => point.date === '2026-06-16'),
+      ).toEqual({ date: '2026-06-16', sent: 0, failed: 2 });
+    });
+
+    it('applies the default email preferences for a user with no stored rows', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        email: { enabled: boolean; eventTypes: string[] };
+      };
+
+      expect(prisma.notificationPreference.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId: 'org-1',
+            userId: 'user-1',
+            channel: 'email',
+          },
+        }),
+      );
+      expect(body.email.enabled).toBe(true);
+      expect(body.email.eventTypes).toContain('case_regressed');
+    });
+
+    it('excludes a delivery belonging to another organization from totals and lastDelivery', async () => {
+      prisma.notificationWebhook.findMany.mockResolvedValue([enabledWebhook]);
+
+      await request(app.getHttpServer()).get('/dashboard/channels').expect(200);
+
+      expect(prisma.notificationDelivery.aggregate).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1' },
+        _max: { deliveredAt: true },
+      });
+      const [sql] = prisma.$queryRaw.mock.calls[0] as [
+        { strings: string[]; values: unknown[] },
+      ];
+      expect(sql.values).toEqual(expect.arrayContaining(['org-1']));
     });
   });
 });
