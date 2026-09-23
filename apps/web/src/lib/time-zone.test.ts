@@ -1,5 +1,6 @@
+import { renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getBrowserTimeZone } from '@/lib/time-zone'
+import { getBrowserTimeZone, useBrowserTimeZone } from '@/lib/time-zone'
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -29,5 +30,13 @@ describe('getBrowserTimeZone', () => {
     expect(getBrowserTimeZone()).toBe('UTC')
 
     spy.mockRestore()
+  })
+})
+
+describe('useBrowserTimeZone', () => {
+  it('resolves to the browser time zone once mounted on the client', () => {
+    const { result } = renderHook(() => useBrowserTimeZone())
+
+    expect(result.current).toBe(getBrowserTimeZone())
   })
 })

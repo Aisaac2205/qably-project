@@ -11,6 +11,7 @@ import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
+import { Prisma } from '../generated/prisma/client';
 import { DashboardModule } from '../src/modules/dashboard/dashboard.module';
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
@@ -323,6 +324,33 @@ describe('Dashboard (e2e)', () => {
 
     expect(body.days).toEqual([
       { date: '2026-06-16', scm: 0, proposals: 0, official: 0, runs: 2 },
+    ]);
+  });
+
+  it('answers 400 instead of 500 when Postgres rejects a zone Node accepts as valid', async () => {
+    prisma.$queryRaw.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError(
+        'Raw query failed. Code: `22023`. Message: `invalid input syntax for type timestamp with time zone: "America/Guatemala"`',
+        {
+          code: 'P2010',
+          clientVersion: '7.0.0',
+          meta: {
+            code: '22023',
+            message:
+              'invalid input syntax for type timestamp with time zone: "America/Guatemala"',
+          },
+        },
+      ),
+    );
+
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/traceability?year=2026&tz=America/Guatemala')
+      .expect(400);
+
+    const body = response.body as { message: string; issues: unknown[] };
+    expect(body.message).toBe('Validation failed');
+    expect(body.issues).toEqual([
+      { path: 'tz', message: 'Invalid IANA time zone' },
     ]);
   });
 });

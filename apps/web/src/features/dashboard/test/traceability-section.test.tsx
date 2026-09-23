@@ -5,6 +5,7 @@ import { TraceabilitySection } from '@/features/dashboard/components/traceabilit
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery, createTestQueryClient } from '@/lib/query-test-utils'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
+import { getBrowserTimeZone } from '@/lib/time-zone'
 import { useI18nStore } from '@/lib/i18n'
 import { traceabilityCalendarFixture } from '@/test/dashboard-api-stub'
 import { getTraceabilityCalendar } from '@/features/dashboard/api/dashboard.api'
@@ -178,7 +179,9 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     getTraceability.mockReturnValue(new Promise(() => {}))
     const client = createTestQueryClient()
     const year = new Date().getFullYear()
-    client.removeQueries({ queryKey: dashboardKeys.traceability(year, 'all') })
+    client.removeQueries({
+      queryKey: dashboardKeys.traceability(year, 'all', getBrowserTimeZone()),
+    })
 
     const { container } = render(
       <QueryClientProvider client={client}>
@@ -195,7 +198,9 @@ describe('TraceabilitySection (Contribution Calendar)', () => {
     getTraceability.mockRejectedValue(new Error('network down'))
     const client = createTestQueryClient()
     const year = new Date().getFullYear()
-    client.removeQueries({ queryKey: dashboardKeys.traceability(year, 'all') })
+    client.removeQueries({
+      queryKey: dashboardKeys.traceability(year, 'all', getBrowserTimeZone()),
+    })
 
     render(
       <QueryClientProvider client={client}>

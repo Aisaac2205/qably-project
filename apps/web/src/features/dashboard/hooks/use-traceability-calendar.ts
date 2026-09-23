@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import type { TraceabilityCalendarRecord } from '@qably/types'
-import { getBrowserTimeZone } from '@/lib/time-zone'
+import { useBrowserTimeZone } from '@/lib/time-zone'
 import { getTraceabilityCalendar } from '../api/dashboard.api'
 import { dashboardKeys } from '../lib/query-keys'
 import { buildTraceabilityGrid } from '../lib/traceability-grid'
@@ -38,15 +38,20 @@ export function useTraceabilityCalendar({
   locale = 'es',
   projectId,
 }: UseTraceabilityCalendarOptions = {}): TraceabilityCalendarState {
-  const tz = useMemo(() => getBrowserTimeZone(), [])
+  const tz = useBrowserTimeZone()
 
   const query = useQuery({
     queryKey: dashboardKeys.traceability(year, projectId ?? 'all', tz),
-    queryFn: ({ signal }) =>
-      getTraceabilityCalendar(year, tz, projectId, signal),
+    queryFn: ({ signal }) => {
+      if (tz === undefined) {
+        return Promise.reject(new Error('browser time zone not resolved yet'))
+      }
+      return getTraceabilityCalendar(year, tz, projectId, signal)
+    },
+    enabled: tz !== undefined,
   })
 
-  const record = query.data ?? emptyRecord(year, tz)
+  const record = query.data ?? emptyRecord(year, tz ?? 'UTC')
 
   const grid = useMemo(
     () => buildTraceabilityGrid(record, activeFilter, MONTH_NAMES[locale], locale),
@@ -60,7 +65,7 @@ export function useTraceabilityCalendar({
     monthLabels: grid.monthLabels,
     breakdownTotals: grid.breakdownTotals,
     activeFilter,
-    isLoading: query.isLoading,
+    isLoading: tz === undefined || query.isLoading,
     isError: query.isError,
     retry: () => {
       void query.refetch()

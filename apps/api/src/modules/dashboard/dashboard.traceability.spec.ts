@@ -1,5 +1,21 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { Prisma } from '../../../generated/prisma/client';
 import { DashboardService } from './dashboard.service';
+
+function invalidTimeZoneError(): Prisma.PrismaClientKnownRequestError {
+  return new Prisma.PrismaClientKnownRequestError(
+    'Raw query failed. Code: `22023`. Message: `invalid input syntax for type timestamp with time zone: "Not/AZone"`',
+    {
+      code: 'P2010',
+      clientVersion: '7.0.0',
+      meta: {
+        code: '22023',
+        message:
+          'invalid input syntax for type timestamp with time zone: "Not/AZone"',
+      },
+    },
+  );
+}
 
 const org: OrgContext = {
   organizationId: 'org-1',
@@ -200,5 +216,31 @@ describe('DashboardService.traceability', () => {
     const result = await build(prisma).traceability(org, 2026, 'Asia/Tokyo');
 
     expect(result.ok && result.value.timeZone).toBe('Asia/Tokyo');
+  });
+
+  it('maps a zone Postgres rejects as invalid to invalid-time-zone instead of throwing', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockRejectedValue(invalidTimeZoneError());
+
+    const result = await build(prisma).traceability(org, 2026, 'Not/AZone');
+
+    expect(result).toEqual({ ok: false, error: 'invalid-time-zone' });
+  });
+
+  it('rethrows a database error unrelated to the time zone instead of swallowing it', async () => {
+    const prisma = createPrisma();
+    const connectionError = new Prisma.PrismaClientKnownRequestError(
+      'Raw query failed. Code: `08006`. Message: `connection reset`',
+      {
+        code: 'P2010',
+        clientVersion: '7.0.0',
+        meta: { code: '08006', message: 'connection reset' },
+      },
+    );
+    prisma.$queryRaw.mockRejectedValue(connectionError);
+
+    await expect(build(prisma).traceability(org, 2026, ZONE)).rejects.toBe(
+      connectionError,
+    );
   });
 });

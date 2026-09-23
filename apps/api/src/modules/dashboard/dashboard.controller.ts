@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   NotFoundException,
@@ -29,6 +30,11 @@ function unwrap<T>(result: Result<T, DashboardError>): T {
   switch (result.error) {
     case 'project-not-found':
       throw new NotFoundException('Project not found');
+    case 'invalid-time-zone':
+      throw new BadRequestException({
+        message: 'Validation failed',
+        issues: [{ path: 'tz', message: 'Invalid IANA time zone' }],
+      });
   }
 }
 

@@ -2,4 +2,4 @@ import type { DashboardSummaryRecord } from '@qably/types';
 
 export type DashboardSummaryView = DashboardSummaryRecord;
 
-export type DashboardError = 'project-not-found';
+export type DashboardError = 'project-not-found' | 'invalid-time-zone';

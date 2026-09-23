@@ -35,6 +35,23 @@ interface RunScope {
   projectId?: string;
 }
 
+const UNKNOWN_TIME_ZONE_SQLSTATE = '22023';
+
+function isUnknownTimeZoneError(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code !== 'P2010') return false;
+
+  const meta = error.meta;
+  const sqlState = typeof meta?.code === 'string' ? meta.code : undefined;
+  const dbMessage =
+    typeof meta?.message === 'string' ? meta.message : error.message;
+
+  return (
+    sqlState === UNKNOWN_TIME_ZONE_SQLSTATE &&
+    dbMessage.toLowerCase().includes('time zone')
+  );
+}
+
 function buildScope(org: OrgContext, projectId?: string): RunScope {
   return {
     organizationId: org.organizationId,
@@ -135,40 +152,50 @@ export class DashboardService {
         ? Prisma.empty
         : Prisma.sql`AND r."projectId" = ${projectId}`;
 
-    const [scm, proposals, official, runs] = await Promise.all([
-      this.stageCounts(
-        Prisma.sql`b."createdAt"`,
-        Prisma.sql`"ingestion_batch" b JOIN "project" p ON p."id" = b."projectId"`,
-        Prisma.sql`p."organizationId" = ${organizationId} ${scmProject}`,
-        year,
-        zone,
-      ),
-      this.stageCounts(
-        Prisma.sql`ep."createdAt"`,
-        Prisma.sql`"extracted_proposal" ep JOIN "project" p ON p."id" = ep."projectId"`,
-        Prisma.sql`p."organizationId" = ${organizationId} ${proposalsProject}`,
-        year,
-        zone,
-      ),
-      this.stageCounts(
-        Prisma.sql`tc."createdAt"`,
-        Prisma.sql`"test_case" tc JOIN "suite" s ON s."id" = tc."suiteId"`,
-        Prisma.sql`s."organizationId" = ${organizationId} ${officialProject}`,
-        year,
-        zone,
-      ),
-      this.stageCounts(
-        Prisma.sql`r."startedAt"`,
-        Prisma.sql`"run" r`,
-        Prisma.sql`r."organizationId" = ${organizationId} ${runsProject}`,
-        year,
-        zone,
-      ),
-    ]);
+    try {
+      const [scm, proposals, official, runs] = await Promise.all([
+        this.stageCounts(
+          Prisma.sql`b."createdAt"`,
+          Prisma.sql`"ingestion_batch" b JOIN "project" p ON p."id" = b."projectId"`,
+          Prisma.sql`p."organizationId" = ${organizationId} ${scmProject}`,
+          year,
+          zone,
+        ),
+        this.stageCounts(
+          Prisma.sql`ep."createdAt"`,
+          Prisma.sql`"extracted_proposal" ep JOIN "project" p ON p."id" = ep."projectId"`,
+          Prisma.sql`p."organizationId" = ${organizationId} ${proposalsProject}`,
+          year,
+          zone,
+        ),
+        this.stageCounts(
+          Prisma.sql`tc."createdAt"`,
+          Prisma.sql`"test_case" tc JOIN "suite" s ON s."id" = tc."suiteId"`,
+          Prisma.sql`s."organizationId" = ${organizationId} ${officialProject}`,
+          year,
+          zone,
+        ),
+        this.stageCounts(
+          Prisma.sql`r."startedAt"`,
+          Prisma.sql`"run" r`,
+          Prisma.sql`r."organizationId" = ${organizationId} ${runsProject}`,
+          year,
+          zone,
+        ),
+      ]);
 
-    return ok(
-      buildTraceabilityCalendar(year, zone, { scm, proposals, official, runs }),
-    );
+      return ok(
+        buildTraceabilityCalendar(year, zone, {
+          scm,
+          proposals,
+          official,
+          runs,
+        }),
+      );
+    } catch (error) {
+      if (isUnknownTimeZoneError(error)) return err('invalid-time-zone');
+      throw error;
+    }
   }
 
   async summary(
