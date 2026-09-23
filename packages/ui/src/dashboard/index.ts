@@ -11,3 +11,10 @@ export { PassRateBar, type PassRateBarProps } from './pass-rate-bar'
 export { DeliveryBars, type DeliveryBarPoint, type DeliveryBarsProps } from './delivery-bars'
 export { KpiTile, type KpiDeltaTone, type KpiTileDelta, type KpiTileProps } from './kpi-tile'
 export { ChannelStat, type ChannelStatProps, type ChannelStatTone } from './channel-stat'
+export {
+  ActivityEntryRow,
+  type ActivityEntryStatus,
+  type ActivityEntryRowProps,
+  type CommitActivityEntryRowProps,
+  type RunActivityEntryRowProps,
+} from './activity-entry-row'
