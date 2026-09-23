@@ -9,7 +9,7 @@ import type {
 export interface DerivedSuiteMetrics {
   suite: Suite
   lastRun: SuiteMetricsLastRun | undefined
-  recentPassRate: number
+  recentPassRate: number | null
   history: RunStatus[]
   status: SuiteRunStatus
 }
@@ -30,7 +30,7 @@ export function deriveSuiteMetrics(
 
   const recentPassRate =
     completed.length === 0
-      ? 0
+      ? null
       : Math.round(
           (completed.filter((status) => status === 'pass').length / completed.length) * 100,
         )
@@ -44,12 +44,12 @@ function deriveStatus(
   trend: RunStatus[],
   lastRun: SuiteMetricsLastRun | undefined,
   completed: RunStatus[],
-  recentPassRate: number,
+  recentPassRate: number | null,
 ): SuiteRunStatus {
   if (trend.some((status) => status === 'running')) return 'running'
   if (lastRun === undefined) return 'never-run'
   if (completed.length === 0) return 'needs-attention'
-  if (recentPassRate < PASS_RATE_THRESHOLD) return 'needs-attention'
+  if (recentPassRate !== null && recentPassRate < PASS_RATE_THRESHOLD) return 'needs-attention'
 
   return completed[completed.length - 1] === 'pass' ? 'pass' : 'fail'
 }

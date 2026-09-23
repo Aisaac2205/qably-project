@@ -29,7 +29,7 @@ describe('deriveSuiteMetrics', () => {
 
     expect(result.status).toBe('never-run')
     expect(result.lastRun).toBeUndefined()
-    expect(result.recentPassRate).toBe(0)
+    expect(result.recentPassRate).toBeNull()
     expect(result.history).toEqual([])
   })
 
@@ -197,7 +197,7 @@ describe('deriveSuiteMetrics', () => {
     const result = deriveSuiteMetrics(suite(), entry)
 
     expect(result.status).toBe('needs-attention')
-    expect(result.recentPassRate).toBe(0)
+    expect(result.recentPassRate).toBeNull()
   })
 
   it('keeps the suite object as-is on the result', () => {

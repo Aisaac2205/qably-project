@@ -161,6 +161,50 @@ describe('Dashboard (e2e)', () => {
     });
   });
 
+  it('reports a null passRate when every case in the window is pending or skipped', async () => {
+    prisma.runCase.groupBy.mockResolvedValueOnce([
+      { status: 'pending', _count: { _all: 2 } },
+      { status: 'skip', _count: { _all: 1 } },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .expect(200);
+
+    const body = response.body as { passRate: number | null };
+    expect(body.passRate).toBeNull();
+  });
+
+  it('counts blocked cases in the pass-rate denominator', async () => {
+    prisma.runCase.groupBy.mockResolvedValueOnce([
+      { status: 'pass', _count: { _all: 3 } },
+      { status: 'blocked', _count: { _all: 1 } },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .expect(200);
+
+    const body = response.body as { passRate: number };
+    expect(body.passRate).toBeCloseTo(0.75);
+  });
+
+  it('excludes pending and skipped cases from the pass-rate denominator', async () => {
+    prisma.runCase.groupBy.mockResolvedValueOnce([
+      { status: 'pass', _count: { _all: 1 } },
+      { status: 'fail', _count: { _all: 1 } },
+      { status: 'pending', _count: { _all: 5 } },
+      { status: 'skip', _count: { _all: 5 } },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/dashboard/summary')
+      .expect(200);
+
+    const body = response.body as { passRate: number };
+    expect(body.passRate).toBeCloseTo(0.5);
+  });
+
   it('scopes the summary to a single project when projectId is given', async () => {
     await request(app.getHttpServer())
       .get('/dashboard/summary?projectId=project-1')

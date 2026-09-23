@@ -6,12 +6,13 @@ import { useTranslation } from '@/lib/i18n'
 
 interface RunHistoryStripProps {
   history: RunStatus[]
-  passRate: number
+  passRate: number | null
   showValue?: boolean
   className?: string
 }
 
-function toneClass(passRate: number): string {
+function toneClass(passRate: number | null): string {
+  if (passRate === null) return 'text-muted'
   if (passRate >= 70) return 'text-pass'
   if (passRate > 0) return 'text-warn'
   return 'text-muted'
@@ -34,7 +35,7 @@ export function RunHistoryStrip({
   const visibleHistory = history.slice(-MAX_VISIBLE_BARS)
 
   const label =
-    history.length === 0
+    history.length === 0 || passRate === null
       ? t('suites.noRecentRuns')
       : t('suites.runHistoryAriaLabel', { count: history.length, passed, failed, rate: passRate })
 
@@ -51,7 +52,7 @@ export function RunHistoryStrip({
       </div>
       {showValue && (
         <span aria-hidden="true" className={cn('text-xs font-medium tabular-nums', toneClass(passRate))}>
-          {passRate}%
+          {passRate === null ? t('dashboard.notMeasured') : `${passRate}%`}
         </span>
       )}
     </div>

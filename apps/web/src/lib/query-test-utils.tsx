@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { render, type RenderOptions, type RenderResult } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { RunSummaryRecord } from '@qably/types'
+import { computePassRate } from '@qably/types'
 import { mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
@@ -77,7 +78,7 @@ function toSummary(run: (typeof runFixtures)[number]): RunSummaryRecord {
     commitMessage: run.commitMessage,
     commitAuthor: run.commitAuthor,
     caseCounts,
-    passRate: caseCounts.total === 0 ? 0 : caseCounts.pass / caseCounts.total,
+    passRate: computePassRate(caseCounts),
     delta: null,
   }
 }

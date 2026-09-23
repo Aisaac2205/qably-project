@@ -72,6 +72,12 @@ describe('RunHistoryStrip', () => {
     expect(label).toMatch(/^Last 8 runs:/)
   })
 
+  it('shows the "not measured" label instead of a fabricated 0% when the pass rate is null', () => {
+    render(<RunHistoryStrip history={[]} passRate={null} />)
+    expect(screen.getByText('Not measured yet')).toBeInTheDocument()
+    expect(screen.queryByText('0%')).not.toBeInTheDocument()
+  })
+
   it('accepts a custom className on the root element', () => {
     render(<RunHistoryStrip history={fourRuns} passRate={75} className="ml-auto" />)
     expect(screen.getByRole('img').className).toContain('ml-auto')

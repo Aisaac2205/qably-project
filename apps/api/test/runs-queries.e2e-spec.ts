@@ -94,7 +94,7 @@ describe('Runs queries (e2e)', () => {
       createManyAndReturn: jest.fn(),
       update: jest.fn(),
     },
-    suite: { findFirst: jest.fn() },
+    suite: { findFirst: jest.fn(), findMany: jest.fn() },
     $queryRaw: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn(),
   };
@@ -121,6 +121,7 @@ describe('Runs queries (e2e)', () => {
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
     prisma.runCase.update.mockResolvedValue(runCaseRow({ status: 'pass' }));
     prisma.suite.findFirst.mockResolvedValue(suiteWithCases);
+    prisma.suite.findMany.mockResolvedValue([]);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -275,5 +276,35 @@ describe('Runs queries (e2e)', () => {
       .patch('/runs/run-1/cases/run-case-missing')
       .send({ status: 'pass' })
       .expect(404);
+  });
+
+  it('reports a null passRate for the last run of a suite when its cases are only pending or skipped', async () => {
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+    ]);
+    prisma.$queryRaw.mockResolvedValueOnce([
+      {
+        id: 'run-1',
+        suiteId: 'suite-1',
+        status: 'pending',
+        source: 'manual',
+        startedAt: new Date('2026-01-01T00:00:00.000Z'),
+        finishedAt: null,
+      },
+    ]);
+    prisma.runCase.groupBy.mockResolvedValue([
+      { runId: 'run-1', status: 'pending', _count: { _all: 1 } },
+      { runId: 'run-1', status: 'skip', _count: { _all: 1 } },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/runs/suite-metrics?projectId=project-1')
+      .expect(200);
+
+    const body = response.body as {
+      items: { suiteId: string; lastRun: { passRate: number | null } | null }[];
+    };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].lastRun?.passRate).toBeNull();
   });
 });

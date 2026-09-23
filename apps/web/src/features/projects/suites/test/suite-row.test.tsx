@@ -174,6 +174,15 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.getByText('80%')).toBeInTheDocument()
   })
 
+  it('shows "Not measured yet" instead of 0% when the suite has no completed runs', async () => {
+    const notMeasuredMetrics = { ...metrics, recentPassRate: null, history: [] as RunStatus[] }
+    await act(async () => {
+      renderWithQuery(<SuiteRow suite={mockSuite} metrics={notMeasuredMetrics} />)
+    })
+    expect(screen.getByText('Not measured yet')).toBeInTheDocument()
+    expect(screen.queryByText('0%')).not.toBeInTheDocument()
+  })
+
   it('renders a run history strip with role="img"', async () => {
     const { container } = renderWithQuery(
       <SuiteRow suite={mockSuite} metrics={metrics} />,

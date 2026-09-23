@@ -221,6 +221,13 @@ describe('SuiteDetail (redesigned)', () => {
     expect(within(strip).getByText(/Cases/i)).toBeInTheDocument()
   })
 
+  it('shows "Not measured yet" instead of 0% pass rate for a suite with no completed runs', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-3" />) })
+    const strip = screen.getByRole('group', { name: /Suite health/i })
+    expect(within(strip).getByText('Not measured yet')).toBeInTheDocument()
+    expect(within(strip).queryByText('0%')).not.toBeInTheDocument()
+  })
+
   it('has a "Run this suite" button', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
     expect(screen.getByRole('button', { name: /Run this suite/ })).toBeInTheDocument()

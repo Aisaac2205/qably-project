@@ -315,14 +315,16 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
               <span className="text-xs font-medium text-muted">{t('suites.passRateLabel')}</span>
               <span
                 className={`text-sm font-mono font-semibold tabular-nums ${
-                  metrics.recentPassRate >= 70
-                    ? 'text-pass'
-                    : metrics.recentPassRate > 0
-                      ? 'text-warn'
-                      : 'text-muted'
+                  metrics.recentPassRate === null
+                    ? 'text-muted'
+                    : metrics.recentPassRate >= 70
+                      ? 'text-pass'
+                      : metrics.recentPassRate > 0
+                        ? 'text-warn'
+                        : 'text-muted'
                 }`}
               >
-                {metrics.recentPassRate}%
+                {metrics.recentPassRate === null ? t('dashboard.notMeasured') : `${metrics.recentPassRate}%`}
               </span>
             </div>
             <div className="flex items-center gap-2">
