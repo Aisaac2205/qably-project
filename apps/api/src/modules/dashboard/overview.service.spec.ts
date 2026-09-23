@@ -15,8 +15,7 @@ interface FakePrisma {
   project: { findFirst: jest.Mock; findMany: jest.Mock };
   suite: { groupBy: jest.Mock };
   testCase: { groupBy: jest.Mock };
-  run: { groupBy: jest.Mock; findMany: jest.Mock };
-  runCase: { groupBy: jest.Mock };
+  run: { groupBy: jest.Mock };
   $queryRaw: jest.Mock;
 }
 
@@ -30,9 +29,7 @@ function createPrisma(): FakePrisma {
     testCase: { groupBy: jest.fn().mockResolvedValue([]) },
     run: {
       groupBy: jest.fn().mockResolvedValue([]),
-      findMany: jest.fn().mockResolvedValue([]),
     },
-    runCase: { groupBy: jest.fn().mockResolvedValue([]) },
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
 }
@@ -66,11 +63,6 @@ describe('OverviewService organization scope', () => {
         where: { organizationId: 'org-1' },
       }),
     );
-    expect(prisma.run.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: 'org-1' },
-      }),
-    );
   });
 
   it('never looks up a single project when none is requested', async () => {
@@ -79,19 +71,6 @@ describe('OverviewService organization scope', () => {
     await build(prisma).overview(org, 7, 'UTC');
 
     expect(prisma.project.findFirst).not.toHaveBeenCalled();
-  });
-
-  it('caps recentRuns at 4, most recent first', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).overview(org, 7, 'UTC');
-
-    expect(prisma.run.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        take: 4,
-        orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
-      }),
-    );
   });
 });
 
@@ -154,11 +133,6 @@ describe('OverviewService project scope', () => {
         where: { organizationId: 'org-1', id: 'project-1' },
       }),
     );
-    expect(prisma.run.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: 'org-1', projectId: 'project-1' },
-      }),
-    );
   });
 });
 
@@ -176,7 +150,6 @@ describe('OverviewService empty organization', () => {
     expect(result.value.kpis.failedCases.value).toBe(0);
     expect(result.value.kpis.avgRunDurationMs.value).toBeNull();
     expect(result.value.projects).toEqual([]);
-    expect(result.value.recentRuns).toEqual([]);
     expect(result.value.recentActivity).toEqual([]);
     expect(result.value.casesPassing).toEqual({
       total: 0,
@@ -285,7 +258,6 @@ describe('OverviewService recentActivity query scoping', () => {
 
     await build(prisma).overview(org, 7, 'UTC');
 
-    expect(prisma.run.findMany).toHaveBeenCalledTimes(1);
     const aggregateCall = findQueryRawCall(prisma, 'matched_runs');
     expect(aggregateCall).toBeDefined();
     const sqlText = aggregateCall?.strings.join('') ?? '';

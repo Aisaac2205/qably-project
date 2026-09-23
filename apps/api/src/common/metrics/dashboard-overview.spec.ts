@@ -3,7 +3,6 @@ import {
   type CaseCountRow,
   type CasesPassingRow,
   type ProjectRow,
-  type RecentRunRow,
   type RunCountRow,
 } from './dashboard-overview';
 
@@ -44,7 +43,6 @@ describe('buildDashboardOverview daily granularity', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current).toEqual([
@@ -87,7 +85,6 @@ describe('buildDashboardOverview daily granularity', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current[0]).toEqual({
@@ -130,7 +127,6 @@ describe('buildDashboardOverview daily granularity', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current[0]).toMatchObject({
@@ -166,7 +162,6 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current.length).toBe(
@@ -189,7 +184,6 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current).toHaveLength(13);
@@ -217,7 +211,6 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current[0].runs).toBe(1);
@@ -240,7 +233,6 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.passRateSeries.current).toHaveLength(13);
@@ -263,7 +255,6 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.kpis.runs.series).toHaveLength(13);
@@ -291,7 +282,6 @@ describe('buildDashboardOverview KPI aggregation', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.kpis.passRate.value).toBeCloseTo(9 / 10);
@@ -319,7 +309,6 @@ describe('buildDashboardOverview KPI aggregation', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.kpis.avgRunDurationMs.value).toBe(5000);
@@ -345,7 +334,6 @@ describe('buildDashboardOverview KPI aggregation', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.kpis.avgRunDurationMs.value).toBeNull();
@@ -372,7 +360,6 @@ describe('buildDashboardOverview casesPassing', () => {
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
       lastRunAtByProjectId: new Map(),
-      recentRuns: [],
     });
 
     expect(record.casesPassing).toEqual({
@@ -424,7 +411,6 @@ describe('buildDashboardOverview project rows', () => {
       lastRunAtByProjectId: new Map([
         ['project-1', new Date('2026-06-10T09:00:00.000Z')],
       ]),
-      recentRuns: [],
     });
 
     expect(record.projects).toEqual([
@@ -442,111 +428,6 @@ describe('buildDashboardOverview project rows', () => {
         suites: 1,
         cases: 2,
         passRate: null,
-      },
-    ]);
-  });
-});
-
-describe('buildDashboardOverview recent runs', () => {
-  it('maps recent run rows, omitting absent optional fields and computing passRate from caseCounts', () => {
-    const rows: RecentRunRow[] = [
-      {
-        id: 'run-1',
-        projectId: 'project-1',
-        projectName: 'Checkout',
-        suiteId: 'suite-1',
-        suiteName: 'Checkout suite',
-        name: 'Nightly regression',
-        status: 'pass',
-        source: 'github_actions',
-        startedAt: new Date('2026-06-10T09:00:00.000Z'),
-        finishedAt: new Date('2026-06-10T09:05:00.000Z'),
-        commitSha: 'abc123',
-        commitMessage: 'fix: retry flaky step',
-        commitAuthor: 'Aisaac2205',
-        caseCounts: {
-          total: 4,
-          pending: 0,
-          running: 0,
-          pass: 3,
-          fail: 1,
-          skip: 0,
-          blocked: 0,
-        },
-      },
-      {
-        id: 'run-2',
-        projectId: 'project-2',
-        projectName: 'Billing',
-        suiteId: 'suite-2',
-        suiteName: 'Billing suite',
-        name: 'Manual smoke',
-        status: 'pending',
-        source: 'manual',
-        startedAt: new Date('2026-06-09T09:00:00.000Z'),
-        finishedAt: null,
-        commitSha: null,
-        commitMessage: null,
-        commitAuthor: null,
-        caseCounts: {
-          total: 0,
-          pending: 2,
-          running: 0,
-          pass: 0,
-          fail: 0,
-          skip: 0,
-          blocked: 0,
-        },
-      },
-    ];
-
-    const record = buildDashboardOverview({
-      period: 7,
-      zone: 'UTC',
-      currentDayKeys: [],
-      previousDayKeys: [],
-      caseCountRows: [],
-      runCountRows: [],
-      casesPassingRows: [],
-      projects: [],
-      suiteCountByProjectId: new Map(),
-      caseCountByProjectId: new Map(),
-      lastRunAtByProjectId: new Map(),
-      recentRuns: rows,
-    });
-
-    expect(record.recentRuns).toEqual([
-      {
-        id: 'run-1',
-        projectId: 'project-1',
-        projectName: 'Checkout',
-        suiteId: 'suite-1',
-        suiteName: 'Checkout suite',
-        name: 'Nightly regression',
-        status: 'pass',
-        source: 'github_actions',
-        startedAt: '2026-06-10T09:00:00.000Z',
-        finishedAt: '2026-06-10T09:05:00.000Z',
-        commitSha: 'abc123',
-        commitMessage: 'fix: retry flaky step',
-        commitAuthor: 'Aisaac2205',
-        passRate: 0.75,
-        casesPassed: 3,
-        casesTotal: 4,
-      },
-      {
-        id: 'run-2',
-        projectId: 'project-2',
-        projectName: 'Billing',
-        suiteId: 'suite-2',
-        suiteName: 'Billing suite',
-        name: 'Manual smoke',
-        status: 'pending',
-        source: 'manual',
-        startedAt: '2026-06-09T09:00:00.000Z',
-        passRate: null,
-        casesPassed: 0,
-        casesTotal: 0,
       },
     ]);
   });

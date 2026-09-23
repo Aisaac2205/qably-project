@@ -11,7 +11,6 @@ import {
 } from '../../common/metrics/calendar-window';
 import {
   buildDashboardOverview,
-  type RecentRunRow,
   type SeriesWindow,
 } from '../../common/metrics/dashboard-overview';
 import {
@@ -19,17 +18,11 @@ import {
   buildRecentActivityFromAggregates,
   type ActivityAggregateRow,
 } from '../../common/metrics/recent-activity';
-import {
-  buildCaseCountsByRun,
-  emptyCaseCounts,
-} from '../../common/metrics/run-case-metrics';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { DashboardError } from './dashboard.contracts';
 import { isUnknownTimeZoneError } from './lib/time-zone-error';
-
-const RECENT_RUNS_LIMIT = 4;
 
 interface RawCaseCountRow {
   projectId: string;
@@ -51,22 +44,6 @@ interface RawRunCountRow {
 interface RawCasesPassingRow {
   status: CaseStatus;
   count: number;
-}
-
-interface RecentRunListRow {
-  id: string;
-  projectId: string;
-  project: { name: string };
-  suiteId: string;
-  suite: { name: string };
-  name: string;
-  status: 'pass' | 'fail' | 'running' | 'pending';
-  source: 'manual' | 'api' | 'github_actions';
-  startedAt: Date;
-  finishedAt: Date | null;
-  commitSha: string | null;
-  commitMessage: string | null;
-  commitAuthor: string | null;
 }
 
 interface RawActivityCandidateRow {
@@ -141,7 +118,6 @@ export class OverviewService {
         suiteCounts,
         testCaseCounts,
         lastRunAts,
-        recentRuns,
         activityCandidates,
       ] = await Promise.all([
         this.prisma.$queryRaw<RawCaseCountRow[]>(Prisma.sql`
@@ -228,29 +204,6 @@ export class OverviewService {
           },
           _max: { startedAt: true },
         }),
-        this.prisma.run.findMany({
-          where: {
-            organizationId,
-            ...(projectId === undefined ? {} : { projectId }),
-          },
-          orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
-          take: RECENT_RUNS_LIMIT,
-          select: {
-            id: true,
-            projectId: true,
-            project: { select: { name: true } },
-            suiteId: true,
-            suite: { select: { name: true } },
-            name: true,
-            status: true,
-            source: true,
-            startedAt: true,
-            finishedAt: true,
-            commitSha: true,
-            commitMessage: true,
-            commitAuthor: true,
-          },
-        }),
         this.prisma.$queryRaw<RawActivityCandidateRow[]>(Prisma.sql`
           WITH activity_candidates AS (
             SELECT r."projectId" AS "projectId",
@@ -273,17 +226,6 @@ export class OverviewService {
            LIMIT ${RECENT_ACTIVITY_LIMIT}
         `),
       ]);
-
-      const recentRunRows = recentRuns as RecentRunListRow[];
-      const recentRunCaseGroups =
-        recentRunRows.length === 0
-          ? []
-          : await this.prisma.runCase.groupBy({
-              by: ['runId', 'status'],
-              where: { runId: { in: recentRunRows.map((run) => run.id) } },
-              _count: { _all: true },
-            });
-      const caseCountsByRun = buildCaseCountsByRun(recentRunCaseGroups);
 
       const activityAggregateRows =
         activityCandidates.length === 0
@@ -429,24 +371,6 @@ export class OverviewService {
                 row._max.startedAt !== null,
             )
             .map((row) => [row.projectId, row._max.startedAt]),
-        ),
-        recentRuns: recentRunRows.map(
-          (run): RecentRunRow => ({
-            id: run.id,
-            projectId: run.projectId,
-            projectName: run.project.name,
-            suiteId: run.suiteId,
-            suiteName: run.suite.name,
-            name: run.name,
-            status: run.status,
-            source: run.source,
-            startedAt: run.startedAt,
-            finishedAt: run.finishedAt,
-            commitSha: run.commitSha,
-            commitMessage: run.commitMessage,
-            commitAuthor: run.commitAuthor,
-            caseCounts: caseCountsByRun.get(run.id) ?? emptyCaseCounts(),
-          }),
         ),
       });
 

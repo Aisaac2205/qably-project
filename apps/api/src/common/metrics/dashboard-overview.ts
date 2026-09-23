@@ -6,10 +6,7 @@ import type {
   DashboardOverviewRecord,
   DashboardPeriod,
   DashboardProjectRow,
-  DashboardRecentRun,
   RunCaseCounts,
-  RunSource,
-  RunStatus,
 } from '@qably/types';
 import { emptyCaseCounts, sumCaseCounts } from './run-case-metrics';
 
@@ -42,23 +39,6 @@ export interface ProjectRow {
   name: string;
 }
 
-export interface RecentRunRow {
-  id: string;
-  projectId: string;
-  projectName: string;
-  suiteId: string;
-  suiteName: string;
-  name: string;
-  status: RunStatus;
-  source: RunSource;
-  startedAt: Date;
-  finishedAt: Date | null;
-  commitSha: string | null;
-  commitMessage: string | null;
-  commitAuthor: string | null;
-  caseCounts: RunCaseCounts;
-}
-
 export interface BuildDashboardOverviewInput {
   period: DashboardPeriod;
   zone: string;
@@ -71,7 +51,6 @@ export interface BuildDashboardOverviewInput {
   suiteCountByProjectId: ReadonlyMap<string, number>;
   caseCountByProjectId: ReadonlyMap<string, number>;
   lastRunAtByProjectId: ReadonlyMap<string, Date>;
-  recentRuns: readonly RecentRunRow[];
 }
 
 interface DayAggregate {
@@ -292,29 +271,6 @@ function buildProjectRows(
   });
 }
 
-function buildRecentRuns(rows: readonly RecentRunRow[]): DashboardRecentRun[] {
-  return rows.map((row) => ({
-    id: row.id,
-    projectId: row.projectId,
-    projectName: row.projectName,
-    suiteId: row.suiteId,
-    suiteName: row.suiteName,
-    name: row.name,
-    status: row.status,
-    source: row.source,
-    startedAt: row.startedAt.toISOString(),
-    ...(row.finishedAt === null
-      ? {}
-      : { finishedAt: row.finishedAt.toISOString() }),
-    ...(row.commitSha === null ? {} : { commitSha: row.commitSha }),
-    ...(row.commitMessage === null ? {} : { commitMessage: row.commitMessage }),
-    ...(row.commitAuthor === null ? {} : { commitAuthor: row.commitAuthor }),
-    passRate: computePassRate(row.caseCounts),
-    casesPassed: row.caseCounts.pass,
-    casesTotal: row.caseCounts.total,
-  }));
-}
-
 export function buildDashboardOverview(
   input: BuildDashboardOverviewInput,
 ): Omit<DashboardOverviewRecord, 'recentActivity'> {
@@ -371,6 +327,5 @@ export function buildDashboardOverview(
       input.lastRunAtByProjectId,
       input.caseCountRows,
     ),
-    recentRuns: buildRecentRuns(input.recentRuns),
   };
 }

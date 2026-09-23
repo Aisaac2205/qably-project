@@ -530,7 +530,6 @@ export interface DashboardOverviewRecord {
   }
   casesPassing: RunCaseCounts
   projects: DashboardProjectRow[]
-  recentRuns: DashboardRecentRun[]
   recentActivity: DashboardActivityEntry[]
 }
 

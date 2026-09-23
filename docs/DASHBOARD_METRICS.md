@@ -50,7 +50,6 @@ for the 0–100 percentage form) is the only place this math is written:
 | `GET /dashboard/overview` `passRateSeries[].passRate` | Per-bucket pass rate (see "Series granularity" below). |
 | `GET /dashboard/overview` `casesPassing` | Raw `RunCaseCounts`; the client derives the rate for the gauge. |
 | `GET /dashboard/overview` `projects[].passRate` | Per-project pass rate over the current window. |
-| `GET /dashboard/overview` `recentRuns[].passRate` | Per-run pass rate. |
 | `GET /dashboard/summary` `passRate`/`passRateTrend` | Same formula, still windowed at the fixed `DASHBOARD_WINDOW_DAYS` (7), used by `/quality`. |
 | `GET /projects` `ProjectListItem.activity.healthScore` | Same formula, rendered 0–100. |
 
@@ -160,12 +159,67 @@ selected with `ROW_NUMBER() OVER (PARTITION BY suiteId ORDER BY startedAt DESC)`
 I ran every suite once right now, what would pass?" — a suite with ten runs today should count once,
 not ten times, or its case counts would dominate a suite that only ran once.
 
-### Projects and recent runs
+### Projects
 
 `projects[].passRate` is the project's pass rate over the **current** window only, computed from the
 same per-project, per-window case tally the series is built from — not `healthScore` on a 0–100
-scale, and not the all-time pass rate. `recentRuns` returns exactly the 4 most recently started runs
-in scope, each carrying its own pass rate and a `casesPassed`/`casesTotal` pair rather than a
+scale, and not the all-time pass rate.
+
+### `recentActivity`: commits, not runs
+
+`recentActivity` groups the window's runs by **what changed**, not by individual run row. A CI
+pipeline reports one `Run` per test suite per push, so a single push can produce dozens of runs with
+the same `commitSha` seconds apart; showing each one as its own feed entry would flood the dashboard
+with duplicates for a single event. `recentActivity` collapses them into one entry per commit (or per
+standalone run when there is no commit to group by), capped at `RECENT_ACTIVITY_LIMIT` (4) entries,
+most recent first.
+
+**Grouping key.** Every run in scope is assigned an `activityKey`: `commitSha` when the run has one,
+otherwise the run's own `id` — so a manual or API-triggered run with no commit still gets its own
+entry instead of silently merging with an unrelated run. Runs are grouped by `(projectId,
+activityKey)`, never across projects, even when two projects happen to build the same commit.
+
+**Bounded by the period window, not by an arbitrary row count.** The candidate query
+(`activity_candidates`) scans only runs inside the overview's already-resolved calendar window
+(`window.currentStart`–`window.currentEnd`, the same window the KPI cards use), groups by
+`(projectId, activityKey)`, and orders by the group's most recent `startedAt` before applying
+`LIMIT RECENT_ACTIVITY_LIMIT`. An earlier version capped the candidate scan at the 200 most recent
+*runs* before grouping; for an organization whose CI reports ~350 runs per push, that row cap filled
+entirely from a single commit and the endpoint returned one activity entry instead of four. Bounding
+by the window first and grouping over the whole window before limiting fixes that: the grouping
+always sees every run in the window, however many rows that is.
+
+**Aggregation is a second, bounded query — never a full refetch.** Once the ≤4 winning
+`(projectId, activityKey)` pairs are known, a second query (`matched_runs`, matched via a
+`(projectId, activityKey) IN (VALUES ...)` tuple list) fetches only runs belonging to those specific
+groups, still scoped to the same window. From there:
+
+- **Latest run per suite** (`DISTINCT ON (projectId, activityKey, suiteId)`, ordered by `startedAt
+  DESC`) — a suite that reran within the same commit counts once, using its most recent result, the
+  same "latest finished run per suite" idea `casesPassing` uses for the gauge.
+- **Suite count and status rollup** (`rollups` CTE) — `COUNT(*)` of the latest-per-suite rows and
+  `array_agg(DISTINCT status)` (cast to `::text[]`; a Postgres enum column has no array type parser
+  registered on Prisma's raw-query path and returns unparsed text otherwise) feed the status
+  precedence below.
+- **Anchor run** (`anchors` CTE, `DISTINCT ON (projectId, activityKey)` ordered by `startedAt DESC`)
+  — the single most recent run in the group supplies the entry's display name, suite name, source and
+  commit message/author. Sourcing these fields from the anchor by construction (not from whichever run
+  happened to be iterated last while building a `Map`) means the field always reflects the newest
+  run, not an iteration-order accident.
+- **Case counts** (`case_counts` CTE) — `casesPassed`/`casesTotal` summed only over the
+  latest-per-suite run ids, so a rerun's cases are not double-counted with its earlier attempt.
+
+**Status precedence: fail > running > pending > pass.** `rollUpStatus` (`common/metrics/
+run-status-rollup.ts`, shared with `recentCiCommits`) reduces the group's distinct suite statuses to
+one headline status by this order: if any suite in the group failed, the entry reads `fail`; else if
+any suite is still running, `running`; else if any suite is still pending, `pending`; otherwise
+(every suite passed) `pass`. A commit is only as good as its worst suite — a nine-of-ten-passing push
+should still read as failing, not as "mostly pass."
+
+`DashboardActivityEntry` is a discriminated union on `kind`: `'commit'` (carries `commitSha` and
+optional `commitMessage`/`commitAuthor`, plus `suiteCount`) or `'run'` (carries `runId`, `runName`,
+`suiteName`, for the standalone case). Every entry, regardless of kind, carries `projectId`,
+`projectName`, `status`, `source`, `occurredAt` and `casesPassed`/`casesTotal` — raw counts, not a
 formatted string, so the client decides how to render "244/300" or a bare percentage.
 
 ## `GET /dashboard/channels?tz=<iana>`

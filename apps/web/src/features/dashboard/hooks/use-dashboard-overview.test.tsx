@@ -30,7 +30,6 @@ const overview: DashboardOverviewRecord = {
   passRateSeries: { current: [], previous: [] },
   casesPassing: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
   projects: [],
-  recentRuns: [],
   recentActivity: [],
 }
 

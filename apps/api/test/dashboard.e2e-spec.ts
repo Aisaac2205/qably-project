@@ -523,40 +523,10 @@ describe('Dashboard (e2e)', () => {
         .expect(404);
     });
 
-    it('returns recent runs with project name, source and commit fields, capped at 4', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/dashboard/overview?period=7')
-        .expect(200);
-
-      const body = response.body as {
-        recentRuns: {
-          projectName: string;
-          source: string;
-          commitSha?: string;
-          commitMessage?: string;
-          commitAuthor?: string;
-          casesPassed: number;
-          casesTotal: number;
-        }[];
-      };
-
-      expect(body.recentRuns.length).toBeLessThanOrEqual(4);
-      expect(body.recentRuns[0]).toMatchObject({
-        projectName: 'Checkout Web',
-        source: 'github_actions',
-        commitSha: runRow.commitSha,
-        commitMessage: runRow.commitMessage,
-        commitAuthor: runRow.commitAuthor,
-        casesPassed: 1,
-        casesTotal: 1,
-      });
-    });
-
     it('reports null/zero KPIs and empty lists for an organization with no data, without crashing', async () => {
       prisma.project.findMany.mockResolvedValue([]);
       prisma.suite.groupBy.mockResolvedValue([]);
       prisma.testCase.groupBy.mockResolvedValue([]);
-      prisma.run.findMany.mockResolvedValue([]);
       prisma.run.groupBy.mockResolvedValue([]);
       prisma.$queryRaw.mockImplementation(queryRawRouter());
 
@@ -572,7 +542,6 @@ describe('Dashboard (e2e)', () => {
           avgRunDurationMs: { value: number | null };
         };
         projects: unknown[];
-        recentRuns: unknown[];
         recentActivity: unknown[];
         casesPassing: { total: number };
       };
@@ -582,7 +551,6 @@ describe('Dashboard (e2e)', () => {
       expect(body.kpis.failedCases.value).toBe(0);
       expect(body.kpis.avgRunDurationMs.value).toBeNull();
       expect(body.projects).toEqual([]);
-      expect(body.recentRuns).toEqual([]);
       expect(body.recentActivity).toEqual([]);
       expect(body.casesPassing.total).toBe(0);
     });

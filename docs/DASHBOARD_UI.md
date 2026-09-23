@@ -42,11 +42,44 @@ in this repo) that the CLI would otherwise re-apply here.
 `packages/ui/src/dashboard/` holds the presentational chart components built on that primitive:
 `Sparkline` (compact area chart for KPI tiles), `Gauge` (the cases-passing donut), `PassRateBar`,
 `DeliveryBars` (per-channel 14-day bar strip), `ChartDataTable` (the shared `sr-only` mirror table
-every chart renders alongside itself), `KpiTile`, `StatusChip` and `Link`. They take data and copy
-through props and know nothing about react-query, Next.js or the i18n store — `apps/web` wraps them
-in containers that fetch real data and translate labels; `apps/landing`'s own dashboard preview
-(`landing-dashboard-previews`, a separate change) will render the same components with demo data,
-so the marketing preview is never a re-implementation of the product's charts.
+every chart renders alongside itself), `KpiTile`, `StatusChip`, `Link`, `ChannelStat` and
+`ActivityEntryRow`. They take data and copy through props and know nothing about react-query,
+Next.js or the i18n store — `apps/web` wraps them in containers that fetch real data and translate
+labels; `apps/landing`'s own dashboard preview (`landing-dashboard-previews`, a separate change) will
+render the same components with demo data, so the marketing preview is never a re-implementation of
+the product's charts.
+
+### `ChannelStat`: a number over its label, not a sentence
+
+`ChannelStat` renders one channel metric (sent/failed/unread) as a value-over-unit visual stack,
+with the full sentence available to assistive tech only: the value and unit sit in an
+`aria-hidden="true"` span pair (value in `font-mono tabular-nums`, unit in a smaller muted line
+under it), and a sibling `.sr-only` span carries the plural-correct phrase a screen reader announces
+instead (`"3 sent"`, `"1 failed"`). A `tone` prop (`default | muted | pass | fail`) maps to the
+matching `qb-*` text colour — `apps/web`'s `channel-row.tsx`/`channels-card.tsx` pass `fail` when a
+channel's failed count is greater than zero and `pass` otherwise, so a channel with zero failures
+reads as healthy rather than neutral. `apps/web` resolves `unit`/`srText` through i18n
+(`dashboard.channels{Sent,Failed,Unread}Unit_one/_other`); the component itself never calls `t()`.
+
+### `ActivityEntryRow`: one row per commit or per standalone run
+
+`ActivityEntryRow` is the shared presentational row behind `ActivityCard`, driven by a discriminated
+union (`kind: 'commit' | 'run'`) matching `DashboardActivityEntry` from `@qably/types` (see
+`docs/DASHBOARD_METRICS.md` for how the API groups runs into one entry per commit). A `commit` row
+shows the project name, the 7-character short SHA (`commitSha.slice(0, 7)`, pure formatting done in
+the component, not through i18n) in `font-mono` with the full SHA in `title` for hover/focus
+disclosure, and a truncated commit message (also carrying its full text in `title` so a long message
+is still readable). A `run` row shows `projectName · runName` instead, with no commit line. Both
+kinds share a `StatusChip` (this package's own, not `apps/web`'s legacy `@/components/ui/status-chip`
+— `apps/web`'s `activity-row.tsx` container resolves the chip's `label` through
+`getLegacyStatusPresentation` for copy parity with the rest of the app), a `<time dateTime>` element
+for the relative timestamp, and a `casesSummary` string the container pre-formats (suite/case counts
+run through `formatEventCount(value, locale)` for locale-aware thousand separators — real
+organizations report suite counts and case totals in the hundreds per push).
+
+Like every other block in this package, `ActivityEntryRow` owns no icon assets: `sourceIcon` and the
+optional `commitIcon` are `ReactNode` slots the web container fills (a GitHub Actions icon, a
+`next/image` logo) so the shared component never imports `next/image` or a specific icon library.
 
 `ChartContainer` always forwards `initialDimension` — pass the chart's intrinsic design size, not a
 guess. Recharts 3.8.1's `ResponsiveContainer` skips measuring entirely when `ResizeObserver` is
@@ -112,10 +145,21 @@ chart while a horizontal drag can still scrub it.
   overflows its sparkline into the tile next to it.
 - Both `@3xl` two-column rows (projects/gauge, channels/activity) stack to one column below their
   own `@3xl`.
-- The projects table lives inside its own horizontally scrollable region
-  (`tabIndex={0}`, `role="region"`, `aria-label`) inside its card — the table can scroll, the page
-  never does.
+- The projects table is `table-fixed w-full` with the Suites and Cases columns
+  (`hidden @lg:table-cell`) dropped below its own `@lg` container breakpoint and the Pass rate column
+  pinned to a fixed width, rather than scrolling horizontally — a fixed layout that hides secondary
+  columns keeps every visible row's data legible at narrow widths instead of clipping the card's
+  `overflow-hidden` boundary or requiring a horizontal drag to see the pass rate. An earlier version
+  used a horizontally scrollable region (`tabIndex={0}`, `role="region"`) with a `min-w-xl` table;
+  dropped in favour of the fixed layout because a scroll-only-if-you-know-to-drag pattern is worse
+  than showing fewer columns outright on a table this narrow.
 - Channel rows stack identity above delivery bars below `@md`.
+- Each channel's sent/failed/unread counts render as `ChannelStat` (`@qably/ui/dashboard`): a
+  value-over-unit visual stack, with the plural-correct sentence available to screen readers via a
+  `.sr-only` sibling rather than an `aria-label` on the visible number.
+- `ActivityCard` groups the window's runs into one row per commit (or per standalone run) via
+  `ActivityEntryRow` (`@qably/ui/dashboard`) — see `docs/DASHBOARD_METRICS.md`'s `recentActivity`
+  section for the grouping and status-precedence rules behind what each row shows.
 - Every interactive control (the period toggle segments, sort buttons) meets the 24×24px minimum
   target size.
 
