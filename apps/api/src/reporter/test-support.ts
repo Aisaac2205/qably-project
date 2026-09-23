@@ -53,6 +53,8 @@ export function callPure<T>(calls: Array<{ fn: string; args: unknown[] }>): T {
   return JSON.parse(result.stdout) as T;
 }
 
+const CI_DETECTION_ENV_KEYS = ['GITHUB_ACTIONS'];
+
 export function runCli(
   args: string[],
   env: Record<string, string | undefined>,
@@ -61,6 +63,10 @@ export function runCli(
   const merged: Record<string, string> = {
     ...(process.env as Record<string, string>),
   };
+
+  for (const key of CI_DETECTION_ENV_KEYS) {
+    delete merged[key];
+  }
 
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) {
