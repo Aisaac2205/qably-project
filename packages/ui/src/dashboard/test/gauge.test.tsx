@@ -71,4 +71,39 @@ describe('Gauge', () => {
 
     expect(container.querySelector('.recharts-wrapper')).not.toHaveAttribute('tabIndex')
   })
+
+  it('defaults to a 240x132 box, per the mockup', () => {
+    const { container } = render(
+      <Gauge value={80} label="Cases passing">
+        <span>80%</span>
+      </Gauge>,
+    )
+
+    const svg = container.querySelector('svg.recharts-surface')
+    expect(svg).toHaveAttribute('width', '240')
+    expect(svg).toHaveAttribute('height', '132')
+  })
+
+  it('colours the value arc ink, never the pass/green semantic tone', () => {
+    const { container } = render(
+      <Gauge value={80} label="Cases passing">
+        <span>80%</span>
+      </Gauge>,
+    )
+
+    const cells = container.querySelectorAll('.recharts-pie:nth-of-type(2) .recharts-pie-sector path')
+    expect(cells[0]).toHaveAttribute('fill', 'var(--qb-chart-line)')
+    expect(cells[0]).not.toHaveAttribute('fill', 'var(--qb-chart-pass)')
+  })
+
+  it('gives the value arc round line caps via a corner radius', () => {
+    const { container } = render(
+      <Gauge value={80} label="Cases passing">
+        <span>80%</span>
+      </Gauge>,
+    )
+
+    const valueSector = container.querySelectorAll('.recharts-pie:nth-of-type(2) .recharts-pie-sector path')[0]
+    expect(valueSector?.getAttribute('d')).toContain('A')
+  })
 })

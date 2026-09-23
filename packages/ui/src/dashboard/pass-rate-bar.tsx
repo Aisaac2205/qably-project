@@ -20,7 +20,7 @@ export function PassRateBar({
   className,
 }: PassRateBarProps) {
   const clamped = value === null ? 0 : Math.min(100, Math.max(0, value))
-  const tone = value === null ? '' : value >= warnBelow ? 'bg-qb-pass' : 'bg-qb-warn'
+  const tone = value === null ? '' : value >= warnBelow ? 'bg-qb-fg' : 'bg-qb-warn'
   const a11yProps =
     value === null
       ? ({ role: 'img', 'aria-label': emptyLabel } as const)

@@ -7,19 +7,31 @@ import { cn } from '../utils'
 export interface GaugeProps {
   value: number | null
   label: string
-  size?: number
+  width?: number
+  height?: number
   className?: string
   children?: ReactNode
 }
 
 const START_ANGLE = 180
 const END_ANGLE = 0
-const OUTER_RADIUS = 56
-const INNER_RADIUS = 42
-const CORNER_RADIUS = 6
+const DEFAULT_WIDTH = 240
+const DEFAULT_HEIGHT = 132
+const STROKE_WIDTH = 18
+const EDGE_MARGIN = 16
+const CORNER_RADIUS = STROKE_WIDTH / 2
 
-export function Gauge({ value, label, size = 128, className, children }: GaugeProps) {
+export function Gauge({
+  value,
+  label,
+  width = DEFAULT_WIDTH,
+  height = DEFAULT_HEIGHT,
+  className,
+  children,
+}: GaugeProps) {
   const clamped = value === null ? null : Math.min(100, Math.max(0, value))
+  const outerRadius = width / 2 - EDGE_MARGIN
+  const innerRadius = outerRadius - STROKE_WIDTH
   const trackData = [{ segment: 'track', portion: 100 }]
   const valueData = clamped === null ? [] : [
     { segment: 'value', portion: clamped },
@@ -41,9 +53,9 @@ export function Gauge({ value, label, size = 128, className, children }: GaugePr
     <div
       {...a11yProps}
       className={cn('relative inline-flex items-center justify-center', className)}
-      style={{ width: size, height: size / 2 + 8 }}
+      style={{ width, height }}
     >
-      <PieChart width={size} height={size / 2 + 8} accessibilityLayer={false} tabIndex={-1}>
+      <PieChart width={width} height={height} accessibilityLayer={false} tabIndex={-1}>
         <Pie
           data={trackData}
           dataKey="portion"
@@ -52,8 +64,8 @@ export function Gauge({ value, label, size = 128, className, children }: GaugePr
           cy="100%"
           startAngle={START_ANGLE}
           endAngle={END_ANGLE}
-          innerRadius={INNER_RADIUS}
-          outerRadius={OUTER_RADIUS}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius}
           isAnimationActive={false}
           stroke="none"
         >
@@ -68,13 +80,13 @@ export function Gauge({ value, label, size = 128, className, children }: GaugePr
             cy="100%"
             startAngle={START_ANGLE}
             endAngle={END_ANGLE}
-            innerRadius={INNER_RADIUS}
-            outerRadius={OUTER_RADIUS}
+            innerRadius={innerRadius}
+            outerRadius={outerRadius}
             cornerRadius={CORNER_RADIUS}
             isAnimationActive={false}
             stroke="none"
           >
-            <Cell fill="var(--qb-chart-pass)" />
+            <Cell fill="var(--qb-chart-line)" />
             <Cell fill="transparent" />
           </Pie>
         ) : null}

@@ -1,6 +1,8 @@
 'use client'
 
 import Image from 'next/image'
+import { DeliveryBars } from '@qably/ui/dashboard'
+import type { DashboardInAppChannel } from '@qably/types'
 import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StateView } from '@/components/ui/state-view'
@@ -23,6 +25,42 @@ function ChannelsCardSkeleton() {
   )
 }
 
+function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
+  const { t } = useTranslation()
+  const name = t('dashboard.channelsInAppName')
+
+  return (
+    <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border">
+          <Image src="/icono-qably.png" alt="" width={20} height={20} className="size-5 shrink-0" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-default">{name}</p>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-4">
+        <DeliveryBars
+          points={inApp.daily}
+          label={t('dashboard.channelsDeliveryLabel', { name })}
+          sentLabel={t('dashboard.channelsSentLabel')}
+          failedLabel={t('dashboard.channelsFailedLabel')}
+          className="w-28"
+        />
+        <div className="flex w-20 flex-col items-end gap-0.5 tabular-nums">
+          <span className="font-mono text-sm font-medium text-default" data-testid="in-app-sent-count">
+            {t('dashboard.channelsSentCount', { count: inApp.sent })}
+          </span>
+          <span className="font-mono text-xs text-muted" data-testid="in-app-unread-count">
+            {t('dashboard.channelsUnreadCount', { count: inApp.unread })}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ChannelsCard() {
   const { channels, isLoading, isError, retry } = useDashboardChannels()
   const { t, locale } = useTranslation()
@@ -30,7 +68,10 @@ export function ChannelsCard() {
   const title = t('dashboard.channelsTitle')
 
   const isEmpty =
-    channels !== undefined && channels.webhooks.length === 0 && !channels.email.enabled
+    channels !== undefined &&
+    channels.webhooks.length === 0 &&
+    !channels.email.enabled &&
+    channels.inApp.sent === 0
 
   return (
     <Card as="section" aria-labelledby="channels-card-heading" className="flex h-full flex-col overflow-hidden">
@@ -57,7 +98,8 @@ export function ChannelsCard() {
         <StateView kind="empty" title={t('dashboard.channelsEmptyTitle')} />
       ) : (
         <>
-          <div className="flex flex-col divide-y divide-border">
+          <div className="flex flex-grow flex-col divide-y divide-border">
+            <InAppChannelRow inApp={channels.inApp} />
             {channels.webhooks.map((webhook) => (
               <ChannelRow key={webhook.id} webhook={webhook} />
             ))}
@@ -79,7 +121,7 @@ export function ChannelsCard() {
           </div>
 
           {channels.lastDelivery !== null ? (
-            <CardFooter className="pt-3">
+            <CardFooter className="mt-auto pt-3">
               <span className="text-xs text-muted">
                 {t('dashboard.channelsLastDelivery', {
                   status: t(

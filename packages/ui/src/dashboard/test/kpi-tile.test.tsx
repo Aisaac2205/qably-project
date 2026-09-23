@@ -60,4 +60,38 @@ describe('KpiTile', () => {
 
     expect(screen.queryByText(/versus/)).not.toBeInTheDocument()
   })
+
+  it('orders content value, then label, then delta, top to bottom per the mockup', () => {
+    render(
+      <KpiTile label="Pass rate" value="89%" delta={{ text: '+5%', tone: 'better', srText: 'x' }} />,
+    )
+
+    const value = screen.getByText('89%')
+    const label = screen.getByText('Pass rate')
+    const delta = screen.getByText('+5%')
+
+    expect(value.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(label.compareDocumentPosition(delta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('gives the label an 8px gap from the value and the delta a 12px gap from the label', () => {
+    render(
+      <KpiTile label="Pass rate" value="89%" delta={{ text: '+5%', tone: 'better', srText: 'x' }} />,
+    )
+
+    expect(screen.getByText('Pass rate')).toHaveClass('mt-2')
+    expect(screen.getByText('+5%').closest('div')).toHaveClass('mt-3')
+  })
+
+  it('aligns caller-supplied children, such as a sparkline, to the bottom-right of the tile', () => {
+    const { container } = render(
+      <KpiTile label="Runs" value={87}>
+        <svg data-testid="child-sparkline" />
+      </KpiTile>,
+    )
+
+    const row = container.querySelector('.items-end')
+    expect(row).toBeInTheDocument()
+    expect(row?.querySelector('[data-testid="child-sparkline"]')).toBeInTheDocument()
+  })
 })

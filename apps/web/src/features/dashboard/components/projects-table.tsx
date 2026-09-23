@@ -73,9 +73,6 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                 <th scope="col" className="py-2.5 pr-3 text-xs font-medium text-muted">
                   {t('dashboard.projectsColProject')}
                 </th>
-                <th scope="col" className="py-2.5 px-3 text-xs font-medium text-muted">
-                  {t('dashboard.projectsColLastRun')}
-                </th>
                 <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-muted">
                   {t('dashboard.projectsColSuites')}
                 </th>
@@ -94,38 +91,42 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
 
                 return (
                   <tr key={project.id}>
-                    <td className="min-w-0 py-2.5 pr-3">
+                    <td className="min-w-48 py-3 pr-3">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <ProjectMonogram projectId={project.id} name={project.name} />
-                        <Link
-                          href={projectRootPath(project.id)}
-                          className="truncate text-xs font-semibold text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
-                        >
-                          {project.name}
-                        </Link>
+                        <div className="min-w-0">
+                          <Link
+                            href={projectRootPath(project.id)}
+                            className="block truncate text-xs font-semibold text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                          >
+                            {project.name}
+                          </Link>
+                          <p className="truncate text-xs text-muted tabular-nums">
+                            {project.lastRunAt === undefined
+                              ? t('dashboard.noRuns')
+                              : t('dashboard.projectsLastRunLabel', {
+                                  time: formatRelativeTime(project.lastRunAt, timeLocale),
+                                })}
+                          </p>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-2.5 px-3 text-xs text-muted tabular-nums">
-                      {project.lastRunAt === undefined
-                        ? t('dashboard.noRuns')
-                        : formatRelativeTime(project.lastRunAt, timeLocale)}
-                    </td>
-                    <td className="py-2.5 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
+                    <td className="py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.suites}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
+                    <td className="py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.cases}
                     </td>
-                    <td className="py-2.5 pl-3">
-                      <div className="flex items-center justify-end gap-2">
-                        <span className="w-11 text-right font-mono text-xs font-semibold text-default tabular-nums">
-                          {passRateText}
-                        </span>
+                    <td className="py-3 pl-3">
+                      <div className="flex items-center gap-2">
                         <PassRateBar
                           value={barValue}
                           label={t('dashboard.projectsRowPassRateLabel', { name: project.name })}
-                          className="w-16"
+                          className="h-1.5 flex-1"
                         />
+                        <span className="w-11 text-right font-mono text-xs font-semibold text-default tabular-nums">
+                          {passRateText}
+                        </span>
                       </div>
                     </td>
                   </tr>

@@ -22,11 +22,26 @@ describe('DeliveryBars', () => {
     expect(bars[5]).toHaveClass('bg-qb-fail')
   })
 
-  it('tints a day with sends and no failures using the pass tone', () => {
+  it('tints a day with sends and no failures using the ink tone, never the pass/green semantic tone', () => {
     const { container } = render(<DeliveryBars points={points} label="Deliveries, last 14 days" />)
 
     const bars = container.querySelectorAll('[data-slot="delivery-bar"]')
-    expect(bars[0]).toHaveClass('bg-qb-pass')
+    expect(bars[0]).toHaveClass('bg-qb-fg')
+    expect(bars[0]).not.toHaveClass('bg-qb-pass')
+  })
+
+  it('scales each bar height proportionally to that day\'s sent count, capped at 26px, with a visible floor for zero days', () => {
+    const { container } = render(<DeliveryBars points={points} label="Deliveries, last 14 days" />)
+
+    const bars = container.querySelectorAll('[data-slot="delivery-bar"]')
+    const heights = [...bars].map((bar) => Number((bar as HTMLElement).style.height.replace('px', '')))
+
+    const zeroSendHeight = heights[3] ?? 0
+    const lastHeight = heights.at(-1) ?? 0
+
+    expect(Math.max(...heights)).toBeLessThanOrEqual(26)
+    expect(zeroSendHeight).toBeGreaterThanOrEqual(3)
+    expect(zeroSendHeight).toBeLessThan(lastHeight)
   })
 
   it('renders a muted empty bar for a day with zero sends and zero failures', () => {

@@ -27,23 +27,23 @@ export function KpiTile({ label, value, delta, className, children }: KpiTilePro
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-col gap-2 rounded-xl border border-qb-border bg-qb-surface px-5 py-4',
+        'flex min-w-0 flex-col rounded-xl border border-qb-border bg-qb-surface px-5 py-4',
         className,
       )}
     >
       <div className="flex items-end justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-2">
-          <dt className="truncate text-xs font-medium text-qb-muted">{label}</dt>
+        <div className="flex min-w-0 flex-col">
           <dd className="text-2xl font-medium leading-none tracking-tight text-qb-fg tabular-nums">{value}</dd>
+          <dt className="mt-2 truncate text-xs font-medium text-qb-muted">{label}</dt>
+          {delta ? (
+            <div className="mt-3 flex items-center gap-1.5 text-xs tabular-nums">
+              <span className={cn('font-medium', DELTA_TONE_CLASSES[delta.tone])}>{delta.text}</span>
+              <span className="sr-only">{delta.srText}</span>
+            </div>
+          ) : null}
         </div>
         {children ? <div className="shrink-0">{children}</div> : null}
       </div>
-      {delta ? (
-        <div className="flex items-center gap-1.5 text-xs tabular-nums">
-          <span className={cn('font-medium', DELTA_TONE_CLASSES[delta.tone])}>{delta.text}</span>
-          <span className="sr-only">{delta.srText}</span>
-        </div>
-      ) : null}
     </div>
   )
 }

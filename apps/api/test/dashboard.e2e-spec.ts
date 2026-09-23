@@ -64,6 +64,7 @@ interface QueryRawFixtures {
   runCounts?: unknown[];
   casesPassing?: unknown[];
   deliveryCounts?: unknown[];
+  inAppCounts?: unknown[];
   traceability?: unknown[];
 }
 
@@ -82,6 +83,9 @@ function queryRawRouter(fixtures: QueryRawFixtures = {}) {
     }
     if (text.includes('FROM "notification_delivery" d')) {
       return Promise.resolve(fixtures.deliveryCounts ?? []);
+    }
+    if (text.includes('FROM "notification" n')) {
+      return Promise.resolve(fixtures.inAppCounts ?? []);
     }
 
     return Promise.resolve(
@@ -785,6 +789,123 @@ describe('Dashboard (e2e)', () => {
         status: 'sent',
         deliveredAt: '2026-06-15T10:00:00.000Z',
       });
+    });
+
+    interface FakeInAppNotification {
+      organizationId: string;
+      userId: string;
+      day: string;
+      sent: number;
+      unread: number;
+    }
+
+    function inAppQueryRouter(rows: readonly FakeInAppNotification[]) {
+      return (sql: RawQueryRawSql & { values: readonly unknown[] }) => {
+        const text = sql.strings.join('');
+        if (!text.includes('FROM "notification" n')) {
+          return queryRawRouter()(sql);
+        }
+
+        const [, organizationId, userId] = sql.values as [
+          string,
+          string,
+          string,
+        ];
+        const matches = rows.filter(
+          (row) =>
+            row.organizationId === organizationId && row.userId === userId,
+        );
+
+        return Promise.resolve(
+          matches.map(({ day, sent, unread }) => ({ day, sent, unread })),
+        );
+      };
+    }
+
+    it("excludes another organization's in-app notifications from the response, even for the same user", async () => {
+      prisma.$queryRaw.mockImplementation(
+        inAppQueryRouter([
+          {
+            organizationId: 'org-1',
+            userId: 'user-1',
+            day: '2026-06-16',
+            sent: 3,
+            unread: 2,
+          },
+          {
+            organizationId: 'org-foreign',
+            userId: 'user-1',
+            day: '2026-06-16',
+            sent: 99,
+            unread: 99,
+          },
+        ]),
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        inApp: { sent: number; unread: number };
+      };
+      expect(body.inApp.sent).toBe(3);
+      expect(body.inApp.unread).toBe(2);
+    });
+
+    it("excludes another user's in-app notifications from the response, even within the same organization", async () => {
+      prisma.$queryRaw.mockImplementation(
+        inAppQueryRouter([
+          {
+            organizationId: 'org-1',
+            userId: 'user-1',
+            day: '2026-06-16',
+            sent: 3,
+            unread: 2,
+          },
+          {
+            organizationId: 'org-1',
+            userId: 'user-2',
+            day: '2026-06-16',
+            sent: 50,
+            unread: 50,
+          },
+        ]),
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        inApp: { sent: number; unread: number };
+      };
+      expect(body.inApp.sent).toBe(3);
+      expect(body.inApp.unread).toBe(2);
+    });
+
+    it('returns zeroed in-app totals and a fully zero-filled daily window for a user with no notifications', async () => {
+      prisma.$queryRaw.mockImplementation(inAppQueryRouter([]));
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        inApp: {
+          sent: number;
+          unread: number;
+          daily: { sent: number; failed: number }[];
+        };
+      };
+      expect(body.inApp.sent).toBe(0);
+      expect(body.inApp.unread).toBe(0);
+      expect(body.inApp.daily).toHaveLength(14);
+      expect(
+        body.inApp.daily.every(
+          (point) => point.sent === 0 && point.failed === 0,
+        ),
+      ).toBe(true);
     });
   });
 });

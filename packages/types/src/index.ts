@@ -529,9 +529,16 @@ export interface DashboardLastDelivery {
   deliveredAt: string
 }
 
+export interface DashboardInAppChannel {
+  sent: number
+  unread: number
+  daily: DashboardChannelDailyPoint[]
+}
+
 export interface DashboardChannelsRecord {
   webhooks: DashboardWebhookChannel[]
   email: DashboardEmailChannel
+  inApp: DashboardInAppChannel
   lastDelivery: DashboardLastDelivery | null
 }
 

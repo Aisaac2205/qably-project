@@ -292,6 +292,15 @@ export const dashboardChannelsFixture: DashboardChannelsRecord = {
     },
   ],
   email: { enabled: true, eventTypes: ['case_regressed', 'connection_security'] },
+  inApp: {
+    sent: 9,
+    unread: 3,
+    daily: Array.from({ length: 14 }, (_, index) => ({
+      date: `2026-06-${String(index + 3).padStart(2, '0')}`,
+      sent: index === 13 ? 0 : 1,
+      failed: 0,
+    })),
+  },
   lastDelivery: {
     webhookId: 'webhook-1',
     eventType: 'run_failed',

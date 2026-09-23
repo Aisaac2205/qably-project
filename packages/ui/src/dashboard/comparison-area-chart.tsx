@@ -182,8 +182,15 @@ export function ComparisonAreaChart({
     return <p className="py-12 text-center text-xs text-qb-muted">{emptyLabel}</p>
   }
 
-  const middleIndex = Math.floor((points.length - 1) / 2)
-  const xTickIds = Array.from(new Set([points[0]?.id, points[middleIndex]?.id, points[points.length - 1]?.id]))
+  const tickCount = Math.min(5, points.length)
+  const xTickIds = Array.from(
+    new Set(
+      Array.from({ length: tickCount }, (_, index) => {
+        const pointIndex = Math.round((index * (points.length - 1)) / (tickCount - 1 || 1))
+        return points[pointIndex]?.id
+      }),
+    ),
+  ).filter((id): id is string => id !== undefined)
   const idToLabel = new Map(points.map((point) => [point.id, point.label]))
 
   return (
@@ -250,7 +257,7 @@ export function ComparisonAreaChart({
           <Area
             type="monotone"
             dataKey="current"
-            connectNulls={false}
+            connectNulls
             stroke="var(--color-current)"
             strokeWidth={2.2}
             strokeLinecap="round"
@@ -262,7 +269,7 @@ export function ComparisonAreaChart({
           <Line
             type="monotone"
             dataKey="previous"
-            connectNulls={false}
+            connectNulls
             stroke="var(--color-previous)"
             strokeWidth={1.5}
             strokeDasharray="5 5"

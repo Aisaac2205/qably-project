@@ -43,12 +43,24 @@ describe('ComparisonAreaChart', () => {
     expect(line).toHaveAttribute('stroke-dasharray', '5 5')
   })
 
-  it('breaks the current series into a gap instead of interpolating across a null day', () => {
+  it('connects the current and previous series across a null day into one continuous curve', () => {
     const { container } = render(<ComparisonAreaChart {...defaultProps} points={points} />)
 
     const area = container.querySelector('.recharts-area-curve')
-    const commands = (area?.getAttribute('d') ?? '').match(/M/g) ?? []
-    expect(commands.length).toBeGreaterThan(1)
+    const areaCommands = (area?.getAttribute('d') ?? '').match(/M/g) ?? []
+    expect(areaCommands.length).toBe(1)
+
+    const line = container.querySelector('.recharts-line-curve')
+    const lineCommands = (line?.getAttribute('d') ?? '').match(/M/g) ?? []
+    expect(lineCommands.length).toBe(1)
+  })
+
+  it('still shows a dash in the sr-only table for a null day, without fabricating data', () => {
+    render(<ComparisonAreaChart {...defaultProps} points={points} />)
+
+    const table = screen.getByRole('table')
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(within(rows[1] as HTMLElement).getByText('—')).toBeInTheDocument()
   })
 
   it('mirrors the series in an sr-only table including runs and failed runs', () => {
@@ -97,6 +109,19 @@ describe('ComparisonAreaChart', () => {
       'data-touch-trigger',
       'click',
     )
+  })
+
+  it('renders five evenly spaced x-axis labels for a longer series', () => {
+    const longSeries: ComparisonAreaPoint[] = Array.from({ length: 30 }, (_, index) => ({
+      id: `d${index}`,
+      label: `Day ${index}`,
+      current: 90,
+      previous: 88,
+    }))
+    const { container } = render(<ComparisonAreaChart {...defaultProps} points={longSeries} />)
+
+    const ticks = container.querySelectorAll('.recharts-xAxis .recharts-cartesian-axis-tick')
+    expect(ticks.length).toBe(5)
   })
 
   it('fills its sized parent instead of relying on ResponsiveContainer to measure a 0-height ancestor', () => {

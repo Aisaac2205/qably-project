@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import type { DashboardWebhookChannel } from '@qably/types'
 import { ChannelRow } from '@/features/dashboard/components/channel-row'
@@ -41,10 +41,18 @@ describe('ChannelRow', () => {
     expect(screen.getByText('Run failed, Run completed')).toBeInTheDocument()
   })
 
-  it('shows the sent and failed totals', () => {
+  it('shows the sent and failed totals as combined counted copy', () => {
     render(<ChannelRow webhook={webhook({ sent: 12, failed: 2 })} />)
-    expect(within(screen.getByTestId('channel-sent-count')).getByText('12')).toBeInTheDocument()
-    expect(within(screen.getByTestId('channel-failed-count')).getByText('2')).toBeInTheDocument()
+    expect(screen.getByTestId('channel-sent-count')).toHaveTextContent('12 sent')
+    expect(screen.getByTestId('channel-failed-count')).toHaveTextContent('2 failed')
+  })
+
+  it('colours the failed count by fail tone when nonzero and pass tone at zero', () => {
+    const { rerender } = render(<ChannelRow webhook={webhook({ sent: 12, failed: 2 })} />)
+    expect(screen.getByTestId('channel-failed-count')).toHaveClass('text-fail')
+
+    rerender(<ChannelRow webhook={webhook({ sent: 12, failed: 0 })} />)
+    expect(screen.getByTestId('channel-failed-count')).toHaveClass('text-pass')
   })
 
   it('renders the 14-day delivery bars', () => {

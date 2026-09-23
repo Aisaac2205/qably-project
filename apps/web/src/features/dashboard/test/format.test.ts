@@ -163,22 +163,22 @@ describe('formatKpiDelta', () => {
     expect(formatKpiDelta('runs', 10, null)).toBeNull()
   })
 
-  it('signs a passRate delta in percentage points', () => {
-    expect(formatKpiDelta('passRate', 0.82, 0.75)).toBe('+7%')
-    expect(formatKpiDelta('passRate', 0.7, 0.9)).toBe('-20%')
+  it('signs a passRate delta in percentage points with an arrow, never a bare +/-', () => {
+    expect(formatKpiDelta('passRate', 0.82, 0.75)).toBe('↑ 7 pts')
+    expect(formatKpiDelta('passRate', 0.7, 0.9)).toBe('↓ 20 pts')
   })
 
-  it('signs a runs/failedCases delta as a whole count', () => {
-    expect(formatKpiDelta('runs', 42, 35)).toBe('+7')
-    expect(formatKpiDelta('failedCases', 6, 9)).toBe('-3')
+  it('signs a runs/failedCases delta as an arrow plus a whole count', () => {
+    expect(formatKpiDelta('runs', 42, 35)).toBe('↑ 7')
+    expect(formatKpiDelta('failedCases', 6, 9)).toBe('↓ 3')
   })
 
-  it('signs an avgRunDurationMs delta as a duration', () => {
-    expect(formatKpiDelta('avgRunDurationMs', 184320, 210500)).toBe('-26s')
+  it('signs an avgRunDurationMs delta as an arrow plus a duration', () => {
+    expect(formatKpiDelta('avgRunDurationMs', 184320, 210500)).toBe('↓ 26s')
   })
 
-  it('renders an unsigned zero when nothing changed', () => {
-    expect(formatKpiDelta('passRate', 0.5, 0.5)).toBe('0%')
+  it('renders an unsigned zero with no arrow when nothing changed', () => {
+    expect(formatKpiDelta('passRate', 0.5, 0.5)).toBe('0 pts')
     expect(formatKpiDelta('runs', 10, 10)).toBe('0')
     expect(formatKpiDelta('avgRunDurationMs', 1000, 1000)).toBe('0s')
   })

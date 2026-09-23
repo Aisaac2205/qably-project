@@ -88,12 +88,16 @@ describe('ChannelsService organization scope', () => {
     );
   });
 
-  it('skips the delivery count raw query when there are no enabled webhooks', async () => {
+  it('skips the delivery count raw query when there are no enabled webhooks, still issuing the always-on in-app query', async () => {
     const prisma = createPrisma();
 
     await build(prisma).channels(org, 'user-1', 'UTC');
 
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    const calls = prisma.$queryRaw.mock.calls as [{ strings: string[] }][];
+    const deliveryCalls = calls.filter(([sql]) =>
+      sql.strings.join('').includes('notification_delivery'),
+    );
+    expect(deliveryCalls).toHaveLength(0);
   });
 
   it('scopes the delivery count raw query to the organization, the enabled webhook ids and the window bounds', async () => {
@@ -104,10 +108,13 @@ describe('ChannelsService organization scope', () => {
 
     await build(prisma).channels(org, 'user-1', 'UTC');
 
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-    const [sql] = prisma.$queryRaw.mock.calls[0] as [
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    const calls = prisma.$queryRaw.mock.calls as [
       { strings: string[]; values: unknown[] },
-    ];
+    ][];
+    const [sql] = calls.find(([candidate]) =>
+      candidate.strings.join('').includes('notification_delivery'),
+    ) as [{ strings: string[]; values: unknown[] }];
     const sqlText = sql.strings.join('');
     expect(sqlText).toContain('notification_delivery');
     expect(sqlText).toContain('<');
@@ -137,6 +144,69 @@ describe('ChannelsService organization scope', () => {
         where: { organizationId: 'org-1', webhookId: { in: ['webhook-1'] } },
       }),
     );
+  });
+});
+
+describe('ChannelsService in-app channel scope', () => {
+  it('always issues the in-app notification raw query, scoped to the organization, the current user and the window bounds', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const [sql] = prisma.$queryRaw.mock.calls[0] as [
+      { strings: string[]; values: unknown[] },
+    ];
+    const sqlText = sql.strings.join('');
+    expect(sqlText).toContain('FROM "notification" n');
+    expect(sqlText).toContain('<');
+    expect(sql.values).toEqual(
+      expect.arrayContaining(['org-1', 'user-1', NOW]),
+    );
+  });
+
+  it('scopes the in-app query to a different user in the same call, never mixing user ids', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).channels(org, 'user-2', 'UTC');
+
+    const [sql] = prisma.$queryRaw.mock.calls[0] as [
+      { strings: string[]; values: unknown[] },
+    ];
+    expect(sql.values).toContain('user-2');
+    expect(sql.values).not.toContain('user-1');
+  });
+
+  it('reports zeroed in-app totals and a fully zero-filled daily window when there is no activity', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inApp.sent).toBe(0);
+    expect(result.value.inApp.unread).toBe(0);
+    expect(result.value.inApp.daily).toHaveLength(14);
+    expect(
+      result.value.inApp.daily.every(
+        (point) => point.sent === 0 && point.failed === 0,
+      ),
+    ).toBe(true);
+  });
+
+  it('aggregates sent and unread counts from the raw query rows into the in-app totals', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockResolvedValue([
+      { day: '2026-06-16', sent: 3, unread: 2 },
+      { day: '2026-06-15', sent: 1, unread: 0 },
+    ]);
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inApp.sent).toBe(4);
+    expect(result.value.inApp.unread).toBe(2);
   });
 });
 

@@ -72,7 +72,7 @@ describe('PassRateHero', () => {
     })
 
     expect(screen.getByText('82%')).toBeInTheDocument()
-    expect(screen.getByText('+7%')).toBeInTheDocument()
+    expect(screen.getByText('↑ 7 pts vs previous period')).toBeInTheDocument()
     expect(screen.getAllByText('Current period').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Previous period').length).toBeGreaterThan(0)
   })

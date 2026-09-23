@@ -3,6 +3,7 @@ import type {
   DashboardChannelDailyPoint,
   DashboardChannelsRecord,
   DashboardEmailChannel,
+  DashboardInAppChannel,
   DashboardWebhookChannel,
   NotificationDeliveryStatus,
   NotificationEventType,
@@ -37,11 +38,18 @@ export interface LastDeliveryRow {
   deliveredAt: Date;
 }
 
+export interface InAppCountRow {
+  day: string;
+  sent: number;
+  unread: number;
+}
+
 export interface BuildDashboardChannelsInput {
   dayKeys: readonly string[];
   webhooks: readonly WebhookRow[];
   deliveryCountRows: readonly DeliveryCountRow[];
   emailPreferenceRows: readonly PreferenceRow[];
+  inAppCountRows?: readonly InAppCountRow[];
   lastDelivery: LastDeliveryRow | null;
 }
 
@@ -107,6 +115,34 @@ function buildEmailChannel(
   };
 }
 
+function buildInAppChannel(
+  dayKeys: readonly string[],
+  inAppCountRows: readonly InAppCountRow[],
+): DashboardInAppChannel {
+  const dailyByDate = new Map<string, DashboardChannelDailyPoint>();
+  for (const day of dayKeys) dailyByDate.set(day, emptyDailyPoint(day));
+
+  let sent = 0;
+  let unread = 0;
+
+  for (const row of inAppCountRows) {
+    const point = dailyByDate.get(row.day);
+    if (point === undefined) continue;
+
+    point.sent += row.sent;
+    sent += row.sent;
+    unread += row.unread;
+  }
+
+  return {
+    sent,
+    unread,
+    daily: dayKeys.map(
+      (day) => dailyByDate.get(day) as DashboardChannelDailyPoint,
+    ),
+  };
+}
+
 export function buildDashboardChannels(
   input: BuildDashboardChannelsInput,
 ): DashboardChannelsRecord {
@@ -115,6 +151,7 @@ export function buildDashboardChannels(
       buildWebhookChannel(webhook, input.dayKeys, input.deliveryCountRows),
     ),
     email: buildEmailChannel(input.emailPreferenceRows),
+    inApp: buildInAppChannel(input.dayKeys, input.inAppCountRows ?? []),
     lastDelivery:
       input.lastDelivery === null
         ? null

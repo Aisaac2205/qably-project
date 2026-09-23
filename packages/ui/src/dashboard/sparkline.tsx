@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useMemo } from 'react'
-import { Area, ComposedChart } from 'recharts'
+import { Area, ComposedChart, YAxis } from 'recharts'
 import { cn } from '../utils'
 import { ChartContainer, type ChartConfig } from '../chart/chart'
 
@@ -27,6 +27,20 @@ export interface SparklineProps {
 
 const MARKER_RADIUS = 4
 const INSET = 3
+const MIN_SPAN_PAD = 1
+const SPAN_PAD_RATIO = 0.15
+
+function computeSparklineDomain(values: readonly (number | null)[]): [number, number] {
+  const defined = values.filter((value): value is number => value !== null)
+  if (defined.length === 0) return [0, 1]
+
+  const min = Math.min(...defined)
+  const max = Math.max(...defined)
+  const span = max - min
+  const pad = span === 0 ? Math.max(Math.abs(min) * SPAN_PAD_RATIO, MIN_SPAN_PAD) : span * SPAN_PAD_RATIO
+
+  return [min - pad, max + pad]
+}
 
 export function Sparkline({
   values,
@@ -41,6 +55,7 @@ export function Sparkline({
   const color = TONE_VAR[tone]
   const data = useMemo(() => values.map((value, index) => ({ index, value })), [values])
   const config: ChartConfig = useMemo(() => ({ value: { color } }), [color])
+  const domain = useMemo(() => computeSparklineDomain(values), [values])
   const definedIndexes = useMemo(
     () => data.reduce<number[]>((found, point) => (point.value !== null ? [...found, point.index] : found), []),
     [data],
@@ -88,6 +103,7 @@ export function Sparkline({
             <stop offset="100%" stopColor="var(--color-value)" stopOpacity={0} />
           </linearGradient>
         </defs>
+        <YAxis type="number" domain={domain} hide />
         <Area
           type="monotone"
           dataKey="value"

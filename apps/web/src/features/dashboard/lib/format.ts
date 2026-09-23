@@ -90,15 +90,10 @@ export function formatKpiDelta(
   if (value === null || previous === null) return null
 
   const diff = metric === 'passRate' ? Math.round(value * 100) - Math.round(previous * 100) : value - previous
-
-  if (diff === 0) {
-    return metric === 'passRate' ? '0%' : metric === 'avgRunDurationMs' ? '0s' : '0'
-  }
-
-  const sign = diff > 0 ? '+' : '-'
   const magnitude = Math.abs(diff)
+  const arrow = diff > 0 ? '↑ ' : diff < 0 ? '↓ ' : ''
 
-  if (metric === 'passRate') return `${sign}${magnitude}%`
-  if (metric === 'avgRunDurationMs') return `${sign}${formatRunDuration(magnitude)}`
-  return `${sign}${formatNumber(magnitude)}`
+  if (metric === 'passRate') return `${arrow}${magnitude} pts`
+  if (metric === 'avgRunDurationMs') return `${arrow}${formatRunDuration(magnitude)}`
+  return `${arrow}${formatNumber(magnitude)}`
 }

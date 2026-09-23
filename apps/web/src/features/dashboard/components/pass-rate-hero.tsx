@@ -9,7 +9,7 @@ import { StateView } from '@/components/ui/state-view'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDashboardOverview } from '@/features/dashboard/hooks/use-dashboard-overview'
-import { HERO_PASS_RATE_DOMAIN, HERO_PASS_RATE_TICKS, buildHeroPoints } from '@/features/dashboard/lib/hero-domain'
+import { buildHeroPoints, resolveHeroPassRateDomain } from '@/features/dashboard/lib/hero-domain'
 import { DASHBOARD_KPI_POLARITY, resolveKpiDeltaTone } from '@/features/dashboard/lib/kpi-delta'
 import { formatKpiDelta, formatKpiValue } from '@/features/dashboard/lib/format'
 import { useTranslation } from '@/lib/i18n'
@@ -69,8 +69,11 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
           dateFormatter.format(new Date(date)),
         )
 
-  const heroDeltaText =
+  const { domain: heroDomain, ticks: heroTicks } = resolveHeroPassRateDomain(points)
+
+  const heroDeltaValue =
     overview === undefined ? null : formatKpiDelta('passRate', overview.kpis.passRate.value, overview.kpis.passRate.previous)
+  const heroDeltaText = heroDeltaValue === null ? null : t('dashboard.heroDeltaVsPrevious', { delta: heroDeltaValue })
   const heroDeltaTone =
     overview === undefined
       ? 'neutral'
@@ -120,8 +123,8 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
                 points={points}
                 label={t('dashboard.heroLabel')}
                 emptyLabel={t('dashboard.heroEmptyLabel')}
-                domain={HERO_PASS_RATE_DOMAIN}
-                ticks={HERO_PASS_RATE_TICKS}
+                domain={heroDomain}
+                ticks={heroTicks}
                 valueFormatter={(value) => `${Math.round(value)}%`}
                 seriesLabels={{
                   current: t('dashboard.heroSeriesCurrent'),

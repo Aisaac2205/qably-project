@@ -10,11 +10,12 @@ describe('PassRateBar', () => {
     expect(fill).toHaveStyle({ width: '72%' })
   })
 
-  it('uses the pass tone at or above the warn threshold', () => {
+  it('uses the ink tone at or above the warn threshold, never the pass/green semantic tone', () => {
     const { container } = render(<PassRateBar value={92} label="Pass rate 92 percent" />)
 
     const fill = container.querySelector('[data-slot="pass-rate-bar-fill"]')
-    expect(fill).toHaveClass('bg-qb-pass')
+    expect(fill).toHaveClass('bg-qb-fg')
+    expect(fill).not.toHaveClass('bg-qb-pass')
   })
 
   it('uses the warn tone below the warn threshold', () => {
@@ -28,7 +29,7 @@ describe('PassRateBar', () => {
     const { container } = render(<PassRateBar value={85} label="Pass rate 85 percent" warnBelow={80} />)
 
     const fill = container.querySelector('[data-slot="pass-rate-bar-fill"]')
-    expect(fill).toHaveClass('bg-qb-pass')
+    expect(fill).toHaveClass('bg-qb-fg')
   })
 
   it('accepts a caller-supplied color override for the fill', () => {

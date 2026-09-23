@@ -1,4 +1,4 @@
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { render, screen, act, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { __resetStore } from '@/lib/mock-store'
@@ -51,7 +51,8 @@ describe('ChannelsCard', () => {
 
     expect(screen.getByText('Email')).toBeInTheDocument()
     expect(screen.getByText('Case regressed, Connection security')).toBeInTheDocument()
-    expect(screen.queryByText('12')).toBeInTheDocument() // Team Slack sent total still present
+    const sentCounts = screen.getAllByTestId('channel-sent-count').map((el) => el.textContent)
+    expect(sentCounts).toContain('12 sent')
   })
 
   it('hides the email row when every effective event type is disabled', async () => {
@@ -72,12 +73,61 @@ describe('ChannelsCard', () => {
     expect(screen.queryByText('Email')).not.toBeInTheDocument()
   })
 
+  it('renders the built-in in-app notifications row with its sent and unread counts', async () => {
+    await act(async () => {
+      renderWithQuery(<ChannelsCard />)
+    })
+
+    expect(screen.getByText('Qably')).toBeInTheDocument()
+    expect(screen.getByTestId('in-app-sent-count')).toHaveTextContent('9 sent')
+    expect(screen.getByTestId('in-app-unread-count')).toHaveTextContent('3 unread')
+  })
+
+  it('uses the Qably app icon, decorative, for the in-app row', async () => {
+    const { container } = await act(async () => renderWithQuery(<ChannelsCard />))
+
+    const icons = within(container).getAllByAltText('')
+    expect(icons.some((icon) => icon.getAttribute('src')?.includes('icono-qably'))).toBe(true)
+  })
+
+  it('treats the card as empty only when webhooks, email and in-app notifications are all empty', async () => {
+    getChannels.mockResolvedValue({
+      webhooks: [],
+      email: { enabled: false, eventTypes: [] },
+      inApp: { sent: 0, unread: 0, daily: [] },
+      lastDelivery: null,
+    })
+    const client = createTestQueryClient()
+    client.removeQueries({ queryKey: dashboardKeys.channels(getBrowserTimeZone()) })
+
+    render(
+      <QueryClientProvider client={client}>
+        <ChannelsCard />
+      </QueryClientProvider>,
+    )
+
+    expect(await screen.findByText('No channels configured')).toBeInTheDocument()
+  })
+
   it('shows the last delivery resolved to its webhook name', async () => {
     await act(async () => {
       renderWithQuery(<ChannelsCard />)
     })
 
     expect(screen.getByText(/Last delivery: sent to Team Slack/)).toBeInTheDocument()
+  })
+
+  it('pins the last-delivery footer to the bottom of the card regardless of row count', async () => {
+    const { container } = await act(async () => renderWithQuery(<ChannelsCard />))
+
+    const card = container.querySelector('[aria-labelledby="channels-card-heading"]')
+    expect(card).toHaveClass('flex', 'h-full', 'flex-col')
+
+    const rowList = card?.querySelector('.divide-y')
+    expect(rowList).toHaveClass('flex-grow')
+
+    const footer = screen.getByText(/Last delivery:/).closest('div')
+    expect(footer).toHaveClass('mt-auto')
   })
 
   it('shows a loading state while channels load', async () => {
@@ -122,6 +172,7 @@ describe('ChannelsCard', () => {
     getChannels.mockResolvedValue({
       webhooks: [],
       email: { enabled: false, eventTypes: [] },
+      inApp: { sent: 0, unread: 0, daily: [] },
       lastDelivery: null,
     })
     const client = createTestQueryClient()

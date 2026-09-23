@@ -6,6 +6,7 @@ function channels(overrides: Partial<DashboardChannelsRecord>): DashboardChannel
   return {
     webhooks: [],
     email: { enabled: false, eventTypes: [] },
+    inApp: { sent: 0, unread: 0, daily: [] },
     lastDelivery: null,
     ...overrides,
   }

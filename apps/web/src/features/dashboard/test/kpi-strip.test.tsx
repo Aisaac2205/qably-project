@@ -42,11 +42,11 @@ describe('KpiStrip', () => {
     })
 
     // failedCases: 6 vs previous 9 -> fewer failures is good ("better" tone)
-    const failedDelta = screen.getByText('-3')
+    const failedDelta = screen.getByText('↓ 3')
     expect(failedDelta.className).toContain('text-qb-pass')
 
     // runs: 42 vs previous 35 -> more runs is good ("better" tone)
-    const runsDelta = screen.getByText('+7')
+    const runsDelta = screen.getByText('↑ 7')
     expect(runsDelta.className).toContain('text-qb-pass')
   })
 

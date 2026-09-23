@@ -70,6 +70,41 @@ describe('ProjectsTable', () => {
     expect(within(row as HTMLElement).getByText('No runs yet')).toBeInTheDocument()
   })
 
+  it('drops the separate Last run column and shows the relative time under the project name instead', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectsTable period={30} />)
+    })
+
+    const table = screen.getByRole('table')
+    expect(within(table).queryByRole('columnheader', { name: 'Last run' })).not.toBeInTheDocument()
+
+    const row = within(table).getByRole('link', { name: 'Checkout Web' }).closest('tr') as HTMLElement
+    expect(within(row).getByText(/Last run/)).toBeInTheDocument()
+  })
+
+  it('renders the pass-rate bar before the mono value, right-aligned', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectsTable period={30} />)
+    })
+
+    const table = screen.getByRole('table')
+    const row = within(table).getByRole('link', { name: 'Checkout Web' }).closest('tr') as HTMLElement
+    const meter = within(row).getByRole('meter')
+    const value = within(row).getByText('82%')
+
+    expect(meter.compareDocumentPosition(value) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('gives the project column a minimum width so the pass-rate column stays reachable on a narrow scroll', async () => {
+    await act(async () => {
+      renderWithQuery(<ProjectsTable period={30} />)
+    })
+
+    const table = screen.getByRole('table')
+    const cell = within(table).getByRole('link', { name: 'Checkout Web' }).closest('td')
+    expect(cell?.className).toMatch(/min-w-/)
+  })
+
   it('wraps the table in a keyboard-focusable scroll region so it never overflows the page', async () => {
     await act(async () => {
       renderWithQuery(<ProjectsTable period={30} />)

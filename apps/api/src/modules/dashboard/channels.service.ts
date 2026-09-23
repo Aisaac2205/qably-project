@@ -6,6 +6,7 @@ import {
   CHANNELS_WINDOW_DAYS,
   buildDashboardChannels,
   type DeliveryCountRow,
+  type InAppCountRow,
   type LastDeliveryRow,
 } from '../../common/metrics/delivery-activity';
 import { err, ok, type Result } from '../../common/result';
@@ -42,10 +43,11 @@ export class ChannelsService {
 
       const webhookIds = webhooks.map((webhook) => webhook.id);
 
-      const [deliveryCountRows, lastDelivery] = await Promise.all([
-        webhookIds.length === 0
-          ? Promise.resolve<DeliveryCountRow[]>([])
-          : this.prisma.$queryRaw<DeliveryCountRow[]>(Prisma.sql`
+      const [deliveryCountRows, lastDelivery, inAppCountRows] =
+        await Promise.all([
+          webhookIds.length === 0
+            ? Promise.resolve<DeliveryCountRow[]>([])
+            : this.prisma.$queryRaw<DeliveryCountRow[]>(Prisma.sql`
               SELECT d."webhookId" AS "webhookId",
                      to_char((d."deliveredAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day,
                      d.status AS status,
@@ -57,25 +59,37 @@ export class ChannelsService {
                  AND d."deliveredAt" < ${window.end}
                GROUP BY 1, 2, 3
             `),
-        webhookIds.length === 0
-          ? Promise.resolve<LastDeliveryRow | null>(null)
-          : this.prisma.notificationDelivery.findFirst({
-              where: { organizationId, webhookId: { in: webhookIds } },
-              orderBy: [{ deliveredAt: 'desc' }, { id: 'desc' }],
-              select: {
-                webhookId: true,
-                eventType: true,
-                status: true,
-                deliveredAt: true,
-              },
-            }),
-      ]);
+          webhookIds.length === 0
+            ? Promise.resolve<LastDeliveryRow | null>(null)
+            : this.prisma.notificationDelivery.findFirst({
+                where: { organizationId, webhookId: { in: webhookIds } },
+                orderBy: [{ deliveredAt: 'desc' }, { id: 'desc' }],
+                select: {
+                  webhookId: true,
+                  eventType: true,
+                  status: true,
+                  deliveredAt: true,
+                },
+              }),
+          this.prisma.$queryRaw<InAppCountRow[]>(Prisma.sql`
+              SELECT to_char((n."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day,
+                     COUNT(*)::int AS sent,
+                     COUNT(*) FILTER (WHERE n."readAt" IS NULL)::int AS unread
+                FROM "notification" n
+               WHERE n."organizationId" = ${organizationId}
+                 AND n."userId" = ${userId}
+                 AND n."createdAt" >= ${window.start}
+                 AND n."createdAt" < ${window.end}
+               GROUP BY 1
+            `),
+        ]);
 
       const record = buildDashboardChannels({
         dayKeys: window.dayKeys,
         webhooks,
         deliveryCountRows,
         emailPreferenceRows,
+        inAppCountRows,
         lastDelivery,
       });
 

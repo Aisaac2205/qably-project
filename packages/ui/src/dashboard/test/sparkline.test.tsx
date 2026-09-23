@@ -105,4 +105,27 @@ describe('Sparkline', () => {
     const style = container.querySelector('style')
     expect(style?.innerHTML).toContain('--color-value: var(--qb-chart-warn);')
   })
+
+  it('centers a flat series vertically instead of pinning it to the top edge', () => {
+    const { container } = render(<Sparkline values={[100, 100, 100, 100]} label="flat trend" height={44} />)
+
+    const path = container.querySelector('.recharts-area-curve')
+    const ys = [...(path?.getAttribute('d') ?? '').matchAll(/-?[\d.]+,(-?[\d.]+)/g)].map((m) => Number(m[1]))
+    expect(ys.length).toBeGreaterThan(0)
+    const middle = 44 / 2
+    for (const y of ys) {
+      expect(Math.abs(y - middle)).toBeLessThan(6)
+    }
+  })
+
+  it('spans close to the full box height for a varied series, using a monotone curve', () => {
+    const { container } = render(<Sparkline values={[10, 40, 20, 90]} label="varied trend" height={44} />)
+
+    const path = container.querySelector('.recharts-area-curve')
+    expect(path).toHaveAttribute('d', expect.stringContaining('C'))
+    const ys = [...(path?.getAttribute('d') ?? '').matchAll(/-?[\d.]+,(-?[\d.]+)/g)].map((m) => Number(m[1]))
+    const min = Math.min(...ys)
+    const max = Math.max(...ys)
+    expect(max - min).toBeGreaterThan(25)
+  })
 })

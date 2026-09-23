@@ -1,6 +1,7 @@
 import {
   buildDashboardChannels,
   type DeliveryCountRow,
+  type InAppCountRow,
   type PreferenceRow,
   type WebhookRow,
 } from './delivery-activity';
@@ -214,6 +215,66 @@ describe('buildDashboardChannels email state', () => {
 
     expect(record.email.enabled).toBe(false);
     expect(record.email.eventTypes).toEqual([]);
+  });
+});
+
+describe('buildDashboardChannels in-app channel', () => {
+  function inAppRow(overrides: Partial<InAppCountRow> = {}): InAppCountRow {
+    return { day: '2026-06-16', sent: 1, unread: 0, ...overrides };
+  }
+
+  it('zero-fills every day in the window when there are no in-app notifications', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      inAppCountRows: [],
+      lastDelivery: null,
+    });
+
+    expect(record.inApp.sent).toBe(0);
+    expect(record.inApp.unread).toBe(0);
+    expect(record.inApp.daily).toHaveLength(14);
+    expect(record.inApp.daily).toEqual(
+      DAY_KEYS.map((date) => ({ date, sent: 0, failed: 0 })),
+    );
+  });
+
+  it('aggregates sent and unread counts into totals, with failed always zero', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      inAppCountRows: [
+        inAppRow({ day: '2026-06-16', sent: 3, unread: 2 }),
+        inAppRow({ day: '2026-06-15', sent: 2, unread: 0 }),
+      ],
+      lastDelivery: null,
+    });
+
+    expect(record.inApp.sent).toBe(5);
+    expect(record.inApp.unread).toBe(2);
+    expect(
+      record.inApp.daily.find((point) => point.date === '2026-06-16'),
+    ).toEqual({ date: '2026-06-16', sent: 3, failed: 0 });
+    expect(
+      record.inApp.daily.find((point) => point.date === '2026-06-15'),
+    ).toEqual({ date: '2026-06-15', sent: 2, failed: 0 });
+  });
+
+  it('ignores an in-app row outside the known day-key window', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      inAppCountRows: [inAppRow({ day: '2020-01-01', sent: 9, unread: 9 })],
+      lastDelivery: null,
+    });
+
+    expect(record.inApp.sent).toBe(0);
   });
 });
 
