@@ -1,11 +1,17 @@
 export const RECORD_SUITE_RESULT_SCRIPT = `
 local key = KEYS[1]
+local tombstoneKey = KEYS[2]
 local sizeArg = ARGV[1]
 local organizationId = ARGV[2]
 local projectId = ARGV[3]
 local reportExternalId = ARGV[4]
 local resultField = ARGV[5]
 local resultValue = ARGV[6]
+local tombstoneTtl = ARGV[7]
+
+if redis.call('EXISTS', tombstoneKey) == 1 then
+  return cjson.encode({complete = false, created = 0, ignored = true})
+end
 
 local existingSize = redis.call('HGET', key, 'size')
 local created = 0
@@ -39,17 +45,21 @@ if resultCount < size then
 end
 
 redis.call('DEL', key)
+redis.call('SET', tombstoneKey, '1', 'EX', tombstoneTtl)
 return cjson.encode({complete = true, created = created, data = map})
 `;
 
 export const FLUSH_BATCH_SCRIPT = `
 local key = KEYS[1]
+local tombstoneKey = KEYS[2]
+local tombstoneTtl = ARGV[1]
 local flat = redis.call('HGETALL', key)
 if #flat == 0 then
   return cjson.encode({found = false})
 end
 
 redis.call('DEL', key)
+redis.call('SET', tombstoneKey, '1', 'EX', tombstoneTtl)
 local map = {}
 for i = 1, #flat, 2 do
   map[flat[i]] = flat[i + 1]

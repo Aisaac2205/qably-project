@@ -6,12 +6,15 @@ import { ReportBatchService } from './report-batch.service';
 
 function createRedis() {
   const store = new Map<string, Map<string, string>>();
+  const tombstones = new Set<string>();
 
   return {
     store,
+    tombstones,
     recordReportSuiteResult: jest.fn(
       (
         key: string,
+        tombstoneKey: string,
         size: string,
         organizationId: string,
         projectId: string,
@@ -19,6 +22,12 @@ function createRedis() {
         field: string,
         value: string,
       ) => {
+        if (tombstones.has(tombstoneKey)) {
+          return Promise.resolve(
+            JSON.stringify({ complete: false, created: 0, ignored: true }),
+          );
+        }
+
         const hash = store.get(key) ?? new Map<string, string>();
         const created = !hash.has('size');
         if (created) {
@@ -45,18 +54,20 @@ function createRedis() {
 
         const data = Object.fromEntries(hash.entries());
         store.delete(key);
+        tombstones.add(tombstoneKey);
         return Promise.resolve(
           JSON.stringify({ complete: true, created: created ? 1 : 0, data }),
         );
       },
     ),
-    flushReportBatch: jest.fn((key: string) => {
+    flushReportBatch: jest.fn((key: string, tombstoneKey: string) => {
       const hash = store.get(key);
       if (hash === undefined) {
         return Promise.resolve(JSON.stringify({ found: false }));
       }
       const data = Object.fromEntries(hash.entries());
       store.delete(key);
+      tombstones.add(tombstoneKey);
       return Promise.resolve(JSON.stringify({ found: true, data }));
     }),
     quit: jest.fn().mockResolvedValue(undefined),
@@ -299,6 +310,75 @@ describe('ReportBatchService.recordAndMaybePublish', () => {
 
     expect(redis.store.size).toBe(0);
   });
+
+  it('ignores a late retry that arrives after the batch already closed, instead of resurrecting a phantom batch and publishing a second, partial notification', async () => {
+    const { service, notifications, queue, redis } = build();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      runId: 'run-1',
+      suiteName: 'a.test.ts',
+      status: 'pass',
+    });
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      runId: 'run-2',
+      suiteName: 'b.test.ts',
+      status: 'pass',
+    });
+
+    expect(notifications.publish).toHaveBeenCalledTimes(1);
+    expect(redis.store.size).toBe(0);
+    queue.add.mockClear();
+    notifications.publish.mockClear();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      runId: 'run-1',
+      suiteName: 'a.test.ts',
+      status: 'pass',
+    });
+
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(notifications.publish).not.toHaveBeenCalled();
+    expect(redis.store.size).toBe(0);
+  });
+
+  it('ignores a late retry that arrives after the safety-net timeout already flushed the batch, instead of scheduling a second timeout job for a phantom batch', async () => {
+    const { service, notifications, queue, redis } = build();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 3,
+      runId: 'run-1',
+      suiteName: 'a.test.ts',
+      status: 'pass',
+    });
+
+    const [, timeoutJobData] = queue.add.mock.calls[0] as [
+      string,
+      { key: string },
+    ];
+    await service.flushIfPending(timeoutJobData.key);
+
+    notifications.publish.mockClear();
+    queue.add.mockClear();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 3,
+      runId: 'run-2',
+      suiteName: 'b.test.ts',
+      status: 'pass',
+    });
+
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(notifications.publish).not.toHaveBeenCalled();
+    expect(redis.store.size).toBe(0);
+  });
 });
 
 describe('ReportBatchService.recordRejectedAndMaybePublish', () => {
@@ -359,6 +439,42 @@ describe('ReportBatchService.recordRejectedAndMaybePublish', () => {
       (field) => field.startsWith('result:'),
     );
     expect(resultFields).toHaveLength(1);
+  });
+
+  it('ignores a late retry of a rejected group that arrives after the batch already closed, instead of resurrecting a phantom batch', async () => {
+    const { service, notifications, queue, redis } = build();
+
+    await service.recordAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      runId: 'run-1',
+      suiteName: 'a.test.ts',
+      status: 'pass',
+    });
+    await service.recordRejectedAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      groupExternalId: 'gha-482913-b',
+      suiteName: 'b.test.ts',
+      reason: 'suiteName: too short',
+    });
+
+    expect(notifications.publish).toHaveBeenCalledTimes(1);
+    expect(redis.store.size).toBe(0);
+    queue.add.mockClear();
+    notifications.publish.mockClear();
+
+    await service.recordRejectedAndMaybePublish({
+      ...baseParams,
+      reportSize: 2,
+      groupExternalId: 'gha-482913-b',
+      suiteName: 'b.test.ts',
+      reason: 'suiteName: too short',
+    });
+
+    expect(queue.add).not.toHaveBeenCalled();
+    expect(notifications.publish).not.toHaveBeenCalled();
+    expect(redis.store.size).toBe(0);
   });
 
   it('enqueues the safety-net timeout job when a rejected group is the first result recorded for the batch', async () => {

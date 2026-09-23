@@ -11,6 +11,8 @@ import { NotificationsPublisher } from '../notifications/notifications.publisher
 import { buildBatchNotificationEvent } from './lib/build-batch-notification';
 import {
   buildReportBatchKey,
+  buildReportBatchTombstoneKey,
+  REPORT_BATCH_TOMBSTONE_TTL_SECONDS,
   type BatchSuiteResult,
 } from './lib/report-batch.types';
 import {
@@ -38,14 +40,20 @@ interface FlushBatchResult {
 export interface ReportBatchRedisClient {
   recordReportSuiteResult(
     key: string,
+    tombstoneKey: string,
     size: string,
     organizationId: string,
     projectId: string,
     reportExternalId: string,
     field: string,
     value: string,
+    tombstoneTtlSeconds: string,
   ): Promise<string>;
-  flushReportBatch(key: string): Promise<string>;
+  flushReportBatch(
+    key: string,
+    tombstoneKey: string,
+    tombstoneTtlSeconds: string,
+  ): Promise<string>;
   quit(): Promise<unknown>;
 }
 
@@ -136,12 +144,14 @@ export class ReportBatchService implements OnModuleDestroy {
   ): Promise<void> {
     const raw = await this.redis.recordReportSuiteResult(
       key,
+      buildReportBatchTombstoneKey(key),
       String(reportSize),
       organizationId,
       projectId,
       reportExternalId,
       field,
       value,
+      String(REPORT_BATCH_TOMBSTONE_TTL_SECONDS),
     );
     const result = JSON.parse(raw) as RecordSuiteResultResult;
 
@@ -169,7 +179,11 @@ export class ReportBatchService implements OnModuleDestroy {
   }
 
   async flushIfPending(key: string): Promise<void> {
-    const raw = await this.redis.flushReportBatch(key);
+    const raw = await this.redis.flushReportBatch(
+      key,
+      buildReportBatchTombstoneKey(key),
+      String(REPORT_BATCH_TOMBSTONE_TTL_SECONDS),
+    );
     const result = JSON.parse(raw) as FlushBatchResult;
 
     if (!result.found || result.data === undefined) return;

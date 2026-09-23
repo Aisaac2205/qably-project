@@ -496,6 +496,24 @@ does not do that:
   (`rejectedCount`/`rejectedSuiteNames` alongside `failedCount`/`failedSuiteNames` in the payload,
   `build-batch-notification.ts`), and counts as `run_failed` whenever there is at least one rejection,
   even with zero test failures.
+- **A tombstone stops a late retry from resurrecting a closed batch.** Both ways a batch closes —
+  every suite reporting in (`RECORD_SUITE_RESULT_SCRIPT`) and the 120-second safety-net timeout firing
+  first (`FLUSH_BATCH_SCRIPT`) — `DEL` the Redis hash *and* `SET` a short-lived tombstone key
+  (`<key>:closed`) in the same script, atomically. `RECORD_SUITE_RESULT_SCRIPT` checks that tombstone
+  before doing anything else: if it exists, the call is a no-op (`{complete: false, created: 0,
+  ignored: true}`), so it neither recreates the Redis hash nor asks `ReportBatchService` to schedule a
+  new safety-net timeout job. Without this, a chunk the reporter retries (`postJunitChunk`'s own
+  backoff, or a re-delivered webhook) after its batch already closed would recreate the hash from
+  scratch with only its own single result (the same first-result path that locks `size` for a
+  genuinely new batch), get treated as a brand-new batch, and 120 seconds
+  later the timeout would fire and publish a second, partial `run_completed`/`run_failed` notification
+  for a report that already had its one correct, complete notification sent. The tombstone's TTL,
+  `REPORT_BATCH_TOMBSTONE_TTL_SECONDS` (`report-batch.types.ts`), is 300 seconds — comfortably above
+  the reporter's own worst-case retry window for one chunk (`qably-report.mjs`: up to `MAX_ATTEMPTS`
+  (4) attempts, each bounded by `DEFAULT_FETCH_TIMEOUT_MS` (60s, `QABLY_REPORT_TIMEOUT_MS`-overridable)
+  plus up to `RETRY_MAX_MS` (5s) backoff between attempts — roughly 255 seconds worst case) and above
+  the 120-second safety-net delay itself, so a retry that is still in flight when either closing path
+  runs is always caught by the tombstone rather than racing past it.
 
 **Exception — pinning `suiteId` or `suiteName` turns the split off.** An explicit `suiteId` or
 `suiteName` is the caller stating "everything in this report belongs to this one suite" — that intent

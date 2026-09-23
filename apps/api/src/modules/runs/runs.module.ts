@@ -53,11 +53,11 @@ import { RunsService } from './runs.service';
       useFactory: (env: Env) => {
         const client = new Redis(env.REDIS_URL);
         client.defineCommand('recordReportSuiteResult', {
-          numberOfKeys: 1,
+          numberOfKeys: 2,
           lua: RECORD_SUITE_RESULT_SCRIPT,
         });
         client.defineCommand('flushReportBatch', {
-          numberOfKeys: 1,
+          numberOfKeys: 2,
           lua: FLUSH_BATCH_SCRIPT,
         });
         return client;

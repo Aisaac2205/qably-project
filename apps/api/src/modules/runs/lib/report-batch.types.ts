@@ -14,3 +14,9 @@ export interface ReportBatchKeyParts {
 export function buildReportBatchKey(parts: ReportBatchKeyParts): string {
   return `report-batch:${parts.organizationId}:${parts.projectId}:${parts.source}:${parts.reportExternalId}`;
 }
+
+export function buildReportBatchTombstoneKey(key: string): string {
+  return `${key}:closed`;
+}
+
+export const REPORT_BATCH_TOMBSTONE_TTL_SECONDS = 300;
