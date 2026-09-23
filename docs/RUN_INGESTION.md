@@ -626,6 +626,24 @@ pytest-style classname nesting two levels deep, a surefire-style unnamed nested 
 identically-named-merge case — and asserts the counts always match, not just the one shape that used
 to diverge.
 
+**Reading a `name` attribute matches the server's own parsing, not just its grouping rule.**
+`readOwnNameAttribute` accepts both `name="..."` and `name='...'` (`fast-xml-parser`, and therefore
+the server, does not care which quote style a `<testsuite>` uses), and decodes the five predefined XML
+entities (`&amp;` `&lt;` `&gt;` `&quot;` `&apos;`) before the name is used as a suite key — the same
+order the server's own parse produces, since `fast-xml-parser` decodes entities as part of parsing,
+before any application code (including truncation) ever sees the string. **Numeric character
+references (`&#38;`, `&#x26;`) are deliberately left undecoded**, matching the server exactly: the
+`XMLParser` options this codebase passes (`parse-junit-xml.ts`) only enable named-entity decoding —
+numeric references are only decoded when the parser's `htmlEntities` option is set, which it is not —
+so a report using a numeric reference produces the *same* (undecoded, literal) suite key on both sides,
+and decoding it client-side only would be a new mismatch, not a fix. Decoding happens before
+truncation to `MAX_SUITE_KEY_LENGTH` (500 code points, matching `parse-junit-xml.ts`'s `truncateTo`
+exactly): truncating the raw, still-encoded text first can cut a multi-character entity in half and
+also drop decoded content that would otherwise still fit inside the 500-character budget, producing a
+truncated key that disagrees with the server's — the contract test's decode-before-truncate case
+exercises exactly this by giving two suites the same undecoded-and-truncated prefix but different
+decoded content past character 500.
+
 **Defense in depth if a future XML shape still disagrees.** `ReportBatchService`'s Redis-backed batch
 size is no longer fixed by whichever call reaches it first: `report-batch.lua.ts`'s
 `RECORD_SUITE_RESULT_SCRIPT` now grows the locked `size` to the max of what it already has and what

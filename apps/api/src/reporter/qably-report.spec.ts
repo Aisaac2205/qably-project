@@ -320,6 +320,69 @@ describe('countTopLevelGroups', () => {
     expect(clientCount).toBe(1);
     expect(clientCount).toBe(serverGroupCount);
   });
+
+  it('matches the server when the same suite name is single-quoted in one testsuite and double-quoted in another', () => {
+    const xml =
+      '<testsuites>' +
+      '<testsuite name=\'Checkout\'><testcase name="a1"/></testsuite>' +
+      '<testsuite name="Checkout"><testcase name="a2"/></testsuite>' +
+      '</testsuites>';
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(1);
+    expect(clientCount).toBe(serverGroupCount);
+  });
+
+  it('does not merge two suites whose numeric character references the server leaves undecoded, matching the server exactly', () => {
+    const xml =
+      '<testsuites>' +
+      '<testsuite name="Cart &amp; Checkout"><testcase name="a1"/></testsuite>' +
+      '<testsuite name="Cart &#38; Checkout"><testcase name="a2"/></testsuite>' +
+      '</testsuites>';
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(2);
+    expect(clientCount).toBe(serverGroupCount);
+  });
+
+  it('decodes a named entity before truncating to 500 characters instead of truncating the raw entity text, so it does not falsely merge with an unrelated suite that only coincides in undecoded form', () => {
+    const prefix = 'p'.repeat(496);
+    const suiteA = `${prefix}&amp;${'q'.repeat(600)}`;
+    const suiteB = `${prefix}&amp;amp`;
+    const xml =
+      '<testsuites>' +
+      `<testsuite name="${suiteA}"><testcase name="a1"/></testsuite>` +
+      `<testsuite name="${suiteB}"><testcase name="a2"/></testsuite>` +
+      '</testsuites>';
+
+    const [clientCount] = callPure<[number]>([
+      { fn: 'countTopLevelGroups', args: [xml] },
+    ]);
+
+    const serverGroupCount = groupJunitReportBySuite(
+      parseJunitXml(xml),
+      'external-id',
+    ).length;
+
+    expect(clientCount).toBe(2);
+    expect(clientCount).toBe(serverGroupCount);
+  });
 });
 
 describe('buildRequestExternalId', () => {

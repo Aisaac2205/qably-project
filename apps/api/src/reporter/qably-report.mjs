@@ -132,9 +132,25 @@ function truncateToCodePoints(value, maxLength) {
   return codePoints.length <= maxLength ? value : codePoints.slice(0, maxLength).join('');
 }
 
+const NAMED_XML_ENTITIES = {
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+};
+
+function decodeXmlEntities(value) {
+  return value.replace(/&([a-zA-Z]+);/g, (match, entity) => {
+    const replacement = NAMED_XML_ENTITIES[entity];
+    return replacement === undefined ? match : replacement;
+  });
+}
+
 function readOwnNameAttribute(openTag) {
-  const match = /\sname\s*=\s*"([^"]*)"/.exec(openTag);
-  return match === null ? '' : match[1];
+  const match = /\sname\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(openTag);
+  if (match === null) return '';
+  return decodeXmlEntities(match[1] ?? match[2]);
 }
 
 function splitChildTestsuiteBlocks(fragment) {
