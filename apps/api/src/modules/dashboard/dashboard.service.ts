@@ -29,27 +29,11 @@ import type {
   DashboardError,
   DashboardSummaryView,
 } from './dashboard.contracts';
+import { isUnknownTimeZoneError } from './lib/time-zone-error';
 
 interface RunScope {
   organizationId: string;
   projectId?: string;
-}
-
-const UNKNOWN_TIME_ZONE_SQLSTATE = '22023';
-
-function isUnknownTimeZoneError(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
-  if (error.code !== 'P2010') return false;
-
-  const meta = error.meta;
-  const sqlState = typeof meta?.code === 'string' ? meta.code : undefined;
-  const dbMessage =
-    typeof meta?.message === 'string' ? meta.message : error.message;
-
-  return (
-    sqlState === UNKNOWN_TIME_ZONE_SQLSTATE &&
-    dbMessage.toLowerCase().includes('time zone')
-  );
 }
 
 function buildScope(org: OrgContext, projectId?: string): RunScope {

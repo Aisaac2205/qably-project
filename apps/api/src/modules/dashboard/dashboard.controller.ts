@@ -1,21 +1,10 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  NotFoundException,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { isErr, type Result } from '../../common/result';
 import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { TraceabilityCalendarRecord } from '@qably/types';
-import type {
-  DashboardError,
-  DashboardSummaryView,
-} from './dashboard.contracts';
+import type { DashboardSummaryView } from './dashboard.contracts';
 import {
   dashboardSummaryQuerySchema,
   dashboardTraceabilityQuerySchema,
@@ -23,20 +12,7 @@ import {
   type DashboardTraceabilityQuery,
 } from './dashboard.schemas';
 import { DashboardService } from './dashboard.service';
-
-function unwrap<T>(result: Result<T, DashboardError>): T {
-  if (!isErr(result)) return result.value;
-
-  switch (result.error) {
-    case 'project-not-found':
-      throw new NotFoundException('Project not found');
-    case 'invalid-time-zone':
-      throw new BadRequestException({
-        message: 'Validation failed',
-        issues: [{ path: 'tz', message: 'Invalid IANA time zone' }],
-      });
-  }
-}
+import { unwrapDashboardError as unwrap } from './lib/unwrap-dashboard-error';
 
 @Controller('dashboard')
 @UseGuards(OrgScopeGuard)

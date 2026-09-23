@@ -1,11 +1,11 @@
+import {
+  DASHBOARD_PERIODS,
+  isDashboardPeriod,
+  type DashboardPeriod,
+} from '@qably/types';
 import { startOfZonedDay, zonedDateKey } from '../time-zone/time-zone';
 
-export const DASHBOARD_PERIODS = [7, 30, 90] as const;
-export type DashboardPeriod = (typeof DASHBOARD_PERIODS)[number];
-
-export function isDashboardPeriod(value: number): value is DashboardPeriod {
-  return (DASHBOARD_PERIODS as readonly number[]).includes(value);
-}
+export { DASHBOARD_PERIODS, isDashboardPeriod, type DashboardPeriod };
 
 export interface CalendarWindow {
   currentStart: Date;
@@ -66,4 +66,44 @@ export function computeCalendarWindow(
     previousStart,
     previousEnd: currentStart,
   };
+}
+
+function formatCalendarDate(date: CalendarDate): string {
+  const month = String(date.month).padStart(2, '0');
+  const day = String(date.day).padStart(2, '0');
+
+  return `${date.year}-${month}-${day}`;
+}
+
+export interface CalendarDayKeys {
+  current: string[];
+  previous: string[];
+}
+
+/**
+ * Ordered (ascending) calendar-day keys for the current and previous
+ * windows computeCalendarWindow resolves for the same period/zone/now,
+ * built from the same calendar arithmetic so the two never drift apart.
+ */
+export function calendarDayKeys(
+  period: DashboardPeriod,
+  zone: string,
+  now: Date,
+): CalendarDayKeys {
+  if (!isDashboardPeriod(period)) {
+    throw new Error(`Unsupported dashboard period: ${String(period)}`);
+  }
+
+  const today = parseZonedDateKey(zonedDateKey(now, zone));
+  const currentStartDate = shiftCalendarDate(today, -(period - 1));
+  const previousStartDate = shiftCalendarDate(currentStartDate, -period);
+
+  const current = Array.from({ length: period }, (_, index) =>
+    formatCalendarDate(shiftCalendarDate(currentStartDate, index)),
+  );
+  const previous = Array.from({ length: period }, (_, index) =>
+    formatCalendarDate(shiftCalendarDate(previousStartDate, index)),
+  );
+
+  return { current, previous };
 }

@@ -1,5 +1,6 @@
 import {
   DASHBOARD_PERIODS,
+  calendarDayKeys,
   computeCalendarWindow,
   isDashboardPeriod,
 } from './calendar-window';
@@ -57,5 +58,48 @@ describe('computeCalendarWindow', () => {
 
   it('throws for a period outside 7/30/90', () => {
     expect(() => computeCalendarWindow(15 as never, 'UTC', now)).toThrow();
+  });
+});
+
+describe('calendarDayKeys', () => {
+  const now = new Date('2026-06-16T20:00:00.000Z');
+
+  it('lists exactly `period` ascending day keys for the current window, ending today', () => {
+    const { current } = calendarDayKeys(7, 'UTC', now);
+
+    expect(current).toEqual([
+      '2026-06-10',
+      '2026-06-11',
+      '2026-06-12',
+      '2026-06-13',
+      '2026-06-14',
+      '2026-06-15',
+      '2026-06-16',
+    ]);
+  });
+
+  it('lists the equal-length previous window immediately before the current one', () => {
+    const { previous } = calendarDayKeys(7, 'UTC', now);
+
+    expect(previous).toEqual([
+      '2026-06-03',
+      '2026-06-04',
+      '2026-06-05',
+      '2026-06-06',
+      '2026-06-07',
+      '2026-06-08',
+      '2026-06-09',
+    ]);
+  });
+
+  it('rolls "today" forward first in a positive-offset zone, matching computeCalendarWindow', () => {
+    const { current } = calendarDayKeys(7, 'Asia/Tokyo', now);
+
+    expect(current[current.length - 1]).toBe('2026-06-17');
+    expect(current[0]).toBe('2026-06-11');
+  });
+
+  it('throws for a period outside 7/30/90', () => {
+    expect(() => calendarDayKeys(15 as never, 'UTC', now)).toThrow();
   });
 });

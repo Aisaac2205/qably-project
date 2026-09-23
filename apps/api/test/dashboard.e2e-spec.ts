@@ -49,15 +49,51 @@ const runRow = {
   commitAuthor: 'Aisaac2205',
 };
 
-const runListRow = { ...runRow, suite: { name: 'Checkout' } };
+const runListRow = {
+  ...runRow,
+  suite: { name: 'Checkout' },
+  project: { name: 'Checkout Web' },
+};
+
+interface RawQueryRawSql {
+  strings: readonly string[];
+}
+
+interface QueryRawFixtures {
+  caseCounts?: unknown[];
+  runCounts?: unknown[];
+  casesPassing?: unknown[];
+  traceability?: unknown[];
+}
+
+function queryRawRouter(fixtures: QueryRawFixtures = {}) {
+  return (sql: RawQueryRawSql) => {
+    const text = sql.strings.join('');
+
+    if (text.includes('FROM "run_case" rc')) {
+      return Promise.resolve(fixtures.caseCounts ?? []);
+    }
+    if (text.includes('FROM "run" r') && text.includes('"failedRuns"')) {
+      return Promise.resolve(fixtures.runCounts ?? []);
+    }
+    if (text.includes('WITH latest AS')) {
+      return Promise.resolve(fixtures.casesPassing ?? []);
+    }
+
+    return Promise.resolve(
+      fixtures.traceability ?? [{ day: '2026-06-16', count: 3 }],
+    );
+  };
+}
 
 describe('Dashboard (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
   const prisma = {
     orgMember: { findFirst: jest.fn() },
-    project: { findFirst: jest.fn(), count: jest.fn() },
-    suite: { count: jest.fn() },
+    project: { findFirst: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+    suite: { count: jest.fn(), groupBy: jest.fn() },
+    testCase: { groupBy: jest.fn() },
     run: { count: jest.fn(), findMany: jest.fn(), groupBy: jest.fn() },
     $queryRaw: jest.fn(),
     runCase: { groupBy: jest.fn() },
@@ -72,12 +108,33 @@ describe('Dashboard (e2e)', () => {
       organization: { slug: 'acme' },
     });
     prisma.project.findFirst.mockResolvedValue({ id: 'project-1' });
+    prisma.project.findMany.mockResolvedValue([
+      { id: 'project-1', name: 'Checkout Web' },
+    ]);
     prisma.project.count.mockResolvedValue(2);
     prisma.suite.count.mockResolvedValue(3);
+    prisma.suite.groupBy.mockResolvedValue([
+      { projectId: 'project-1', _count: { _all: 3 } },
+    ]);
+    prisma.testCase.groupBy.mockResolvedValue([
+      { projectId: 'project-1', _count: { _all: 10 } },
+    ]);
     prisma.run.count.mockResolvedValue(4);
     prisma.run.findMany.mockResolvedValue([runListRow]);
-    prisma.run.groupBy.mockResolvedValue([{ commitSha: runRow.commitSha }]);
-    prisma.$queryRaw.mockResolvedValue([{ day: '2026-06-16', count: 3 }]);
+    prisma.run.groupBy.mockImplementation(
+      (args: { by: string[] }): Promise<unknown[]> => {
+        if (args.by.includes('commitSha')) {
+          return Promise.resolve([{ commitSha: runRow.commitSha }]);
+        }
+        if (args.by.includes('projectId')) {
+          return Promise.resolve([
+            { projectId: 'project-1', _max: { startedAt: runRow.startedAt } },
+          ]);
+        }
+        return Promise.resolve([]);
+      },
+    );
+    prisma.$queryRaw.mockImplementation(queryRawRouter());
     prisma.runCase.groupBy.mockResolvedValue([
       { runId: 'run-1', status: 'pass', _count: { _all: 1 } },
     ]);
@@ -352,5 +409,160 @@ describe('Dashboard (e2e)', () => {
     expect(body.issues).toEqual([
       { path: 'tz', message: 'Invalid IANA time zone' },
     ]);
+  });
+
+  describe('GET /dashboard/overview', () => {
+    const NOW = new Date('2026-06-16T11:00:00.000Z');
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick'] });
+      jest.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('rejects a period outside 7/30/90', async () => {
+      await request(app.getHttpServer())
+        .get('/dashboard/overview?period=15')
+        .expect(400);
+    });
+
+    it('rejects a missing period', async () => {
+      await request(app.getHttpServer()).get('/dashboard/overview').expect(400);
+    });
+
+    it('rejects a malformed tz', async () => {
+      await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7&tz=Not/AZone')
+        .expect(400);
+    });
+
+    it('falls back to UTC when tz is absent', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .expect(200);
+
+      const body = response.body as { timeZone: string };
+      expect(body.timeZone).toBe('UTC');
+    });
+
+    it('refuses the route without a session', async () => {
+      read.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .expect(401);
+    });
+
+    it('answers 403 when the organization header names a foreign organization', async () => {
+      prisma.orgMember.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .set('x-organization-id', 'org-someone-else')
+        .expect(403);
+    });
+
+    it('answers 404 when projectId targets a project outside the organization', async () => {
+      prisma.project.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7&projectId=project-x')
+        .expect(404);
+    });
+
+    it('returns recent runs with project name, source and commit fields, capped at 4', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .expect(200);
+
+      const body = response.body as {
+        recentRuns: {
+          projectName: string;
+          source: string;
+          commitSha?: string;
+          commitMessage?: string;
+          commitAuthor?: string;
+        }[];
+      };
+
+      expect(body.recentRuns.length).toBeLessThanOrEqual(4);
+      expect(body.recentRuns[0]).toMatchObject({
+        projectName: 'Checkout Web',
+        source: 'github_actions',
+        commitSha: runRow.commitSha,
+        commitMessage: runRow.commitMessage,
+        commitAuthor: runRow.commitAuthor,
+      });
+    });
+
+    it('reports null/zero KPIs and empty lists for an organization with no data, without crashing', async () => {
+      prisma.project.findMany.mockResolvedValue([]);
+      prisma.suite.groupBy.mockResolvedValue([]);
+      prisma.testCase.groupBy.mockResolvedValue([]);
+      prisma.run.findMany.mockResolvedValue([]);
+      prisma.run.groupBy.mockResolvedValue([]);
+      prisma.$queryRaw.mockImplementation(queryRawRouter());
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7')
+        .expect(200);
+
+      const body = response.body as {
+        kpis: {
+          passRate: { value: number | null };
+          runs: { value: number };
+          failedCases: { value: number };
+          avgRunDurationMs: { value: number | null };
+        };
+        projects: unknown[];
+        recentRuns: unknown[];
+        casesPassing: { total: number };
+      };
+
+      expect(body.kpis.passRate.value).toBeNull();
+      expect(body.kpis.runs.value).toBe(0);
+      expect(body.kpis.failedCases.value).toBe(0);
+      expect(body.kpis.avgRunDurationMs.value).toBeNull();
+      expect(body.projects).toEqual([]);
+      expect(body.recentRuns).toEqual([]);
+      expect(body.casesPassing.total).toBe(0);
+    });
+
+    it('computes exactly 7 ascending calendar-day buckets across a DST transition', async () => {
+      jest.setSystemTime(new Date('2026-03-10T12:00:00.000Z'));
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7&tz=America/New_York')
+        .expect(200);
+
+      const body = response.body as {
+        passRateSeries: { current: { date: string }[] };
+      };
+
+      expect(body.passRateSeries.current.map((point) => point.date)).toEqual([
+        '2026-03-04',
+        '2026-03-05',
+        '2026-03-06',
+        '2026-03-07',
+        '2026-03-08',
+        '2026-03-09',
+        '2026-03-10',
+      ]);
+    });
+
+    it('scopes results to a single project when projectId is given', async () => {
+      await request(app.getHttpServer())
+        .get('/dashboard/overview?period=7&projectId=project-1')
+        .expect(200);
+
+      expect(prisma.suite.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org-1', projectId: 'project-1' },
+        }),
+      );
+    });
   });
 });

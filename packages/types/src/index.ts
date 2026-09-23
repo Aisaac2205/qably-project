@@ -1,4 +1,5 @@
 import type { CaseDocumentationState, SuiteDocumentationState } from './documentation-completeness'
+import type { DashboardPeriod } from './dashboard-period'
 
 // ─── Status types ────────────────────────────────────────────────────────────
 
@@ -439,6 +440,84 @@ export interface TraceabilityCalendarRecord {
   days: TraceabilityDayRecord[]
 }
 
+/**
+ * value/previous are the aggregate for the resolved window, computed from
+ * the underlying counts the series buckets are built from (not a mean of
+ * the per-bucket values). series is one entry per bucket: daily buckets for
+ * period 7/30, ISO-week buckets for period 90. null marks a bucket with no
+ * measurable data (e.g. no decided case that day), never a fabricated 0.
+ */
+export interface KpiMetric {
+  value: number | null
+  previous: number | null
+  series: (number | null)[]
+}
+
+/**
+ * One bucket (day, or ISO week for period 90) of the pass-rate hero series.
+ * `runs` is the count of runs started in the bucket; `failedRuns` counts
+ * only runs whose final status is `fail` (run-level, not case-level).
+ */
+export interface DailyPoint {
+  date: string
+  passRate: number | null
+  runs: number
+  failedRuns: number
+}
+
+export interface DashboardProjectRow {
+  id: string
+  name: string
+  suites: number
+  cases: number
+  /** Fraction 0–1 over the resolved window. `null` when no case decided. */
+  passRate: number | null
+  lastRunAt?: string
+}
+
+export interface DashboardRecentRun {
+  id: string
+  projectId: string
+  projectName: string
+  suiteId: string
+  suiteName: string
+  name: string
+  status: RunStatus
+  source: RunSource
+  startedAt: string
+  finishedAt?: string
+  commitSha?: string
+  commitMessage?: string
+  commitAuthor?: string
+  passRate: number | null
+}
+
+export interface DashboardOverviewKpis {
+  passRate: KpiMetric
+  runs: KpiMetric
+  failedCases: KpiMetric
+  avgRunDurationMs: KpiMetric
+}
+
+/**
+ * Server-computed KPI + chart data for the redesigned /dashboard, scoped to
+ * the caller's organization and optionally one project via projectId. The
+ * server owns period-window and calendar-day resolution in `timeZone`; the
+ * client must never compute these itself.
+ */
+export interface DashboardOverviewRecord {
+  period: DashboardPeriod
+  timeZone: string
+  kpis: DashboardOverviewKpis
+  passRateSeries: {
+    current: DailyPoint[]
+    previous: DailyPoint[]
+  }
+  casesPassing: RunCaseCounts
+  projects: DashboardProjectRow[]
+  recentRuns: DashboardRecentRun[]
+}
+
 export interface NotificationDelivery {
   channel: NotificationWebhookType
   status: NotificationDeliveryStatus
@@ -862,3 +941,4 @@ export interface ChatSendToReviewRecord {
 
 export * from './documentation-completeness'
 export * from './pass-rate'
+export * from './dashboard-period'
