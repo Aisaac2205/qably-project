@@ -239,6 +239,17 @@ never responding — is treated exactly like a network error: it counts as one o
 is retried with the same backoff, instead of leaving the CI job blocked indefinitely on a single
 stuck request.
 
+### The reporter's grouping count must match the server's
+
+`countTopLevelGroups` in `qably-report.mjs` computes the `reportSize` query parameter — how many
+suite groups the whole file will become once the server parses it — by walking the document with the
+same suite-key rule the server itself uses (`parse-junit-xml.ts`'s `collectCases`,
+`group-junit-report.ts`'s `groupJunitReportBySuite`), not an approximation of it. A mismatch here
+would misreport the total to `ReportBatchService`, the Redis-backed batch that decides when every
+group of a split file has reported in — see `docs/RUN_INGESTION.md`'s "`apps/api/src/reporter/qably-report.mjs`"
+subsection for the full algorithm and the contract test (`qably-report.spec.ts`) that asserts the
+client and server counts always agree.
+
 Because one request already carries a whole file — the server splits it into runs internally, not
 the script — this budget is now sized against **the number of report files a workflow generates**
 (typically one to three), not the number of `<testsuite>` elements inside them. A repository would

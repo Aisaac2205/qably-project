@@ -412,13 +412,6 @@ export class RunsService {
         }
       }
 
-      // Composite keys can find no match on their own composite identity
-      // when the case was first reported before composite keys existed,
-      // and the row still carries the bare-name legacy automationKey. This
-      // fallback claims that row only when this legacyKey is unambiguous —
-      // i.e. no other distinct identity in this batch also reaches it —
-      // otherwise two genuinely different tests would silently share one
-      // official case (see findLegacyKeyCollisions).
       if (match === undefined && usesCompositeIdentity && !legacyIsAmbiguous) {
         match = byExactKey.get(legacyKey);
         if (
@@ -447,12 +440,6 @@ export class RunsService {
       }
 
       if (match === undefined) {
-        // A plain ref's own identity key is the bare name itself, so if the
-        // legacy key is ambiguous, drafting under that exact key would just
-        // silently re-claim whichever row already holds it (skipDuplicates
-        // makes the create a no-op, then the requery below reattaches it).
-        // Composite refs are safe to draft: their own composite key cannot
-        // collide with the contested bare-name row.
         if (legacyIsAmbiguous && !usesCompositeIdentity) continue;
         missingKeys.push(key);
         continue;
@@ -489,10 +476,6 @@ export class RunsService {
           try {
             await tx.testCase.update({ where: { id }, data });
           } catch (error) {
-            // A concurrent ingest can win the race to migrate the same
-            // legacy row's automationKey to the same composite key first;
-            // both migrations are idempotent (same target value), so the
-            // loser can safely drop the write instead of failing the run.
             if (!isUniqueViolation(error)) throw error;
           }
         }),

@@ -137,11 +137,6 @@ function readOwnNameAttribute(openTag) {
   return match === null ? '' : match[1];
 }
 
-// Splits `fragment` into its direct `<testsuite>` children (each as
-// { openTag, inner, selfClosing }, respecting nesting depth) plus the text
-// outside of any of those children — mirrors the depth-tracking scan in
-// findTopLevelTestsuiteBlocks, generalized to work on any XML fragment, not
-// only the body of a <testsuites> root.
 function splitChildTestsuiteBlocks(fragment) {
   const masked = maskCdataAndComments(fragment);
   const tagPattern = /<testsuite\b[^>]*?(\/)?>|<\/testsuite\s*>/gi;
@@ -194,12 +189,6 @@ function splitChildTestsuiteBlocks(fragment) {
   return { children, outsideText };
 }
 
-// Ports the server's own grouping rule (parse-junit-xml.ts's collectCases,
-// group-junit-report.ts's groupJunitReportBySuite) into this zero-dependency
-// script: a <testsuite> with its own `name` attribute starts a new suite
-// key; one without inherits its closest ancestor's key. Two nodes anywhere
-// in the document that resolve to the identical suite key merge into one
-// group, in first-seen order — exactly like the server's suiteKey Map.
 function collectGroupSuiteKeys(openTag, inner, parentSuiteKey, depth, seen, order) {
   if (depth > MAX_SUITE_KEY_DEPTH) return;
 

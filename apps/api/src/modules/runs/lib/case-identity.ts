@@ -53,15 +53,6 @@ export interface LegacyKeyCollision {
   count: number;
 }
 
-/**
- * Two distinct reported identities (for example a plain `name` and a
- * `className::name` composite, or two different composites) can share the
- * same bare `name`. Both would otherwise try to claim the same
- * legacy-keyed `TestCase` row (one whose `automationKey` is still the bare
- * name) when their own exact identity key has no match. This reports every
- * bare name contested by more than one distinct identity in the batch, so
- * the caller can refuse to let any of them claim that row.
- */
 export function findLegacyKeyCollisions(
   cases: readonly CaseIdentityInput[],
 ): LegacyKeyCollision[] {
