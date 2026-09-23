@@ -10,3 +10,17 @@ export {
 } from './kpi-card'
 export { TrendChart, type TrendChartProps, type TrendPoint } from './trend-chart'
 export { StatusDonut, type StatusDonutProps, type StatusDonutSlice, type StatusDonutTone } from './status-donut'
+export {
+  ChartDataTable,
+  type ChartDataTableColumn,
+  type ChartDataTableProps,
+} from './chart-data-table'
+export {
+  ComparisonAreaChart,
+  type ComparisonAreaChartProps,
+  type ComparisonAreaPoint,
+} from './comparison-area-chart'
+export { Gauge, type GaugeProps } from './gauge'
+export { PassRateBar, type PassRateBarProps } from './pass-rate-bar'
+export { DeliveryBars, type DeliveryBarPoint, type DeliveryBarsProps } from './delivery-bars'
+export { KpiTile, type KpiDeltaTone, type KpiTileDelta, type KpiTileProps } from './kpi-tile'

@@ -71,7 +71,9 @@ describe('KpiRow', () => {
 
     const spark = defectsCard.querySelector('svg[role="img"]')
     expect(spark).not.toBeNull()
-    expect(spark?.querySelector('circle')).toHaveClass('fill-qb-fail')
+    expect(spark?.querySelector('circle')).toHaveAttribute('fill', 'var(--color-value)')
+    const chartRoot = defectsCard.querySelector('[data-slot="chart"]')
+    expect(chartRoot?.querySelector('style')?.innerHTML).toContain('--color-value: var(--qb-chart-fail);')
   })
 
   it('lays the cards out two per row on a phone and four on a wide container', async () => {

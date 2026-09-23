@@ -1,25 +1,21 @@
-import { Line, LineChart } from 'recharts'
+'use client'
 
-export type SparklineTone = 'pass' | 'fail' | 'warn' | 'muted' | 'primary'
+import { useId } from 'react'
+import { Area, ComposedChart } from 'recharts'
+import { cn } from '../utils'
+import { ChartContainer, type ChartConfig } from '../chart/chart'
 
-const TONE_FILL: Record<SparklineTone, string> = {
-  pass: 'fill-qb-pass',
-  fail: 'fill-qb-fail',
-  warn: 'fill-qb-warn',
-  muted: 'fill-qb-muted',
-  primary: 'fill-qb-primary',
-}
+export type SparklineTone = 'pass' | 'fail' | 'muted' | 'primary'
 
-const TONE_STROKE: Record<SparklineTone, string> = {
-  pass: 'stroke-qb-pass',
-  fail: 'stroke-qb-fail',
-  warn: 'stroke-qb-warn',
-  muted: 'stroke-qb-muted',
-  primary: 'stroke-qb-primary',
+const TONE_VAR: Record<SparklineTone, `var(--qb-chart-${string})`> = {
+  primary: 'var(--qb-chart-line)',
+  muted: 'var(--qb-chart-compare)',
+  pass: 'var(--qb-chart-pass)',
+  fail: 'var(--qb-chart-fail)',
 }
 
 export interface SparklineProps {
-  values: readonly number[]
+  values: readonly (number | null)[]
   label: string
   tone?: SparklineTone
   width?: number
@@ -35,58 +31,74 @@ interface SparkDotProps {
   cx?: number
   cy?: number
   index?: number
+  value?: number | null
 }
 
-export function Sparkline({
-  values,
-  label,
-  tone = 'primary',
-  width = 72,
-  height = 24,
-  className,
-}: SparklineProps) {
+export function Sparkline({ values, label, tone = 'primary', width = 72, height = 24, className }: SparklineProps) {
+  const gradientId = useId()
+
   if (values.length < 2) return null
 
+  const color = TONE_VAR[tone]
   const data = values.map((value, index) => ({ index, value }))
+  const config: ChartConfig = { value: { color } }
+  const lastDefinedIndex = data.reduce(
+    (found, point, index) => (point.value !== null ? index : found),
+    -1,
+  )
 
   return (
-    <LineChart
+    <ChartContainer
+      config={config}
+      initialDimension={{ width, height }}
       width={width}
       height={height}
-      data={data}
-      role="img"
-      aria-label={label}
-      accessibilityLayer={false}
-      tabIndex={-1}
-      margin={{ top: INSET, right: INSET, bottom: INSET, left: INSET }}
-      className={className ?? ''}
+      className={cn('aspect-auto', className)}
+      style={{ width, height }}
     >
-      <Line
-        type="monotone"
-        dataKey="value"
-        className={TONE_STROKE[tone]}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        isAnimationActive={false}
-        activeDot={false}
-        dot={(dotProps: SparkDotProps) => {
-          const isLast = dotProps.index === values.length - 1
-          if (!isLast) {
-            return <g key={`dot-${dotProps.index}`} />
-          }
-          return (
-            <circle
-              key="marker"
-              cx={dotProps.cx}
-              cy={dotProps.cy}
-              r={MARKER_RADIUS}
-              className={`stroke-qb-surface ${TONE_FILL[tone]}`}
-              strokeWidth={RING}
-            />
-          )
-        }}
-      />
-    </LineChart>
+      <ComposedChart
+        data={data}
+        role="img"
+        aria-label={label}
+        accessibilityLayer={false}
+        tabIndex={-1}
+        margin={{ top: INSET, right: INSET, bottom: INSET, left: INSET }}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--color-value)" stopOpacity={0.28} />
+            <stop offset="100%" stopColor="var(--color-value)" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <Area
+          type="monotone"
+          dataKey="value"
+          connectNulls={false}
+          stroke="var(--color-value)"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill={`url(#${gradientId})`}
+          isAnimationActive={false}
+          activeDot={false}
+          dot={(dotProps: SparkDotProps) => {
+            if (dotProps.index !== lastDefinedIndex) {
+              return <g key={`dot-${dotProps.index}`} />
+            }
+            return (
+              <circle
+                key="marker"
+                cx={dotProps.cx}
+                cy={dotProps.cy}
+                r={MARKER_RADIUS}
+                fill="var(--color-value)"
+                className="stroke-qb-surface"
+                strokeWidth={RING}
+              />
+            )
+          }}
+        />
+      </ComposedChart>
+    </ChartContainer>
   )
 }
