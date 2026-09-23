@@ -54,7 +54,7 @@ function ChartContainer({
   height?: number
 }) {
   const uniqueId = React.useId()
-  const chartId = `chart-${id ?? uniqueId.replace(/:/g, '')}`
+  const chartId = `chart-${(id ?? uniqueId).replace(/[^A-Za-z0-9_-]/g, '')}`
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -76,8 +76,16 @@ function ChartContainer({
   )
 }
 
+const CHART_STYLE_KEY_PATTERN = /^[A-Za-z0-9_-]+$/
+const CHART_STYLE_COLOR_PATTERN = /^var\(--qb-chart-[a-z0-9-]+\)$/
+
 function ChartStyle({ id, config }: { id: string; config: ChartConfig }) {
-  const colorConfig = Object.entries(config).filter(([, itemConfig]) => itemConfig.color)
+  const colorConfig = Object.entries(config).filter(
+    ([key, itemConfig]) =>
+      itemConfig.color !== undefined &&
+      CHART_STYLE_KEY_PATTERN.test(key) &&
+      CHART_STYLE_COLOR_PATTERN.test(itemConfig.color),
+  )
 
   if (!colorConfig.length) {
     return null
@@ -86,7 +94,7 @@ function ChartStyle({ id, config }: { id: string; config: ChartConfig }) {
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: `[data-chart=${id}] {\n${colorConfig
+        __html: `[data-chart="${id}"] {\n${colorConfig
           .map(([key, itemConfig]) => `  --color-${key}: ${itemConfig.color};`)
           .join('\n')}\n}`,
       }}

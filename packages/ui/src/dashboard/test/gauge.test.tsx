@@ -3,14 +3,29 @@ import { describe, expect, it } from 'vitest'
 import { Gauge } from '../gauge'
 
 describe('Gauge', () => {
-  it('is an image with an accessible name', () => {
+  it('is a meter with an accessible name and value bounds when a value is present', () => {
     render(
       <Gauge value={92} label="Cases passing, 92 percent">
         <span>92%</span>
       </Gauge>,
     )
 
-    expect(screen.getByRole('img', { name: 'Cases passing, 92 percent' })).toBeInTheDocument()
+    const meter = screen.getByRole('meter', { name: 'Cases passing, 92 percent' })
+    expect(meter).toHaveAttribute('aria-valuenow', '92')
+    expect(meter).toHaveAttribute('aria-valuemin', '0')
+    expect(meter).toHaveAttribute('aria-valuemax', '100')
+    expect(meter).toHaveAttribute('aria-valuetext', 'Cases passing, 92 percent')
+  })
+
+  it('stays an image with an accessible name when there is no value', () => {
+    render(
+      <Gauge value={null} label="Cases passing, no data">
+        <span>—</span>
+      </Gauge>,
+    )
+
+    expect(screen.getByRole('img', { name: 'Cases passing, no data' })).toBeInTheDocument()
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument()
   })
 
   it('renders caller-supplied centre content as children', () => {

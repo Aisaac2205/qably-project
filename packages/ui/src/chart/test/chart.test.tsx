@@ -44,7 +44,7 @@ describe('ChartContainer', () => {
     const style = container.querySelector('style')
 
     expect(chartId).toBeTruthy()
-    expect(style?.innerHTML).toContain(`[data-chart=${chartId}]`)
+    expect(style?.innerHTML).toContain(`[data-chart="${chartId}"]`)
     expect(style?.innerHTML).toContain('--color-current: var(--qb-chart-line);')
     expect(style?.innerHTML).toContain('--color-previous: var(--qb-chart-compare);')
   })
@@ -59,6 +59,62 @@ describe('ChartContainer', () => {
     )
 
     expect(container.querySelector('style')).not.toBeInTheDocument()
+  })
+
+  it('never interpolates a config key that would break out of the CSS declaration block', () => {
+    const unsafeConfig: ChartConfig = {
+      'x;}body{display:none}': { color: 'var(--qb-chart-line)' },
+      previous: { label: 'Anterior', color: 'var(--qb-chart-compare)' },
+    }
+
+    const { container } = render(
+      <ChartContainer config={unsafeConfig} initialDimension={{ width: 480, height: 240 }}>
+        <LineChart data={data}>
+          <Line dataKey="current" />
+        </LineChart>
+      </ChartContainer>,
+    )
+
+    const style = container.querySelector('style')
+    expect(style?.innerHTML).not.toContain('body{display:none}')
+    expect(style?.innerHTML).toContain('--color-previous: var(--qb-chart-compare);')
+  })
+
+  it('never interpolates a config color that would break out of the CSS declaration block', () => {
+    const unsafeConfig: ChartConfig = {
+      current: { color: 'red;} *{x:y' as NonNullable<ChartConfig[string]['color']> },
+      previous: { label: 'Anterior', color: 'var(--qb-chart-compare)' },
+    }
+
+    const { container } = render(
+      <ChartContainer config={unsafeConfig} initialDimension={{ width: 480, height: 240 }}>
+        <LineChart data={data}>
+          <Line dataKey="current" />
+        </LineChart>
+      </ChartContainer>,
+    )
+
+    const style = container.querySelector('style')
+    expect(style?.innerHTML).not.toContain('red;')
+    expect(style?.innerHTML).not.toContain('*{x:y')
+    expect(style?.innerHTML).toContain('--color-previous: var(--qb-chart-compare);')
+  })
+
+  it('sanitises a caller-supplied id so the style selector always matches the data-chart attribute', () => {
+    const { container } = render(
+      <ChartContainer id="weekly:trend" config={config} initialDimension={{ width: 480, height: 240 }}>
+        <LineChart data={data}>
+          <Line dataKey="current" />
+        </LineChart>
+      </ChartContainer>,
+    )
+
+    const chartNode = container.querySelector('[data-chart]')
+    const chartId = chartNode?.getAttribute('data-chart') ?? ''
+    const style = container.querySelector('style')
+
+    expect(chartId).not.toContain(':')
+    expect(style?.innerHTML).toContain(`[data-chart="${chartId}"]`)
   })
 })
 

@@ -17,10 +17,32 @@ describe('Sparkline', () => {
     expect(container.querySelectorAll('circle')).toHaveLength(1)
   })
 
-  it('renders nothing for fewer than two values', () => {
-    const { container } = render(<Sparkline values={[42]} label="single" />)
+  it('renders an accessible dot for a single value instead of a silent blank', () => {
+    render(<Sparkline values={[42]} label="single" />)
 
-    expect(container).toBeEmptyDOMElement()
+    expect(screen.getByRole('img', { name: 'single' })).toBeInTheDocument()
+  })
+
+  it('renders no visual and an accessible empty-state name for an empty series', () => {
+    render(<Sparkline values={[]} label="trend" emptyLabel="No data" />)
+
+    const image = screen.getByRole('img', { name: 'No data' })
+    expect(image).toBeInTheDocument()
+    expect(image.querySelector('.recharts-surface')).not.toBeInTheDocument()
+  })
+
+  it('renders no visual and an accessible empty-state name when every value is null', () => {
+    render(<Sparkline values={[null, null, null]} label="trend" emptyLabel="No data" />)
+
+    const image = screen.getByRole('img', { name: 'No data' })
+    expect(image).toBeInTheDocument()
+    expect(image.querySelector('.recharts-surface')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the label as the accessible name when no emptyLabel is given', () => {
+    render(<Sparkline values={[null, null]} label="trend" />)
+
+    expect(screen.getByRole('img', { name: 'trend' })).toBeInTheDocument()
   })
 
   it('breaks the line into a gap instead of interpolating across a null value', () => {

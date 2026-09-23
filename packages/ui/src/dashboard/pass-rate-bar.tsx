@@ -21,11 +21,21 @@ export function PassRateBar({
 }: PassRateBarProps) {
   const clamped = value === null ? 0 : Math.min(100, Math.max(0, value))
   const tone = value === null ? '' : value >= warnBelow ? 'bg-qb-pass' : 'bg-qb-warn'
+  const a11yProps =
+    value === null
+      ? ({ role: 'img', 'aria-label': emptyLabel } as const)
+      : ({
+          role: 'meter',
+          'aria-label': label,
+          'aria-valuenow': clamped,
+          'aria-valuemin': 0,
+          'aria-valuemax': 100,
+          'aria-valuetext': label,
+        } as const)
 
   return (
     <div
-      role="img"
-      aria-label={value === null ? emptyLabel : label}
+      {...a11yProps}
       className={cn('h-1.5 w-full overflow-hidden rounded-full bg-qb-border/30', className)}
     >
       <div

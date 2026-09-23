@@ -1,6 +1,6 @@
 'use client'
 
-import { useId } from 'react'
+import { useId, useMemo } from 'react'
 import { Area, ComposedChart } from 'recharts'
 import { cn } from '../utils'
 import { ChartContainer, type ChartConfig } from '../chart/chart'
@@ -21,6 +21,7 @@ export interface SparklineProps {
   width?: number
   height?: number
   className?: string
+  emptyLabel?: string
 }
 
 const MARKER_RADIUS = 4
@@ -34,18 +35,43 @@ interface SparkDotProps {
   value?: number | null
 }
 
-export function Sparkline({ values, label, tone = 'primary', width = 72, height = 24, className }: SparklineProps) {
+export function Sparkline({
+  values,
+  label,
+  tone = 'primary',
+  width = 72,
+  height = 24,
+  className,
+  emptyLabel,
+}: SparklineProps) {
   const gradientId = useId()
-
-  if (values.length < 2) return null
-
   const color = TONE_VAR[tone]
-  const data = values.map((value, index) => ({ index, value }))
-  const config: ChartConfig = { value: { color } }
-  const lastDefinedIndex = data.reduce(
-    (found, point, index) => (point.value !== null ? index : found),
-    -1,
+  const data = useMemo(() => values.map((value, index) => ({ index, value })), [values])
+  const config: ChartConfig = useMemo(() => ({ value: { color } }), [color])
+  const definedIndexes = useMemo(
+    () => data.reduce<number[]>((found, point) => (point.value !== null ? [...found, point.index] : found), []),
+    [data],
   )
+  const lastDefinedIndex = definedIndexes.length ? definedIndexes[definedIndexes.length - 1] : -1
+
+  if (definedIndexes.length === 0) {
+    return (
+      <span
+        role="img"
+        aria-label={emptyLabel ?? label}
+        className={cn('inline-block', className)}
+        style={{ width, height }}
+      />
+    )
+  }
+
+  if (definedIndexes.length === 1) {
+    return (
+      <svg role="img" aria-label={label} width={width} height={height} className={className}>
+        <circle cx={width / 2} cy={height / 2} r={MARKER_RADIUS} fill={color} />
+      </svg>
+    )
+  }
 
   return (
     <ChartContainer

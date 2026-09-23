@@ -99,11 +99,12 @@
   --app-heatmap-l3:        oklch(0.560 0.180 145);
   --app-heatmap-l4:        oklch(0.440 0.200 145);
 
-  --qb-chart-line:  var(--app-primary);
-  --qb-chart-grid:  var(--app-border);
-  --qb-chart-pass:  oklch(0.62 0.16 145);
-  --qb-chart-fail:  oklch(0.42 0.19 25);
-  --qb-chart-skip:  oklch(0.62 0.00 0);
+  --qb-chart-line:    var(--app-primary);
+  --qb-chart-grid:    var(--app-border);
+  --qb-chart-pass:    oklch(0.62 0.16 145);
+  --qb-chart-fail:    oklch(0.42 0.19 25);
+  --qb-chart-skip:    oklch(0.62 0.00 0);
+  --qb-chart-compare: var(--app-fg-muted);
 }
 
 @theme inline {

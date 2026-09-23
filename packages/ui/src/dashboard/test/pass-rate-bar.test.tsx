@@ -44,11 +44,16 @@ describe('PassRateBar', () => {
     render(<PassRateBar value={null} label="Pass rate" emptyLabel="No data" />)
 
     expect(screen.getByRole('img', { name: 'No data' })).toBeInTheDocument()
+    expect(screen.queryByRole('meter')).not.toBeInTheDocument()
   })
 
-  it('exposes the percentage as an accessible image name when a value is present', () => {
+  it('exposes itself as a meter with value bounds when a value is present', () => {
     render(<PassRateBar value={72} label="Pass rate 72 percent" />)
 
-    expect(screen.getByRole('img', { name: 'Pass rate 72 percent' })).toBeInTheDocument()
+    const meter = screen.getByRole('meter', { name: 'Pass rate 72 percent' })
+    expect(meter).toHaveAttribute('aria-valuenow', '72')
+    expect(meter).toHaveAttribute('aria-valuemin', '0')
+    expect(meter).toHaveAttribute('aria-valuemax', '100')
+    expect(meter).toHaveAttribute('aria-valuetext', 'Pass rate 72 percent')
   })
 })

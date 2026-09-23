@@ -15,7 +15,10 @@ import {
 import { cn } from '../utils'
 import { ChartContainer, ChartTooltip, type ChartConfig } from '../chart/chart'
 import { useCoarsePointer } from '../chart/use-coarse-pointer'
+import { useDebouncedValue } from '../chart/use-debounced-value'
 import { ChartDataTable } from './chart-data-table'
+
+const ANNOUNCE_DEBOUNCE_MS = 300
 
 export interface ComparisonAreaPoint {
   id: string
@@ -141,9 +144,11 @@ function ActivePointAnnouncer({
           .join(', ')
       : ''
 
+  const announcedText = useDebouncedValue(text, ANNOUNCE_DEBOUNCE_MS)
+
   return (
     <div role="status" aria-live="polite" className="sr-only">
-      {text}
+      {announcedText}
     </div>
   )
 }
@@ -165,10 +170,13 @@ export function ComparisonAreaChart({
   const isCoarsePointer = useCoarsePointer()
   const trigger = isCoarsePointer ? 'click' : 'hover'
 
-  const config: ChartConfig = {
-    current: { label: seriesLabels.current, color: CURRENT_COLOR },
-    previous: { label: seriesLabels.previous, color: PREVIOUS_COLOR },
-  }
+  const config: ChartConfig = useMemo(
+    () => ({
+      current: { label: seriesLabels.current, color: CURRENT_COLOR },
+      previous: { label: seriesLabels.previous, color: PREVIOUS_COLOR },
+    }),
+    [seriesLabels.current, seriesLabels.previous],
+  )
 
   if (points.length === 0) {
     return <p className="py-12 text-center text-xs text-qb-muted">{emptyLabel}</p>

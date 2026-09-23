@@ -25,11 +25,21 @@ export function Gauge({ value, label, size = 128, className, children }: GaugePr
     { segment: 'value', portion: clamped },
     { segment: 'rest', portion: 100 - clamped },
   ]
+  const a11yProps =
+    clamped === null
+      ? ({ role: 'img', 'aria-label': label } as const)
+      : ({
+          role: 'meter',
+          'aria-label': label,
+          'aria-valuenow': clamped,
+          'aria-valuemin': 0,
+          'aria-valuemax': 100,
+          'aria-valuetext': label,
+        } as const)
 
   return (
     <div
-      role="img"
-      aria-label={label}
+      {...a11yProps}
       className={cn('relative inline-flex items-center justify-center', className)}
       style={{ width: size, height: size / 2 + 8 }}
     >
