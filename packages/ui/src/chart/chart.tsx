@@ -55,10 +55,35 @@ function ChartContainer({
 }) {
   const uniqueId = React.useId()
   const chartId = `chart-${(id ?? uniqueId).replace(/[^A-Za-z0-9_-]/g, '')}`
+  const containerRef = React.useRef<HTMLDivElement>(null)
+  const [hasDimensions, setHasDimensions] = React.useState(true)
+
+  React.useEffect(() => {
+    const el = containerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+
+    const checkSize = () => {
+      const rect = el.getBoundingClientRect()
+      setHasDimensions(rect.width > 0 && rect.height > 0)
+    }
+
+    checkSize()
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0]
+      if (entry) {
+        setHasDimensions(entry.contentRect.width > 0 && entry.contentRect.height > 0)
+      }
+    })
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <ChartContext.Provider value={{ config }}>
       <div
+        ref={containerRef}
         data-slot="chart"
         data-chart={chartId}
         className={cn(
@@ -68,13 +93,17 @@ function ChartContainer({
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer
-          initialDimension={initialDimension}
-          {...(width !== undefined ? { width } : {})}
-          {...(height !== undefined ? { height } : {})}
-        >
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        {hasDimensions ? (
+          <RechartsPrimitive.ResponsiveContainer
+            initialDimension={initialDimension}
+            minWidth={0}
+            minHeight={0}
+            {...(width !== undefined ? { width } : {})}
+            {...(height !== undefined ? { height } : {})}
+          >
+            {children}
+          </RechartsPrimitive.ResponsiveContainer>
+        ) : null}
       </div>
     </ChartContext.Provider>
   )
