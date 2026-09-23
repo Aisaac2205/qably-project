@@ -134,3 +134,39 @@ Deleted with their tests and i18n keys: the traceability components, hook, grid 
 ## Docs
 
 Update `docs/DASHBOARD_METRICS.md`, `docs/DASHBOARD_UI.md` and `apps/web/src/features/dashboard/README.md`. The reasoning goes there, not into code comments.
+
+## Implementation notes
+
+Where the shipped dashboard differs from this brief, decided and approved during implementation
+(full detail in `docs/DASHBOARD_METRICS.md` and `docs/DASHBOARD_UI.md`):
+
+- **The hero shows executed cases, not pass rate.** Pass rate already has its own KPI tile; the
+  hero was changed to a two-line executed-cases comparison (current vs. previous period, with a
+  passed/failed/blocked breakdown in its tooltip) so it carries information the KPI strip does not
+  already show.
+- **The period control is a toggle group, not a tablist.** This brief called it a "period
+  segmented control"; it shipped as `role="group"` with `aria-pressed` buttons (7/30/90, default
+  30) rather than a `tablist`/`tab` pair, because there are no separate tab panels — the control
+  just switches which period every widget on the same page queries. The initial `tablist` markup
+  implied panels that do not exist and was corrected during review.
+- **Chart primitives live in `packages/ui/src/dashboard`, not `apps/web/src/components/charts`.**
+  This overturned this brief's "Chart primitives live in `apps/web/src/components/charts`" decision
+  — they were moved to the shared package, built on a vendored shadcn chart primitive
+  (`packages/ui/src/chart`), specifically so the landing preview (the separate
+  `landing-dashboard-previews` change) renders the product's actual chart components rather than a
+  copy.
+- **Notification channels gained two rows this brief did not plan for**: a "Qably" in-app row
+  (sent/unread counts over the same 14-day window, scoped to the calling user) and, once approved
+  as a follow-up, real sent/failed counts and daily bars on the email row — this brief's "Email
+  counts are out of scope" decision was superseded once `NotificationDelivery` was widened to
+  record email sends alongside webhook sends.
+- **Project monograms are neutral**, not the per-id deterministic colour hash this brief and the
+  formal spec both asked for — see `docs/DASHBOARD_UI.md`'s deviations section for why.
+- **Time zone is dynamic (client `Intl` zone, validated server-side, missing falls back to UTC,
+  invalid is `400`)**, not the fixed zone bucketing this brief's "Daily buckets use the same
+  timezone resolution as the traceability calendar" line implied — the traceability calendar's own
+  bucketing became dynamic too, as part of the same change, rather than staying the fixed reference
+  point.
+- **Traceability was not removed.** This brief's removal list included "the traceability
+  components, hook, grid lib and types," conditioned on no other caller remaining — `/quality`
+  turned out to still depend on them, so they were kept, unlike everything else on that list.

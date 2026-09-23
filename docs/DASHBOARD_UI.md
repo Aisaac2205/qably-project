@@ -1,208 +1,163 @@
 # Dashboard UI
 
-Why the dashboard surface (`apps/web/src/features/dashboard`) renders what it renders. The metric
-definitions and query shapes live in `docs/DASHBOARD_METRICS.md`; this file covers presentation
-decisions that the code deliberately does not explain inline.
+Why the redesigned dashboard surface (`apps/web/src/features/dashboard`) renders what it renders.
+Metric definitions and query shapes live in `docs/DASHBOARD_METRICS.md`; this file covers
+presentation, the shared chart package, accessibility and responsive rules, and the verification
+practice this redesign introduced.
 
-## Vocabulary
+## Page composition
 
-The dashboard is read by QA engineers and QA leads at Guatemalan software factories, working from
-editors, terminals and CI. Labels follow, in order of precedence:
+`dashboard-page.tsx` renders, in order, inside a single lifted `period` state (`useState<DashboardPeriod>(30)`):
 
-1. The terms the thesis already fixes (`CONTEXT.md` 4.1-4.4): *ejecución de prueba*, *conjunto de
-   pruebas*, *caso de prueba*, *cobertura*, *trazabilidad*.
-2. The ISTQB/SSTQB Spanish glossary, which the thesis cites as the standard for testing terms.
-3. Microsoft Learn's Spanish Azure Test Plans documentation for metric names (*tasa de
-   aprobación*), and GitHub's Spanish Actions documentation for CI terms (*ejecución de flujo de
-   trabajo*, *trabajo*).
+1. `DashboardHeader` — title, subtitle, period toggle (7/30/90).
+2. `KpiStrip` — 4 `KpiTile`s (pass rate, runs, failed cases, avg run duration), each with a
+   sparkline and a delta against the previous window.
+3. `PassRateHero` — full-width executed-cases comparison chart (see "The hero shows executed
+   cases" below).
+4. A `@3xl:grid-cols-3` row: `ProjectsTable` (`col-span-2`) and `CasesGaugeCard`.
+5. A `@3xl:grid-cols-2` row: `ChannelsCard` and `ActivityCard`.
 
-A label states what the panel lists, never a category the reader has to decode.
+Both two-column rows live inside their own `max-w-dashboard` (`--container-dashboard: 1128px`, a
+`@theme` token, never `max-w-[1128px]`) wrapper and stack to a single column below their own
+`@3xl` container breakpoint — the breakpoint is keyed to the row's own width, not the viewport, so
+a row narrows correctly regardless of what else is on the page. Every grid child carries `min-w-0`,
+because `ResponsiveContainer` (Recharts) cannot shrink a flex/grid child below its content size
+without it.
 
-| Key | Spanish | English | Why |
-| --- | --- | --- | --- |
-| `dashboard.recentRuns` | Ejecuciones de prueba | Test runs | ISTQB's term for the unit being listed. "Recientes" said nothing the ordering did not. |
-| `dashboard.ciCommits` | Commits en CI | Commits in CI | Each row is a commit, not a pipeline. See "Two queues, two granularities" below. |
-| `dashboard.ciRunsPassed` | {{passed}}/{{total}} aprobadas | {{passed}}/{{total}} passed | Counts the commit's test runs. Server-computed over every run, see `docs/DASHBOARD_METRICS.md`. |
-| `dashboard.workQueue` | Cola de trabajo | Work queue | Landmark name for the two-queue panel. Was hardcoded English. |
-| `dashboard.projectStatus` | Estado de los proyectos | Project status | "Salud" is a project-management health-check metaphor, not a QA metric, and the table reports status. |
-| `dashboard.thPassRate` | Tasa de aprobación | Pass rate | Microsoft Learn's Spanish Azure Test Plans term for this exact metric. |
-| `common.viewDetails` / `common.noRecentChange` | Ver detalles / Sin cambios recientes | View details / No recent change | `KpiCard` hardcoded the Spanish strings while its screen-reader affordance hardcoded English, so both rendered at once. |
+Every widget manages its own `isLoading`/`isError`/`retry` independently — a failed
+`GET /dashboard/channels` only degrades the channels and activity cards, never the KPI strip or the
+hero, which read from `GET /dashboard/overview`.
 
-## Two queues, two granularities
+## The dashboard blocks live in `@qably/ui`, built on a vendored shadcn chart
 
-The work-queue panel holds two lists that describe the same events at different levels, and the
-naming has to make that hierarchy legible rather than look like duplication:
+`packages/ui/src/chart/chart.tsx` is a hand-vendored copy of shadcn/ui's `chart` primitive
+(`ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartLegend`, `ChartLegendContent`,
+`ChartStyle`, `ChartConfig`) over Recharts 3.8.1, rewritten so it speaks only this package's
+`qb-*` token contract instead of shadcn's own `muted-foreground`/`background`/`border` class names
+— those collide with names this repo already uses for other things. There is no `components.json`
+in `packages/ui`; the file was copied and adapted by hand rather than run through the shadcn CLI,
+because `apps/web/components.json` targets a different style base and icon library (lucide, banned
+in this repo) that the CLI would otherwise re-apply here.
 
-- **Ejecuciones de prueba** lists individual runs. One run is one test suite executed, which for
-  CI-reported runs means one test file. It answers "what ran, and did it pass?".
-- **Commits en CI** lists commits. It answers "which changes has CI checked, and what is their
-  verdict?" — the correlation between a code change and its test evidence that `CONTEXT.md` 4.1.2
-  names as the product's first objective.
+`packages/ui/src/dashboard/` holds the presentational chart components built on that primitive:
+`Sparkline` (compact area chart for KPI tiles), `Gauge` (the cases-passing donut), `PassRateBar`,
+`DeliveryBars` (per-channel 14-day bar strip), `ChartDataTable` (the shared `sr-only` mirror table
+every chart renders alongside itself), `KpiTile`, `StatusChip` and `Link`. They take data and copy
+through props and know nothing about react-query, Next.js or the i18n store — `apps/web` wraps them
+in containers that fetch real data and translate labels; `apps/landing`'s own dashboard preview
+(`landing-dashboard-previews`, a separate change) will render the same components with demo data,
+so the marketing preview is never a re-implementation of the product's charts.
 
-The right-hand queue is grouped by commit rather than by CI workflow run. The reasoning, and why
-the grouping cannot happen in the client, is in `docs/DASHBOARD_METRICS.md` under "Why CI activity
-is grouped by commit".
+`ChartContainer` always forwards `initialDimension` — pass the chart's intrinsic design size, not a
+guess. Recharts 3.8.1's `ResponsiveContainer` skips measuring entirely when `ResizeObserver` is
+`undefined` (true in most test environments and on first paint before layout settles) and renders
+at `initialDimension` instead of the historical `-1×-1` fallback that produced sizing warnings.
+Passing the real intrinsic size means the chart is never invisible on first paint or inside a test.
 
-## Row subtitles carry what the title does not
+### Token contract
 
-A queue row is a title, a subtitle and a status. The subtitle exists to add information, so it
-never restates the title:
+Every block speaks only Tailwind `qb-*` utilities (`--color-qb-*`, declared in each app's `@theme
+inline`) and, for charts, raw `--qb-chart-*` CSS variables read directly (`stroke="var(--qb-chart-line)"`,
+or as a `ChartConfig` series `color` — `ChartConfig.color` is typed as `` `var(--qb-chart-${string})` ``
+so a raw hex/oklch value fails to compile). `apps/web/src/app/globals.css` binds them to its light
+OKLCH tokens; `apps/landing/src/styles/global.css` binds them to its own dark hex/rgba mirror. The
+two token files are separate systems — never copy a value from one into the other. Both apps
+`@source packages/ui/src` so Tailwind generates the package's utility classes.
 
-- **Test-run rows** previously showed the suite name as the subtitle. For CI-reported runs the run
-  name is `"<workflow> / <suite> (#<number>)"`, so the suite name was already in the title and the
-  subtitle read as a duplicate. The subtitle now shows how long ago the run started — which the row
-  did not state at all before — and prepends the suite name only when the title does not already
-  contain it.
-- **Commit rows** show the short sha, the passed/total run count, and how long ago the last run
-  started. The rolled-up status sits in the chip on the right.
+`--qb-chart-compare` is this redesign's one new package-level contract variable (bound to
+`var(--fg-muted)` in `apps/web`): the muted, dashed "previous period" series colour used by the
+hero and by `Sparkline`'s `muted` tone. It is a package contract var like the others, not a
+web-local token — `apps/landing` will bind its own value when the landing preview change lands,
+never copy `apps/web`'s.
 
-## Counts are stated once
+## Accessibility contract
 
-The traceability header states the year's event total in its heading. The stage selector used to
-repeat that same total as a badge on its trigger, and with a different thousands separator, because
-the heading formatted through `formatEventCount` while the badge fell through to a bare
-`toLocaleString()`.
+Every chart component satisfies the same three rules, independent of which one it is:
 
-The trigger no longer carries a badge (`SelectSimple`'s `badgeInTrigger={false}`). The per-stage
-badges stay inside the dropdown, where they are not a repetition: they let the reader compare stage
-volumes before choosing one. All of them are formatted through `formatEventCount` with the active
-locale.
+1. **An `sr-only` data table mirrors the chart.** `ChartDataTable` renders a real `<table>` with a
+   `<caption>`, one column per series, `sr-only` so it is never visible but always in the
+   accessibility tree — a screen reader gets the same date/value pairs a sighted reader gets from
+   the plotted line or bar.
+2. **Keyboard focus reveals the same content hover does.** The hero and any other Recharts-backed
+   chart use Recharts 3's native `accessibilityLayer` (a focusable chart root, arrow keys move the
+   active point) rather than a hand-rolled roving-tabindex overlay — one tooltip implementation
+   serves mouse, touch and keyboard instead of three.
+3. **A `null` point renders as a visual gap, never a drop to zero.** `Sparkline` and the hero both
+   use `connectNulls={false}`/real gaps in the underlying series; a day with no runs is invisible on
+   the line, not a dip to the axis.
 
-## Time is localized
+`Gauge` and `PassRateBar` additionally carry a proper meter contract: when their value is a real
+number they render `role="meter"` with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`/`aria-valuetext`;
+when the value is `null` (not measured) they fall back to `role="img"` with just an `aria-label`,
+because a meter with no value to report is a contradiction — there is nothing to measure against a
+min/max.
 
-`formatRelativeTime` takes the active locale. It returns compact forms (`1h ago`, `hace 1 h`)
-rather than going through `Intl.RelativeTimeFormat`, because the dashboard's number formatting is
-already deliberately ICU-independent (see `formatEventCount`) and the compact form suits dense
-operational rows. Beyond 30 days it falls back to a locale-appropriate absolute date.
+### Touch and coarse-pointer input
 
-## The project table reports status, and orders by what needs attention
+`useCoarsePointer()` (`@qably/ui/chart`, a `useSyncExternalStore` wrapper over
+`matchMedia('(pointer: coarse)')`) decides whether a chart's tooltip trigger is `'hover'` or
+`'click'`. Recharts 3.8.1 only dispatches its touch handling on `touchmove`, so a tap with no
+movement would not reliably open a hover-triggered tooltip on a touch device; switching the trigger
+to `'click'` on coarse pointers makes a tap open it every time. The plot itself gets
+`touch-action: pan-y` (Tailwind's `touch-pan-y`) so vertical page scrolling still works over the
+chart while a horizontal drag can still scrub it.
 
-`ProjectActivity.healthScore` is not a health score. `computeHealthScore` in
-`apps/api/src/common/metrics/run-case-metrics.ts` returns `round(passRate * 100)` over the trailing
-window: it is the pass rate, under a different name. The dashboard was showing that same number in
-three places under three labels — the KPI card ("Aprobación · 7 días"), the trend card ("Tendencia
-de aprobación") and the table's "Salud" column — which read as three metrics instead of one.
+## Responsive rules, verified at 390px
 
-The UI now calls it the pass rate everywhere. The API field keeps its `healthScore` name because
-renaming a contract field consumed by the projects page as well is a separate change; the
-presentation layer is what the reader sees.
+- KPI cards: 1 column by default, 2 columns from the strip's own `@xs` container breakpoint (not
+  `@md` — a 390px viewport produces roughly a 350px container width once page padding is
+  subtracted, which only clears `@xs`), 4 columns from `@2xl`.
+- `KpiTile` itself is a `@container`: it stacks its value/label above its sparkline below 220px of
+  its own width and goes side-by-side above that, so a narrow 2-up tile on a small phone never
+  overflows its sparkline into the tile next to it.
+- Both `@3xl` two-column rows (projects/gauge, channels/activity) stack to one column below their
+  own `@3xl`.
+- The projects table lives inside its own horizontally scrollable region
+  (`tabIndex={0}`, `role="region"`, `aria-label`) inside its card — the table can scroll, the page
+  never does.
+- Channel rows stack identity above delivery bars below `@md`.
+- Every interactive control (the period toggle segments, sort buttons) meets the 24×24px minimum
+  target size.
 
-Two columns replace the old "Salud" column, because it was conflating two different facts:
+The 390px gate — no horizontal `scrollWidth` overflow, hero tooltip opens on tap, horizontal drag
+scrubs it, vertical swipe still scrolls the page, the table scrolls inside its own card — is
+verified manually (Chrome device mode at 390×844, plus one real phone when available) and recorded
+in the change's apply-progress. jsdom tests cover the same structural rules
+(`min-w-0`, `role="region"`, no `max-w-[1128px]` arbitrary values, loading/empty/error states) but
+cannot substitute for an actual narrow-viewport render.
 
-- **Última ejecución** pairs the status chip of the most recent run with when that run started. A
-  chip alone did not say whether it was from an hour ago or a month ago.
-- **Tasa de aprobación** carries the windowed percentage, or "Aún sin medir" when the project has
-  run but has nothing inside the window. `null` there means "not measured in this window" and is
-  rendered differently from a real `0`.
+## Real-browser verification is part of done
 
-Rows are ordered by how much attention they need rather than by insertion order: failing first,
-then runs in flight, then measured projects by weakest pass rate, then projects whose window holds
-no runs, then projects that have never run. The tie-break is the most recent run, then the name.
-`CONTEXT.md` 4.1.4b states the table's job as giving the QA lead immediate visibility of each
-project's real state without opening every suite, and an unordered list of every project does not
-do that job.
+jsdom alone missed a real defect during this redesign: the hero rendered as a 0×0 box in a real
+browser while every jsdom test for the same component passed, because jsdom never triggers the
+`ResizeObserver`/layout path that exposed the bug. Every UI unit in this redesign is now also
+checked in a real browser before being considered finished: a temporary harness route seeded with
+realistic data, Playwright screenshots taken at 1440×900 and 390×844, compared against the approved
+mockup, and the harness route deleted afterwards (`git status --porcelain` confirms nothing leaks
+into the committed tree). This does not replace the jsdom/vitest suite — it catches the class of
+bug jsdom structurally cannot.
 
-## Columns appear when they have something to report
+## Deviations from the original spec, evaluated and accepted
 
-The Review/AI domain has no API module, and `projects.service.ts` deliberately omits
-`aiPendingCount` rather than inventing a zero. The table therefore rendered a column of em dashes on
-every row.
+- **The hero shows executed cases, not pass rate.** The original spec described the hero as a pass-rate
+  comparison chart. The pass rate KPI tile already covers that number, so the hero was changed to a
+  two-line "executed cases" comparison (current period solid, previous period dashed, both real
+  zeros on no-run days rather than connected gaps) with a tooltip breaking each day down into
+  passed/failed/blocked and a footer trend against the previous period. This is a deliberate,
+  approved deviation from the spec text, not an oversight.
+- **Project monograms are neutral, not a deterministic per-id color hash.** The spec asked for a
+  monogram colour derived from a hash of the project id. Shipped, `project-monogram.tsx` renders a
+  plain neutral badge (`bg-canvas-hover`/`text-default`) with the project's initials; the per-row
+  `PassRateBar` already carries the value-driven semantic colour (pass/warn) for that row, and a
+  second, unrelated colour signal on the monogram itself tested as visual noise rather than useful
+  information. `monogram-tone.ts` was removed rather than kept unused.
+- **The hero's debounced `aria-live` announcer was not ported** when the hero was rewritten for
+  executed cases. Recharts' `accessibilityLayer` plus the `sr-only` data table cover the same
+  keyboard/assistive-technology path; a live-region announcement on every arrow-key move was judged
+  a WARNING-level nice-to-have, not a blocking gap, but it has not yet had a manual screen-reader
+  spot check.
 
-The AI column is now conditional: it is absent while no project reports a count, and appears on its
-own as soon as one does. This keeps the surface honest today without discarding the contract, so
-landing the Review/AI module requires no change here.
-
-## The traceability calendar reads the database
-
-`useTraceabilityCalendar` used to fabricate the whole year with `Math.sin()`-seeded
-pseudo-randomness, overlay live store counts onto the single `MOCK_NOW` day, and take the displayed
-year from `MOCK_NOW` rather than the clock. That is why one cell reported thousands of events and
-why the calendar stopped in June.
-
-It now fetches `GET /dashboard/traceability` (see `docs/DASHBOARD_METRICS.md`) and hands the record
-to `buildTraceabilityGrid`, a pure function that lays the year out into week columns, pads the
-first and last week with nulls rather than foreign days, and fills the days the server omitted with
-zero. Handling the leap year and the month labels there keeps the component free of date logic.
-
-### Intensity levels come from the data, not fixed cut points
-
-The old thresholds were hardcoded at 3, 7 and 12 events. Real CI activity here is one run per test
-file, so an ordinary day clears the top bucket and the whole year renders as one flat colour.
-
-`computeLevelThresholds` takes the quartiles of the days that actually had activity, so the five
-steps always describe the distribution being shown. The scale is recomputed per stage filter,
-because a stage's volume is not comparable to the total.
-
-The quantile interpolates between neighbouring values rather than snapping to an index. Without
-that, a year with only a handful of active days collapsed all three thresholds onto the same number
-and every active day fell into the faintest bucket. Interpolating spreads them, so two days of 309
-and 2048 events land on levels 1 and 4 rather than sharing one.
-
-When every active day genuinely holds the same count there is no distribution to encode, and the
-three thresholds legitimately coincide. That case renders at a solid mid level instead of the
-faintest one, so a uniformly busy year does not read as an empty one.
-
-Levels are not rescaled to flatter sparse data. A day at 15% of the year's peak belongs in the
-lowest bucket, and pushing it up would overstate the activity.
-
-## The calendar grid uses the width it is given
-
-Cells were a fixed 10px, so on a wide card the grid stopped short and the whole section read as
-shrunken. The table is now `table-fixed` with a `colgroup`: the weekday column takes a fixed track
-and the 53 week columns split the remainder evenly, while each cell holds a child with
-`aspect-ratio: 1` so it grows with the card and stays square.
-
-A `min-width` keeps the cells legible on narrow screens; below that the grid scrolls inside its own
-container rather than pushing the page sideways.
-
-The card itself carries no padding. The heading and the stage and year selectors sit in a top bar
-with the `--canvas` background and a bottom border, and the grid gets its own padding underneath,
-so the calendar reaches the card's edges instead of floating inside a frame.
-
-## The heatmap ramp lives in tokens
-
-`--heatmap-l0` through `--heatmap-l4` did not exist. The calendar referenced them with a fallback,
-so it always rendered the hardcoded `oklch()` literals sitting in the fallback position, against
-the project's tokens-only rule. The same five values are now real tokens, and intensity is applied
-through `bg-heatmap-l*` utilities rather than inline styles, so the palette lives in one place.
-
-The ramp is green on hue 145, which is also the hue of `--status-pass`. That overlap is a
-deliberate, owner-approved choice: the calendar reads as a contribution graph, and the familiar
-green is what makes it legible at a glance. The trade-off worth knowing is that the heatmap encodes
-event **volume**, not quality, so a day of thirty failing runs still renders dark green. If the two
-ever need separating, shifting the ramp's hue to about 160 keeps it reading as green while pulling
-it off the status colour.
-
-## The calendar is a real grid, not a picture
-
-The calendar was an `<svg role="img">` whose `<rect>` children each carried `role="gridcell"`.
-`role="img"` makes its entire subtree presentational, so those 365 cells did not exist for a screen
-reader at all; and `gridcell` outside a `grid`/`row` is invalid ARIA regardless. The tooltip was
-bound to `onMouseEnter` alone, so a keyboard user could not reach any of the per-day figures, and
-the cell labels were hardcoded Spanish with no pluralisation ("1 eventos").
-
-It is now a `<table role="grid">`: one row per weekday, one column per week, month names as
-`columnheader`s spanning their weeks, and weekday names as `rowheader`s. All seven weekday headers
-exist for assistive technology; only three are shown visually, the rest are `sr-only`, so the sparse
-look survives without costing the row headers.
-
-Keyboard access follows the APG grid pattern: one tab stop into the grid, then the arrow keys move
-between days. Focus and hover both open the day summary, satisfying the requirement that
-hover-revealed content also be reachable by keyboard. The tooltip itself is `aria-hidden`, because
-the focused cell's own label already carries the same sentence and announcing it twice is worse
-than not announcing it.
-
-Day labels come from `describeDay`, shared by the tooltip and the cell labels, which picks the
-singular, plural or empty phrasing from the active locale instead of formatting "1 eventos".
-
-## The dashboard blocks live in `@qably/ui`, and both surfaces render them
-
-`packages/ui/src/dashboard/` holds the presentational blocks of the dashboard: `KpiCard`, `StatusChip`, `Sparkline`, `TrendChart` and, as they move, the project table, the activity queues and the pending proposals list. They take data and copy through props and know nothing about react-query, Next or the i18n store. `apps/web` wraps them in containers that fetch real data; `apps/landing` renders the same components with demo data inside the hero window. That is what makes the marketing preview identical to the product: it is the product's components.
-
-The blocks speak only one token vocabulary, the `qb-*` classes (`bg-qb-surface`, `text-qb-muted`, `text-qb-pass`, `shadow-qb-card`, `fill-qb-primary`). Each surface binds those names in its own `@theme`: `apps/web/src/app/globals.css` maps them to the product tokens, `apps/landing/src/styles/global.css` maps them to its `app-*` mirror. Neither surface copies a value from the other, and the landing's own brand tokens (`--color-primary` is white there) are never touched. Both CSS files also declare `@source "../../../../packages/ui/src"` so Tailwind generates the package's classes; forget that line and the blocks render unstyled.
-
-Links are injected: every block that navigates accepts `linkComponent`, which `apps/web` fills with `next/link` and the landing leaves as a plain anchor.
-
-### Chart colours are re-stepped from the status hues
-
-`--qb-chart-line`, `--qb-chart-grid`, `--qb-chart-pass`, `--qb-chart-fail` and `--qb-chart-skip` are plain CSS variables read by the SVG charts. The pass and fail steps are not the status tokens: `--status-pass` and `--status-fail` sit at the same lightness (L 0.45) and separate by only dE 3.2 under deuteranopia, which is fine for a chip that also carries an icon and a label, and unacceptable for two adjacent bar segments. The chart steps (pass L 0.62, fail L 0.42, same hues) separate by dE 17.4 and keep 3:1 against the surface; `--qb-chart-skip` is a grey that the categorical validator flags for chroma by design, because it encodes a state, not an identity. Stacked segments additionally keep a 2px surface gap and every chart ships a legend, a tooltip and a screen-reader table, so no value is colour-only.
+See `docs/design/2026-09-22-dashboard-redesign.md`'s "Implementation notes" section for the full
+list of where the shipped dashboard differs from the original brief, including the two backend
+additions (the Qably in-app channel and email delivery tracking) that are not UI decisions but do
+appear on this page.

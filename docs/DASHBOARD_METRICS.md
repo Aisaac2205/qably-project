@@ -1,247 +1,248 @@
 # Dashboard Metrics — Server-Owned Quality Snapshot
 
-`GET /dashboard/summary` is the central-panel endpoint from thesis §1.6.1 scope 1: it feeds the
-organization dashboard the counts, pass rate, trend and defect count that panel needs, computed
-server-side from real `Run` and `RunCase` rows. It also documents how `ProjectListItem.activity`
-(consumed by `GET /projects`) is derived, since both share the same metric math.
+Three read endpoints feed the redesigned `/dashboard`: `GET /dashboard/overview` (the hero, the
+four KPI cards, the projects table and the cases-passing gauge), `GET /dashboard/channels` (the
+notification channels card) and `GET /dashboard/traceability` (still consumed by `/quality`'s
+traceability calendar, unchanged in shape). `GET /dashboard/summary` also stays — `/quality`'s KPI
+strip and pass-rate trend still call it — and now computes its pass rate with the same pinned
+formula as everything else.
 
-Everything Review/AI-shaped — proposals, coverage gaps, quality risks — stays mock on the web for
-this slice. Neither endpoint invents numbers for that domain; see "What stays underivable" below.
+Every metric is computed server-side from real `Run` and `RunCase` rows. Nothing on `/dashboard`
+reads a mock store or a client-side clock.
 
-## Why the server owns the clock
+## Pass rate: one formula, one place
 
-The web app's `use-dashboard-stats.ts` currently computes its 7-day window against a frozen
-`MOCK_NOW` constant. That is a client deciding what "now" means, which breaks the moment a real
-user opens the dashboard on a real day. `GET /dashboard/summary` fixes this at the source: every
-windowed metric is computed from `new Date()` taken once, server-side, at the start of the
-request. The client receives already-windowed numbers plus the window length (`windowDays`) and
-never computes a "now" of its own. The web migration (next slice) replaces the mock hook's
-client-side window with a straight read of this response.
+`packages/types/src/pass-rate.ts` pins the definition every consumer uses:
 
-## `GET /dashboard/summary?projectId=<id>`
-
-Session-authenticated (`SessionGuard`, global) and organization-scoped (`OrgScopeGuard` +
-`@CurrentOrg()`), the same pattern as `runs` and `suites`. `projectId` is optional.
-
-- **Omitted**: every metric describes the whole organization.
-- **Given**: every metric is rescoped to that one project, including `totalProjects`, which becomes
-  `1` — the response always describes "the projects in the current view," not a mix of scoped and
-  unscoped numbers. A `projectId` that does not belong to the caller's organization answers `404`
-  (`project-not-found`), the same "not found, not forbidden" rule the rest of the API uses to avoid
-  telling a caller that a foreign resource exists.
-
-Response shape (`DashboardSummaryRecord` in `packages/types`):
-
-```json
-{
-  "totalProjects": 4,
-  "totalSuites": 11,
-  "totalRuns": 87,
-  "runsInWindow": 9,
-  "activeRuns": 1,
-  "passRate": 0.82,
-  "passRateTrend": 0.05,
-  "defectsDetected": 3,
-  "windowDays": 7,
-  "recentRuns": [ /* RunSummaryRecord, newest first, up to 5 */ ],
-  "recentCiCommits": [ /* CiCommitActivityRecord, newest first, up to 4 */ ]
-}
+```ts
+passRate = pass / (pass + fail + blocked)
 ```
 
-### Metric definitions
+`pending` and `running` cases are excluded from both numerator and denominator — they have not
+produced a verdict yet, so counting them would dilute the rate with cases that say nothing about
+quality. `skipped` cases are excluded too: skipping a case is a decision not to execute it, not an
+outcome to average in. `blocked` stays in the denominator and pulls the rate down, because a
+blocked case is a recorded outcome (something prevented it from running to completion) rather than
+an absence of data.
 
-| Field | Definition |
+The result is `null`, never `0`, when `pass + fail + blocked` is `0` — a suite or a day with only
+pending, running or skipped cases has **not been measured**, and printing a `0%` would claim a
+verdict that does not exist. Every UI surface that renders a pass rate must render this `null` state
+distinctly (an em dash, "Not measured yet", a track-only gauge) and must never coerce it to a
+printed zero.
+
+`computePassRateTrend(current, previous)` returns `current - previous`, and `null` whenever either
+side is `null` — a trend needs two measured points to mean anything.
+
+This project checked whether TestRail, Xray or Allure publish an official pass-rate formula worth
+citing here, and could not verify their current definitions against their own documentation inside
+this change's scope. Rather than cite a formula that was not independently confirmed, this section
+states the rule and its rationale on their own terms, with no vendor citation attached.
+
+### Every consumer, the same function
+
+`computePassRate`/`computePassRateTrend` (re-exported by `apps/api/src/common/metrics/run-case-metrics.ts` as `computeHealthScore`
+for the 0–100 percentage form) is the only place this math is written:
+
+| Consumer | What it computes |
 | --- | --- |
-| `totalProjects` | Count of projects in scope. Org-wide unless `projectId` narrows it to `1`. |
-| `totalSuites` | Count of suites in scope. All-time, not windowed. |
-| `totalRuns` | Count of runs in scope. All-time, not windowed. |
-| `runsInWindow` | Count of runs in scope with `startedAt` inside the current window (`[now - windowDays, now]`, both ends inclusive). This is the thesis's "percentage of tests executed" made concrete as a raw count; `passRate` below is the percentage form. |
-| `activeRuns` | Count of runs in scope with `status: "running"`, **not windowed** — this is "what is happening right now," independent of the trailing window. |
-| `passRate` | `pass / total` across every `RunCase` belonging to a run in scope with `startedAt` inside the current window, `total` counting every case status (not only terminal ones). `0` when the window has no cases. This mirrors `RunSummaryRecord.passRate` exactly (see `docs/RUN_QUERIES.md`) — one definition of pass rate, reused, not reinvented for the dashboard. |
-| `passRateTrend` | `passRate(current window) - passRate(previous window)`, where the previous window is the `windowDays`-long span immediately before the current one, with no gap and no overlap (`previousEnd == currentStart`). Positive means improving, negative means regressing, `0` means unchanged or no data in either window. This is the thesis's "historical trends" requirement, expressed as the simplest possible one-step trend: this period versus the one before it. |
-| `defectsDetected` | Count of `RunCase` rows with `status: "fail"` inside the current window — the thesis's "number of defects detected." Read directly off the same current-window tally used for `passRate`, no extra query. |
-| `windowDays` | The window length in days, always `7` in this slice (see below). Present so the client is never tempted to hardcode or guess it. |
-| `recentRuns` | The `RECENT_RUNS_LIMIT` (5) most recent runs in scope, reusing `RunQueriesService.list()` — the exact same list, sort and `caseCounts`/`passRate` computation `GET /runs` already returns, sliced to the first 5. No duplicate run-summarizing logic. |
-| `recentCiCommits` | The `RECENT_CI_COMMITS_LIMIT` (4) most recently active commits in scope that reached CI, one entry each. See "Why CI activity is grouped by commit" below. |
+| `GET /dashboard/overview` `kpis.passRate` | Aggregate pass rate over the resolved window, current and previous. |
+| `GET /dashboard/overview` `passRateSeries[].passRate` | Per-bucket pass rate (see "Series granularity" below). |
+| `GET /dashboard/overview` `casesPassing` | Raw `RunCaseCounts`; the client derives the rate for the gauge. |
+| `GET /dashboard/overview` `projects[].passRate` | Per-project pass rate over the current window. |
+| `GET /dashboard/overview` `recentRuns[].passRate` | Per-run pass rate. |
+| `GET /dashboard/summary` `passRate`/`passRateTrend` | Same formula, still windowed at the fixed `DASHBOARD_WINDOW_DAYS` (7), used by `/quality`. |
+| `GET /projects` `ProjectListItem.activity.healthScore` | Same formula, rendered 0–100. |
 
-### Why the window is fixed at 7 days, not a query parameter
+## Time zone: the client's clock decides the calendar day
 
-The window is a named constant (`DASHBOARD_WINDOW_DAYS` in
-`apps/api/src/common/metrics/run-case-metrics.ts`), not a `?windowDays=` query parameter. A
-variable window multiplies what "the trend" means (trend versus what, exactly, if the caller can
-also change the window mid-comparison?) and the thesis does not ask for one — it asks for
-"historical trends per project," which a single well-defined trailing window already delivers. A
-fixed constant also keeps `passRate` and `passRateTrend` simple to reason about and test: there is
-exactly one current window and one previous window, always the same length. If a future slice needs
-a configurable range, it is a additive, backward-compatible change (an optional query parameter
-defaulting to `DASHBOARD_WINDOW_DAYS`), not a breaking one — nothing here forecloses it.
+Every endpoint that buckets by day (`overview`, `channels`, `traceability`) accepts an optional
+`tz` query parameter. The client sends `Intl.DateTimeFormat().resolvedOptions().timeZone` — the
+viewer's own IANA zone, not a stored preference — because a calendar day is a fact about where the
+viewer is sitting, not about their organization.
 
-### Query shape (no N+1)
+`apps/api/src/common/time-zone/time-zone.ts` resolves it:
 
-Per request, the summary is built from a fixed number of queries regardless of how much data is in
-scope: two `count`s for `totalSuites`/`totalRuns`, one `count` for `runsInWindow`, one `count` for
-`activeRuns`, one `count` (or a constant `1`) for `totalProjects`, two `runCase.groupBy` calls (one
-per window) for the pass-rate/defects tally, and one call into `RunQueriesService.list()` (itself
-already N+1-free, see `docs/RUN_QUERIES.md`) for `recentRuns`, and two more for `recentCiCommits`
-(one `run.groupBy` to pick the most recent commits, one `run.findMany` to load their runs). All of
-it runs inside one `Promise.all`.
+- **Missing** `tz` → falls back to `UTC` (`DEFAULT_TIME_ZONE`).
+- **Present but not a real IANA zone name** (validated by constructing an `Intl.DateTimeFormat`
+  with it and catching the throw, plus a 64-character length cap) → the request is rejected with
+  `400`. A silent UTC fallback for a typo'd zone would compute the "wrong" calendar days without
+  telling anyone; failing loudly is cheaper than a support ticket about a dashboard that is
+  quietly one day off.
+- **Present and valid** → canonicalized (`America/Guatemala` stays `America/Guatemala`;
+  deprecated aliases resolve to their canonical IANA name) and used for every day boundary in the
+  response.
 
-### Why CI activity is grouped by commit
+`apps/web`'s `useBrowserTimeZone()` hook resolves the browser's zone once and every dashboard query
+key includes it, so switching zones (a laptop travelling, a VPN, a test with a mocked
+`Intl.DateTimeFormat`) invalidates and refetches rather than silently serving stale buckets.
 
-The server splits each posted report into one run per JUnit `<testsuite>`, which in this repo means
-one per test file since the reporter (`apps/api/src/reporter/qably-report.mjs`) posts each file once. A
-single GitHub Actions workflow run over this repository therefore arrives as dozens of runs that
-share a `commitSha`, a `commitMessage` and a run number. Listing raw CI runs showed the same commit
-message repeated on every row while saying nothing new.
+### The `AT TIME ZONE` double-application, and the bug it fixes
 
-`recentCiCommits` folds those runs back into the commit that produced them. Each
-`CiCommitActivityRecord` carries the rolled-up `status` (a single failing run fails the commit;
-`fail` outranks `running`, which outranks `pending`, which outranks `pass`), `runCount`,
-`passedRunCount` and `lastRunAt`.
+Every `Run`, `NotificationDelivery` and `Notification` timestamp is stored as a naive
+`TIMESTAMP(3)` column that always holds a UTC instant — Prisma never attaches a zone to it. Every
+raw SQL query that buckets one of these columns by calendar day uses the same pattern:
 
-The grouping is deliberately **server-side**. The client only ever receives a page of runs, so
-grouping there would report a run count and a status derived from that page: a commit with 214 runs
-whose 88th failed would render as "passed" with a count of 5. The service instead selects the most
-recent commits first (`run.groupBy` on the indexed `commitSha`), then loads **every** run of those
-commits, so both the count and the rolled-up status describe the whole commit.
+```sql
+to_char((col AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM-DD')
+```
 
-Grouping key is `commitSha`, not the CI workflow run id. The workflow run id is only recoverable by
-parsing `externalId` (`gha-<runId>-<jobId>-...`), which would mean regex-in-SQL against an unindexed
-expression; `commitSha` is already indexed on `Run`. The trade-off is that re-running CI on the same
-commit merges into one entry, which is the more useful reading for a dashboard: "what is the state
-of this change?" rather than "how many times did we retry it?".
+The inner `AT TIME ZONE 'UTC'` tells Postgres "this naive value is UTC," producing a real
+`timestamptz` that correctly represents the instant. The outer `AT TIME ZONE ${zone}` then converts
+that instant into a naive local timestamp in the viewer's zone, which is what `to_char` buckets by
+day.
 
-## `activity` on `GET /projects`
+Applying `AT TIME ZONE zone` directly to the naive column, with no inner UTC step, does the
+opposite of what it looks like: Postgres treats the naive value as if it were **already** expressed
+in `zone` and converts it to UTC, shifting the timestamp in the wrong direction. `dashboard.service.ts`'s
+traceability query had exactly this bug before this change — every day bucket, and the year-boundary
+`WHERE` clause, was silently double-negated. The fix wraps both the bucketing expression and the
+year-boundary comparison in the same two-step pattern, and the year boundary reads:
 
-`ProjectListItem.activity` (`packages/types`) was previously hardcoded to `null` on every project —
-`apps/api/src/modules/projects/projects.service.ts` never populated it, even though `Run`/`RunCase`
-are real. It is now derived from the same run data, using the same metric functions as the
-dashboard summary.
+```sql
+AND col >= ((${`${year}-01-01`})::timestamp AT TIME ZONE ${zone}) AT TIME ZONE 'UTC'
+```
 
-For a project that has **never had a run**, `activity` stays `null` — this is the existing,
-unchanged convention: `null` means "not measured yet," never "zero." A project only gets a
-populated `activity` once it has run at least once.
+— the same idea run in reverse: a local-zone calendar boundary (`YYYY-01-01` in `zone`) converted
+forward into the UTC instant that actually starts the year for that viewer.
 
-For a project with at least one run:
+## `GET /dashboard/overview?period=<7|30|90>&tz=<iana>&projectId=<id>`
 
-| Field | Definition |
-| --- | --- |
-| `lastRunStatus` | `status` of that project's most recent run (by `startedAt`). |
-| `lastRunAt` | `startedAt` of that project's most recent run, ISO string. |
-| `activeRunCount` | Count of that project's runs with `status: "running"`, not windowed (same "right now" semantics as the summary's `activeRuns`). |
-| `healthScore` | The project's `passRate` inside the current `DASHBOARD_WINDOW_DAYS` window, rendered as a rounded 0–100 percentage (`Math.round(passRate * 100)`) — the web renders this field as `{healthScore}%`. `null` when the project has no cases counted inside the current window (no runs in the window, or runs with no recorded cases yet) — this follows the same `null`-means-"not measured" rule as `activity` itself, applied at the field level: a project can have run before (`activity` non-null) while still having nothing to measure right now. A real `0` means the window has case data and every one of those cases failed. The web must render these two states differently — never collapse a `null` into a printed `0%`. |
+Session-authenticated and organization-scoped (`OrgScopeGuard`/`@CurrentOrg()`), same pattern as
+every other dashboard route. `period` must be one of `DASHBOARD_PERIODS` (`7`, `30`, `90`); any
+other value is `400`. `projectId` narrows every field to that project and `404`s
+(`project-not-found`) if it does not belong to the caller's organization — never a `403`, so a
+foreign project id reads as "does not exist," not "exists but is forbidden."
 
-### What stays underivable: `aiPendingCount`
+### Calendar windows, not rolling windows
 
-`ProjectActivity.aiPendingCount` belongs to the Review/AI domain (pending AI-extracted proposals
-awaiting human review). That domain has no API module yet — no `Proposal` table exists in
-`schema.prisma`, by design (out of scope for this slice). It is **not derivable** from real data
-right now, and rather than fake a `0` (which would misrepresent "we have no idea" as "there are
-truly zero pending proposals"), the API omits the field entirely.
+`computeCalendarWindow` resolves the **current** window as the `period`-day span ending today
+(inclusive) in the resolved zone, and the **previous** window as the equal-length span immediately
+before it, with no gap and no overlap (`previousEnd === currentStart`). Both windows are aligned to
+midnight boundaries in the viewer's zone, not to "now minus N days" — a KPI card comparing "this
+week" to "last week" should compare two calendar weeks, not two arbitrary 168-hour slices that both
+include part of today.
 
-`ProjectActivity.aiPendingCount` was changed from required to optional in `packages/types` to make
-this honest: the web must treat a missing `aiPendingCount` the same way it already treats a missing
-`activity` object — as "not measured yet," never as `0`. This is the one contract-shape change in
-this slice, and it is additive/widening (an optional field is a safe change for existing consumers
-that always provided it, like the current web mocks).
+### Series granularity: daily for 7/30, weekly for 90
 
-### Avoiding N+1 across the whole project list
+`passRateSeries.current`/`.previous` and every KPI's `series` use one bucket per calendar day for
+`period` 7 or 30, and one bucket per 7-day chunk for `period` 90 — a 90-point daily series is too
+dense to read as a trend line, and a coarser weekly rollup is legible at that range. The 90-day
+buckets are **window-anchored**, not calendar-week-anchored: they chunk the resolved 90-day window
+into consecutive 7-day groups starting from the window's own first day, not from the nearest Monday.
+An earlier version of this bucketing anchored to ISO week boundaries instead, which meant the last
+partial chunk could be misaligned with the window's actual end date; anchoring to the window itself
+guarantees exactly 13 buckets that tile the requested range with no gap and no overlap.
 
-`ProjectsService.list()` loads activity for every listed project with four queries total, none of
-them per-project:
+A bucket with zero runs reports `passRate: null`, `runs: 0`, `failedRuns: 0` — an unmeasured day is
+not a zero day.
 
-1. `run.findMany` with `distinct: ['projectId']` and `orderBy: { startedAt: 'desc' }` — Postgres's
-   `DISTINCT ON` pattern, one row per project: its most recent run.
-2. `run.groupBy` by `projectId` where `status: 'running'` — active run counts for every project at
-   once.
-3. `run.findMany` scoped to the current window (`startedAt` inside `[now - windowDays, now]`) across
-   every listed project — just `id` and `projectId`.
-4. `runCase.groupBy` by `['runId', 'status']` for every run id from step 3 — the same
-   `groupBy`-by-run-then-fold pattern `RunQueriesService.list()` already uses for `caseCounts` (see
-   `docs/RUN_QUERIES.md`), extended one level: fold each run's case counts into its project's totals
-   using the `runId -> projectId` map from step 3, then compute `healthScore` per project.
+### KPI aggregation: sum the buckets, then take the ratio
 
-Step 4 is skipped entirely (no query issued) when step 3 returns no runs — an empty project list, or
-a page of projects with nothing in the current window, costs nothing extra.
+Each KPI's `value` is **not** the average of its own `series` — it is the pass rate (or count, or
+duration average) of the counts summed across every bucket in the window, then reduced once. For
+`passRate` specifically this means: sum `pass`/`fail`/`blocked` across every day in the window first,
+then divide once (`aggregatePassRate` calls `computePassRate(sumCaseCounts(...))`), rather than
+averaging each day's already-divided rate. Averaging per-day rates would weight a day with 2 cases
+the same as a day with 2,000; summing counts first and dividing once weights every case equally,
+which is the reading a QA lead expects from "the pass rate this month."
+
+`avgRunDurationMs` only counts runs with a `finishedAt` — a run still in flight has no duration yet,
+and including it (as `0` or as elapsed-so-far) would understate the average every time a run happens
+to be running at request time.
+
+### `casesPassing`: the latest finished run of every in-scope suite
+
+The gauge's numbers come from a different query than the series: for every suite in scope (the
+whole organization, or one project when `projectId` narrows it), only its single most recent
+**finished** run (`status IN ('pass', 'fail')`, `finishedAt IS NOT NULL`) contributes case counts,
+selected with `ROW_NUMBER() OVER (PARTITION BY suiteId ORDER BY startedAt DESC)`. This answers "if
+I ran every suite once right now, what would pass?" — a suite with ten runs today should count once,
+not ten times, or its case counts would dominate a suite that only ran once.
+
+### Projects and recent runs
+
+`projects[].passRate` is the project's pass rate over the **current** window only, computed from the
+same per-project, per-window case tally the series is built from — not `healthScore` on a 0–100
+scale, and not the all-time pass rate. `recentRuns` returns exactly the 4 most recently started runs
+in scope, each carrying its own pass rate and a `casesPassed`/`casesTotal` pair rather than a
+formatted string, so the client decides how to render "244/300" or a bare percentage.
+
+## `GET /dashboard/channels?tz=<iana>`
+
+Session-authenticated, organization- and user-scoped. Unlike `overview`, this endpoint ignores
+`period` entirely: webhook, email and in-app delivery stats always use a **fixed 14-day window**
+(`CHANNELS_WINDOW_DAYS`), because "how has this channel been delivering lately" is a health check,
+not a metric the reader tunes — changing it with the page's period control would make the channels
+card answer a different, unstated question every time someone changed the KPI window.
+
+### Webhooks
+
+Only webhooks with `enabled: true` are included. Each one reports `sent`/`failed` totals and a
+14-entry `daily` array (`{date, sent, failed}`) over the fixed window, aggregated from
+`NotificationDelivery` rows scoped to that `webhookId`.
+
+### Email
+
+`email.enabled`/`email.eventTypes` are derived by merging the calling user's `NotificationPreference`
+rows (`channel: 'email'`) over `DEFAULT_NOTIFICATION_PREFERENCES` — an event type with no stored row
+falls back to its default rather than reading as disabled, since most users never touch their
+notification settings and the defaults are what they are actually receiving. `email.enabled` is
+`true` once at least one effective event type is on.
+
+Email deliveries are now recorded and counted the same way webhook deliveries are (added in this
+change): every send attempt from `notifications.processor.ts`'s email path upserts a
+`NotificationDelivery` row (`channel: 'email'`, `userId` set, `webhookId` null) on success or
+failure, so `email.sent`/`email.failed`/`email.daily` report real delivery history instead of the
+counter-less "is this channel on" state the endpoint originally returned. The email delivery query
+is scoped by `organizationId + userId + channel = 'email'` and, unlike the webhook query, is **not**
+skipped when the organization has zero webhooks configured — a user's email deliveries are
+independent of whether any webhook exists.
+
+### Qably in-app channel
+
+`inApp.sent`/`inApp.unread`/`inApp.daily` report the calling user's own in-app `Notification` rows
+over the same fixed 14-day window, scoped to `organizationId + userId`. This is per-user by design —
+two people in the same organization can have different unread counts — unlike the webhook and email
+rows, which describe organization- or user-scoped delivery infrastructure rather than personal inbox
+state.
+
+### `lastDelivery`
+
+The single most recent delivery across every included channel (`webhooks` with `enabled: true`,
+plus the user's own email and, since `lastDelivery` predates the in-app addition, the query that
+resolves it), returned as an object (`webhookId | null`, `channel`, `eventType`, `status`,
+`deliveredAt`) rather than a bare id, so the client never has to look the webhook back up to label
+the row. `webhookId` is `null` for email deliveries, which have no webhook to point at. The query
+always runs, even when the organization has zero enabled webhooks, because the most recent delivery
+could still be the user's own email.
+
+## `GET /dashboard/traceability?year=<YYYY>&tz=<iana>&projectId=<id>`
+
+Unchanged in shape from before this change — still consumed by `/quality`'s traceability calendar,
+still returns per-stage day counts for `scm`, `proposals`, `official` and `runs` with days that had
+no activity omitted rather than padded. What changed is that it now accepts the same dynamic `tz`
+query parameter as `overview` and `channels` (previously bucketed on a hardcoded
+`TRACEABILITY_TIME_ZONE = 'America/Guatemala'` constant regardless of who was looking), and both its
+day-bucketing query and its year-boundary `WHERE` clause now use the corrected
+`(col AT TIME ZONE 'UTC') AT TIME ZONE zone` pattern described above — the same direction-bug fix
+this change made everywhere else.
+
+## `GET /dashboard/summary` and `ProjectListItem.activity` — unchanged shape, same pinned formula
+
+`/quality`'s KPI strip and pass-rate trend still call `GET /dashboard/summary`, and `GET /projects`
+still returns `ProjectListItem.activity.healthScore`. Neither endpoint's window logic changed in
+this redesign (both still use the fixed, non-timezone-aware `DASHBOARD_WINDOW_DAYS` window), but
+both now compute their pass rate through the same pinned `computePassRate` this document describes,
+so a suite's pass rate reads identically whether it is seen on `/dashboard`, `/quality` or the
+`/projects` list. See `docs/RUN_QUERIES.md` for `RunSummaryRecord.passRate`, which follows the same
+rule.
 
 ## Shared metric math
 
-Every metric above other than plain `count`s comes from
-`apps/api/src/common/metrics/run-case-metrics.ts`, a Prisma-free module of pure functions, unit
-tested independently of any service (§4.8.3's "strict separation... each can be tested
-independently," the same shape as `runs/lib/derive-run-status.ts`):
-
-- `computeMetricsWindow(now, windowDays)` — the current/previous window boundaries.
-- `tallyCaseStatuses`, `buildCaseCountsByRun`, `sumCaseCounts` — folding Prisma `groupBy` rows into
-  `RunCaseCounts`, at increasing levels of aggregation (all statuses, per run, or summed across
-  several runs).
-- `computePassRate`, `computeHealthScore`, `computePassRateTrend` — the actual metric formulas.
-
-`RunQueriesService` (the `GET /runs` list endpoint) was refactored to call these same functions
-instead of keeping its own private copy — there was previously a second, near-identical
-`buildCaseCounts`/`ZERO_COUNTS`/inline-`passRate` implementation local to that service. There is now
-exactly one definition of "pass rate" and "case tally" in the codebase, used by `GET /runs`,
-`GET /dashboard/summary`, and `GET /projects`.
-
-## `GET /dashboard/traceability`
-
-`?year=<YYYY>` is required; `?projectId=` narrows the scope the same way the summary route does.
-The response is a `TraceabilityCalendarRecord`: the year, the time zone the days were bucketed in,
-per-stage totals, and one entry per day that had activity.
-
-```json
-{
-  "year": 2026,
-  "timeZone": "America/Guatemala",
-  "totals": { "scm": 41, "proposals": 0, "official": 213, "runs": 5122 },
-  "days": [{ "date": "2026-06-16", "scm": 2, "proposals": 0, "official": 5, "runs": 214 }]
-}
-```
-
-Days with no activity are omitted rather than padded, and the client fills the gaps: a full year of
-zeros is payload nobody reads.
-
-### Stage sources
-
-| Stage | Source | Scope path |
-| --- | --- | --- |
-| `scm` | `IngestionBatch.createdAt` | `ingestion_batch` joined to `project` for `organizationId` |
-| `official` | `TestCase.createdAt` | `test_case` joined to `suite`, which carries both `organizationId` and `projectId` |
-| `runs` | `Run.startedAt` | `run` directly |
-| `proposals` | none | Always `0` |
-
-`proposals` has no Prisma model: the Review/AI domain is not built. The stage stays in the contract
-and reports `0` so the client needs no change when that domain lands.
-
-### Why the aggregation is raw SQL
-
-Prisma's typed API cannot group by a date truncation, so the alternative was `findMany` over every
-row of the year and bucketing in JS. The CI reporter produces one run per test file, which for this
-repository is over two hundred runs per push, so a year reaches six figures. Both approaches read
-the same rows from the same index; only one ships them all to Node. Postgres aggregates and returns
-at most 366 rows per stage.
-
-The queries are `Prisma.sql` tagged templates, so every interpolation is a bind parameter. There are
-no dynamic identifiers: table and column names are literals, and only the organization id, the
-project id, the year bounds and the time zone are interpolated. `$queryRawUnsafe` and `Prisma.raw`
-are not used.
-
-The `WHERE` clause filters on the raw timestamp column, never on the truncated expression:
-`date_trunc`/`to_char` are not sargable, so filtering on them would discard the index. The
-truncation runs only over the already-filtered rows. `COUNT(*)` is cast to `int` so the driver
-returns a number rather than a bigint.
-
-### Time zone
-
-Days are bucketed with `AT TIME ZONE 'America/Guatemala'` (`TRACEABILITY_TIME_ZONE`), and the year
-bounds are converted in the same zone. Truncating in UTC would push an event logged at 19:00 local
-onto the next day's cell, which is wrong on a calendar the user reads in local time. The zone is a
-constant rather than a per-organization setting because the product targets Guatemalan software
-factories; making it configurable is additive.
-
-### Index
-
-`Run` gained `@@index([organizationId, startedAt])`. The existing indexes covered
-`(projectId, startedAt)` and `(organizationId)` alone, so an organization-wide query bounded by year
-scanned every run of the organization before filtering by date. The new index also covers the
-`runsInWindow` count in the summary route.
+`apps/api/src/common/metrics/run-case-metrics.ts` stays the Prisma-free module of pure, independently
+unit-tested functions backing every consumer above (`tallyCaseStatuses`, `buildCaseCountsByRun`,
+`sumCaseCounts`, `computeHealthScore`). `apps/api/src/common/metrics/dashboard-overview.ts` and
+`apps/api/src/common/metrics/delivery-activity.ts` are the equivalent pure builders for the two new
+endpoints, taking already-queried rows and returning the response record with zero Prisma calls
+inside them — the same "strict separation, independently testable" shape as the rest of this module.

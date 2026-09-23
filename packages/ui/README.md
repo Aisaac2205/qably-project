@@ -10,17 +10,21 @@ The package encapsulates presentational telemetry components. It enforces strict
 
 ### `./chart`
 
-- `ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartLegend`, `ChartLegendContent`, `ChartStyle`, `ChartConfig`: a Recharts 3 chart primitive vendored from shadcn/ui and rewritten to speak only the `qb-*` token contract below. `ChartConfig` colors are typed as `` `var(--qb-chart-${string})` ``, so a raw hex/oklch/named color fails to compile. `ChartContainer` always forwards `initialDimension` to Recharts' `ResponsiveContainer` — pass the chart's intrinsic design size so it renders correctly before `ResizeObserver` fires (and in test environments where `ResizeObserver` does not exist at all).
+- `ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartLegend`, `ChartLegendContent`, `ChartStyle`, `ChartConfig`: a Recharts 3 chart primitive vendored from shadcn/ui and rewritten to speak only the `qb-*` token contract below. `ChartConfig` colors are typed as `` `var(--qb-chart-${string})` ``, so a raw hex/oklch/named color fails to compile. `ChartContainer` always forwards `initialDimension`, and optionally `width`/`height`, to Recharts' `ResponsiveContainer` — pass the chart's intrinsic design size so it renders correctly before `ResizeObserver` fires (and in test environments where `ResizeObserver` does not exist at all). `ChartStyle` injects the config's CSS custom properties as an inline `<style>` tag scoped to the container's generated id, so two chart instances on the same page never leak each other's colors.
 - `useCoarsePointer`: hook over `matchMedia('(pointer: coarse)')` used to switch a chart's tooltip trigger from hover to click on touch devices.
 
 ### `./dashboard`
 
-- `KpiCard`: Metric card displaying total counts, percentage deltas, and directional change indicators.
-- `TrendChart`: Historical pass-rate trend chart powered by Recharts, rendering responsive area and line layers.
-- `Sparkline`: Compact SVG trendline designed for embedding within dense data table rows.
+- `Sparkline`: Compact area chart (built on `ChartContainer`) for embedding a trend inside a KPI tile or table cell. Accepts `values: readonly (number | null)[]` — a run of `null`s renders an empty placeholder via `emptyLabel`; a single defined point renders a static dot rather than a chart. `tone` (`'pass' | 'fail' | 'muted' | 'primary' | 'warn'`) maps to a `--qb-chart-*` variable.
+- `Gauge`: Half-donut (`PieChart`, 180°→0°) showing a single `value: number | null` against a 0–100 scale, with a `track`/`value` two-layer pie so the unfilled portion stays visible. `null` renders a full, unfilled track with `role="img"`; a real value renders `role="meter"` with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`/`aria-valuetext`. `width`/`height` default to 240×132; the centre label is passed as `children`, not a prop, so callers control its typography.
+- `PassRateBar`: A single-row percentage bar with the same `null` → `role="img"`, real value → `role="meter"` contract as `Gauge`. `warnBelow` (default 90) switches its fill tone; an explicit `color` prop overrides the computed tone entirely.
+- `DeliveryBars`: A 14-day (or any length) bar strip for one notification channel — `sent`/`failed` counts per day, tallest-sent-day-relative bar heights, plus its own `ChartDataTable` mirror.
+- `ChartDataTable`: A generic `sr-only` table (`caption`, typed `columns`, `rowKey`) that every chart above renders alongside itself so assistive technology gets the same series a sighted user sees plotted.
+- `KpiTile`: The KPI-strip metric tile — `label`, `value`, an optional `delta` (`{text, tone: 'better' | 'worse' | 'neutral', srText}`, tone and polarity decided by the caller, e.g. `apps/web`'s `lib/kpi-delta.ts`), and a `children` slot for a `Sparkline`. Is itself a `@container` and stacks its value above its sparkline below 220px of its own width.
 - `StatusChip`: Accessible status badge that always pairs a Phosphor icon with a text label.
-- `StatusDonut`: Circular distribution chart illustrating test execution verdicts (pass, fail, skip, blocked).
-- `Link`: Accessible anchor element wrapper.
+- `Link`: Accessible anchor element wrapper (`DefaultLink`); components that navigate accept a `linkComponent` prop instead of importing a router, so `apps/web` can inject `next/link` while `apps/landing` uses a plain anchor.
+
+`KpiCard`, `TrendChart` and `StatusDonut` were removed once the dashboard redesign replaced every consumer that used them; `Gauge`, `PassRateBar`, `DeliveryBars`, `ChartDataTable` and `KpiTile` are what replaced them.
 
 ## Design Token Contract
 
@@ -32,7 +36,7 @@ Components never hardcode hex, rgb, or oklch colors. They speak only Tailwind `q
 
 ### `--qb-chart-*` (raw CSS vars, declared in each app's `:root`)
 
-`--qb-chart-line`, `--qb-chart-grid`, `--qb-chart-pass`, `--qb-chart-fail`, `--qb-chart-skip`, `--qb-chart-compare`. Chart components read these directly (e.g. `stroke="var(--qb-chart-line)"` or as a `ChartConfig` series `color`) because Tailwind's `@theme inline` values are not guaranteed to exist as runtime custom properties — `ChartConfig.color` is typed to require this `var(--qb-chart-*)` form.
+`--qb-chart-line`, `--qb-chart-grid`, `--qb-chart-pass`, `--qb-chart-fail`, `--qb-chart-skip`, `--qb-chart-warn`, `--qb-chart-compare`. Chart components read these directly (e.g. `stroke="var(--qb-chart-line)"` or as a `ChartConfig` series `color`) because Tailwind's `@theme inline` values are not guaranteed to exist as runtime custom properties — `ChartConfig.color` is typed to require this `var(--qb-chart-*)` form.
 
 Both `apps/web` and `apps/landing` `@source` this package's `src` directory so Tailwind picks up every `qb-*` utility class used inside it.
 
