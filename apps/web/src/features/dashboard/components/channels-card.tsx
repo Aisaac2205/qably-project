@@ -71,9 +71,6 @@ function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
 function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
   const { t } = useTranslation()
   const name = t('dashboard.channelsEmailName')
-  const eventTypesLabel = email.eventTypes
-    .map((eventType) => t(`settings.notifications.events.${eventType}`))
-    .join(', ')
 
   return (
     <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -83,7 +80,6 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-default">{name}</p>
-          <p className="truncate text-xs text-muted">{eventTypesLabel}</p>
         </div>
       </div>
 

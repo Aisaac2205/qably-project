@@ -44,13 +44,13 @@ describe('ChannelsCard', () => {
     expect(screen.getByText('QA Alerts')).toBeInTheDocument()
   })
 
-  it('shows the email row with its event types, sent/failed counters and 14-day delivery bars, like every other channel row', async () => {
+  it('shows the email row without a subscribed-events line, with sent/failed counters and 14-day delivery bars, like every other channel row', async () => {
     await act(async () => {
       renderWithQuery(<ChannelsCard />)
     })
 
     expect(screen.getByText('Email')).toBeInTheDocument()
-    expect(screen.getByText('Case regressed, Connection security')).toBeInTheDocument()
+    expect(screen.queryByText('Case regressed, Connection security')).not.toBeInTheDocument()
     const sentStats = screen.getAllByTestId('channel-sent-count')
     const failedStats = screen.getAllByTestId('channel-failed-count')
     expect(sentStats.some((stat) => within(stat).queryByText('12 sent', { selector: '.sr-only' }))).toBe(true)

@@ -16,9 +16,6 @@ export interface ChannelRowProps {
 
 export function ChannelRow({ webhook }: ChannelRowProps) {
   const { t } = useTranslation()
-  const eventTypesLabel = webhook.eventTypes
-    .map((eventType) => t(`settings.notifications.events.${eventType}`))
-    .join(', ')
 
   return (
     <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
@@ -28,7 +25,6 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-default">{webhook.name}</p>
-          <p className="truncate text-xs text-muted">{eventTypesLabel}</p>
         </div>
       </div>
 

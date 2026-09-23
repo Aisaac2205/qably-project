@@ -40,10 +40,10 @@ describe('ChannelRow', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', '/logos/discord.svg')
   })
 
-  it('shows the webhook name and its translated event types', () => {
+  it('shows the webhook name without a subscribed-events line', () => {
     render(<ChannelRow webhook={webhook({ eventTypes: ['run_failed', 'run_completed'] })} />)
     expect(screen.getByText('Team Slack')).toBeInTheDocument()
-    expect(screen.getByText('Run failed, Run completed')).toBeInTheDocument()
+    expect(screen.queryByText('Run failed, Run completed')).not.toBeInTheDocument()
   })
 
   it.each<[Locale, number, string, string]>([
