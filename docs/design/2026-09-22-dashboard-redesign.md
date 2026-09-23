@@ -117,7 +117,8 @@ Types live in `packages/types`; both endpoints get unit and e2e coverage.
 - **Email counts are out of scope.** `NotificationDelivery.channel` only records `slack | discord`, so tracking email deliveries needs a schema change and processor work. Email shows as a configured channel without numbers until that lands as its own change.
 - **No branch in activity.** `Run` stores no branch, so the row shows SHA and message only.
 - **Monograms instead of project images.** R2 storage is deferred until a project image carries more than decoration.
-- **Components live in `apps/web/src/features/dashboard`.** The shared `packages/ui/src/dashboard` primitives are consumed by the landing preview. Changing them here would move the landing too, so the landing preview is left as is and may diverge.
+- **Chart primitives live in `apps/web/src/components/charts`.** The comparison area chart, the gauge, the sparkline and the pass-rate bar are built there, data-agnostic, so `/projects/[id]/quality` reuses them in its follow-up redesign instead of keeping its own ring and curve. Dashboard widgets that compose them live in `apps/web/src/features/dashboard`. The shared `packages/ui/src/dashboard` primitives are consumed by the landing preview. Changing them here would move the landing too, so the landing preview is left as is and may diverge.
+- **Quality page follows as a separate change.** It adopts these primitives once the dashboard ships. The earlier polish attempt is parked on the `wip/quality-charts` branch for reference.
 - **Charts use Recharts 3**, already a dependency, with the existing `--qb-chart-*` tokens. Logos come from `apps/web/public/logos` through `next/image`. The official Gmail mark is added there as `gmail.svg`.
 
 ## Removal
