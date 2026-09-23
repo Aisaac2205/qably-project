@@ -13,7 +13,7 @@ const NOW = new Date('2026-06-16T11:00:00.000Z');
 interface FakePrisma {
   notificationWebhook: { findMany: jest.Mock };
   notificationPreference: { findMany: jest.Mock };
-  notificationDelivery: { aggregate: jest.Mock };
+  notificationDelivery: { findFirst: jest.Mock };
   $queryRaw: jest.Mock;
 }
 
@@ -21,10 +21,32 @@ function createPrisma(): FakePrisma {
   return {
     notificationWebhook: { findMany: jest.fn().mockResolvedValue([]) },
     notificationPreference: { findMany: jest.fn().mockResolvedValue([]) },
-    notificationDelivery: {
-      aggregate: jest.fn().mockResolvedValue({ _max: { deliveredAt: null } }),
-    },
+    notificationDelivery: { findFirst: jest.fn().mockResolvedValue(null) },
     $queryRaw: jest.fn().mockResolvedValue([]),
+  };
+}
+
+interface FakeDeliveryRow {
+  organizationId: string;
+  webhookId: string;
+  eventType: string;
+  status: 'sent' | 'failed';
+  deliveredAt: Date;
+}
+
+function findFirstRouter(rows: readonly FakeDeliveryRow[]) {
+  return (args: {
+    where: { organizationId: string; webhookId: { in: string[] } };
+  }) => {
+    const matches = rows
+      .filter(
+        (row) =>
+          row.organizationId === args.where.organizationId &&
+          args.where.webhookId.in.includes(row.webhookId),
+      )
+      .sort((a, b) => b.deliveredAt.getTime() - a.deliveredAt.getTime());
+
+    return Promise.resolve(matches[0] ?? null);
   };
 }
 
@@ -66,17 +88,6 @@ describe('ChannelsService organization scope', () => {
     );
   });
 
-  it('scopes the lastDelivery aggregate to the caller organization', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).channels(org, 'user-1', 'UTC');
-
-    expect(prisma.notificationDelivery.aggregate).toHaveBeenCalledWith({
-      where: { organizationId: 'org-1' },
-      _max: { deliveredAt: true },
-    });
-  });
-
   it('skips the delivery count raw query when there are no enabled webhooks', async () => {
     const prisma = createPrisma();
 
@@ -85,7 +96,7 @@ describe('ChannelsService organization scope', () => {
     expect(prisma.$queryRaw).not.toHaveBeenCalled();
   });
 
-  it('scopes the delivery count raw query to the organization and the enabled webhook ids', async () => {
+  it('scopes the delivery count raw query to the organization, the enabled webhook ids and the window bounds', async () => {
     const prisma = createPrisma();
     prisma.notificationWebhook.findMany.mockResolvedValue([
       { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
@@ -99,7 +110,138 @@ describe('ChannelsService organization scope', () => {
     ];
     const sqlText = sql.strings.join('');
     expect(sqlText).toContain('notification_delivery');
-    expect(sql.values).toEqual(expect.arrayContaining(['org-1', 'webhook-1']));
+    expect(sqlText).toContain('<');
+    expect(sql.values).toEqual(
+      expect.arrayContaining(['org-1', 'webhook-1', NOW]),
+    );
+  });
+
+  it('skips the lastDelivery query when there are no enabled webhooks', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(prisma.notificationDelivery.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('scopes the lastDelivery query to the organization and the enabled webhook ids', async () => {
+    const prisma = createPrisma();
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
+    ]);
+
+    await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: 'org-1', webhookId: { in: ['webhook-1'] } },
+      }),
+    );
+  });
+});
+
+describe('ChannelsService lastDelivery resolution', () => {
+  it('resolves lastDelivery to the full shape of the newest matching delivery', async () => {
+    const prisma = createPrisma();
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
+    ]);
+    prisma.notificationDelivery.findFirst.mockImplementation(
+      findFirstRouter([
+        {
+          organizationId: 'org-1',
+          webhookId: 'webhook-1',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
+        },
+      ]),
+    );
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lastDelivery).toEqual({
+      webhookId: 'webhook-1',
+      eventType: 'run_failed',
+      status: 'sent',
+      deliveredAt: '2026-06-16T09:00:00.000Z',
+    });
+  });
+
+  it('ignores a newer delivery from a webhook that is not currently enabled', async () => {
+    const prisma = createPrisma();
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
+    ]);
+    prisma.notificationDelivery.findFirst.mockImplementation(
+      findFirstRouter([
+        {
+          organizationId: 'org-1',
+          webhookId: 'webhook-1',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-15T09:00:00.000Z'),
+        },
+        {
+          organizationId: 'org-1',
+          webhookId: 'webhook-disabled',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
+        },
+      ]),
+    );
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lastDelivery?.webhookId).toBe('webhook-1');
+  });
+
+  it('ignores a newer delivery belonging to another organization', async () => {
+    const prisma = createPrisma();
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
+    ]);
+    prisma.notificationDelivery.findFirst.mockImplementation(
+      findFirstRouter([
+        {
+          organizationId: 'org-1',
+          webhookId: 'webhook-1',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-15T09:00:00.000Z'),
+        },
+        {
+          organizationId: 'org-foreign',
+          webhookId: 'webhook-1',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
+        },
+      ]),
+    );
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lastDelivery?.deliveredAt).toBe(
+      '2026-06-15T09:00:00.000Z',
+    );
+  });
+
+  it('reports null lastDelivery when there are no enabled webhooks', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lastDelivery).toBeNull();
   });
 });
 

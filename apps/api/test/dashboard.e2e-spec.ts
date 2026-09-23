@@ -103,7 +103,7 @@ describe('Dashboard (e2e)', () => {
     runCase: { groupBy: jest.fn() },
     notificationWebhook: { findMany: jest.fn() },
     notificationPreference: { findMany: jest.fn() },
-    notificationDelivery: { aggregate: jest.fn() },
+    notificationDelivery: { findFirst: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -147,9 +147,7 @@ describe('Dashboard (e2e)', () => {
     ]);
     prisma.notificationWebhook.findMany.mockResolvedValue([]);
     prisma.notificationPreference.findMany.mockResolvedValue([]);
-    prisma.notificationDelivery.aggregate.mockResolvedValue({
-      _max: { deliveredAt: null },
-    });
+    prisma.notificationDelivery.findFirst.mockResolvedValue(null);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -625,7 +623,12 @@ describe('Dashboard (e2e)', () => {
       const body = response.body as {
         webhooks: unknown[];
         email: { enabled: boolean; eventTypes: string[] };
-        lastDelivery: string | null;
+        lastDelivery: {
+          webhookId: string;
+          eventType: string;
+          status: string;
+          deliveredAt: string;
+        } | null;
       };
 
       expect(body.webhooks).toEqual([]);
@@ -730,19 +733,54 @@ describe('Dashboard (e2e)', () => {
       expect(body.email.eventTypes).toContain('case_regressed');
     });
 
-    it('excludes a delivery belonging to another organization from totals and lastDelivery', async () => {
+    it('excludes a newer delivery belonging to another organization from lastDelivery', async () => {
       prisma.notificationWebhook.findMany.mockResolvedValue([enabledWebhook]);
-
-      await request(app.getHttpServer()).get('/dashboard/channels').expect(200);
-
-      expect(prisma.notificationDelivery.aggregate).toHaveBeenCalledWith({
-        where: { organizationId: 'org-1' },
-        _max: { deliveredAt: true },
-      });
-      const [sql] = prisma.$queryRaw.mock.calls[0] as [
-        { strings: string[]; values: unknown[] },
+      const deliveries = [
+        {
+          organizationId: 'org-1',
+          webhookId: 'webhook-1',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-15T10:00:00.000Z'),
+        },
+        {
+          organizationId: 'org-foreign',
+          webhookId: 'webhook-1',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-16T10:00:00.000Z'),
+        },
       ];
-      expect(sql.values).toEqual(expect.arrayContaining(['org-1']));
+      prisma.notificationDelivery.findFirst.mockImplementation(
+        (args: {
+          where: { organizationId: string; webhookId: { in: string[] } };
+        }) => {
+          const matches = deliveries
+            .filter(
+              (row) =>
+                row.organizationId === args.where.organizationId &&
+                args.where.webhookId.in.includes(row.webhookId),
+            )
+            .sort((a, b) => b.deliveredAt.getTime() - a.deliveredAt.getTime());
+
+          return Promise.resolve(matches[0] ?? null);
+        },
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        lastDelivery: { webhookId: string; deliveredAt: string } | null;
+      };
+
+      expect(body.lastDelivery).toEqual({
+        webhookId: 'webhook-1',
+        eventType: 'run_failed',
+        status: 'sent',
+        deliveredAt: '2026-06-15T10:00:00.000Z',
+      });
     });
   });
 });

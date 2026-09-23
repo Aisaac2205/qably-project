@@ -6,6 +6,7 @@ import {
   CHANNELS_WINDOW_DAYS,
   buildDashboardChannels,
   type DeliveryCountRow,
+  type LastDeliveryRow,
 } from '../../common/metrics/delivery-activity';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -27,7 +28,7 @@ export class ChannelsService {
     const window = fixedCalendarWindow(CHANNELS_WINDOW_DAYS, zone, now);
 
     try {
-      const [webhooks, emailPreferenceRows, lastDelivery] = await Promise.all([
+      const [webhooks, emailPreferenceRows] = await Promise.all([
         this.prisma.notificationWebhook.findMany({
           where: { organizationId, enabled: true },
           select: { id: true, type: true, name: true, eventTypes: true },
@@ -37,18 +38,14 @@ export class ChannelsService {
           where: { organizationId, userId, channel: 'email' },
           select: { eventType: true, enabled: true },
         }),
-        this.prisma.notificationDelivery.aggregate({
-          where: { organizationId },
-          _max: { deliveredAt: true },
-        }),
       ]);
 
       const webhookIds = webhooks.map((webhook) => webhook.id);
 
-      const deliveryCountRows =
+      const [deliveryCountRows, lastDelivery] = await Promise.all([
         webhookIds.length === 0
-          ? []
-          : await this.prisma.$queryRaw<DeliveryCountRow[]>(Prisma.sql`
+          ? Promise.resolve<DeliveryCountRow[]>([])
+          : this.prisma.$queryRaw<DeliveryCountRow[]>(Prisma.sql`
               SELECT d."webhookId" AS "webhookId",
                      to_char((d."deliveredAt" AT TIME ZONE 'UTC') AT TIME ZONE ${zone}, 'YYYY-MM-DD') AS day,
                      d.status AS status,
@@ -57,15 +54,29 @@ export class ChannelsService {
                WHERE d."organizationId" = ${organizationId}
                  AND d."webhookId" IN (${Prisma.join(webhookIds)})
                  AND d."deliveredAt" >= ${window.start}
+                 AND d."deliveredAt" < ${window.end}
                GROUP BY 1, 2, 3
-            `);
+            `),
+        webhookIds.length === 0
+          ? Promise.resolve<LastDeliveryRow | null>(null)
+          : this.prisma.notificationDelivery.findFirst({
+              where: { organizationId, webhookId: { in: webhookIds } },
+              orderBy: [{ deliveredAt: 'desc' }, { id: 'desc' }],
+              select: {
+                webhookId: true,
+                eventType: true,
+                status: true,
+                deliveredAt: true,
+              },
+            }),
+      ]);
 
       const record = buildDashboardChannels({
         dayKeys: window.dayKeys,
         webhooks,
         deliveryCountRows,
         emailPreferenceRows,
-        lastDeliveryAt: lastDelivery._max.deliveredAt,
+        lastDelivery,
       });
 
       return ok(record);

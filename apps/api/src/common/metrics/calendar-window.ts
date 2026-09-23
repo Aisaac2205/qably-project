@@ -82,6 +82,7 @@ export interface CalendarDayKeys {
 
 export interface FixedCalendarWindow {
   start: Date;
+  end: Date;
   dayKeys: string[];
 }
 
@@ -97,7 +98,7 @@ export function fixedCalendarWindow(
     formatCalendarDate(shiftCalendarDate(startDate, index)),
   );
 
-  return { start, dayKeys };
+  return { start, end: now, dayKeys };
 }
 
 export function calendarDayKeys(

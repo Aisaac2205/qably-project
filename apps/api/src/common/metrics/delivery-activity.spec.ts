@@ -51,7 +51,7 @@ describe('buildDashboardChannels webhook daily buckets', () => {
       webhooks: [webhook()],
       deliveryCountRows: [],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.webhooks).toHaveLength(1);
@@ -73,7 +73,7 @@ describe('buildDashboardChannels webhook daily buckets', () => {
         deliveryRow({ day: '2026-06-15', status: 'sent', count: 2 }),
       ],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     const [record0] = record.webhooks;
@@ -99,7 +99,7 @@ describe('buildDashboardChannels webhook daily buckets', () => {
         deliveryRow({ day: '2026-06-16', status: 'failed', count: 2 }),
       ],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(
@@ -115,7 +115,7 @@ describe('buildDashboardChannels webhook daily buckets', () => {
         deliveryRow({ webhookId: 'webhook-1', day: '2026-06-16', count: 4 }),
       ],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.webhooks[0].daily).toHaveLength(14);
@@ -134,7 +134,7 @@ describe('buildDashboardChannels webhook daily buckets', () => {
         }),
       ],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.webhooks[0].sent).toBe(0);
@@ -153,7 +153,7 @@ describe('buildDashboardChannels webhook daily buckets', () => {
       ],
       deliveryCountRows: [],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.webhooks[0]).toMatchObject({
@@ -178,7 +178,7 @@ describe('buildDashboardChannels email state', () => {
       webhooks: [],
       deliveryCountRows: [],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.email.enabled).toBe(true);
@@ -194,7 +194,7 @@ describe('buildDashboardChannels email state', () => {
       emailPreferenceRows: [
         preferenceRow({ eventType: 'run_failed', enabled: true }),
       ],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.email.eventTypes).toContain('run_failed');
@@ -209,7 +209,7 @@ describe('buildDashboardChannels email state', () => {
         preferenceRow({ eventType: 'case_regressed', enabled: false }),
         preferenceRow({ eventType: 'connection_security', enabled: false }),
       ],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.email.enabled).toBe(false);
@@ -224,21 +224,31 @@ describe('buildDashboardChannels lastDelivery', () => {
       webhooks: [],
       deliveryCountRows: [],
       emailPreferenceRows: [],
-      lastDeliveryAt: null,
+      lastDelivery: null,
     });
 
     expect(record.lastDelivery).toBeNull();
   });
 
-  it('serializes the given instant to ISO', () => {
+  it('serializes the newest matching delivery to the resolvable shape', () => {
     const record = buildDashboardChannels({
       dayKeys: DAY_KEYS,
       webhooks: [],
       deliveryCountRows: [],
       emailPreferenceRows: [],
-      lastDeliveryAt: new Date('2026-06-16T10:00:00.000Z'),
+      lastDelivery: {
+        webhookId: 'webhook-1',
+        eventType: 'run_failed',
+        status: 'sent',
+        deliveredAt: new Date('2026-06-16T10:00:00.000Z'),
+      },
     });
 
-    expect(record.lastDelivery).toBe('2026-06-16T10:00:00.000Z');
+    expect(record.lastDelivery).toEqual({
+      webhookId: 'webhook-1',
+      eventType: 'run_failed',
+      status: 'sent',
+      deliveredAt: '2026-06-16T10:00:00.000Z',
+    });
   });
 });

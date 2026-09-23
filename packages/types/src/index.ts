@@ -520,10 +520,17 @@ export interface DashboardEmailChannel {
   eventTypes: NotificationEventType[]
 }
 
+export interface DashboardLastDelivery {
+  webhookId: string
+  eventType: NotificationEventType
+  status: NotificationDeliveryStatus
+  deliveredAt: string
+}
+
 export interface DashboardChannelsRecord {
   webhooks: DashboardWebhookChannel[]
   email: DashboardEmailChannel
-  lastDelivery: string | null
+  lastDelivery: DashboardLastDelivery | null
 }
 
 export interface NotificationDelivery {

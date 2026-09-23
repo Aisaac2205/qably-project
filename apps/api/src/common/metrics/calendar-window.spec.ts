@@ -127,4 +127,10 @@ describe('fixedCalendarWindow', () => {
 
     expect(start.toISOString()).toBe('2026-06-03T06:00:00.000Z');
   });
+
+  it('bounds the window end at `now`', () => {
+    const { end } = fixedCalendarWindow(14, 'UTC', now);
+
+    expect(end.toISOString()).toBe('2026-06-16T20:00:00.000Z');
+  });
 });

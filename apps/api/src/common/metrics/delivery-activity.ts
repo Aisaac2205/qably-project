@@ -30,12 +30,19 @@ export interface PreferenceRow {
   enabled: boolean;
 }
 
+export interface LastDeliveryRow {
+  webhookId: string;
+  eventType: NotificationEventType;
+  status: NotificationDeliveryStatus;
+  deliveredAt: Date;
+}
+
 export interface BuildDashboardChannelsInput {
   dayKeys: readonly string[];
   webhooks: readonly WebhookRow[];
   deliveryCountRows: readonly DeliveryCountRow[];
   emailPreferenceRows: readonly PreferenceRow[];
-  lastDeliveryAt: Date | null;
+  lastDelivery: LastDeliveryRow | null;
 }
 
 function emptyDailyPoint(date: string): DashboardChannelDailyPoint {
@@ -109,6 +116,13 @@ export function buildDashboardChannels(
     ),
     email: buildEmailChannel(input.emailPreferenceRows),
     lastDelivery:
-      input.lastDeliveryAt === null ? null : input.lastDeliveryAt.toISOString(),
+      input.lastDelivery === null
+        ? null
+        : {
+            webhookId: input.lastDelivery.webhookId,
+            eventType: input.lastDelivery.eventType,
+            status: input.lastDelivery.status,
+            deliveredAt: input.lastDelivery.deliveredAt.toISOString(),
+          },
   };
 }
