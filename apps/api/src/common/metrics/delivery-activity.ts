@@ -5,6 +5,7 @@ import type {
   DashboardEmailChannel,
   DashboardInAppChannel,
   DashboardWebhookChannel,
+  NotificationChannel,
   NotificationDeliveryStatus,
   NotificationEventType,
   NotificationWebhookType,
@@ -32,7 +33,8 @@ export interface PreferenceRow {
 }
 
 export interface LastDeliveryRow {
-  webhookId: string;
+  webhookId: string | null;
+  channel: NotificationChannel;
   eventType: NotificationEventType;
   status: NotificationDeliveryStatus;
   deliveredAt: Date;
@@ -44,11 +46,18 @@ export interface InAppCountRow {
   unread: number;
 }
 
+export interface EmailDeliveryCountRow {
+  day: string;
+  status: NotificationDeliveryStatus;
+  count: number;
+}
+
 export interface BuildDashboardChannelsInput {
   dayKeys: readonly string[];
   webhooks: readonly WebhookRow[];
   deliveryCountRows: readonly DeliveryCountRow[];
   emailPreferenceRows: readonly PreferenceRow[];
+  emailDeliveryCountRows?: readonly EmailDeliveryCountRow[];
   inAppCountRows?: readonly InAppCountRow[];
   lastDelivery: LastDeliveryRow | null;
 }
@@ -96,7 +105,9 @@ function buildWebhookChannel(
 }
 
 function buildEmailChannel(
+  dayKeys: readonly string[],
   emailPreferenceRows: readonly PreferenceRow[],
+  emailDeliveryCountRows: readonly EmailDeliveryCountRow[],
 ): DashboardEmailChannel {
   const overrideByEventType = new Map(
     emailPreferenceRows.map((row) => [row.eventType, row.enabled]),
@@ -109,9 +120,33 @@ function buildEmailChannel(
     return override ?? DEFAULT_NOTIFICATION_PREFERENCES[eventType].email;
   });
 
+  const dailyByDate = new Map<string, DashboardChannelDailyPoint>();
+  for (const day of dayKeys) dailyByDate.set(day, emptyDailyPoint(day));
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const row of emailDeliveryCountRows) {
+    const point = dailyByDate.get(row.day);
+    if (point === undefined) continue;
+
+    if (row.status === 'sent') {
+      point.sent += row.count;
+      sent += row.count;
+    } else {
+      point.failed += row.count;
+      failed += row.count;
+    }
+  }
+
   return {
     enabled: eventTypes.length > 0,
     eventTypes,
+    sent,
+    failed,
+    daily: dayKeys.map(
+      (day) => dailyByDate.get(day) as DashboardChannelDailyPoint,
+    ),
   };
 }
 
@@ -150,13 +185,18 @@ export function buildDashboardChannels(
     webhooks: input.webhooks.map((webhook) =>
       buildWebhookChannel(webhook, input.dayKeys, input.deliveryCountRows),
     ),
-    email: buildEmailChannel(input.emailPreferenceRows),
+    email: buildEmailChannel(
+      input.dayKeys,
+      input.emailPreferenceRows,
+      input.emailDeliveryCountRows ?? [],
+    ),
     inApp: buildInAppChannel(input.dayKeys, input.inAppCountRows ?? []),
     lastDelivery:
       input.lastDelivery === null
         ? null
         : {
             webhookId: input.lastDelivery.webhookId,
+            channel: input.lastDelivery.channel,
             eventType: input.lastDelivery.eventType,
             status: input.lastDelivery.status,
             deliveredAt: input.lastDelivery.deliveredAt.toISOString(),

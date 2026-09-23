@@ -525,10 +525,14 @@ export interface DashboardWebhookChannel {
 export interface DashboardEmailChannel {
   enabled: boolean
   eventTypes: NotificationEventType[]
+  sent: number
+  failed: number
+  daily: DashboardChannelDailyPoint[]
 }
 
 export interface DashboardLastDelivery {
-  webhookId: string
+  webhookId: string | null
+  channel: NotificationChannel
   eventType: NotificationEventType
   status: NotificationDeliveryStatus
   deliveredAt: string

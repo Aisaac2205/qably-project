@@ -247,8 +247,51 @@ export class NotificationsProcessor extends WorkerHost {
         preferencesUrl,
       });
 
-      await this.mailer.send({ to: recipient.user.email, subject, html });
+      try {
+        await this.mailer.send({ to: recipient.user.email, subject, html });
+      } catch (error) {
+        await this.recordEmailDelivery(
+          event,
+          recipient.userId,
+          'failed',
+          error instanceof Error ? error.message : String(error),
+        );
+        throw error;
+      }
+
+      await this.recordEmailDelivery(event, recipient.userId, 'sent');
     }
+  }
+
+  private async recordEmailDelivery(
+    event: NotificationJobData,
+    userId: string,
+    status: NotificationDeliveryStatus,
+    errorMessage?: string,
+  ): Promise<void> {
+    await this.prisma.notificationDelivery.upsert({
+      where: {
+        userId_dedupeKey_channel: {
+          userId,
+          dedupeKey: event.dedupeKey,
+          channel: 'email',
+        },
+      },
+      create: {
+        organizationId: event.organizationId,
+        eventType: event.eventType,
+        dedupeKey: event.dedupeKey,
+        channel: 'email',
+        userId,
+        status,
+        ...(errorMessage === undefined ? {} : { errorMessage }),
+      },
+      update: {
+        status,
+        deliveredAt: new Date(),
+        errorMessage: errorMessage ?? null,
+      },
+    });
   }
 
   private async isEnabled(

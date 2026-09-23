@@ -1,6 +1,7 @@
 import {
   buildDashboardChannels,
   type DeliveryCountRow,
+  type EmailDeliveryCountRow,
   type InAppCountRow,
   type PreferenceRow,
   type WebhookRow,
@@ -299,6 +300,7 @@ describe('buildDashboardChannels lastDelivery', () => {
       emailPreferenceRows: [],
       lastDelivery: {
         webhookId: 'webhook-1',
+        channel: 'slack',
         eventType: 'run_failed',
         status: 'sent',
         deliveredAt: new Date('2026-06-16T10:00:00.000Z'),
@@ -307,9 +309,98 @@ describe('buildDashboardChannels lastDelivery', () => {
 
     expect(record.lastDelivery).toEqual({
       webhookId: 'webhook-1',
+      channel: 'slack',
       eventType: 'run_failed',
       status: 'sent',
       deliveredAt: '2026-06-16T10:00:00.000Z',
     });
+  });
+
+  it('serializes an email lastDelivery with a null webhookId', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      lastDelivery: {
+        webhookId: null,
+        channel: 'email',
+        eventType: 'case_regressed',
+        status: 'sent',
+        deliveredAt: new Date('2026-06-16T10:00:00.000Z'),
+      },
+    });
+
+    expect(record.lastDelivery).toEqual({
+      webhookId: null,
+      channel: 'email',
+      eventType: 'case_regressed',
+      status: 'sent',
+      deliveredAt: '2026-06-16T10:00:00.000Z',
+    });
+  });
+});
+
+describe('buildDashboardChannels email daily buckets', () => {
+  function emailDeliveryRow(
+    overrides: Partial<EmailDeliveryCountRow> = {},
+  ): EmailDeliveryCountRow {
+    return { day: '2026-06-16', status: 'sent', count: 1, ...overrides };
+  }
+
+  it('zero-fills every day in the window when there are no email deliveries', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      emailDeliveryCountRows: [],
+      lastDelivery: null,
+    });
+
+    expect(record.email.sent).toBe(0);
+    expect(record.email.failed).toBe(0);
+    expect(record.email.daily).toHaveLength(14);
+    expect(record.email.daily).toEqual(
+      DAY_KEYS.map((date) => ({ date, sent: 0, failed: 0 })),
+    );
+  });
+
+  it('aggregates sent and failed email counts into totals and the matching day', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      emailDeliveryCountRows: [
+        emailDeliveryRow({ day: '2026-06-16', status: 'sent', count: 3 }),
+        emailDeliveryRow({ day: '2026-06-16', status: 'failed', count: 1 }),
+        emailDeliveryRow({ day: '2026-06-15', status: 'sent', count: 2 }),
+      ],
+      lastDelivery: null,
+    });
+
+    expect(record.email.sent).toBe(5);
+    expect(record.email.failed).toBe(1);
+    expect(
+      record.email.daily.find((point) => point.date === '2026-06-16'),
+    ).toEqual({ date: '2026-06-16', sent: 3, failed: 1 });
+  });
+
+  it('reports a failed-only email day with sent left at zero', () => {
+    const record = buildDashboardChannels({
+      dayKeys: DAY_KEYS,
+      webhooks: [],
+      deliveryCountRows: [],
+      emailPreferenceRows: [],
+      emailDeliveryCountRows: [
+        emailDeliveryRow({ day: '2026-06-16', status: 'failed', count: 2 }),
+      ],
+      lastDelivery: null,
+    });
+
+    expect(
+      record.email.daily.find((point) => point.date === '2026-06-16'),
+    ).toEqual({ date: '2026-06-16', sent: 0, failed: 2 });
   });
 });

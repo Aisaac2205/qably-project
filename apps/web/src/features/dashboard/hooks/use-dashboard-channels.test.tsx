@@ -20,7 +20,7 @@ const browserTimeZone = vi.mocked(useBrowserTimeZone)
 
 const channels: DashboardChannelsRecord = {
   webhooks: [],
-  email: { enabled: false, eventTypes: [] },
+  email: { enabled: false, eventTypes: [], sent: 0, failed: 0, daily: [] },
   inApp: { sent: 0, unread: 0, daily: [] },
   lastDelivery: null,
 }

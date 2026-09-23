@@ -63,6 +63,7 @@ model User {
   notificationPreferences NotificationPreference[]
   reviewDecisions         ReviewDecision[]
   chatThreads             ChatThread[]
+  notificationDeliveries  NotificationDelivery[]
 
   @@unique([email])
   @@map("user")
@@ -700,14 +701,17 @@ model NotificationDelivery {
   organizationId String
   eventType      NotificationEventType
   dedupeKey      String
-  channel        NotificationWebhookType
-  webhookId      String
-  webhook        NotificationWebhook        @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  channel        NotificationChannel
+  webhookId      String?
+  webhook        NotificationWebhook?       @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?                      @relation(fields: [userId], references: [id], onDelete: Cascade)
   status         NotificationDeliveryStatus
   errorMessage   String?
   deliveredAt    DateTime                   @default(now())
 
   @@unique([webhookId, dedupeKey])
+  @@unique([userId, dedupeKey, channel])
   @@index([organizationId, dedupeKey])
   @@index([organizationId, deliveredAt])
   @@map("notification_delivery")

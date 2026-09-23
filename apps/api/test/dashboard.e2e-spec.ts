@@ -64,6 +64,7 @@ interface QueryRawFixtures {
   runCounts?: unknown[];
   casesPassing?: unknown[];
   deliveryCounts?: unknown[];
+  emailDeliveryCounts?: unknown[];
   inAppCounts?: unknown[];
   traceability?: unknown[];
 }
@@ -80,6 +81,9 @@ function queryRawRouter(fixtures: QueryRawFixtures = {}) {
     }
     if (text.includes('WITH latest AS')) {
       return Promise.resolve(fixtures.casesPassing ?? []);
+    }
+    if (text.includes(`d."channel" = 'email'`)) {
+      return Promise.resolve(fixtures.emailDeliveryCounts ?? []);
     }
     if (text.includes('FROM "notification_delivery" d')) {
       return Promise.resolve(fixtures.deliveryCounts ?? []);
@@ -804,6 +808,8 @@ describe('Dashboard (e2e)', () => {
         {
           organizationId: 'org-1',
           webhookId: 'webhook-1',
+          channel: 'slack',
+          userId: null as string | null,
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-15T10:00:00.000Z'),
@@ -811,6 +817,8 @@ describe('Dashboard (e2e)', () => {
         {
           organizationId: 'org-foreign',
           webhookId: 'webhook-1',
+          channel: 'slack',
+          userId: null as string | null,
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-16T10:00:00.000Z'),
@@ -818,14 +826,25 @@ describe('Dashboard (e2e)', () => {
       ];
       prisma.notificationDelivery.findFirst.mockImplementation(
         (args: {
-          where: { organizationId: string; webhookId: { in: string[] } };
+          where: {
+            organizationId: string;
+            OR: Array<
+              | { webhookId: { in: string[] } }
+              | { channel: 'email'; userId: string }
+            >;
+          };
         }) => {
           const matches = deliveries
-            .filter(
-              (row) =>
-                row.organizationId === args.where.organizationId &&
-                args.where.webhookId.in.includes(row.webhookId),
-            )
+            .filter((row) => {
+              if (row.organizationId !== args.where.organizationId) {
+                return false;
+              }
+              return args.where.OR.some((clause) =>
+                'webhookId' in clause
+                  ? clause.webhookId.in.includes(row.webhookId)
+                  : row.channel === 'email' && row.userId === clause.userId,
+              );
+            })
             .sort((a, b) => b.deliveredAt.getTime() - a.deliveredAt.getTime());
 
           return Promise.resolve(matches[0] ?? null);
@@ -842,9 +861,55 @@ describe('Dashboard (e2e)', () => {
 
       expect(body.lastDelivery).toEqual({
         webhookId: 'webhook-1',
+        channel: 'slack',
         eventType: 'run_failed',
         status: 'sent',
         deliveredAt: '2026-06-15T10:00:00.000Z',
+      });
+    });
+
+    it('shows the email row with sent, failed and daily counts scoped to the current user, and includes it in lastDelivery when newest', async () => {
+      prisma.notificationWebhook.findMany.mockResolvedValue([enabledWebhook]);
+      prisma.$queryRaw.mockImplementation(
+        queryRawRouter({
+          emailDeliveryCounts: [
+            { day: '2026-06-16', status: 'sent', count: 4 },
+            { day: '2026-06-16', status: 'failed', count: 1 },
+          ],
+        }),
+      );
+      prisma.notificationDelivery.findFirst.mockResolvedValue({
+        webhookId: null,
+        channel: 'email',
+        eventType: 'case_regressed',
+        status: 'sent',
+        deliveredAt: new Date('2026-06-16T10:00:00.000Z'),
+      });
+
+      const response = await request(app.getHttpServer())
+        .get('/dashboard/channels')
+        .expect(200);
+
+      const body = response.body as {
+        email: {
+          sent: number;
+          failed: number;
+          daily: { date: string; sent: number; failed: number }[];
+        };
+        lastDelivery: { webhookId: string | null; channel: string } | null;
+      };
+
+      expect(body.email.sent).toBe(4);
+      expect(body.email.failed).toBe(1);
+      expect(
+        body.email.daily.find((point) => point.date === '2026-06-16'),
+      ).toEqual({ date: '2026-06-16', sent: 4, failed: 1 });
+      expect(body.lastDelivery).toEqual({
+        webhookId: null,
+        channel: 'email',
+        eventType: 'case_regressed',
+        status: 'sent',
+        deliveredAt: '2026-06-16T10:00:00.000Z',
       });
     });
 

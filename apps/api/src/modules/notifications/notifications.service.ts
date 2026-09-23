@@ -86,6 +86,7 @@ export class NotificationsService {
       where: {
         organizationId,
         dedupeKey: { in: [...new Set(dedupeKeys)] },
+        channel: { in: ['slack', 'discord'] },
       },
       select: { dedupeKey: true, channel: true, status: true },
     })) as DeliveryRow[];

@@ -291,7 +291,17 @@ export const dashboardChannelsFixture: DashboardChannelsRecord = {
       })),
     },
   ],
-  email: { enabled: true, eventTypes: ['case_regressed', 'connection_security'] },
+  email: {
+    enabled: true,
+    eventTypes: ['case_regressed', 'connection_security'],
+    sent: 12,
+    failed: 1,
+    daily: Array.from({ length: 14 }, (_, index) => ({
+      date: `2026-06-${String(index + 3).padStart(2, '0')}`,
+      sent: index === 13 ? 0 : 1,
+      failed: index === 13 ? 1 : 0,
+    })),
+  },
   inApp: {
     sent: 9,
     unread: 3,
@@ -303,6 +313,7 @@ export const dashboardChannelsFixture: DashboardChannelsRecord = {
   },
   lastDelivery: {
     webhookId: 'webhook-1',
+    channel: 'slack',
     eventType: 'run_failed',
     status: 'sent',
     deliveredAt: '2026-06-15T10:00:00.000Z',

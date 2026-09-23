@@ -44,7 +44,7 @@ describe('ChannelsCard', () => {
     expect(screen.getByText('QA Alerts')).toBeInTheDocument()
   })
 
-  it('shows the email row with its event types and no delivery counters', async () => {
+  it('shows the email row with its event types, sent/failed counters and 14-day delivery bars, like every other channel row', async () => {
     await act(async () => {
       renderWithQuery(<ChannelsCard />)
     })
@@ -52,13 +52,18 @@ describe('ChannelsCard', () => {
     expect(screen.getByText('Email')).toBeInTheDocument()
     expect(screen.getByText('Case regressed, Connection security')).toBeInTheDocument()
     const sentCounts = screen.getAllByTestId('channel-sent-count').map((el) => el.textContent)
+    const failedCounts = screen.getAllByTestId('channel-failed-count').map((el) => el.textContent)
     expect(sentCounts).toContain('12 sent')
+    expect(failedCounts).toContain('1 failed')
+    expect(
+      screen.getByRole('img', { name: 'Email deliveries over the last 14 days' }),
+    ).toBeInTheDocument()
   })
 
   it('hides the email row when every effective event type is disabled', async () => {
     getChannels.mockResolvedValue({
       ...dashboardChannelsFixture,
-      email: { enabled: false, eventTypes: [] },
+      email: { enabled: false, eventTypes: [], sent: 0, failed: 0, daily: [] },
     })
     const client = createTestQueryClient()
     client.removeQueries({ queryKey: dashboardKeys.channels(getBrowserTimeZone()) })
@@ -93,7 +98,7 @@ describe('ChannelsCard', () => {
   it('treats the card as empty only when webhooks, email and in-app notifications are all empty', async () => {
     getChannels.mockResolvedValue({
       webhooks: [],
-      email: { enabled: false, eventTypes: [] },
+      email: { enabled: false, eventTypes: [], sent: 0, failed: 0, daily: [] },
       inApp: { sent: 0, unread: 0, daily: [] },
       lastDelivery: null,
     })
@@ -171,7 +176,7 @@ describe('ChannelsCard', () => {
   it('shows an empty state when there are no webhooks and email is disabled', async () => {
     getChannels.mockResolvedValue({
       webhooks: [],
-      email: { enabled: false, eventTypes: [] },
+      email: { enabled: false, eventTypes: [], sent: 0, failed: 0, daily: [] },
       inApp: { sent: 0, unread: 0, daily: [] },
       lastDelivery: null,
     })

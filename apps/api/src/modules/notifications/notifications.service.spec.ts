@@ -86,9 +86,21 @@ describe('NotificationsService.list', () => {
         where: {
           organizationId: 'org-1',
           dedupeKey: { in: ['run_failed:run-1', 'run_completed:run-2'] },
+          channel: { in: ['slack', 'discord'] },
         },
       }),
     );
+  });
+
+  it("never leaks another recipient's personal email delivery into the shared webhook deliveries list", async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).list(org, 'user-1');
+
+    const [args] = prisma.notificationDelivery.findMany.mock.calls[0] as [
+      { where: { channel: { in: string[] } } },
+    ];
+    expect(args.where.channel.in).not.toContain('email');
   });
 
   it('skips the delivery query entirely when there are no notifications', async () => {

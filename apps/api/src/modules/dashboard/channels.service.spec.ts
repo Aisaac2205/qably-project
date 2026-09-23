@@ -28,22 +28,32 @@ function createPrisma(): FakePrisma {
 
 interface FakeDeliveryRow {
   organizationId: string;
-  webhookId: string;
+  webhookId: string | null;
+  channel: 'slack' | 'discord' | 'email';
+  userId?: string;
   eventType: string;
   status: 'sent' | 'failed';
   deliveredAt: Date;
 }
 
+type LastDeliveryWhereClause =
+  | { webhookId: { in: string[] } }
+  | { channel: 'email'; userId: string };
+
 function findFirstRouter(rows: readonly FakeDeliveryRow[]) {
   return (args: {
-    where: { organizationId: string; webhookId: { in: string[] } };
+    where: { organizationId: string; OR: LastDeliveryWhereClause[] };
   }) => {
     const matches = rows
-      .filter(
-        (row) =>
-          row.organizationId === args.where.organizationId &&
-          args.where.webhookId.in.includes(row.webhookId),
-      )
+      .filter((row) => {
+        if (row.organizationId !== args.where.organizationId) return false;
+        return args.where.OR.some((clause) =>
+          'webhookId' in clause
+            ? row.webhookId !== null &&
+              clause.webhookId.in.includes(row.webhookId)
+            : row.channel === 'email' && row.userId === clause.userId,
+        );
+      })
       .sort((a, b) => b.deliveredAt.getTime() - a.deliveredAt.getTime());
 
     return Promise.resolve(matches[0] ?? null);
@@ -88,16 +98,17 @@ describe('ChannelsService organization scope', () => {
     );
   });
 
-  it('skips the delivery count raw query when there are no enabled webhooks, still issuing the always-on in-app query', async () => {
+  it('skips the webhook delivery count raw query when there are no enabled webhooks, still issuing the always-on email and in-app queries', async () => {
     const prisma = createPrisma();
 
     await build(prisma).channels(org, 'user-1', 'UTC');
 
     const calls = prisma.$queryRaw.mock.calls as [{ strings: string[] }][];
-    const deliveryCalls = calls.filter(([sql]) =>
-      sql.strings.join('').includes('notification_delivery'),
+    const webhookDeliveryCalls = calls.filter(([sql]) =>
+      sql.strings.join('').includes('d."webhookId"'),
     );
-    expect(deliveryCalls).toHaveLength(0);
+    expect(webhookDeliveryCalls).toHaveLength(0);
+    expect(calls).toHaveLength(2);
   });
 
   it('scopes the delivery count raw query to the organization, the enabled webhook ids and the window bounds', async () => {
@@ -108,12 +119,12 @@ describe('ChannelsService organization scope', () => {
 
     await build(prisma).channels(org, 'user-1', 'UTC');
 
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
     const calls = prisma.$queryRaw.mock.calls as [
       { strings: string[]; values: unknown[] },
     ][];
     const [sql] = calls.find(([candidate]) =>
-      candidate.strings.join('').includes('notification_delivery'),
+      candidate.strings.join('').includes('d."webhookId"'),
     ) as [{ strings: string[]; values: unknown[] }];
     const sqlText = sql.strings.join('');
     expect(sqlText).toContain('notification_delivery');
@@ -123,15 +134,22 @@ describe('ChannelsService organization scope', () => {
     );
   });
 
-  it('skips the lastDelivery query when there are no enabled webhooks', async () => {
+  it("still issues the lastDelivery query when there are no enabled webhooks, scoped only to the current user's email deliveries", async () => {
     const prisma = createPrisma();
 
     await build(prisma).channels(org, 'user-1', 'UTC');
 
-    expect(prisma.notificationDelivery.findFirst).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: 'org-1',
+          OR: [{ channel: 'email', userId: 'user-1' }],
+        },
+      }),
+    );
   });
 
-  it('scopes the lastDelivery query to the organization and the enabled webhook ids', async () => {
+  it('scopes the lastDelivery query to the organization, the enabled webhook ids and the current user email deliveries', async () => {
     const prisma = createPrisma();
     prisma.notificationWebhook.findMany.mockResolvedValue([
       { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
@@ -141,7 +159,13 @@ describe('ChannelsService organization scope', () => {
 
     expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: 'org-1', webhookId: { in: ['webhook-1'] } },
+        where: {
+          organizationId: 'org-1',
+          OR: [
+            { webhookId: { in: ['webhook-1'] } },
+            { channel: 'email', userId: 'user-1' },
+          ],
+        },
       }),
     );
   });
@@ -153,10 +177,13 @@ describe('ChannelsService in-app channel scope', () => {
 
     await build(prisma).channels(org, 'user-1', 'UTC');
 
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
-    const [sql] = prisma.$queryRaw.mock.calls[0] as [
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    const calls = prisma.$queryRaw.mock.calls as [
       { strings: string[]; values: unknown[] },
-    ];
+    ][];
+    const [sql] = calls.find(([candidate]) =>
+      candidate.strings.join('').includes('FROM "notification" n'),
+    ) as [{ strings: string[]; values: unknown[] }];
     const sqlText = sql.strings.join('');
     expect(sqlText).toContain('FROM "notification" n');
     expect(sqlText).toContain('<');
@@ -170,9 +197,12 @@ describe('ChannelsService in-app channel scope', () => {
 
     await build(prisma).channels(org, 'user-2', 'UTC');
 
-    const [sql] = prisma.$queryRaw.mock.calls[0] as [
+    const calls = prisma.$queryRaw.mock.calls as [
       { strings: string[]; values: unknown[] },
-    ];
+    ][];
+    const [sql] = calls.find(([candidate]) =>
+      candidate.strings.join('').includes('FROM "notification" n'),
+    ) as [{ strings: string[]; values: unknown[] }];
     expect(sql.values).toContain('user-2');
     expect(sql.values).not.toContain('user-1');
   });
@@ -210,6 +240,78 @@ describe('ChannelsService in-app channel scope', () => {
   });
 });
 
+describe('ChannelsService email channel', () => {
+  it('scopes the email delivery count raw query to the organization, the current user, the email channel and the window bounds', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).channels(org, 'user-1', 'UTC');
+
+    const calls = prisma.$queryRaw.mock.calls as [
+      { strings: string[]; values: unknown[] },
+    ][];
+    const [sql] = calls.find(([candidate]) =>
+      candidate.strings.join('').includes(`d."channel" = 'email'`),
+    ) as [{ strings: string[]; values: unknown[] }];
+    const sqlText = sql.strings.join('');
+    expect(sqlText).toContain('notification_delivery');
+    expect(sqlText).toContain('<');
+    expect(sql.values).toEqual(
+      expect.arrayContaining(['org-1', 'user-1', NOW]),
+    );
+  });
+
+  it('reports zeroed email totals and a fully zero-filled daily window when there are no email deliveries', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.email.sent).toBe(0);
+    expect(result.value.email.failed).toBe(0);
+    expect(result.value.email.daily).toHaveLength(14);
+  });
+
+  it('aggregates sent and failed email delivery counts into the email totals and daily points', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockImplementation((sql: { strings: string[] }) => {
+      const text = sql.strings.join('');
+      if (text.includes(`d."channel" = 'email'`)) {
+        return Promise.resolve([
+          { day: '2026-06-16', status: 'sent', count: 3 },
+          { day: '2026-06-16', status: 'failed', count: 1 },
+        ]);
+      }
+      return Promise.resolve([]);
+    });
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.email.sent).toBe(3);
+    expect(result.value.email.failed).toBe(1);
+    expect(
+      result.value.email.daily.find((point) => point.date === '2026-06-16'),
+    ).toEqual({ date: '2026-06-16', sent: 3, failed: 1 });
+  });
+
+  it("excludes another user's email deliveries from the current user's totals", async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).channels(org, 'user-2', 'UTC');
+
+    const calls = prisma.$queryRaw.mock.calls as [
+      { strings: string[]; values: unknown[] },
+    ][];
+    const [sql] = calls.find(([candidate]) =>
+      candidate.strings.join('').includes(`d."channel" = 'email'`),
+    ) as [{ strings: string[]; values: unknown[] }];
+    expect(sql.values).toContain('user-2');
+    expect(sql.values).not.toContain('user-1');
+  });
+});
+
 describe('ChannelsService lastDelivery resolution', () => {
   it('resolves lastDelivery to the full shape of the newest matching delivery', async () => {
     const prisma = createPrisma();
@@ -221,6 +323,7 @@ describe('ChannelsService lastDelivery resolution', () => {
         {
           organizationId: 'org-1',
           webhookId: 'webhook-1',
+          channel: 'slack',
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
@@ -234,10 +337,74 @@ describe('ChannelsService lastDelivery resolution', () => {
     if (!result.ok) return;
     expect(result.value.lastDelivery).toEqual({
       webhookId: 'webhook-1',
+      channel: 'slack',
       eventType: 'run_failed',
       status: 'sent',
       deliveredAt: '2026-06-16T09:00:00.000Z',
     });
+  });
+
+  it('resolves lastDelivery to the current user email delivery when it is the newest, labelled by channel and no webhookId', async () => {
+    const prisma = createPrisma();
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      { id: 'webhook-1', type: 'slack', name: 'Team Slack', eventTypes: [] },
+    ]);
+    prisma.notificationDelivery.findFirst.mockImplementation(
+      findFirstRouter([
+        {
+          organizationId: 'org-1',
+          webhookId: 'webhook-1',
+          channel: 'slack',
+          eventType: 'run_failed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-15T09:00:00.000Z'),
+        },
+        {
+          organizationId: 'org-1',
+          webhookId: null,
+          channel: 'email',
+          userId: 'user-1',
+          eventType: 'case_regressed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
+        },
+      ]),
+    );
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lastDelivery).toEqual({
+      webhookId: null,
+      channel: 'email',
+      eventType: 'case_regressed',
+      status: 'sent',
+      deliveredAt: '2026-06-16T09:00:00.000Z',
+    });
+  });
+
+  it("ignores another user's email delivery even when it is newer", async () => {
+    const prisma = createPrisma();
+    prisma.notificationDelivery.findFirst.mockImplementation(
+      findFirstRouter([
+        {
+          organizationId: 'org-1',
+          webhookId: null,
+          channel: 'email',
+          userId: 'user-2',
+          eventType: 'case_regressed',
+          status: 'sent',
+          deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
+        },
+      ]),
+    );
+
+    const result = await build(prisma).channels(org, 'user-1', 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.lastDelivery).toBeNull();
   });
 
   it('ignores a newer delivery from a webhook that is not currently enabled', async () => {
@@ -250,6 +417,7 @@ describe('ChannelsService lastDelivery resolution', () => {
         {
           organizationId: 'org-1',
           webhookId: 'webhook-1',
+          channel: 'slack',
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-15T09:00:00.000Z'),
@@ -257,6 +425,7 @@ describe('ChannelsService lastDelivery resolution', () => {
         {
           organizationId: 'org-1',
           webhookId: 'webhook-disabled',
+          channel: 'slack',
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-16T09:00:00.000Z'),
@@ -281,6 +450,7 @@ describe('ChannelsService lastDelivery resolution', () => {
         {
           organizationId: 'org-1',
           webhookId: 'webhook-1',
+          channel: 'slack',
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-15T09:00:00.000Z'),
@@ -288,6 +458,7 @@ describe('ChannelsService lastDelivery resolution', () => {
         {
           organizationId: 'org-foreign',
           webhookId: 'webhook-1',
+          channel: 'slack',
           eventType: 'run_failed',
           status: 'sent',
           deliveredAt: new Date('2026-06-16T09:00:00.000Z'),

@@ -627,3 +627,91 @@ describe('NotificationsProcessor team webhook fan-out', () => {
     expect(slack.send).not.toHaveBeenCalled();
   });
 });
+
+describe('NotificationsProcessor email delivery recording', () => {
+  it('records a sent email delivery scoped by organization, user, event and dedupeKey', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith({
+      where: {
+        userId_dedupeKey_channel: {
+          userId: 'user-owner',
+          dedupeKey: 'run_failed:run-1',
+          channel: 'email',
+        },
+      },
+      create: {
+        organizationId: 'org-1',
+        eventType: 'run_failed',
+        dedupeKey: 'run_failed:run-1',
+        channel: 'email',
+        userId: 'user-owner',
+        status: 'sent',
+      },
+      update: {
+        status: 'sent',
+        deliveredAt: expect.any(Date) as Date,
+        errorMessage: null,
+      },
+    });
+  });
+
+  it('records a failed email delivery and still rejects the job so BullMQ retries it', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+    mailer.send.mockRejectedValue(new Error('SMTP timeout'));
+
+    await expect(
+      build(prisma, mailer).process(job(runFailedEvent)),
+    ).rejects.toThrow('SMTP timeout');
+
+    expect(prisma.notificationDelivery.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          channel: 'email',
+          userId: 'user-owner',
+          status: 'failed',
+          errorMessage: 'SMTP timeout',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('does not record an email delivery when the email channel is disabled for the recipient', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue(null);
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    expect(mailer.send).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.upsert).not.toHaveBeenCalled();
+  });
+
+  it('records one email delivery per recipient, never mixing user ids', async () => {
+    const prisma = createPrisma([ownerMember, memberMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(runFailedEvent));
+
+    const userIds = prisma.notificationDelivery.upsert.mock.calls.map(
+      ([call]: [{ create: { userId: string } }]) => call.create.userId,
+    );
+    expect(userIds).toEqual(
+      expect.arrayContaining(['user-owner', 'user-member']),
+    );
+    expect(new Set(userIds).size).toBe(2);
+  });
+});
