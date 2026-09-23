@@ -446,7 +446,9 @@
     "channelsInAppName": "Qably",
     "activityTitle": "Actividad reciente",
     "activityEmptyTitle": "Sin actividad reciente",
-    "activityPassedOf": "{{passed}} de {{total}} aprobados"
+    "activityPassedOf": "{{passed}} de {{total}} aprobados",
+    "activitySuitesCases_one": "{{count}} suite · {{passed}}/{{total}} casos",
+    "activitySuitesCases_other": "{{count}} suites · {{passed}}/{{total}} casos"
   },
   "quality": {
     "breadcrumb": "Calidad",

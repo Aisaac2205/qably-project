@@ -52,12 +52,15 @@ export function ActivityCard({ period, projectId }: ActivityCardProps) {
         />
       ) : isLoading || overview === undefined ? (
         <ActivityCardSkeleton />
-      ) : overview.recentRuns.length === 0 ? (
+      ) : overview.recentActivity.length === 0 ? (
         <StateView kind="empty" title={t('dashboard.activityEmptyTitle')} />
       ) : (
         <div className="flex flex-col divide-y divide-border px-5 pb-2">
-          {overview.recentRuns.map((run) => (
-            <ActivityRow key={run.id} run={run} />
+          {overview.recentActivity.map((entry) => (
+            <ActivityRow
+              key={entry.kind === 'commit' ? `commit:${entry.projectId}:${entry.commitSha}` : entry.runId}
+              entry={entry}
+            />
           ))}
         </div>
       )}

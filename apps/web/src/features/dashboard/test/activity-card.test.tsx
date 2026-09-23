@@ -29,15 +29,13 @@ describe('ActivityCard', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Recent activity' })).toBeInTheDocument()
   })
 
-  it('renders the four most recent runs in the order the server returns', async () => {
+  it('renders the recent activity entries in the order the server returns', async () => {
     await act(async () => {
       renderWithQuery(<ActivityCard period={30} />)
     })
 
-    expect(screen.getByText('Checkout regression')).toBeInTheDocument()
-    expect(screen.getByText('Auth smoke')).toBeInTheDocument()
-    expect(screen.getByText('Manual smoke')).toBeInTheDocument()
-    expect(screen.getByText('Auth regression')).toBeInTheDocument()
+    expect(screen.getByText('Checkout Web')).toBeInTheDocument()
+    expect(screen.getByText('Mobile App · Auth smoke')).toBeInTheDocument()
   })
 
   it('shows a loading state while the overview loads', async () => {
@@ -51,7 +49,7 @@ describe('ActivityCard', () => {
       </QueryClientProvider>,
     )
 
-    expect(screen.queryByText('Checkout regression')).not.toBeInTheDocument()
+    expect(screen.queryByText('Checkout Web')).not.toBeInTheDocument()
     expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0)
   })
 
@@ -75,11 +73,11 @@ describe('ActivityCard', () => {
       retryButton.click()
     })
 
-    await waitFor(() => expect(screen.getByText('Checkout regression')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Checkout Web')).toBeInTheDocument())
   })
 
   it('shows an empty state when there is no recent activity', async () => {
-    getOverview.mockResolvedValue({ ...dashboardOverviewFixture, recentRuns: [] })
+    getOverview.mockResolvedValue({ ...dashboardOverviewFixture, recentActivity: [] })
     const client = createTestQueryClient()
     client.removeQueries({ queryKey: dashboardKeys.overview(30, 'all', getBrowserTimeZone()) })
 
