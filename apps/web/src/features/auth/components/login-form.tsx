@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { AuthHeading } from '@/features/auth/components/auth-heading'
 import { AuthFormError } from '@/features/auth/components/auth-form-error'
 import { GithubAuthButton } from '@/features/auth/components/github-auth-button'
+import { BitbucketAuthButton } from '@/features/auth/components/bitbucket-auth-button'
 import {
   Field,
   FieldDescription,
@@ -16,8 +17,10 @@ import {
 } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useLoginForm } from '@/features/auth/hooks/use-login-form'
+import { useTranslation } from '@/lib/i18n'
 
 export function LoginForm() {
+  const { t } = useTranslation()
   const {
     email,
     password,
@@ -109,6 +112,10 @@ export function LoginForm() {
             disabled={isSubmitting}
             pending={isRedirecting}
             onClick={() => void continueWithGithub()}
+          />
+          <BitbucketAuthButton
+            label={t('auth.bitbucketLoginLabel')}
+            comingSoonLabel={t('auth.comingSoon')}
           />
           <FieldDescription className="text-center">
             Don&apos;t have an account?{' '}

@@ -546,7 +546,12 @@
     "deleteProject": "Eliminar proyecto",
     "deleteProjectTitle": "¿Eliminar proyecto?",
     "deleteProjectDescription": "Esto elimina permanentemente {{name}} con todas sus suites y casos de prueba. Esta acción no se puede deshacer.",
-    "projectActions": "Acciones del proyecto"
+    "projectActions": "Acciones del proyecto",
+    "linkGithubTitle": "Conecta un repositorio con GitHub",
+    "linkGithubDescription": "Vinculá tu cuenta de GitHub para ver y conectar tus repositorios.",
+    "linkGithubCta": "Vincular GitHub",
+    "linkGithubLinking": "Redirigiendo a GitHub…",
+    "linkGithubFailed": "GitHub rechazó la solicitud para vincular tu cuenta. Intentá de nuevo."
   },
   "aiReview": {
     "title": "Revisión IA",
@@ -1245,5 +1250,10 @@
       "cta": "Aceptar invitación",
       "disclaimer": "Si no esperabas esta invitación, podés ignorar este correo de forma segura."
     }
+  },
+  "auth": {
+    "bitbucketLoginLabel": "Iniciar sesión con Bitbucket",
+    "bitbucketSignupLabel": "Crear cuenta con Bitbucket",
+    "comingSoon": "Próximamente"
   }
 }

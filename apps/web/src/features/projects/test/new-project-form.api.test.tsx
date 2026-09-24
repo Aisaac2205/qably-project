@@ -30,6 +30,15 @@ vi.mock('@/features/integrations/api/connections.api', () => ({
   detectStack: vi.fn(),
 }))
 
+const listAccounts = vi.fn()
+
+vi.mock('@/lib/auth-client', () => ({
+  authClient: {
+    listAccounts: (...args: unknown[]) => listAccounts(...args),
+    linkSocial: vi.fn(),
+  },
+}))
+
 const create = vi.mocked(createProject)
 const listConnectionsMock = vi.mocked(listConnections)
 const listAvailableReposMock = vi.mocked(listAvailableRepos)
@@ -67,6 +76,10 @@ function renderForm() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  listAccounts.mockResolvedValue({
+    data: [{ providerId: 'github' }],
+    error: null,
+  })
   listConnectionsMock.mockResolvedValue([connection])
   listAvailableReposMock.mockResolvedValue([availableRepo])
   createConnectionMock.mockResolvedValue({
@@ -339,5 +352,23 @@ describe('NewProjectForm against the api', () => {
       expect(screen.getAllByRole('radio').length).toBeGreaterThan(0)
     })
     expect(detectStackMock).not.toHaveBeenCalled()
+  })
+
+  it('does not prompt to link github when the account is already linked', async () => {
+    await act(async () => { renderForm() })
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('radio').length).toBeGreaterThan(0)
+    })
+    expect(screen.queryByRole('button', { name: /Link GitHub/ })).not.toBeInTheDocument()
+  })
+
+  it('prompts to link github when the user has no linked github account', async () => {
+    listAccounts.mockResolvedValue({ data: [], error: null })
+    await act(async () => { renderForm() })
+
+    expect(
+      await screen.findByRole('button', { name: /Link GitHub/ }),
+    ).toBeInTheDocument()
   })
 })

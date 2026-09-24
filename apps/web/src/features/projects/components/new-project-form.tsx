@@ -8,6 +8,7 @@ import type { CreateProjectPayload } from '../api/projects.api'
 import { useConnections } from '@/features/integrations/hooks/use-connections'
 import { useAvailableRepos } from '@/features/integrations/hooks/use-available-repos'
 import { RepoPicker } from '@/features/integrations/components/repo-picker'
+import { LinkGithubPrompt } from '@/features/integrations/components/link-github-prompt'
 import { createConnection } from '@/features/integrations/api/connections.api'
 import { useDetectedStack } from '@/features/integrations/hooks/use-detected-stack'
 import { WebhookSetupPanel } from '@/features/integrations'
@@ -153,6 +154,7 @@ export function NewProjectForm() {
             ({t('projects.repoConnectionHint')})
           </span>
         </p>
+        <LinkGithubPrompt />
         <RepoPicker
           options={repoOptions}
           value={connectionId}

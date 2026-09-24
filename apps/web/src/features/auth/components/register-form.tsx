@@ -15,9 +15,12 @@ import { Input } from '@/components/ui/input'
 import { AuthHeading } from '@/features/auth/components/auth-heading'
 import { AuthFormError } from '@/features/auth/components/auth-form-error'
 import { GithubAuthButton } from '@/features/auth/components/github-auth-button'
+import { BitbucketAuthButton } from '@/features/auth/components/bitbucket-auth-button'
 import { useRegisterForm } from '@/features/auth/hooks/use-register-form'
+import { useTranslation } from '@/lib/i18n'
 
 export function RegisterForm() {
+  const { t } = useTranslation()
   const {
     name,
     email,
@@ -145,6 +148,10 @@ export function RegisterForm() {
             disabled={isSubmitting}
             pending={isRedirecting}
             onClick={() => void continueWithGithub()}
+          />
+          <BitbucketAuthButton
+            label={t('auth.bitbucketSignupLabel')}
+            comingSoonLabel={t('auth.comingSoon')}
           />
           <FieldDescription className="text-center">
             Already have an account?{' '}

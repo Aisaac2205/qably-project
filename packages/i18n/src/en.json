@@ -546,7 +546,12 @@
     "deleteProject": "Delete project",
     "deleteProjectTitle": "Delete project?",
     "deleteProjectDescription": "This permanently deletes {{name}} with all its suites and test cases. This action cannot be undone.",
-    "projectActions": "Project actions"
+    "projectActions": "Project actions",
+    "linkGithubTitle": "Connect a repository with GitHub",
+    "linkGithubDescription": "Link your GitHub account to browse and connect your repositories.",
+    "linkGithubCta": "Link GitHub",
+    "linkGithubLinking": "Redirecting to GitHub…",
+    "linkGithubFailed": "GitHub rejected the request to link your account. Try again."
   },
   "aiReview": {
     "title": "AI Review",
@@ -1245,5 +1250,10 @@
       "cta": "Accept invitation",
       "disclaimer": "If you were not expecting this invitation, you can safely ignore this email."
     }
+  },
+  "auth": {
+    "bitbucketLoginLabel": "Login with Bitbucket",
+    "bitbucketSignupLabel": "Sign up with Bitbucket",
+    "comingSoon": "Coming soon"
   }
 }

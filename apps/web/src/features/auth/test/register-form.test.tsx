@@ -64,6 +64,16 @@ describe('RegisterForm', () => {
     expect(screen.getByText('Or continue with')).toBeInTheDocument()
   })
 
+  it('shows a disabled Bitbucket button labeled coming soon', async () => {
+    await renderForm()
+
+    const bitbucketButton = screen.getByRole('button', {
+      name: /Sign up with Bitbucket/,
+    })
+    expect(bitbucketButton).toBeDisabled()
+    expect(screen.getByText('Coming soon')).toBeInTheDocument()
+  })
+
   it('links back to login', async () => {
     await renderForm()
 
