@@ -1,5 +1,6 @@
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
+import { OfficialCaseReconciler } from './official-case-reconciler';
 import type { IngestRunInput } from './runs.schemas';
 import { RunsService } from './runs.service';
 
@@ -134,6 +135,7 @@ function build(
     prisma as never,
     notifications as never,
     reportBatch as never,
+    new OfficialCaseReconciler(),
   );
 }
 

@@ -11,6 +11,7 @@ import {
   FLUSH_BATCH_SCRIPT,
   RECORD_SUITE_RESULT_SCRIPT,
 } from './lib/report-batch.lua';
+import { OfficialCaseReconciler } from './official-case-reconciler';
 import { ReportBatchService } from './report-batch.service';
 import { REPORT_BATCH_REDIS } from './report-batch.tokens';
 import { RunIngestProcessor } from './run-ingest.processor';
@@ -47,6 +48,7 @@ import { RunsService } from './runs.service';
     RunQueriesService,
     RunIngestProcessor,
     ReportBatchService,
+    OfficialCaseReconciler,
     {
       provide: REPORT_BATCH_REDIS,
       inject: [ENV],

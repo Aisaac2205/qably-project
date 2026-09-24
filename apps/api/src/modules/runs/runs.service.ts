@@ -1,20 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { RunSource } from '@qably/types';
-import { humanizeTestName } from '@qably/test-naming';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { err, ok, type Result } from '../../common/result';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  OfficialCaseReconciler,
+  type AdoptionTx,
+} from './official-case-reconciler';
 import { ReportBatchService } from './report-batch.service';
 import type { RunError, RunView } from './runs.contracts';
 import { deriveRunStatus } from './lib/derive-run-status';
-import {
-  findCaseIdentityCollisions,
-  findLegacyKeyCollisions,
-  resolveCaseIdentityKey,
-} from './lib/case-identity';
-import { normalizeAutomationKeyForMatch } from './lib/normalize-automation-key';
+import { resolveCaseIdentityKey } from './lib/case-identity';
 import {
   CASE_READ_SELECT,
   CASE_SELECT,
@@ -25,7 +23,6 @@ import {
 import type { IngestCaseInput, IngestRunInput } from './runs.schemas';
 
 const ALLOWED_SOURCES: readonly RunSource[] = ['api', 'github_actions'];
-const AUTOMATION_KEY_MIGRATION_SAVEPOINT = 'automation_key_migration';
 
 function isSourceAllowed(source: RunSource): boolean {
   return ALLOWED_SOURCES.includes(source);
@@ -34,37 +31,6 @@ function isSourceAllowed(source: RunSource): boolean {
 interface SuiteRef {
   id: string;
   name: string;
-}
-
-interface AdoptionTx {
-  suite: {
-    findFirst: PrismaService['suite']['findFirst'];
-    create: PrismaService['suite']['create'];
-    findFirstOrThrow: PrismaService['suite']['findFirstOrThrow'];
-    update: PrismaService['suite']['update'];
-  };
-  testCase: {
-    findMany: PrismaService['testCase']['findMany'];
-    findFirst: PrismaService['testCase']['findFirst'];
-    createMany: PrismaService['testCase']['createMany'];
-    update: PrismaService['testCase']['update'];
-  };
-  $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
-}
-
-interface RawCaseRef {
-  name: string;
-  className?: string;
-  filePath?: string;
-}
-
-interface SuiteCaseRow {
-  id: string;
-  name: string;
-  automationKey: string | null;
-  automationClassName?: string | null;
-  automationFilePath?: string | null;
-  executionMode?: string;
 }
 
 interface CaseReloadTx {
@@ -81,6 +47,7 @@ export class RunsService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsPublisher,
     private readonly reportBatch: ReportBatchService,
+    private readonly officialCaseReconciler: OfficialCaseReconciler,
   ) {}
 
   async ingest(
@@ -115,7 +82,7 @@ export class RunsService {
         knownSuite ??
         (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
 
-      const testCaseIdByIdentity = await this.ensureOfficialCases(
+      const testCaseIdByIdentity = await this.officialCaseReconciler.reconcile(
         tx,
         suite.id,
         apiKey.projectId,
@@ -308,270 +275,6 @@ export class RunsService {
         where: { ingestionKey: suiteKey, projectId: apiKey.projectId },
         select: { id: true, name: true },
       });
-    }
-  }
-
-  private async ensureOfficialCases(
-    tx: AdoptionTx,
-    suiteId: string,
-    projectId: string,
-    cases: RawCaseRef[],
-  ): Promise<Map<string, string>> {
-    const collidingKeys = new Set(
-      findCaseIdentityCollisions(cases).map((collision) => collision.key),
-    );
-
-    const refByKey = new Map<string, RawCaseRef>();
-    for (const testCase of cases) {
-      const identityKey = resolveCaseIdentityKey(testCase);
-      if (collidingKeys.has(identityKey)) continue;
-      if (!refByKey.has(identityKey)) refByKey.set(identityKey, testCase);
-    }
-    const keys = [...refByKey.keys()];
-
-    const suiteCases = (await tx.testCase.findMany({
-      where: { suiteId },
-      select: {
-        id: true,
-        name: true,
-        automationKey: true,
-        automationClassName: true,
-        automationFilePath: true,
-        executionMode: true,
-      },
-    })) as SuiteCaseRow[];
-
-    const byExactKey = new Map<string, SuiteCaseRow>();
-    const byNormalizedKey = new Map<string, SuiteCaseRow>();
-    const ambiguousNormalizedKeys = new Set<string>();
-    const byExactName = new Map<string, SuiteCaseRow>();
-    const byNormalizedName = new Map<string, SuiteCaseRow>();
-    const ambiguousNormalizedNames = new Set<string>();
-    const takenNames = new Set<string>();
-
-    for (const row of suiteCases) {
-      takenNames.add(row.name);
-
-      if (row.automationKey !== null) {
-        byExactKey.set(row.automationKey, row);
-        const normalizedKey = normalizeAutomationKeyForMatch(row.automationKey);
-        if (byNormalizedKey.has(normalizedKey)) {
-          ambiguousNormalizedKeys.add(normalizedKey);
-        } else {
-          byNormalizedKey.set(normalizedKey, row);
-        }
-      }
-
-      byExactName.set(row.name, row);
-      const normalizedName = normalizeAutomationKeyForMatch(row.name);
-      if (byNormalizedName.has(normalizedName)) {
-        ambiguousNormalizedNames.add(normalizedName);
-      } else {
-        byNormalizedName.set(normalizedName, row);
-      }
-    }
-
-    interface SafeBackfillPatch {
-      automationFilePath?: string;
-      automationClassName?: string;
-    }
-
-    const ambiguousLegacyKeys = new Set(
-      findLegacyKeyCollisions(cases).map((collision) => collision.key),
-    );
-
-    const resultByKey = new Map<string, string>();
-    const safeBackfillById = new Map<string, SafeBackfillPatch>();
-    const keyMigrationById = new Map<string, string>();
-    const missingKeys: string[] = [];
-
-    for (const key of keys) {
-      const ref = refByKey.get(key) as RawCaseRef;
-      const legacyKey = ref.name;
-      const usesCompositeIdentity = key !== legacyKey;
-      const legacyIsAmbiguous = ambiguousLegacyKeys.has(legacyKey);
-      const normalized = normalizeAutomationKeyForMatch(key);
-      const legacyNormalized = normalizeAutomationKeyForMatch(legacyKey);
-
-      let match: SuiteCaseRow | undefined;
-      let needsKeyBackfill = false;
-      let claimsLegacyRow = false;
-
-      if (usesCompositeIdentity) {
-        match = byExactKey.get(key);
-        if (match === undefined && !ambiguousNormalizedKeys.has(normalized)) {
-          match = byNormalizedKey.get(normalized);
-        }
-      } else if (!legacyIsAmbiguous) {
-        match = byExactKey.get(key);
-        if (match === undefined && !ambiguousNormalizedKeys.has(normalized)) {
-          match = byNormalizedKey.get(normalized);
-        }
-      }
-
-      if (match === undefined && usesCompositeIdentity && !legacyIsAmbiguous) {
-        match = byExactKey.get(legacyKey);
-        if (
-          match === undefined &&
-          !ambiguousNormalizedKeys.has(legacyNormalized)
-        ) {
-          match = byNormalizedKey.get(legacyNormalized);
-        }
-        if (match !== undefined) claimsLegacyRow = true;
-      }
-
-      if (match === undefined && !legacyIsAmbiguous) {
-        const nameMatch =
-          byExactName.get(legacyKey) ??
-          (ambiguousNormalizedNames.has(legacyNormalized)
-            ? undefined
-            : byNormalizedName.get(legacyNormalized));
-        if (
-          nameMatch !== undefined &&
-          nameMatch.automationKey === null &&
-          nameMatch.executionMode === 'automated'
-        ) {
-          match = nameMatch;
-          needsKeyBackfill = true;
-        }
-      }
-
-      if (match === undefined) {
-        if (legacyIsAmbiguous && !usesCompositeIdentity) continue;
-        missingKeys.push(key);
-        continue;
-      }
-
-      resultByKey.set(key, match.id);
-
-      if (needsKeyBackfill || claimsLegacyRow) {
-        keyMigrationById.set(match.id, key);
-      }
-
-      const safePatch: SafeBackfillPatch = {};
-      if (
-        (match.automationFilePath ?? null) === null &&
-        ref.filePath !== undefined
-      ) {
-        safePatch.automationFilePath = ref.filePath;
-      }
-      if (
-        (match.automationClassName ?? null) === null &&
-        ref.className !== undefined
-      ) {
-        safePatch.automationClassName = ref.className;
-      }
-
-      if (Object.keys(safePatch).length > 0) {
-        safeBackfillById.set(match.id, {
-          ...(safeBackfillById.get(match.id) ?? {}),
-          ...safePatch,
-        });
-      }
-    }
-
-    if (safeBackfillById.size > 0) {
-      await Promise.all(
-        [...safeBackfillById.entries()].map(([id, data]) =>
-          tx.testCase.update({ where: { id }, data }),
-        ),
-      );
-    }
-
-    if (keyMigrationById.size > 0) {
-      await this.migrateAutomationKeys(
-        tx,
-        suiteId,
-        keyMigrationById,
-        resultByKey,
-      );
-    }
-
-    if (missingKeys.length === 0) return resultByKey;
-
-    const toCreate = missingKeys.map((key) => {
-      const ref = refByKey.get(key) as RawCaseRef;
-      const humanized = humanizeTestName({
-        name: ref.name,
-        className: ref.className,
-        filePath: ref.filePath,
-      }).title;
-      const candidateName = humanized.length > 0 ? humanized : key;
-      const name = takenNames.has(candidateName) ? key : candidateName;
-      takenNames.add(name);
-
-      return {
-        suiteId,
-        projectId,
-        name,
-        state: 'draft' as const,
-        executionMode: 'automated' as const,
-        automationKey: key,
-        ...(ref.className === undefined
-          ? {}
-          : { automationClassName: ref.className }),
-        ...(ref.filePath === undefined
-          ? {}
-          : { automationFilePath: ref.filePath }),
-      };
-    });
-
-    await tx.testCase.createMany({ data: toCreate, skipDuplicates: true });
-
-    const created = await tx.testCase.findMany({
-      where: { suiteId, automationKey: { in: missingKeys } },
-      select: { id: true, automationKey: true },
-    });
-
-    for (const testCase of created) {
-      if (testCase.automationKey !== null) {
-        resultByKey.set(testCase.automationKey, testCase.id);
-      }
-    }
-
-    return resultByKey;
-  }
-
-  private async migrateAutomationKeys(
-    tx: AdoptionTx,
-    suiteId: string,
-    keyMigrationById: Map<string, string>,
-    resultByKey: Map<string, string>,
-  ): Promise<void> {
-    for (const [id, key] of keyMigrationById) {
-      await tx.$executeRawUnsafe(
-        `SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
-      );
-
-      try {
-        await tx.testCase.update({
-          where: { id },
-          data: { automationKey: key },
-        });
-        await tx.$executeRawUnsafe(
-          `RELEASE SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
-        );
-      } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
-
-        await tx.$executeRawUnsafe(
-          `ROLLBACK TO SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
-        );
-        await tx.$executeRawUnsafe(
-          `RELEASE SAVEPOINT ${AUTOMATION_KEY_MIGRATION_SAVEPOINT}`,
-        );
-
-        const owner = await tx.testCase.findFirst({
-          where: { suiteId, automationKey: key },
-          select: { id: true },
-        });
-
-        this.logger.warn(
-          `automation key migration for test case ${id} in suite ${suiteId} lost a race to a concurrent ingest that already claimed automationKey "${key}"; linking this run to the composite owner ${owner?.id ?? 'unknown'} instead`,
-        );
-
-        if (owner !== null) resultByKey.set(key, owner.id);
-      }
     }
   }
 }
