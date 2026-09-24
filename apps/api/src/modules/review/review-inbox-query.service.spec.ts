@@ -1,4 +1,5 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { encodeInboxCursor } from './lib/inbox-cursor';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
 
 const org: OrgContext = {
@@ -515,5 +516,203 @@ describe('ReviewInboxQueryService.getDuplicateCandidates', () => {
       'case-title-only',
     ]);
     expect(result.value[0].matchReason).toBe('automation-key');
+  });
+});
+
+interface PageFakePrisma {
+  extractedProposal: {
+    findMany: jest.Mock;
+    findFirst: jest.Mock;
+    groupBy: jest.Mock;
+  };
+  testCase: { findMany: jest.Mock };
+  traceabilityLink: { findMany: jest.Mock };
+}
+
+function createPageFixture(rows: Record<string, unknown>[]): PageFakePrisma {
+  return {
+    extractedProposal: {
+      findMany: jest.fn().mockResolvedValue(rows),
+      findFirst: jest.fn().mockResolvedValue(null),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
+    testCase: { findMany: jest.fn().mockResolvedValue([]) },
+    traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+}
+
+function pageRow(overrides: Record<string, unknown> = {}) {
+  return {
+    ...serviceProposalRow,
+    locale: null,
+    observations: null,
+    evidence: { title: 'src/cart.spec.ts' },
+    createdAt: new Date('2026-09-24T10:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+describe('ReviewInboxQueryService.page', () => {
+  it('orders by createdAt desc, id desc and requests one extra row to detect the next page', async () => {
+    const prisma = createPageFixture([pageRow()]);
+
+    await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ orderBy: unknown; take: number }],
+    ];
+    expect(call[0].orderBy).toEqual([{ createdAt: 'desc' }, { id: 'desc' }]);
+    expect(call[0].take).toBe(51);
+  });
+
+  it('returns nextCursor null when fewer rows than the limit come back', async () => {
+    const prisma = createPageFixture([pageRow()]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('returns an encoded nextCursor pointing at the last item on the page when more rows remain', async () => {
+    const rows = Array.from({ length: 3 }, (_, index) =>
+      pageRow({
+        id: `proposal-${index}`,
+        createdAt: new Date(2026, 8, 24, 10, index),
+      }),
+    );
+    const prisma = createPageFixture(rows);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 2,
+    });
+
+    expect(result.items).toHaveLength(2);
+    expect(result.nextCursor).toBe(
+      encodeInboxCursor({
+        createdAt: rows[1].createdAt.toISOString(),
+        id: 'proposal-1',
+      }),
+    );
+  });
+
+  it('applies the keyset filter from a decoded cursor', async () => {
+    const prisma = createPageFixture([]);
+    const cursor = encodeInboxCursor({
+      createdAt: '2026-09-24T10:00:00.000Z',
+      id: 'proposal-5',
+    });
+
+    await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+      cursor,
+    });
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: { AND: unknown[] } }],
+    ];
+    expect(call[0].where.AND).toEqual([
+      expect.objectContaining({
+        project: { organizationId: 'org-1' },
+      }) as unknown,
+      {
+        OR: [
+          { createdAt: { lt: new Date('2026-09-24T10:00:00.000Z') } },
+          {
+            createdAt: new Date('2026-09-24T10:00:00.000Z'),
+            id: { lt: 'proposal-5' },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('ignores cursor and pagination for duplicatesOnly, returning a single unpaginated page', async () => {
+    const prisma = createPageFixture([pageRow({ id: 'dup' })]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 1,
+      duplicatesOnly: true,
+    });
+
+    expect(result.nextCursor).toBeNull();
+    const [duplicatesCall] = prisma.extractedProposal.findMany.mock.calls as [
+      [Record<string, unknown>],
+    ];
+    expect(duplicatesCall[0]).not.toHaveProperty('take');
+  });
+});
+
+describe('ReviewInboxQueryService.counts', () => {
+  it('returns zero counts for every status when nothing matches', async () => {
+    const prisma = createPageFixture([]);
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.byStatus).toEqual({
+      in_review: 0,
+      approved: 0,
+      rejected: 0,
+      changes_requested: 0,
+    });
+  });
+
+  it('maps groupBy rows onto byStatus by status name', async () => {
+    const prisma = createPageFixture([]);
+    prisma.extractedProposal.groupBy.mockResolvedValue([
+      {
+        status: 'in_review',
+        _count: { _all: 7 },
+        _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+      },
+      {
+        status: 'approved',
+        _count: { _all: 3 },
+        _max: { updatedAt: new Date('2026-09-23T10:00:00.000Z') },
+      },
+    ]);
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.byStatus).toEqual({
+      in_review: 7,
+      approved: 3,
+      rejected: 0,
+      changes_requested: 0,
+    });
+  });
+
+  it('produces a version hash that changes when the counts change', async () => {
+    const prisma = createPageFixture([]);
+    prisma.extractedProposal.groupBy.mockResolvedValue([
+      {
+        status: 'in_review',
+        _count: { _all: 7 },
+        _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+      },
+    ]);
+
+    const first = await buildService(prisma).counts(serviceOrg, {});
+
+    prisma.extractedProposal.groupBy.mockResolvedValue([
+      {
+        status: 'in_review',
+        _count: { _all: 8 },
+        _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+      },
+    ]);
+
+    const second = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(first.version).not.toBe(second.version);
   });
 });

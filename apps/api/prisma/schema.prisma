@@ -488,6 +488,7 @@ model ExtractedProposal {
   @@unique([codeChangeId, automationKey])
   @@index([projectId])
   @@index([projectId, status])
+  @@index([projectId, status, createdAt(sort: Desc), id(sort: Desc)], map: "review_inbox_keyset_idx")
   @@index([targetTestCaseId])
   @@index([codeChangeId])
   @@index([suiteId])

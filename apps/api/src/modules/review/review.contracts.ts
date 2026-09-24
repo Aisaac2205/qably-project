@@ -27,6 +27,32 @@ export interface ListProposalsFilters {
   search?: string;
 }
 
+export interface ReviewInboxPageFilters {
+  projectId?: string;
+  status: ProposalStatus;
+  duplicatesOnly?: boolean;
+  search?: string;
+  cursor?: string;
+  limit: number;
+}
+
+export interface ReviewInboxPage {
+  items: ProposalView[];
+  nextCursor: string | null;
+}
+
+export interface ReviewInboxCountsFilters {
+  projectId?: string;
+  search?: string;
+}
+
+export type ReviewInboxStatusCounts = Record<ProposalStatus, number>;
+
+export interface ReviewInboxCounts {
+  byStatus: ReviewInboxStatusCounts;
+  version: string;
+}
+
 export const EXTRACTION_QUEUE = 'extraction';
 
 export interface DocumentFileTarget {

@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
+import type { ProposalStatus } from '@qably/types';
+import { Prisma } from '../../../generated/prisma/client';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -8,11 +11,17 @@ import type {
   ProposalDetailView,
   ProposalView,
   ReviewError,
+  ReviewInboxCounts,
+  ReviewInboxCountsFilters,
+  ReviewInboxPage,
+  ReviewInboxPageFilters,
+  ReviewInboxStatusCounts,
 } from './review.contracts';
 import {
   rankDuplicateCandidates,
   type DuplicateRankCandidate,
 } from './lib/rank-duplicate-candidates';
+import { decodeInboxCursor, encodeInboxCursor } from './lib/inbox-cursor';
 import {
   toEvidence,
   toLink,
@@ -22,6 +31,39 @@ import {
   type LinkRow,
   type ViewRow,
 } from './lib/proposal-view';
+
+const INBOX_STATUSES: ProposalStatus[] = [
+  'in_review',
+  'approved',
+  'rejected',
+  'changes_requested',
+];
+
+function emptyStatusCounts(): ReviewInboxStatusCounts {
+  return {
+    in_review: 0,
+    approved: 0,
+    rejected: 0,
+    changes_requested: 0,
+  };
+}
+
+interface GroupedStatusRow {
+  status: ProposalStatus;
+  _count: { _all: number };
+  _max: { updatedAt: Date | null };
+}
+
+function hashCounts(rows: readonly GroupedStatusRow[]): string {
+  const payload = [...rows]
+    .sort((a, b) => a.status.localeCompare(b.status))
+    .map(
+      (row) =>
+        `${row.status}:${row._count._all}:${row._max.updatedAt?.toISOString() ?? ''}`,
+    )
+    .join('|');
+  return createHash('sha1').update(payload).digest('hex');
+}
 
 const DUPLICATE_TARGET_SELECT = {
   id: true,
@@ -90,28 +132,35 @@ function toDuplicateRankCandidate(
 export class ReviewInboxQueryService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private baseWhere(
+    org: OrgContext,
+    filters: { projectId?: string; status?: ProposalStatus; search?: string },
+  ): Prisma.ExtractedProposalWhereInput {
+    return {
+      project: { organizationId: org.organizationId },
+      ...(filters.projectId === undefined
+        ? {}
+        : { projectId: filters.projectId }),
+      ...(filters.status === undefined ? {} : { status: filters.status }),
+      ...(filters.search === undefined
+        ? {}
+        : {
+            OR: [
+              { title: { contains: filters.search, mode: 'insensitive' } },
+              {
+                objective: { contains: filters.search, mode: 'insensitive' },
+              },
+            ],
+          }),
+    };
+  }
+
   async list(
     org: OrgContext,
     filters: ListProposalsFilters,
   ): Promise<ProposalView[]> {
     const rows = (await this.prisma.extractedProposal.findMany({
-      where: {
-        project: { organizationId: org.organizationId },
-        ...(filters.projectId === undefined
-          ? {}
-          : { projectId: filters.projectId }),
-        ...(filters.status === undefined ? {} : { status: filters.status }),
-        ...(filters.search === undefined
-          ? {}
-          : {
-              OR: [
-                { title: { contains: filters.search, mode: 'insensitive' } },
-                {
-                  objective: { contains: filters.search, mode: 'insensitive' },
-                },
-              ],
-            }),
-      },
+      where: this.baseWhere(org, filters),
       orderBy: { createdAt: 'desc' },
       select: VIEW_SELECT,
     })) as ViewRow[];
@@ -122,6 +171,86 @@ export class ReviewInboxQueryService {
     return filters.duplicatesOnly === true
       ? views.filter((view) => view.possibleDuplicate === true)
       : views;
+  }
+
+  async page(
+    org: OrgContext,
+    filters: ReviewInboxPageFilters,
+  ): Promise<ReviewInboxPage> {
+    if (filters.duplicatesOnly === true) {
+      const items = await this.list(org, {
+        projectId: filters.projectId,
+        status: filters.status,
+        search: filters.search,
+        duplicatesOnly: true,
+      });
+      return { items, nextCursor: null };
+    }
+
+    const cursor =
+      filters.cursor === undefined ? null : decodeInboxCursor(filters.cursor);
+    const base = this.baseWhere(org, filters);
+    const where =
+      cursor === null
+        ? base
+        : {
+            AND: [
+              base,
+              {
+                OR: [
+                  { createdAt: { lt: new Date(cursor.createdAt) } },
+                  {
+                    createdAt: new Date(cursor.createdAt),
+                    id: { lt: cursor.id },
+                  },
+                ],
+              },
+            ],
+          };
+
+    const rows = (await this.prisma.extractedProposal.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: VIEW_SELECT,
+      take: filters.limit + 1,
+    })) as ViewRow[];
+
+    const hasMore = rows.length > filters.limit;
+    const pageRows = hasMore ? rows.slice(0, filters.limit) : rows;
+    const flagged = await this.flagPossibleDuplicates(pageRows);
+    const items = pageRows.map((row) => toView(row, flagged.has(row.id)));
+
+    const last = pageRows[pageRows.length - 1];
+    const nextCursor =
+      hasMore && last?.createdAt !== undefined
+        ? encodeInboxCursor({
+            createdAt: last.createdAt.toISOString(),
+            id: last.id,
+          })
+        : null;
+
+    return { items, nextCursor };
+  }
+
+  async counts(
+    org: OrgContext,
+    filters: ReviewInboxCountsFilters,
+  ): Promise<ReviewInboxCounts> {
+    const grouped = (await this.prisma.extractedProposal.groupBy({
+      by: ['status'],
+      where: this.baseWhere(org, filters),
+      _count: { _all: true },
+      _max: { updatedAt: true },
+    })) as unknown as GroupedStatusRow[];
+
+    const byStatus = emptyStatusCounts();
+    for (const row of grouped) {
+      if (INBOX_STATUSES.includes(row.status)) {
+        byStatus[row.status] = row._count._all;
+      }
+    }
+
+    return { byStatus, version: hashCounts(grouped) };
   }
 
   private async flagPossibleDuplicates(

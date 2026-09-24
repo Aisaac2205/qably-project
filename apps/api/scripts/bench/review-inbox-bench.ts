@@ -214,6 +214,37 @@ async function main(): Promise<void> {
     ),
   );
 
+  results.push(
+    await measure(
+      'GET /review/inbox (default in_review)',
+      Array.from(
+        { length: WARMUP_SAMPLES + MEASURED_SAMPLES },
+        () => () => request(server).get('/review/inbox').expect(200),
+      ),
+    ),
+  );
+
+  results.push(
+    await measure(
+      'GET /review/inbox?search=bench',
+      Array.from(
+        { length: WARMUP_SAMPLES + MEASURED_SAMPLES },
+        () => () =>
+          request(server).get('/review/inbox?search=bench').expect(200),
+      ),
+    ),
+  );
+
+  results.push(
+    await measure(
+      'GET /review/inbox/counts',
+      Array.from(
+        { length: WARMUP_SAMPLES + MEASURED_SAMPLES },
+        () => () => request(server).get('/review/inbox/counts').expect(200),
+      ),
+    ),
+  );
+
   const approveIds = seed.inReviewProposalIds;
   if (approveIds.length < WARMUP_SAMPLES + MEASURED_SAMPLES) {
     throw new Error(

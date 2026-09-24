@@ -12,6 +12,7 @@ import { ExtractionProcessor } from './extraction.processor';
 import { ExtractionService } from './extraction.service';
 import { EXTRACTION_QUEUE } from './review.contracts';
 import { ReviewController } from './review.controller';
+import { ReviewInboxController } from './review-inbox.controller';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
 import { ReviewDecisionService } from './review-decision.service';
 
@@ -35,7 +36,7 @@ import { ReviewDecisionService } from './review-decision.service';
       },
     }),
   ],
-  controllers: [ReviewController],
+  controllers: [ReviewController, ReviewInboxController],
   providers: [
     ReviewInboxQueryService,
     ReviewDecisionService,
