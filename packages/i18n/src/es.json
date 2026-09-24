@@ -897,6 +897,9 @@
     "saveCaseError": "No se pudo guardar el caso. Volvé a intentarlo.",
     "caseNotFound": "Caso no encontrado",
     "documentCase": "Documentar este caso",
+    "documentationFailure": {
+      "label": "Aeris falló: {{reason}}"
+    },
     "caseUndocumented": "Sin documentar",
     "caseAwaitingConfirmation": "Sin confirmar",
     "caseGroupNeedsAttention": "Necesita atención",

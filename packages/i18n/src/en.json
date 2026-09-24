@@ -898,6 +898,9 @@
     "caseNotFound": "Case not found",
     "noCasesCta": "Add the first test case to start documenting this suite.",
     "documentCase": "Document this case",
+    "documentationFailure": {
+      "label": "Aeris failed: {{reason}}"
+    },
     "caseUndocumented": "Undocumented",
     "caseAwaitingConfirmation": "Unconfirmed",
     "caseGroupNeedsAttention": "Needs attention",
