@@ -3,11 +3,13 @@
 import { useMemo, useCallback } from 'react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
-import { useProposals } from '../hooks/use-proposals'
+import { useInboxPage } from '../hooks/use-inbox-page'
+import { useInboxCounts } from '../hooks/use-inbox-counts'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
 import { useReviewInboxFilters } from '../hooks/use-review-inbox-filters'
 import { useReviewInboxSelection } from '../hooks/use-review-inbox-selection'
 import { useInboxFeedback } from '../hooks/use-inbox-feedback'
+import type { ReviewInboxStatusCounts } from './review-inbox-queue'
 import { useTranslation } from '@/lib/i18n'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue } from './review-inbox-queue'
@@ -16,27 +18,35 @@ import { ReviewInboxFeedback } from './review-inbox-feedback'
 
 export function ReviewInboxPage() {
   const { t } = useTranslation()
-  const { proposals } = useProposals()
-
   const filters = useReviewInboxFilters()
   const feedback = useInboxFeedback()
 
-  const filteredProposals = useMemo(() => {
-    return proposals.filter((p) => {
-      if (filters.selectedProjectId !== 'all' && p.projectId !== filters.selectedProjectId) return false
-      if (filters.statusFilter !== 'all' && p.status !== filters.statusFilter) return false
-      if (filters.duplicateOnly && p.possibleDuplicate !== true) return false
-      if (filters.searchQuery.trim()) {
-        const q = filters.searchQuery.toLowerCase().trim()
-        return p.title.toLowerCase().includes(q) || p.objective.toLowerCase().includes(q)
-      }
-      return true
-    })
-  }, [proposals, filters.selectedProjectId, filters.statusFilter, filters.duplicateOnly, filters.searchQuery])
+  const selectedProjectId =
+    filters.selectedProjectId === 'all' ? undefined : filters.selectedProjectId
+  const search = filters.searchQuery.trim() === '' ? undefined : filters.searchQuery
+
+  const { proposals, hasNextPage, isFetchingNextPage, fetchNextPage } = useInboxPage({
+    projectId: selectedProjectId,
+    status: filters.statusFilter,
+    duplicatesOnly: filters.duplicateOnly || undefined,
+    search,
+  })
+
+  const { counts } = useInboxCounts({ projectId: selectedProjectId, search })
+
+  const statusCounts: ReviewInboxStatusCounts = useMemo(
+    () => ({
+      in_review: counts.in_review,
+      approved: counts.approved,
+      rejected: counts.rejected,
+      all: counts.in_review + counts.approved + counts.rejected + counts.changes_requested,
+    }),
+    [counts],
+  )
 
   const { activeSelectedId, selectedProposal, setSelectedId, selectNextPending } = useReviewInboxSelection(
     proposals,
-    filteredProposals,
+    proposals,
   )
 
   const { approve, reject } = useProposalDecision({
@@ -112,8 +122,12 @@ export function ReviewInboxPage() {
                 onStatusFilterChange={filters.setStatusFilter}
                 duplicateOnly={filters.duplicateOnly}
                 onToggleDuplicateOnly={toggleDuplicateOnly}
-                searchQuery={filters.searchQuery}
+                searchQuery={filters.searchInput}
                 onSearchQueryChange={filters.setSearchQuery}
+                statusCounts={statusCounts}
+                hasNextPage={hasNextPage}
+                isFetchingNextPage={isFetchingNextPage}
+                onLoadMore={() => void fetchNextPage()}
               />
             </section>
           }

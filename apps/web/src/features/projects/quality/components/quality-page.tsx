@@ -11,7 +11,7 @@ import { TraceabilitySection } from '@/features/dashboard/components/traceabilit
 import { useDashboardSummary } from '@/features/dashboard/hooks/use-dashboard-summary'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { projectRootPath, reviewInboxPath } from '@/features/projects/lib/routes'
-import { useProposals } from '@/features/review-inbox/hooks/use-proposals'
+import { useInboxCounts } from '@/features/review-inbox/hooks/use-inbox-counts'
 import { useRecentRuns, useRegressions, useSuiteMetricsQuery } from '@/features/runs/hooks/use-runs'
 import { useTranslation } from '@/lib/i18n'
 import { PassRateTrendFigure } from './pass-rate-trend-figure'
@@ -58,7 +58,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
   const recentRuns = useRecentRuns(projectId, TREND_RUN_LIMIT)
   const regressionsQuery = useRegressions(projectId)
   const suiteMetrics = useSuiteMetricsQuery(projectId)
-  const proposalsQuery = useProposals({ projectId, status: 'in_review' })
+  const inboxCounts = useInboxCounts({ projectId })
 
   if (summaryQuery.isLoading) {
     return (
@@ -86,7 +86,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
   const passRateTrendPercent =
     summary.passRateTrend === null ? null : Math.round(summary.passRateTrend * 100)
   const regressionsCount = regressionsQuery.regressions.length
-  const pendingProposalsCount = proposalsQuery.proposals.length
+  const pendingProposalsCount = inboxCounts.counts.in_review
 
   const trendPoints = recentRuns.runs
     .filter(hasMeasuredPassRate)
@@ -143,7 +143,7 @@ export function QualityPage({ projectId }: { projectId: string }) {
         />
         <KpiCard
           label={t('quality.kpiPendingProposals')}
-          value={proposalsQuery.isLoading ? '—' : pendingProposalsCount}
+          value={inboxCounts.isLoading ? '—' : pendingProposalsCount}
           icon={Sparkle}
           href={reviewInboxPath(projectId)}
           accent="ai"

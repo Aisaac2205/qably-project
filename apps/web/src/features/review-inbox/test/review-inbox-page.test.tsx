@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { ReviewInboxPage } from '../components/review-inbox-page'
@@ -163,7 +163,9 @@ describe('ReviewInboxPage', () => {
     const searchInput = screen.getByRole('searchbox', { name: /Search by title/i })
     await user.type(searchInput, 'nonexistentquery123xyz')
 
-    expect(screen.getAllByText(/No review proposals found/i).length).toBeGreaterThan(0)
+    await waitFor(() =>
+      expect(screen.getAllByText(/No review proposals found/i).length).toBeGreaterThan(0),
+    )
   })
 
   it('approves a proposal when clicking Approve & publish', async () => {

@@ -1,4 +1,6 @@
+import type { ComponentProps } from 'react'
 import { screen, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ReviewInboxQueue } from '../components/review-inbox-queue'
 import type { ProposalListItem } from '../api/review.api'
@@ -26,7 +28,10 @@ function proposal(overrides: Partial<ProposalListItem> = {}): ProposalListItem {
   }
 }
 
-function renderQueue(proposals: ProposalListItem[]) {
+function renderQueue(
+  proposals: ProposalListItem[],
+  overrides: Partial<ComponentProps<typeof ReviewInboxQueue>> = {},
+) {
   return renderWithQuery(
     <ReviewInboxQueue
       proposals={proposals}
@@ -40,6 +45,7 @@ function renderQueue(proposals: ProposalListItem[]) {
       onToggleDuplicateOnly={vi.fn()}
       searchQuery=""
       onSearchQueryChange={vi.fn()}
+      {...overrides}
     />,
   )
 }
@@ -68,5 +74,39 @@ describe('ReviewInboxQueue', () => {
     })
 
     expect(screen.getByText('Confirm the cart resets')).toBeInTheDocument()
+  })
+
+  it('renders no load-more control when there is no next page', async () => {
+    await act(async () => {
+      renderQueue([proposal()])
+    })
+
+    expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument()
+  })
+
+  it('shows a load-more button when a next page is available and calls onLoadMore', async () => {
+    const onLoadMore = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderQueue([proposal()], { hasNextPage: true, onLoadMore })
+    })
+
+    const button = screen.getByRole('button', { name: /load more/i })
+    await user.click(button)
+
+    expect(onLoadMore).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables the load-more button while the next page is fetching', async () => {
+    await act(async () => {
+      renderQueue([proposal()], {
+        hasNextPage: true,
+        isFetchingNextPage: true,
+        onLoadMore: vi.fn(),
+      })
+    })
+
+    expect(screen.getByRole('button', { name: /loading more/i })).toBeDisabled()
   })
 })

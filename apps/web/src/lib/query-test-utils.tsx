@@ -3,7 +3,7 @@ import { render, type RenderOptions, type RenderResult } from '@testing-library/
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { RunSummaryRecord } from '@qably/types'
 import { computePassRate } from '@qably/types'
-import { mockSuites } from '@/lib/mock-data'
+import { mockProjects, mockSuites } from '@/lib/mock-data'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { runKeys } from '@/features/runs/lib/query-keys'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
@@ -25,9 +25,12 @@ import { getSnapshot } from '@/lib/mock-store'
 import {
   PROPOSAL_STATUSES,
   proposalDetailFixtures,
+  proposalInboxCountsFixtures,
+  proposalInboxFixtures,
   proposalListFixtures,
   proposalListFixturesFor,
 } from '@/test/review-api-stub'
+import type { ReviewInboxStatusFilter } from '@/features/review-inbox/api/review.api'
 
 /**
  * Suites and runs used to come from a synchronous store, so component tests
@@ -186,6 +189,45 @@ function seedProposals(client: QueryClient): void {
   }
 }
 
+const INBOX_STATUS_FILTERS: ReviewInboxStatusFilter[] = [
+  'in_review',
+  'all',
+  'approved',
+  'rejected',
+  'changes_requested',
+]
+
+function seedInboxPages(client: QueryClient): void {
+  const projectIds = [undefined, ...mockProjects.map((project) => project.id)]
+
+  for (const projectId of projectIds) {
+    for (const status of INBOX_STATUS_FILTERS) {
+      for (const duplicatesOnly of [undefined, true]) {
+        const filters = { projectId, status, duplicatesOnly, search: undefined }
+        const items = proposalInboxFixtures(filters)
+
+        client.setQueryData(reviewKeys.inbox(filters), {
+          pages: [{ items, nextCursor: null }],
+          pageParams: [null],
+        })
+      }
+    }
+  }
+}
+
+function seedInboxCounts(client: QueryClient): void {
+  const projectIds = [undefined, ...mockProjects.map((project) => project.id)]
+
+  for (const projectId of projectIds) {
+    const filters = { projectId, search: undefined }
+
+    client.setQueryData(reviewKeys.inboxCounts(filters), {
+      byStatus: proposalInboxCountsFixtures(filters),
+      version: 'test-version',
+    })
+  }
+}
+
 function seedDuplicates(client: QueryClient): void {
   const snapshot = getSnapshot()
 
@@ -222,7 +264,7 @@ function seedDuplicates(client: QueryClient): void {
 export function createTestQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: 0 },
+      queries: { retry: false, gcTime: Infinity, staleTime: Infinity },
       mutations: { retry: false },
     },
   })
@@ -237,6 +279,8 @@ export function createTestQueryClient(): QueryClient {
   seedDashboardOverview(client)
   seedDashboardChannels(client)
   seedProposals(client)
+  seedInboxPages(client)
+  seedInboxCounts(client)
   seedDuplicates(client)
 
   return client

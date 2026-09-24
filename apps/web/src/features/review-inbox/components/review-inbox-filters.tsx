@@ -1,7 +1,7 @@
 'use client'
 
 import { MagnifyingGlass, CopySimple } from '@phosphor-icons/react'
-import type { ReviewQueueStatusFilter } from '../lib/filter-proposals'
+import type { ReviewQueueStatusFilter } from './review-inbox-queue'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { useTranslation } from '@/lib/i18n'
 

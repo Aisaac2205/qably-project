@@ -10,7 +10,7 @@ import type {
   SuiteMetricsRecord,
   TraceabilityCalendarRecord,
 } from '@qably/types'
-import type { ProposalListItem } from '@/features/review-inbox/api/review.api'
+import type { ReviewInboxCountsResult } from '@/features/review-inbox/api/review.api'
 import { QualityPage } from '@/features/projects/quality/components/quality-page'
 
 vi.mock('next/link', () => ({
@@ -24,7 +24,7 @@ const getTraceabilityCalendar = vi.fn()
 const listRuns = vi.fn()
 const getRegressions = vi.fn()
 const getSuiteMetrics = vi.fn()
-const listProposals = vi.fn()
+const getInboxCounts = vi.fn()
 
 vi.mock('@/features/projects/api/projects.api', () => ({
   getProject: (...args: unknown[]) => getProject(...args),
@@ -45,10 +45,11 @@ vi.mock('@/features/runs/api/runs.api', () => ({
 }))
 
 vi.mock('@/features/review-inbox/api/review.api', () => ({
-  listProposals: (...args: unknown[]) => listProposals(...args),
+  listProposals: vi.fn(),
   getProposal: vi.fn(),
   approveProposal: vi.fn(),
   rejectProposal: vi.fn(),
+  getInboxCounts: (...args: unknown[]) => getInboxCounts(...args),
 }))
 
 const project: ProjectSummary = {
@@ -159,38 +160,10 @@ const suiteMetrics: SuiteMetricsRecord = {
   ],
 }
 
-const proposals: ProposalListItem[] = [
-  {
-    id: 'proposal-1',
-    projectId: 'proj-1',
-    evidenceId: 'evidence-1',
-    evidenceTitle: 'src/checkout.test.ts',
-    status: 'in_review',
-    title: 'Discount code applies correctly',
-    objective: '',
-    preconditions: [],
-    steps: [],
-    expectedResult: '',
-    priority: 'medium',
-    createdAt: '2026-06-16T10:00:00Z',
-    updatedAt: '2026-06-16T10:00:00Z',
-  } as unknown as ProposalListItem,
-  {
-    id: 'proposal-2',
-    projectId: 'proj-1',
-    evidenceId: 'evidence-2',
-    evidenceTitle: 'src/cart.test.ts',
-    status: 'in_review',
-    title: 'Removes item from cart',
-    objective: '',
-    preconditions: [],
-    steps: [],
-    expectedResult: '',
-    priority: 'medium',
-    createdAt: '2026-06-16T10:00:00Z',
-    updatedAt: '2026-06-16T10:00:00Z',
-  } as unknown as ProposalListItem,
-]
+const inboxCounts: ReviewInboxCountsResult = {
+  byStatus: { in_review: 2, approved: 0, rejected: 0, changes_requested: 0 },
+  version: 'v1',
+}
 
 const emptyTraceability: TraceabilityCalendarRecord = {
   year: 2026,
@@ -223,7 +196,7 @@ describe('QualityPage', () => {
     listRuns.mockResolvedValue(runsPage)
     getRegressions.mockResolvedValue(regressions)
     getSuiteMetrics.mockResolvedValue(suiteMetrics)
-    listProposals.mockResolvedValue(proposals)
+    getInboxCounts.mockResolvedValue(inboxCounts)
 
     await act(async () => {
       renderPage()
@@ -238,7 +211,7 @@ describe('QualityPage', () => {
     listRuns.mockResolvedValue(runsPage)
     getRegressions.mockResolvedValue(regressions)
     getSuiteMetrics.mockResolvedValue(suiteMetrics)
-    listProposals.mockResolvedValue(proposals)
+    getInboxCounts.mockResolvedValue(inboxCounts)
 
     await act(async () => {
       renderPage()
@@ -262,7 +235,7 @@ describe('QualityPage', () => {
       listRuns.mockResolvedValue(runsPage)
       getRegressions.mockResolvedValue(regressions)
       getSuiteMetrics.mockResolvedValue(suiteMetrics)
-      listProposals.mockResolvedValue(proposals)
+      getInboxCounts.mockResolvedValue(inboxCounts)
 
       await act(async () => {
         renderPage()
@@ -325,7 +298,7 @@ describe('QualityPage', () => {
       listRuns.mockResolvedValue(runsPage)
       getRegressions.mockResolvedValue({ items: [], runsScanned: 5 })
       getSuiteMetrics.mockResolvedValue(suiteMetrics)
-      listProposals.mockResolvedValue(proposals)
+      getInboxCounts.mockResolvedValue(inboxCounts)
 
       await act(async () => {
         renderPage()

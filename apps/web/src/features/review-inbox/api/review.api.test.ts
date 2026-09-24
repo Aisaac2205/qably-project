@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   approveProposal,
+  getInboxCounts,
+  getInboxPage,
   getProposal,
   listProposals,
   rejectProposal,
@@ -99,5 +101,45 @@ describe('review.api', () => {
     const [url, init] = lastCall()
     expect(url).toMatch(/\/review\/proposals\/proposal-1\/reject$/)
     expect(init.method).toBe('POST')
+  })
+
+  it('requests a page of the inbox with status, cursor, and limit', async () => {
+    await getInboxPage({ status: 'in_review' }, 'cursor-1', 50)
+
+    const [url, init] = lastCall()
+    expect(url).toMatch(/\/review\/inbox\?/)
+    expect(url).toContain('status=in_review')
+    expect(url).toContain('cursor=cursor-1')
+    expect(url).toContain('limit=50')
+    expect(init.method).toBe('GET')
+  })
+
+  it('omits the cursor from the inbox page request when there is none', async () => {
+    await getInboxPage({ status: 'all' }, null, 50)
+
+    const [url] = lastCall()
+    expect(url).not.toContain('cursor')
+  })
+
+  it('sends duplicatesOnly and search on the inbox page request', async () => {
+    await getInboxPage(
+      { status: 'in_review', duplicatesOnly: true, search: 'cart' },
+      null,
+      50,
+    )
+
+    const [url] = lastCall()
+    expect(url).toContain('duplicatesOnly=true')
+    expect(url).toContain('search=cart')
+  })
+
+  it('requests inbox counts scoped by project and search', async () => {
+    await getInboxCounts({ projectId: 'proj-1', search: 'cart' })
+
+    const [url, init] = lastCall()
+    expect(url).toMatch(/\/review\/inbox\/counts\?/)
+    expect(url).toContain('projectId=proj-1')
+    expect(url).toContain('search=cart')
+    expect(init.method).toBe('GET')
   })
 })

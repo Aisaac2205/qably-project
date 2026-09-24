@@ -3,6 +3,9 @@ import type {
   ProposalDetail,
   ProposalFilters,
   ProposalListItem,
+  ReviewInboxCountsFilters,
+  ReviewInboxFilters,
+  ReviewInboxStatusCounts,
 } from '@/features/review-inbox/api/review.api'
 import { getSnapshot } from '@/lib/mock-store'
 
@@ -37,6 +40,37 @@ export const PROPOSAL_STATUSES: ProposalStatus[] = [
   'rejected',
   'changes_requested',
 ]
+
+function matchesSearch(proposal: ProposalListItem, search: string | undefined): boolean {
+  if (search === undefined || search.trim() === '') return true
+  const q = search.toLowerCase()
+  return proposal.title.toLowerCase().includes(q) || proposal.objective.toLowerCase().includes(q)
+}
+
+export function proposalInboxFixtures(filters: ReviewInboxFilters): ProposalListItem[] {
+  return proposalListFixtures().filter((proposal) => {
+    if (filters.projectId !== undefined && proposal.projectId !== filters.projectId) return false
+    if (filters.status !== 'all' && proposal.status !== filters.status) return false
+    if (filters.duplicatesOnly === true && proposal.possibleDuplicate !== true) return false
+    return matchesSearch(proposal, filters.search)
+  })
+}
+
+export function proposalInboxCountsFixtures(
+  filters: ReviewInboxCountsFilters = {},
+): ReviewInboxStatusCounts {
+  const scoped = proposalListFixtures().filter((proposal) => {
+    if (filters.projectId !== undefined && proposal.projectId !== filters.projectId) return false
+    return matchesSearch(proposal, filters.search)
+  })
+
+  return {
+    in_review: scoped.filter((p) => p.status === 'in_review').length,
+    approved: scoped.filter((p) => p.status === 'approved').length,
+    rejected: scoped.filter((p) => p.status === 'rejected').length,
+    changes_requested: scoped.filter((p) => p.status === 'changes_requested').length,
+  }
+}
 
 export function proposalDetailFixtures(): ProposalDetail[] {
   const snapshot = getSnapshot()
