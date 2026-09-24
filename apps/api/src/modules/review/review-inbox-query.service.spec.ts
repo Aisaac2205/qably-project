@@ -650,6 +650,27 @@ describe('ReviewInboxQueryService.page', () => {
     ];
     expect(duplicatesCall[0]).not.toHaveProperty('take');
   });
+
+  it('honors the requested limit for duplicatesOnly instead of returning every match', async () => {
+    const prisma = createPageFixture([]);
+    const service = buildService(prisma);
+    jest
+      .spyOn(service, 'list')
+      .mockResolvedValue([
+        pageRow({ id: 'dup-a' }),
+        pageRow({ id: 'dup-b' }),
+        pageRow({ id: 'dup-c' }),
+      ] as never);
+
+    const result = await service.page(serviceOrg, {
+      status: 'in_review',
+      limit: 2,
+      duplicatesOnly: true,
+    });
+
+    expect(result.items.map((item) => item.id)).toEqual(['dup-a', 'dup-b']);
+    expect(result.nextCursor).toBeNull();
+  });
 });
 
 describe('ReviewInboxQueryService.counts', () => {

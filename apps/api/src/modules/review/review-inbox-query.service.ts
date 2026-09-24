@@ -184,7 +184,7 @@ export class ReviewInboxQueryService {
         search: filters.search,
         duplicatesOnly: true,
       });
-      return { items, nextCursor: null };
+      return { items: items.slice(0, filters.limit), nextCursor: null };
     }
 
     const cursor =
