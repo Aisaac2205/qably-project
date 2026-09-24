@@ -64,6 +64,7 @@ model User {
   reviewDecisions         ReviewDecision[]
   chatThreads             ChatThread[]
   notificationDeliveries  NotificationDelivery[]
+  sentInvites             OrgInvite[]
 
   @@unique([email])
   @@map("user")
@@ -125,8 +126,10 @@ model Organization {
   maxProjects             Int                      @default(3)
   maxUsers                Int                      @default(5)
   maxCases                Int                      @default(100)
-  aiEnabled               Boolean                  @default(false)
+  aiEnabled               Boolean                  @default(true)
   aiCredits               Int                      @default(0)
+  aiCreditsUsed           Int                      @default(0)
+  aiCreditsPeriodStart    DateTime                 @default(now())
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   members                 OrgMember[]
@@ -138,6 +141,7 @@ model Organization {
   notificationPreferences NotificationPreference[]
   notificationWebhooks    NotificationWebhook[]
   chatThreads             ChatThread[]
+  invites                 OrgInvite[]
 
   @@unique([slug])
   @@map("organization")
@@ -155,6 +159,25 @@ model OrgMember {
   @@unique([organizationId, userId])
   @@index([userId])
   @@map("org_member")
+}
+
+model OrgInvite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  role           OrgRole
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  invitedById    String?
+  invitedBy      User?        @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, email])
+  @@map("org_invite")
 }
 
 model Project {
