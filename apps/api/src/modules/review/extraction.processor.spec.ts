@@ -39,6 +39,7 @@ interface FakePrisma {
     findMany: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    deleteMany: jest.Mock;
   };
   $transaction: jest.Mock;
   $executeRawUnsafe: jest.Mock;
@@ -98,6 +99,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: 'proposal-new' }),
       update: jest.fn().mockResolvedValue({ id: 'proposal-updated' }),
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: jest.fn(),
     $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
@@ -300,7 +302,7 @@ describe('ExtractionProcessor — code-change job', () => {
     expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
   });
 
-  it('falls back to a manual-review proposal when the project has no connection', async () => {
+  it('creates no manual-review proposal when the project has no connection', async () => {
     const prisma = createPrisma();
     prisma.codeChange.findUnique.mockResolvedValue({
       ...codeChangeRow,
@@ -313,15 +315,7 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    const createCall = lastCall(prisma.extractedProposal.create);
-    expect(createCall.data).toMatchObject({
-      projectId: 'project-1',
-      codeChangeId: 'change-1',
-      evidenceId: 'evidence-blob-1',
-      title: 'src/cart.spec.ts',
-      needsManualReview: true,
-      status: 'in_review',
-    });
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     expect(extractSpy).not.toHaveBeenCalled();
   });
 
@@ -369,7 +363,7 @@ describe('ExtractionProcessor — code-change job', () => {
     expect(tryConsume).not.toHaveBeenCalled();
   });
 
-  it('falls back to a manual-review proposal when the source is unavailable', async () => {
+  it('creates no manual-review proposal when the source is unavailable (infrastructure failure, not reviewable work)', async () => {
     const prisma = createPrisma();
     const sourceReader = fakeSourceReader(
       jest.fn().mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
@@ -381,11 +375,8 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    const createCall = lastCall(prisma.extractedProposal.create);
-    expect(createCall.data).toMatchObject({
-      needsManualReview: true,
-      objective: 'http-404',
-    });
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
     expect(extractSpy).not.toHaveBeenCalled();
   });
 
@@ -816,6 +807,48 @@ describe('ExtractionProcessor — document-case job', () => {
     });
   });
 
+  it('supersedes a stale manual-review fallback proposal once a real extraction succeeds for the case', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.deleteMany).toHaveBeenCalledWith({
+      where: {
+        targetTestCaseId: 'case-1',
+        needsManualReview: true,
+        status: 'in_review',
+      },
+    });
+  });
+
+  it('does not let a pending manual-review fallback block a fresh successful extraction from being proposed', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          args.where.needsManualReview === false
+            ? null
+            : { id: 'stale-fallback' },
+        ),
+    );
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+  });
+
   it('normalizes an absolute CI runner path stored on the case before reading the source', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue({
@@ -1009,7 +1042,7 @@ describe('ExtractionProcessor — document-case job', () => {
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
   });
 
-  it('falls back to manual review with a fresh evidence row when the source is unavailable', async () => {
+  it('marks the case failed and creates no proposal when the source is unavailable, so it stays documentable', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
     const sourceReader = fakeSourceReader(
@@ -1021,11 +1054,66 @@ describe('ExtractionProcessor — document-case job', () => {
       data: { kind: 'document-case', testCaseId: 'case-1' },
     } as never);
 
-    expect(prisma.evidence.create).toHaveBeenCalled();
-    const createCall = lastCall(prisma.extractedProposal.create);
-    expect(createCall.data).toMatchObject({
-      targetTestCaseId: 'case-1',
-      needsManualReview: true,
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'case-1',
+        documentationSource: { not: 'human' },
+        documentationQueuedAt: { not: null },
+      },
+      data: {
+        documentationOutcome: 'failed',
+        documentationSkipReason: 'http-404',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
+    });
+  });
+
+  it.each(['timeout', 'fetch-failed', 'http-401', 'http-403'])(
+    'creates no proposal for the source-unavailable reason %s',
+    async (reason) => {
+      const prisma = createPrisma();
+      prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+      const sourceReader = fakeSourceReader(
+        jest.fn().mockResolvedValue({ kind: 'unavailable', reason }),
+      );
+      const extractor = fakeExtractor(jest.fn());
+
+      await build(prisma, sourceReader, extractor).process({
+        data: { kind: 'document-case', testCaseId: 'case-1' },
+      } as never);
+
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('creates no proposal and marks the case failed when there is no repository connection', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...testCaseRow,
+      project: { organizationId: 'org-1', connection: null },
+    });
+    const extractor = fakeExtractor(jest.fn());
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.testCase.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'case-1',
+        documentationSource: { not: 'human' },
+        documentationQueuedAt: { not: null },
+      },
+      data: {
+        documentationOutcome: 'failed',
+        documentationSkipReason: 'no-connection',
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+      },
     });
   });
 
@@ -1235,6 +1323,47 @@ describe('ExtractionProcessor — document-file job', () => {
       expect.arrayContaining([
         ['case-1', expect.objectContaining({ documentationSource: 'aeris' })],
         ['case-2', expect.objectContaining({ documentationSource: 'aeris' })],
+      ]),
+    );
+  });
+
+  it('supersedes a stale manual-review fallback proposal for each case it successfully documents directly', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    const deleteCalls = prisma.extractedProposal.deleteMany.mock.calls as [
+      { where: Record<string, unknown> },
+    ][];
+    expect(deleteCalls.map(([call]) => call.where)).toEqual(
+      expect.arrayContaining([
+        {
+          targetTestCaseId: 'case-1',
+          needsManualReview: true,
+          status: 'in_review',
+        },
+        {
+          targetTestCaseId: 'case-2',
+          needsManualReview: true,
+          status: 'in_review',
+        },
       ]),
     );
   });
@@ -1534,7 +1663,7 @@ describe('ExtractionProcessor — document-file job', () => {
     );
   });
 
-  it('falls back every target when the project has no repository connection', async () => {
+  it('creates no manual-review proposal for any target when the project has no repository connection', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue({
       ...firstTargetRow,
@@ -1547,7 +1676,7 @@ describe('ExtractionProcessor — document-file job', () => {
     );
 
     expect(extractSpy).not.toHaveBeenCalled();
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
   });
 
   it('falls back every target without calling the provider when the organization is not entitled', async () => {
@@ -2536,12 +2665,8 @@ describe('ExtractionProcessor — direct suite metadata and locale', () => {
 
     await build(
       prisma,
-      fakeSourceReader(
-        jest
-          .fn()
-          .mockResolvedValue({ kind: 'unavailable', reason: 'http-404' }),
-      ),
-      fakeExtractor(jest.fn()),
+      fakeSourceReader(),
+      fakeExtractor(jest.fn().mockResolvedValue({ kind: 'no-tests-found' })),
     ).process(documentFileJob('en'));
 
     expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({

@@ -711,6 +711,7 @@ export class SuitesService {
             where: {
               targetTestCaseId: { in: allCaseIds },
               status: PENDING_STATUS,
+              needsManualReview: false,
             },
             orderBy: { createdAt: 'asc' },
             select: { id: true, targetTestCaseId: true },

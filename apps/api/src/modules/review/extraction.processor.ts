@@ -24,6 +24,7 @@ import type {
 import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
+import { isSourceUnavailableReason } from '../repository/lib/source-unavailable-reason';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
 import { detectLanguage } from './lib/detect-language';
@@ -161,6 +162,7 @@ interface TxClient extends PublishTestCaseVersionTx {
     findMany: PrismaService['extractedProposal']['findMany'];
     create: PrismaService['extractedProposal']['create'];
     update: PrismaService['extractedProposal']['update'];
+    deleteMany: PrismaService['extractedProposal']['deleteMany'];
   };
   organization: {
     findUnique: PrismaService['organization']['findUnique'];
@@ -1144,6 +1146,14 @@ export class ExtractionProcessor extends WorkerHost {
             ? {}
             : { observations: testCase.observations }),
         });
+
+        await tx.extractedProposal.deleteMany({
+          where: {
+            targetTestCaseId: target.testCaseId,
+            needsManualReview: true,
+            status: 'in_review',
+          },
+        });
       }
 
       if (skippedForHumanEdit > 0) {
@@ -1436,6 +1446,7 @@ export class ExtractionProcessor extends WorkerHost {
           where: {
             targetTestCaseId: ctx.targetTestCaseId,
             status: 'in_review',
+            needsManualReview: false,
           },
           select: { id: true },
         });
@@ -1524,6 +1535,16 @@ export class ExtractionProcessor extends WorkerHost {
             targetTestCaseId: ctx.targetTestCaseId,
           },
         });
+
+        if (ctx.targetTestCaseId !== null) {
+          await tx.extractedProposal.deleteMany({
+            where: {
+              targetTestCaseId: ctx.targetTestCaseId,
+              needsManualReview: true,
+              status: 'in_review',
+            },
+          });
+        }
       }
 
       return true;
@@ -1705,6 +1726,31 @@ export class ExtractionProcessor extends WorkerHost {
     reason: string,
     observations?: string[],
   ): Promise<void> {
+    if (isSourceUnavailableReason(reason)) {
+      if (ctx.targetTestCaseId !== null) {
+        const failedState: DocumentationStateWrite = {
+          documentationOutcome: 'failed',
+          documentationSkipReason: reason,
+          documentationOutcomeAt: new Date(),
+          documentationQueuedAt: null,
+        };
+
+        await this.prisma.testCase.updateMany({
+          where: {
+            id: ctx.targetTestCaseId,
+            documentationSource: { not: HUMAN_DOCUMENTATION_SOURCE },
+            documentationQueuedAt: { not: null },
+          },
+          data: failedState,
+        });
+      }
+
+      this.logger.log(
+        `Skipping manual-review fallback for ${ctx.filePath}: source unavailable (${reason})`,
+      );
+      return;
+    }
+
     const existing =
       ctx.codeChangeId !== null
         ? await this.prisma.extractedProposal.findFirst({

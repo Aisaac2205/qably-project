@@ -347,6 +347,40 @@ describe('ExtractionService.enqueueDocumentCase', () => {
 
     expect(result).toEqual({ ok: false, error: 'already-pending' });
     expect(queue.add).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.findFirst).toHaveBeenCalledWith({
+      where: {
+        targetTestCaseId: 'case-1',
+        status: 'in_review',
+        needsManualReview: false,
+      },
+      select: { id: true },
+    });
+  });
+
+  it('does not let a manual-review fallback proposal block re-enqueuing the case', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockImplementation(
+      (args: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          args.where.needsManualReview === false
+            ? null
+            : { id: 'stale-fallback' },
+        ),
+    );
+
+    const result = await build(prisma, queue).enqueueDocumentCase(
+      org,
+      'suite-1',
+      'case-1',
+      null,
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { jobId: buildJobId('document-case', ['case-1']) },
+    });
+    expect(queue.add).toHaveBeenCalled();
   });
 
   it('returns no-automation-key when the case is not linked to an automated test', async () => {
@@ -608,6 +642,41 @@ describe('ExtractionService.enqueueDocumentFiles', () => {
       },
     });
     expect(queue.addBulk).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.findMany).toHaveBeenCalledWith({
+      where: {
+        targetTestCaseId: { in: ['case-1'] },
+        status: 'in_review',
+        needsManualReview: false,
+      },
+      select: { targetTestCaseId: true },
+    });
+  });
+
+  it('does not let a manual-review fallback proposal keep a case out of the documentable set', async () => {
+    const queue = createQueue();
+    const prisma = createPrisma('en');
+    prisma.testCase.findMany.mockResolvedValue([candidate()]);
+    prisma.extractedProposal.findMany.mockImplementation(
+      (args: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          args.where.needsManualReview === false
+            ? []
+            : [{ targetTestCaseId: 'case-1' }],
+        ),
+    );
+
+    const result = await build(prisma, queue).enqueueDocumentFiles(
+      org,
+      { suiteId: 'suite-1' },
+      null,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.casesSkipped).not.toContainEqual(
+        expect.objectContaining({ reason: 'already-pending' }),
+      );
+    }
   });
 
   it('skips a case a human already documented and counts it, never enqueuing it', async () => {

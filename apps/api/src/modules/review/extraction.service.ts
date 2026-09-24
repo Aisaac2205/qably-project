@@ -234,7 +234,11 @@ export class ExtractionService {
     if (testCase.executionMode !== 'automated') return err('not-automated');
 
     const pending = await this.prisma.extractedProposal.findFirst({
-      where: { targetTestCaseId: caseId, status: PENDING_STATUS },
+      where: {
+        targetTestCaseId: caseId,
+        status: PENDING_STATUS,
+        needsManualReview: false,
+      },
       select: { id: true },
     });
 
@@ -348,6 +352,7 @@ export class ExtractionService {
       where: {
         targetTestCaseId: { in: rows.map((row) => row.id) },
         status: PENDING_STATUS,
+        needsManualReview: false,
       },
       select: { targetTestCaseId: true },
     });
