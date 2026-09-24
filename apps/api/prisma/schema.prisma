@@ -123,11 +123,7 @@ model Organization {
   name                    String
   slug                    String
   plan                    Plan                     @default(gratuito)
-  maxProjects             Int                      @default(3)
-  maxUsers                Int                      @default(5)
-  maxCases                Int                      @default(100)
   aiEnabled               Boolean                  @default(true)
-  aiCredits               Int                      @default(0)
   aiCreditsUsed           Int                      @default(0)
   aiCreditsPeriodStart    DateTime                 @default(now())
   createdAt               DateTime                 @default(now())
