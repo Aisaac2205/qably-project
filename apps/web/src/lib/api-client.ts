@@ -1,6 +1,8 @@
 import { resolveApiBaseUrl } from '@/lib/api-base-url'
 import { useI18nStore } from '@/lib/i18n/store'
 import { useActiveOrganizationStore } from '@/stores/active-organization.store'
+import { getRegisteredQueryClient } from '@/lib/query-client-registry'
+import { applyOrganizationChange } from '@/lib/organization-context'
 
 const ORGANIZATION_HEADER = 'x-organization-id'
 const NOT_A_MEMBER_ERROR_CODE = 'not-a-member'
@@ -24,8 +26,22 @@ export interface ApiRequestOptions {
   signal?: AbortSignal
 }
 
-function resolveOrganizationId(options: ApiRequestOptions): string | undefined {
+async function waitForActiveOrganizationHydration(): Promise<void> {
+  if (useActiveOrganizationStore.persist.hasHydrated()) return
+
+  await new Promise<void>((resolve) => {
+    const unsubscribe = useActiveOrganizationStore.persist.onFinishHydration(() => {
+      unsubscribe()
+      resolve()
+    })
+  })
+}
+
+async function resolveOrganizationId(options: ApiRequestOptions): Promise<string | undefined> {
   if (options.organizationId !== undefined) return options.organizationId
+
+  await waitForActiveOrganizationHydration()
+
   return useActiveOrganizationStore.getState().organizationId ?? undefined
 }
 
@@ -71,7 +87,7 @@ async function performRequest<T>(
   options: ApiRequestOptions,
   isRetry: boolean,
 ): Promise<T> {
-  const organizationId = resolveOrganizationId(options)
+  const organizationId = await resolveOrganizationId(options)
   const organizationIdWasInjected = options.organizationId === undefined && organizationId !== undefined
 
   const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
@@ -91,7 +107,7 @@ async function performRequest<T>(
       response.status === 403 &&
       code === NOT_A_MEMBER_ERROR_CODE
     ) {
-      useActiveOrganizationStore.getState().clearActiveOrganization()
+      await applyOrganizationChange(getRegisteredQueryClient(), null)
       return performRequest<T>(path, options, true)
     }
 

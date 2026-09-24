@@ -21,7 +21,8 @@ import {
 import { useAuth } from '@/features/auth/hooks/use-auth'
 import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
 import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
-import { useActiveOrganizationStore } from '@/stores/active-organization.store'
+import { applyOrganizationChange } from '@/lib/organization-context'
+import { useSession } from '@/lib/auth-client'
 import { useTranslation } from '@/lib/i18n'
 import { UserAvatar } from './user-avatar'
 
@@ -40,6 +41,7 @@ export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountP
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const { logout } = useAuth()
+  const { data: session } = useSession()
   const { organizations } = useOrganizations()
   const { organization: currentOrganization } = useCurrentOrganization()
   const [isSigningOut, setIsSigningOut] = useState(false)
@@ -62,11 +64,13 @@ export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountP
     router.refresh()
   }
 
-  function handleSwitchOrganization(organizationId: string) {
+  async function handleSwitchOrganization(organizationId: string) {
     if (organizationId === currentOrganization?.id) return
 
-    useActiveOrganizationStore.getState().setActiveOrganization(organizationId)
-    queryClient.clear()
+    const userId = session?.user.id
+    if (!userId) return
+
+    await applyOrganizationChange(queryClient, { organizationId, userId })
     router.replace(DASHBOARD_ROUTE)
   }
 

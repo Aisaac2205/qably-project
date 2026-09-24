@@ -19,6 +19,7 @@ vi.mock('@/lib/auth-client', () => ({
     signUp: { email: vi.fn() },
     signOut: (...args: unknown[]) => signOut(...args),
   },
+  useSession: () => ({ data: { user: { id: 'user-1' } }, isPending: false }),
 }))
 
 vi.mock('@/features/organizations/hooks/use-organizations', () => ({ useOrganizations: vi.fn() }))
@@ -78,7 +79,7 @@ function renderAccount(collapsed = false) {
 beforeEach(() => {
   vi.clearAllMocks()
   setOrganizations([acme])
-  useActiveOrganizationStore.setState({ organizationId: null })
+  useActiveOrganizationStore.setState({ organizationId: null, userId: null })
 })
 
 describe('SidebarAccount', () => {
@@ -154,17 +155,18 @@ describe('SidebarAccount', () => {
     )
   })
 
-  it('switching organizations persists the choice, clears the query cache, and returns to the dashboard', async () => {
+  it('switching organizations persists the choice bound to the signed-in user, resets the query cache, and returns to the dashboard', async () => {
     setOrganizations([acme, globex], acme)
     const user = userEvent.setup()
     const { queryClient } = await act(async () => renderAccount())
-    const clearSpy = vi.spyOn(queryClient, 'clear')
+    const resetSpy = vi.spyOn(queryClient, 'resetQueries')
 
     await user.click(screen.getByRole('button', { name: /Isaac Flores/ }))
     await user.click(await screen.findByRole('menuitemradio', { name: 'Globex Labs' }))
 
-    expect(useActiveOrganizationStore.getState().organizationId).toBe('org-2')
-    expect(clearSpy).toHaveBeenCalled()
+    await waitFor(() => expect(useActiveOrganizationStore.getState().organizationId).toBe('org-2'))
+    expect(useActiveOrganizationStore.getState().userId).toBe('user-1')
+    expect(resetSpy).toHaveBeenCalled()
     expect(replace).toHaveBeenCalledWith('/dashboard')
   })
 })

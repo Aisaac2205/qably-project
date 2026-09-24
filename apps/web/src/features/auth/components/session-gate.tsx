@@ -2,9 +2,11 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import { Spinner } from '@/components/ui/spinner'
 import { useSession } from '@/lib/auth-client'
 import { useTranslation } from '@/lib/i18n'
+import { applyOrganizationChange } from '@/lib/organization-context'
 
 const DEFAULT_DESTINATION = '/dashboard'
 
@@ -19,13 +21,15 @@ export function SessionGate({ children }: { children: React.ReactNode }) {
   const { data, isPending } = useSession()
   const router = useRouter()
   const pathname = usePathname()
+  const queryClient = useQueryClient()
   const isSignedIn = data != null
 
   useEffect(() => {
     if (isPending || isSignedIn) return
 
+    void applyOrganizationChange(queryClient, null)
     router.replace(buildLoginPath(pathname))
-  }, [isPending, isSignedIn, pathname, router])
+  }, [isPending, isSignedIn, pathname, router, queryClient])
 
   if (isPending) {
     return (

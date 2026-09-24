@@ -1,7 +1,9 @@
+import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiRequest } from './api-client'
 import { DEFAULT_LOCALE, useI18nStore } from './i18n/store'
 import { useActiveOrganizationStore } from '@/stores/active-organization.store'
+import { registerQueryClient, resetQueryClientRegistry } from '@/lib/query-client-registry'
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   const spy = vi.fn().mockResolvedValue({
@@ -27,7 +29,8 @@ function notAMemberResponse() {
 afterEach(() => {
   vi.unstubAllGlobals()
   useI18nStore.getState().setLocale(DEFAULT_LOCALE)
-  useActiveOrganizationStore.setState({ organizationId: null })
+  useActiveOrganizationStore.setState({ organizationId: null, userId: null })
+  resetQueryClientRegistry()
   localStorage.clear()
 })
 
@@ -142,7 +145,7 @@ describe('apiRequest', () => {
   })
 
   it('injects the active organization when the caller gives no explicit id', async () => {
-    useActiveOrganizationStore.getState().setActiveOrganization('org-9')
+    useActiveOrganizationStore.getState().setActiveOrganization('org-9', 'user-1')
     const spy = mockFetch({ json: () => Promise.resolve([]) })
 
     await apiRequest('/projects')
@@ -152,7 +155,7 @@ describe('apiRequest', () => {
   })
 
   it('lets an explicit organization id win over the active organization', async () => {
-    useActiveOrganizationStore.getState().setActiveOrganization('org-9')
+    useActiveOrganizationStore.getState().setActiveOrganization('org-9', 'user-1')
     const spy = mockFetch({ json: () => Promise.resolve([]) })
 
     await apiRequest('/projects', { organizationId: 'org-explicit' })
@@ -162,7 +165,7 @@ describe('apiRequest', () => {
   })
 
   it('clears the active organization and retries once when the injected header is rejected as not-a-member', async () => {
-    useActiveOrganizationStore.getState().setActiveOrganization('org-stale')
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale', 'user-1')
     const spy = vi
       .fn()
       .mockResolvedValueOnce(notAMemberResponse())
@@ -184,6 +187,29 @@ describe('apiRequest', () => {
     expect(useActiveOrganizationStore.getState().organizationId).toBeNull()
   })
 
+  it('resets a registered query cache when the not-a-member recovery clears the organization, so stale panels cannot keep showing the removed org', async () => {
+    const queryClient = new QueryClient()
+    const resetSpy = vi.spyOn(queryClient, 'resetQueries').mockResolvedValue(undefined)
+    vi.spyOn(queryClient, 'cancelQueries').mockResolvedValue(undefined)
+    registerQueryClient(queryClient)
+
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale', 'user-1')
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(notAMemberResponse())
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve([{ id: 'p1' }]),
+      })
+    vi.stubGlobal('fetch', spy)
+
+    await apiRequest('/projects')
+
+    expect(resetSpy).toHaveBeenCalled()
+  })
+
   it('does not retry a not-a-member 403 when the caller explicitly chose the organization id', async () => {
     const spy = vi.fn().mockResolvedValue(notAMemberResponse())
     vi.stubGlobal('fetch', spy)
@@ -197,7 +223,7 @@ describe('apiRequest', () => {
   })
 
   it('does not retry a second time when the retry also comes back not-a-member', async () => {
-    useActiveOrganizationStore.getState().setActiveOrganization('org-stale')
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale', 'user-1')
     const spy = vi.fn().mockResolvedValue(notAMemberResponse())
     vi.stubGlobal('fetch', spy)
 
@@ -207,7 +233,7 @@ describe('apiRequest', () => {
   })
 
   it('does not retry a 403 that carries a different error code', async () => {
-    useActiveOrganizationStore.getState().setActiveOrganization('org-stale')
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale', 'user-1')
     const spy = vi.fn().mockResolvedValue({
       ok: false,
       status: 403,
@@ -220,5 +246,36 @@ describe('apiRequest', () => {
 
     expect(spy).toHaveBeenCalledTimes(1)
     expect(useActiveOrganizationStore.getState().organizationId).toBe('org-stale')
+  })
+
+  it('awaits store rehydration before resolving the injected organization header', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-42', 'user-1')
+    const originalHasHydrated = useActiveOrganizationStore.persist.hasHydrated
+    const originalOnFinishHydration = useActiveOrganizationStore.persist.onFinishHydration
+    let finishHydration: (() => void) | undefined
+
+    useActiveOrganizationStore.persist.hasHydrated = () => false
+    useActiveOrganizationStore.persist.onFinishHydration = (fn) => {
+      finishHydration = () => fn(useActiveOrganizationStore.getState())
+      return () => {}
+    }
+
+    try {
+      const spy = mockFetch({ json: () => Promise.resolve([]) })
+
+      const requestPromise = apiRequest('/projects')
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(spy).not.toHaveBeenCalled()
+
+      finishHydration?.()
+      await requestPromise
+
+      const init = spy.mock.calls[0][1] as RequestInit
+      expect(new Headers(init.headers).get('x-organization-id')).toBe('org-42')
+    } finally {
+      useActiveOrganizationStore.persist.hasHydrated = originalHasHydrated
+      useActiveOrganizationStore.persist.onFinishHydration = originalOnFinishHydration
+    }
   })
 })
