@@ -1,4 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  PLAN_LIMITS,
+  creditsUsedAt,
+  nextMonthStartUtc,
+  type OrganizationUsageRecord,
+} from '@qably/types';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -83,6 +89,50 @@ export class OrganizationsService {
       plan: membership.organization.plan,
       role: membership.role,
     }));
+  }
+
+  async getUsage(
+    org: OrgContext,
+    now: Date = new Date(),
+  ): Promise<OrganizationUsageRecord> {
+    const [organization, members, pendingInvites, projects] = await Promise.all(
+      [
+        this.prisma.organization.findUniqueOrThrow({
+          where: { id: org.organizationId },
+          select: {
+            plan: true,
+            aiEnabled: true,
+            aiCreditsUsed: true,
+            aiCreditsPeriodStart: true,
+          },
+        }),
+        this.prisma.orgMember.count({
+          where: { organizationId: org.organizationId },
+        }),
+        this.prisma.orgInvite.count({
+          where: {
+            organizationId: org.organizationId,
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: now },
+          },
+        }),
+        this.prisma.project.count({
+          where: { organizationId: org.organizationId },
+        }),
+      ],
+    );
+
+    return {
+      plan: organization.plan,
+      limits: PLAN_LIMITS[organization.plan],
+      members,
+      pendingInvites,
+      projects,
+      aiEnabled: organization.aiEnabled,
+      aiCreditsUsed: creditsUsedAt(organization, now),
+      creditsResetAt: nextMonthStartUtc(now).toISOString(),
+    };
   }
 
   private async bootstrapPersonalOrganization(

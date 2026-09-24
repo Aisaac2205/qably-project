@@ -14,15 +14,28 @@ interface FakePrisma {
     findFirst: jest.Mock;
     findMany: jest.Mock;
     create: jest.Mock;
+    count: jest.Mock;
   };
-  organization: { create: jest.Mock };
+  orgInvite: { count: jest.Mock };
+  project: { count: jest.Mock };
+  organization: { create: jest.Mock; findUniqueOrThrow: jest.Mock };
   $transaction: jest.Mock;
 }
 
 function createPrisma(): FakePrisma {
   const prisma: FakePrisma = {
-    orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
-    organization: { create: jest.fn() },
+    orgMember: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
+    },
+    orgInvite: { count: jest.fn().mockResolvedValue(0) },
+    project: { count: jest.fn().mockResolvedValue(0) },
+    organization: {
+      create: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -176,5 +189,56 @@ describe('OrganizationsService.listForUser', () => {
         role: 'owner',
       },
     ]);
+  });
+});
+
+describe('OrganizationsService.getUsage', () => {
+  const org = { organizationId: 'org-1', slug: 'acme', role: 'owner' as const };
+
+  it('reports plan limits alongside real member, invite, project and credit counts', async () => {
+    const prisma = createPrisma();
+    prisma.organization.findUniqueOrThrow.mockResolvedValue({
+      plan: 'equipo',
+      aiEnabled: true,
+      aiCreditsUsed: 12,
+      aiCreditsPeriodStart: new Date('2026-09-01T00:00:00.000Z'),
+    });
+    prisma.orgMember.count.mockResolvedValue(2);
+    prisma.orgInvite.count.mockResolvedValue(1);
+    prisma.project.count.mockResolvedValue(3);
+
+    const result = await build(prisma).getUsage(
+      org,
+      new Date('2026-09-23T12:00:00.000Z'),
+    );
+
+    expect(result).toEqual({
+      plan: 'equipo',
+      limits: { members: 10, projects: 5, monthlyAiCredits: 300 },
+      members: 2,
+      pendingInvites: 1,
+      projects: 3,
+      aiEnabled: true,
+      aiCreditsUsed: 12,
+      creditsResetAt: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
+  it('reports zero used credits without mutating storage once the period has rolled over', async () => {
+    const prisma = createPrisma();
+    prisma.organization.findUniqueOrThrow.mockResolvedValue({
+      plan: 'gratuito',
+      aiEnabled: true,
+      aiCreditsUsed: 20,
+      aiCreditsPeriodStart: new Date('2026-08-01T00:00:00.000Z'),
+    });
+
+    const result = await build(prisma).getUsage(
+      org,
+      new Date('2026-09-23T12:00:00.000Z'),
+    );
+
+    expect(result.aiCreditsUsed).toBe(0);
+    expect(prisma.organization.findUniqueOrThrow).toHaveBeenCalledTimes(1);
   });
 });

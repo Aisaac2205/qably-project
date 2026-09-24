@@ -32,7 +32,10 @@ export class OrgScopeGuard implements CanActivate {
     );
 
     if (isErr(result)) {
-      throw new ForbiddenException('You do not belong to that organization');
+      throw new ForbiddenException({
+        code: result.error,
+        message: 'You do not belong to that organization',
+      });
     }
 
     request.org = result.value;

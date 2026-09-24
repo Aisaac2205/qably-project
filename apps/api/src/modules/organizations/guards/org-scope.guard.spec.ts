@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   InternalServerErrorException,
+  type HttpException,
 } from '@nestjs/common';
 import type { ExecutionContext } from '@nestjs/common';
 import { err, ok } from '../../../common/result';
@@ -55,11 +56,18 @@ describe('OrgScopeGuard', () => {
   it('rejects an organization the caller does not belong to', async () => {
     resolveContext.mockResolvedValue(err('not-a-member'));
 
-    await expect(
-      guard.canActivate(
+    expect.assertions(2);
+    try {
+      await guard.canActivate(
         contextFor({ session, headers: { 'x-organization-id': 'org-x' } }),
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+      );
+    } catch (error) {
+      expect(error).toBeInstanceOf(ForbiddenException);
+      expect((error as HttpException).getResponse()).toEqual({
+        code: 'not-a-member',
+        message: 'You do not belong to that organization',
+      });
+    }
   });
 
   it('fails loudly when the session guard did not run first', async () => {
