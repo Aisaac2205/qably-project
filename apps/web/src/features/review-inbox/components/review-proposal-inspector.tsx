@@ -26,7 +26,7 @@ import { TraceabilityTrail } from '@/components/ui/traceability-trail'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { useProposal } from '../hooks/use-proposals'
-import { manualReviewReasonKey } from '../lib/manual-review-reason'
+import { extractionFailureReasonKey } from '@/lib/extraction-failure-reason'
 import { useTranslation } from '@/lib/i18n'
 import { AerisObservations } from '@/components/ui/aeris-observations'
 import { projectRootPath, reviewInboxPath } from '@/features/projects/lib/routes'
@@ -65,7 +65,7 @@ export function ReviewProposalInspector({
   const hasNothingToPublish = proposal.steps.length === 0
   const needsManualReview = proposal.needsManualReview || hasNothingToPublish
   const manualReviewReason = needsManualReview
-    ? manualReviewReasonKey(proposal.objective)
+    ? extractionFailureReasonKey(proposal.objective)
     : null
   const documentCase = useDocumentCase()
   const canRedocumentCase =

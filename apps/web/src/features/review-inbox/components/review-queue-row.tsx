@@ -2,7 +2,7 @@
 
 import { CopySimple, CheckCircle, XCircle, Clock, CaretRight, ChatCircleText, FileText } from '@phosphor-icons/react'
 import type { ProposalListItem } from '../api/review.api'
-import { manualReviewReasonKey } from '../lib/manual-review-reason'
+import { extractionFailureReasonKey } from '@/lib/extraction-failure-reason'
 import { Badge } from '@/components/ui/badge'
 import { useTranslation } from '@/lib/i18n'
 
@@ -21,7 +21,7 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
   const isRejected = proposal.status === 'rejected'
 
   const needsManualReview = proposal.needsManualReview || proposal.steps.length === 0
-  const manualReviewReason = needsManualReview ? manualReviewReasonKey(proposal.objective) : null
+  const manualReviewReason = needsManualReview ? extractionFailureReasonKey(proposal.objective) : null
   const subtitle = !needsManualReview
     ? proposal.objective
     : manualReviewReason === null
