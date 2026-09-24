@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="jest tests" tests="144" failures="8" errors="0" time="6.771">
+<testsuites name="jest tests" tests="141" failures="8" errors="0" time="6.771">
   <testsuite name="Projects (e2e)" errors="0" failures="1" skipped="0" time="2.554" tests="17">
     <testcase classname="Projects (e2e) refuses every project route without a session" name="Projects (e2e) refuses every project route without a session" time="0.37" file="apps/api/test/projects.e2e-spec.ts">
     </testcase>
@@ -192,7 +192,7 @@
     <testcase classname="Runs queries (e2e) answers 404 when the case does not belong to the run" name="Runs queries (e2e) answers 404 when the case does not belong to the run" time="0.013" file="apps/api/test/runs-queries.e2e-spec.ts">
     </testcase>
   </testsuite>
-  <testsuite name="Review (e2e)" errors="0" failures="0" skipped="0" time="0.637" tests="14">
+  <testsuite name="Review (e2e)" errors="0" failures="0" skipped="0" time="0.637" tests="11">
     <testcase classname="Review (e2e) refuses the review routes without a session" name="Review (e2e) refuses the review routes without a session" time="0.078" file="apps/api/test/review.e2e-spec.ts">
     </testcase>
     <testcase classname="Review (e2e) lists the proposals of the caller organization" name="Review (e2e) lists the proposals of the caller organization" time="0.012" file="apps/api/test/review.e2e-spec.ts">
@@ -204,12 +204,6 @@
     <testcase classname="Review (e2e) answers 404 for a proposal outside the resolved organization" name="Review (e2e) answers 404 for a proposal outside the resolved organization" time="0.02" file="apps/api/test/review.e2e-spec.ts">
     </testcase>
     <testcase classname="Review (e2e) publishes the official case when approving" name="Review (e2e) publishes the official case when approving" time="0.024" file="apps/api/test/review.e2e-spec.ts">
-    </testcase>
-    <testcase classname="Review (e2e) bulk-approves the ids in the request body" name="Review (e2e) bulk-approves the ids in the request body" time="0.012" file="apps/api/test/review.e2e-spec.ts">
-    </testcase>
-    <testcase classname="Review (e2e) bulk-approves a mixed batch, skipping an already-decided proposal with its reason" name="Review (e2e) bulk-approves a mixed batch, skipping an already-decided proposal with its reason" time="0.022" file="apps/api/test/review.e2e-spec.ts">
-    </testcase>
-    <testcase classname="Review (e2e) rejects a bulk request over the 100-id bound" name="Review (e2e) rejects a bulk request over the 100-id bound" time="0.01" file="apps/api/test/review.e2e-spec.ts">
     </testcase>
     <testcase classname="Review (e2e) takes the actor from the session, never from the body" name="Review (e2e) takes the actor from the session, never from the body" time="0.01" file="apps/api/test/review.e2e-spec.ts">
     </testcase>
