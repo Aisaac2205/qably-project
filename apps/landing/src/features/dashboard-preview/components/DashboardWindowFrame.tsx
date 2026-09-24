@@ -463,11 +463,11 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                       <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.projectsTitle}</h2>
                     </div>
 
-                    <div className="flex-1 overflow-x-auto px-4 pb-4 sm:px-5">
+                    <div className="flex-1 overflow-x-auto pb-3">
                       <table className="w-full min-w-[440px] border-collapse text-left">
                         <thead>
                           <tr className="border-b border-app-border bg-app-canvas/40">
-                            <th scope="col" className="py-2.5 pr-3 text-xs font-medium text-app-muted">
+                            <th scope="col" className="py-2.5 pl-4 pr-3 text-xs font-medium text-app-muted sm:pl-5">
                               {tDashboard.thProject}
                             </th>
                             <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-app-muted">
@@ -476,7 +476,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                             <th scope="col" className="py-2.5 px-3 text-center text-xs font-medium text-app-muted">
                               {tDashboard.thCases}
                             </th>
-                            <th scope="col" className="py-2.5 pl-3 text-right text-xs font-medium text-app-muted">
+                            <th scope="col" className="py-2.5 pl-3 pr-4 text-right text-xs font-medium text-app-muted sm:pr-5">
                               {tDashboard.thPassRate}
                             </th>
                           </tr>
@@ -486,7 +486,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                             const pct = project.passRate === null ? null : Math.round(project.passRate * 100);
                             return (
                               <tr key={project.id} className="transition-colors hover:bg-app-canvas/20">
-                                <td className="py-3 pr-3">
+                                <td className="py-3 pl-4 pr-3 sm:pl-5">
                                   <div className="flex min-w-0 items-center gap-2.5">
                                     <ProjectMonogram name={project.name} />
                                     <div className="min-w-0">
@@ -503,7 +503,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                                 <td className="py-3 px-3 text-center font-mono text-xs font-medium text-app-default tabular-nums">
                                   {project.cases}
                                 </td>
-                                <td className="py-3 pl-3">
+                                <td className="py-3 pl-3 pr-4 sm:pr-5">
                                   <div className="flex items-center justify-end gap-2.5">
                                     <div className="w-24">
                                       <PassRateBar value={pct} label={`${project.name} pass rate`} />

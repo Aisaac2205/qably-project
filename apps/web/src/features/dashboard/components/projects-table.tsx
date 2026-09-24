@@ -61,11 +61,11 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
       ) : overview.projects.length === 0 ? (
         <StateView kind="empty" title={t('dashboard.projectsEmptyTitle')} />
       ) : (
-        <div className="px-5 pb-5">
+        <div className="w-full pb-3">
           <table className="w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="border-b border-border bg-canvas">
-                <th scope="col" className="py-2.5 pr-3 text-xs font-medium text-muted">
+                <th scope="col" className="py-2.5 pl-5 pr-3 text-xs font-medium text-muted">
                   {t('dashboard.projectsColProject')}
                 </th>
                 <th scope="col" className="hidden @lg:table-cell w-20 py-2.5 px-3 text-center text-xs font-medium text-muted">
@@ -74,7 +74,7 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                 <th scope="col" className="hidden @lg:table-cell w-20 py-2.5 px-3 text-center text-xs font-medium text-muted">
                   {t('dashboard.projectsColCases')}
                 </th>
-                <th scope="col" className="w-32 py-2.5 pl-3 text-right text-xs font-medium text-muted">
+                <th scope="col" className="w-36 py-2.5 pl-3 pr-5 text-right text-xs font-medium text-muted">
                   {t('dashboard.projectsColPassRate')}
                 </th>
               </tr>
@@ -86,7 +86,7 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
 
                 return (
                   <tr key={project.id}>
-                    <td className="min-w-48 py-3 pr-3">
+                    <td className="min-w-48 py-3 pl-5 pr-3">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <ProjectMonogram projectId={project.id} name={project.name} />
                         <div className="min-w-0">
@@ -112,7 +112,7 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                     <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
                       {project.cases}
                     </td>
-                    <td className="py-3 pl-3">
+                    <td className="py-3 pl-3 pr-5">
                       <div className="flex items-center gap-2">
                         <PassRateBar
                           value={barValue}
