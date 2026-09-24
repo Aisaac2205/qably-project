@@ -117,7 +117,9 @@ export function ChatMessageList({
                 role="status"
                 className="max-w-[85%] sm:max-w-[80%] text-xs sm:text-sm text-muted bg-surface border border-border rounded-2xl rounded-tl-xs px-4 py-2.5"
               >
-                {t('aiReview.assistantUnavailable')}
+                {pendingMessage.errorKind === 'quota-exhausted'
+                  ? t('aiReview.chatQuotaExhausted')
+                  : t('aiReview.assistantUnavailable')}
               </p>
             </div>
           )}

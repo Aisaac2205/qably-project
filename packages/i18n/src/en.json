@@ -632,6 +632,7 @@
     "sendToReviewError": "Couldn't send this case to review. Try again.",
     "assistantThinking": "Thinking…",
     "assistantUnavailable": "The AI assistant is not available right now. Your message was saved — try again in a moment.",
+    "chatQuotaExhausted": "Today's Aeris budget is used up. Your message was saved — try again tomorrow.",
     "chatAiNotEnabled": "AI chat isn't enabled for this organization.",
     "chatForbidden": "You don't have access to this conversation.",
     "chatThrottled": "Too many messages right now. Try again in a moment.",

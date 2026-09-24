@@ -80,6 +80,20 @@ describe('ChatMessageList', () => {
     expect(liveRegions[0]?.textContent).not.toBe('')
   })
 
+  it('shows a distinct message when the daily Aeris budget is exhausted', async () => {
+    await act(async () => {
+      render(
+        <ChatMessageList
+          projectId="proj-1"
+          messages={[]}
+          pendingMessage={{ content: 'Another question', status: 'unavailable', errorKind: 'quota-exhausted' }}
+        />,
+      )
+    })
+    expect(screen.getByRole('status')).toHaveTextContent(/budget/i)
+    expect(screen.getByRole('status')).not.toHaveTextContent(/not available right now/i)
+  })
+
   it('shows a throttled error message', async () => {
     await act(async () => {
       render(

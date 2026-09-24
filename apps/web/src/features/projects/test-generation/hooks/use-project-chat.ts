@@ -15,6 +15,7 @@ import { ApiError } from '@/lib/api-client'
 
 export type ChatSendErrorKind =
   | 'provider-unavailable'
+  | 'quota-exhausted'
   | 'ai-not-enabled'
   | 'forbidden'
   | 'throttled'
@@ -31,6 +32,9 @@ export interface PendingMessage {
 
 function classifySendError(error: unknown): ChatSendErrorKind {
   if (error instanceof ApiError) {
+    if (error.code === 'quota-exhausted') {
+      return 'quota-exhausted'
+    }
     if (error.code === 'provider-unavailable' || error.status === 503) {
       return 'provider-unavailable'
     }
@@ -134,7 +138,7 @@ export function useProjectChat(projectId: string) {
       } catch (error) {
         const kind = classifySendError(error)
 
-        if (kind === 'provider-unavailable' && threadId !== null) {
+        if ((kind === 'provider-unavailable' || kind === 'quota-exhausted') && threadId !== null) {
           await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
           setPendingMessage({ status: 'unavailable', errorKind: kind })
           return

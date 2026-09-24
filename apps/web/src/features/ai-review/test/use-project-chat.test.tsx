@@ -145,6 +145,39 @@ describe('useProjectChat', () => {
     })
   })
 
+  it('classifies a coded quota-exhausted 503 distinctly from an uncoded provider-unavailable 503', async () => {
+    listThreads.mockResolvedValue([thread])
+    const persistedUserMessage: ChatMessageRecord = {
+      id: 'message-4',
+      threadId: 'thread-1',
+      role: 'user',
+      content: 'Budget question',
+      suggestedCases: [],
+      createdAt: '2026-01-01T00:00:03.000Z',
+    }
+    getThread.mockResolvedValue({
+      ...threadDetail,
+      messages: [...threadDetail.messages, persistedUserMessage],
+    })
+    sendMessage.mockRejectedValue(new ApiError(503, 'Daily budget spent', 'quota-exhausted'))
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.messages.length).toBe(3))
+
+    await act(async () => {
+      await result.current.send('Budget question')
+    })
+
+    expect(result.current.pendingMessage).toEqual({
+      status: 'unavailable',
+      errorKind: 'quota-exhausted',
+    })
+  })
+
   it('classifies a coded ai-not-enabled 403 distinctly from an uncoded forbidden 403', async () => {
     listThreads.mockResolvedValue([thread])
     getThread.mockResolvedValue(threadDetail)
