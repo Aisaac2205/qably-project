@@ -11,6 +11,7 @@ import request from 'supertest';
 import type { App } from 'supertest/types';
 import { PrismaClient } from '../../generated/prisma/client';
 import { assertLocalBenchUrl } from './lib/assert-local-bench-url';
+import { WARMUP_SAMPLES, MEASURED_SAMPLES } from './lib/sample-size';
 import { seedReviewInboxBench } from './seed';
 import { ConfigModule } from '../../src/config/config.module';
 import { ENV } from '../../src/config/config.tokens';
@@ -34,8 +35,6 @@ function noopQueue(): { add: () => Promise<{ id: string }> } {
 
 const API_ROOT = join(__dirname, '..', '..');
 const RESULTS_DIR = join(__dirname, 'results');
-const WARMUP_SAMPLES = 20;
-const MEASURED_SAMPLES = 200;
 
 interface CallStats {
   label: string;
@@ -162,7 +161,7 @@ async function main(): Promise<void> {
     adapter: new PrismaPg({ connectionString: databaseUrl }),
   });
   console.log('Seeding the bench database...');
-  const seed = await seedReviewInboxBench(seedClient);
+  const seed = await seedReviewInboxBench(seedClient, databaseUrl);
   await seedClient.$disconnect();
 
   const session: SessionContext = {

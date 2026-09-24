@@ -1,0 +1,3 @@
+export const WARMUP_SAMPLES = 20;
+export const MEASURED_SAMPLES = 200;
+export const TOTAL_SAMPLES = WARMUP_SAMPLES + MEASURED_SAMPLES;

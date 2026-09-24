@@ -1,4 +1,6 @@
 import type { PrismaClient } from '../../generated/prisma/client';
+import { assertLocalBenchUrl } from './lib/assert-local-bench-url';
+import { TOTAL_SAMPLES } from './lib/sample-size';
 
 const BENCH_ORG_SLUG = 'review-inbox-bench';
 const BENCH_ORG_NAME = 'Review Inbox Bench Org';
@@ -10,7 +12,7 @@ const CASE_COUNT = 1_500;
 const IN_REVIEW_COUNT = 1_000;
 const DECIDED_COUNT = 2_000;
 const CREATE_MANY_CHUNK = 500;
-const APPROVE_SAMPLE_SIZE = 220;
+const APPROVE_SAMPLE_SIZE = TOTAL_SAMPLES;
 
 export interface BenchSeedResult {
   organizationId: string;
@@ -30,7 +32,10 @@ async function chunkedCreateMany<T>(
 
 export async function seedReviewInboxBench(
   prisma: PrismaClient,
+  databaseUrl: string,
 ): Promise<BenchSeedResult> {
+  assertLocalBenchUrl(databaseUrl);
+
   await prisma.organization.deleteMany({ where: { slug: BENCH_ORG_SLUG } });
 
   const organization = await prisma.organization.create({
