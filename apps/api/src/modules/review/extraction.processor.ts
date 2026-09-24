@@ -24,7 +24,6 @@ import type {
 import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
-import { isSourceUnavailableReason } from '../repository/lib/source-unavailable-reason';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
 import { detectLanguage } from './lib/detect-language';
@@ -55,8 +54,8 @@ import {
   type SharedProposalFields,
   type TxClient,
 } from './extraction.types';
+import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 
-const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
 const MAX_CASE_OBSERVATIONS = 5;
 const HEAD_REF = 'HEAD';
 const NOT_ENTITLED_REASON = 'ai-not-enabled';
@@ -196,6 +195,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly entitlement: AiEntitlementService,
     private readonly dailyBudget: AiDailyBudget,
     private readonly testFileLocator: TestFileLocator,
+    private readonly failureRecorder: ExtractionFailureRecorder,
   ) {
     super();
   }
@@ -675,7 +675,11 @@ export class ExtractionProcessor extends WorkerHost {
       this.logger.error(
         `Document-file extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
       );
-      await this.fallbackForTargets(ctx, ctx.targets, EXTRACTION_FAILED_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        EXTRACTION_FAILED_REASON,
+      );
     }
   }
 
@@ -683,13 +687,21 @@ export class ExtractionProcessor extends WorkerHost {
     ctx: DocumentFileJobContext,
   ): Promise<void> {
     if (ctx.connection === null) {
-      await this.fallbackForTargets(ctx, ctx.targets, 'no-connection');
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        'no-connection',
+      );
       return;
     }
 
     const entitled = await this.entitlement.isEntitled(ctx.organizationId);
     if (!entitled) {
-      await this.fallbackForTargets(ctx, ctx.targets, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        NOT_ENTITLED_REASON,
+      );
       return;
     }
 
@@ -709,7 +721,11 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     if (source.kind === 'unavailable') {
-      await this.fallbackForTargets(ctx, ctx.targets, source.reason);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        source.reason,
+      );
       return;
     }
 
@@ -722,7 +738,11 @@ export class ExtractionProcessor extends WorkerHost {
       ? await this.dailyBudget.tryConsume(NOT_BYOK)
       : true;
     if (!withinBudget) {
-      await this.fallbackForTargets(ctx, ctx.targets, QUOTA_EXHAUSTED_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        QUOTA_EXHAUSTED_REASON,
+      );
       return;
     }
 
@@ -747,7 +767,11 @@ export class ExtractionProcessor extends WorkerHost {
       if (outcome.retryable && !ctx.isFinalAttempt) {
         throw new RetryableProviderError(outcome.reason);
       }
-      await this.fallbackForTargets(ctx, ctx.targets, outcome.reason);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        outcome.reason,
+      );
       return;
     }
 
@@ -755,7 +779,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
         return;
       }
-      await this.fallbackForTargets(
+      await this.failureRecorder.recordForTargets(
         ctx,
         ctx.targets,
         incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
@@ -805,7 +829,11 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
         return;
       }
-      await this.fallbackForTargets(ctx, unmatched, NO_MATCHING_CASE_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        unmatched,
+        NO_MATCHING_CASE_REASON,
+      );
       return;
     }
 
@@ -821,12 +849,20 @@ export class ExtractionProcessor extends WorkerHost {
       outcome.suite,
     );
     if (!persisted) {
-      await this.fallbackForTargets(ctx, ctx.targets, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        ctx.targets,
+        NOT_ENTITLED_REASON,
+      );
       return;
     }
 
     if (unmatched.length > 0) {
-      await this.fallbackForTargets(ctx, unmatched, NO_MATCHING_CASE_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        unmatched,
+        NO_MATCHING_CASE_REASON,
+      );
     }
   }
 
@@ -936,7 +972,11 @@ export class ExtractionProcessor extends WorkerHost {
   ): Promise<boolean> {
     const spent = await this.entitlement.spendCredit(ctx.organizationId);
     if (!spent) {
-      await this.fallbackForTargets(ctx, targets, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordForTargets(
+        ctx,
+        targets,
+        NOT_ENTITLED_REASON,
+      );
     }
     return spent;
   }
@@ -1139,53 +1179,6 @@ export class ExtractionProcessor extends WorkerHost {
     }
   }
 
-  private async fallbackForTargets(
-    ctx: DocumentFileJobContext,
-    targets: readonly DocumentFileTarget[],
-    reason: string,
-    observations?: string[],
-  ): Promise<void> {
-    if (targets.length > 0) {
-      const failedState: DocumentationStateWrite = {
-        documentationOutcome: 'failed',
-        documentationSkipReason: reason,
-        documentationOutcomeAt: new Date(),
-        documentationQueuedAt: null,
-      };
-
-      await this.prisma.testCase.updateMany({
-        where: {
-          id: { in: targets.map((target) => target.testCaseId) },
-          documentationSource: { not: HUMAN_DOCUMENTATION_SOURCE },
-          documentationQueuedAt: { not: null },
-        },
-        data: failedState,
-      });
-    }
-
-    for (const target of targets) {
-      await this.persistManualReviewFallback(
-        {
-          projectId: ctx.projectId,
-          organizationId: ctx.organizationId,
-          filePath: ctx.filePath,
-          ref: ctx.ref,
-          connection: ctx.connection,
-          codeChangeId: null,
-          targetTestCaseId: target.testCaseId,
-          knownSuiteId: null,
-          onlyAutomationKey: target.automationKey,
-          fallbackEvidenceId: null,
-          locale: ctx.locale,
-          isFinalAttempt: ctx.isFinalAttempt,
-          isFirstAttempt: ctx.isFirstAttempt,
-        },
-        reason,
-        observations,
-      );
-    }
-  }
-
   private async runExtraction(ctx: JobContext): Promise<void> {
     try {
       await this.runExtractionUnsafe(ctx);
@@ -1195,19 +1188,19 @@ export class ExtractionProcessor extends WorkerHost {
       this.logger.error(
         `Extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
       );
-      await this.persistManualReviewFallback(ctx, EXTRACTION_FAILED_REASON);
+      await this.failureRecorder.recordForJob(ctx, EXTRACTION_FAILED_REASON);
     }
   }
 
   private async runExtractionUnsafe(ctx: JobContext): Promise<void> {
     if (ctx.connection === null) {
-      await this.persistManualReviewFallback(ctx, 'no-connection');
+      await this.failureRecorder.recordForJob(ctx, 'no-connection');
       return;
     }
 
     const entitled = await this.entitlement.isEntitled(ctx.organizationId);
     if (!entitled) {
-      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordForJob(ctx, NOT_ENTITLED_REASON);
       return;
     }
 
@@ -1227,7 +1220,7 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     if (source.kind === 'unavailable') {
-      await this.persistManualReviewFallback(ctx, source.reason);
+      await this.failureRecorder.recordForJob(ctx, source.reason);
       return;
     }
 
@@ -1237,7 +1230,7 @@ export class ExtractionProcessor extends WorkerHost {
       ? await this.dailyBudget.tryConsume(NOT_BYOK)
       : true;
     if (!withinBudget) {
-      await this.persistManualReviewFallback(ctx, QUOTA_EXHAUSTED_REASON);
+      await this.failureRecorder.recordForJob(ctx, QUOTA_EXHAUSTED_REASON);
       return;
     }
 
@@ -1261,7 +1254,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (outcome.retryable && !ctx.isFinalAttempt) {
         throw new RetryableProviderError(outcome.reason);
       }
-      await this.persistManualReviewFallback(ctx, outcome.reason);
+      await this.failureRecorder.recordForJob(ctx, outcome.reason);
       return;
     }
 
@@ -1269,7 +1262,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallback(ctx))) return;
 
       if (ctx.targetTestCaseId !== null) {
-        await this.persistManualReviewFallback(
+        await this.failureRecorder.recordForJob(
           ctx,
           incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
           incomplete
@@ -1304,7 +1297,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallback(ctx))) return;
 
       if (ctx.targetTestCaseId !== null) {
-        await this.persistManualReviewFallback(ctx, NO_MATCHING_CASE_REASON);
+        await this.failureRecorder.recordForJob(ctx, NO_MATCHING_CASE_REASON);
         return;
       }
       this.logger.log(
@@ -1315,14 +1308,14 @@ export class ExtractionProcessor extends WorkerHost {
 
     const persisted = await this.persistExtracted(cases, ctx);
     if (!persisted) {
-      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordForJob(ctx, NOT_ENTITLED_REASON);
     }
   }
 
   private async spendCreditOrFallback(ctx: JobContext): Promise<boolean> {
     const spent = await this.entitlement.spendCredit(ctx.organizationId);
     if (!spent) {
-      await this.persistManualReviewFallback(ctx, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordForJob(ctx, NOT_ENTITLED_REASON);
     }
     return spent;
   }
@@ -1616,102 +1609,5 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     return defaultSuite?.id ?? null;
-  }
-
-  private async persistManualReviewFallback(
-    ctx: JobContext,
-    reason: string,
-    observations?: string[],
-  ): Promise<void> {
-    if (isSourceUnavailableReason(reason)) {
-      if (ctx.targetTestCaseId !== null) {
-        const failedState: DocumentationStateWrite = {
-          documentationOutcome: 'failed',
-          documentationSkipReason: reason,
-          documentationOutcomeAt: new Date(),
-          documentationQueuedAt: null,
-        };
-
-        await this.prisma.testCase.updateMany({
-          where: {
-            id: ctx.targetTestCaseId,
-            documentationSource: { not: HUMAN_DOCUMENTATION_SOURCE },
-            documentationQueuedAt: { not: null },
-          },
-          data: failedState,
-        });
-      }
-
-      this.logger.log(
-        `Skipping manual-review fallback for ${ctx.filePath}: source unavailable (${reason})`,
-      );
-      return;
-    }
-
-    const existing =
-      ctx.codeChangeId !== null
-        ? await this.prisma.extractedProposal.findFirst({
-            where: { codeChangeId: ctx.codeChangeId, automationKey: null },
-            select: { id: true },
-          })
-        : await this.prisma.extractedProposal.findFirst({
-            where: {
-              targetTestCaseId: ctx.targetTestCaseId,
-              status: 'in_review',
-            },
-            select: { id: true },
-          });
-
-    if (existing !== null) {
-      this.logger.log(
-        `Manual-review fallback already pending for ${ctx.filePath}`,
-      );
-      return;
-    }
-
-    const evidenceId =
-      ctx.fallbackEvidenceId ?? (await this.createFallbackEvidence(ctx));
-
-    await this.prisma.extractedProposal.create({
-      data: {
-        projectId: ctx.projectId,
-        evidenceId,
-        codeChangeId: ctx.codeChangeId,
-        targetTestCaseId: ctx.targetTestCaseId,
-        status: 'in_review',
-        title: ctx.filePath,
-        objective: reason.slice(0, MAX_FALLBACK_OBJECTIVE_LENGTH),
-        needsManualReview: true,
-        promptVersion: EXTRACTION_PROMPT_VERSION,
-        locale: ctx.locale ?? null,
-        ...(observations === undefined || observations.length === 0
-          ? {}
-          : { observations }),
-      },
-    });
-  }
-
-  private async createFallbackEvidence(ctx: JobContext): Promise<string> {
-    const uri =
-      ctx.connection === null
-        ? ctx.filePath
-        : buildBlobUrl(
-            ctx.connection.provider,
-            ctx.connection.repo,
-            ctx.ref,
-            ctx.filePath,
-          );
-
-    const evidence = await this.prisma.evidence.create({
-      data: {
-        projectId: ctx.projectId,
-        kind: 'SOURCE_EXCERPT',
-        title: ctx.filePath,
-        uri,
-      },
-      select: { id: true },
-    });
-
-    return evidence.id;
   }
 }

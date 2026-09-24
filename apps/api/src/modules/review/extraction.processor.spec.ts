@@ -6,6 +6,7 @@ import type { SourceReader } from '../repository/source-reader';
 import type { TestFileLocator } from '../repository/test-file-locator';
 import type { TestCaseExtractor } from '../ai/extraction.contracts';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
+import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractionProcessor } from './extraction.processor';
 
 function extractedCase(overrides: Record<string, unknown> = {}) {
@@ -174,6 +175,7 @@ function build(
     entitlement,
     dailyBudget,
     testFileLocator,
+    new ExtractionFailureRecorder(prisma as never),
   );
 }
 

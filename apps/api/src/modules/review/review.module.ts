@@ -8,6 +8,7 @@ import { AiModule } from '../ai/ai.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { SourceReader } from '../repository/source-reader';
 import { TestFileLocator } from '../repository/test-file-locator';
+import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractionProcessor } from './extraction.processor';
 import { ExtractionService } from './extraction.service';
 import { EXTRACTION_QUEUE } from './review.contracts';
@@ -42,6 +43,7 @@ import { ReviewDecisionService } from './review-decision.service';
     ReviewDecisionService,
     ExtractionService,
     ExtractionProcessor,
+    ExtractionFailureRecorder,
     EncryptionService,
     SourceReader,
     TestFileLocator,
