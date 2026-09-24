@@ -34,6 +34,7 @@ interface FakePrisma {
     findFirst: jest.Mock;
     findMany: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
   suite: { findFirst: jest.Mock; update: jest.Mock };
   testCase: { create: jest.Mock; update: jest.Mock; findMany: jest.Mock };
@@ -49,6 +50,7 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
       findFirst: jest.fn().mockResolvedValue({ ...proposalRow, ...overrides }),
       findMany: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({ id: 'proposal-1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     suite: {
       findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
@@ -533,6 +535,34 @@ describe('ReviewService.approve', () => {
     expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
+
+  it('claims the proposal atomically, conditioned on it still being in_review, before publishing', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
+      data: { status: 'approved' },
+    });
+    const [claimOrder] =
+      prisma.extractedProposal.updateMany.mock.invocationCallOrder;
+    const [createOrder] = prisma.testCase.create.mock.invocationCallOrder;
+    expect(claimOrder).toBeLessThan(createOrder);
+  });
+
+  it('returns invalid-transition and publishes nothing when a concurrent decision wins the claim', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'invalid-transition' });
+    expect(prisma.testCase.create).not.toHaveBeenCalled();
+    expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReviewService.reject', () => {
@@ -554,10 +584,34 @@ describe('ReviewService.reject', () => {
       action: 'rejected',
       comment: 'Evidence does not support the steps',
     });
-    expect(prisma.extractedProposal.update).toHaveBeenCalledWith({
-      where: { id: 'proposal-1' },
+    expect(prisma.extractedProposal.updateMany).toHaveBeenCalledWith({
+      where: { id: 'proposal-1', status: 'in_review' },
       data: { status: 'rejected' },
     });
+  });
+
+  it('claims the proposal atomically, conditioned on it still being in_review, before recording the rejection', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).reject(org, 'proposal-1', { actorId: 'user-1' });
+
+    const [claimOrder] =
+      prisma.extractedProposal.updateMany.mock.invocationCallOrder;
+    const [decisionOrder] =
+      prisma.reviewDecision.create.mock.invocationCallOrder;
+    expect(claimOrder).toBeLessThan(decisionOrder);
+  });
+
+  it('returns invalid-transition and records no decision when a concurrent decision wins the claim', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await build(prisma).reject(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'invalid-transition' });
+    expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
 
   it('still rejects a proposal that documents no steps', async () => {

@@ -64,6 +64,7 @@ describe('Review (e2e)', () => {
       findMany: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     suite: { findFirst: jest.fn() },
     testCase: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
@@ -87,6 +88,7 @@ describe('Review (e2e)', () => {
     prisma.extractedProposal.findMany.mockResolvedValue([proposalRow]);
     prisma.extractedProposal.findFirst.mockResolvedValue(proposalRow);
     prisma.extractedProposal.update.mockResolvedValue({ id: 'proposal-1' });
+    prisma.extractedProposal.updateMany.mockResolvedValue({ count: 1 });
     prisma.suite.findFirst.mockResolvedValue({ id: 'suite-1' });
     prisma.testCase.create.mockResolvedValue({ id: 'case-new' });
     prisma.testCase.update.mockResolvedValue({ id: 'case-new' });

@@ -22,6 +22,12 @@ import { publishTestCaseVersion } from './lib/publish-test-case-version';
 const PENDING_STATUS = 'in_review';
 const UNIQUE_VIOLATION = 'P2002';
 
+class DecisionConflict extends Error {
+  constructor() {
+    super('proposal is no longer in_review');
+  }
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return (
     typeof error === 'object' &&
@@ -453,6 +459,7 @@ export class ReviewService {
       return ok(await this.publish(proposal.value, suiteId, input));
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
+      if (error instanceof DecisionConflict) return err('invalid-transition');
       throw error;
     }
   }
@@ -466,26 +473,32 @@ export class ReviewService {
 
     if (!proposal.ok) return proposal;
 
-    const decisionId = await this.prisma.$transaction(async (tx) => {
-      const decision = await tx.reviewDecision.create({
-        data: {
-          proposalId: proposal.value.id,
-          actorId: input.actorId,
-          action: 'rejected',
-          ...(input.comment === undefined ? {} : { comment: input.comment }),
-        },
-        select: { id: true },
+    try {
+      const decisionId = await this.prisma.$transaction(async (tx) => {
+        const claim = await tx.extractedProposal.updateMany({
+          where: { id: proposal.value.id, status: PENDING_STATUS },
+          data: { status: 'rejected' },
+        });
+        if (claim.count === 0) throw new DecisionConflict();
+
+        const decision = await tx.reviewDecision.create({
+          data: {
+            proposalId: proposal.value.id,
+            actorId: input.actorId,
+            action: 'rejected',
+            ...(input.comment === undefined ? {} : { comment: input.comment }),
+          },
+          select: { id: true },
+        });
+
+        return decision.id;
       });
 
-      await tx.extractedProposal.update({
-        where: { id: proposal.value.id },
-        data: { status: 'rejected' },
-      });
-
-      return decision.id;
-    });
-
-    return ok({ decisionId });
+      return ok({ decisionId });
+    } catch (error) {
+      if (error instanceof DecisionConflict) return err('invalid-transition');
+      throw error;
+    }
   }
 
   async approveMany(
@@ -560,6 +573,12 @@ export class ReviewService {
     input: DecisionInput,
   ): Promise<ApprovalView> {
     return this.prisma.$transaction(async (tx) => {
+      const claim = await tx.extractedProposal.updateMany({
+        where: { id: proposal.id, status: PENDING_STATUS },
+        data: { status: 'approved' },
+      });
+      if (claim.count === 0) throw new DecisionConflict();
+
       const createdNewCase = proposal.targetTestCaseId === null;
       const automationFields = automationFieldsFor(proposal);
       const testCaseId = createdNewCase
@@ -625,11 +644,6 @@ export class ReviewService {
           ...(input.comment === undefined ? {} : { comment: input.comment }),
         },
         select: { id: true },
-      });
-
-      await tx.extractedProposal.update({
-        where: { id: proposal.id },
-        data: { status: 'approved' },
       });
 
       return {
