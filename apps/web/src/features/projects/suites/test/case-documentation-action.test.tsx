@@ -60,6 +60,23 @@ describe('CaseDocumentationAction', () => {
     expect(screen.getByText(/daily aeris documentation limit|límite diario/i)).toBeInTheDocument()
   })
 
+  it('shows plain-language copy for a source-unavailable reason, never the raw code', async () => {
+    await act(async () => {
+      renderAction({
+        documentation: {
+          outcome: 'failed',
+          missing: [],
+          skipReason: 'http-404',
+          queuedAt: null,
+          outcomeAt: '2026-03-01T00:00:00Z',
+        },
+      })
+    })
+
+    expect(screen.queryByText('http-404')).not.toBeInTheDocument()
+    expect(screen.getByText(/file could not be found|no se pudo encontrar/i)).toBeInTheDocument()
+  })
+
   it('triggers a new Aeris attempt when the inline action is clicked after a failure', async () => {
     const user = userEvent.setup()
     const documentCase = vi.spyOn(suitesApi, 'documentCase')
@@ -81,7 +98,7 @@ describe('CaseDocumentationAction', () => {
     expect(documentCase).toHaveBeenCalledWith('suite-1', 'tc-9')
   })
 
-  it('falls back to the raw code for an unrecognized skip reason instead of hiding the action', async () => {
+  it('shows a generic reason, never the raw code, for an unrecognized skip reason', async () => {
     await act(async () => {
       renderAction({
         documentation: {
@@ -97,7 +114,10 @@ describe('CaseDocumentationAction', () => {
     expect(
       screen.getByRole('button', { name: /document again with aeris/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText(/a-reason-nobody-mapped-yet/)).toBeInTheDocument()
+    expect(screen.queryByText(/a-reason-nobody-mapped-yet/)).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/extraction failed for a reason|falló por un motivo/i),
+    ).toBeInTheDocument()
   })
 
   it('still shows the in-review link when a proposal is pending and nothing has failed', async () => {

@@ -54,9 +54,7 @@ export function CaseDocumentationAction({
       const reasonText =
         reasonCode === null
           ? null
-          : reasonKey === null
-            ? t('reviewInbox.manualReviewReasonUnknown', { reason: reasonCode })
-            : t(`reviewInbox.${reasonKey}`)
+          : t(`reviewInbox.${reasonKey ?? 'manualReviewReasonUnknown'}`)
 
       return (
         <div className="inline-flex flex-wrap items-center gap-1.5">

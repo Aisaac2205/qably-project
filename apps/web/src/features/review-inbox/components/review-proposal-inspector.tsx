@@ -171,11 +171,7 @@ export function ReviewProposalInspector({
               {t('reviewInbox.manualReviewTitle')}
             </h4>
             <p className="text-sm text-default leading-relaxed">
-              {manualReviewReason === null
-                ? t('reviewInbox.manualReviewReasonUnknown', {
-                    reason: proposal.objective,
-                  })
-                : t(`reviewInbox.${manualReviewReason}`)}
+              {t(`reviewInbox.${manualReviewReason ?? 'manualReviewReasonUnknown'}`)}
             </p>
             <p className="text-xs text-muted leading-relaxed">
               {t('reviewInbox.manualReviewHint')}

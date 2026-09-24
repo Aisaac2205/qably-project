@@ -97,7 +97,7 @@ describe('ReviewProposalInspector', () => {
     expect(screen.queryByText('invalid-credentials')).not.toBeInTheDocument()
   })
 
-  it('shows the raw reason only when the extraction reported something truly untranslated', () => {
+  it('shows a generic reason, never the raw code, when the extraction reported something untranslated', () => {
     renderInspector(
       proposal({
         needsManualReview: true,
@@ -107,7 +107,10 @@ describe('ReviewProposalInspector', () => {
       }),
     )
 
-    expect(screen.getByText(/some-future-code-nobody-mapped-yet/)).toBeInTheDocument()
+    expect(screen.queryByText(/some-future-code-nobody-mapped-yet/)).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/extraction failed for a reason|falló por un motivo/i),
+    ).toBeInTheDocument()
   })
 
   it('refuses to offer publication for a proposal with nothing to publish', () => {

@@ -24,9 +24,7 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
   const manualReviewReason = needsManualReview ? extractionFailureReasonKey(proposal.objective) : null
   const subtitle = !needsManualReview
     ? proposal.objective
-    : manualReviewReason === null
-      ? t('reviewInbox.manualReviewReasonUnknown', { reason: proposal.objective })
-      : t(`reviewInbox.${manualReviewReason}`)
+    : t(`reviewInbox.${manualReviewReason ?? 'manualReviewReasonUnknown'}`)
 
   const formattedDate = proposal.createdAt
     ? new Date(proposal.createdAt).toLocaleDateString(undefined, {
