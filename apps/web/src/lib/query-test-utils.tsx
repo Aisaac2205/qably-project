@@ -261,14 +261,10 @@ function seedDuplicates(client: QueryClient): void {
   }
 }
 
-export interface TestQueryClientOptions {
-  staleTime?: number
-}
-
-export function createTestQueryClient(options: TestQueryClientOptions = {}): QueryClient {
+export function createTestQueryClient(): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false, gcTime: Infinity, staleTime: options.staleTime ?? 0 },
+      queries: { retry: false, gcTime: Infinity, staleTime: 0 },
       mutations: { retry: false },
     },
   })
@@ -290,21 +286,12 @@ export function createTestQueryClient(options: TestQueryClientOptions = {}): Que
   return client
 }
 
-export function withQueryClient(
-  children: ReactNode,
-  queryClientOptions?: TestQueryClientOptions,
-): ReactElement {
+export function withQueryClient(children: ReactNode): ReactElement {
   return (
-    <QueryClientProvider client={createTestQueryClient(queryClientOptions)}>
-      {children}
-    </QueryClientProvider>
+    <QueryClientProvider client={createTestQueryClient()}>{children}</QueryClientProvider>
   )
 }
 
-export function renderWithQuery(
-  ui: ReactElement,
-  options?: RenderOptions & { queryClientOptions?: TestQueryClientOptions },
-): RenderResult {
-  const { queryClientOptions, ...renderOptions } = options ?? {}
-  return render(withQueryClient(ui, queryClientOptions), renderOptions)
+export function renderWithQuery(ui: ReactElement, options?: RenderOptions): RenderResult {
+  return render(withQueryClient(ui), options)
 }
