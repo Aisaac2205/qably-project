@@ -43,7 +43,6 @@ function jobContext(overrides: Partial<JobContext> = {}): JobContext {
     targetTestCaseId: 'case-1',
     knownSuiteId: null,
     onlyAutomationKey: null,
-    fallbackEvidenceId: null,
     locale: undefined,
     isFinalAttempt: true,
     isFirstAttempt: true,

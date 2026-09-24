@@ -27,7 +27,6 @@ export interface JobContext {
   targetTestCaseId: string | null;
   knownSuiteId: string | null;
   onlyAutomationKey: string | null;
-  fallbackEvidenceId: string | null;
   locale: string | undefined;
   isFinalAttempt: boolean;
   isFirstAttempt: boolean;
