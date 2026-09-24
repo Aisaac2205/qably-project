@@ -31,6 +31,12 @@ export interface ProposalClassification {
 
 const POSSIBLE_DUPLICATE_THRESHOLD = 0.6;
 
+function normalizeAutomationKey(key: string | null): string | null {
+  if (key === null) return null;
+  const trimmed = key.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
 interface ScoredCandidate {
   candidate: ClassifyProposalCandidate;
   score: number;
@@ -56,11 +62,14 @@ export function classifyProposal(
     (candidate) => candidate.suiteId === effectiveSuiteId,
   );
 
+  const proposalKey = normalizeAutomationKey(proposal.automationKey);
+
   const exactKeyMatch =
-    proposal.automationKey === null
+    proposalKey === null
       ? null
       : (inSuite.find(
-          (candidate) => candidate.automationKey === proposal.automationKey,
+          (candidate) =>
+            normalizeAutomationKey(candidate.automationKey) === proposalKey,
         ) ?? null);
 
   let base: ProposalClassification;
@@ -94,11 +103,11 @@ export function classifyProposal(
   }
 
   const hasCrossSuiteKeyMatch =
-    proposal.automationKey !== null &&
+    proposalKey !== null &&
     candidates.some(
       (candidate) =>
         candidate.suiteId !== effectiveSuiteId &&
-        candidate.automationKey === proposal.automationKey,
+        normalizeAutomationKey(candidate.automationKey) === proposalKey,
     );
 
   return hasCrossSuiteKeyMatch

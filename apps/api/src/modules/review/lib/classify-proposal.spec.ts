@@ -306,6 +306,57 @@ describe('classifyProposal', () => {
     expect(reversed.matchedCaseId).toBe('case-aaa');
   });
 
+  it('treats an empty-string automation key on the proposal the same as null, never matching update', () => {
+    const target = proposal({ suiteId: 'suite-cart', automationKey: '' });
+    const emptyKeyCase = candidate({
+      id: 'case-empty-key',
+      suiteId: 'suite-cart',
+      automationKey: '',
+      title: 'Zebra quokka umbrella',
+      steps: ['Xylophone yak zeppelin'],
+      expectedResult: 'Wombat narwhal',
+    });
+
+    const result = classifyProposal(target, [emptyKeyCase], DEFAULT_SUITE_ID);
+
+    expect(result.kind).toBe('none');
+    expect(result.matchedCaseId).toBeNull();
+  });
+
+  it('treats a whitespace-only automation key on the proposal the same as null, never matching update', () => {
+    const target = proposal({ suiteId: 'suite-cart', automationKey: '   ' });
+    const whitespaceKeyCase = candidate({
+      id: 'case-whitespace-key',
+      suiteId: 'suite-cart',
+      automationKey: '   ',
+      title: 'Zebra quokka umbrella',
+      steps: ['Xylophone yak zeppelin'],
+      expectedResult: 'Wombat narwhal',
+    });
+
+    const result = classifyProposal(
+      target,
+      [whitespaceKeyCase],
+      DEFAULT_SUITE_ID,
+    );
+
+    expect(result.kind).toBe('none');
+    expect(result.matchedCaseId).toBeNull();
+  });
+
+  it('never adds cross-suite-key when the proposal automation key is empty or whitespace-only', () => {
+    const target = proposal({ suiteId: 'suite-cart', automationKey: '  ' });
+    const otherSuiteCase = candidate({
+      id: 'case-other-suite',
+      suiteId: 'suite-checkout',
+      automationKey: '  ',
+    });
+
+    const result = classifyProposal(target, [otherSuiteCase], DEFAULT_SUITE_ID);
+
+    expect(result.reasons).not.toContain('cross-suite-key');
+  });
+
   it('ignores candidates in a different suite when scoring possible_duplicate', () => {
     const target = proposal({
       suiteId: 'suite-cart',
