@@ -144,6 +144,9 @@ export interface PricingTranslations {
   creditsFeature: string;
   teamReviewFeature: string;
   sharedFeatures: string[];
+  notificationsFeature: string;
+  byokFeature: string;
+  planUpgradeNote: string;
   tiers: {
     gratuito: PricingTierCopy;
     equipo: PricingTierCopy;

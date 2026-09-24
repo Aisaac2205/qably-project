@@ -30,4 +30,9 @@ describe('PricingSection has no monthly/annual toggle, no fabricated price, no c
     expect(anchorMatches).toHaveLength(1);
     expect(source).toMatch(/PRICING_TIERS\.map/);
   });
+
+  it('shows the plan-upgrade note only for tiers other than gratuito', () => {
+    expect(source).toMatch(/tier\.id\s*!==\s*'gratuito'/);
+    expect(source).toMatch(/planUpgradeNote/);
+  });
 });

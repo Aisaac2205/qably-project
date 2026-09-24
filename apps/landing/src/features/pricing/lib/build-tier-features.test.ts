@@ -38,4 +38,26 @@ describe('buildTierFeatures', () => {
     expect(features.slice(limitCount + 1)).toEqual(es.pricing.sharedFeatures);
     expect(features).toHaveLength(limitCount + 1 + es.pricing.sharedFeatures.length);
   });
+
+  it('never lists notification integrations for a tier without the capability', () => {
+    expect(gratuito.notificationIntegrations).toBe(false);
+    expect(buildTierFeatures(gratuito, es.pricing)).not.toContain(
+      es.pricing.notificationsFeature,
+    );
+  });
+
+  it('lists notification integrations for tiers with the capability', () => {
+    expect(buildTierFeatures(equipo, es.pricing)).toContain(
+      es.pricing.notificationsFeature,
+    );
+    expect(buildTierFeatures(empresa, es.pricing)).toContain(
+      es.pricing.notificationsFeature,
+    );
+  });
+
+  it('lists the bring-your-own-model feature only for empresa', () => {
+    expect(buildTierFeatures(empresa, es.pricing)).toContain(es.pricing.byokFeature);
+    expect(buildTierFeatures(gratuito, es.pricing)).not.toContain(es.pricing.byokFeature);
+    expect(buildTierFeatures(equipo, es.pricing)).not.toContain(es.pricing.byokFeature);
+  });
 });

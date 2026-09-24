@@ -15,11 +15,16 @@ function buildProjectsFeature(tier: PricingTier, t: PricingTranslations): string
 }
 
 export function buildTierFeatures(tier: PricingTier, t: PricingTranslations): string[] {
-  return [
+  const features = [
     fill(t.membersFeature, { count: tier.members }),
     buildProjectsFeature(tier, t),
     fill(t.creditsFeature, { count: tier.monthlyAiCredits }),
     t.teamReviewFeature,
     ...t.sharedFeatures,
   ];
+
+  if (tier.notificationIntegrations) features.push(t.notificationsFeature);
+  if (tier.id === 'empresa') features.push(t.byokFeature);
+
+  return features;
 }

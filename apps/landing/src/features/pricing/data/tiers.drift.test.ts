@@ -18,6 +18,12 @@ describe('landing pricing tiers match @qably/types PLAN_LIMITS', () => {
     expect(tier.monthlyAiCredits).toBe(limits.monthlyAiCredits);
   });
 
+  it.each(PRICING_TIERS)('$id notificationIntegrations matches PLAN_LIMITS', (tier) => {
+    const limits = PLAN_LIMITS[tier.id];
+
+    expect(tier.notificationIntegrations).toBe(limits.notificationIntegrations);
+  });
+
   it('prices are fixed monthly USD amounts, none are null', () => {
     for (const tier of PRICING_TIERS) {
       expect(typeof tier.monthlyPriceUsd).toBe('number');

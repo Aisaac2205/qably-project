@@ -132,12 +132,13 @@ export const es: Dictionary = {
       'Ingesta de reportes JUnit desde GitHub Actions y Bitbucket Pipelines',
       'Trazabilidad bidireccional entre commits y casos de prueba',
       'Detección de casos inestables (flaky) y salud de casos',
-      'Notificaciones por Slack y webhooks',
       'Claves de API para tu integración de CI',
       'Aeris extrae casos de prueba y responde preguntas en el chat del proyecto',
       'Panel con tasa de aprobación y actividad reciente',
-      'Interfaz en español e inglés',
     ],
+    notificationsFeature: 'Notificaciones por Slack, Discord y webhooks',
+    byokFeature: 'Modelos de IA propios (próximamente)',
+    planUpgradeNote: 'Las cuentas comienzan en el plan Gratuito. Los cambios de plan estarán disponibles próximamente.',
     tiers: {
       gratuito: {
         name: 'Gratuito',
@@ -147,12 +148,12 @@ export const es: Dictionary = {
       equipo: {
         name: 'Equipo',
         description: 'Para equipos de producto e ingeniería que ya integraron su CI.',
-        cta: 'Elegir Equipo',
+        cta: 'Comenzar gratis',
       },
       empresa: {
         name: 'Empresa',
         description: 'Para organizaciones con varios equipos y proyectos en simultáneo.',
-        cta: 'Elegir Empresa',
+        cta: 'Comenzar gratis',
       },
     },
   },

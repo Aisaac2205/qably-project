@@ -84,6 +84,10 @@ export function PricingSection({ t }: PricingSectionProps) {
               >
                 {copy.cta}
               </a>
+
+              {tier.id !== 'gratuito' ? (
+                <p className="mt-3 text-center text-[11px] text-zinc-500">{t.planUpgradeNote}</p>
+              ) : null}
             </div>
           );
         })}
