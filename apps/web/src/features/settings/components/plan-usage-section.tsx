@@ -22,15 +22,20 @@ const PLAN_ICONS: Record<Plan, typeof Briefcase> = {
   empresa: Buildings,
 }
 
-const FEATURE_KEYS = [
+const BASE_FEATURE_KEYS = [
   'settings.planUsage.featureJunitIngestion',
   'settings.planUsage.featureTraceability',
   'settings.planUsage.featureCaseHealth',
-  'settings.planUsage.featureNotifications',
   'settings.planUsage.featureCiKeys',
   'settings.planUsage.featureAeris',
   'settings.planUsage.featureDashboard',
 ] as const
+
+function includedFeatureKeys(notificationIntegrations: boolean): readonly string[] {
+  return notificationIntegrations
+    ? [...BASE_FEATURE_KEYS, 'settings.planUsage.featureNotifications']
+    : BASE_FEATURE_KEYS
+}
 
 type Translate = (key: string, vars?: Record<string, string | number>) => string
 
@@ -160,7 +165,7 @@ export function PlanUsageSection() {
             {t('settings.planUsage.includedFeaturesTitle')}
           </h3>
           <ul className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {FEATURE_KEYS.map((key) => (
+            {includedFeatureKeys(usage.limits.notificationIntegrations).map((key) => (
               <li key={key} className="flex items-start gap-2 text-xs text-default">
                 <CheckCircle size={14} weight="fill" className="text-pass shrink-0 mt-0.5" aria-hidden="true" />
                 <span>{t(key)}</span>

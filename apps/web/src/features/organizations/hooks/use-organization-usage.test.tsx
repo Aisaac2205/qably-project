@@ -17,7 +17,12 @@ function wrapper({ children }: { children: ReactNode }) {
 
 const usage: OrganizationUsageRecord = {
   plan: 'equipo',
-  limits: { members: 10, projects: 5, monthlyAiCredits: 300 },
+  limits: {
+    members: 10,
+    projects: 5,
+    monthlyAiCredits: 300,
+    notificationIntegrations: true,
+  },
   members: 2,
   pendingInvites: 1,
   projects: 3,

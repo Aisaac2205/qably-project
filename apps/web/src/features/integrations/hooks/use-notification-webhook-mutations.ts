@@ -10,6 +10,16 @@ import {
   type UpdateNotificationWebhookPayload,
 } from '../api/notification-webhooks.api'
 import { notificationWebhookKeys } from '../lib/notification-webhook-keys'
+import { ApiError } from '@/lib/api-client'
+
+export type WebhookErrorCode = 'plan-limit-reached' | 'error'
+
+export function classifyWebhookError(error: unknown): WebhookErrorCode {
+  if (error instanceof ApiError && error.code === 'plan-limit-reached') {
+    return error.code
+  }
+  return 'error'
+}
 
 export function useCreateNotificationWebhook() {
   const queryClient = useQueryClient()

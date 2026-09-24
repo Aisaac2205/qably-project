@@ -11,16 +11,22 @@ import {
 } from '@/features/integrations/hooks/use-notification-webhook-mutations'
 import { useNotificationWebhooks } from '@/features/integrations/hooks/use-notification-webhooks'
 import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
+import { ApiError } from '@/lib/api-client'
 
 vi.mock('@/features/integrations/hooks/use-notification-webhooks', () => ({
   useNotificationWebhooks: vi.fn(),
 }))
-vi.mock('@/features/integrations/hooks/use-notification-webhook-mutations', () => ({
-  useCreateNotificationWebhook: vi.fn(),
-  useUpdateNotificationWebhook: vi.fn(),
-  useDeleteNotificationWebhook: vi.fn(),
-  useTestNotificationWebhook: vi.fn(),
-}))
+vi.mock('@/features/integrations/hooks/use-notification-webhook-mutations', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/features/integrations/hooks/use-notification-webhook-mutations')>()
+  return {
+    ...actual,
+    useCreateNotificationWebhook: vi.fn(),
+    useUpdateNotificationWebhook: vi.fn(),
+    useDeleteNotificationWebhook: vi.fn(),
+    useTestNotificationWebhook: vi.fn(),
+  }
+})
 vi.mock('@/features/organizations/hooks/use-current-organization', () => ({
   useCurrentOrganization: vi.fn(),
 }))
@@ -57,9 +63,9 @@ function setWebhooks(webhooks: NotificationWebhook[]) {
   })
 }
 
-function setRole(role: 'owner' | 'admin' | 'member') {
+function setRole(role: 'owner' | 'admin' | 'member', plan: 'gratuito' | 'equipo' | 'empresa' = 'equipo') {
   useCurrentOrganizationMock.mockReturnValue({
-    organization: { id: 'org-1', name: 'Acme', slug: 'acme', plan: 'equipo', role },
+    organization: { id: 'org-1', name: 'Acme', slug: 'acme', plan, role },
     isLoading: false,
     isError: false,
     error: undefined,
@@ -74,6 +80,7 @@ beforeEach(() => {
     mutate: createMutate,
     isPending: false,
     isError: false,
+    error: undefined,
   } as never)
   useUpdateNotificationWebhookMock.mockReturnValue({
     mutate: updateMutate,
@@ -190,5 +197,49 @@ describe('NotificationWebhooksPanel', () => {
     expect(optionLogo).not.toBeNull()
     expect(optionLogo?.closest('[class*="rounded-xl"]')).toBeNull()
     expect(optionLogo?.parentElement?.className).not.toMatch(/border|shadow|bg-surface/)
+  })
+
+  it('shows an inline plan explanation instead of the add action on the free plan', async () => {
+    setRole('owner', 'gratuito')
+    await act(async () => {
+      render(<NotificationWebhooksPanel />)
+    })
+
+    expect(screen.queryByRole('button', { name: 'Add channel' })).not.toBeInTheDocument()
+    expect(
+      screen.getByText('Notification channels are available on the Team and Enterprise plans.'),
+    ).toBeInTheDocument()
+  })
+
+  it('still lists existing webhooks on the free plan', async () => {
+    setRole('owner', 'gratuito')
+    setWebhooks([webhook])
+    await act(async () => {
+      render(<NotificationWebhooksPanel />)
+    })
+
+    expect(screen.getByText('Team alerts')).toBeInTheDocument()
+  })
+
+  it('maps a plan-limit-reached create error to the same plan explanation', async () => {
+    useCreateNotificationWebhookMock.mockReturnValue({
+      mutate: createMutate,
+      isPending: false,
+      isError: true,
+      error: new ApiError(403, 'nope', 'plan-limit-reached'),
+    } as never)
+    const user = userEvent.setup()
+    await act(async () => {
+      render(<NotificationWebhooksPanel />)
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Add channel' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(
+      within(dialog).getByText(
+        'Notification channels are available on the Team and Enterprise plans.',
+      ),
+    ).toBeInTheDocument()
   })
 })

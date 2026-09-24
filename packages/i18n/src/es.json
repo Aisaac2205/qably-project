@@ -1103,6 +1103,7 @@
       "creating": "Agregando…",
       "create": "Agregar canal",
       "createError": "No se pudo agregar el canal. Revisá la URL del webhook e intentá de nuevo.",
+      "planGateDescription": "Los canales de notificación están disponibles en los planes Equipo y Empresa.",
       "loadError": "No se pudieron cargar los canales de notificación.",
       "emptyTitle": "Todavía no hay canales de equipo",
       "emptyDescription": "Agregá un webhook de Slack o Discord para que tu equipo se entere donde ya conversa.",

@@ -12,7 +12,12 @@ const useOrganizationUsageMock = vi.mocked(useOrganizationUsage)
 
 const teamUsage: OrganizationUsageRecord = {
   plan: 'equipo',
-  limits: { members: 10, projects: 5, monthlyAiCredits: 300 },
+  limits: {
+    members: 10,
+    projects: 5,
+    monthlyAiCredits: 300,
+    notificationIntegrations: true,
+  },
   members: 2,
   pendingInvites: 1,
   projects: 3,
@@ -23,12 +28,33 @@ const teamUsage: OrganizationUsageRecord = {
 
 const enterpriseUsage: OrganizationUsageRecord = {
   plan: 'empresa',
-  limits: { members: 25, projects: null, monthlyAiCredits: 1000 },
+  limits: {
+    members: 25,
+    projects: null,
+    monthlyAiCredits: 1000,
+    notificationIntegrations: true,
+  },
   members: 25,
   pendingInvites: 0,
   projects: 40,
   aiEnabled: true,
   aiCreditsUsed: 25,
+  creditsResetAt: '2026-10-01T00:00:00.000Z',
+}
+
+const freeUsage: OrganizationUsageRecord = {
+  plan: 'gratuito',
+  limits: {
+    members: 3,
+    projects: 1,
+    monthlyAiCredits: 25,
+    notificationIntegrations: false,
+  },
+  members: 1,
+  pendingInvites: 0,
+  projects: 1,
+  aiEnabled: true,
+  aiCreditsUsed: 5,
   creditsResetAt: '2026-10-01T00:00:00.000Z',
 }
 
@@ -90,6 +116,32 @@ describe('PlanUsageSection', () => {
     expect(screen.getByText('JUnit ingestion from GitHub Actions and Bitbucket Pipelines')).toBeInTheDocument()
     expect(screen.getByText('Aeris case extraction and chat')).toBeInTheDocument()
     expect(screen.queryByText(/parallel suite execution/i)).not.toBeInTheDocument()
+  })
+
+  it('lists Slack and webhook notifications as included on a plan that has them', async () => {
+    setUsage(teamUsage)
+    await act(async () => {
+      render(<PlanUsageSection />)
+    })
+
+    expect(screen.getByText('Slack and webhook notifications')).toBeInTheDocument()
+  })
+
+  it('drops Slack and webhook notifications from the included list on the free plan', async () => {
+    setUsage(freeUsage)
+    await act(async () => {
+      render(<PlanUsageSection />)
+    })
+
+    expect(screen.queryByText('Slack and webhook notifications')).not.toBeInTheDocument()
+  })
+
+  it('never advertises a Spanish/English interface as a plan feature', async () => {
+    await act(async () => {
+      render(<PlanUsageSection />)
+    })
+
+    expect(screen.queryByText(/spanish.*english interface/i)).not.toBeInTheDocument()
   })
 
   it('renders no invoices, payment card, or upgrade/manage-subscription controls', async () => {

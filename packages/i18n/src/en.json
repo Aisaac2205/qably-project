@@ -1103,6 +1103,7 @@
       "creating": "Adding…",
       "create": "Add channel",
       "createError": "Couldn't add the channel. Check the webhook URL and try again.",
+      "planGateDescription": "Notification channels are available on the Team and Enterprise plans.",
       "loadError": "Couldn't load the notification channels.",
       "emptyTitle": "No team channels yet",
       "emptyDescription": "Add a Slack or Discord webhook so your team hears about critical runs where they already talk.",

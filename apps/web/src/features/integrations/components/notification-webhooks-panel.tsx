@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Plus } from '@phosphor-icons/react'
-import type { NotificationWebhook } from '@qably/types'
+import { PLAN_LIMITS, type NotificationWebhook } from '@qably/types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -11,6 +11,7 @@ import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
 import {
+  classifyWebhookError,
   useCreateNotificationWebhook,
   useDeleteNotificationWebhook,
   useTestNotificationWebhook,
@@ -24,6 +25,9 @@ export function NotificationWebhooksPanel() {
   const { t } = useTranslation()
   const { organization } = useCurrentOrganization()
   const canWrite = organization?.role === 'owner' || organization?.role === 'admin'
+  const hasNotificationIntegrations = organization
+    ? PLAN_LIMITS[organization.plan].notificationIntegrations
+    : true
 
   const { webhooks, isLoading, isError } = useNotificationWebhooks()
   const createMutation = useCreateNotificationWebhook()
@@ -52,13 +56,19 @@ export function NotificationWebhooksPanel() {
           </p>
         </div>
 
-        {canWrite && (
+        {canWrite && hasNotificationIntegrations && (
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus size={14} weight="bold" aria-hidden="true" />
             {t('settings.webhooks.addAction')}
           </Button>
         )}
       </header>
+
+      {canWrite && !hasNotificationIntegrations && (
+        <p className="rounded-lg border border-border bg-canvas px-3 py-2.5 text-xs text-muted max-w-xl">
+          {t('settings.webhooks.planGateDescription')}
+        </p>
+      )}
 
       {isLoading ? (
         <StateView kind="loading" title={t('common.loading')} />
@@ -101,7 +111,15 @@ export function NotificationWebhooksPanel() {
         onOpenChange={setCreateOpen}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
-        error={createMutation.isError ? t('settings.webhooks.createError') : undefined}
+        error={
+          createMutation.isError
+            ? t(
+                classifyWebhookError(createMutation.error) === 'plan-limit-reached'
+                  ? 'settings.webhooks.planGateDescription'
+                  : 'settings.webhooks.createError',
+              )
+            : undefined
+        }
       />
 
       <ConfirmDialog
