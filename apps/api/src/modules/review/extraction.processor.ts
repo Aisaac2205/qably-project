@@ -5,7 +5,6 @@ import { resolveLocale } from '@qably/i18n';
 import {
   assessCaseDocumentation,
   assessSuiteDocumentation,
-  type RepoConnectionProvider,
 } from '@qably/types';
 import { assertNever } from '../../common/assert-never';
 import { EncryptionService } from '../../common/crypto/encryption.service';
@@ -34,7 +33,6 @@ import {
   publishTestCaseVersion,
   type DocumentationStateWrite,
   type PublishTestCaseVersionFields,
-  type PublishTestCaseVersionTx,
 } from './lib/publish-test-case-version';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
@@ -48,6 +46,15 @@ import {
   type DocumentFileTarget,
   type ExtractionJobData,
 } from './review.contracts';
+import {
+  RetryableProviderError,
+  type ConnectionInfo,
+  type DocumentFileJobContext,
+  type ExistingProposal,
+  type JobContext,
+  type SharedProposalFields,
+  type TxClient,
+} from './extraction.types';
 
 const MAX_FALLBACK_OBJECTIVE_LENGTH = 500;
 const MAX_CASE_OBSERVATIONS = 5;
@@ -69,108 +76,6 @@ const SUITE_SUMMARY_SAVEPOINT = 'suite_summary_metadata';
 const SUITE_SUMMARY_MAX_CASES = 60;
 const SUITE_TAG_CAP = 20;
 const SUITE_STATES_FOR_SUMMARY = ['active', 'draft'] as const;
-
-interface ConnectionInfo {
-  provider: RepoConnectionProvider;
-  repo: string;
-  encryptedAccessToken: string | null;
-}
-
-/**
- * Marks a provider failure that's worth a real BullMQ retry (with backoff)
- * instead of an immediate manual-review fallback. Thrown only when the
- * extractor reported the failure as retryable AND this isn't the job's last
- * allowed attempt — the outer catch in runExtraction/runDocumentFileExtraction
- * rethrows it so it reaches the queue instead of being swallowed.
- */
-class RetryableProviderError extends Error {
-  constructor(reason: string) {
-    super(`provider-unavailable:${reason}`);
-    this.name = 'RetryableProviderError';
-  }
-}
-
-interface JobContext {
-  projectId: string;
-  organizationId: string;
-  filePath: string;
-  ref: string;
-  connection: ConnectionInfo | null;
-  codeChangeId: string | null;
-  targetTestCaseId: string | null;
-  knownSuiteId: string | null;
-  onlyAutomationKey: string | null;
-  fallbackEvidenceId: string | null;
-  locale: string | undefined;
-  /** True when BullMQ won't retry this job again after this attempt. */
-  isFinalAttempt: boolean;
-  /** True on the job's first execution — a retry means budget was already spent once for this logical extraction. */
-  isFirstAttempt: boolean;
-}
-
-interface DocumentFileJobContext {
-  projectId: string;
-  organizationId: string;
-  filePath: string;
-  ref: string;
-  connection: ConnectionInfo | null;
-  targets: DocumentFileTarget[];
-  locale: string | undefined;
-  requestSuiteSummary: boolean;
-  /** True when BullMQ won't retry this job again after this attempt. */
-  isFinalAttempt: boolean;
-  /** True on the job's first execution — a retry means budget was already spent once for this logical extraction. */
-  isFirstAttempt: boolean;
-}
-
-interface ExistingProposal {
-  id: string;
-  status: string;
-  evidenceId: string;
-}
-
-interface SharedProposalFields {
-  projectId: string;
-  suiteId: string | null;
-  status: 'in_review';
-  title: string;
-  objective: string;
-  preconditions: string[];
-  steps: string[];
-  expectedResult: string;
-  priority: ExtractedCase['priority'];
-  promptVersion: string;
-}
-
-interface TxClient extends PublishTestCaseVersionTx {
-  suite: {
-    findFirst: PrismaService['suite']['findFirst'];
-    update: PrismaService['suite']['update'];
-    updateMany: PrismaService['suite']['updateMany'];
-  };
-  testCase: {
-    findFirst: PrismaService['testCase']['findFirst'];
-    findMany: PrismaService['testCase']['findMany'];
-    update: PrismaService['testCase']['update'];
-  };
-  evidence: {
-    create: PrismaService['evidence']['create'];
-    update: PrismaService['evidence']['update'];
-  };
-  extractedProposal: {
-    findFirst: PrismaService['extractedProposal']['findFirst'];
-    findMany: PrismaService['extractedProposal']['findMany'];
-    create: PrismaService['extractedProposal']['create'];
-    update: PrismaService['extractedProposal']['update'];
-    deleteMany: PrismaService['extractedProposal']['deleteMany'];
-  };
-  organization: {
-    findUnique: PrismaService['organization']['findUnique'];
-    updateMany: PrismaService['organization']['updateMany'];
-  };
-  $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
-  $queryRawUnsafe: PrismaService['$queryRawUnsafe'];
-}
 
 const PROPOSAL_SAVEPOINT = 'extraction_proposal';
 

@@ -193,6 +193,10 @@ Every proposal the processor writes, including manual-review fallbacks, records 
 
 `EXTRACTION_QUEUE` jobs get `attempts: 3` with a 30s exponential backoff (`review.module.ts`). A shorter delay (2s was tried first) does not survive a per-minute provider rate limit — the most common retryable failure, e.g. the Gemini free tier — because the SDK itself already retries transient errors three times within seconds before giving up. A job-level retry only helps if it waits meaningfully longer, so 30s exponential gives attempts at roughly 30s and 60s after the first failure.
 
+### Attempt tracking on the job context
+
+`JobContext`/`DocumentFileJobContext` (`extraction.types.ts`) carry `isFinalAttempt` and `isFirstAttempt`. `isFinalAttempt` is true once BullMQ won't retry the job again after this run, which is what lets the fallback path decide between rethrowing a `RetryableProviderError` (more attempts remain) and writing the manual-review fallback (this was the last one). `isFirstAttempt` is true only on the job's very first execution; a retry means the daily AI budget was already spent once for this logical extraction, so budget checks only charge on the first attempt.
+
 ### Decided-proposal guard (redelivery safety)
 
 Proposals produced from a code change are keyed by `(codeChangeId, automationKey)`. Because the queue uses `removeOnComplete: true`, a completed job's id can be reused, so a redelivered or retried job could otherwise flip an already-**approved**/**rejected**/**changes_requested** proposal back into review. Before writing, `ExtractionProcessor` batches a lookup of the existing proposals for every `automationKey` in the current batch (one `findMany`, not one query per case) and then, per case:
