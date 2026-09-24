@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 export interface InboxFeedbackToast {
   message: string
@@ -37,5 +37,8 @@ export function useInboxFeedback(): UseInboxFeedbackResult {
     setToast({ message, type: 'error' })
   }, [])
 
-  return { toast, dismiss, showSuccess, showInfo, showError }
+  return useMemo(
+    () => ({ toast, dismiss, showSuccess, showInfo, showError }),
+    [toast, dismiss, showSuccess, showInfo, showError],
+  )
 }

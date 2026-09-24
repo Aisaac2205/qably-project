@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 
 export interface UseBulkSelectionResult {
   selectedIds: Set<string>
@@ -32,5 +32,8 @@ export function useBulkSelection(): UseBulkSelectionResult {
     setSelectedIds(new Set())
   }, [])
 
-  return { selectedIds, toggle, toggleAll, clear }
+  return useMemo(
+    () => ({ selectedIds, toggle, toggleAll, clear }),
+    [selectedIds, toggle, toggleAll, clear],
+  )
 }

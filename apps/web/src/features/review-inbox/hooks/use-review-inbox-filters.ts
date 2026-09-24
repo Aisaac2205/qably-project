@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ReviewQueueStatusFilter } from '../components/review-inbox-queue'
 
 export interface UseReviewInboxFiltersResult {
@@ -20,14 +20,17 @@ export function useReviewInboxFilters(): UseReviewInboxFiltersResult {
   const [duplicateOnly, setDuplicateOnly] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  return {
-    selectedProjectId,
-    setSelectedProjectId,
-    statusFilter,
-    setStatusFilter,
-    duplicateOnly,
-    setDuplicateOnly,
-    searchQuery,
-    setSearchQuery,
-  }
+  return useMemo(
+    () => ({
+      selectedProjectId,
+      setSelectedProjectId,
+      statusFilter,
+      setStatusFilter,
+      duplicateOnly,
+      setDuplicateOnly,
+      searchQuery,
+      setSearchQuery,
+    }),
+    [selectedProjectId, statusFilter, duplicateOnly, searchQuery],
+  )
 }
