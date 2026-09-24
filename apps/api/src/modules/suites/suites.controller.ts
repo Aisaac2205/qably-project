@@ -52,6 +52,7 @@ import {
   type UpdateCaseInput,
   type UpdateSuiteInput,
 } from './suites.schemas';
+import { SuiteCasesService } from './suite-cases.service';
 import { SuitesService } from './suites.service';
 
 function unwrap<T>(result: Result<T, SuiteError>): T {
@@ -118,6 +119,7 @@ function unwrapDocumentFiles<T>(result: Result<T, DocumentFilesError>): T {
 export class SuitesController {
   constructor(
     private readonly suites: SuitesService,
+    private readonly suiteCases: SuiteCasesService,
     private readonly extraction: ExtractionService,
   ) {}
 
@@ -171,7 +173,7 @@ export class SuitesController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(createCaseSchema)) body: CreateCaseInput,
   ): Promise<SuiteView> {
-    return unwrap(await this.suites.addCase(org, id, body));
+    return unwrap(await this.suiteCases.addCase(org, id, body));
   }
 
   @Patch(':id/cases/:caseId')
@@ -181,7 +183,7 @@ export class SuitesController {
     @Param('caseId') caseId: string,
     @Body(new ZodValidationPipe(updateCaseSchema)) body: UpdateCaseInput,
   ): Promise<SuiteView> {
-    return unwrap(await this.suites.updateCase(org, id, caseId, body));
+    return unwrap(await this.suiteCases.updateCase(org, id, caseId, body));
   }
 
   @Delete(':id/cases/:caseId')
@@ -190,7 +192,7 @@ export class SuitesController {
     @Param('id') id: string,
     @Param('caseId') caseId: string,
   ): Promise<SuiteView> {
-    return unwrap(await this.suites.removeCase(org, id, caseId));
+    return unwrap(await this.suiteCases.removeCase(org, id, caseId));
   }
 
   @Post(':id/cases/:caseId/document')

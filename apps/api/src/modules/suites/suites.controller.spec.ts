@@ -39,7 +39,11 @@ function build(
   extraction: ReturnType<typeof fakeExtraction>,
   suites: ReturnType<typeof fakeSuites> = fakeSuites(),
 ) {
-  return new SuitesController(suites as never, extraction as never);
+  return new SuitesController(
+    suites as never,
+    {} as never,
+    extraction as never,
+  );
 }
 
 describe('SuitesController.documentCase', () => {
