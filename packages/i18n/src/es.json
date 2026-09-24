@@ -1247,6 +1247,13 @@
       "body": "Confirmá que esta es tu dirección de correo para terminar de configurar tu cuenta de Qably.",
       "cta": "Verificar correo",
       "disclaimer": "Si no creaste una cuenta de Qably, podés ignorar este correo de forma segura."
+    },
+    "organizationInvite": {
+      "subject": "{{inviterName}} te invitó a unirte a {{organizationName}} en Qably",
+      "heading": "Te invitaron a {{organizationName}}",
+      "body": "{{inviterName}} te invitó a unirte a {{organizationName}} en Qably. Hacé clic en el botón de abajo para aceptar la invitación.",
+      "cta": "Aceptar invitación",
+      "disclaimer": "Si no esperabas esta invitación, podés ignorar este correo de forma segura."
     }
   }
 }

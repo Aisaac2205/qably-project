@@ -152,6 +152,16 @@ export interface OrganizationContext {
   role: OrgRole
 }
 
+export type OrgInviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked'
+
+export interface InvitePreviewRecord {
+  organizationName: string
+  inviterName: string
+  email: string
+  role: OrgRole
+  status: OrgInviteStatus
+}
+
 
 export interface CaseLastResult {
   status: CaseStatus

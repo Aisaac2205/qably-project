@@ -1247,6 +1247,13 @@
       "body": "Confirm this is your email address to finish setting up your Qably account.",
       "cta": "Verify email",
       "disclaimer": "If you did not create a Qably account, you can safely ignore this email."
+    },
+    "organizationInvite": {
+      "subject": "{{inviterName}} invited you to join {{organizationName}} on Qably",
+      "heading": "You have been invited to {{organizationName}}",
+      "body": "{{inviterName}} invited you to join {{organizationName}} on Qably. Click the button below to accept the invitation.",
+      "cta": "Accept invitation",
+      "disclaimer": "If you were not expecting this invitation, you can safely ignore this email."
     }
   }
 }

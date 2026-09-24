@@ -54,6 +54,9 @@ export function buildAuthOptions(
     },
     account: {
       encryptOAuthTokens: true,
+      accountLinking: {
+        allowDifferentEmails: true,
+      },
     },
     session: {
       expiresIn: 60 * 60 * 24 * 7,

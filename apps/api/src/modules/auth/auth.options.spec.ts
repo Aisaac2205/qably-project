@@ -81,6 +81,20 @@ describe('buildAuthOptions provider credentials', () => {
       buildAuthOptions(env, sender, prisma).socialProviders.github.scope,
     ).toContain('repo');
   });
+
+  it('allows linking a github account whose email differs from the signed-in user, for authenticated linking only', () => {
+    expect(
+      buildAuthOptions(env, sender, prisma).account.accountLinking
+        .allowDifferentEmails,
+    ).toBe(true);
+  });
+
+  it('leaves updateUserInfoOnLink off so a linked github profile cannot overwrite the account name or avatar', () => {
+    const accountLinking = buildAuthOptions(env, sender, prisma).account
+      .accountLinking as { updateUserInfoOnLink?: boolean };
+
+    expect(accountLinking.updateUserInfoOnLink).not.toBe(true);
+  });
 });
 
 describe('buildAuthOptions transactional email', () => {
