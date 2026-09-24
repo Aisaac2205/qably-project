@@ -1,8 +1,11 @@
 import { render as rtlRender, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
+import type { OrganizationSummary } from '@qably/types'
 import { AppShell } from '@/components/shell/app-shell'
 import { QueryProvider } from '@/providers/query-provider'
+import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
+import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
 
 function render(ui: React.ReactElement) {
   return rtlRender(ui, { wrapper: QueryProvider })
@@ -17,6 +20,37 @@ vi.mock('@/features/projects/hooks/use-project', async () => {
       isError: false,
     }),
   }
+})
+
+vi.mock('@/features/organizations/hooks/use-organizations', () => ({ useOrganizations: vi.fn() }))
+vi.mock('@/features/organizations/hooks/use-current-organization', () => ({
+  useCurrentOrganization: vi.fn(),
+}))
+
+const useOrganizationsMock = vi.mocked(useOrganizations)
+const useCurrentOrganizationMock = vi.mocked(useCurrentOrganization)
+
+const singleOrganization: OrganizationSummary = {
+  id: 'org-1',
+  name: 'Acme QA Team',
+  slug: 'acme-qa',
+  plan: 'equipo',
+  role: 'owner',
+}
+
+beforeEach(() => {
+  useOrganizationsMock.mockReturnValue({
+    organizations: [singleOrganization],
+    isLoading: false,
+    isError: false,
+    error: null,
+  })
+  useCurrentOrganizationMock.mockReturnValue({
+    organization: singleOrganization,
+    isLoading: false,
+    isError: false,
+    error: undefined,
+  })
 })
 
 

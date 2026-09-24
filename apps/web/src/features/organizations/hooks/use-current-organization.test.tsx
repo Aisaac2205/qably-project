@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { useCurrentOrganization } from './use-current-organization'
 import { listOrganizations } from '../api/organizations.api'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 vi.mock('../api/organizations.api', () => ({ listOrganizations: vi.fn() }))
 
@@ -35,6 +36,7 @@ const second = {
 beforeEach(() => {
   vi.clearAllMocks()
   list.mockResolvedValue([first, second])
+  useActiveOrganizationStore.setState({ organizationId: null })
 })
 
 describe('useCurrentOrganization', () => {
@@ -45,6 +47,20 @@ describe('useCurrentOrganization', () => {
   })
 
   it('resolves to the earliest-joined membership, mirroring the api default', async () => {
+    const { result } = renderHook(() => useCurrentOrganization(), { wrapper })
+
+    await waitFor(() => expect(result.current.organization).toEqual(first))
+  })
+
+  it('prefers the stored active organization over the earliest-joined default', async () => {
+    useActiveOrganizationStore.setState({ organizationId: 'org-2' })
+    const { result } = renderHook(() => useCurrentOrganization(), { wrapper })
+
+    await waitFor(() => expect(result.current.organization).toEqual(second))
+  })
+
+  it('falls back to the earliest-joined membership when the stored organization is not in the list', async () => {
+    useActiveOrganizationStore.setState({ organizationId: 'org-unknown' })
     const { result } = renderHook(() => useCurrentOrganization(), { wrapper })
 
     await waitFor(() => expect(result.current.organization).toEqual(first))

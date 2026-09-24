@@ -1,7 +1,9 @@
 import { resolveApiBaseUrl } from '@/lib/api-base-url'
 import { useI18nStore } from '@/lib/i18n/store'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 const ORGANIZATION_HEADER = 'x-organization-id'
+const NOT_A_MEMBER_ERROR_CODE = 'not-a-member'
 
 export class ApiError extends Error {
   readonly status: number
@@ -22,7 +24,12 @@ export interface ApiRequestOptions {
   signal?: AbortSignal
 }
 
-function buildHeaders(options: ApiRequestOptions): Headers {
+function resolveOrganizationId(options: ApiRequestOptions): string | undefined {
+  if (options.organizationId !== undefined) return options.organizationId
+  return useActiveOrganizationStore.getState().organizationId ?? undefined
+}
+
+function buildHeaders(options: ApiRequestOptions, organizationId: string | undefined): Headers {
   const headers = new Headers()
 
   headers.set('accept-language', useI18nStore.getState().locale)
@@ -30,8 +37,8 @@ function buildHeaders(options: ApiRequestOptions): Headers {
   if (options.body !== undefined) {
     headers.set('content-type', 'application/json')
   }
-  if (options.organizationId !== undefined) {
-    headers.set(ORGANIZATION_HEADER, options.organizationId)
+  if (organizationId !== undefined) {
+    headers.set(ORGANIZATION_HEADER, organizationId)
   }
 
   return headers
@@ -56,16 +63,38 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
+  return performRequest<T>(path, options, false)
+}
+
+async function performRequest<T>(
+  path: string,
+  options: ApiRequestOptions,
+  isRetry: boolean,
+): Promise<T> {
+  const organizationId = resolveOrganizationId(options)
+  const organizationIdWasInjected = options.organizationId === undefined && organizationId !== undefined
+
   const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     method: options.method ?? 'GET',
     credentials: 'include',
-    headers: buildHeaders(options),
+    headers: buildHeaders(options, organizationId),
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     signal: options.signal,
   })
 
   if (!response.ok) {
     const { message, code } = await readErrorBody(response, `Request to ${path} failed`)
+
+    if (
+      !isRetry &&
+      organizationIdWasInjected &&
+      response.status === 403 &&
+      code === NOT_A_MEMBER_ERROR_CODE
+    ) {
+      useActiveOrganizationStore.getState().clearActiveOrganization()
+      return performRequest<T>(path, options, true)
+    }
+
     throw new ApiError(response.status, message, code)
   }
 

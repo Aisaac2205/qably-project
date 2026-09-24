@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ApiError, apiRequest } from './api-client'
 import { DEFAULT_LOCALE, useI18nStore } from './i18n/store'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   const spy = vi.fn().mockResolvedValue({
@@ -14,9 +15,20 @@ function mockFetch(response: Partial<Response> & { json?: () => Promise<unknown>
   return spy
 }
 
+function notAMemberResponse() {
+  return {
+    ok: false,
+    status: 403,
+    headers: new Headers({ 'content-type': 'application/json' }),
+    json: () => Promise.resolve({ code: 'not-a-member', message: 'You do not belong to that organization' }),
+  }
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
   useI18nStore.getState().setLocale(DEFAULT_LOCALE)
+  useActiveOrganizationStore.setState({ organizationId: null })
+  localStorage.clear()
 })
 
 describe('apiRequest', () => {
@@ -127,5 +139,86 @@ describe('apiRequest', () => {
 
     const init = spy.mock.calls[0][1] as RequestInit
     expect(new Headers(init.headers).get('accept-language')).toBe('es')
+  })
+
+  it('injects the active organization when the caller gives no explicit id', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-9')
+    const spy = mockFetch({ json: () => Promise.resolve([]) })
+
+    await apiRequest('/projects')
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect(new Headers(init.headers).get('x-organization-id')).toBe('org-9')
+  })
+
+  it('lets an explicit organization id win over the active organization', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-9')
+    const spy = mockFetch({ json: () => Promise.resolve([]) })
+
+    await apiRequest('/projects', { organizationId: 'org-explicit' })
+
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect(new Headers(init.headers).get('x-organization-id')).toBe('org-explicit')
+  })
+
+  it('clears the active organization and retries once when the injected header is rejected as not-a-member', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale')
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(notAMemberResponse())
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve([{ id: 'p1' }]),
+      })
+    vi.stubGlobal('fetch', spy)
+
+    await expect(apiRequest('/projects')).resolves.toEqual([{ id: 'p1' }])
+
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(new Headers((spy.mock.calls[0][1] as RequestInit).headers).get('x-organization-id')).toBe(
+      'org-stale',
+    )
+    expect(new Headers((spy.mock.calls[1][1] as RequestInit).headers).get('x-organization-id')).toBeNull()
+    expect(useActiveOrganizationStore.getState().organizationId).toBeNull()
+  })
+
+  it('does not retry a not-a-member 403 when the caller explicitly chose the organization id', async () => {
+    const spy = vi.fn().mockResolvedValue(notAMemberResponse())
+    vi.stubGlobal('fetch', spy)
+
+    await expect(apiRequest('/projects', { organizationId: 'org-explicit' })).rejects.toMatchObject({
+      status: 403,
+      code: 'not-a-member',
+    })
+
+    expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not retry a second time when the retry also comes back not-a-member', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale')
+    const spy = vi.fn().mockResolvedValue(notAMemberResponse())
+    vi.stubGlobal('fetch', spy)
+
+    await expect(apiRequest('/projects')).rejects.toMatchObject({ status: 403, code: 'not-a-member' })
+
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry a 403 that carries a different error code', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale')
+    const spy = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: () => Promise.resolve({ code: 'forbidden', message: 'nope' }),
+    })
+    vi.stubGlobal('fetch', spy)
+
+    await expect(apiRequest('/projects')).rejects.toMatchObject({ status: 403, code: 'forbidden' })
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(useActiveOrganizationStore.getState().organizationId).toBe('org-stale')
   })
 })

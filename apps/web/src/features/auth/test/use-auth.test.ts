@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/hooks/use-auth'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 const signInEmail = vi.fn()
 const signUpEmail = vi.fn()
@@ -20,6 +21,7 @@ vi.mock('@/lib/auth-client', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useActiveOrganizationStore.setState({ organizationId: null })
 })
 
 describe('useAuth', () => {
@@ -108,6 +110,30 @@ describe('useAuth', () => {
 
     expect(signOut).toHaveBeenCalled()
     expect(outcome).toEqual({ error: null })
+  })
+
+  it('clears the active organization once the session ends', async () => {
+    useActiveOrganizationStore.setState({ organizationId: 'org-1' })
+    signOut.mockResolvedValue({ data: {}, error: null })
+    const { result } = renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.logout()
+    })
+
+    expect(useActiveOrganizationStore.getState().organizationId).toBeNull()
+  })
+
+  it('keeps the active organization when sign out fails', async () => {
+    useActiveOrganizationStore.setState({ organizationId: 'org-1' })
+    signOut.mockResolvedValue({ data: null, error: { code: 'SESSION_EXPIRED' } })
+    const { result } = renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.logout()
+    })
+
+    expect(useActiveOrganizationStore.getState().organizationId).toBe('org-1')
   })
 
   it('reports a failed sign out instead of pretending the session ended', async () => {

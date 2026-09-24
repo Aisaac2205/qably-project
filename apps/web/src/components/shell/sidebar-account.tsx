@@ -2,13 +2,31 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CaretUpDown, SignOut } from '@phosphor-icons/react'
-import { Menu, MenuContent, MenuItem, MenuPortal, MenuPositioner, MenuTrigger } from '@/components/ui/menu'
+import { useQueryClient } from '@tanstack/react-query'
+import { CaretUpDown, Check, SignOut } from '@phosphor-icons/react'
+import {
+  Menu,
+  MenuContent,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuItem,
+  MenuPortal,
+  MenuPositioner,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuRadioItemIndicator,
+  MenuSeparator,
+  MenuTrigger,
+} from '@/components/ui/menu'
 import { useAuth } from '@/features/auth/hooks/use-auth'
+import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
+import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 import { useTranslation } from '@/lib/i18n'
 import { UserAvatar } from './user-avatar'
 
 const LOGIN_ROUTE = '/login'
+const DASHBOARD_ROUTE = '/dashboard'
 
 interface SidebarAccountProps {
   name: string
@@ -19,8 +37,11 @@ interface SidebarAccountProps {
 
 export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountProps) {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const { t } = useTranslation()
   const { logout } = useAuth()
+  const { organizations } = useOrganizations()
+  const { organization: currentOrganization } = useCurrentOrganization()
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +60,14 @@ export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountP
 
     router.replace(LOGIN_ROUTE)
     router.refresh()
+  }
+
+  function handleSwitchOrganization(organizationId: string) {
+    if (organizationId === currentOrganization?.id) return
+
+    useActiveOrganizationStore.getState().setActiveOrganization(organizationId)
+    queryClient.clear()
+    router.replace(DASHBOARD_ROUTE)
   }
 
   const triggerClassName = collapsed
@@ -70,6 +99,33 @@ export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountP
         <MenuPortal>
           <MenuPositioner side="top" align={collapsed ? 'center' : 'start'}>
             <MenuContent className="w-56">
+              {organizations.length > 1 && (
+                <>
+                  <MenuGroup>
+                    <MenuGroupLabel>{t('sidebar.organization')}</MenuGroupLabel>
+                    <MenuRadioGroup
+                      value={currentOrganization?.id}
+                      onValueChange={(value) => handleSwitchOrganization(value as string)}
+                    >
+                      {organizations.map((organization) => (
+                        <MenuRadioItem
+                          key={organization.id}
+                          value={organization.id}
+                          closeOnClick
+                          className="gap-2 px-2.5 py-2 text-sm text-default"
+                        >
+                          <MenuRadioItemIndicator>
+                            <Check size={14} weight="bold" aria-hidden="true" />
+                          </MenuRadioItemIndicator>
+                          <span className="min-w-0 flex-1 truncate">{organization.name}</span>
+                        </MenuRadioItem>
+                      ))}
+                    </MenuRadioGroup>
+                  </MenuGroup>
+                  <MenuSeparator />
+                </>
+              )}
+
               <MenuItem
                 closeOnClick={false}
                 disabled={isSigningOut}

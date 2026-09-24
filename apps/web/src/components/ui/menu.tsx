@@ -63,4 +63,74 @@ function MenuItem({ className, ...props }: MenuPrimitive.Item.Props) {
   )
 }
 
-export { Menu, MenuTrigger, MenuPortal, MenuPositioner, MenuContent, MenuItem }
+function MenuGroup({ ...props }: MenuPrimitive.Group.Props) {
+  return <MenuPrimitive.Group data-slot="menu-group" {...props} />
+}
+
+function MenuGroupLabel({ className, ...props }: MenuPrimitive.GroupLabel.Props) {
+  return (
+    <MenuPrimitive.GroupLabel
+      data-slot="menu-group-label"
+      className={cn("px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted-foreground", className)}
+      {...props}
+    />
+  )
+}
+
+function MenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
+  return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />
+}
+
+function MenuRadioItem({ className, ...props }: MenuPrimitive.RadioItem.Props) {
+  return (
+    <MenuPrimitive.RadioItem
+      data-slot="menu-radio-item"
+      className={cn(
+        "relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
+        "data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary",
+        "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+function MenuRadioItemIndicator({ className, ...props }: MenuPrimitive.RadioItemIndicator.Props) {
+  return (
+    <MenuPrimitive.RadioItemIndicator
+      data-slot="menu-radio-item-indicator"
+      keepMounted
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center data-[unchecked]:opacity-0",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+function MenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {
+  return (
+    <MenuPrimitive.Separator
+      data-slot="menu-separator"
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Menu,
+  MenuTrigger,
+  MenuPortal,
+  MenuPositioner,
+  MenuContent,
+  MenuItem,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuRadioItemIndicator,
+  MenuSeparator,
+}

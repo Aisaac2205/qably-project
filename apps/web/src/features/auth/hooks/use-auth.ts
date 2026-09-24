@@ -7,6 +7,7 @@ import {
   type AuthClientError,
   toAuthMessage,
 } from '@/features/auth/lib/auth-errors'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 export interface AuthOutcome {
   error: string | null
@@ -56,7 +57,15 @@ export function useAuth(): Auth {
     [],
   )
 
-  const logout = useCallback(() => run(() => authClient.signOut()), [])
+  const logout = useCallback(async () => {
+    const outcome = await run(() => authClient.signOut())
+
+    if (!outcome.error) {
+      useActiveOrganizationStore.getState().clearActiveOrganization()
+    }
+
+    return outcome
+  }, [])
 
   return { login, register, signInWithGithub, logout }
 }

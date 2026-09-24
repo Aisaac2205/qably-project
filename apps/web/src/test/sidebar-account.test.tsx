@@ -1,6 +1,8 @@
 import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { OrganizationSummary } from '@qably/types'
 
 const replace = vi.fn()
 const refresh = vi.fn()
@@ -19,16 +21,64 @@ vi.mock('@/lib/auth-client', () => ({
   },
 }))
 
+vi.mock('@/features/organizations/hooks/use-organizations', () => ({ useOrganizations: vi.fn() }))
+vi.mock('@/features/organizations/hooks/use-current-organization', () => ({
+  useCurrentOrganization: vi.fn(),
+}))
+
 import { SidebarAccount } from '@/components/shell/sidebar-account'
+import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
+import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
+import { useActiveOrganizationStore } from '@/stores/active-organization.store'
+
+const useOrganizationsMock = vi.mocked(useOrganizations)
+const useCurrentOrganizationMock = vi.mocked(useCurrentOrganization)
+
+const acme: OrganizationSummary = {
+  id: 'org-1',
+  name: 'Acme QA Team',
+  slug: 'acme-qa',
+  plan: 'equipo',
+  role: 'owner',
+}
+
+const globex: OrganizationSummary = {
+  id: 'org-2',
+  name: 'Globex Labs',
+  slug: 'globex-labs',
+  plan: 'gratuito',
+  role: 'member',
+}
+
+function setOrganizations(organizations: OrganizationSummary[], current = organizations[0]) {
+  useOrganizationsMock.mockReturnValue({
+    organizations,
+    isLoading: false,
+    isError: false,
+    error: null,
+  })
+  useCurrentOrganizationMock.mockReturnValue({
+    organization: current,
+    isLoading: false,
+    isError: false,
+    error: undefined,
+  })
+}
 
 function renderAccount(collapsed = false) {
-  return render(
-    <SidebarAccount name="Isaac Flores" image={null} role="Admin" collapsed={collapsed} />,
+  const queryClient = new QueryClient()
+  const result = render(
+    <QueryClientProvider client={queryClient}>
+      <SidebarAccount name="Isaac Flores" image={null} role="Admin" collapsed={collapsed} />
+    </QueryClientProvider>,
   )
+  return { queryClient, ...result }
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  setOrganizations([acme])
+  useActiveOrganizationStore.setState({ organizationId: null })
 })
 
 describe('SidebarAccount', () => {
@@ -74,5 +124,47 @@ describe('SidebarAccount', () => {
     const account = screen.getByRole('button', { name: /Isaac Flores/ })
     expect(account).toHaveAttribute('aria-haspopup')
     expect(account).toHaveTextContent('IF')
+  })
+
+  it('does not show an organization switcher for a single-organization account', async () => {
+    setOrganizations([acme])
+    const user = userEvent.setup()
+    await act(async () => renderAccount())
+
+    await user.click(screen.getByRole('button', { name: /Isaac Flores/ }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Sign out' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument()
+  })
+
+  it('lists every organization the user belongs to and marks the active one', async () => {
+    setOrganizations([acme, globex], acme)
+    const user = userEvent.setup()
+    await act(async () => renderAccount())
+
+    await user.click(screen.getByRole('button', { name: /Isaac Flores/ }))
+
+    expect(await screen.findByRole('menuitemradio', { name: 'Acme QA Team' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    expect(screen.getByRole('menuitemradio', { name: 'Globex Labs' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    )
+  })
+
+  it('switching organizations persists the choice, clears the query cache, and returns to the dashboard', async () => {
+    setOrganizations([acme, globex], acme)
+    const user = userEvent.setup()
+    const { queryClient } = await act(async () => renderAccount())
+    const clearSpy = vi.spyOn(queryClient, 'clear')
+
+    await user.click(screen.getByRole('button', { name: /Isaac Flores/ }))
+    await user.click(await screen.findByRole('menuitemradio', { name: 'Globex Labs' }))
+
+    expect(useActiveOrganizationStore.getState().organizationId).toBe('org-2')
+    expect(clearSpy).toHaveBeenCalled()
+    expect(replace).toHaveBeenCalledWith('/dashboard')
   })
 })

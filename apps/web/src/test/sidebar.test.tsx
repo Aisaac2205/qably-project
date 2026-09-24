@@ -1,7 +1,13 @@
 import { render, screen, act, within } from '@testing-library/react'
-import { afterEach, describe, it, expect, vi } from 'vitest'
-import type { ProjectSummary } from '@qably/types'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import type { OrganizationSummary, ProjectSummary } from '@qably/types'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
+
+vi.mock('@/features/organizations/hooks/use-organizations', () => ({ useOrganizations: vi.fn() }))
+vi.mock('@/features/organizations/hooks/use-current-organization', () => ({
+  useCurrentOrganization: vi.fn(),
+}))
 
 const mockPathname = vi.fn(() => '/dashboard')
 let isMobileViewport = false
@@ -86,6 +92,19 @@ vi.mock('@/lib/use-mock-store', () => ({
 }))
 
 import { Sidebar } from '@/components/shell/sidebar'
+import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
+import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
+
+const useOrganizationsMock = vi.mocked(useOrganizations)
+const useCurrentOrganizationMock = vi.mocked(useCurrentOrganization)
+
+const singleOrganization: OrganizationSummary = {
+  id: 'org-1',
+  name: 'Acme QA Team',
+  slug: 'acme-qa',
+  plan: 'equipo',
+  role: 'owner',
+}
 
 vi.mock('@/features/projects/hooks/use-project', async () => {
   const { getProject } = await import('@/lib/mock-store')
@@ -100,13 +119,31 @@ vi.mock('@/features/projects/hooks/use-project', async () => {
 
 // Sidebar uses useSidebar() which requires a SidebarProvider. Wrap renders.
 function renderSidebar({ defaultOpen = true, includeTrigger = false } = {}) {
+  const queryClient = new QueryClient()
   return render(
-    <SidebarProvider defaultOpen={defaultOpen}>
-      {includeTrigger ? <SidebarTrigger /> : null}
-      <Sidebar />
-    </SidebarProvider>,
+    <QueryClientProvider client={queryClient}>
+      <SidebarProvider defaultOpen={defaultOpen}>
+        {includeTrigger ? <SidebarTrigger /> : null}
+        <Sidebar />
+      </SidebarProvider>
+    </QueryClientProvider>,
   )
 }
+
+beforeEach(() => {
+  useOrganizationsMock.mockReturnValue({
+    organizations: [singleOrganization],
+    isLoading: false,
+    isError: false,
+    error: null,
+  })
+  useCurrentOrganizationMock.mockReturnValue({
+    organization: singleOrganization,
+    isLoading: false,
+    isError: false,
+    error: undefined,
+  })
+})
 
 afterEach(() => {
   isMobileViewport = false
