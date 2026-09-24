@@ -1,22 +1,34 @@
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import type { DocumentFileJobContext, JobContext } from './extraction.types';
 
+const REAL_FAILURE_REASONS = [
+  'ai-not-enabled',
+  'extraction-failed',
+  'no-tests-found',
+  'extraction-incomplete',
+  'automation-key-not-found',
+  'not-configured',
+  'invalid-credentials',
+  'rate-limited',
+  'provider-overloaded',
+  'empty-response',
+  'invalid-json-response',
+  'schema-violation',
+  'unknown-provider-error',
+  'quota-exhausted',
+  'no-connection',
+  'timeout',
+  'fetch-failed',
+  'http-404',
+];
+
 interface FakePrisma {
   testCase: { updateMany: jest.Mock };
-  extractedProposal: { findFirst: jest.Mock; create: jest.Mock };
-  evidence: { create: jest.Mock };
 }
 
 function createPrisma(): FakePrisma {
   return {
-    testCase: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
-    extractedProposal: {
-      findFirst: jest.fn().mockResolvedValue(null),
-      create: jest.fn().mockResolvedValue({ id: 'proposal-new' }),
-    },
-    evidence: {
-      create: jest.fn().mockResolvedValue({ id: 'evidence-new' }),
-    },
+    testCase: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
   };
 }
 
@@ -39,159 +51,128 @@ function jobContext(overrides: Partial<JobContext> = {}): JobContext {
   };
 }
 
+function documentFileContext(
+  overrides: Partial<DocumentFileJobContext> = {},
+): DocumentFileJobContext {
+  return {
+    projectId: 'project-1',
+    organizationId: 'org-1',
+    filePath: 'src/cart.spec.ts',
+    ref: 'HEAD',
+    connection: null,
+    targets: [],
+    locale: undefined,
+    requestSuiteSummary: false,
+    isFinalAttempt: true,
+    isFirstAttempt: true,
+    ...overrides,
+  };
+}
+
 describe('ExtractionFailureRecorder', () => {
-  describe('recordForJob', () => {
-    it('writes the failed documentation state and creates no proposal when the source was unavailable', async () => {
+  describe('recordExtractionFailure', () => {
+    it.each(REAL_FAILURE_REASONS)(
+      'marks the targeted case failed for reason "%s" and creates no proposal',
+      async (reason) => {
+        const prisma = createPrisma();
+        const recorder = new ExtractionFailureRecorder(prisma as never);
+
+        await recorder.recordExtractionFailure(jobContext(), reason);
+
+        const [{ where, data }] = prisma.testCase.updateMany.mock.calls[0] as [
+          {
+            where: Record<string, unknown>;
+            data: {
+              documentationOutcome: string;
+              documentationSkipReason: string;
+            };
+          },
+        ];
+        expect(where.id).toEqual({ in: ['case-1'] });
+        expect(data.documentationOutcome).toBe('failed');
+        expect(data.documentationSkipReason).toBe(reason);
+      },
+    );
+
+    it('excludes human-documented cases from the failed-state guard', async () => {
       const prisma = createPrisma();
       const recorder = new ExtractionFailureRecorder(prisma as never);
 
-      await recorder.recordForJob(jobContext(), 'no-connection');
+      await recorder.recordExtractionFailure(jobContext(), 'extraction-failed');
 
-      const [{ where, data }] = prisma.testCase.updateMany.mock.calls[0] as [
-        {
-          where: Record<string, unknown>;
-          data: {
-            documentationOutcome: string;
-            documentationSkipReason: string;
-          };
-        },
+      const [{ where }] = prisma.testCase.updateMany.mock.calls[0] as [
+        { where: { documentationSource: { not: string } } },
       ];
-      expect(where).toEqual({
-        id: 'case-1',
-        documentationSource: { not: 'human' },
-        documentationQueuedAt: { not: null },
-      });
-      expect(data.documentationOutcome).toBe('failed');
-      expect(data.documentationSkipReason).toBe('no-connection');
-      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(where.documentationSource).toEqual({ not: 'human' });
     });
 
-    it('does not write a failed documentation state for an untargeted source-unavailable failure', async () => {
+    it('also marks a case failed when it was never queued but has no outcome yet', async () => {
       const prisma = createPrisma();
       const recorder = new ExtractionFailureRecorder(prisma as never);
 
-      await recorder.recordForJob(
+      await recorder.recordExtractionFailure(jobContext(), 'extraction-failed');
+
+      const [{ where }] = prisma.testCase.updateMany.mock.calls[0] as [
+        { where: { OR: unknown[] } },
+      ];
+      expect(where.OR).toEqual([
+        { documentationQueuedAt: { not: null } },
+        { documentationOutcome: null },
+        { documentationOutcome: 'failed' },
+      ]);
+    });
+
+    it('only logs a warning and writes nothing when there is no target case', async () => {
+      const prisma = createPrisma();
+      const recorder = new ExtractionFailureRecorder(prisma as never);
+
+      await recorder.recordExtractionFailure(
         jobContext({ targetTestCaseId: null }),
-        'timeout',
+        'extraction-failed',
       );
 
       expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
-      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
-    });
-
-    it('does not create a second fallback proposal when one is already pending', async () => {
-      const prisma = createPrisma();
-      prisma.extractedProposal.findFirst.mockResolvedValue({
-        id: 'proposal-existing',
-      });
-      const recorder = new ExtractionFailureRecorder(prisma as never);
-
-      await recorder.recordForJob(jobContext(), 'extraction-failed');
-
-      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
-    });
-
-    it('reuses the context fallbackEvidenceId instead of creating new evidence', async () => {
-      const prisma = createPrisma();
-      const recorder = new ExtractionFailureRecorder(prisma as never);
-
-      await recorder.recordForJob(
-        jobContext({ fallbackEvidenceId: 'evidence-existing' }),
-        'extraction-failed',
-      );
-
-      expect(prisma.evidence.create).not.toHaveBeenCalled();
-      const [{ data }] = prisma.extractedProposal.create.mock.calls[0] as [
-        { data: { evidenceId: string } },
-      ];
-      expect(data.evidenceId).toBe('evidence-existing');
-    });
-
-    it('creates fallback evidence when the context has none yet', async () => {
-      const prisma = createPrisma();
-      const recorder = new ExtractionFailureRecorder(prisma as never);
-
-      await recorder.recordForJob(jobContext(), 'extraction-failed');
-
-      expect(prisma.evidence.create).toHaveBeenCalledTimes(1);
-      const [{ data }] = prisma.extractedProposal.create.mock.calls[0] as [
-        { data: { evidenceId: string } },
-      ];
-      expect(data.evidenceId).toBe('evidence-new');
     });
   });
 
-  describe('recordForTargets', () => {
-    function documentFileContext(
-      overrides: Partial<DocumentFileJobContext> = {},
-    ): DocumentFileJobContext {
-      return {
-        projectId: 'project-1',
-        organizationId: 'org-1',
-        filePath: 'src/cart.spec.ts',
-        ref: 'HEAD',
-        connection: null,
-        targets: [],
-        locale: undefined,
-        requestSuiteSummary: false,
-        isFinalAttempt: true,
-        isFirstAttempt: true,
-        ...overrides,
-      };
-    }
+  describe('recordExtractionFailureForTargets', () => {
+    it.each(REAL_FAILURE_REASONS)(
+      'marks every targeted case failed for reason "%s"',
+      async (reason) => {
+        const prisma = createPrisma();
+        const recorder = new ExtractionFailureRecorder(prisma as never);
 
-    it('excludes human-documented cases from the failed-state updateMany guard', async () => {
-      const prisma = createPrisma();
-      const recorder = new ExtractionFailureRecorder(prisma as never);
+        await recorder.recordExtractionFailureForTargets(
+          documentFileContext(),
+          [
+            { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+            { testCaseId: 'case-2', automationKey: 'Cart > empties the cart' },
+          ],
+          reason,
+        );
 
-      await recorder.recordForTargets(
-        documentFileContext(),
-        [{ testCaseId: 'case-1', automationKey: 'Cart > adds an item' }],
-        'extraction-failed',
-      );
-
-      const [{ where, data }] = prisma.testCase.updateMany.mock.calls[0] as [
-        {
-          where: Record<string, unknown>;
-          data: { documentationOutcome: string };
-        },
-      ];
-      expect(where).toEqual({
-        id: { in: ['case-1'] },
-        documentationSource: { not: 'human' },
-        documentationQueuedAt: { not: null },
-      });
-      expect(data.documentationOutcome).toBe('failed');
-    });
-
-    it('records a fallback for every target', async () => {
-      const prisma = createPrisma();
-      const recorder = new ExtractionFailureRecorder(prisma as never);
-
-      await recorder.recordForTargets(
-        documentFileContext(),
-        [
-          { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
-          { testCaseId: 'case-2', automationKey: 'Cart > empties the cart' },
-        ],
-        'extraction-failed',
-      );
-
-      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
-    });
+        const [{ where, data }] = prisma.testCase.updateMany.mock.calls[0] as [
+          {
+            where: { id: { in: string[] } };
+            data: { documentationSkipReason: string };
+          },
+        ];
+        expect(where.id).toEqual({ in: ['case-1', 'case-2'] });
+        expect(data.documentationSkipReason).toBe(reason);
+      },
+    );
 
     it('does nothing when there are no targets', async () => {
       const prisma = createPrisma();
       const recorder = new ExtractionFailureRecorder(prisma as never);
 
-      await recorder.recordForTargets(
+      await recorder.recordExtractionFailureForTargets(
         documentFileContext(),
         [],
         'extraction-failed',
       );
 
       expect(prisma.testCase.updateMany).not.toHaveBeenCalled();
-      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     });
   });
 });

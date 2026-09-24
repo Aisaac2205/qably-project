@@ -675,7 +675,7 @@ export class ExtractionProcessor extends WorkerHost {
       this.logger.error(
         `Document-file extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
       );
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         EXTRACTION_FAILED_REASON,
@@ -687,7 +687,7 @@ export class ExtractionProcessor extends WorkerHost {
     ctx: DocumentFileJobContext,
   ): Promise<void> {
     if (ctx.connection === null) {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         'no-connection',
@@ -697,7 +697,7 @@ export class ExtractionProcessor extends WorkerHost {
 
     const entitled = await this.entitlement.isEntitled(ctx.organizationId);
     if (!entitled) {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         NOT_ENTITLED_REASON,
@@ -721,7 +721,7 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     if (source.kind === 'unavailable') {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         source.reason,
@@ -738,7 +738,7 @@ export class ExtractionProcessor extends WorkerHost {
       ? await this.dailyBudget.tryConsume(NOT_BYOK)
       : true;
     if (!withinBudget) {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         QUOTA_EXHAUSTED_REASON,
@@ -748,26 +748,23 @@ export class ExtractionProcessor extends WorkerHost {
 
     const locale = resolveLocale(ctx.locale);
 
-    const { outcome, incomplete, declarationCount } =
-      await this.extractWithDeclarationRetry(
-        {
-          filePath: ctx.filePath,
-          language: detectLanguage(ctx.filePath),
-          content: source.content,
-          locale,
-          targetAutomationKeys: ctx.targets.map(
-            (target) => target.automationKey,
-          ),
-          requestSuiteSummary: ctx.requestSuiteSummary,
-        },
-        source.content,
-      );
+    const { outcome, incomplete } = await this.extractWithDeclarationRetry(
+      {
+        filePath: ctx.filePath,
+        language: detectLanguage(ctx.filePath),
+        content: source.content,
+        locale,
+        targetAutomationKeys: ctx.targets.map((target) => target.automationKey),
+        requestSuiteSummary: ctx.requestSuiteSummary,
+      },
+      source.content,
+    );
 
     if (outcome.kind === 'provider-unavailable') {
       if (outcome.retryable && !ctx.isFinalAttempt) {
         throw new RetryableProviderError(outcome.reason);
       }
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         outcome.reason,
@@ -779,13 +776,10 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
         return;
       }
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
-        incomplete
-          ? [incompleteExtractionNote(0, declarationCount, locale)]
-          : undefined,
       );
       return;
     }
@@ -829,7 +823,7 @@ export class ExtractionProcessor extends WorkerHost {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
         return;
       }
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         unmatched,
         NO_MATCHING_CASE_REASON,
@@ -849,7 +843,7 @@ export class ExtractionProcessor extends WorkerHost {
       outcome.suite,
     );
     if (!persisted) {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         ctx.targets,
         NOT_ENTITLED_REASON,
@@ -858,7 +852,7 @@ export class ExtractionProcessor extends WorkerHost {
     }
 
     if (unmatched.length > 0) {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         unmatched,
         NO_MATCHING_CASE_REASON,
@@ -972,7 +966,7 @@ export class ExtractionProcessor extends WorkerHost {
   ): Promise<boolean> {
     const spent = await this.entitlement.spendCredit(ctx.organizationId);
     if (!spent) {
-      await this.failureRecorder.recordForTargets(
+      await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         targets,
         NOT_ENTITLED_REASON,
@@ -1188,19 +1182,25 @@ export class ExtractionProcessor extends WorkerHost {
       this.logger.error(
         `Extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
       );
-      await this.failureRecorder.recordForJob(ctx, EXTRACTION_FAILED_REASON);
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        EXTRACTION_FAILED_REASON,
+      );
     }
   }
 
   private async runExtractionUnsafe(ctx: JobContext): Promise<void> {
     if (ctx.connection === null) {
-      await this.failureRecorder.recordForJob(ctx, 'no-connection');
+      await this.failureRecorder.recordExtractionFailure(ctx, 'no-connection');
       return;
     }
 
     const entitled = await this.entitlement.isEntitled(ctx.organizationId);
     if (!entitled) {
-      await this.failureRecorder.recordForJob(ctx, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        NOT_ENTITLED_REASON,
+      );
       return;
     }
 
@@ -1220,7 +1220,7 @@ export class ExtractionProcessor extends WorkerHost {
     });
 
     if (source.kind === 'unavailable') {
-      await this.failureRecorder.recordForJob(ctx, source.reason);
+      await this.failureRecorder.recordExtractionFailure(ctx, source.reason);
       return;
     }
 
@@ -1230,7 +1230,10 @@ export class ExtractionProcessor extends WorkerHost {
       ? await this.dailyBudget.tryConsume(NOT_BYOK)
       : true;
     if (!withinBudget) {
-      await this.failureRecorder.recordForJob(ctx, QUOTA_EXHAUSTED_REASON);
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        QUOTA_EXHAUSTED_REASON,
+      );
       return;
     }
 
@@ -1254,27 +1257,16 @@ export class ExtractionProcessor extends WorkerHost {
       if (outcome.retryable && !ctx.isFinalAttempt) {
         throw new RetryableProviderError(outcome.reason);
       }
-      await this.failureRecorder.recordForJob(ctx, outcome.reason);
+      await this.failureRecorder.recordExtractionFailure(ctx, outcome.reason);
       return;
     }
 
     if (outcome.kind === 'no-tests-found') {
       if (!(await this.spendCreditOrFallback(ctx))) return;
 
-      if (ctx.targetTestCaseId !== null) {
-        await this.failureRecorder.recordForJob(
-          ctx,
-          incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
-          incomplete
-            ? [incompleteExtractionNote(0, declarationCount, locale)]
-            : undefined,
-        );
-        return;
-      }
-      this.logger.log(
-        incomplete
-          ? `Aeris found ${declarationCount} test declaration(s) in ${ctx.filePath} but could not extract them`
-          : `No tests found in ${ctx.filePath}`,
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        incomplete ? EXTRACTION_INCOMPLETE_REASON : NO_TESTS_FOUND_REASON,
       );
       return;
     }
@@ -1296,26 +1288,29 @@ export class ExtractionProcessor extends WorkerHost {
     if (cases.length === 0) {
       if (!(await this.spendCreditOrFallback(ctx))) return;
 
-      if (ctx.targetTestCaseId !== null) {
-        await this.failureRecorder.recordForJob(ctx, NO_MATCHING_CASE_REASON);
-        return;
-      }
-      this.logger.log(
-        `Extraction for ${ctx.filePath} did not include the requested case`,
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        NO_MATCHING_CASE_REASON,
       );
       return;
     }
 
     const persisted = await this.persistExtracted(cases, ctx);
     if (!persisted) {
-      await this.failureRecorder.recordForJob(ctx, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        NOT_ENTITLED_REASON,
+      );
     }
   }
 
   private async spendCreditOrFallback(ctx: JobContext): Promise<boolean> {
     const spent = await this.entitlement.spendCredit(ctx.organizationId);
     if (!spent) {
-      await this.failureRecorder.recordForJob(ctx, NOT_ENTITLED_REASON);
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        NOT_ENTITLED_REASON,
+      );
     }
     return spent;
   }
