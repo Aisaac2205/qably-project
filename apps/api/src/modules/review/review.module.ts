@@ -12,6 +12,7 @@ import { ExtractionProcessor } from './extraction.processor';
 import { ExtractionService } from './extraction.service';
 import { EXTRACTION_QUEUE } from './review.contracts';
 import { ReviewController } from './review.controller';
+import { ReviewInboxQueryService } from './review-inbox-query.service';
 import { ReviewService } from './review.service';
 
 @Module({
@@ -41,6 +42,7 @@ import { ReviewService } from './review.service';
   ],
   controllers: [ReviewController],
   providers: [
+    ReviewInboxQueryService,
     ReviewService,
     ExtractionService,
     ExtractionProcessor,

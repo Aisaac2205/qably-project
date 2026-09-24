@@ -30,12 +30,16 @@ import {
   type ListProposalsQuery,
 } from './review.schemas';
 import { unwrap } from './lib/review-error-http';
+import { ReviewInboxQueryService } from './review-inbox-query.service';
 import { ReviewService } from './review.service';
 
 @Controller('review/proposals')
 @UseGuards(OrgScopeGuard)
 export class ReviewController {
-  constructor(private readonly review: ReviewService) {}
+  constructor(
+    private readonly queries: ReviewInboxQueryService,
+    private readonly review: ReviewService,
+  ) {}
 
   @Get()
   list(
@@ -43,7 +47,7 @@ export class ReviewController {
     @Query(new ZodValidationPipe(listProposalsQuerySchema))
     query: ListProposalsQuery,
   ): Promise<ProposalView[]> {
-    return this.review.list(org, query);
+    return this.queries.list(org, query);
   }
 
   @Get(':id')
@@ -51,7 +55,7 @@ export class ReviewController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
   ): Promise<ProposalDetailView> {
-    return unwrap(await this.review.findOne(org, id));
+    return unwrap(await this.queries.findOne(org, id));
   }
 
   @Get(':id/duplicates')
@@ -59,7 +63,7 @@ export class ReviewController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
   ): Promise<DuplicateCandidateView[]> {
-    return unwrap(await this.review.getDuplicateCandidates(org, id));
+    return unwrap(await this.queries.getDuplicateCandidates(org, id));
   }
 
   @Post(':id/approve')

@@ -33,7 +33,7 @@ function fakeReview(result: unknown) {
 }
 
 function build(review: ReturnType<typeof fakeReview>) {
-  return new ReviewController(review as never);
+  return new ReviewController(review as never, review as never);
 }
 
 describe('ReviewController error codes', () => {
