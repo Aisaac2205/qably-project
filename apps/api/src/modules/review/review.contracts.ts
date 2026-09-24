@@ -115,9 +115,3 @@ export interface ApprovalView {
 export interface RejectionView {
   decisionId: string;
 }
-
-export interface BulkDecisionItemResult {
-  id: string;
-  outcome: 'approved' | 'rejected' | 'skipped';
-  reason?: ReviewError;
-}

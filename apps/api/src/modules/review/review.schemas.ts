@@ -27,10 +27,6 @@ export const documentFilesBodySchema = z
 
 export type DocumentFilesBody = z.infer<typeof documentFilesBodySchema>;
 
-export const bulkDecisionSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1).max(100),
-});
-
 export const reviewInboxQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
   status: z
@@ -59,7 +55,6 @@ export const reviewInboxCountsQuerySchema = z.object({
 
 export type ListProposalsQuery = z.infer<typeof listProposalsQuerySchema>;
 export type DecisionBody = z.infer<typeof decisionSchema>;
-export type BulkDecisionBody = z.infer<typeof bulkDecisionSchema>;
 export type ReviewInboxQuery = z.infer<typeof reviewInboxQuerySchema>;
 export type ReviewInboxCountsQuery = z.infer<
   typeof reviewInboxCountsQuerySchema

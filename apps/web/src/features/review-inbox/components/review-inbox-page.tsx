@@ -5,12 +5,9 @@ import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '../hooks/use-proposals'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
-import { useBulkProposalDecision } from '../hooks/use-bulk-proposal-decision'
 import { useReviewInboxFilters } from '../hooks/use-review-inbox-filters'
 import { useReviewInboxSelection } from '../hooks/use-review-inbox-selection'
-import { useBulkSelection } from '../hooks/use-bulk-selection'
 import { useInboxFeedback } from '../hooks/use-inbox-feedback'
-import { formatBulkSummary } from '../lib/bulk-decision-reason'
 import { useTranslation } from '@/lib/i18n'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue } from './review-inbox-queue'
@@ -22,7 +19,6 @@ export function ReviewInboxPage() {
   const { proposals } = useProposals()
 
   const filters = useReviewInboxFilters()
-  const bulkSelection = useBulkSelection()
   const feedback = useInboxFeedback()
 
   const filteredProposals = useMemo(() => {
@@ -73,23 +69,7 @@ export function ReviewInboxPage() {
     const next = !filters.duplicateOnly
     filters.setDuplicateOnly(next)
     feedback.showInfo(next ? t('reviewInbox.duplicateFilterEnabled') : t('reviewInbox.duplicateFilterDisabled'))
-    bulkSelection.clear()
-  }, [filters, feedback, bulkSelection, t])
-
-  const { approveMany, rejectMany, isApproving: isBulkApproving, isRejecting: isBulkRejecting } =
-    useBulkProposalDecision({
-      onApproved: (results) => {
-        feedback.showSuccess(formatBulkSummary(t, results, 'approve'))
-        bulkSelection.clear()
-      },
-      onRejected: (results) => {
-        feedback.showInfo(formatBulkSummary(t, results, 'reject'))
-        bulkSelection.clear()
-      },
-    })
-
-  const handleBulkApprove = useCallback((ids: string[]) => approveMany(ids), [approveMany])
-  const handleBulkReject = useCallback((ids: string[]) => rejectMany(ids), [rejectMany])
+  }, [filters, feedback, t])
 
   useKeyboardShortcuts({
     a: () => {
@@ -127,29 +107,13 @@ export function ReviewInboxPage() {
                 selectedId={activeSelectedId}
                 onSelect={(id) => setSelectedId(id)}
                 selectedProjectId={filters.selectedProjectId}
-                onSelectProject={(id) => {
-                  filters.setSelectedProjectId(id)
-                  bulkSelection.clear()
-                }}
+                onSelectProject={filters.setSelectedProjectId}
                 statusFilter={filters.statusFilter}
-                onStatusFilterChange={(s) => {
-                  filters.setStatusFilter(s)
-                  bulkSelection.clear()
-                }}
+                onStatusFilterChange={filters.setStatusFilter}
                 duplicateOnly={filters.duplicateOnly}
                 onToggleDuplicateOnly={toggleDuplicateOnly}
                 searchQuery={filters.searchQuery}
-                onSearchQueryChange={(q) => {
-                  filters.setSearchQuery(q)
-                  bulkSelection.clear()
-                }}
-                selectedIds={bulkSelection.selectedIds}
-                onToggleSelect={bulkSelection.toggle}
-                onToggleSelectAll={bulkSelection.toggleAll}
-                onBulkApprove={handleBulkApprove}
-                onBulkReject={handleBulkReject}
-                isBulkApproving={isBulkApproving}
-                isBulkRejecting={isBulkRejecting}
+                onSearchQueryChange={filters.setSearchQuery}
               />
             </section>
           }

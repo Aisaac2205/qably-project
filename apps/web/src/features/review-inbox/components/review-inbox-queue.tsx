@@ -25,13 +25,6 @@ export interface ReviewInboxQueueProps {
   onToggleDuplicateOnly: () => void
   searchQuery: string
   onSearchQueryChange: (query: string) => void
-  selectedIds?: Set<string>
-  onToggleSelect?: (id: string) => void
-  onToggleSelectAll?: (ids: string[]) => void
-  onBulkApprove?: (ids: string[]) => void
-  onBulkReject?: (ids: string[]) => void
-  isBulkApproving?: boolean
-  isBulkRejecting?: boolean
 }
 
 export function ReviewInboxQueue({
