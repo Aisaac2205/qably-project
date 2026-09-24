@@ -125,30 +125,30 @@ export interface DocumentationTranslations {
   copied: string;
 }
 
+export interface PricingTierCopy {
+  name: string;
+  description: string;
+  cta: string;
+}
+
 export interface PricingTranslations {
   sectionBadge: string;
   title: string;
   subtitle: string;
-  monthly: string;
-  annual: string;
-  save20: string;
-  planStarterTitle: string;
-  planStarterDesc: string;
-  planStarterPrice: string;
-  planStarterCta: string;
-  planStarterFeatures: string[];
-  planProTitle: string;
-  planProDesc: string;
-  planProPriceMonthly: string;
-  planProPriceAnnual: string;
-  planProCta: string;
-  planProBadge: string;
-  planProFeatures: string[];
-  planEnterpriseTitle: string;
-  planEnterpriseDesc: string;
-  planEnterprisePrice: string;
-  planEnterpriseCta: string;
-  planEnterpriseFeatures: string[];
+  perMonth: string;
+  mostPopularBadge: string;
+  membersFeature: string;
+  projectsFeatureOne: string;
+  projectsFeatureOther: string;
+  projectsFeatureUnlimited: string;
+  creditsFeature: string;
+  teamReviewFeature: string;
+  sharedFeatures: string[];
+  tiers: {
+    gratuito: PricingTierCopy;
+    equipo: PricingTierCopy;
+    empresa: PricingTierCopy;
+  };
 }
 
 export interface FooterTranslations {

@@ -29,8 +29,8 @@ const dict = getDictionary(locale);
     {/* Interactive Documentation Section with Tabbed Code Snippets */}
     <DocumentationSection client:visible t={dict.docs} locale={locale} />
 
-    {/* Interactive Pricing Section with Monthly/Annual Toggle */}
-    <PricingSection client:visible t={dict.pricing} />
+    {/* Pricing section: static render, no client JS needed */}
+    <PricingSection t={dict.pricing} />
 
     {/* Bottom Call to Action */}
     <CtaBanner locale={locale} />
