@@ -21,6 +21,7 @@ import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale'
 import { isLocaleStale } from '../../common/locale/stale-locale';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
   ConfirmDocumentationResult,
@@ -35,7 +36,6 @@ import type {
   UpdateSuiteInput,
 } from './suites.schemas';
 
-const UNIQUE_VIOLATION = 'P2002';
 const PENDING_STATUS = 'in_review';
 const FLAKY_WINDOW_SIZE = 6;
 const RESULT_STATUSES = new Set<CaseHealthResult>([
@@ -181,14 +181,6 @@ interface SuiteRow {
   documentationMissing: string[];
   documentationSkipReason: string | null;
   cases: CaseRow[];
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === UNIQUE_VIOLATION
-  );
 }
 
 interface DocumentationColumns {

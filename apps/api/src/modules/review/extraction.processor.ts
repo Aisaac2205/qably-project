@@ -9,6 +9,7 @@ import {
 } from '@qably/types';
 import { assertNever } from '../../common/assert-never';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
@@ -58,7 +59,6 @@ const EXTRACTION_INCOMPLETE_REASON = 'extraction-incomplete';
 const EXTRACTION_FAILED_REASON = 'extraction-failed';
 const QUOTA_EXHAUSTED_REASON = 'quota-exhausted';
 const NOT_BYOK = { isByok: false };
-const UNIQUE_VIOLATION = 'P2002';
 const LOCK_DURATION_MS = 120_000;
 const HUMAN_DOCUMENTATION_SOURCE = 'human';
 const AERIS_DOCUMENTATION_SOURCE = 'aeris';
@@ -259,14 +259,6 @@ function mergeSuiteTags(
   }
 
   return merged;
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === UNIQUE_VIOLATION
-  );
 }
 
 function dedupeByAutomationKey(

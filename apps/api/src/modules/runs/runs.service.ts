@@ -4,6 +4,7 @@ import { humanizeTestName } from '@qably/test-naming';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { err, ok, type Result } from '../../common/result';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
+import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ReportBatchService } from './report-batch.service';
 import type { RunError, RunView } from './runs.contracts';
@@ -24,19 +25,10 @@ import {
 import type { IngestCaseInput, IngestRunInput } from './runs.schemas';
 
 const ALLOWED_SOURCES: readonly RunSource[] = ['api', 'github_actions'];
-const UNIQUE_VIOLATION = 'P2002';
 const AUTOMATION_KEY_MIGRATION_SAVEPOINT = 'automation_key_migration';
 
 function isSourceAllowed(source: RunSource): boolean {
   return ALLOWED_SOURCES.includes(source);
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === UNIQUE_VIOLATION
-  );
 }
 
 interface SuiteRef {

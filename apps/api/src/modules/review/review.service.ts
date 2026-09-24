@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { err, isErr, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
   ApprovalView,
@@ -20,20 +21,11 @@ import {
 import { publishTestCaseVersion } from './lib/publish-test-case-version';
 
 const PENDING_STATUS = 'in_review';
-const UNIQUE_VIOLATION = 'P2002';
 
 class DecisionConflict extends Error {
   constructor() {
     super('proposal is no longer in_review');
   }
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === UNIQUE_VIOLATION
-  );
 }
 
 const EVIDENCE_KIND: Record<string, 'source_excerpt' | 'artifact' | 'url'> = {
