@@ -88,6 +88,8 @@
     "noProposalsDescription": "No AI-generated proposals match the selected filters.",
     "loadMore": "Load more",
     "loadingMore": "Loading more…",
+    "loadedMoreItems_one": "{{count}} more proposal loaded",
+    "loadedMoreItems_other": "{{count}} more proposals loaded",
     "selectProposalPrompt": "Select a proposal from the queue to inspect its structured steps, source evidence, and governance actions.",
     "inspectorTitle": "Proposal details",
     "inspectorSubtitle": "Structured extraction from test code",

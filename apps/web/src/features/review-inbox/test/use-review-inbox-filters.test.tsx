@@ -47,6 +47,7 @@ describe('useReviewInboxFilters', () => {
     expect(result.current.statusFilter).toBe('approved')
     expect(result.current.duplicateOnly).toBe(true)
     expect(result.current.searchInput).toBe('cart')
+    expect(result.current.searchQuery).toBe('cart')
   })
 
   it('updates the project filter immediately and syncs the URL', () => {

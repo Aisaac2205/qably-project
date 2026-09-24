@@ -88,6 +88,8 @@
     "noProposalsDescription": "No hay propuestas generadas por IA que coincidan con los filtros seleccionados.",
     "loadMore": "Cargar más",
     "loadingMore": "Cargando más…",
+    "loadedMoreItems_one": "Se cargó {{count}} propuesta más",
+    "loadedMoreItems_other": "Se cargaron {{count}} propuestas más",
     "selectProposalPrompt": "Selecciona una propuesta de la cola para inspeccionar sus pasos estructurados, evidencia de origen y acciones de gobierno.",
     "inspectorTitle": "Detalles de la propuesta",
     "inspectorSubtitle": "Extracción estructurada desde el código de prueba",

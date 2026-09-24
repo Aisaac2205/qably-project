@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ReviewInboxQueue } from '../components/review-inbox-queue'
 import type { ProposalListItem } from '../api/review.api'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { renderWithQuery, withQueryClient } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/api/projects.api', async () =>
   await import('@/test/projects-api-stub'),
@@ -108,5 +108,86 @@ describe('ReviewInboxQueue', () => {
     })
 
     expect(screen.getByRole('button', { name: /loading more/i })).toBeDisabled()
+  })
+
+  it('announces the loaded item count in a polite live region once more proposals load', async () => {
+    const initial = [proposal({ id: 'proposal-1' })]
+    let result: ReturnType<typeof renderQueue>
+
+    await act(async () => {
+      result = renderQueue(initial, { hasNextPage: true, onLoadMore: vi.fn() })
+    })
+
+    const grown = [
+      proposal({ id: 'proposal-1' }),
+      proposal({ id: 'proposal-2', title: 'Second proposal' }),
+      proposal({ id: 'proposal-3', title: 'Third proposal' }),
+    ]
+
+    await act(async () => {
+      result.rerender(
+        withQueryClient(
+          <ReviewInboxQueue
+            proposals={grown}
+            selectedId={undefined}
+            onSelect={vi.fn()}
+            selectedProjectId="all"
+            onSelectProject={vi.fn()}
+            statusFilter="all"
+            onStatusFilterChange={vi.fn()}
+            duplicateOnly={false}
+            onToggleDuplicateOnly={vi.fn()}
+            searchQuery=""
+            onSearchQueryChange={vi.fn()}
+            hasNextPage={true}
+            onLoadMore={vi.fn()}
+          />,
+        ),
+      )
+    })
+
+    expect(screen.getByRole('status')).toHaveTextContent('2 more proposals loaded')
+  })
+
+  it('moves focus to the first newly loaded row once the last page loads and load-more unmounts', async () => {
+    const initial = [proposal({ id: 'proposal-1' }), proposal({ id: 'proposal-2' })]
+    let result: ReturnType<typeof renderQueue>
+
+    await act(async () => {
+      result = renderQueue(initial, { hasNextPage: true, onLoadMore: vi.fn() })
+    })
+
+    screen.getByRole('button', { name: /load more/i }).focus()
+
+    const grown = [
+      proposal({ id: 'proposal-1' }),
+      proposal({ id: 'proposal-2' }),
+      proposal({ id: 'proposal-3', title: 'Newly loaded proposal' }),
+    ]
+
+    await act(async () => {
+      result.rerender(
+        withQueryClient(
+          <ReviewInboxQueue
+            proposals={grown}
+            selectedId={undefined}
+            onSelect={vi.fn()}
+            selectedProjectId="all"
+            onSelectProject={vi.fn()}
+            statusFilter="all"
+            onStatusFilterChange={vi.fn()}
+            duplicateOnly={false}
+            onToggleDuplicateOnly={vi.fn()}
+            searchQuery=""
+            onSearchQueryChange={vi.fn()}
+            hasNextPage={false}
+            onLoadMore={vi.fn()}
+          />,
+        ),
+      )
+    })
+
+    expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument()
+    expect(document.activeElement).toHaveAccessibleName(/Newly loaded proposal/)
   })
 })

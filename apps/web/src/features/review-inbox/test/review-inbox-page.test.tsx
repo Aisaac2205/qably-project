@@ -41,11 +41,6 @@ vi.mock('@/features/review-inbox/api/review.api', async () => {
       decisionId: 'decision-1',
     }),
     rejectProposal: vi.fn().mockResolvedValue({ decisionId: 'decision-1' }),
-    approveProposals: vi.fn().mockResolvedValue([
-      { id: 'proposal-ai-3', outcome: 'approved' },
-      { id: 'proposal-ai-4', outcome: 'skipped', reason: 'incomplete-proposal' },
-    ]),
-    rejectProposals: vi.fn().mockResolvedValue([{ id: 'proposal-ai-3', outcome: 'rejected' }]),
   }
 })
 

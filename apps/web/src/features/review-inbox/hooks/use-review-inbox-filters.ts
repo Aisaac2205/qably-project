@@ -53,7 +53,7 @@ export function useReviewInboxFilters(): UseReviewInboxFiltersResult {
     () => searchParams.get('duplicatesOnly') === 'true',
   )
   const [searchInput, setSearchInput] = useState(() => searchParams.get('search') ?? '')
-  const [searchQuery, setSearchQueryState] = useState('')
+  const [searchQuery, setSearchQueryState] = useState(() => searchParams.get('search') ?? '')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const setSelectedProjectId = useCallback((id: string) => {

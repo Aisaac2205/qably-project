@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ProposalListItem } from '../api/review.api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -66,6 +66,10 @@ export function ReviewInboxQueue({
   const { t } = useTranslation()
   const { projects } = useProjects()
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const previousCountRef = useRef(proposals.length)
+  const previousHasNextPageRef = useRef(hasNextPage)
+  const [loadedCount, setLoadedCount] = useState<number | null>(null)
 
   useEffect(() => {
     if (!hasNextPage || onLoadMore === undefined) return
@@ -79,6 +83,27 @@ export function ReviewInboxQueue({
 
     return () => observer.disconnect()
   }, [hasNextPage, onLoadMore])
+
+  useEffect(() => {
+    const previousCount = previousCountRef.current
+    const wasShowingLoadMore = previousHasNextPageRef.current
+    const added = proposals.length - previousCount
+
+    if (added > 0) {
+      setLoadedCount(added)
+
+      if (wasShowingLoadMore && !hasNextPage) {
+        const rows = listRef.current?.querySelectorAll('li')
+        const newRow = rows?.[previousCount]
+        const focusable = newRow?.querySelector<HTMLElement>('button')
+        if (focusable) focusable.focus()
+        else listRef.current?.focus()
+      }
+    }
+
+    previousCountRef.current = proposals.length
+    previousHasNextPageRef.current = hasNextPage
+  }, [proposals.length, hasNextPage])
 
   const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
 
@@ -107,17 +132,19 @@ export function ReviewInboxQueue({
           />
         ) : (
           <>
-            <EntityList aria-label={t('reviewInbox.queueTitle')}>
-              {proposals.map((proposal) => (
-                <ReviewQueueRow
-                  key={proposal.id}
-                  proposal={proposal}
-                  isSelected={proposal.id === selectedId}
-                  onSelect={onSelect}
-                  projectName={projectNameById.get(proposal.projectId)}
-                />
-              ))}
-            </EntityList>
+            <div ref={listRef} tabIndex={-1} className="outline-none">
+              <EntityList aria-label={t('reviewInbox.queueTitle')}>
+                {proposals.map((proposal) => (
+                  <ReviewQueueRow
+                    key={proposal.id}
+                    proposal={proposal}
+                    isSelected={proposal.id === selectedId}
+                    onSelect={onSelect}
+                    projectName={projectNameById.get(proposal.projectId)}
+                  />
+                ))}
+              </EntityList>
+            </div>
 
             {hasNextPage && (
               <div ref={sentinelRef} className="flex justify-center p-3">
@@ -135,6 +162,12 @@ export function ReviewInboxQueue({
           </>
         )}
       </CardContent>
+
+      {loadedCount !== null && (
+        <div className="sr-only" aria-live="polite" aria-atomic="true" role="status">
+          {t('reviewInbox.loadedMoreItems', { count: loadedCount })}
+        </div>
+      )}
 
       <ReviewShortcutsLegend />
     </Card>
