@@ -1,5 +1,5 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
-import { ReviewService } from './review.service';
+import { ReviewDecisionService } from './review-decision.service';
 
 const org: OrgContext = {
   organizationId: 'org-1',
@@ -80,10 +80,10 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
 }
 
 function build(prisma: FakePrisma) {
-  return new ReviewService(prisma as never);
+  return new ReviewDecisionService(prisma as never);
 }
 
-describe('ReviewService.approve', () => {
+describe('ReviewDecisionService.approve', () => {
   it('creates an official case and its first version when the proposal has no target', async () => {
     const prisma = createPrisma();
 
@@ -464,7 +464,7 @@ describe('ReviewService.approve', () => {
   });
 });
 
-describe('ReviewService.reject', () => {
+describe('ReviewDecisionService.reject', () => {
   it('records the decision and moves the proposal to rejected', async () => {
     const prisma = createPrisma();
 
@@ -544,7 +544,7 @@ describe('ReviewService.reject', () => {
   });
 });
 
-describe('ReviewService.approveMany', () => {
+describe('ReviewDecisionService.approveMany', () => {
   function createBulkPrisma(
     rowsById: Record<string, typeof proposalRow | undefined>,
   ) {
@@ -607,7 +607,7 @@ describe('ReviewService.approveMany', () => {
   });
 });
 
-describe('ReviewService.rejectMany', () => {
+describe('ReviewDecisionService.rejectMany', () => {
   function createBulkPrisma(
     rowsById: Record<string, typeof proposalRow | undefined>,
   ) {
@@ -640,7 +640,7 @@ describe('ReviewService.rejectMany', () => {
   });
 });
 
-describe('ReviewService.publish locale', () => {
+describe('ReviewDecisionService.publish locale', () => {
   it('copies the proposal locale onto the published version', async () => {
     const prisma = createPrisma({ locale: 'es' } as never);
 

@@ -65,7 +65,7 @@ The job completes normally in this case; there is no retry loop over a missing A
 
 The fallback exists to tell a reviewer that a file could not be documented automatically. It has no `steps`, no `expectedResult` and no `preconditions`, because there is nothing to put in them.
 
-That makes it unpublishable by definition, and the API enforces it: `ReviewService.approve` returns `incomplete-proposal` (HTTP 422) for any proposal whose `steps` are empty, before any transaction opens. Without that guard, approving a fallback published an `active` official case with zero steps — documented intent with no content — which is exactly what human review is supposed to prevent. The invariant is stated on the content, not on the flag: nothing publishes an official case with no steps, whatever produced it.
+That makes it unpublishable by definition, and the API enforces it: `ReviewDecisionService.approve` returns `incomplete-proposal` (HTTP 422) for any proposal whose `steps` are empty, before any transaction opens. Without that guard, approving a fallback published an `active` official case with zero steps — documented intent with no content — which is exactly what human review is supposed to prevent. The invariant is stated on the content, not on the flag: nothing publishes an official case with no steps, whatever produced it.
 
 `needsManualReview` is what the reviewer sees. It travels on `ExtractedProposal` through to the web client, where `review-proposal-inspector.tsx` replaces the Steps and Expected result sections with the reason the extraction gave and disables Approve, leaving Reject available. The reason arrives in `objective` as one of the processor's own codes (`extraction-failed`, `no-tests-found`, `ai-not-enabled`, `automation-key-not-found`); `manual-review-reason.ts` maps those to translated copy and falls back to showing the raw provider message when the reason is something else.
 
@@ -188,6 +188,10 @@ Every proposal the processor writes, including manual-review fallbacks, records 
 ### Uncaught errors always land in the fallback
 
 `ExtractionProcessor.runExtraction` wraps the entire extraction path — source read, access-token decryption, and the extractor call — in a try/catch. If any of those throws instead of returning a typed result (e.g. `EncryptionService.decrypt` throwing on a malformed ciphertext), the job still ends in the manual-review fallback with reason `extraction-failed`, instead of failing the BullMQ job with no proposal at all.
+
+### Queue retry backoff
+
+`EXTRACTION_QUEUE` jobs get `attempts: 3` with a 30s exponential backoff (`review.module.ts`). A shorter delay (2s was tried first) does not survive a per-minute provider rate limit — the most common retryable failure, e.g. the Gemini free tier — because the SDK itself already retries transient errors three times within seconds before giving up. A job-level retry only helps if it waits meaningfully longer, so 30s exponential gives attempts at roughly 30s and 60s after the first failure.
 
 ### Decided-proposal guard (redelivery safety)
 

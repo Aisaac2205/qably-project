@@ -31,14 +31,14 @@ import {
 } from './review.schemas';
 import { unwrap } from './lib/review-error-http';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
-import { ReviewService } from './review.service';
+import { ReviewDecisionService } from './review-decision.service';
 
 @Controller('review/proposals')
 @UseGuards(OrgScopeGuard)
 export class ReviewController {
   constructor(
     private readonly queries: ReviewInboxQueryService,
-    private readonly review: ReviewService,
+    private readonly review: ReviewDecisionService,
   ) {}
 
   @Get()

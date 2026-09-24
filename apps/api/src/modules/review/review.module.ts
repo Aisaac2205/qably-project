@@ -13,7 +13,7 @@ import { ExtractionService } from './extraction.service';
 import { EXTRACTION_QUEUE } from './review.contracts';
 import { ReviewController } from './review.controller';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
-import { ReviewService } from './review.service';
+import { ReviewDecisionService } from './review-decision.service';
 
 @Module({
   imports: [
@@ -29,11 +29,6 @@ import { ReviewService } from './review.service';
       name: EXTRACTION_QUEUE,
       defaultJobOptions: {
         attempts: 3,
-        // 2s was too short to survive a per-minute provider rate limit (the
-        // most common retryable failure — e.g. the Gemini free tier): the SDK
-        // itself already retries transient errors 3x in seconds before
-        // giving up, so a job-level retry only helps if it waits meaningfully
-        // longer. 30s exponential gives attempts at ~30s and ~60s.
         backoff: { type: 'exponential', delay: 30_000 },
         removeOnComplete: true,
         removeOnFail: 500,
@@ -43,7 +38,7 @@ import { ReviewService } from './review.service';
   controllers: [ReviewController],
   providers: [
     ReviewInboxQueryService,
-    ReviewService,
+    ReviewDecisionService,
     ExtractionService,
     ExtractionProcessor,
     EncryptionService,

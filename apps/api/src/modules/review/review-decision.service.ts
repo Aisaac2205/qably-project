@@ -76,7 +76,7 @@ function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
 }
 
 @Injectable()
-export class ReviewService {
+export class ReviewDecisionService {
   constructor(private readonly prisma: PrismaService) {}
 
   async approve(
