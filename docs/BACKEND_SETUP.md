@@ -107,7 +107,13 @@ Slug collisions are handled by retrying `withSlugSuffix` up to five times on a `
 
 ### Plan limits
 
-`Organization.maxProjects` is checked in `ProjectsService.create` before insert, counting only that organization's projects. Exceeding it returns `plan-limit-reached`, which the controller maps to `403`. `maxUsers` and `maxCases` are declared on the model but not yet enforced — they belong to the membership and test-case units.
+Limits live in code, not on the `Organization` row: `PLAN_LIMITS` in `@qably/types` maps each `Plan` to its project, member, and monthly Aeris credit caps, so a manual `plan` change takes effect on the next check with no column to keep in sync.
+
+`PlanEntitlementsService` (`apps/api/src/modules/organizations/plan-entitlements.service.ts`) enforces them. `ensureProjectAllowance` locks the organization row (`SELECT plan ... FOR UPDATE`) before counting projects, then creates inside the same `$transaction` — the lock closes the count-then-insert race that a bare transaction cannot, since two concurrent reads under READ COMMITTED would both see the same count. `ProjectsService.create` calls it before insert; exceeding the cap returns `plan-limit-reached`, which the controller maps to `403`. A plan with no project cap (`projects: null`, Empresa) skips the count entirely.
+
+Organizations that already exceed their plan's cap keep every existing project — the check only blocks *new* creation, never reads.
+
+`ensureSeatAllowance`/`countSeats` apply the same lock-then-count shape to members plus pending (unaccepted, unrevoked, unexpired) `OrgInvite` rows; the invite and member-management units wire it in.
 
 ### Roles
 

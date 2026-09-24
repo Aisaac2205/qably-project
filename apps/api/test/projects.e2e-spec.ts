@@ -49,9 +49,9 @@ describe('Projects (e2e)', () => {
     orgMember: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
     organization: {
       create: jest.fn(),
-      findUniqueOrThrow: jest.fn(),
       findUnique: jest.fn(),
     },
+    $queryRaw: jest.fn(),
     project: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -80,7 +80,7 @@ describe('Projects (e2e)', () => {
       organization: { slug: 'acme' },
       user: { locale: 'en' },
     });
-    prisma.organization.findUniqueOrThrow.mockResolvedValue({ maxProjects: 3 });
+    prisma.$queryRaw.mockResolvedValue([{ plan: 'equipo' }]);
     prisma.organization.findUnique.mockResolvedValue({
       plan: 'equipo',
       aiEnabled: true,
@@ -290,12 +290,27 @@ describe('Projects (e2e)', () => {
   });
 
   it('answers 403 once the plan allowance is spent', async () => {
-    prisma.project.count.mockResolvedValue(3);
+    prisma.project.count.mockResolvedValue(5);
 
     await request(app.getHttpServer())
       .post('/projects')
       .send({ name: 'Checkout' })
       .expect(403);
+  });
+
+  it('still lists every project of an organization already over its plan cap', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ plan: 'gratuito' }]);
+    prisma.project.findMany.mockResolvedValue([
+      projectRow,
+      { ...projectRow, id: 'project-2', name: 'Payments' },
+      { ...projectRow, id: 'project-3', name: 'Notifications' },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/projects')
+      .expect(200);
+
+    expect(response.body).toHaveLength(3);
   });
 
   it('answers 404 for a project owned by another organization', async () => {

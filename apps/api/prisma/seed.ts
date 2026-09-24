@@ -48,9 +48,6 @@ async function seed(prisma: PrismaClient): Promise<void> {
       name: SEED_ORG_NAME,
       slug: SEED_ORG_SLUG,
       plan: 'equipo',
-      maxProjects: 20,
-      maxUsers: 10,
-      maxCases: 1000,
     },
   });
 

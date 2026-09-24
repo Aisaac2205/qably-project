@@ -1,5 +1,6 @@
 import { isErr, isOk } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { PlanEntitlementsService } from '../organizations/plan-entitlements.service';
 import { ProjectsService } from './projects.service';
 
 const owner: OrgContext = {
@@ -29,7 +30,8 @@ interface FakePrisma {
     delete: jest.Mock;
     count: jest.Mock;
   };
-  organization: { findUniqueOrThrow: jest.Mock };
+  $queryRaw: jest.Mock;
+  $transaction: jest.Mock;
   connection: { findFirst: jest.Mock };
   run: { findMany: jest.Mock; groupBy: jest.Mock };
   runCase: { groupBy: jest.Mock };
@@ -37,7 +39,7 @@ interface FakePrisma {
 }
 
 function createPrisma(): FakePrisma {
-  return {
+  const prisma: FakePrisma = {
     project: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -46,9 +48,8 @@ function createPrisma(): FakePrisma {
       delete: jest.fn(),
       count: jest.fn().mockResolvedValue(0),
     },
-    organization: {
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ maxProjects: 3 }),
-    },
+    $queryRaw: jest.fn().mockResolvedValue([{ plan: 'equipo' }]),
+    $transaction: jest.fn(),
     connection: { findFirst: jest.fn().mockResolvedValue({ id: 'conn-1' }) },
     run: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -57,10 +58,19 @@ function createPrisma(): FakePrisma {
     runCase: { groupBy: jest.fn().mockResolvedValue([]) },
     testCase: { findFirst: jest.fn().mockResolvedValue(null) },
   };
+
+  prisma.$transaction.mockImplementation((run: (tx: FakePrisma) => unknown) =>
+    run(prisma),
+  );
+
+  return prisma;
 }
 
 function build(prisma: FakePrisma) {
-  return new ProjectsService(prisma as never);
+  return new ProjectsService(
+    prisma as never,
+    new PlanEntitlementsService(prisma as never),
+  );
 }
 
 describe('ProjectsService.list', () => {
@@ -105,7 +115,7 @@ describe('ProjectsService.create', () => {
 
   it('refuses to exceed the plan project allowance', async () => {
     const prisma = createPrisma();
-    prisma.project.count.mockResolvedValue(3);
+    prisma.project.count.mockResolvedValue(5);
 
     const result = await build(prisma).create(owner, {
       name: 'Checkout',
@@ -125,6 +135,33 @@ describe('ProjectsService.create', () => {
     expect(prisma.project.count).toHaveBeenCalledWith({
       where: { organizationId: 'org-1' },
     });
+  });
+
+  it('locks the organization row before counting projects and creating', async () => {
+    const prisma = createPrisma();
+    prisma.project.create.mockResolvedValue(row);
+
+    await build(prisma).create(owner, { name: 'Checkout', technologies: [] });
+
+    const lockOrder = prisma.$queryRaw.mock.invocationCallOrder[0];
+    const countOrder = prisma.project.count.mock.invocationCallOrder[0];
+    const createOrder = prisma.project.create.mock.invocationCallOrder[0];
+    expect(lockOrder).toBeLessThan(countOrder);
+    expect(countOrder).toBeLessThan(createOrder);
+  });
+
+  it('never counts projects when the plan has no project cap', async () => {
+    const prisma = createPrisma();
+    prisma.$queryRaw.mockResolvedValue([{ plan: 'empresa' }]);
+    prisma.project.create.mockResolvedValue(row);
+
+    const result = await build(prisma).create(owner, {
+      name: 'Checkout',
+      technologies: [],
+    });
+
+    expect(result.ok).toBe(true);
+    expect(prisma.project.count).not.toHaveBeenCalled();
   });
 
   it('reports a duplicate name instead of leaking the database error', async () => {

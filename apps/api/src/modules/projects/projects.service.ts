@@ -14,6 +14,7 @@ import {
 } from '../../common/metrics/run-case-metrics';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { PlanEntitlementsService } from '../organizations/plan-entitlements.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
   ProjectError,
@@ -99,7 +100,10 @@ function canDelete(org: OrgContext): boolean {
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: PlanEntitlementsService,
+  ) {}
 
   async list(org: OrgContext): Promise<ProjectListView[]> {
     const rows = await this.prisma.project.findMany({
@@ -143,21 +147,26 @@ export class ProjectsService {
     org: OrgContext,
     input: CreateProjectInput,
   ): Promise<Result<ProjectView, ProjectError>> {
-    const withinAllowance = await this.hasProjectAllowance(org);
-
-    if (!withinAllowance) return err('plan-limit-reached');
-
-    if (!(await this.connectionIsUsable(org, input.connectionId))) {
-      return err('connection-not-found');
-    }
-
     try {
-      const row = await this.prisma.project.create({
-        data: { ...input, organizationId: org.organizationId },
-        select: SELECT,
-      });
+      return await this.prisma.$transaction(async (tx) => {
+        const allowance = await this.entitlements.ensureProjectAllowance(
+          org.organizationId,
+          tx,
+        );
 
-      return ok(toView(row));
+        if (!allowance.ok) return err(allowance.error);
+
+        if (!(await this.connectionIsUsable(org, input.connectionId))) {
+          return err('connection-not-found');
+        }
+
+        const row = await tx.project.create({
+          data: { ...input, organizationId: org.organizationId },
+          select: SELECT,
+        });
+
+        return ok(toView(row));
+      });
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       throw error;
@@ -314,19 +323,5 @@ export class ProjectsService {
     }
 
     return activityByProject;
-  }
-
-  private async hasProjectAllowance(org: OrgContext): Promise<boolean> {
-    const [{ maxProjects }, used] = await Promise.all([
-      this.prisma.organization.findUniqueOrThrow({
-        where: { id: org.organizationId },
-        select: { maxProjects: true },
-      }),
-      this.prisma.project.count({
-        where: { organizationId: org.organizationId },
-      }),
-    ]);
-
-    return used < maxProjects;
   }
 }
