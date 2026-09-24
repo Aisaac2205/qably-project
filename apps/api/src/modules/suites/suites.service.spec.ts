@@ -1,4 +1,5 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
+import { SuiteViewAssembler } from './suite-view.assembler';
 import { SuitesService } from './suites.service';
 
 const owner: OrgContext = {
@@ -101,7 +102,10 @@ function createPrisma(): FakePrisma {
 }
 
 function build(prisma: FakePrisma) {
-  return new SuitesService(prisma as never);
+  return new SuitesService(
+    prisma as never,
+    new SuiteViewAssembler(prisma as never),
+  );
 }
 
 const baseSuiteInput = {

@@ -1,5 +1,6 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { ExtractionService } from '../review/extraction.service';
+import { SuiteViewAssembler } from './suite-view.assembler';
 import { SuitesService } from './suites.service';
 
 const org: OrgContext = {
@@ -81,7 +82,10 @@ function buildSuitesService() {
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
 
-  return new SuitesService(prisma as never);
+  return new SuitesService(
+    prisma as never,
+    new SuiteViewAssembler(prisma as never),
+  );
 }
 
 function buildExtractionService() {
