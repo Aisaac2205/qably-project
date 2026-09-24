@@ -1,6 +1,8 @@
+import { QueryClient } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuth } from '@/features/auth/hooks/use-auth'
+import { registerQueryClient, resetQueryClientRegistry } from '@/lib/query-client-registry'
 import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 const signInEmail = vi.fn()
@@ -21,6 +23,7 @@ vi.mock('@/lib/auth-client', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  resetQueryClientRegistry()
   useActiveOrganizationStore.setState({ organizationId: null })
 })
 
@@ -122,6 +125,34 @@ describe('useAuth', () => {
     })
 
     expect(useActiveOrganizationStore.getState().organizationId).toBeNull()
+  })
+
+  it('drops every cached query of the previous user once the session ends', async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['projects'], [{ id: 'p-1' }])
+    registerQueryClient(queryClient)
+    signOut.mockResolvedValue({ data: {}, error: null })
+    const { result } = renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.logout()
+    })
+
+    expect(queryClient.getQueryCache().getAll()).toHaveLength(0)
+  })
+
+  it('keeps cached queries when sign out fails', async () => {
+    const queryClient = new QueryClient()
+    queryClient.setQueryData(['projects'], [{ id: 'p-1' }])
+    registerQueryClient(queryClient)
+    signOut.mockResolvedValue({ data: null, error: { code: 'SESSION_EXPIRED' } })
+    const { result } = renderHook(() => useAuth())
+
+    await act(async () => {
+      await result.current.logout()
+    })
+
+    expect(queryClient.getQueryData(['projects'])).toEqual([{ id: 'p-1' }])
   })
 
   it('keeps the active organization when sign out fails', async () => {

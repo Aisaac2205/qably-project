@@ -7,6 +7,7 @@ import {
   type AuthClientError,
   toAuthMessage,
 } from '@/features/auth/lib/auth-errors'
+import { getRegisteredQueryClient } from '@/lib/query-client-registry'
 import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 
 export interface AuthOutcome {
@@ -62,6 +63,11 @@ export function useAuth(): Auth {
 
     if (!outcome.error) {
       useActiveOrganizationStore.getState().clearActiveOrganization()
+      const queryClient = getRegisteredQueryClient()
+      if (queryClient) {
+        await queryClient.cancelQueries()
+        queryClient.clear()
+      }
     }
 
     return outcome
