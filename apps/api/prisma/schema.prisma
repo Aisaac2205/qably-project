@@ -287,7 +287,8 @@ model TestCase {
   updatedAt               DateTime            @updatedAt
   runCases                RunCase[]
   versions                TestCaseVersion[]   @relation("TestCaseVersions")
-  proposals               ExtractedProposal[]
+  proposals               ExtractedProposal[] @relation("ProposalTargetCase")
+  duplicateOfProposals    ExtractedProposal[] @relation("ProposalMatchedCase")
 
   @@unique([suiteId, name])
   @@unique([suiteId, automationKey])
@@ -430,6 +431,12 @@ enum ProposalStatus {
   changes_requested
 }
 
+enum ProposalDuplicateKind {
+  none
+  update
+  possible_duplicate
+}
+
 enum ReviewDecisionAction {
   approved
   rejected
@@ -464,7 +471,7 @@ model ExtractedProposal {
   codeChangeId      String?
   codeChange        CodeChange?      @relation(fields: [codeChangeId], references: [id], onDelete: SetNull)
   targetTestCaseId  String?
-  targetTestCase    TestCase?        @relation(fields: [targetTestCaseId], references: [id], onDelete: SetNull)
+  targetTestCase    TestCase?        @relation("ProposalTargetCase", fields: [targetTestCaseId], references: [id], onDelete: SetNull)
   suiteId           String?
   suite             Suite?           @relation(fields: [suiteId], references: [id], onDelete: SetNull)
   status            ProposalStatus   @default(in_review)
@@ -485,6 +492,13 @@ model ExtractedProposal {
   locale       String?
   observations Json?
 
+  duplicateKind    ProposalDuplicateKind?
+  matchedCaseId    String?
+  matchedCase      TestCase?              @relation("ProposalMatchedCase", fields: [matchedCaseId], references: [id], onDelete: SetNull)
+  duplicateScore   Float?
+  duplicateReasons Json?
+  classifiedAt     DateTime?
+
   @@unique([codeChangeId, automationKey])
   @@index([projectId])
   @@index([projectId, status])
@@ -492,6 +506,7 @@ model ExtractedProposal {
   @@index([targetTestCaseId])
   @@index([codeChangeId])
   @@index([suiteId])
+  @@index([matchedCaseId])
   @@map("extracted_proposal")
 }
 
