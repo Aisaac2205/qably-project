@@ -460,6 +460,18 @@ describe('parseJunitXml', () => {
     expect(report.cases[0].skipReason).toBe('requires network');
   });
 
+  it('normalizes a GitHub Actions runner absolute file path to repo-relative', () => {
+    const report = parseJunitXml(
+      `<testsuite name="vitest" tests="1">
+        <testcase classname="pass-rate-hero" name="renders the pass rate" file="/home/runner/work/qably-project/qably-project/apps/web/src/features/dashboard/test/pass-rate-hero.test.tsx" time="0.05"/>
+      </testsuite>`,
+    );
+
+    expect(report.cases[0].filePath).toBe(
+      'apps/web/src/features/dashboard/test/pass-rate-hero.test.tsx',
+    );
+  });
+
   it('parses a playwright report: name joined by " › " and a file attribute', () => {
     const report = parseJunitXml(
       `<testsuites name="Playwright Tests" tests="1">

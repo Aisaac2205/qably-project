@@ -1,4 +1,5 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
+import { normalizeAutomationFilePath } from '../../../common/paths/normalize-automation-file-path';
 
 const MAX_NAME_LENGTH = 120;
 const MAX_CLASS_NAME_LENGTH = 250;
@@ -334,7 +335,7 @@ export function parseJunitXml(xml: string): JunitReport {
 
     const outcome = deriveCaseOutcome(raw, counter);
     const className = readAttribute(raw, 'classname');
-    const filePath = readAttribute(raw, 'file');
+    const filePath = normalizeAutomationFilePath(readAttribute(raw, 'file'));
     const durationMs = parseDurationMs(readAttribute(raw, 'time'));
 
     counter.track('name', name, MAX_NAME_LENGTH);

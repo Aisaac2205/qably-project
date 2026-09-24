@@ -5,6 +5,7 @@ import {
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
 import { splitRepo } from '../repository/lib/split-repo';
 import { SourceReader } from '../repository/source-reader';
 
@@ -383,7 +384,7 @@ export class CaseContextBuilder {
       owner,
       repo,
       ref,
-      path: candidate.automationFilePath,
+      path: normalizeAutomationFilePath(candidate.automationFilePath, repo),
       accessToken,
     });
 

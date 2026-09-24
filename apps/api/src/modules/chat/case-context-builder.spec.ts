@@ -368,4 +368,31 @@ describe('CaseContextBuilder', () => {
       expect.objectContaining({ accessToken: 'decrypted-token' }),
     );
   });
+
+  it('normalizes an absolute CI runner file path stored on the case before reading the source', async () => {
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'code',
+      truncated: false,
+    });
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(read),
+      fakeEncryption(),
+      fakeRefResolver(),
+    );
+
+    await builder.build(
+      [
+        candidate({
+          automationFilePath:
+            '/home/runner/work/shop/shop/src/checkout.spec.ts',
+        }),
+      ],
+      connection(),
+    );
+
+    expect(read).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'src/checkout.spec.ts' }),
+    );
+  });
 });

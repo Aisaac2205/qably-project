@@ -25,6 +25,7 @@ import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildBlobUrl, SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
+import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
 import { detectLanguage } from './lib/detect-language';
 import {
   isSameDocumentation,
@@ -804,7 +805,7 @@ export class ExtractionProcessor extends WorkerHost {
       owner,
       repo,
       ref: ctx.ref,
-      path: ctx.filePath,
+      path: normalizeAutomationFilePath(ctx.filePath, repo),
       accessToken,
     });
 
@@ -1314,7 +1315,7 @@ export class ExtractionProcessor extends WorkerHost {
       owner,
       repo,
       ref: ctx.ref,
-      path: ctx.filePath,
+      path: normalizeAutomationFilePath(ctx.filePath, repo),
       accessToken,
     });
 

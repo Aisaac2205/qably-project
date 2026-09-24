@@ -816,6 +816,30 @@ describe('ExtractionProcessor — document-case job', () => {
     });
   });
 
+  it('normalizes an absolute CI runner path stored on the case before reading the source', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue({
+      ...testCaseRow,
+      automationFilePath: '/home/runner/work/qably/qably/src/cart.spec.ts',
+    });
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'file body',
+      truncated: false,
+    });
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(read), extractor).process({
+      data: { kind: 'document-case', testCaseId: 'case-1' },
+    } as never);
+
+    expect(read).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'src/cart.spec.ts' }),
+    );
+  });
+
   it('resolves the file path from the repository when the case carries none', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue({
@@ -1121,6 +1145,40 @@ describe('ExtractionProcessor — document-file job', () => {
 
     expect(extract).toHaveBeenCalledWith(
       expect.objectContaining({ requestSuiteSummary: false }),
+    );
+  });
+
+  it('normalizes an absolute CI runner file path before reading the source', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'file body',
+      truncated: false,
+    });
+    const extractor = fakeExtractor(
+      jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+            extractedCase({ automationKey: 'Cart > removes an item' }),
+          ]),
+        ),
+    );
+
+    await build(prisma, fakeSourceReader(read), extractor).process(
+      documentFileJob({
+        filePath: '/home/runner/work/qably/qably/src/cart.spec.ts',
+      }),
+    );
+
+    expect(read).toHaveBeenCalledWith(
+      expect.objectContaining({ path: 'src/cart.spec.ts' }),
     );
   });
 
