@@ -7,6 +7,7 @@ import type { TestFileLocator } from '../repository/test-file-locator';
 import type { TestCaseExtractor } from '../ai/extraction.contracts';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
+import { ExtractedProposalWriter } from './extracted-proposal-writer';
 import { ExtractionProcessor } from './extraction.processor';
 
 function extractedCase(overrides: Record<string, unknown> = {}) {
@@ -176,6 +177,7 @@ function build(
     dailyBudget,
     testFileLocator,
     new ExtractionFailureRecorder(prisma as never),
+    new ExtractedProposalWriter(prisma as never, entitlement),
   );
 }
 
