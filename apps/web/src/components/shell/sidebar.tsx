@@ -31,8 +31,10 @@ import {
   Key,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
+import type { OrgRole } from '@qably/types'
 import { SidebarAccount } from '@/components/shell/sidebar-account'
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
+import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
 import {
@@ -51,11 +53,18 @@ interface NavItem {
   exact?: boolean
 }
 
+const ROLE_LABEL_KEYS: Record<OrgRole, string> = {
+  owner: 'settings.members.roleOwner',
+  admin: 'settings.members.roleAdmin',
+  member: 'settings.members.roleMember',
+}
+
 export function Sidebar() {
   const pathname = usePathname()
   const { t } = useTranslation()
   const { state, isMobile, setOpenMobile } = useSidebar()
   const currentUser = useCurrentUser()
+  const { organization: currentOrganization } = useCurrentOrganization()
   const isCollapsed = state === 'collapsed'
 
   const projectId = useProjectRouteId()
@@ -198,7 +207,7 @@ export function Sidebar() {
         <SidebarAccount
           name={currentUser.name}
           image={currentUser.image}
-          role={t('sidebar.admin')}
+          role={currentOrganization ? t(ROLE_LABEL_KEYS[currentOrganization.role]) : ''}
           collapsed={isCollapsed}
         />
       </SidebarFooter>

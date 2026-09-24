@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/features/auth/hooks/use-auth'
+import { resolveDestination } from '@/features/auth/lib/destination'
 import {
   validateEmail,
   validatePassword,
@@ -77,7 +78,7 @@ export function useRegisterForm(): RegisterForm {
         return
       }
 
-      router.push(DESTINATION)
+      router.push(resolveDestination(window.location.search, DESTINATION))
     } finally {
       setIsSubmitting(false)
     }
@@ -88,7 +89,9 @@ export function useRegisterForm(): RegisterForm {
     setFormError(null)
     setIsRedirecting(true)
 
-    const { error } = await signInWithGithub(DESTINATION)
+    const { error } = await signInWithGithub(
+      resolveDestination(window.location.search, DESTINATION),
+    )
 
     if (error) {
       setFormError(error)

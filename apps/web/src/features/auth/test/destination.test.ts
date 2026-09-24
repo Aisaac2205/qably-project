@@ -21,4 +21,14 @@ describe('resolveDestination', () => {
   it('refuses a protocol-relative url', () => {
     expect(resolveDestination('?next=%2F%2Fevil.test')).toBe('/dashboard')
   })
+
+  it('falls back to a caller-provided default when no destination was requested', () => {
+    expect(resolveDestination('', '/projects')).toBe('/projects')
+  })
+
+  it('prefers the requested destination over a caller-provided default', () => {
+    expect(resolveDestination('?next=%2Finvite%2Ftok123', '/projects')).toBe(
+      '/invite/tok123',
+    )
+  })
 })

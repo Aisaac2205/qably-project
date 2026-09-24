@@ -168,7 +168,21 @@ describe('Sidebar — global state (no project route)', () => {
     expect(footer).not.toHaveClass('border-t')
     expect(account).toHaveClass('h-12', 'rounded-xl', 'border', 'border-border-sidebar')
     expect(account).toHaveTextContent('Ana Ruiz')
-    expect(account).toHaveTextContent('Admin')
+    expect(account).toHaveTextContent('Owner')
+  })
+
+  it('shows the member role label for a plain member', async () => {
+    useCurrentOrganizationMock.mockReturnValue({
+      organization: { ...singleOrganization, role: 'member' },
+      isLoading: false,
+      isError: false,
+      error: undefined,
+    })
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+
+    const account = container.querySelector('[data-slot="sidebar-account"]')
+    expect(account).toHaveTextContent('Member')
   })
 
   it('shows the aligned global destinations', async () => {
