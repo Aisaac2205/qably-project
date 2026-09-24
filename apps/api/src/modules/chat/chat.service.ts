@@ -6,6 +6,7 @@ import {
 } from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -47,6 +48,7 @@ const CONTEXT_RUN_LIMIT = 5;
 const THREAD_LIST_LIMIT = 50;
 const UNIQUE_VIOLATION = 'P2002';
 const HUMAN_DOCUMENTATION_SOURCE = 'human';
+const NOT_BYOK = { isByok: false };
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -239,6 +241,7 @@ export class ChatService {
     @Inject(CHAT_ASSISTANT) private readonly assistant: ChatAssistant,
     private readonly entitlement: AiEntitlementService,
     private readonly caseContextBuilder: CaseContextBuilder,
+    private readonly dailyBudget: AiDailyBudget,
   ) {}
 
   async listThreads(
@@ -362,6 +365,9 @@ export class ChatService {
         attachedCaseIds: caseIds,
       },
     });
+
+    const withinBudget = await this.dailyBudget.tryConsume(NOT_BYOK);
+    if (!withinBudget) return err('quota-exhausted');
 
     const [context, locale, connection] = await Promise.all([
       this.buildContext(projectId),

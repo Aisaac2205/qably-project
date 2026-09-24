@@ -66,6 +66,7 @@ export type ChatError =
   | 'missing-suite'
   | 'provider-unavailable'
   | 'ai-not-enabled'
+  | 'quota-exhausted'
   | 'invalid-suggested-cases'
   | 'human-documented'
   | 'too-many-cases';

@@ -81,6 +81,12 @@ function unwrap<T>(result: Result<T, ChatError>): T {
         code: result.error,
         message: 'AI features are not enabled for this organization',
       });
+    case 'quota-exhausted':
+      throw new ServiceUnavailableException({
+        code: result.error,
+        message:
+          'The daily Aeris limit was reached. Your message was saved — try again tomorrow.',
+      });
     case 'invalid-suggested-cases':
       throw new UnprocessableEntityException({
         code: result.error,

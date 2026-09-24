@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { DEFAULT_LOCALE } from '@qably/i18n';
+import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -187,6 +188,12 @@ function fakeEntitlement(
   } as unknown as AiEntitlementService;
 }
 
+function fakeDailyBudget(
+  tryConsume: jest.Mock = jest.fn().mockResolvedValue(true),
+): AiDailyBudget {
+  return { tryConsume } as unknown as AiDailyBudget;
+}
+
 function fakeCaseContextBuilder(
   build: jest.Mock = jest.fn().mockResolvedValue(''),
   locateForEvidence: jest.Mock = jest.fn().mockResolvedValue({
@@ -207,12 +214,14 @@ function build(
   assistant: ChatAssistant,
   entitlement: AiEntitlementService = fakeEntitlement(),
   caseContextBuilder: CaseContextBuilder = fakeCaseContextBuilder(),
+  dailyBudget: AiDailyBudget = fakeDailyBudget(),
 ): ChatService {
   return new ChatService(
     prisma as never,
     assistant,
     entitlement,
     caseContextBuilder,
+    dailyBudget,
   );
 }
 
@@ -460,6 +469,35 @@ describe('ChatService', () => {
     });
 
     expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+  });
+
+  it('reports quota-exhausted and does not call the assistant when the daily Aeris budget is spent', async () => {
+    const prisma = createPrisma();
+    const reply = jest.fn();
+    const assistant: ChatAssistant = { reply };
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const tryConsume = jest.fn().mockResolvedValue(false);
+    const service = build(
+      prisma,
+      assistant,
+      fakeEntitlement(spendCredit),
+      fakeCaseContextBuilder(),
+      fakeDailyBudget(tryConsume),
+    );
+
+    const result = await service.sendMessage(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      { content: 'What is missing in checkout?' },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'quota-exhausted' });
+    expect(reply).not.toHaveBeenCalled();
+    expect(spendCredit).not.toHaveBeenCalled();
+    expect(tryConsume).toHaveBeenCalledWith({ isByok: false });
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
   });
 
   it('does not spend a credit when the provider is unavailable', async () => {

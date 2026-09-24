@@ -160,6 +160,17 @@ describe('ChatController error codes', () => {
     ).rejects.toMatchObject({ response: { code: 'provider-unavailable' } });
   });
 
+  it('throws a coded ServiceUnavailableException when the daily Aeris budget is exhausted', async () => {
+    const chat = fakeChat({ ok: false, error: 'quota-exhausted' });
+
+    await expect(
+      build(chat).send(org, user, 'project-1', 'thread-1', { content: 'Hi' }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(
+      build(chat).send(org, user, 'project-1', 'thread-1', { content: 'Hi' }),
+    ).rejects.toMatchObject({ response: { code: 'quota-exhausted' } });
+  });
+
   it('throws a coded ForbiddenException when AI features are not enabled for the organization', async () => {
     const chat = fakeChat({ ok: false, error: 'ai-not-enabled' });
 
