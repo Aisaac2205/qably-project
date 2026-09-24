@@ -37,6 +37,12 @@ function unwrap<T>(result: Result<T, NotificationWebhookError>): T {
       throw new NotFoundException('Notification webhook not found');
     case 'forbidden':
       throw new ForbiddenException('Your role cannot perform this action');
+    case 'plan-limit-reached':
+      throw new ForbiddenException({
+        code: result.error,
+        message:
+          'This organization does not have notification integrations on its plan',
+      });
   }
 }
 

@@ -4,12 +4,28 @@ export interface PlanLimits {
   members: number;
   projects: number | null;
   monthlyAiCredits: number;
+  notificationIntegrations: boolean;
 }
 
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
-  gratuito: { members: 3, projects: 1, monthlyAiCredits: 25 },
-  equipo: { members: 10, projects: 5, monthlyAiCredits: 300 },
-  empresa: { members: 25, projects: null, monthlyAiCredits: 1000 },
+  gratuito: {
+    members: 3,
+    projects: 1,
+    monthlyAiCredits: 25,
+    notificationIntegrations: false,
+  },
+  equipo: {
+    members: 10,
+    projects: 5,
+    monthlyAiCredits: 300,
+    notificationIntegrations: true,
+  },
+  empresa: {
+    members: 25,
+    projects: null,
+    monthlyAiCredits: 1000,
+    notificationIntegrations: true,
+  },
 };
 
 export function monthStartUtc(date: Date): Date {

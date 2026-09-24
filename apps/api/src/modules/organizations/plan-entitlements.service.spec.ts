@@ -91,6 +91,40 @@ describe('PlanEntitlementsService.ensureProjectAllowance', () => {
   });
 });
 
+describe('PlanEntitlementsService.ensureCapability', () => {
+  it('locks the organization row before checking the capability', async () => {
+    const tx = createTx('equipo');
+
+    await build().ensureCapability('org-1', 'notificationIntegrations', tx);
+
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows the capability when the plan includes it', async () => {
+    const tx = createTx('equipo');
+
+    const result = await build().ensureCapability(
+      'org-1',
+      'notificationIntegrations',
+      tx,
+    );
+
+    expect(result).toEqual({ ok: true, value: undefined });
+  });
+
+  it('reports plan-limit-reached when the plan lacks the capability', async () => {
+    const tx = createTx('gratuito');
+
+    const result = await build().ensureCapability(
+      'org-1',
+      'notificationIntegrations',
+      tx,
+    );
+
+    expect(result).toEqual({ ok: false, error: 'plan-limit-reached' });
+  });
+});
+
 describe('PlanEntitlementsService.countSeats', () => {
   it('counts active members plus pending, unexpired, unrevoked invites', async () => {
     const tx = createTx('equipo');

@@ -7,27 +7,30 @@ import {
 } from './plans';
 
 describe('PLAN_LIMITS', () => {
-  it('gratuito allows 3 members, 1 project and 25 monthly Aeris credits', () => {
+  it('gratuito allows 3 members, 1 project and 25 monthly Aeris credits, no notification integrations', () => {
     expect(PLAN_LIMITS.gratuito).toEqual({
       members: 3,
       projects: 1,
       monthlyAiCredits: 25,
+      notificationIntegrations: false,
     });
   });
 
-  it('equipo allows 10 members, 5 projects and 300 monthly Aeris credits', () => {
+  it('equipo allows 10 members, 5 projects, 300 monthly Aeris credits and notification integrations', () => {
     expect(PLAN_LIMITS.equipo).toEqual({
       members: 10,
       projects: 5,
       monthlyAiCredits: 300,
+      notificationIntegrations: true,
     });
   });
 
-  it('empresa allows 25 members, unlimited projects and 1000 monthly Aeris credits', () => {
+  it('empresa allows 25 members, unlimited projects, 1000 monthly Aeris credits and notification integrations', () => {
     expect(PLAN_LIMITS.empresa).toEqual({
       members: 25,
       projects: null,
       monthlyAiCredits: 1000,
+      notificationIntegrations: true,
     });
   });
 });

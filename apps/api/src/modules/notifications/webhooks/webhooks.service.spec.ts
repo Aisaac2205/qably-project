@@ -58,17 +58,31 @@ function createChannel() {
   return { send: jest.fn().mockResolvedValue(undefined) };
 }
 
+function createEntitlements(allowed = true) {
+  return {
+    ensureCapability: jest
+      .fn()
+      .mockResolvedValue(
+        allowed
+          ? { ok: true, value: undefined }
+          : { ok: false, error: 'plan-limit-reached' },
+      ),
+  };
+}
+
 function build(
   prisma: FakePrisma,
   encryption: ReturnType<typeof createEncryption>,
   slack: ReturnType<typeof createChannel> = createChannel(),
   discord: ReturnType<typeof createChannel> = createChannel(),
+  entitlements: ReturnType<typeof createEntitlements> = createEntitlements(),
 ) {
   return new NotificationWebhooksService(
     prisma as never,
     encryption as never,
     slack,
     discord,
+    entitlements as never,
   );
 }
 
@@ -141,6 +155,43 @@ describe('NotificationWebhooksService.create', () => {
 
     expect(JSON.stringify(result)).not.toContain('secrettoken');
   });
+
+  it('refuses an org whose plan lacks notification integrations, without touching prisma', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const entitlements = createEntitlements(false);
+
+    const result = await build(
+      prisma,
+      encryption,
+      createChannel(),
+      createChannel(),
+      entitlements,
+    ).create(owner, input);
+
+    expect(result).toEqual({ ok: false, error: 'plan-limit-reached' });
+    expect(entitlements.ensureCapability).toHaveBeenCalledWith(
+      'org-1',
+      'notificationIntegrations',
+    );
+    expect(prisma.notificationWebhook.create).not.toHaveBeenCalled();
+  });
+
+  it('checks the capability only after confirming the caller can write', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const entitlements = createEntitlements(false);
+
+    await build(
+      prisma,
+      encryption,
+      createChannel(),
+      createChannel(),
+      entitlements,
+    ).create(member, input);
+
+    expect(entitlements.ensureCapability).not.toHaveBeenCalled();
+  });
 });
 
 describe('NotificationWebhooksService.update', () => {
@@ -188,6 +239,93 @@ describe('NotificationWebhooksService.update', () => {
         where: { id: 'webhook-1' },
         data: { enabled: false },
       }),
+    );
+  });
+
+  it('never checks the capability when disabling a grandfathered webhook', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const entitlements = createEntitlements(false);
+    prisma.notificationWebhook.findFirst.mockResolvedValue(row);
+    prisma.notificationWebhook.update.mockResolvedValue({
+      ...row,
+      enabled: false,
+    });
+
+    const result = await build(
+      prisma,
+      encryption,
+      createChannel(),
+      createChannel(),
+      entitlements,
+    ).update(owner, 'webhook-1', { enabled: false });
+
+    expect(result.ok).toBe(true);
+    expect(entitlements.ensureCapability).not.toHaveBeenCalled();
+  });
+
+  it('never checks the capability when only renaming a webhook', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const entitlements = createEntitlements(false);
+    prisma.notificationWebhook.findFirst.mockResolvedValue(row);
+    prisma.notificationWebhook.update.mockResolvedValue(row);
+
+    const result = await build(
+      prisma,
+      encryption,
+      createChannel(),
+      createChannel(),
+      entitlements,
+    ).update(owner, 'webhook-1', { name: 'Renamed' });
+
+    expect(result.ok).toBe(true);
+    expect(entitlements.ensureCapability).not.toHaveBeenCalled();
+  });
+
+  it('refuses re-enabling a webhook on a plan without notification integrations', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const entitlements = createEntitlements(false);
+    prisma.notificationWebhook.findFirst.mockResolvedValue({
+      ...row,
+      enabled: false,
+    });
+
+    const result = await build(
+      prisma,
+      encryption,
+      createChannel(),
+      createChannel(),
+      entitlements,
+    ).update(owner, 'webhook-1', { enabled: true });
+
+    expect(result).toEqual({ ok: false, error: 'plan-limit-reached' });
+    expect(prisma.notificationWebhook.update).not.toHaveBeenCalled();
+  });
+
+  it('allows re-enabling a webhook once the plan has notification integrations', async () => {
+    const prisma = createPrisma();
+    const encryption = createEncryption();
+    const entitlements = createEntitlements(true);
+    prisma.notificationWebhook.findFirst.mockResolvedValue({
+      ...row,
+      enabled: false,
+    });
+    prisma.notificationWebhook.update.mockResolvedValue(row);
+
+    const result = await build(
+      prisma,
+      encryption,
+      createChannel(),
+      createChannel(),
+      entitlements,
+    ).update(owner, 'webhook-1', { enabled: true });
+
+    expect(result.ok).toBe(true);
+    expect(entitlements.ensureCapability).toHaveBeenCalledWith(
+      'org-1',
+      'notificationIntegrations',
     );
   });
 });

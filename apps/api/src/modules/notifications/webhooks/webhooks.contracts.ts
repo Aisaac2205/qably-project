@@ -6,7 +6,10 @@ import type {
 
 export type NotificationWebhookView = NotificationWebhook;
 
-export type NotificationWebhookError = 'not-found' | 'forbidden';
+export type NotificationWebhookError =
+  | 'not-found'
+  | 'forbidden'
+  | 'plan-limit-reached';
 
 export interface NotificationWebhookRow {
   id: string;

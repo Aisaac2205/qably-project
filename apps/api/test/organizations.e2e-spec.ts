@@ -146,7 +146,12 @@ describe('Organizations (e2e)', () => {
 
     expect(response.body).toEqual({
       plan: 'equipo',
-      limits: { members: 10, projects: 5, monthlyAiCredits: 300 },
+      limits: {
+        members: 10,
+        projects: 5,
+        monthlyAiCredits: 300,
+        notificationIntegrations: true,
+      },
       members: 2,
       pendingInvites: 0,
       projects: 1,

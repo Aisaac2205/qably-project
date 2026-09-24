@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PLAN_LIMITS, type Plan } from '@qably/types';
+import { PLAN_LIMITS, type Plan, type PlanLimits } from '@qably/types';
 import { Prisma } from '../../../generated/prisma/client';
 import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -16,6 +16,10 @@ export interface SeatAllowanceClient extends OrganizationLockClient {
   orgMember: { count: PrismaService['orgMember']['count'] };
   orgInvite: { count: PrismaService['orgInvite']['count'] };
 }
+
+export type BooleanPlanCapability = {
+  [K in keyof PlanLimits]: PlanLimits[K] extends boolean ? K : never;
+}[keyof PlanLimits];
 
 @Injectable()
 export class PlanEntitlementsService {
@@ -52,6 +56,18 @@ export class PlanEntitlementsService {
     const used = await tx.project.count({ where: { organizationId } });
 
     return used < limit ? ok(undefined) : err('plan-limit-reached');
+  }
+
+  async ensureCapability(
+    organizationId: string,
+    capability: BooleanPlanCapability,
+    tx: OrganizationLockClient = this.prisma,
+  ): Promise<Result<void, 'plan-limit-reached'>> {
+    const plan = await this.lockPlan(organizationId, tx);
+
+    return PLAN_LIMITS[plan][capability]
+      ? ok(undefined)
+      : err('plan-limit-reached');
   }
 
   async countSeats(

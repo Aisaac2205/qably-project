@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { EncryptionService } from '../../../common/crypto/encryption.service';
-import { err, ok, type Result } from '../../../common/result';
+import { err, isErr, ok, type Result } from '../../../common/result';
+import { PlanEntitlementsService } from '../../organizations/plan-entitlements.service';
 import type { OrgContext } from '../../organizations/organizations.contracts';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { DiscordChannel } from './channels/discord.channel';
@@ -44,6 +45,7 @@ export class NotificationWebhooksService {
     private readonly encryption: EncryptionService,
     private readonly slack: SlackChannel,
     private readonly discord: DiscordChannel,
+    private readonly entitlements: PlanEntitlementsService,
   ) {}
 
   async list(org: OrgContext): Promise<NotificationWebhookView[]> {
@@ -60,6 +62,13 @@ export class NotificationWebhooksService {
     input: CreateNotificationWebhookInput,
   ): Promise<Result<NotificationWebhookView, NotificationWebhookError>> {
     if (!canWrite(org)) return err('forbidden');
+
+    const allowance = await this.entitlements.ensureCapability(
+      org.organizationId,
+      'notificationIntegrations',
+    );
+
+    if (isErr(allowance)) return err(allowance.error);
 
     const row = await this.prisma.notificationWebhook.create({
       data: {
@@ -84,6 +93,15 @@ export class NotificationWebhooksService {
     const existing = await this.scoped(org, id);
 
     if (existing === null) return err('not-found');
+
+    if (input.enabled === true && !existing.enabled) {
+      const allowance = await this.entitlements.ensureCapability(
+        org.organizationId,
+        'notificationIntegrations',
+      );
+
+      if (isErr(allowance)) return err(allowance.error);
+    }
 
     const row = await this.prisma.notificationWebhook.update({
       where: { id },
