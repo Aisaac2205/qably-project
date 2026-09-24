@@ -112,8 +112,10 @@ describe('Suites (e2e)', () => {
     prisma.runCase.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.organization.findUnique.mockResolvedValue({
+      plan: 'equipo',
       aiEnabled: true,
-      aiCredits: 10,
+      aiCreditsUsed: 0,
+      aiCreditsPeriodStart: new Date(),
     });
 
     const moduleFixture = await stubQueues(
@@ -357,8 +359,10 @@ describe('Suites (e2e)', () => {
 
   it('answers 403 for /document when the organization is not entitled to AI', async () => {
     prisma.organization.findUnique.mockResolvedValue({
+      plan: 'gratuito',
       aiEnabled: false,
-      aiCredits: 0,
+      aiCreditsUsed: 0,
+      aiCreditsPeriodStart: new Date(),
     });
 
     await request(app.getHttpServer())

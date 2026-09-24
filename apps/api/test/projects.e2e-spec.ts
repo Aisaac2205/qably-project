@@ -82,8 +82,10 @@ describe('Projects (e2e)', () => {
     });
     prisma.organization.findUniqueOrThrow.mockResolvedValue({ maxProjects: 3 });
     prisma.organization.findUnique.mockResolvedValue({
+      plan: 'equipo',
       aiEnabled: true,
-      aiCredits: 10,
+      aiCreditsUsed: 0,
+      aiCreditsPeriodStart: new Date(),
     });
     prisma.project.count.mockResolvedValue(0);
     prisma.project.findUnique.mockResolvedValue({ connection: null });
@@ -360,8 +362,10 @@ describe('Projects (e2e)', () => {
 
   it('answers 403 for /document when the organization is not entitled to AI', async () => {
     prisma.organization.findUnique.mockResolvedValue({
+      plan: 'gratuito',
       aiEnabled: false,
-      aiCredits: 0,
+      aiCreditsUsed: 0,
+      aiCreditsPeriodStart: new Date(),
     });
 
     await request(app.getHttpServer())

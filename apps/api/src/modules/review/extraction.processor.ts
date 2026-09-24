@@ -161,7 +161,10 @@ interface TxClient extends PublishTestCaseVersionTx {
     create: PrismaService['extractedProposal']['create'];
     update: PrismaService['extractedProposal']['update'];
   };
-  organization: { updateMany: PrismaService['organization']['updateMany'] };
+  organization: {
+    findUnique: PrismaService['organization']['findUnique'];
+    updateMany: PrismaService['organization']['updateMany'];
+  };
   $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
   $queryRawUnsafe: PrismaService['$queryRawUnsafe'];
 }
