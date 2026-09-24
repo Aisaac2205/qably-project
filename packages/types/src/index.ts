@@ -1002,3 +1002,4 @@ export interface ChatSendToReviewRecord {
 export * from './documentation-completeness'
 export * from './pass-rate'
 export * from './dashboard-period'
+export * from './plans'
