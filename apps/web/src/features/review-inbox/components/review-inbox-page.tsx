@@ -1,185 +1,95 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { CheckCircle, Info, WarningCircle, X } from '@phosphor-icons/react'
+import { useMemo, useCallback } from 'react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { useProposals } from '../hooks/use-proposals'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
 import { useBulkProposalDecision } from '../hooks/use-bulk-proposal-decision'
-import { bulkDecisionReasonKey, summarizeBulkResults } from '../lib/bulk-decision-reason'
-import type { BulkDecisionItemResult } from '../api/review.api'
+import { useReviewInboxFilters } from '../hooks/use-review-inbox-filters'
+import { useReviewInboxSelection } from '../hooks/use-review-inbox-selection'
+import { useBulkSelection } from '../hooks/use-bulk-selection'
+import { useInboxFeedback } from '../hooks/use-inbox-feedback'
+import { formatBulkSummary } from '../lib/bulk-decision-reason'
 import { useTranslation } from '@/lib/i18n'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
-import { ReviewInboxQueue, type ReviewQueueStatusFilter } from './review-inbox-queue'
+import { ReviewInboxQueue } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
+import { ReviewInboxFeedback } from './review-inbox-feedback'
 
 export function ReviewInboxPage() {
   const { t } = useTranslation()
   const { proposals } = useProposals()
-  const searchParams = useSearchParams()
 
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<ReviewQueueStatusFilter>('in_review')
-  const [duplicateOnly, setDuplicateOnly] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedId, setSelectedId] = useState<string | undefined>(
-    () => searchParams.get('proposal') ?? undefined,
-  )
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [feedbackToast, setFeedbackToast] = useState<{
-    message: string
-    type: 'success' | 'info' | 'error'
-    href?: string
-    linkLabel?: string
-  } | null>(null)
+  const filters = useReviewInboxFilters()
+  const bulkSelection = useBulkSelection()
+  const feedback = useInboxFeedback()
 
   const filteredProposals = useMemo(() => {
     return proposals.filter((p) => {
-      if (selectedProjectId !== 'all' && p.projectId !== selectedProjectId) return false
-      if (statusFilter !== 'all' && p.status !== statusFilter) return false
-      if (duplicateOnly && p.possibleDuplicate !== true) return false
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim()
+      if (filters.selectedProjectId !== 'all' && p.projectId !== filters.selectedProjectId) return false
+      if (filters.statusFilter !== 'all' && p.status !== filters.statusFilter) return false
+      if (filters.duplicateOnly && p.possibleDuplicate !== true) return false
+      if (filters.searchQuery.trim()) {
+        const q = filters.searchQuery.toLowerCase().trim()
         return p.title.toLowerCase().includes(q) || p.objective.toLowerCase().includes(q)
       }
       return true
     })
-  }, [proposals, selectedProjectId, statusFilter, duplicateOnly, searchQuery])
+  }, [proposals, filters.selectedProjectId, filters.statusFilter, filters.duplicateOnly, filters.searchQuery])
 
-  const activeSelectedId =
-    selectedId !== undefined && proposals.some((p) => p.id === selectedId)
-      ? selectedId
-      : filteredProposals[0]?.id
-  const selectedProposal = proposals.find((p) => p.id === activeSelectedId)
-
-  const selectNextPending = useCallback(() => {
-    const remainingPending = filteredProposals.filter(
-      (p) => p.id !== activeSelectedId && p.status === 'in_review',
-    )
-    if (remainingPending.length > 0) {
-      setSelectedId(remainingPending[0].id)
-    }
-  }, [activeSelectedId, filteredProposals])
+  const { activeSelectedId, selectedProposal, setSelectedId, selectNextPending } = useReviewInboxSelection(
+    proposals,
+    filteredProposals,
+  )
 
   const { approve, reject } = useProposalDecision({
     onApproved: (proposalId, result) => {
       const proposal = proposals.find((p) => p.id === proposalId)
-      setFeedbackToast({
-        message: t('reviewInbox.approvedWithCase', { caseName: result.testCaseName }),
-        type: 'success',
-        ...(proposal && result.suiteId
+      feedback.showSuccess(
+        t('reviewInbox.approvedWithCase', { caseName: result.testCaseName }),
+        proposal && result.suiteId
           ? {
               href: `/projects/${proposal.projectId}/suites/${result.suiteId}`,
               linkLabel: t('reviewInbox.viewCase'),
             }
-          : {}),
-      })
+          : undefined,
+      )
       selectNextPending()
     },
     onRejected: () => {
-      setFeedbackToast({
-        message: t('reviewInbox.rejectedSuccess'),
-        type: 'info',
-      })
+      feedback.showInfo(t('reviewInbox.rejectedSuccess'))
       selectNextPending()
     },
     onError: (code) => {
-      setFeedbackToast({
-        message: t(`aiReview.${decisionErrorKey(code)}`),
-        type: 'error',
-      })
+      feedback.showError(t(`aiReview.${decisionErrorKey(code)}`))
     },
   })
 
-  const handleApprove = useCallback(
-    (proposalId: string) => {
-      approve(proposalId)
-    },
-    [approve],
-  )
-
-  const handleReject = useCallback(
-    (proposalId: string) => {
-      reject(proposalId)
-    },
-    [reject],
-  )
+  const handleApprove = useCallback((proposalId: string) => approve(proposalId), [approve])
+  const handleReject = useCallback((proposalId: string) => reject(proposalId), [reject])
 
   const toggleDuplicateOnly = useCallback(() => {
-    setDuplicateOnly((prev) => {
-      const next = !prev
-      setFeedbackToast({
-        message: next ? t('reviewInbox.duplicateFilterEnabled') : t('reviewInbox.duplicateFilterDisabled'),
-        type: 'info',
-      })
-      return next
-    })
-    setSelectedIds(new Set())
-  }, [t])
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
-  const toggleSelectAll = useCallback((ids: string[]) => {
-    setSelectedIds((prev) => {
-      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id))
-      return allSelected ? new Set() : new Set(ids)
-    })
-  }, [])
-
-  const buildBulkSummary = useCallback(
-    (results: BulkDecisionItemResult[], kind: 'approve' | 'reject') => {
-      const summary = summarizeBulkResults(results)
-      const base = t(kind === 'approve' ? 'reviewInbox.bulkApproveSummary' : 'reviewInbox.bulkRejectSummary', {
-        approved: summary.succeeded,
-        rejected: summary.succeeded,
-        skipped: summary.skipped,
-      })
-      const reasons = summary.skippedByReason
-        .map(({ reason, count }) =>
-          t('reviewInbox.bulkSkipReason', { count, reason: t(`reviewInbox.${bulkDecisionReasonKey(reason)}`) }),
-        )
-        .join(', ')
-
-      return reasons ? `${base} (${reasons})` : base
-    },
-    [t],
-  )
+    const next = !filters.duplicateOnly
+    filters.setDuplicateOnly(next)
+    feedback.showInfo(next ? t('reviewInbox.duplicateFilterEnabled') : t('reviewInbox.duplicateFilterDisabled'))
+    bulkSelection.clear()
+  }, [filters, feedback, bulkSelection, t])
 
   const { approveMany, rejectMany, isApproving: isBulkApproving, isRejecting: isBulkRejecting } =
     useBulkProposalDecision({
       onApproved: (results) => {
-        setFeedbackToast({ message: buildBulkSummary(results, 'approve'), type: 'success' })
-        setSelectedIds(new Set())
+        feedback.showSuccess(formatBulkSummary(t, results, 'approve'))
+        bulkSelection.clear()
       },
       onRejected: (results) => {
-        setFeedbackToast({ message: buildBulkSummary(results, 'reject'), type: 'info' })
-        setSelectedIds(new Set())
+        feedback.showInfo(formatBulkSummary(t, results, 'reject'))
+        bulkSelection.clear()
       },
     })
 
-  const handleBulkApprove = useCallback(
-    (ids: string[]) => {
-      approveMany(ids)
-    },
-    [approveMany],
-  )
-
-  const handleBulkReject = useCallback(
-    (ids: string[]) => {
-      rejectMany(ids)
-    },
-    [rejectMany],
-  )
+  const handleBulkApprove = useCallback((ids: string[]) => approveMany(ids), [approveMany])
+  const handleBulkReject = useCallback((ids: string[]) => rejectMany(ids), [rejectMany])
 
   useKeyboardShortcuts({
     a: () => {
@@ -197,45 +107,7 @@ export function ReviewInboxPage() {
       className="flex h-full min-h-0 w-full flex-col gap-4 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
       <div className="shrink-0 space-y-4 empty:hidden">
-        {feedbackToast && (
-          <div
-            role={feedbackToast.type === 'error' ? 'alert' : 'status'}
-            className={`flex items-center justify-between gap-3 rounded-xl border p-4 text-xs font-medium transition-all duration-200 ${
-              feedbackToast.type === 'success'
-                ? 'border-pass/40 bg-pass-bg/20 text-pass'
-                : feedbackToast.type === 'error'
-                  ? 'border-fail/40 bg-fail-bg/20 text-fail'
-                  : 'border-border bg-surface text-default'
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              {feedbackToast.type === 'success' ? (
-                <CheckCircle size={16} weight="fill" aria-hidden="true" />
-              ) : feedbackToast.type === 'error' ? (
-                <WarningCircle size={16} weight="fill" aria-hidden="true" />
-              ) : (
-                <Info size={16} weight="fill" aria-hidden="true" />
-              )}
-              <span className="truncate">{feedbackToast.message}</span>
-              {feedbackToast.href && (
-                <Link
-                  href={feedbackToast.href}
-                  className="font-semibold underline hover:text-primary shrink-0"
-                >
-                  {feedbackToast.linkLabel}
-                </Link>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => setFeedbackToast(null)}
-              aria-label={t('common.cancel')}
-              className="rounded p-1 hover:bg-canvas text-muted hover:text-default transition-colors"
-            >
-              <X size={14} aria-hidden="true" />
-            </button>
-          </div>
-        )}
+        <ReviewInboxFeedback toast={feedback.toast} onDismiss={feedback.dismiss} />
       </div>
 
       <div className="min-h-0 flex-1">
@@ -254,26 +126,26 @@ export function ReviewInboxPage() {
                 proposals={proposals}
                 selectedId={activeSelectedId}
                 onSelect={(id) => setSelectedId(id)}
-                selectedProjectId={selectedProjectId}
+                selectedProjectId={filters.selectedProjectId}
                 onSelectProject={(id) => {
-                  setSelectedProjectId(id)
-                  setSelectedIds(new Set())
+                  filters.setSelectedProjectId(id)
+                  bulkSelection.clear()
                 }}
-                statusFilter={statusFilter}
+                statusFilter={filters.statusFilter}
                 onStatusFilterChange={(s) => {
-                  setStatusFilter(s)
-                  setSelectedIds(new Set())
+                  filters.setStatusFilter(s)
+                  bulkSelection.clear()
                 }}
-                duplicateOnly={duplicateOnly}
+                duplicateOnly={filters.duplicateOnly}
                 onToggleDuplicateOnly={toggleDuplicateOnly}
-                searchQuery={searchQuery}
+                searchQuery={filters.searchQuery}
                 onSearchQueryChange={(q) => {
-                  setSearchQuery(q)
-                  setSelectedIds(new Set())
+                  filters.setSearchQuery(q)
+                  bulkSelection.clear()
                 }}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onToggleSelectAll={toggleSelectAll}
+                selectedIds={bulkSelection.selectedIds}
+                onToggleSelect={bulkSelection.toggle}
+                onToggleSelectAll={bulkSelection.toggleAll}
                 onBulkApprove={handleBulkApprove}
                 onBulkReject={handleBulkReject}
                 isBulkApproving={isBulkApproving}

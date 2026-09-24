@@ -39,3 +39,25 @@ export function summarizeBulkResults(results: BulkDecisionItemResult[]): BulkDec
     skippedByReason: Array.from(counts.entries()).map(([reason, count]) => ({ reason, count })),
   }
 }
+
+export type BulkDecisionKind = 'approve' | 'reject'
+
+export function formatBulkSummary(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  results: BulkDecisionItemResult[],
+  kind: BulkDecisionKind,
+): string {
+  const summary = summarizeBulkResults(results)
+  const base = t(kind === 'approve' ? 'reviewInbox.bulkApproveSummary' : 'reviewInbox.bulkRejectSummary', {
+    approved: summary.succeeded,
+    rejected: summary.succeeded,
+    skipped: summary.skipped,
+  })
+  const reasons = summary.skippedByReason
+    .map(({ reason, count }) =>
+      t('reviewInbox.bulkSkipReason', { count, reason: t(`reviewInbox.${bulkDecisionReasonKey(reason)}`) }),
+    )
+    .join(', ')
+
+  return reasons ? `${base} (${reasons})` : base
+}

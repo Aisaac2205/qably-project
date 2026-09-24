@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { bulkDecisionReasonKey, summarizeBulkResults } from '../lib/bulk-decision-reason'
+import { bulkDecisionReasonKey, formatBulkSummary, summarizeBulkResults } from '../lib/bulk-decision-reason'
+
+function fakeT(key: string, params?: Record<string, string | number>): string {
+  if (key === 'reviewInbox.bulkApproveSummary') return `Approved ${params?.approved}, skipped ${params?.skipped}`
+  if (key === 'reviewInbox.bulkRejectSummary') return `Rejected ${params?.rejected}, skipped ${params?.skipped}`
+  if (key === 'reviewInbox.bulkSkipReason') return `${params?.count} ${params?.reason}`
+  if (key.startsWith('reviewInbox.bulkReason')) return key.replace('reviewInbox.', '')
+  return key
+}
 
 describe('bulkDecisionReasonKey', () => {
   it('maps every ReviewError code to a translation key', () => {
@@ -43,5 +51,33 @@ describe('summarizeBulkResults', () => {
     const summary = summarizeBulkResults([{ id: '1', outcome: 'rejected' }])
 
     expect(summary).toEqual({ succeeded: 1, skipped: 0, skippedByReason: [] })
+  })
+})
+
+describe('formatBulkSummary', () => {
+  it('formats an approve summary with no skip reasons', () => {
+    const message = formatBulkSummary(
+      fakeT,
+      [
+        { id: '1', outcome: 'approved' },
+        { id: '2', outcome: 'approved' },
+      ],
+      'approve',
+    )
+
+    expect(message).toBe('Approved 2, skipped 0')
+  })
+
+  it('formats a reject summary and appends skip reasons in parentheses', () => {
+    const message = formatBulkSummary(
+      fakeT,
+      [
+        { id: '1', outcome: 'rejected' },
+        { id: '2', outcome: 'skipped', reason: 'incomplete-proposal' },
+      ],
+      'reject',
+    )
+
+    expect(message).toBe('Rejected 1, skipped 1 (1 bulkReasonIncompleteProposal)')
   })
 })
