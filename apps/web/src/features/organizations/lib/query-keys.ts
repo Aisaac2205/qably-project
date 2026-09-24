@@ -1,5 +1,6 @@
 export const organizationKeys = {
   all: ['organizations'] as const,
+  usage: ['organizations', 'current', 'usage'] as const,
 }
 
 export const memberKeys = {

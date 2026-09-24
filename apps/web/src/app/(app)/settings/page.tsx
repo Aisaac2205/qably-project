@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { LanguageSection } from '@/features/settings/components/language-section'
-import { AccountPlanSection } from '@/features/settings/components/account-plan-section'
+import { PlanUsageSection } from '@/features/settings/components/plan-usage-section'
 import { MembersSettingsPanel } from '@/features/settings/components/members-settings-panel'
 import { NotificationPreferencesPanel } from '@/features/notifications/components/notification-preferences-panel'
 import { NotificationWebhooksPanel } from '@/features/integrations'
@@ -61,7 +61,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="space-y-6 px-4 sm:px-6 lg:px-8 py-6">
-        {(activeTab === 'all' || activeTab === 'plan') && <AccountPlanSection />}
+        {(activeTab === 'all' || activeTab === 'plan') && <PlanUsageSection />}
         {(activeTab === 'all' || activeTab === 'members') && <MembersSettingsPanel />}
         {(activeTab === 'all' || activeTab === 'notifications') && <NotificationPreferencesPanel />}
         {(activeTab === 'all' || activeTab === 'integrations') && <NotificationWebhooksPanel />}

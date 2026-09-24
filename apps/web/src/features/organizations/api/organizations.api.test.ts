@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { listOrganizations } from './organizations.api'
+import { getUsage, listOrganizations } from './organizations.api'
 import { apiRequest } from '@/lib/api-client'
 
 vi.mock('@/lib/api-client', () => ({ apiRequest: vi.fn() }))
@@ -16,5 +16,11 @@ describe('organizations api', () => {
     await listOrganizations()
 
     expect(request).toHaveBeenCalledWith('/organizations', expect.anything())
+  })
+
+  it('reads plan usage from the current organization usage route', async () => {
+    await getUsage()
+
+    expect(request).toHaveBeenCalledWith('/organizations/current/usage', expect.anything())
   })
 })
