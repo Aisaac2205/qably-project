@@ -671,6 +671,20 @@ describe('ReviewInboxQueryService.page', () => {
     expect(result.items.map((item) => item.id)).toEqual(['dup-a', 'dup-b']);
     expect(result.nextCursor).toBeNull();
   });
+
+  it('omits the status filter entirely when status is "all"', async () => {
+    const prisma = createPageFixture([pageRow()]);
+
+    await buildService(prisma).page(serviceOrg, {
+      status: 'all',
+      limit: 50,
+    });
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: Record<string, unknown> }],
+    ];
+    expect(call[0].where).not.toHaveProperty('status');
+  });
 });
 
 describe('ReviewInboxQueryService.counts', () => {

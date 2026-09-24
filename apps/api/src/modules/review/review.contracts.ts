@@ -29,7 +29,7 @@ export interface ListProposalsFilters {
 
 export interface ReviewInboxPageFilters {
   projectId?: string;
-  status: ProposalStatus;
+  status: ProposalStatus | 'all';
   duplicatesOnly?: boolean;
   search?: string;
   cursor?: string;

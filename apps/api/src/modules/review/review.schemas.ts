@@ -30,7 +30,7 @@ export type DocumentFilesBody = z.infer<typeof documentFilesBodySchema>;
 export const reviewInboxQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
   status: z
-    .enum(['in_review', 'approved', 'rejected', 'changes_requested'])
+    .enum(['in_review', 'approved', 'rejected', 'changes_requested', 'all'])
     .default('in_review'),
   duplicatesOnly: z
     .enum(['true', 'false'])

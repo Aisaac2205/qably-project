@@ -177,10 +177,12 @@ export class ReviewInboxQueryService {
     org: OrgContext,
     filters: ReviewInboxPageFilters,
   ): Promise<ReviewInboxPage> {
+    const status = filters.status === 'all' ? undefined : filters.status;
+
     if (filters.duplicatesOnly === true) {
       const items = await this.list(org, {
         projectId: filters.projectId,
-        status: filters.status,
+        status,
         search: filters.search,
         duplicatesOnly: true,
       });
@@ -189,7 +191,7 @@ export class ReviewInboxQueryService {
 
     const cursor =
       filters.cursor === undefined ? null : decodeInboxCursor(filters.cursor);
-    const base = this.baseWhere(org, filters);
+    const base = this.baseWhere(org, { ...filters, status });
     const where =
       cursor === null
         ? base

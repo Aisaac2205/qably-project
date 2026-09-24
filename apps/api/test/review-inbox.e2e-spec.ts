@@ -143,6 +143,17 @@ describe('Review inbox (e2e)', () => {
     expect(call[0].where.status).toBe('in_review');
   });
 
+  it('omits the status filter when status=all is requested', async () => {
+    await request(app.getHttpServer())
+      .get('/review/inbox?status=all')
+      .expect(200);
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: { status?: string } }],
+    ];
+    expect(call[0].where.status).toBeUndefined();
+  });
+
   it('rejects an unknown status filter', async () => {
     await request(app.getHttpServer())
       .get('/review/inbox?status=whatever')

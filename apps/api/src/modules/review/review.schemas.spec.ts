@@ -55,6 +55,10 @@ describe('reviewInboxQuerySchema', () => {
       reviewInboxQuerySchema.parse({ cursor: 'not-a-cursor' }),
     ).toThrow();
   });
+
+  it('accepts status "all" to request every status', () => {
+    expect(reviewInboxQuerySchema.parse({ status: 'all' }).status).toBe('all');
+  });
 });
 
 describe('reviewInboxCountsQuerySchema', () => {
