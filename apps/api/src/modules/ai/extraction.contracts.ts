@@ -1,10 +1,21 @@
 import { z } from 'zod';
 import { normalizeTitleForComparison } from '@qably/types';
+import { truncateTo } from '../../common/text/truncate-to';
 
 export const MAX_SOURCE_CONTENT_LENGTH = 60_000;
 export const MAX_EXTRACTED_CASES = 20;
 
+const AUTOMATION_KEY_MAX_LENGTH_MATCHING_JUNIT_INGESTION = 120;
+
 export const shortText = (max: number) => z.string().trim().min(1).max(max);
+
+const automationKeyText = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value) =>
+    truncateTo(value, AUTOMATION_KEY_MAX_LENGTH_MATCHING_JUNIT_INGESTION),
+  );
 
 const LEADING_ORDINAL = /^\d+[.)]\s*/;
 
@@ -16,7 +27,7 @@ const listItem = (max: number) =>
     .pipe(shortText(max));
 
 export const extractedCaseObjectSchema = z.object({
-  automationKey: shortText(120),
+  automationKey: automationKeyText,
   title: shortText(120),
   objective: shortText(500),
   preconditions: z.array(listItem(300)).max(10).default([]),

@@ -79,6 +79,31 @@ describe('extractedCaseSchema', () => {
     ).toBe(false);
   });
 
+  it('truncates an automationKey longer than 120 characters instead of dropping the case', () => {
+    const longKey = `CaseDocumentationAction > ${'x'.repeat(200)}`;
+    const result = extractedCaseSchema.safeParse(
+      validCase({ automationKey: longKey }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.automationKey).toBe(
+      longKey.slice(0, 120),
+    );
+  });
+
+  it('truncates automationKey on code points so a surrogate pair is never split', () => {
+    const emoji = String.fromCodePoint(0x1f600);
+    const longKey = `${'a'.repeat(119)}${emoji}${emoji}`;
+    const result = extractedCaseSchema.safeParse(
+      validCase({ automationKey: longKey }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(
+      result.success && Array.from(result.data.automationKey),
+    ).toHaveLength(120);
+  });
+
   it('rejects more than 10 preconditions', () => {
     const preconditions = Array.from({ length: 11 }, (_, i) => `pre ${i}`);
     expect(

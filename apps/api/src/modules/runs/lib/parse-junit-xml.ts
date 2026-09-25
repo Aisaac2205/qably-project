@@ -1,5 +1,6 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { normalizeAutomationFilePath } from '../../../common/paths/normalize-automation-file-path';
+import { truncateTo } from '../../../common/text/truncate-to';
 
 const MAX_NAME_LENGTH = 120;
 const MAX_CLASS_NAME_LENGTH = 250;
@@ -113,13 +114,6 @@ function toArray(value: unknown): RawNode[] {
 function readAttribute(node: RawNode, attribute: string): string {
   const value = node[`@_${attribute}`];
   return typeof value === 'string' ? value : '';
-}
-
-function truncateTo(value: string, maxLength: number): string {
-  const codePoints = Array.from(value);
-  return codePoints.length <= maxLength
-    ? value
-    : codePoints.slice(0, maxLength).join('');
 }
 
 function truncate(value: string): string {
