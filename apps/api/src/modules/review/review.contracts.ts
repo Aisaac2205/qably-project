@@ -134,7 +134,7 @@ export interface RejectionView {
 }
 
 export interface LastDecisionView {
-  action: 'approved' | 'rejected' | 'changes_requested';
+  action: 'approved' | 'rejected';
   decidedAt: string;
   decidedBy: { id: string; name: string };
 }

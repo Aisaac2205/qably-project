@@ -159,7 +159,7 @@ export class ReviewDecisionService {
         proposalId,
         proposal: { project: { organizationId: org.organizationId } },
       },
-      orderBy: { decidedAt: 'desc' },
+      orderBy: [{ decidedAt: 'desc' }, { id: 'desc' }],
       select: {
         action: true,
         decidedAt: true,
@@ -170,7 +170,7 @@ export class ReviewDecisionService {
     if (decision === null) return null;
 
     return {
-      action: decision.action,
+      action: decision.action as 'approved' | 'rejected',
       decidedAt: decision.decidedAt.toISOString(),
       decidedBy: { id: decision.actor.id, name: decision.actor.name },
     };

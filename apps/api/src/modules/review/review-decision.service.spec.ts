@@ -681,4 +681,16 @@ describe('ReviewDecisionService.lastDecision', () => {
       proposal: { project: { organizationId: 'org-1' } },
     });
   });
+
+  it('breaks decidedAt ties by ordering id desc, most recent first', async () => {
+    const prisma = createPrisma();
+    prisma.reviewDecision.findFirst.mockResolvedValue(null);
+
+    await build(prisma).lastDecision(org, 'proposal-1');
+
+    const [call] = prisma.reviewDecision.findFirst.mock.calls as [
+      [{ orderBy: Array<Record<string, 'desc'>> }],
+    ];
+    expect(call[0].orderBy).toEqual([{ decidedAt: 'desc' }, { id: 'desc' }]);
+  });
 });
