@@ -11,6 +11,7 @@ import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { buildBlobUrl } from '../repository/source-reader';
+import { gate } from './chat-evidence-gate';
 import {
   CaseContextBuilder,
   type CaseContextCandidate,
@@ -209,8 +210,12 @@ function lineAnchor(
 
 interface TargetedEvidence {
   uri: string;
-  excerpt: string | null;
+  excerpt: string;
 }
+
+type TargetedEvidenceResult =
+  | { kind: 'ok'; evidence: TargetedEvidence }
+  | { kind: 'no-code-evidence'; reason: string };
 
 function parseChatEvidenceUri(
   prefix: string,
@@ -560,7 +565,11 @@ export class ChatService {
     }
 
     const connection = await this.findConnection(projectId);
-    const evidence = await this.buildTargetedEvidence(target, connection);
+    const evidenceResult = await this.buildTargetedEvidence(target, connection);
+    if (evidenceResult.kind === 'no-code-evidence') {
+      return err('no-code-evidence');
+    }
+    const evidence = evidenceResult.evidence;
 
     try {
       const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
@@ -613,12 +622,12 @@ export class ChatService {
   private async buildTargetedEvidence(
     target: EvidenceCandidate,
     connection: CaseContextConnection | null,
-  ): Promise<TargetedEvidence> {
+  ): Promise<TargetedEvidenceResult> {
     if (connection === null || target.automationFilePath === null) {
-      return {
-        uri: target.automationFilePath ?? target.automationKey ?? 'unknown',
-        excerpt: null,
-      };
+      const gated = gate(null);
+      return gated.kind === 'no-code-evidence'
+        ? gated
+        : { kind: 'no-code-evidence', reason: 'no-evidence' };
     }
 
     const { ref, excerpt } = await this.caseContextBuilder.locateForEvidence(
@@ -639,17 +648,22 @@ export class ChatService {
     provider: RepoConnectionProvider,
     blobUrl: string,
     excerpt: ExcerptOutcome,
-  ): TargetedEvidence {
+  ): TargetedEvidenceResult {
+    const gated = gate(excerpt);
+    if (gated.kind === 'no-code-evidence') {
+      return gated;
+    }
+
     if (excerpt.kind === 'declaration') {
       return {
-        uri: `${blobUrl}${lineAnchor(provider, excerpt.startLine, excerpt.endLine)}`,
-        excerpt: excerpt.excerpt,
+        kind: 'ok',
+        evidence: {
+          uri: `${blobUrl}${lineAnchor(provider, excerpt.startLine, excerpt.endLine)}`,
+          excerpt: gated.excerpt,
+        },
       };
     }
-    if (excerpt.kind === 'file-head') {
-      return { uri: blobUrl, excerpt: excerpt.excerpt };
-    }
-    return { uri: blobUrl, excerpt: null };
+    return { kind: 'ok', evidence: { uri: blobUrl, excerpt: gated.excerpt } };
   }
 
   private async loadSentProposalIds(

@@ -69,6 +69,7 @@ export type ChatError =
   | 'quota-exhausted'
   | 'invalid-suggested-cases'
   | 'human-documented'
-  | 'too-many-cases';
+  | 'too-many-cases'
+  | 'no-code-evidence';
 
 export const CHAT_ASSISTANT = Symbol('CHAT_ASSISTANT');

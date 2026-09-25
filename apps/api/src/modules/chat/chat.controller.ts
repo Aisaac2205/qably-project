@@ -102,6 +102,11 @@ function unwrap<T>(result: Result<T, ChatError>): T {
         code: result.error,
         message: 'Too many cases attached to this message',
       });
+    case 'no-code-evidence':
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message: 'This suggestion has no code-backed evidence to send',
+      });
   }
 }
 

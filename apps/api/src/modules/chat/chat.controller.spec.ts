@@ -206,6 +206,31 @@ describe('ChatController error codes', () => {
       ),
     ).rejects.toMatchObject({ response: { code: 'invalid-suggested-cases' } });
   });
+
+  it('throws a coded UnprocessableEntityException when the suggestion has no code-backed evidence', async () => {
+    const chat = fakeChat({ ok: false, error: 'no-code-evidence' });
+
+    await expect(
+      build(chat).sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-1',
+        { caseIndex: 0 },
+      ),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(
+      build(chat).sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-1',
+        { caseIndex: 0 },
+      ),
+    ).rejects.toMatchObject({ response: { code: 'no-code-evidence' } });
+  });
 });
 
 describe('ChatController guard and throttle wiring', () => {

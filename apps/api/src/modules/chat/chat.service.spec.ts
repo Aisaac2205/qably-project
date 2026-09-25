@@ -1177,6 +1177,115 @@ describe('ChatService', () => {
       expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     });
 
+    it('rejects a targeted suggestion with no repo connection, creating no rows', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      // default createPrisma() already resolves project.connection to null
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a targeted suggestion with no automationFilePath, creating no rows', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.testCase.findFirst.mockResolvedValue({
+        suiteId: 'suite-1',
+        automationKey: 'Checkout > rejects an expired card',
+        automationFilePath: null,
+        documentationSource: 'aeris',
+      });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a targeted suggestion when the source file cannot be located, creating no rows', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce(targetedAssistantRow)
+        .mockResolvedValueOnce({ content: userRow.content });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
+      const caseContextBuilder = fakeCaseContextBuilder(
+        undefined,
+        jest.fn().mockResolvedValue({
+          ref: 'sha123',
+          excerpt: { kind: 'unavailable', reason: 'http-404' },
+        }),
+      );
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+        undefined,
+        caseContextBuilder,
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
     it('recovers the existing proposal instead of a raw 500 when a double submit races the unique chatCaseKey', async () => {
       const prisma = createPrisma();
       prisma.chatMessage.findFirst.mockReset();
@@ -1187,6 +1296,15 @@ describe('ChatService', () => {
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 'winner-proposal' });
       prisma.extractedProposal.create.mockRejectedValue({ code: 'P2002' });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
       const service = build(
         prisma,
         createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
