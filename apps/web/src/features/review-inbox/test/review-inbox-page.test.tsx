@@ -398,6 +398,47 @@ describe('ReviewInboxPage', () => {
         expect(detailRegion.className).not.toMatch(/\bhidden\b/)
       })
     })
+
+    it('moves focus to the detail heading when a proposal row is tapped', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      await user.click(screen.getByText('Checkout with empty cart blocked'))
+
+      const heading = screen.getByRole('heading', { name: 'Checkout with empty cart blocked' })
+      expect(document.activeElement).toBe(heading)
+      expect(heading).toHaveAttribute('tabIndex', '-1')
+    })
+
+    it('returns focus to the originating queue row when the back button closes the detail', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      const row = screen.getByText('Checkout with empty cart blocked').closest('button')
+      expect(row).not.toBeNull()
+      await user.click(row as HTMLButtonElement)
+      await user.click(screen.getByRole('button', { name: 'Back to queue' }))
+
+      await waitFor(() => expect(document.activeElement).toBe(row))
+    })
+
+    it('falls back to focusing the queue container when the originating row is gone (e.g. after a decision)', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      await user.click(screen.getByText('Checkout with empty cart blocked'))
+      await user.click(screen.getByRole('button', { name: 'Approve & publish' }))
+      await waitFor(() =>
+        expect(screen.queryByText('Checkout with empty cart blocked')).not.toBeInTheDocument(),
+      )
+
+      await user.click(screen.getByRole('button', { name: 'Back to queue' }))
+
+      await waitFor(() => {
+        const queueRegion = screen.getByRole('region', { name: 'Proposals queue' })
+        expect(document.activeElement).toBe(queueRegion)
+      })
+    })
   })
 })
 

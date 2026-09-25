@@ -50,6 +50,7 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
     <li className="flex items-stretch">
       <button
         type="button"
+        id={`review-queue-row-${proposal.id}`}
         aria-current={isSelected ? 'true' : undefined}
         onClick={() => onSelect(proposal.id)}
         className={`group flex-1 min-w-0 text-left p-3.5 sm:p-4 transition-all duration-150 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-border/70 ${

@@ -116,16 +116,35 @@ export function ReviewInboxPage() {
     feedback.showInfo(next ? t('reviewInbox.duplicateFilterEnabled') : t('reviewInbox.duplicateFilterDisabled'))
   }, [filters, feedback, t])
 
-  const backButtonRef = useRef<HTMLButtonElement>(null)
+  const detailHeadingRef = useRef<HTMLHeadingElement>(null)
   const queueSectionRef = useRef<HTMLElement>(null)
+  const lastOpenedRowIdRef = useRef<string | undefined>(undefined)
   const wasDetailOpenOnMobileRef = useRef(isDetailOpenOnMobile)
 
   useEffect(() => {
     if (wasDetailOpenOnMobileRef.current === isDetailOpenOnMobile) return
     wasDetailOpenOnMobileRef.current = isDetailOpenOnMobile
-    if (isDetailOpenOnMobile) backButtonRef.current?.focus()
+
+    if (isDetailOpenOnMobile) {
+      detailHeadingRef.current?.focus()
+      return
+    }
+
+    const originatingRow =
+      lastOpenedRowIdRef.current === undefined
+        ? null
+        : document.getElementById(`review-queue-row-${lastOpenedRowIdRef.current}`)
+    if (originatingRow) originatingRow.focus()
     else queueSectionRef.current?.focus()
   }, [isDetailOpenOnMobile])
+
+  const handleSelectFromList = useCallback(
+    (id: string) => {
+      lastOpenedRowIdRef.current = id
+      selectFromList(id)
+    },
+    [selectFromList],
+  )
 
   useKeyboardShortcuts({
     a: () => {
@@ -166,7 +185,7 @@ export function ReviewInboxPage() {
               <ReviewInboxQueue
                 proposals={proposals}
                 selectedId={activeSelectedId}
-                onSelect={(id) => selectFromList(id)}
+                onSelect={handleSelectFromList}
                 selectedProjectId={filters.selectedProjectId}
                 onSelectProject={filters.setSelectedProjectId}
                 statusFilter={filters.statusFilter}
@@ -194,7 +213,6 @@ export function ReviewInboxPage() {
                 <>
                   <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-1.5 md:hidden">
                     <button
-                      ref={backButtonRef}
                       type="button"
                       onClick={closeDetail}
                       aria-label={t('reviewInbox.backToQueue')}
@@ -239,6 +257,7 @@ export function ReviewInboxPage() {
                     onApprove={handleApprove}
                     onReject={handleReject}
                     isSubmitting={isDeciding(selectedProposal.id)}
+                    headingRef={detailHeadingRef}
                   />
                 </>
               ) : (

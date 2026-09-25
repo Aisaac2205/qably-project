@@ -1,5 +1,6 @@
 'use client'
 
+import type { RefObject } from 'react'
 import Link from 'next/link'
 import type { ExtractedProposal } from '@qably/types'
 import {
@@ -25,6 +26,7 @@ interface InspectorHeaderProps {
   project: InspectorHeaderProject | undefined
   evidenceTitle: string | undefined
   formattedDate: string
+  headingRef?: RefObject<HTMLHeadingElement | null>
 }
 
 function getPriorityBadgeVariant(priority: ExtractedProposal['priority']): 'warn' | 'default' {
@@ -44,6 +46,7 @@ export function InspectorHeader({
   project,
   evidenceTitle,
   formattedDate,
+  headingRef,
 }: InspectorHeaderProps) {
   const { t } = useTranslation()
   const isApproved = proposal.status === 'approved'
@@ -90,7 +93,11 @@ export function InspectorHeader({
         </button>
       </div>
 
-      <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-default leading-snug">
+      <h3
+        ref={headingRef}
+        tabIndex={-1}
+        className="text-xl sm:text-2xl font-bold tracking-tight text-default leading-snug outline-none"
+      >
         {proposal.title}
       </h3>
 

@@ -1,5 +1,6 @@
 'use client'
 
+import type { RefObject } from 'react'
 import type { ExtractedProposal } from '@qably/types'
 import { DuplicateComparison } from './duplicate-comparison'
 import { InspectorHeader } from './inspector/inspector-header'
@@ -20,6 +21,7 @@ interface ReviewProposalInspectorProps {
   onApprove: (id: string) => void
   onReject: (id: string) => void
   isSubmitting?: boolean
+  headingRef?: RefObject<HTMLHeadingElement | null>
 }
 
 export function ReviewProposalInspector({
@@ -27,6 +29,7 @@ export function ReviewProposalInspector({
   onApprove,
   onReject,
   isSubmitting = false,
+  headingRef,
 }: ReviewProposalInspectorProps) {
   const { project } = useProject(proposal.projectId)
   const { proposal: detail } = useProposal(proposal.id)
@@ -53,6 +56,7 @@ export function ReviewProposalInspector({
           project={project}
           evidenceTitle={evidence?.title}
           formattedDate={formattedDate}
+          headingRef={headingRef}
         />
 
         {classification.kind !== 'none' && (
