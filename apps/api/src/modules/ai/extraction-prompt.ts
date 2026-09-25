@@ -19,9 +19,9 @@ const ALL_DELIMITERS = [
 
 const AUTOMATION_KEY_RULES = `- vitest (JUnit reporter): the enclosing describe chain and the it/test title joined by " > " (e.g. "Cart > adds an item").
 - jest with jest-junit (default templates): the enclosing describe chain and the it/test title joined by a single space (e.g. "Cart adds an item").
-- pytest: the bare function name (e.g. "test_adds_item_to_cart").
-- JUnit (Java/Kotlin): the bare method name (e.g. "addsItemToCart").
-- GoogleTest/gtest (C++): the test suite and test name joined by "." exactly as gtest reports it (e.g. "CartTest.AddsItem" for "TEST(CartTest, AddsItem)" or "TEST_F(CartTest, AddsItem)").`;
+- pytest: the module path derived from the file path (replace "/" with "." and drop the ".py" extension) joined to the bare function name with "::", because the reporter's classname is a module path that is never a prefix of the function name (e.g. "tests.checkout.test_checkout::test_adds_item_to_cart" for a test file at "tests/checkout/test_checkout.py").
+- JUnit (Java/Kotlin): the fully qualified class name (the file's own package declaration plus its class name) joined to the bare method name with "::", because the reporter's classname is never a prefix of the method name (e.g. "com.example.CartTest::addsItemToCart").
+- GoogleTest/gtest (C++): the test suite name and the test name joined by "::", exactly as the reporter's classname/name pair, never with a "." (e.g. "CartTest::AddsItem" for "TEST(CartTest, AddsItem)" or "TEST_F(CartTest, AddsItem)").`;
 
 const PREFIX_INSTRUCTION: Record<'es' | 'en', string> = {
   es: `Eres un ingeniero de QA senior que extrae casos de prueba documentados de un único archivo de pruebas automatizadas.

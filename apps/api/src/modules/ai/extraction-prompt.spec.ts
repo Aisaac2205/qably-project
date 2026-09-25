@@ -50,8 +50,36 @@ describe('buildSystemInstruction', () => {
       const instruction = buildSystemInstruction(locale);
 
       expect(instruction).toContain('"automationKey"');
-      expect(instruction).toContain('CartTest.AddsItem');
+      expect(instruction).toContain('CartTest::AddsItem');
       expect(instruction).toContain('test_adds_item_to_cart');
+    }
+  });
+
+  it('tells the model to build a composite classname::name key for pytest, since the reporter classname is never a prefix of the bare function name', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+
+      expect(instruction).toContain('pytest');
+      expect(instruction).toContain(
+        'tests.checkout.test_checkout::test_adds_item_to_cart',
+      );
+    }
+  });
+
+  it('tells the model to build a composite classname::name key for JUnit Java/Kotlin from the package plus class name', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+
+      expect(instruction).toContain('com.example.CartTest::addsItemToCart');
+    }
+  });
+
+  it('joins the gtest suite and test name with "::" like the reporter does, not with "."', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+
+      expect(instruction).toContain('CartTest::AddsItem');
+      expect(instruction).not.toContain('CartTest.AddsItem');
     }
   });
 
