@@ -52,6 +52,19 @@ describe('DuplicateComparison', () => {
     expect(screen.queryByText('steps-overlap')).not.toBeInTheDocument()
   })
 
+  it('labels the reasons list with an accessible heading', () => {
+    const classification: ProposalClassification = {
+      kind: 'possible_duplicate',
+      matchedCaseId: 'case-2',
+      score: 0.72,
+      reasons: ['same-title', 'steps-overlap'],
+    }
+
+    render(<DuplicateComparison classification={classification} />)
+
+    expect(screen.getByRole('list', { name: 'Why' })).toBeInTheDocument()
+  })
+
   it('shows a separate cross-suite note when the automation key also matches in another suite', () => {
     const classification: ProposalClassification = {
       kind: 'update',

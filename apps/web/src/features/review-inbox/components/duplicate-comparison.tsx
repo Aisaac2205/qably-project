@@ -1,5 +1,6 @@
 'use client'
 
+import { useId } from 'react'
 import { ArrowsClockwise, CopySimple } from '@phosphor-icons/react'
 import type { ProposalClassification } from '../api/review.api'
 import {
@@ -14,6 +15,7 @@ export function DuplicateComparison({
   classification: ProposalClassification
 }) {
   const { t } = useTranslation()
+  const reasonsHeadingId = useId()
 
   if (classification.kind === 'none') return null
 
@@ -38,7 +40,11 @@ export function DuplicateComparison({
       </div>
 
       {displayedReasons.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5">
+        <div>
+          <h4 className="sr-only" id={reasonsHeadingId}>
+            {t('reviewInbox.classificationReasonsHeading')}
+          </h4>
+          <ul className="flex flex-wrap gap-1.5" aria-labelledby={reasonsHeadingId}>
           {displayedReasons.map((reason) => (
             <li
               key={reason}
@@ -47,7 +53,8 @@ export function DuplicateComparison({
               {t(`reviewInbox.${classificationReasonKey(reason)}`)}
             </li>
           ))}
-        </ul>
+          </ul>
+        </div>
       )}
 
       {percent !== null && (
