@@ -2061,4 +2061,149 @@ describe('ChatService', () => {
       expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('locale fidelity for generated proposals', () => {
+    const esSuggestedCase = {
+      title: 'Rechaza una tarjeta caducada',
+      objective:
+        'Confirmar que el sistema rechaza tarjetas de crédito caducadas',
+      preconditions: ['Un carrito con un artículo de más de $10.000'],
+      steps: [
+        'Ir al pago',
+        'Introducir una tarjeta caducada',
+        'Pulsar «Confirmar pago»',
+      ],
+      expectedResult:
+        'El pago se rechaza y se muestra un mensaje de error en español',
+      priority: 'high' as const,
+    };
+
+    it('persists a Spanish-localized suggested case unaltered from the model reply into the assistant chat row', async () => {
+      const prisma = createPrisma();
+      prisma.user.findUnique.mockResolvedValue({ locale: 'es' });
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Aquí tienes un caso que vale la pena agregar.',
+        cases: [esSuggestedCase],
+        usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+        grounding: { status: 'grounded', references: [] },
+      });
+      const service = build(prisma, assistant);
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        { content: '¿Qué falta cubrir en el checkout?' },
+      );
+
+      expect(assistant.reply).toHaveBeenCalledWith(
+        containing({ locale: 'es' }),
+      );
+      expect(result.ok).toBe(true);
+      expect(prisma.chatMessage.create).toHaveBeenLastCalledWith(
+        containing({
+          data: containing({ suggestedCases: [esSuggestedCase] }),
+        }),
+      );
+    });
+
+    it('carries the exact Spanish-localized fields — not re-translated, truncated, or dropped — into the persisted ExtractedProposal row', async () => {
+      const prisma = createPrisma();
+      prisma.user.findUnique.mockResolvedValue({ locale: 'es' });
+      prisma.chatMessage.findFirst.mockReset();
+      prisma.chatMessage.findFirst
+        .mockResolvedValueOnce({
+          ...assistantRow,
+          suggestedCases: [esSuggestedCase],
+        })
+        .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+      prisma.project.findFirst.mockResolvedValue({
+        id: 'project-1',
+        name: 'Shop',
+        connection: {
+          provider: 'GITHUB',
+          repo: 'acme/shop',
+          encryptedAccessToken: null,
+        },
+      });
+      const caseContextBuilder = fakeCaseContextBuilder(
+        undefined,
+        jest.fn().mockResolvedValue({
+          ref: 'sha123',
+          excerpt: {
+            kind: 'file-head',
+            excerpt: 'export function checkout() {}',
+          },
+        }),
+      );
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+        undefined,
+        caseContextBuilder,
+      );
+
+      const result = await service.sendToReview(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        'message-2',
+        { caseIndex: 0 },
+      );
+
+      expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+      expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+        containing({
+          data: containing({
+            title: esSuggestedCase.title,
+            objective: esSuggestedCase.objective,
+            preconditions: esSuggestedCase.preconditions,
+            steps: esSuggestedCase.steps,
+            expectedResult: esSuggestedCase.expectedResult,
+            priority: esSuggestedCase.priority,
+          }),
+        }),
+      );
+    });
+
+    it('mirrors locale fidelity for an English-localized suggested case (cheap parity check)', async () => {
+      const enSuggestedCase = {
+        title: 'Rejects an expired card',
+        objective: 'Confirm the system rejects expired credit cards',
+        preconditions: ['A cart with an item over $10,000'],
+        steps: [
+          'Go to checkout',
+          'Enter an expired card',
+          'Press "Confirm payment"',
+        ],
+        expectedResult:
+          'The payment is refused and an English error message is shown',
+        priority: 'high' as const,
+      };
+      const prisma = createPrisma();
+      prisma.user.findUnique.mockResolvedValue({ locale: 'en' });
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [enSuggestedCase],
+        usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+        grounding: { status: 'grounded', references: [] },
+      });
+      const service = build(prisma, assistant);
+
+      await service.sendMessage(org, user, 'project-1', 'thread-1', {
+        content: 'What is missing in checkout?',
+      });
+
+      expect(assistant.reply).toHaveBeenCalledWith(
+        containing({ locale: 'en' }),
+      );
+      expect(prisma.chatMessage.create).toHaveBeenLastCalledWith(
+        containing({ data: containing({ suggestedCases: [enSuggestedCase] }) }),
+      );
+    });
+  });
 });
