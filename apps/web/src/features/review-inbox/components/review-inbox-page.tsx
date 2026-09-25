@@ -6,18 +6,20 @@ import { StateView } from '@/components/ui/state-view'
 import { useInboxPage } from '../hooks/use-inbox-page'
 import { useInboxCounts } from '../hooks/use-inbox-counts'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
+import { decisionConflictMessageKey } from '../lib/decision-error'
 import { useReviewInboxFilters } from '../hooks/use-review-inbox-filters'
 import { useReviewInboxSelection } from '../hooks/use-review-inbox-selection'
 import { useInboxFeedback } from '../hooks/use-inbox-feedback'
 import type { ReviewInboxStatusCounts } from './review-inbox-queue'
 import { useTranslation } from '@/lib/i18n'
+import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
 import { ReviewInboxFeedback } from './review-inbox-feedback'
 
 export function ReviewInboxPage() {
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
   const filters = useReviewInboxFilters()
   const feedback = useInboxFeedback()
 
@@ -49,7 +51,7 @@ export function ReviewInboxPage() {
     proposals,
   )
 
-  const { approve, reject } = useProposalDecision({
+  const { approve, reject, isDeciding } = useProposalDecision({
     onApproved: (proposalId, result) => {
       const proposal = proposals.find((p) => p.id === proposalId)
       feedback.showSuccess(
@@ -61,19 +63,38 @@ export function ReviewInboxPage() {
             }
           : undefined,
       )
-      selectNextPending()
     },
     onRejected: () => {
       feedback.showInfo(t('reviewInbox.rejectedSuccess'))
-      selectNextPending()
     },
-    onError: (code) => {
+    onError: (code, _proposalId, conflict) => {
+      if (code === 'invalid-transition' && conflict !== null) {
+        feedback.showError(
+          t(`aiReview.${decisionConflictMessageKey(conflict.action)}`, {
+            name: conflict.decidedBy.name,
+            time: formatRelative(conflict.decidedAt, locale, ''),
+          }),
+        )
+        return
+      }
       feedback.showError(t(`aiReview.${decisionErrorKey(code)}`))
     },
   })
 
-  const handleApprove = useCallback((proposalId: string) => approve(proposalId), [approve])
-  const handleReject = useCallback((proposalId: string) => reject(proposalId), [reject])
+  const handleApprove = useCallback(
+    (proposalId: string) => {
+      approve(proposalId)
+      selectNextPending()
+    },
+    [approve, selectNextPending],
+  )
+  const handleReject = useCallback(
+    (proposalId: string) => {
+      reject(proposalId)
+      selectNextPending()
+    },
+    [reject, selectNextPending],
+  )
 
   const toggleDuplicateOnly = useCallback(() => {
     const next = !filters.duplicateOnly
@@ -141,6 +162,7 @@ export function ReviewInboxPage() {
                   proposal={selectedProposal}
                   onApprove={handleApprove}
                   onReject={handleReject}
+                  isSubmitting={isDeciding(selectedProposal.id)}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center p-8">

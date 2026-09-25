@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { ReviewInboxPage } from '../components/review-inbox-page'
@@ -175,6 +175,55 @@ describe('ReviewInboxPage', () => {
       'href',
       expect.stringContaining('/suites/suite-1'),
     )
+  })
+
+  it('calls approve only once when the button is clicked twice before the request resolves', async () => {
+    let resolveApproval!: (value: Awaited<ReturnType<typeof approveProposal>>) => void
+    vi.mocked(approveProposal).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveApproval = resolve
+        }),
+    )
+    vi.mocked(approveProposal).mockClear()
+    renderWithQuery(<ReviewInboxPage />)
+
+    const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
+    await act(async () => {
+      fireEvent.click(approveButton)
+      fireEvent.click(approveButton)
+    })
+
+    resolveApproval({
+      createdNewCase: true,
+      testCaseId: 'case-1',
+      testCaseName: 'Empties the cart',
+      suiteId: 'suite-1',
+      versionId: 'version-1',
+      version: 1,
+      decisionId: 'decision-1',
+    })
+
+    await waitFor(() => expect(vi.mocked(approveProposal)).toHaveBeenCalledTimes(1))
+  })
+
+  it('shows who decided and when on an invalid-transition conflict', async () => {
+    vi.mocked(approveProposal).mockRejectedValueOnce(
+      new ApiError(409, 'Conflict', 'invalid-transition', {
+        decision: {
+          action: 'approved',
+          decidedAt: new Date().toISOString(),
+          decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+        },
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithQuery(<ReviewInboxPage />)
+
+    const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
+    await user.click(approveButton)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Grace Hopper already approved/i)
   })
 
   it('shows a clear error toast instead of doing nothing when approve fails because the proposal has no steps', async () => {

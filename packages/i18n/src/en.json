@@ -616,6 +616,8 @@
     "actionReject": "Reject",
     "actionSkip": "Skip",
     "decisionAlreadyDecided": "This case was already decided.",
+    "decisionConflictApproved": "{{name}} already approved this {{time}}.",
+    "decisionConflictRejected": "{{name}} already rejected this {{time}}.",
     "decisionMissingEvidence": "The evidence backing this proposal is no longer available.",
     "decisionMissingSuite": "This project has no suite to publish the official case into.",
     "decisionNameTaken": "Another official case in this suite already uses that title.",

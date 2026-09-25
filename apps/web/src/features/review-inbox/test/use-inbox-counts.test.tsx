@@ -6,14 +6,22 @@ import {
   inboxCountsRefetchInterval,
   useInboxCounts,
 } from '@/features/review-inbox/hooks/use-inbox-counts'
+import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
 import * as reviewApi from '@/features/review-inbox/api/review.api'
 
-function wrapper({ children }: { children: ReactNode }) {
-  const client = new QueryClient({
+function makeClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
   })
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>
 }
+
+function wrapperFor(client: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  }
+}
+
+const wrapper = wrapperFor(makeClient())
 
 describe('inboxCountsRefetchInterval', () => {
   it('pauses polling once the query is in an error state', () => {
@@ -67,5 +75,47 @@ describe('useInboxCounts', () => {
       rejected: 0,
       changes_requested: 0,
     })
+  })
+
+  it('does not invalidate the inbox lists on the first load', async () => {
+    vi.spyOn(reviewApi, 'getInboxCounts').mockResolvedValue({
+      byStatus: { in_review: 3, approved: 0, rejected: 0, changes_requested: 0 },
+      version: 'v1',
+    })
+    const client = makeClient()
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+
+    const { result } = renderHook(() => useInboxCounts({}), { wrapper: wrapperFor(client) })
+
+    await waitFor(() => expect(result.current.version).toBe('v1'))
+    expect(invalidateSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['review', 'inbox'] }),
+    )
+  })
+
+  it('invalidates the inbox lists when the counts version changes on a later poll', async () => {
+    const spy = vi
+      .spyOn(reviewApi, 'getInboxCounts')
+      .mockResolvedValueOnce({
+        byStatus: { in_review: 3, approved: 0, rejected: 0, changes_requested: 0 },
+        version: 'v1',
+      })
+      .mockResolvedValueOnce({
+        byStatus: { in_review: 2, approved: 1, rejected: 0, changes_requested: 0 },
+        version: 'v2',
+      })
+    const client = makeClient()
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+
+    const { result } = renderHook(() => useInboxCounts({}), { wrapper: wrapperFor(client) })
+    await waitFor(() => expect(result.current.version).toBe('v1'))
+
+    await client.refetchQueries({ queryKey: reviewKeys.inboxCounts({}) })
+    await waitFor(() => expect(result.current.version).toBe('v2'))
+
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['review', 'inbox'] }),
+    )
   })
 })
