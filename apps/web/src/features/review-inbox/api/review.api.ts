@@ -13,8 +13,32 @@ export interface ProposalFilters {
   search?: string
 }
 
+export type ProposalDuplicateKind = 'none' | 'update' | 'possible_duplicate'
+
+export type DuplicateReason =
+  | 'same-automation-key'
+  | 'same-title'
+  | 'title-overlap'
+  | 'steps-overlap'
+  | 'expected-result-overlap'
+  | 'cross-suite-key'
+
+export interface ProposalClassification {
+  kind: ProposalDuplicateKind
+  matchedCaseId: string | null
+  score: number | null
+  reasons: DuplicateReason[]
+}
+
+export interface InboxSuite {
+  id: string
+  name: string
+}
+
 export interface ProposalListItem extends ExtractedProposal {
   evidenceTitle: string
+  suite?: InboxSuite | null
+  classification?: ProposalClassification
 }
 
 export interface ProposalDetail extends ProposalListItem {

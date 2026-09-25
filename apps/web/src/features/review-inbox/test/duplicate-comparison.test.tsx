@@ -1,77 +1,85 @@
 import { render, screen } from '@testing-library/react'
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { describe, it, expect } from 'vitest'
 import { DuplicateComparison } from '@/features/review-inbox/components/duplicate-comparison'
-import * as duplicatesApi from '@/features/review-inbox/api/duplicates.api'
-
-vi.mock('@/features/review-inbox/api/duplicates.api')
-
-function renderComparison(proposalId: string) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  })
-
-  return render(
-    <QueryClientProvider client={client}>
-      <DuplicateComparison proposalId={proposalId} />
-    </QueryClientProvider>,
-  )
-}
+import type { ProposalClassification } from '@/features/review-inbox/api/review.api'
 
 describe('DuplicateComparison', () => {
-  afterEach(() => {
-    vi.mocked(duplicatesApi.getDuplicateCandidates).mockReset()
+  it('renders nothing when the classification kind is none', () => {
+    const classification: ProposalClassification = {
+      kind: 'none',
+      matchedCaseId: null,
+      score: null,
+      reasons: [],
+    }
+
+    const { container } = render(<DuplicateComparison classification={classification} />)
+
+    expect(container).toBeEmptyDOMElement()
   })
 
-  it('shows the not-found message when the proposal has no plausible duplicates', async () => {
-    vi.mocked(duplicatesApi.getDuplicateCandidates).mockResolvedValue([])
+  it('explains an update classification without ever showing a raw reason code', () => {
+    const classification: ProposalClassification = {
+      kind: 'update',
+      matchedCaseId: 'case-1',
+      score: 1,
+      reasons: ['same-automation-key'],
+    }
 
-    renderComparison('proposal-1')
+    render(<DuplicateComparison classification={classification} />)
 
-    expect(
-      await screen.findByText(/could not be located/i),
-    ).toBeInTheDocument()
-  })
-
-  it('renders each ranked candidate with its title, match reason, and expected result', async () => {
-    vi.mocked(duplicatesApi.getDuplicateCandidates).mockResolvedValue([
-      {
-        id: 'case-1',
-        title: 'Checkout with empty cart blocked',
-        steps: ['Open checkout with an empty cart'],
-        expectedResult: 'The checkout button is disabled',
-        matchReason: 'automation-key',
-      },
-      {
-        id: 'case-2',
-        title: 'Checkout blocks empty carts',
-        steps: ['Open checkout with an empty cart'],
-        expectedResult: 'An error message is shown',
-        matchReason: 'token-overlap',
-      },
-    ])
-
-    renderComparison('proposal-1')
-
-    expect(
-      await screen.findByText('Checkout with empty cart blocked'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('The checkout button is disabled')).toBeInTheDocument()
+    expect(screen.getByText(/updates an existing case in this suite/i)).toBeInTheDocument()
     expect(screen.getByText('Same automation key')).toBeInTheDocument()
-    expect(screen.getByText('Checkout blocks empty carts')).toBeInTheDocument()
-    expect(screen.getByText('Similar title')).toBeInTheDocument()
+    expect(screen.queryByText('same-automation-key')).not.toBeInTheDocument()
   })
 
-  it('shows a dedicated failure message when the duplicates query fails, distinct from the empty state', async () => {
-    vi.mocked(duplicatesApi.getDuplicateCandidates).mockRejectedValue(
-      new Error('network error'),
-    )
+  it('explains a possible-duplicate classification with its reasons and a human-readable score', () => {
+    const classification: ProposalClassification = {
+      kind: 'possible_duplicate',
+      matchedCaseId: 'case-2',
+      score: 0.72,
+      reasons: ['same-title', 'steps-overlap'],
+    }
 
-    renderComparison('proposal-1')
+    render(<DuplicateComparison classification={classification} />)
 
     expect(
-      await screen.findByText(/could not be completed/i),
+      screen.getByText(/possible duplicate of an existing case in this suite/i),
     ).toBeInTheDocument()
-    expect(screen.queryByText(/could not be located/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Same title')).toBeInTheDocument()
+    expect(screen.getByText('Similar steps')).toBeInTheDocument()
+    expect(screen.getByText('72% match')).toBeInTheDocument()
+    expect(screen.queryByText('same-title')).not.toBeInTheDocument()
+    expect(screen.queryByText('steps-overlap')).not.toBeInTheDocument()
+  })
+
+  it('shows a separate cross-suite note when the automation key also matches in another suite', () => {
+    const classification: ProposalClassification = {
+      kind: 'update',
+      matchedCaseId: 'case-1',
+      score: 1,
+      reasons: ['same-automation-key', 'cross-suite-key'],
+    }
+
+    render(<DuplicateComparison classification={classification} />)
+
+    expect(
+      screen.getByText(/this automation key also exists in another suite/i),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('cross-suite-key')).not.toBeInTheDocument()
+  })
+
+  it('omits the cross-suite note when the reason is absent', () => {
+    const classification: ProposalClassification = {
+      kind: 'update',
+      matchedCaseId: 'case-1',
+      score: 1,
+      reasons: ['same-automation-key'],
+    }
+
+    render(<DuplicateComparison classification={classification} />)
+
+    expect(
+      screen.queryByText(/this automation key also exists in another suite/i),
+    ).not.toBeInTheDocument()
   })
 })

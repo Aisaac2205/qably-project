@@ -20,8 +20,3 @@ export const reviewKeys = {
   inboxCounts: (filters: { projectId?: string; search?: string } = {}) =>
     ['review', 'inbox-counts', filters.projectId ?? 'all', filters.search?.trim() || ''] as const,
 }
-
-export const duplicateKeys = {
-  all: ['duplicates'] as const,
-  detail: (proposalId: string) => ['duplicates', proposalId] as const,
-}

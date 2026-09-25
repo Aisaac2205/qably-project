@@ -7,11 +7,16 @@ import { ManualReviewNotice } from './inspector/manual-review-notice'
 import { ProposalContentSections } from './inspector/proposal-content-sections'
 import { InspectorEvidence } from './inspector/inspector-evidence'
 import { DecisionToolbar } from './inspector/decision-toolbar'
+import type { InboxSuite, ProposalClassification } from '../api/review.api'
+import { resolveClassification } from '../lib/classification-reason'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProposal } from '../hooks/use-proposals'
 
 interface ReviewProposalInspectorProps {
-  proposal: ExtractedProposal
+  proposal: ExtractedProposal & {
+    suite?: InboxSuite | null
+    classification?: ProposalClassification
+  }
   onApprove: (id: string) => void
   onReject: (id: string) => void
   isSubmitting?: boolean
@@ -29,6 +34,7 @@ export function ReviewProposalInspector({
   const links = detail?.links ?? []
 
   const needsManualReview = proposal.needsManualReview || proposal.steps.length === 0
+  const classification = resolveClassification(proposal.classification)
 
   const formattedDate = proposal.createdAt
     ? new Date(proposal.createdAt).toLocaleDateString(undefined, {
@@ -49,7 +55,9 @@ export function ReviewProposalInspector({
           formattedDate={formattedDate}
         />
 
-        {proposal.possibleDuplicate && <DuplicateComparison proposalId={proposal.id} />}
+        {classification.kind !== 'none' && (
+          <DuplicateComparison classification={classification} />
+        )}
 
         {needsManualReview && <ManualReviewNotice proposal={proposal} />}
 

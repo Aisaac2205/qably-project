@@ -40,4 +40,58 @@ describe('ReviewQueueRow', () => {
       screen.getByText(/could not be found at that commit|no se pudo encontrar/i),
     ).toBeInTheDocument()
   })
+
+  it('shows an update badge, never "possible duplicate", when the persisted classification is update', () => {
+    render(
+      <ReviewQueueRow
+        proposal={proposal({
+          classification: {
+            kind: 'update',
+            matchedCaseId: 'case-1',
+            score: 1,
+            reasons: ['same-automation-key'],
+          },
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Updates an existing case in this suite')).toBeInTheDocument()
+    expect(screen.queryByText('Possible duplicate')).not.toBeInTheDocument()
+  })
+
+  it('shows a possible-duplicate badge scoped to the suite when the persisted classification says so', () => {
+    render(
+      <ReviewQueueRow
+        proposal={proposal({
+          classification: {
+            kind: 'possible_duplicate',
+            matchedCaseId: 'case-2',
+            score: 0.72,
+            reasons: ['same-title'],
+          },
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByText('Possible duplicate of an existing case in this suite'),
+    ).toBeInTheDocument()
+  })
+
+  it('shows neither badge when the classification is absent or none', () => {
+    render(
+      <ReviewQueueRow proposal={proposal()} isSelected={false} onSelect={vi.fn()} />,
+    )
+
+    expect(
+      screen.queryByText('Updates an existing case in this suite'),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Possible duplicate of an existing case in this suite'),
+    ).not.toBeInTheDocument()
+  })
 })

@@ -1,63 +1,65 @@
 'use client'
 
-import { CopySimple } from '@phosphor-icons/react'
+import { ArrowsClockwise, CopySimple } from '@phosphor-icons/react'
+import type { ProposalClassification } from '../api/review.api'
+import {
+  classificationReasonKey,
+  classificationScorePercent,
+} from '../lib/classification-reason'
 import { useTranslation } from '@/lib/i18n'
-import { Skeleton } from '@/components/ui/skeleton'
-import { useDuplicateCandidates } from '../hooks/use-duplicate-candidates'
-import type { DuplicateMatchReason } from '@qably/types'
 
-const REASON_KEY: Record<DuplicateMatchReason, string> = {
-  'automation-key': 'aiReview.duplicateReasonAutomationKey',
-  title: 'aiReview.duplicateReasonSameTitle',
-  'token-overlap': 'aiReview.duplicateReasonSimilarTitle',
-}
-
-export function DuplicateComparison({ proposalId }: { proposalId: string }) {
+export function DuplicateComparison({
+  classification,
+}: {
+  classification: ProposalClassification
+}) {
   const { t } = useTranslation()
-  const { candidates, isLoading, isError } = useDuplicateCandidates(proposalId)
-  const showError = !isLoading && isError
-  const showNotFound = !isLoading && !isError && candidates.length === 0
-  const showCandidates = !isLoading && !isError && candidates.length > 0
+
+  if (classification.kind === 'none') return null
+
+  const isUpdate = classification.kind === 'update'
+  const percent = classificationScorePercent(classification.score)
+  const hasCrossSuiteNote = classification.reasons.includes('cross-suite-key')
+  const displayedReasons = classification.reasons.filter(
+    (reason) => reason !== 'cross-suite-key',
+  )
 
   return (
     <div className="rounded border border-warn/30 bg-warn-bg p-3.5 space-y-2">
       <div className="flex items-center gap-2 text-sm font-semibold text-warn">
-        <CopySimple size={16} weight="bold" aria-hidden="true" />
-        {t('aiReview.possibleDuplicate')}
+        {isUpdate ? (
+          <ArrowsClockwise size={16} weight="bold" aria-hidden="true" />
+        ) : (
+          <CopySimple size={16} weight="bold" aria-hidden="true" />
+        )}
+        {isUpdate
+          ? t('reviewInbox.classificationUpdate')
+          : t('reviewInbox.classificationPossibleDuplicate')}
       </div>
 
-      {isLoading && (
-        <div className="space-y-1.5" role="status" aria-label={t('aiReview.possibleDuplicate')}>
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-3 w-1/3" />
-          <Skeleton className="h-3 w-full" />
-        </div>
-      )}
-
-      {showError && (
-        <p className="text-sm text-muted leading-relaxed">
-          {t('aiReview.duplicateCheckFailed')}
-        </p>
-      )}
-
-      {showNotFound && (
-        <p className="text-sm text-muted leading-relaxed">
-          {t('aiReview.duplicateNotFound')}
-        </p>
-      )}
-
-      {showCandidates && (
-        <ul className="space-y-2.5">
-          {candidates.map((candidate) => (
-            <li key={candidate.id} className="space-y-0.5">
-              <p className="text-sm font-medium text-default truncate">
-                {candidate.title}
-              </p>
-              <p className="text-xs text-muted">{t(REASON_KEY[candidate.matchReason])}</p>
-              <p className="text-xs text-muted truncate">{candidate.expectedResult}</p>
+      {displayedReasons.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5">
+          {displayedReasons.map((reason) => (
+            <li
+              key={reason}
+              className="rounded-full border border-warn/30 bg-surface px-2 py-0.5 text-xs text-default"
+            >
+              {t(`reviewInbox.${classificationReasonKey(reason)}`)}
             </li>
           ))}
         </ul>
+      )}
+
+      {percent !== null && (
+        <p className="text-xs text-muted">
+          {t('reviewInbox.classificationScore', { percent })}
+        </p>
+      )}
+
+      {hasCrossSuiteNote && (
+        <p className="text-xs text-muted leading-relaxed">
+          {t('reviewInbox.classificationCrossSuiteNote')}
+        </p>
       )}
     </div>
   )
