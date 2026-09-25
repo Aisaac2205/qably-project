@@ -70,6 +70,7 @@ export type ChatError =
   | 'invalid-suggested-cases'
   | 'human-documented'
   | 'too-many-cases'
-  | 'no-code-evidence';
+  | 'no-code-evidence'
+  | 'file-unreadable';
 
 export const CHAT_ASSISTANT = Symbol('CHAT_ASSISTANT');

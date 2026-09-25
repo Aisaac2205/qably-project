@@ -14,6 +14,7 @@ import { buildBlobUrl } from '../repository/source-reader';
 import { gate } from './chat-evidence-gate';
 import {
   CaseContextBuilder,
+  type AttachedFileContext,
   type CaseContextCandidate,
   type CaseContextConnection,
   type EvidenceCandidate,
@@ -378,6 +379,22 @@ export class ChatService {
       if (attachedRows.length !== caseIds.length) return err('case-not-found');
     }
 
+    const filePath = input.filePath;
+    const connection =
+      caseIds.length > 0 || filePath !== undefined
+        ? await this.findConnection(projectId)
+        : null;
+
+    let attachedFile: AttachedFileContext | undefined;
+    if (filePath !== undefined) {
+      const resolved = await this.resolveAttachedFileContext(
+        filePath,
+        connection,
+      );
+      if (resolved.kind === 'no-code-evidence') return err('file-unreadable');
+      attachedFile = resolved.context;
+    }
+
     const history = await this.prisma.chatMessage.findMany({
       where: { threadId },
       orderBy: { createdAt: 'desc' },
@@ -393,22 +410,23 @@ export class ChatService {
         role: 'user',
         content: input.content,
         attachedCaseIds: caseIds,
+        attachedFilePath: filePath ?? null,
       },
     });
 
     const withinBudget = await this.dailyBudget.tryConsume(NOT_BYOK);
     if (!withinBudget) return err('quota-exhausted');
 
-    const [context, locale, connection] = await Promise.all([
+    const [context, locale] = await Promise.all([
       this.buildContext(projectId),
       this.resolveLocale(user.id),
-      caseIds.length > 0 ? this.findConnection(projectId) : null,
     ]);
     const caseContext =
-      caseIds.length > 0
+      caseIds.length > 0 || attachedFile !== undefined
         ? await this.caseContextBuilder.build(
             attachedRows.map(toCaseContextCandidate),
             connection,
+            attachedFile,
           )
         : undefined;
     const outcome = await this.assistant.reply({
@@ -733,6 +751,32 @@ export class ChatService {
       filePath,
     );
     return { kind: 'ok', evidence: { uri, excerpt: gated.excerpt } };
+  }
+
+  private async resolveAttachedFileContext(
+    filePath: string,
+    connection: CaseContextConnection | null,
+  ): Promise<
+    { kind: 'ok'; context: AttachedFileContext } | { kind: 'no-code-evidence' }
+  > {
+    if (connection === null) {
+      return { kind: 'no-code-evidence' };
+    }
+
+    const { ref, excerpt } = await this.caseContextBuilder.locateForEvidence(
+      { automationKey: null, automationFilePath: filePath },
+      connection,
+    );
+    if (excerpt.kind === 'unavailable') {
+      return { kind: 'no-code-evidence' };
+    }
+
+    const gated = gate(excerpt);
+    if (gated.kind === 'no-code-evidence') {
+      return { kind: 'no-code-evidence' };
+    }
+
+    return { kind: 'ok', context: { path: filePath, ref, excerpt } };
   }
 
   private toTargetedEvidence(

@@ -369,6 +369,109 @@ describe('CaseContextBuilder', () => {
     );
   });
 
+  it('renders an attached file as a File: [F1] section inside the same CASE_CONTEXT block', async () => {
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(jest.fn()),
+      fakeEncryption(),
+      fakeRefResolver(),
+    );
+
+    const turn = await builder.build([], connection(), {
+      path: 'src/checkout.spec.ts',
+      ref: 'abc123',
+      excerpt: { kind: 'file-head', excerpt: 'export function checkout() {}' },
+    });
+
+    expect(turn.startsWith(CASE_CONTEXT_OPEN)).toBe(true);
+    expect(turn.trimEnd().endsWith(CASE_CONTEXT_CLOSE)).toBe(true);
+    expect(turn).toContain('File: [F1]');
+    expect(turn).toContain('src/checkout.spec.ts');
+    expect(turn).toContain('abc123');
+    expect(turn).toContain('export function checkout() {}');
+  });
+
+  it('places the attached file section before the case sections', async () => {
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'it("x", () => {})',
+      truncated: false,
+    });
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(read),
+      fakeEncryption(),
+      fakeRefResolver(),
+    );
+
+    const turn = await builder.build([candidate()], connection(), {
+      path: 'src/checkout.spec.ts',
+      ref: 'abc123',
+      excerpt: { kind: 'file-head', excerpt: 'export function checkout() {}' },
+    });
+
+    expect(turn.indexOf('File: [F1]')).toBeGreaterThanOrEqual(0);
+    expect(turn.indexOf('File: [F1]')).toBeLessThan(
+      turn.indexOf('Case ID: case-1'),
+    );
+  });
+
+  it('counts the attached file excerpt first in the message budget, dropping case excerpts sooner', async () => {
+    const bigCaseContent = 'z'.repeat(MAX_EXCERPT_LENGTH_PER_CASE);
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: bigCaseContent,
+      truncated: false,
+    });
+    const cases = [
+      candidate({ id: 'case-1', automationFilePath: 'a.ts' }),
+      candidate({ id: 'case-2', automationFilePath: 'b.ts' }),
+      candidate({ id: 'case-3', automationFilePath: 'c.ts' }),
+      candidate({ id: 'case-4', automationFilePath: 'd.ts' }),
+    ];
+
+    const withoutFile = await new CaseContextBuilder(
+      fakeSourceReader(read),
+      fakeEncryption(),
+      fakeRefResolver(),
+    ).build(cases, connection());
+
+    expect(withoutFile).not.toContain(
+      'omitted (message context budget reached)',
+    );
+
+    const withFile = await new CaseContextBuilder(
+      fakeSourceReader(read),
+      fakeEncryption(),
+      fakeRefResolver(),
+    ).build(cases, connection(), {
+      path: 'big-file.ts',
+      ref: 'abc123',
+      excerpt: {
+        kind: 'file-head',
+        excerpt: 'y'.repeat(MAX_EXCERPT_LENGTH_PER_CASE),
+      },
+    });
+
+    expect(withFile).toContain('File: [F1]');
+    expect(withFile).toContain('omitted (message context budget reached)');
+  });
+
+  it('renders only the file section when there are no attached cases', async () => {
+    const builder = new CaseContextBuilder(
+      fakeSourceReader(jest.fn()),
+      fakeEncryption(),
+      fakeRefResolver(),
+    );
+
+    const turn = await builder.build([], null, {
+      path: 'src/checkout.spec.ts',
+      ref: 'HEAD',
+      excerpt: { kind: 'file-head', excerpt: 'export function checkout() {}' },
+    });
+
+    expect(turn).toContain('File: [F1]');
+    expect(turn).not.toContain('Case ID:');
+  });
+
   it('normalizes an absolute CI runner file path stored on the case before reading the source', async () => {
     const read = jest.fn().mockResolvedValue({
       kind: 'content',

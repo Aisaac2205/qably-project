@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_ATTACHED_CASES } from '@qably/types';
+import { isSafeRepoRelativePath, MAX_ATTACHED_CASES } from '@qably/types';
 
 export { MAX_ATTACHED_CASES };
 
@@ -18,6 +18,13 @@ const attachedCaseIdsSchema = z
 export const sendMessageSchema = z.object({
   content: z.string().trim().min(1).max(4000),
   caseIds: attachedCaseIdsSchema.optional(),
+  filePath: z
+    .string()
+    .trim()
+    .min(1)
+    .max(300)
+    .refine(isSafeRepoRelativePath)
+    .optional(),
 });
 
 export const sendToReviewSchema = z.object({

@@ -349,6 +349,129 @@ describe('ChatService', () => {
     expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects sendMessage with an attached file path when the project has no repo connection, before creating any row or spending budget', async () => {
+    const prisma = createPrisma();
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const dailyBudget = fakeDailyBudget(tryConsume);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      undefined,
+      dailyBudget,
+    );
+
+    const result = await service.sendMessage(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      {
+        content: 'What does this do?',
+        filePath: 'src/missing.ts',
+      },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'file-unreadable' });
+    expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+    expect(tryConsume).not.toHaveBeenCalled();
+  });
+
+  it('rejects sendMessage when the attached file path cannot be read from a connected repo, before creating any row or spending budget', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    const caseContextBuilder = fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: { kind: 'unavailable', reason: 'http-404' },
+      }),
+    );
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const dailyBudget = fakeDailyBudget(tryConsume);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+      dailyBudget,
+    );
+
+    const result = await service.sendMessage(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      {
+        content: 'What does this do?',
+        filePath: 'src/missing.ts',
+      },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'file-unreadable' });
+    expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+    expect(tryConsume).not.toHaveBeenCalled();
+  });
+
+  it('stores the attached file path on the user message and grounds the case context in it when the path is readable', async () => {
+    const prisma = createPrisma();
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    const caseContextBuilder = fakeCaseContextBuilder();
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is what I found.',
+      cases: [],
+      usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+    });
+    const service = build(prisma, assistant, undefined, caseContextBuilder);
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What does checkout do?',
+      filePath: 'src/checkout.spec.ts',
+    });
+
+    expect(prisma.chatMessage.create).toHaveBeenNthCalledWith(
+      1,
+      containing({
+        data: containing({ attachedFilePath: 'src/checkout.spec.ts' }),
+      }),
+    );
+    expect(caseContextBuilder.build).toHaveBeenCalledWith(
+      [],
+      {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+      {
+        path: 'src/checkout.spec.ts',
+        ref: 'sha123',
+        excerpt: {
+          kind: 'declaration',
+          excerpt: 'it("rejects an expired card", () => {})',
+          startLine: 10,
+          endLine: 12,
+        },
+      },
+    );
+  });
+
   it('creates a SOURCE_EXCERPT proposal from the file path attached to the preceding user message, with no targetTestCaseId', async () => {
     const prisma = createPrisma();
     prisma.chatMessage.findFirst.mockReset();
@@ -1201,6 +1324,7 @@ describe('ChatService', () => {
           repo: 'acme/shop',
           encryptedAccessToken: null,
         },
+        undefined,
       );
       expect(assistant.reply).toHaveBeenCalledWith(
         containing({

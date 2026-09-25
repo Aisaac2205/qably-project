@@ -231,6 +231,23 @@ describe('ChatController error codes', () => {
       ),
     ).rejects.toMatchObject({ response: { code: 'no-code-evidence' } });
   });
+
+  it('throws a coded UnprocessableEntityException when the attached file cannot be read', async () => {
+    const chat = fakeChat({ ok: false, error: 'file-unreadable' });
+
+    await expect(
+      build(chat).send(org, user, 'project-1', 'thread-1', {
+        content: 'Hi',
+        filePath: 'src/missing.ts',
+      }),
+    ).rejects.toBeInstanceOf(UnprocessableEntityException);
+    await expect(
+      build(chat).send(org, user, 'project-1', 'thread-1', {
+        content: 'Hi',
+        filePath: 'src/missing.ts',
+      }),
+    ).rejects.toMatchObject({ response: { code: 'file-unreadable' } });
+  });
 });
 
 describe('ChatController guard and throttle wiring', () => {

@@ -59,3 +59,66 @@ describe('sendMessageSchema.caseIds', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('sendMessageSchema.filePath', () => {
+  it('accepts a message with no filePath', () => {
+    const result = sendMessageSchema.safeParse({ content: 'hello' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts and preserves a safe repo-relative filePath', () => {
+    const result = sendMessageSchema.safeParse({
+      content: 'hello',
+      filePath: 'src/checkout.spec.ts',
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.filePath).toBe('src/checkout.spec.ts');
+  });
+
+  it('rejects a path traversal attempt', () => {
+    const result = sendMessageSchema.safeParse({
+      content: 'hello',
+      filePath: '../../etc/passwd',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an absolute path', () => {
+    const result = sendMessageSchema.safeParse({
+      content: 'hello',
+      filePath: '/etc/passwd',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a backslash path', () => {
+    const result = sendMessageSchema.safeParse({
+      content: 'hello',
+      filePath: 'src\\checkout.spec.ts',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty filePath', () => {
+    const result = sendMessageSchema.safeParse({
+      content: 'hello',
+      filePath: '',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a filePath over 300 characters', () => {
+    const result = sendMessageSchema.safeParse({
+      content: 'hello',
+      filePath: `${'a'.repeat(298)}.ts`,
+    });
+
+    expect(result.success).toBe(false);
+  });
+});

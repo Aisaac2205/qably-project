@@ -47,13 +47,19 @@ export interface DefaultRefResolver {
   ): Promise<string>;
 }
 
-type LocatedExcerpt =
+export type LocatedExcerpt =
   | { kind: 'declaration'; excerpt: string; startLine: number; endLine: number }
   | { kind: 'file-head'; excerpt: string };
 
 export type ExcerptOutcome =
   | LocatedExcerpt
   | { kind: 'unavailable'; reason: string };
+
+export interface AttachedFileContext {
+  path: string;
+  ref: string;
+  excerpt: LocatedExcerpt;
+}
 
 export type EvidenceCandidate = Pick<
   CaseContextCandidate,
@@ -125,9 +131,12 @@ function droppedForBudget(entry: ResolvedCase): ResolvedCase {
   };
 }
 
-function applyMessageBudget(resolved: readonly ResolvedCase[]): ResolvedCase[] {
-  let total = 0;
-  let overBudget = false;
+function applyMessageBudget(
+  resolved: readonly ResolvedCase[],
+  initialTotal = 0,
+): ResolvedCase[] {
+  let total = initialTotal;
+  let overBudget = total > MAX_EXCERPT_LENGTH_PER_MESSAGE;
 
   return resolved.map((entry) => {
     if (entry.excerpt.kind === 'unavailable') return entry;
@@ -195,11 +204,38 @@ function formatSection(resolved: ResolvedCase): string {
   return lines.join('\n');
 }
 
-function buildCaseContextTurn(resolved: readonly ResolvedCase[]): string {
-  if (resolved.length === 0) return '';
+function formatFileSection(attachedFile: AttachedFileContext): string {
+  const lines: string[] = [
+    'File: [F1]',
+    `Path: ${sanitizeUntrustedText(attachedFile.path, 300)}`,
+    `Ref: ${sanitizeUntrustedText(attachedFile.ref, 100)}`,
+  ];
 
-  const sections = resolved.map(formatSection).join('\n\n');
-  return `${CASE_CONTEXT_OPEN}\n${sections}\n${CASE_CONTEXT_CLOSE}`;
+  if (attachedFile.excerpt.kind === 'file-head') {
+    lines.push('Excerpt (file head):');
+  } else {
+    lines.push(
+      `Excerpt (lines ${attachedFile.excerpt.startLine}-${attachedFile.excerpt.endLine}):`,
+    );
+  }
+  lines.push(
+    stripBlockDelimiters(attachedFile.excerpt.excerpt, ALL_DELIMITERS),
+  );
+
+  return lines.join('\n');
+}
+
+function buildCaseContextTurn(
+  resolved: readonly ResolvedCase[],
+  fileSection: string | null,
+): string {
+  const sections = [
+    ...(fileSection === null ? [] : [fileSection]),
+    ...resolved.map(formatSection),
+  ];
+  if (sections.length === 0) return '';
+
+  return `${CASE_CONTEXT_OPEN}\n${sections.join('\n\n')}\n${CASE_CONTEXT_CLOSE}`;
 }
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
@@ -311,34 +347,45 @@ export class CaseContextBuilder {
   async build(
     candidates: readonly CaseContextCandidate[],
     connection: CaseContextConnection | null,
+    attachedFile?: AttachedFileContext,
   ): Promise<string> {
-    if (candidates.length === 0) return '';
-
-    const accessToken =
-      connection === null || connection.encryptedAccessToken === null
-        ? undefined
-        : this.encryption.decrypt(connection.encryptedAccessToken);
-
-    const ref =
-      connection === null
-        ? HEAD_REF
-        : await this.defaultRefResolver.resolve(connection, accessToken);
+    if (candidates.length === 0 && attachedFile === undefined) return '';
 
     const resolved: ResolvedCase[] = [];
-    for (const candidate of candidates) {
-      resolved.push({
-        candidate,
-        ref,
-        excerpt: await this.resolveExcerpt(
+    if (candidates.length > 0) {
+      const accessToken =
+        connection === null || connection.encryptedAccessToken === null
+          ? undefined
+          : this.encryption.decrypt(connection.encryptedAccessToken);
+
+      const ref =
+        connection === null
+          ? HEAD_REF
+          : await this.defaultRefResolver.resolve(connection, accessToken);
+
+      for (const candidate of candidates) {
+        resolved.push({
           candidate,
-          connection,
-          accessToken,
           ref,
-        ),
-      });
+          excerpt: await this.resolveExcerpt(
+            candidate,
+            connection,
+            accessToken,
+            ref,
+          ),
+        });
+      }
     }
 
-    return buildCaseContextTurn(applyMessageBudget(resolved));
+    const fileBudget =
+      attachedFile === undefined ? 0 : attachedFile.excerpt.excerpt.length;
+    const fileSection =
+      attachedFile === undefined ? null : formatFileSection(attachedFile);
+
+    return buildCaseContextTurn(
+      applyMessageBudget(resolved, fileBudget),
+      fileSection,
+    );
   }
 
   async locateForEvidence(

@@ -107,6 +107,11 @@ function unwrap<T>(result: Result<T, ChatError>): T {
         code: result.error,
         message: 'This suggestion has no code-backed evidence to send',
       });
+    case 'file-unreadable':
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message: 'The attached file could not be read from the repository',
+      });
   }
 }
 
