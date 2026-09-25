@@ -993,6 +993,21 @@ export interface ChatThreadRecord {
   updatedAt: string
 }
 
+export type GroundingReferenceKind =
+  | 'source-excerpt'
+  | 'code-change'
+  | 'review'
+  | 'attached-file'
+
+export interface GroundingReference {
+  kind: GroundingReferenceKind
+  id: string
+}
+
+export type GroundingView =
+  | { status: 'grounded'; references: GroundingReference[] }
+  | { status: 'insufficient' }
+
 export interface ChatMessageRecord {
   id: string
   threadId: string
@@ -1000,6 +1015,8 @@ export interface ChatMessageRecord {
   content: string
   suggestedCases: SuggestedCaseRecord[]
   attachedCases?: AttachedCaseRecord[]
+  attachedFilePath?: string | null
+  grounding?: GroundingView | null
   createdAt: string
   sentProposalIds?: Record<number, string>
 }
@@ -1017,3 +1034,4 @@ export * from './documentation-completeness'
 export * from './pass-rate'
 export * from './dashboard-period'
 export * from './plans'
+export * from './is-safe-repo-relative-path'

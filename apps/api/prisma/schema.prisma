@@ -804,16 +804,18 @@ model ChatThread {
 }
 
 model ChatMessage {
-  id              String     @id @default(cuid())
-  threadId        String
-  thread          ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  role            ChatRole
-  content         String
-  suggestedCases  Json?
-  attachedCaseIds String[]   @default([])
-  promptVersion   String?
-  totalTokens     Int?
-  createdAt       DateTime   @default(now())
+  id               String     @id @default(cuid())
+  threadId         String
+  thread           ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role             ChatRole
+  content          String
+  suggestedCases   Json?
+  attachedCaseIds  String[]   @default([])
+  attachedFilePath String?
+  grounding        Json?
+  promptVersion    String?
+  totalTokens      Int?
+  createdAt        DateTime   @default(now())
 
   @@index([threadId, createdAt])
   @@map("chat_message")
