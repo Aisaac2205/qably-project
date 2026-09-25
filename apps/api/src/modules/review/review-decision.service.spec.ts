@@ -248,6 +248,11 @@ describe('ReviewDecisionService.approve', () => {
         expectedResult: 'The cart shows zero items',
         priority: 'high',
         state: 'active',
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
       },
     });
   });
@@ -278,6 +283,11 @@ describe('ReviewDecisionService.approve', () => {
         expectedResult: 'The mini basket shows zero items',
         priority: 'high',
         state: 'active',
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
       },
     });
   });
@@ -310,8 +320,57 @@ describe('ReviewDecisionService.approve', () => {
         executionMode: 'automated',
         automationKey: 'Cart > adds an item',
         automationFilePath: 'src/cart.spec.ts',
+        documentationOutcome: 'complete',
+        documentationMissing: [],
+        documentationOutcomeAt: expect.any(Date) as Date,
+        documentationQueuedAt: null,
+        documentationSkipReason: null,
       },
     });
+  });
+
+  it('clears a stale failed/queued documentation state on the case once the proposal is approved, so the old Aeris error stops showing and it stops being retried forever', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+    prisma.testCaseVersion.count.mockResolvedValue(1);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-2',
+      version: 2,
+    });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    const { data } = (
+      prisma.testCase.update.mock.calls as [
+        { where: { id: string }; data: Record<string, unknown> },
+      ][]
+    )[0][0];
+
+    expect(data.documentationOutcome).toBe('complete');
+    expect(data.documentationSkipReason).toBeNull();
+    expect(data.documentationQueuedAt).toBeNull();
+  });
+
+  it('marks the published case incomplete when the approved proposal is missing a required field', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      objective: '',
+    });
+    prisma.testCaseVersion.count.mockResolvedValue(1);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-2',
+      version: 2,
+    });
+
+    await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
+
+    const { data } = (
+      prisma.testCase.update.mock.calls as [
+        { where: { id: string }; data: Record<string, unknown> },
+      ][]
+    )[0][0];
+
+    expect(data.documentationOutcome).toBe('incomplete');
+    expect(data.documentationMissing).toContain('objective');
   });
 
   it('records the produced, version_of, and proposal-to-version traceability links', async () => {

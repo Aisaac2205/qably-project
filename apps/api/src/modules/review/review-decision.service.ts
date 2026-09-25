@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { assessCaseDocumentation } from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
@@ -78,6 +79,30 @@ function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
     executionMode: 'automated',
     automationKey: proposal.automationKey,
     ...(automationFilePath === null ? {} : { automationFilePath }),
+  };
+}
+
+function documentedStateFor(proposal: ProposalRow): {
+  documentationOutcome: 'complete' | 'incomplete';
+  documentationMissing: string[];
+  documentationOutcomeAt: Date;
+  documentationQueuedAt: null;
+  documentationSkipReason: null;
+} {
+  const assessment = assessCaseDocumentation({
+    name: proposal.title,
+    automationKey: proposal.automationKey,
+    objective: proposal.objective,
+    steps: proposal.steps,
+    expectedResult: proposal.expectedResult,
+  });
+
+  return {
+    documentationOutcome: assessment.complete ? 'complete' : 'incomplete',
+    documentationMissing: assessment.missing,
+    documentationOutcomeAt: new Date(),
+    documentationQueuedAt: null,
+    documentationSkipReason: null,
   };
 }
 
@@ -223,6 +248,7 @@ export class ReviewDecisionService {
 
       const createdNewCase = proposal.targetTestCaseId === null;
       const automationFields = automationFieldsFor(proposal);
+      const documentedState = documentedStateFor(proposal);
       const testCaseId = createdNewCase
         ? (
             await tx.testCase.create({
@@ -235,6 +261,7 @@ export class ReviewDecisionService {
                 priority: proposal.priority,
                 state: 'active',
                 ...automationFields,
+                ...documentedState,
               },
               select: { id: true },
             })
@@ -253,7 +280,12 @@ export class ReviewDecisionService {
           priority: proposal.priority,
           locale: proposal.locale ?? null,
         },
-        { priority: proposal.priority, state: 'active', ...automationFields },
+        {
+          priority: proposal.priority,
+          state: 'active',
+          ...automationFields,
+          ...documentedState,
+        },
       );
 
       await tx.traceabilityLink.createMany({
