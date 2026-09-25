@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   classifyDecisionError,
   decisionErrorKey,
+  decisionConflictMessageKey,
+  extractDecisionConflict,
 } from '@/features/review-inbox/lib/decision-error'
 import { ApiError } from '@/lib/api-client'
 
@@ -34,5 +36,57 @@ describe('decisionErrorKey', () => {
 
   it('maps error to the generic i18n key', () => {
     expect(decisionErrorKey('error')).toBe('decisionError')
+  })
+})
+
+describe('extractDecisionConflict', () => {
+  it('reads a well-formed decision out of ApiError.details', () => {
+    const error = new ApiError(409, 'Conflict', 'invalid-transition', {
+      decision: {
+        action: 'approved',
+        decidedAt: '2026-01-05T12:00:00.000Z',
+        decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+      },
+    })
+
+    expect(extractDecisionConflict(error)).toEqual({
+      action: 'approved',
+      decidedAt: '2026-01-05T12:00:00.000Z',
+      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+    })
+  })
+
+  it('returns null when details.decision is explicitly null', () => {
+    const error = new ApiError(409, 'Conflict', 'invalid-transition', { decision: null })
+
+    expect(extractDecisionConflict(error)).toBeNull()
+  })
+
+  it('returns null when details has no decision field at all', () => {
+    const error = new ApiError(409, 'Conflict', 'invalid-transition', {})
+
+    expect(extractDecisionConflict(error)).toBeNull()
+  })
+
+  it('returns null when the decision shape is malformed', () => {
+    const error = new ApiError(409, 'Conflict', 'invalid-transition', {
+      decision: { action: 'approved' },
+    })
+
+    expect(extractDecisionConflict(error)).toBeNull()
+  })
+
+  it('returns null for a non-ApiError value', () => {
+    expect(extractDecisionConflict(new Error('boom'))).toBeNull()
+  })
+})
+
+describe('decisionConflictMessageKey', () => {
+  it('maps an approved conflict to its own i18n key', () => {
+    expect(decisionConflictMessageKey('approved')).toBe('decisionConflictApproved')
+  })
+
+  it('maps a rejected conflict to its own i18n key', () => {
+    expect(decisionConflictMessageKey('rejected')).toBe('decisionConflictRejected')
   })
 })

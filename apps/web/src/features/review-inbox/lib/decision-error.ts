@@ -34,3 +34,29 @@ export function classifyDecisionError(error: unknown): DecisionErrorCode {
 export function decisionErrorKey(code: DecisionErrorCode): string {
   return DECISION_ERROR_KEYS[code]
 }
+
+export interface DecisionConflict {
+  action: 'approved' | 'rejected'
+  decidedAt: string
+  decidedBy: { id: string; name: string }
+}
+
+function isDecisionConflict(value: unknown): value is DecisionConflict {
+  if (typeof value !== 'object' || value === null) return false
+  const { action, decidedAt, decidedBy } = value as Record<string, unknown>
+  if (action !== 'approved' && action !== 'rejected') return false
+  if (typeof decidedAt !== 'string') return false
+  if (typeof decidedBy !== 'object' || decidedBy === null) return false
+  const { id, name } = decidedBy as Record<string, unknown>
+  return typeof id === 'string' && typeof name === 'string'
+}
+
+export function extractDecisionConflict(error: unknown): DecisionConflict | null {
+  if (!(error instanceof ApiError)) return null
+  const decision = error.details?.decision
+  return isDecisionConflict(decision) ? decision : null
+}
+
+export function decisionConflictMessageKey(action: DecisionConflict['action']): string {
+  return action === 'approved' ? 'decisionConflictApproved' : 'decisionConflictRejected'
+}

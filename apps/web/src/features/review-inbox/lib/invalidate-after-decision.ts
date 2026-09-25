@@ -6,8 +6,12 @@ export function invalidateReviewLists(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: reviewKeys.all })
 }
 
-export function invalidateAfterDecision(queryClient: QueryClient): void {
-  invalidateReviewLists(queryClient)
+export function invalidateSuiteAndProjectLists(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: suiteKeys.all })
   void queryClient.invalidateQueries({ queryKey: projectKeys.all })
+}
+
+export function invalidateAfterDecision(queryClient: QueryClient): void {
+  invalidateReviewLists(queryClient)
+  invalidateSuiteAndProjectLists(queryClient)
 }

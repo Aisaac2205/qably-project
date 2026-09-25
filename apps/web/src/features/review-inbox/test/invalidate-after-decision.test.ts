@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 import {
   invalidateReviewLists,
+  invalidateSuiteAndProjectLists,
   invalidateAfterDecision,
 } from '@/features/review-inbox/lib/invalidate-after-decision'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
@@ -16,6 +17,19 @@ describe('invalidateReviewLists', () => {
 
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ queryKey: reviewKeys.all }))
+  })
+})
+
+describe('invalidateSuiteAndProjectLists', () => {
+  it('invalidates suite and project caches, never the review list', () => {
+    const client = new QueryClient()
+    const spy = vi.spyOn(client, 'invalidateQueries')
+
+    invalidateSuiteAndProjectLists(client)
+
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(spy).toHaveBeenNthCalledWith(1, expect.objectContaining({ queryKey: suiteKeys.all }))
+    expect(spy).toHaveBeenNthCalledWith(2, expect.objectContaining({ queryKey: projectKeys.all }))
   })
 })
 
