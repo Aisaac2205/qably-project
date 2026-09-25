@@ -19,15 +19,29 @@ const row = {
   expectedResult: 'The cart shows zero items',
   priority: 'high',
   evidenceId: 'evidence-1',
-  targetTestCaseId: null,
-  targetTestCase: null,
-  evidence: { title: 'src/cart.spec.ts' },
+  targetTestCaseId: null as string | null,
+  targetTestCase: null as Record<string, unknown> | null,
+  evidence: {
+    id: 'evidence-1',
+    projectId: 'project-1',
+    kind: 'SOURCE_EXCERPT',
+    title: 'src/cart.spec.ts',
+    uri: 'https://example.test/cart.spec.ts',
+    excerpt: null as string | null,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  },
+  codeChange: null as Record<string, unknown> | null,
+  duplicateKind: null as string | null,
+  matchedCaseId: null as string | null,
+  matchedCase: null as Record<string, unknown> | null,
 };
 
 interface FakePrisma {
   extractedProposal: { findMany: jest.Mock; findFirst: jest.Mock };
   testCase: { findMany: jest.Mock };
   traceabilityLink: { findMany: jest.Mock };
+  runCase: { findMany: jest.Mock };
+  reviewDecision: { findFirst: jest.Mock };
 }
 
 function createPrisma(): FakePrisma {
@@ -38,11 +52,21 @@ function createPrisma(): FakePrisma {
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
     traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
+    runCase: { findMany: jest.fn().mockResolvedValue([]) },
+    reviewDecision: { findFirst: jest.fn().mockResolvedValue(null) },
   };
 }
 
-function build(prisma: FakePrisma) {
-  return new ReviewInboxQueryService(prisma as never);
+interface FakeDecisions {
+  lastDecision: jest.Mock;
+}
+
+function fakeDecisions(overrides: Partial<FakeDecisions> = {}): FakeDecisions {
+  return { lastDecision: jest.fn().mockResolvedValue(null), ...overrides };
+}
+
+function build(prisma: FakePrisma, decisions: FakeDecisions = fakeDecisions()) {
+  return new ReviewInboxQueryService(prisma as never, decisions as never);
 }
 
 describe('ReviewInboxQueryService.findOne', () => {
@@ -123,7 +147,13 @@ describe('ReviewInboxQueryService.findOne', () => {
     prisma.extractedProposal.findFirst.mockResolvedValue({
       ...row,
       targetTestCaseId: 'case-9',
-      targetTestCase: { suiteId: 'suite-9' },
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: null,
+      },
       evidence: null,
     });
 
@@ -132,6 +162,307 @@ describe('ReviewInboxQueryService.findOne', () => {
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.value.targetOfficialTestCaseSuiteId).toBe('suite-9');
+  });
+
+  it('returns a null matchedCase when the proposal has no target and no duplicate classification', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.matchedCase).toBeNull();
+  });
+
+  it('prefers the explicit target case over a duplicate-classification match for matchedCase', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-target',
+      targetTestCase: {
+        id: 'case-target',
+        name: 'Empties the cart',
+        suiteId: 'suite-1',
+        suite: { name: 'Cart suite' },
+        currentVersion: null,
+      },
+      duplicateKind: 'possible_duplicate',
+      matchedCaseId: 'case-duplicate',
+      matchedCase: {
+        id: 'case-duplicate',
+        name: 'A different case',
+        suiteId: 'suite-2',
+        suite: { name: 'Checkout suite' },
+        currentVersion: null,
+      },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.matchedCase).toEqual({
+        id: 'case-target',
+        name: 'Empties the cart',
+        suiteId: 'suite-1',
+        suiteName: 'Cart suite',
+      });
+    }
+  });
+
+  it('falls back to the duplicate-classification match for matchedCase when there is no explicit target', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      duplicateKind: 'possible_duplicate',
+      matchedCaseId: 'case-duplicate',
+      matchedCase: {
+        id: 'case-duplicate',
+        name: 'A different case',
+        suiteId: 'suite-2',
+        suite: { name: 'Checkout suite' },
+        currentVersion: null,
+      },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.matchedCase).toEqual({
+        id: 'case-duplicate',
+        name: 'A different case',
+        suiteId: 'suite-2',
+        suiteName: 'Checkout suite',
+      });
+    }
+  });
+
+  it('returns a null publishedVersion when the matched case has never been published', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: null,
+      },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.publishedVersion).toBeNull();
+  });
+
+  it('resolves publishedBy from the approved decision made at the same instant as the version was published', async () => {
+    const prisma = createPrisma();
+    const publishedAt = new Date('2026-02-01T10:00:00.000Z');
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: {
+          version: 2,
+          title: 'Empties the cart',
+          objective: 'Confirm the cart resets',
+          preconditions: [],
+          steps: ['Open the cart', 'Remove every item'],
+          expectedResult: 'The cart shows zero items',
+          publishedAt,
+        },
+      },
+    });
+    prisma.reviewDecision.findFirst.mockResolvedValue({
+      actor: { id: 'user-2', name: 'Grace Hopper' },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.publishedVersion).toEqual({
+        version: 2,
+        title: 'Empties the cart',
+        objective: 'Confirm the cart resets',
+        preconditions: [],
+        steps: ['Open the cart', 'Remove every item'],
+        expectedResult: 'The cart shows zero items',
+        publishedAt: publishedAt.toISOString(),
+        publishedBy: { id: 'user-2', name: 'Grace Hopper' },
+      });
+    }
+    expect(prisma.reviewDecision.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          action: 'approved',
+          decidedAt: publishedAt,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('reports publishedBy as null when no approved decision matches the version (a manual edit)', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: {
+          version: 3,
+          title: 'Empties the cart',
+          objective: '',
+          preconditions: [],
+          steps: ['Open the cart'],
+          expectedResult: 'The cart is empty',
+          publishedAt: new Date('2026-03-01T00:00:00.000Z'),
+        },
+      },
+    });
+    prisma.reviewDecision.findFirst.mockResolvedValue(null);
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok)
+      expect(result.value.publishedVersion?.publishedBy).toBeNull();
+  });
+
+  it('returns a null source when the proposal has no code change', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.source).toBeNull();
+  });
+
+  it('returns the code change as source, normalizing an empty commitSha to null', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      codeChange: {
+        filePath: 'src/cart.ts',
+        commitSha: '',
+        pullRequestNumber: null,
+      },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.source).toEqual({
+        filePath: 'src/cart.ts',
+        uri: 'https://example.test/cart.spec.ts',
+        commitSha: null,
+        pullRequestNumber: null,
+      });
+    }
+  });
+
+  it('returns the code change commit and PR number as source when present', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      codeChange: {
+        filePath: 'src/cart.ts',
+        commitSha: 'abc123',
+        pullRequestNumber: 42,
+      },
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.source).toEqual({
+        filePath: 'src/cart.ts',
+        uri: 'https://example.test/cart.spec.ts',
+        commitSha: 'abc123',
+        pullRequestNumber: 42,
+      });
+    }
+  });
+
+  it('returns an empty recentRuns array and skips the query when there is no matched case', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.recentRuns).toEqual([]);
+    expect(prisma.runCase.findMany).not.toHaveBeenCalled();
+  });
+
+  it('returns at most 5 recorded runs for the matched case, most recent first', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: null,
+      },
+    });
+    prisma.runCase.findMany.mockResolvedValue([
+      {
+        runId: 'run-1',
+        status: 'pass',
+        recordedAt: new Date('2026-02-01T00:00:00.000Z'),
+      },
+    ]);
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.recentRuns).toEqual([
+        {
+          runId: 'run-1',
+          status: 'pass',
+          recordedAt: '2026-02-01T00:00:00.000Z',
+        },
+      ]);
+    }
+    expect(prisma.runCase.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { testCaseId: 'case-9', recordedAt: { not: null } },
+        orderBy: { recordedAt: 'desc' },
+        take: 5,
+      }),
+    );
+  });
+
+  it('returns the decision from ReviewDecisionService.lastDecision', async () => {
+    const prisma = createPrisma();
+    const decision = {
+      action: 'approved' as const,
+      decidedAt: '2026-01-05T12:00:00.000Z',
+      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+    };
+    const decisions = fakeDecisions({
+      lastDecision: jest.fn().mockResolvedValue(decision),
+    });
+
+    const result = await build(prisma, decisions).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.decision).toEqual(decision);
+    expect(decisions.lastDecision).toHaveBeenCalledWith(org, 'proposal-1');
   });
 });
 
@@ -160,6 +491,7 @@ const serviceProposalRow = {
   automationKey: null as string | null,
   codeChange: null as { filePath: string } | null,
   targetTestCase: null as { automationFilePath: string | null } | null,
+  matchedCase: null as Record<string, unknown> | null,
   needsManualReview: false,
 };
 
@@ -170,6 +502,8 @@ interface ServiceFakePrisma {
   };
   testCase: { findMany: jest.Mock };
   traceabilityLink: { findMany: jest.Mock };
+  runCase: { findMany: jest.Mock };
+  reviewDecision: { findFirst: jest.Mock };
 }
 
 function createServicePrisma(
@@ -184,11 +518,16 @@ function createServicePrisma(
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
     traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
+    runCase: { findMany: jest.fn().mockResolvedValue([]) },
+    reviewDecision: { findFirst: jest.fn().mockResolvedValue(null) },
   };
 }
 
-function buildService(prisma: ServiceFakePrisma) {
-  return new ReviewInboxQueryService(prisma as never);
+function buildService(prisma: object) {
+  return new ReviewInboxQueryService(
+    prisma as never,
+    { lastDecision: jest.fn().mockResolvedValue(null) } as never,
+  );
 }
 
 describe('ReviewInboxQueryService.findOne (from review.service.spec)', () => {
@@ -424,6 +763,7 @@ describe('ReviewInboxQueryService.page', () => {
     expect(result.items[0].classification).toEqual({
       kind: 'none',
       matchedCaseId: null,
+      matchedCaseName: null,
       score: null,
       reasons: [],
     });
@@ -434,6 +774,7 @@ describe('ReviewInboxQueryService.page', () => {
       pageRow({
         duplicateKind: 'possible_duplicate',
         matchedCaseId: 'case-9',
+        matchedCase: { name: 'Empties the cart' },
         duplicateScore: 0.75,
         duplicateReasons: ['same-title', 'steps-overlap'],
       }),
@@ -447,9 +788,27 @@ describe('ReviewInboxQueryService.page', () => {
     expect(result.items[0].classification).toEqual({
       kind: 'possible_duplicate',
       matchedCaseId: 'case-9',
+      matchedCaseName: 'Empties the cart',
       score: 0.75,
       reasons: ['same-title', 'steps-overlap'],
     });
+  });
+
+  it('reports a null matchedCaseName when the matched case was deleted after classification', async () => {
+    const prisma = createPageFixture([
+      pageRow({
+        duplicateKind: 'update',
+        matchedCaseId: 'case-9',
+        matchedCase: null,
+      }),
+    ]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    expect(result.items[0].classification.matchedCaseName).toBeNull();
   });
 
   it('includes the suite id and name when the proposal has a suite', async () => {
@@ -491,6 +850,7 @@ describe('ReviewInboxQueryService.page', () => {
       suite: { select: { id: true, name: true } },
       duplicateKind: true,
       matchedCaseId: true,
+      matchedCase: { select: { name: true } },
       duplicateScore: true,
       duplicateReasons: true,
     });

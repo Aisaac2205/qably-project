@@ -47,6 +47,12 @@ const proposalRow = {
   createdAt: new Date('2026-09-24T10:00:00.000Z'),
   locale: null,
   observations: null,
+  suite: null,
+  duplicateKind: null,
+  matchedCaseId: null,
+  matchedCase: null,
+  duplicateScore: null,
+  duplicateReasons: null,
   evidence: {
     id: 'evidence-1',
     projectId: 'project-1',

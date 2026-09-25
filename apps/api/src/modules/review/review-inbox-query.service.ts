@@ -1,13 +1,19 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import type { ProposalStatus } from '@qably/types';
+import type { CaseStatus, ProposalStatus } from '@qably/types';
 import { Prisma } from '../../../generated/prisma/client';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ReviewDecisionService } from './review-decision.service';
 import type {
+  InboxClassification,
   InboxItem,
+  MatchedCaseView,
   ProposalDetailView,
+  ProposalSourceView,
+  PublishedVersionView,
+  RecentRunView,
   ReviewError,
   ReviewInboxCounts,
   ReviewInboxCountsFilters,
@@ -16,10 +22,7 @@ import type {
   ReviewInboxPageFilters,
   ReviewInboxStatusCounts,
 } from './review.contracts';
-import type {
-  ProposalClassification,
-  ProposalDuplicateKind,
-} from './lib/classify-proposal';
+import type { ProposalDuplicateKind } from './lib/classify-proposal';
 import { decodeInboxCursor, encodeInboxCursor } from './lib/inbox-cursor';
 import {
   toEvidence,
@@ -30,6 +33,82 @@ import {
   type LinkRow,
   type ViewRow,
 } from './lib/proposal-view';
+
+const RECENT_RUNS_LIMIT = 5;
+
+interface CaseRefRow {
+  id: string;
+  name: string;
+  suiteId: string;
+  suite: { name: string };
+  currentVersion: VersionRow | null;
+}
+
+interface VersionRow {
+  version: number;
+  title: string;
+  objective: string;
+  preconditions: string[];
+  steps: string[];
+  expectedResult: string;
+  publishedAt: Date;
+}
+
+const CASE_REF_SELECT = {
+  id: true,
+  name: true,
+  suiteId: true,
+  suite: { select: { name: true } },
+  currentVersion: {
+    select: {
+      version: true,
+      title: true,
+      objective: true,
+      preconditions: true,
+      steps: true,
+      expectedResult: true,
+      publishedAt: true,
+    },
+  },
+} as const;
+
+interface DetailRow extends Omit<ViewRow, 'targetTestCase'> {
+  evidence: EvidenceRow | null;
+  targetTestCase: CaseRefRow | null;
+  codeChange: {
+    filePath: string;
+    commitSha: string;
+    pullRequestNumber: number | null;
+  } | null;
+  duplicateKind: ProposalDuplicateKind | null;
+  matchedCaseId: string | null;
+  matchedCase: CaseRefRow | null;
+}
+
+function resolveCaseRef(row: DetailRow): CaseRefRow | null {
+  return row.targetTestCase ?? row.matchedCase;
+}
+
+function toMatchedCase(ref: CaseRefRow | null): MatchedCaseView | null {
+  if (ref === null) return null;
+  return {
+    id: ref.id,
+    name: ref.name,
+    suiteId: ref.suiteId,
+    suiteName: ref.suite.name,
+  };
+}
+
+function toSource(row: DetailRow): ProposalSourceView | null {
+  if (row.codeChange === null) return null;
+  return {
+    filePath: row.codeChange.filePath,
+    uri: row.evidence === null ? '' : row.evidence.uri,
+    commitSha:
+      row.codeChange.commitSha === '' ? null : row.codeChange.commitSha,
+    pullRequestNumber: row.codeChange.pullRequestNumber,
+  };
+}
 
 const INBOX_STATUSES: ProposalStatus[] = [
   'in_review',
@@ -92,6 +171,7 @@ const INBOX_ITEM_SELECT = {
   suite: { select: { id: true, name: true } },
   duplicateKind: true,
   matchedCaseId: true,
+  matchedCase: { select: { name: true } },
   duplicateScore: true,
   duplicateReasons: true,
 } as const;
@@ -100,21 +180,29 @@ interface InboxItemRow extends ViewRow {
   suite: { id: string; name: string } | null;
   duplicateKind: ProposalDuplicateKind | null;
   matchedCaseId: string | null;
+  matchedCase: { name: string } | null;
   duplicateScore: number | null;
   duplicateReasons: unknown;
 }
 
-function toClassification(row: InboxItemRow): ProposalClassification {
+function toClassification(row: InboxItemRow): InboxClassification {
   if (row.duplicateKind === null) {
-    return { kind: 'none', matchedCaseId: null, score: null, reasons: [] };
+    return {
+      kind: 'none',
+      matchedCaseId: null,
+      matchedCaseName: null,
+      score: null,
+      reasons: [],
+    };
   }
 
   return {
     kind: row.duplicateKind,
     matchedCaseId: row.matchedCaseId,
+    matchedCaseName: row.matchedCase === null ? null : row.matchedCase.name,
     score: row.duplicateScore,
     reasons: Array.isArray(row.duplicateReasons)
-      ? (row.duplicateReasons as ProposalClassification['reasons'])
+      ? (row.duplicateReasons as InboxClassification['reasons'])
       : [],
   };
 }
@@ -129,7 +217,10 @@ function toInboxItem(row: InboxItemRow): InboxItem {
 
 @Injectable()
 export class ReviewInboxQueryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly decisions: ReviewDecisionService,
+  ) {}
 
   private baseWhere(
     org: OrgContext,
@@ -262,25 +353,106 @@ export class ReviewInboxQueryService {
         id: proposalId,
         project: { organizationId: org.organizationId },
       },
-      select: { ...VIEW_SELECT, evidence: true },
-    })) as (ViewRow & { evidence: EvidenceRow | null }) | null;
+      select: {
+        ...VIEW_SELECT,
+        evidence: true,
+        codeChange: {
+          select: {
+            filePath: true,
+            commitSha: true,
+            pullRequestNumber: true,
+          },
+        },
+        duplicateKind: true,
+        matchedCaseId: true,
+        matchedCase: { select: CASE_REF_SELECT },
+        targetTestCase: { select: CASE_REF_SELECT },
+      },
+    })) as DetailRow | null;
 
     if (row === null) return err('not-found');
 
-    const links = (await this.prisma.traceabilityLink.findMany({
-      where: {
-        projectId: row.projectId,
-        OR: [
-          { fromType: 'proposal', fromId: row.id },
-          { toType: 'proposal', toId: row.id },
-        ],
-      },
-    })) as LinkRow[];
+    const [links, decision] = await Promise.all([
+      this.prisma.traceabilityLink.findMany({
+        where: {
+          projectId: row.projectId,
+          OR: [
+            { fromType: 'proposal', fromId: row.id },
+            { toType: 'proposal', toId: row.id },
+          ],
+        },
+      }) as Promise<LinkRow[]>,
+      this.decisions.lastDecision(org, proposalId),
+    ]);
+
+    const caseRef = resolveCaseRef(row);
+
+    const [publishedVersion, recentRuns] = await Promise.all([
+      this.publishedVersionFor(org, caseRef),
+      this.recentRunsFor(caseRef),
+    ]);
 
     return ok({
       ...toView(row),
       evidence: row.evidence === null ? null : toEvidence(row.evidence),
       links: links.map(toLink),
+      matchedCase: toMatchedCase(caseRef),
+      publishedVersion,
+      source: toSource(row),
+      recentRuns,
+      decision,
     });
+  }
+
+  private async publishedVersionFor(
+    org: OrgContext,
+    caseRef: CaseRefRow | null,
+  ): Promise<PublishedVersionView | null> {
+    const version = caseRef?.currentVersion ?? null;
+    if (version === null) return null;
+
+    const approval = await this.prisma.reviewDecision.findFirst({
+      where: {
+        action: 'approved',
+        decidedAt: version.publishedAt,
+        proposal: { project: { organizationId: org.organizationId } },
+      },
+      select: { actor: { select: { id: true, name: true } } },
+    });
+
+    return {
+      version: version.version,
+      title: version.title,
+      objective: version.objective,
+      preconditions: version.preconditions,
+      steps: version.steps,
+      expectedResult: version.expectedResult,
+      publishedAt: version.publishedAt.toISOString(),
+      publishedBy:
+        approval === null
+          ? null
+          : { id: approval.actor.id, name: approval.actor.name },
+    };
+  }
+
+  private async recentRunsFor(
+    caseRef: CaseRefRow | null,
+  ): Promise<RecentRunView[]> {
+    if (caseRef === null) return [];
+
+    const rows = (await this.prisma.runCase.findMany({
+      where: { testCaseId: caseRef.id, recordedAt: { not: null } },
+      orderBy: { recordedAt: 'desc' },
+      take: RECENT_RUNS_LIMIT,
+      select: { runId: true, status: true, recordedAt: true },
+    })) as { runId: string; status: CaseStatus; recordedAt: Date | null }[];
+
+    return rows
+      .filter((row) => row.recordedAt !== null)
+      .map((row) => ({
+        runId: row.runId,
+        status: row.status,
+        recordedAt: (row.recordedAt as Date).toISOString(),
+      }));
   }
 }

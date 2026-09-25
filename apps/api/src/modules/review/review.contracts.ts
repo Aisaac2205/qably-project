@@ -1,5 +1,6 @@
 import type { Locale } from '@qably/i18n';
 import type {
+  CaseStatus,
   Evidence,
   ExtractedProposal,
   ProposalStatus,
@@ -16,14 +17,54 @@ export interface InboxSuite {
   name: string;
 }
 
+export interface InboxClassification extends ProposalClassification {
+  matchedCaseName: string | null;
+}
+
 export interface InboxItem extends ProposalView {
   suite: InboxSuite | null;
-  classification: ProposalClassification;
+  classification: InboxClassification;
+}
+
+export interface MatchedCaseView {
+  id: string;
+  name: string;
+  suiteId: string;
+  suiteName: string;
+}
+
+export interface PublishedVersionView {
+  version: number;
+  title: string;
+  objective: string;
+  preconditions: string[];
+  steps: string[];
+  expectedResult: string;
+  publishedAt: string;
+  publishedBy: { id: string; name: string } | null;
+}
+
+export interface ProposalSourceView {
+  filePath: string;
+  uri: string;
+  commitSha: string | null;
+  pullRequestNumber: number | null;
+}
+
+export interface RecentRunView {
+  runId: string;
+  status: CaseStatus;
+  recordedAt: string;
 }
 
 export interface ProposalDetailView extends ProposalView {
   evidence: Evidence | null;
   links: TraceabilityLink[];
+  matchedCase: MatchedCaseView | null;
+  publishedVersion: PublishedVersionView | null;
+  source: ProposalSourceView | null;
+  recentRuns: RecentRunView[];
+  decision: LastDecisionView | null;
 }
 
 export interface ReviewInboxPageFilters {

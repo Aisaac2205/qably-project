@@ -43,6 +43,10 @@ const proposalRow = {
   evidenceId: 'evidence-1',
   targetTestCaseId: null,
   targetTestCase: null,
+  codeChange: null,
+  duplicateKind: null,
+  matchedCaseId: null,
+  matchedCase: null,
   evidence: {
     id: 'evidence-1',
     projectId: 'project-1',
@@ -71,6 +75,7 @@ describe('Review (e2e)', () => {
     testCaseVersion: { count: jest.fn(), create: jest.fn() },
     reviewDecision: { create: jest.fn(), findFirst: jest.fn() },
     traceabilityLink: { findMany: jest.fn(), createMany: jest.fn() },
+    runCase: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -102,6 +107,7 @@ describe('Review (e2e)', () => {
     prisma.reviewDecision.findFirst.mockResolvedValue(null);
     prisma.traceabilityLink.findMany.mockResolvedValue([]);
     prisma.traceabilityLink.createMany.mockResolvedValue({ count: 2 });
+    prisma.runCase.findMany.mockResolvedValue([]);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -148,6 +154,97 @@ describe('Review (e2e)', () => {
 
     const body = response.body as { evidence: { kind: string } };
     expect(body.evidence.kind).toBe('source_excerpt');
+  });
+
+  it('returns matchedCase, publishedVersion, source and recentRuns for a targeted proposal', async () => {
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...proposalRow,
+      targetTestCaseId: 'case-9',
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: {
+          version: 2,
+          title: 'Empties the cart',
+          objective: 'Confirm the cart resets',
+          preconditions: [],
+          steps: ['Open the cart', 'Remove every item'],
+          expectedResult: 'The cart shows zero items',
+          publishedAt: new Date('2026-02-01T10:00:00.000Z'),
+        },
+      },
+      codeChange: {
+        filePath: 'src/cart.ts',
+        commitSha: 'abc123',
+        pullRequestNumber: 42,
+      },
+    });
+    prisma.reviewDecision.findFirst.mockImplementation(
+      (args: { where: { proposalId?: string } }) =>
+        Promise.resolve(
+          args.where.proposalId === undefined
+            ? { actor: { id: 'user-2', name: 'Grace Hopper' } }
+            : null,
+        ),
+    );
+    prisma.runCase.findMany.mockResolvedValue([
+      {
+        runId: 'run-1',
+        status: 'pass',
+        recordedAt: new Date('2026-02-05T00:00:00.000Z'),
+      },
+    ]);
+
+    const response = await request(app.getHttpServer())
+      .get('/review/proposals/proposal-1')
+      .expect(200);
+
+    const body = response.body as {
+      matchedCase: {
+        id: string;
+        name: string;
+        suiteId: string;
+        suiteName: string;
+      };
+      publishedVersion: {
+        version: number;
+        publishedBy: { name: string } | null;
+      };
+      source: {
+        filePath: string;
+        commitSha: string | null;
+        pullRequestNumber: number | null;
+      };
+      recentRuns: { runId: string; status: string }[];
+      decision: unknown;
+    };
+    expect(body.matchedCase).toEqual({
+      id: 'case-9',
+      name: 'Empties the cart',
+      suiteId: 'suite-9',
+      suiteName: 'Cart suite',
+    });
+    expect(body.publishedVersion?.version).toBe(2);
+    expect(body.publishedVersion?.publishedBy).toEqual({
+      id: 'user-2',
+      name: 'Grace Hopper',
+    });
+    expect(body.source).toEqual({
+      filePath: 'src/cart.ts',
+      uri: 'https://example.test/cart.spec.ts',
+      commitSha: 'abc123',
+      pullRequestNumber: 42,
+    });
+    expect(body.recentRuns).toEqual([
+      {
+        runId: 'run-1',
+        status: 'pass',
+        recordedAt: '2026-02-05T00:00:00.000Z',
+      },
+    ]);
+    expect(body.decision).toBeNull();
   });
 
   it('answers 404 for a proposal outside the resolved organization', async () => {
