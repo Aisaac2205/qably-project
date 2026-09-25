@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
@@ -17,15 +9,9 @@ import type {
   ApprovalView,
   DuplicateCandidateView,
   ProposalDetailView,
-  ProposalView,
   RejectionView,
 } from './review.contracts';
-import {
-  decisionSchema,
-  listProposalsQuerySchema,
-  type DecisionBody,
-  type ListProposalsQuery,
-} from './review.schemas';
+import { decisionSchema, type DecisionBody } from './review.schemas';
 import { unwrap, unwrapDecision } from './lib/review-error-http';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
 import { ReviewDecisionService } from './review-decision.service';
@@ -37,15 +23,6 @@ export class ReviewController {
     private readonly queries: ReviewInboxQueryService,
     private readonly review: ReviewDecisionService,
   ) {}
-
-  @Get()
-  list(
-    @CurrentOrg() org: OrgContext,
-    @Query(new ZodValidationPipe(listProposalsQuerySchema))
-    query: ListProposalsQuery,
-  ): Promise<ProposalView[]> {
-    return this.queries.list(org, query);
-  }
 
   @Get(':id')
   async findOne(

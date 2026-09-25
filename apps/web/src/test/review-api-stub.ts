@@ -1,7 +1,5 @@
-import type { ProposalStatus } from '@qably/types'
 import type {
   ProposalDetail,
-  ProposalFilters,
   ProposalListItem,
   ReviewInboxCountsFilters,
   ReviewInboxFilters,
@@ -20,27 +18,6 @@ export function proposalListFixtures(): ProposalListItem[] {
   }))
 }
 
-export function proposalListFixturesFor(
-  filters: ProposalFilters = {},
-): ProposalListItem[] {
-  return proposalListFixtures().filter((proposal) => {
-    if (filters.projectId !== undefined && proposal.projectId !== filters.projectId) {
-      return false
-    }
-    if (filters.status !== undefined && proposal.status !== filters.status) {
-      return false
-    }
-    return true
-  })
-}
-
-export const PROPOSAL_STATUSES: ProposalStatus[] = [
-  'in_review',
-  'approved',
-  'rejected',
-  'changes_requested',
-]
-
 function matchesSearch(proposal: ProposalListItem, search: string | undefined): boolean {
   if (search === undefined || search.trim() === '') return true
   const q = search.toLowerCase()
@@ -51,7 +28,9 @@ export function proposalInboxFixtures(filters: ReviewInboxFilters): ProposalList
   return proposalListFixtures().filter((proposal) => {
     if (filters.projectId !== undefined && proposal.projectId !== filters.projectId) return false
     if (filters.status !== 'all' && proposal.status !== filters.status) return false
-    if (filters.duplicatesOnly === true && proposal.possibleDuplicate !== true) return false
+    if (filters.duplicatesOnly === true && proposal.classification?.kind !== 'possible_duplicate') {
+      return false
+    }
     return matchesSearch(proposal, filters.search)
   })
 }

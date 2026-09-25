@@ -45,107 +45,6 @@ function build(prisma: FakePrisma) {
   return new ReviewInboxQueryService(prisma as never);
 }
 
-describe('ReviewInboxQueryService.list', () => {
-  it('scopes every query to the organization', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).list(org, {});
-
-    const [call] = prisma.extractedProposal.findMany.mock.calls as [
-      [{ where: Record<string, unknown> }],
-    ];
-    expect(call[0].where).toMatchObject({
-      project: { organizationId: 'org-1' },
-    });
-  });
-
-  it('maps targetTestCaseId onto the frontend contract name', async () => {
-    const prisma = createPrisma();
-
-    const result = await build(prisma).list(org, {});
-
-    expect(result[0]).toEqual({
-      id: 'proposal-1',
-      projectId: 'project-1',
-      status: 'in_review',
-      title: 'Empties the cart',
-      objective: 'Confirm the cart resets',
-      preconditions: ['A signed-in user'],
-      steps: ['Open the cart'],
-      expectedResult: 'The cart shows zero items',
-      priority: 'high',
-      evidenceId: 'evidence-1',
-      evidenceTitle: 'src/cart.spec.ts',
-      locale: null,
-    });
-  });
-
-  it('carries the evidence title so the queue never fetches it per row', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).list(org, {});
-
-    const [call] = prisma.extractedProposal.findMany.mock.calls as [
-      [{ select: { evidence: unknown } }],
-    ];
-    expect(call[0].select.evidence).toEqual({ select: { title: true } });
-  });
-
-  it('exposes the documentation target when the proposal has one', async () => {
-    const prisma = createPrisma();
-    prisma.extractedProposal.findMany.mockResolvedValue([
-      { ...row, targetTestCaseId: 'case-9' },
-    ]);
-
-    const result = await build(prisma).list(org, {});
-
-    expect(result[0].targetOfficialTestCaseId).toBe('case-9');
-  });
-
-  it('filters by project and status when asked', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).list(org, {
-      projectId: 'project-1',
-      status: 'approved',
-    });
-
-    const [call] = prisma.extractedProposal.findMany.mock.calls as [
-      [{ where: Record<string, unknown> }],
-    ];
-    expect(call[0].where).toMatchObject({
-      projectId: 'project-1',
-      status: 'approved',
-    });
-  });
-
-  it('resolves duplicatesOnly against real matches, never against the documentation target', async () => {
-    const prisma = createPrisma();
-
-    const result = await build(prisma).list(org, { duplicatesOnly: true });
-
-    const [call] = prisma.extractedProposal.findMany.mock.calls as [
-      [{ where: Record<string, unknown> }],
-    ];
-    expect(call[0].where).not.toHaveProperty('targetTestCaseId');
-    expect(result).toEqual([]);
-  });
-
-  it('searches title and objective case-insensitively', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).list(org, { search: 'cart' });
-
-    const [call] = prisma.extractedProposal.findMany.mock.calls as [
-      [{ where: { OR: unknown } }],
-    ];
-    expect(call[0].where.OR).toEqual([
-      { title: { contains: 'cart', mode: 'insensitive' } },
-      { objective: { contains: 'cart', mode: 'insensitive' } },
-    ]);
-  });
-});
-
 describe('ReviewInboxQueryService.findOne', () => {
   it('returns not-found for a proposal outside the organization', async () => {
     const prisma = createPrisma();
@@ -204,6 +103,36 @@ describe('ReviewInboxQueryService.findOne', () => {
       },
     ]);
   });
+
+  it('maps targetTestCaseId onto the frontend contract name', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      evidence: null,
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.targetOfficialTestCaseId).toBe('case-9');
+  });
+
+  it('exposes the target case suite id so the client can offer to re-document it in place', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      targetTestCase: { suiteId: 'suite-9' },
+      evidence: null,
+    });
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok)
+      expect(result.value.targetOfficialTestCaseSuiteId).toBe('suite-9');
+  });
 });
 
 const serviceOrg: OrgContext = {
@@ -261,106 +190,6 @@ function createServicePrisma(
 function buildService(prisma: ServiceFakePrisma) {
   return new ReviewInboxQueryService(prisma as never);
 }
-
-function serviceListRow(overrides: Record<string, unknown> = {}) {
-  return {
-    ...serviceProposalRow,
-    locale: null,
-    observations: null,
-    createdAt: new Date('2026-09-12T10:00:00.000Z'),
-    evidence: { title: 'src/cart.spec.ts' },
-    ...overrides,
-  };
-}
-
-function serviceOfficialCase(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'case-1',
-    projectId: 'project-1',
-    name: 'Empties the cart',
-    automationKey: 'Cart > empties the cart',
-    updatedAt: new Date('2026-09-01T00:00:00.000Z'),
-    ...overrides,
-  };
-}
-
-describe('ReviewInboxQueryService.list (from review.service.spec)', () => {
-  it('flags an untargeted proposal that matches an existing case in its project', async () => {
-    const prisma = createServicePrisma();
-    prisma.extractedProposal.findMany.mockResolvedValue([
-      serviceListRow({ automationKey: 'Cart > empties the cart' }),
-    ]);
-    prisma.testCase.findMany.mockResolvedValue([serviceOfficialCase()]);
-
-    const [view] = await buildService(prisma).list(serviceOrg, {});
-
-    expect(view.possibleDuplicate).toBe(true);
-    expect(view.targetOfficialTestCaseId).toBeUndefined();
-  });
-
-  it('never flags a proposal that documents a case, however similar it is to that case', async () => {
-    const prisma = createServicePrisma();
-    prisma.extractedProposal.findMany.mockResolvedValue([
-      serviceListRow({
-        targetTestCaseId: 'case-1',
-        automationKey: 'Cart > empties the cart',
-      }),
-    ]);
-    prisma.testCase.findMany.mockResolvedValue([serviceOfficialCase()]);
-
-    const [view] = await buildService(prisma).list(serviceOrg, {});
-
-    expect(view.possibleDuplicate).toBeUndefined();
-    expect(view.targetOfficialTestCaseId).toBe('case-1');
-    expect(prisma.testCase.findMany).not.toHaveBeenCalled();
-  });
-
-  it('exposes the target case suite id so the client can offer to re-document it in place', async () => {
-    const prisma = createServicePrisma();
-    prisma.extractedProposal.findMany.mockResolvedValue([
-      serviceListRow({
-        targetTestCaseId: 'case-1',
-        targetTestCase: { suiteId: 'suite-9' },
-      }),
-    ]);
-
-    const [view] = await buildService(prisma).list(serviceOrg, {});
-
-    expect(view.targetOfficialTestCaseSuiteId).toBe('suite-9');
-  });
-
-  it('leaves an untargeted proposal unflagged when nothing in the project resembles it', async () => {
-    const prisma = createServicePrisma();
-    prisma.extractedProposal.findMany.mockResolvedValue([
-      serviceListRow({ title: 'Applies a discount code', automationKey: null }),
-    ]);
-    prisma.testCase.findMany.mockResolvedValue([serviceOfficialCase()]);
-
-    const [view] = await buildService(prisma).list(serviceOrg, {});
-
-    expect(view.possibleDuplicate).toBeUndefined();
-  });
-
-  it('keeps only flagged proposals when duplicatesOnly is requested', async () => {
-    const prisma = createServicePrisma();
-    prisma.extractedProposal.findMany.mockResolvedValue([
-      serviceListRow({ id: 'dup', automationKey: 'Cart > empties the cart' }),
-      serviceListRow({
-        id: 'fresh',
-        title: 'Applies a discount code',
-        automationKey: null,
-      }),
-      serviceListRow({ id: 'documents', targetTestCaseId: 'case-1' }),
-    ]);
-    prisma.testCase.findMany.mockResolvedValue([serviceOfficialCase()]);
-
-    const views = await buildService(prisma).list(serviceOrg, {
-      duplicatesOnly: true,
-    });
-
-    expect(views.map((view) => view.id)).toEqual(['dup']);
-  });
-});
 
 describe('ReviewInboxQueryService.findOne (from review.service.spec)', () => {
   it('tells the reviewer when a proposal was flagged for manual review', async () => {
@@ -637,6 +466,24 @@ describe('ReviewInboxQueryService.page', () => {
           },
         ],
       },
+    ]);
+  });
+
+  it('searches title and objective case-insensitively', async () => {
+    const prisma = createPageFixture([]);
+
+    await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+      search: 'cart',
+    });
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: { OR: unknown } }],
+    ];
+    expect(call[0].where.OR).toEqual([
+      { title: { contains: 'cart', mode: 'insensitive' } },
+      { objective: { contains: 'cart', mode: 'insensitive' } },
     ]);
   });
 

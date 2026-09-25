@@ -31,13 +31,6 @@ export interface ProposalDetailView extends ProposalView {
   links: TraceabilityLink[];
 }
 
-export interface ListProposalsFilters {
-  projectId?: string;
-  status?: ProposalStatus;
-  duplicatesOnly?: boolean;
-  search?: string;
-}
-
 export interface ReviewInboxPageFilters {
   projectId?: string;
   status: ProposalStatus | 'all';

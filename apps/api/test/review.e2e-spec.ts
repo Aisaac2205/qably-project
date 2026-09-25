@@ -136,23 +136,9 @@ describe('Review (e2e)', () => {
   it('refuses the review routes without a session', async () => {
     read.mockResolvedValue(null);
 
-    await request(app.getHttpServer()).get('/review/proposals').expect(401);
-  });
-
-  it('lists the proposals of the caller organization', async () => {
-    const response = await request(app.getHttpServer())
-      .get('/review/proposals')
-      .expect(200);
-
-    const body = response.body as { id: string; evidenceId: string }[];
-    expect(body).toHaveLength(1);
-    expect(body[0].evidenceId).toBe('evidence-1');
-  });
-
-  it('rejects an unknown status filter', async () => {
     await request(app.getHttpServer())
-      .get('/review/proposals?status=whatever')
-      .expect(400);
+      .get('/review/proposals/proposal-1')
+      .expect(401);
   });
 
   it('returns the proposal detail with evidence in the frontend contract shape', async () => {

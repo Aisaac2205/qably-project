@@ -8,9 +8,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type {
   DuplicateCandidateView,
   InboxItem,
-  ListProposalsFilters,
   ProposalDetailView,
-  ProposalView,
   ReviewError,
   ReviewInboxCounts,
   ReviewInboxCountsFilters,
@@ -108,22 +106,6 @@ interface DuplicateTargetRow {
   title: string;
   automationKey: string | null;
   targetTestCaseId: string | null;
-}
-
-const DUPLICATE_FLAG_SELECT = {
-  id: true,
-  projectId: true,
-  name: true,
-  automationKey: true,
-  updatedAt: true,
-} as const;
-
-interface DuplicateFlagRow {
-  id: string;
-  projectId: string;
-  name: string;
-  automationKey: string | null;
-  updatedAt: Date;
 }
 
 const DUPLICATE_CANDIDATE_SELECT = {
@@ -224,24 +206,6 @@ export class ReviewInboxQueryService {
     };
   }
 
-  async list(
-    org: OrgContext,
-    filters: ListProposalsFilters,
-  ): Promise<ProposalView[]> {
-    const rows = (await this.prisma.extractedProposal.findMany({
-      where: this.baseWhere(org, filters),
-      orderBy: { createdAt: 'desc' },
-      select: VIEW_SELECT,
-    })) as ViewRow[];
-
-    const flagged = await this.flagPossibleDuplicates(rows);
-    const views = rows.map((row) => toView(row, flagged.has(row.id)));
-
-    return filters.duplicatesOnly === true
-      ? views.filter((view) => view.possibleDuplicate === true)
-      : views;
-  }
-
   async page(
     org: OrgContext,
     filters: ReviewInboxPageFilters,
@@ -339,44 +303,6 @@ export class ReviewInboxQueryService {
       .digest('hex');
 
     return { byStatus, byDuplicateKind, version };
-  }
-
-  private async flagPossibleDuplicates(
-    rows: readonly ViewRow[],
-  ): Promise<Set<string>> {
-    const untargeted = rows.filter((row) => row.targetTestCaseId === null);
-    if (untargeted.length === 0) return new Set();
-
-    const projectIds = [...new Set(untargeted.map((row) => row.projectId))];
-    const cases = (await this.prisma.testCase.findMany({
-      where: { projectId: { in: projectIds } },
-      select: DUPLICATE_FLAG_SELECT,
-    })) as DuplicateFlagRow[];
-
-    const candidatesByProject = new Map<string, DuplicateRankCandidate[]>();
-    for (const row of cases) {
-      const list = candidatesByProject.get(row.projectId) ?? [];
-      list.push({
-        id: row.id,
-        title: row.name,
-        steps: [],
-        expectedResult: '',
-        automationKey: row.automationKey,
-        publishedAt: row.updatedAt,
-      });
-      candidatesByProject.set(row.projectId, list);
-    }
-
-    const flagged = new Set<string>();
-    for (const row of untargeted) {
-      const ranked = rankDuplicateCandidates(
-        { title: row.title, automationKey: row.automationKey },
-        candidatesByProject.get(row.projectId) ?? [],
-      );
-      if (ranked.length > 0) flagged.add(row.id);
-    }
-
-    return flagged;
   }
 
   async findOne(

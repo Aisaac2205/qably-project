@@ -75,7 +75,7 @@ export interface LinkRow {
   relation: string;
 }
 
-export function toView(row: ViewRow, possibleDuplicate = false): ProposalView {
+export function toView(row: ViewRow): ProposalView {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -102,7 +102,6 @@ export function toView(row: ViewRow, possibleDuplicate = false): ProposalView {
     ...(row.targetTestCase === null
       ? {}
       : { targetOfficialTestCaseSuiteId: row.targetTestCase.suiteId }),
-    ...(possibleDuplicate ? { possibleDuplicate: true } : {}),
   };
 }
 

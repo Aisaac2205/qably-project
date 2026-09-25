@@ -21,12 +21,9 @@ import { projectKeys } from '@/features/projects/lib/query-keys'
 import { organizationKeys } from '@/features/organizations/lib/query-keys'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
 import {
-  PROPOSAL_STATUSES,
   proposalDetailFixtures,
   proposalInboxCountsFixtures,
   proposalInboxFixtures,
-  proposalListFixtures,
-  proposalListFixturesFor,
 } from '@/test/review-api-stub'
 import type { ReviewInboxStatusFilter } from '@/features/review-inbox/api/review.api'
 
@@ -166,24 +163,9 @@ function seedDashboardChannels(client: QueryClient): void {
   client.setQueryData(dashboardKeys.channels(getBrowserTimeZone()), record)
 }
 
-function seedProposals(client: QueryClient): void {
-  client.setQueryData(reviewKeys.list(), proposalListFixtures())
-
+function seedProposalDetails(client: QueryClient): void {
   for (const detail of proposalDetailFixtures()) {
     client.setQueryData(reviewKeys.detail(detail.id), detail)
-  }
-
-  const projectIds = new Set(proposalListFixtures().map((proposal) => proposal.projectId))
-
-  for (const projectId of projectIds) {
-    client.setQueryData(reviewKeys.list({ projectId }), proposalListFixturesFor({ projectId }))
-
-    for (const status of PROPOSAL_STATUSES) {
-      client.setQueryData(
-        reviewKeys.list({ projectId, status }),
-        proposalListFixturesFor({ projectId, status }),
-      )
-    }
   }
 }
 
@@ -243,7 +225,7 @@ export function createTestQueryClient(): QueryClient {
   seedTraceability(client)
   seedDashboardOverview(client)
   seedDashboardChannels(client)
-  seedProposals(client)
+  seedProposalDetails(client)
   seedInboxPages(client)
   seedInboxCounts(client)
 

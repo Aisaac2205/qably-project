@@ -113,7 +113,6 @@ function createReviewDomain() {
     expectedResult: aiCase.expectedResult,
     priority: 'medium',
     evidenceId: `evidence-${aiCase.id}`,
-    ...(aiCase.possibleDuplicateOf === undefined ? {} : { possibleDuplicate: true }),
     ...(aiCase.documentsCaseId === undefined ? {} : { targetOfficialTestCaseId: `case-${aiCase.documentsCaseId}` }),
   }))
   const existingCases = mockSuites.flatMap((suite) => suite.cases.map<OfficialTestCase>((testCase) => ({

@@ -1,18 +1,6 @@
 import { z } from 'zod';
 import { decodeInboxCursor } from './lib/inbox-cursor';
 
-export const listProposalsQuerySchema = z.object({
-  projectId: z.string().min(1).optional(),
-  status: z
-    .enum(['in_review', 'approved', 'rejected', 'changes_requested'])
-    .optional(),
-  duplicatesOnly: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
-  search: z.string().trim().min(1).max(200).optional(),
-});
-
 export const decisionSchema = z.object({
   comment: z.string().trim().min(1).max(1000).optional(),
 });
@@ -53,7 +41,6 @@ export const reviewInboxCountsQuerySchema = z.object({
   search: z.string().trim().min(1).max(200).optional(),
 });
 
-export type ListProposalsQuery = z.infer<typeof listProposalsQuerySchema>;
 export type DecisionBody = z.infer<typeof decisionSchema>;
 export type ReviewInboxQuery = z.infer<typeof reviewInboxQuerySchema>;
 export type ReviewInboxCountsQuery = z.infer<

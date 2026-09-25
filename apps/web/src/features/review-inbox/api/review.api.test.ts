@@ -4,7 +4,6 @@ import {
   getInboxCounts,
   getInboxPage,
   getProposal,
-  listProposals,
   rejectProposal,
 } from './review.api'
 
@@ -30,45 +29,6 @@ describe('review.api', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     fetchMock.mockReset()
-  })
-
-  it('lists every proposal in the organization when no filter is given', async () => {
-    await listProposals({})
-
-    const [url, init] = lastCall()
-    expect(url).toMatch(/\/review\/proposals$/)
-    expect(init.method).toBe('GET')
-  })
-
-  it('sends only the filters that were set', async () => {
-    await listProposals({ projectId: 'proj-1', status: 'in_review' })
-
-    const [url] = lastCall()
-    expect(url).toContain('projectId=proj-1')
-    expect(url).toContain('status=in_review')
-    expect(url).not.toContain('duplicatesOnly')
-    expect(url).not.toContain('search')
-  })
-
-  it('encodes a search term instead of pasting it raw into the query', async () => {
-    await listProposals({ search: 'empty cart & checkout' })
-
-    const [url] = lastCall()
-    expect(url).toContain('search=empty+cart+%26+checkout')
-  })
-
-  it('sends duplicatesOnly as the string the api validates', async () => {
-    await listProposals({ duplicatesOnly: true })
-
-    const [url] = lastCall()
-    expect(url).toContain('duplicatesOnly=true')
-  })
-
-  it('omits duplicatesOnly when it is false', async () => {
-    await listProposals({ duplicatesOnly: false })
-
-    const [url] = lastCall()
-    expect(url).not.toContain('duplicatesOnly')
   })
 
   it('reads one proposal with its evidence', async () => {

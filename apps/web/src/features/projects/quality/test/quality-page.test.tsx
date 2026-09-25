@@ -45,7 +45,6 @@ vi.mock('@/features/runs/api/runs.api', () => ({
 }))
 
 vi.mock('@/features/review-inbox/api/review.api', () => ({
-  listProposals: vi.fn(),
   getProposal: vi.fn(),
   approveProposal: vi.fn(),
   rejectProposal: vi.fn(),

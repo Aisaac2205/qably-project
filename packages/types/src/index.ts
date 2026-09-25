@@ -699,7 +699,6 @@ export interface ExtractedProposal {
   needsManualReview: boolean
   targetOfficialTestCaseId?: string
   targetOfficialTestCaseSuiteId?: string
-  possibleDuplicate?: boolean
   locale?: string | null
   observations?: string[]
   createdAt?: string
