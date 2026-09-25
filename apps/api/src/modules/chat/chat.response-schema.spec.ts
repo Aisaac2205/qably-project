@@ -38,4 +38,40 @@ describe('RESPONSE_JSON_SCHEMA (chat)', () => {
       'priority',
     ]);
   });
+
+  it('requires reply, cases and grounding at the top level', () => {
+    expect(RESPONSE_JSON_SCHEMA.required).toEqual([
+      'reply',
+      'cases',
+      'grounding',
+    ]);
+  });
+
+  it('declares the grounding status as a bounded enum, not a free string', () => {
+    expect(RESPONSE_JSON_SCHEMA.properties.grounding.properties.status).toEqual(
+      { type: 'string', enum: ['grounded', 'insufficient'] },
+    );
+  });
+
+  it('declares every grounding reference kind the server can validate', () => {
+    expect(
+      RESPONSE_JSON_SCHEMA.properties.grounding.properties.references.items
+        .properties.kind,
+    ).toEqual({
+      type: 'string',
+      enum: ['source-excerpt', 'code-change', 'review', 'attached-file'],
+    });
+  });
+
+  it('carries no length or item-count bound on the nested grounding references array', () => {
+    const referenceItems =
+      RESPONSE_JSON_SCHEMA.properties.grounding.properties.references.items;
+    expect(referenceItems.properties.id).toEqual({ type: 'string' });
+    expect(
+      RESPONSE_JSON_SCHEMA.properties.grounding.properties.references,
+    ).not.toHaveProperty('maxItems');
+    expect(
+      RESPONSE_JSON_SCHEMA.properties.grounding.properties.references,
+    ).not.toHaveProperty('minItems');
+  });
 });

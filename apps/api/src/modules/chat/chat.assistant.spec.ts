@@ -39,7 +39,11 @@ function capture() {
       generateContent: (params) => {
         received.params = params;
         return Promise.resolve({
-          text: JSON.stringify({ reply: 'ok', cases: [] }),
+          text: JSON.stringify({
+            reply: 'ok',
+            cases: [],
+            grounding: { status: 'insufficient' },
+          }),
         });
       },
     },
@@ -154,5 +158,80 @@ describe('GeminiChatAssistant', () => {
     expect(contents[2].parts[0].text).toBe('hello');
     expect(contents[3].parts[0].text).toBe('hi');
     expect(contents[4].parts[0].text).toBe('Which flows are uncovered?');
+  });
+
+  it('forwards the parsed grounding declaration on a successful reply', async () => {
+    const client: GeminiClient = {
+      models: {
+        generateContent: () =>
+          Promise.resolve({
+            text: JSON.stringify({
+              reply: 'ok',
+              cases: [],
+              grounding: {
+                status: 'grounded',
+                references: [{ kind: 'source-excerpt', id: 'case-1' }],
+              },
+            }),
+          }),
+      },
+    };
+
+    const outcome = await new GeminiChatAssistant(client, env()).reply(input());
+
+    expect(outcome).toEqual({
+      kind: 'replied',
+      reply: 'ok',
+      cases: [],
+      grounding: {
+        status: 'grounded',
+        references: [{ kind: 'source-excerpt', id: 'case-1' }],
+      },
+      usage: { promptTokens: 0, candidatesTokens: 0, totalTokens: 0 },
+    });
+  });
+
+  it('treats a response missing the grounding declaration as a schema violation', async () => {
+    const client: GeminiClient = {
+      models: {
+        generateContent: () =>
+          Promise.resolve({
+            text: JSON.stringify({ reply: 'ok', cases: [] }),
+          }),
+      },
+    };
+
+    const outcome = await new GeminiChatAssistant(client, env()).reply(input());
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'schema-violation',
+    });
+  });
+
+  it('treats a grounded declaration citing an unbounded number of references as a schema violation', async () => {
+    const references = Array.from({ length: 11 }, (_, index) => ({
+      kind: 'source-excerpt' as const,
+      id: `case-${index}`,
+    }));
+    const client: GeminiClient = {
+      models: {
+        generateContent: () =>
+          Promise.resolve({
+            text: JSON.stringify({
+              reply: 'ok',
+              cases: [],
+              grounding: { status: 'grounded', references },
+            }),
+          }),
+      },
+    };
+
+    const outcome = await new GeminiChatAssistant(client, env()).reply(input());
+
+    expect(outcome).toEqual({
+      kind: 'provider-unavailable',
+      reason: 'schema-violation',
+    });
   });
 });

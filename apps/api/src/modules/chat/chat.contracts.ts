@@ -1,11 +1,13 @@
 import { z } from 'zod';
+import type { GroundingView } from '@qably/types';
 import { extractedCaseObjectSchema } from '../ai/extraction.contracts';
 
-export const CHAT_PROMPT_VERSION = 'chat-v4';
+export const CHAT_PROMPT_VERSION = 'chat-v5';
 export const MAX_SUGGESTED_CASES = 5;
 export const MAX_HISTORY_MESSAGES = 20;
 export const MAX_REPLY_LENGTH = 4000;
 export const MAX_EXCERPT_LENGTH = 600;
+export const MAX_GROUNDING_REFERENCES = 10;
 
 export const suggestedCaseSchema = extractedCaseObjectSchema
   .omit({
@@ -45,6 +47,7 @@ export interface ChatMessageView {
   content: string;
   suggestedCases: SuggestedCase[];
   attachedCases: AttachedCaseView[];
+  grounding: GroundingView | null;
   createdAt: string;
   sentProposalIds?: Record<number, string>;
 }

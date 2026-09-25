@@ -5,6 +5,7 @@ import {
   PROJECT_DATA_OPEN,
   buildCaseContextAcknowledgement,
   buildChatSystemInstruction,
+  buildGroundingDeclineReply,
   buildProjectContextAcknowledgement,
   buildProjectContextTurn,
   type ChatProjectContext,
@@ -124,6 +125,51 @@ describe('buildChatSystemInstruction', () => {
       /documentation source.*human/i,
     );
     expect(buildChatSystemInstruction('en')).toMatch(/targetTestCaseId/);
+  });
+
+  it('requires every reply to declare grounded or insufficient', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildChatSystemInstruction(locale);
+
+      expect(instruction).toMatch(/grounding/i);
+      expect(instruction).toMatch(/insufficient/i);
+    }
+  });
+
+  it('tells the assistant how to cite a context item it grounds a reply in', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildChatSystemInstruction(locale);
+
+      expect(instruction).toMatch(/source-excerpt/);
+      expect(instruction).toMatch(/attached-file/);
+      expect(instruction).toMatch(/F1/);
+    }
+  });
+
+  it('requires every suggested-case field to match the reply locale, not just the reply text (Unit 5 verification, no new behavior)', () => {
+    expect(buildChatSystemInstruction('es')).toMatch(
+      /cada campo de cada caso/i,
+    );
+    expect(buildChatSystemInstruction('en')).toMatch(
+      /every field of every case/i,
+    );
+  });
+});
+
+describe('buildGroundingDeclineReply', () => {
+  it('answers in the requested locale', () => {
+    expect(buildGroundingDeclineReply('es')).not.toBe(
+      buildGroundingDeclineReply('en'),
+    );
+  });
+
+  it('is a short, non-empty sentence in each locale', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const reply = buildGroundingDeclineReply(locale);
+
+      expect(reply.length).toBeGreaterThan(0);
+      expect(reply.length).toBeLessThan(300);
+    }
   });
 });
 

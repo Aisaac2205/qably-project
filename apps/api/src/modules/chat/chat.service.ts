@@ -2,15 +2,22 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { resolveLocale } from '@qably/i18n';
 import {
   assessCaseDocumentation,
+  type GroundingView,
   type RepoConnectionProvider,
 } from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
+import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { buildBlobUrl } from '../repository/source-reader';
+import {
+  buildGroundingManifest,
+  groundingDeclarationSchema,
+  resolveGrounding,
+} from './chat-grounding';
 import { gate } from './chat-evidence-gate';
 import {
   CaseContextBuilder,
@@ -20,7 +27,10 @@ import {
   type EvidenceCandidate,
   type ExcerptOutcome,
 } from './case-context-builder';
-import type { ChatProjectContext } from './chat-prompt';
+import {
+  buildGroundingDeclineReply,
+  type ChatProjectContext,
+} from './chat-prompt';
 import type { ChatAssistant, ChatHistoryEntry } from './chat.assistant';
 import {
   CHAT_ASSISTANT,
@@ -77,7 +87,13 @@ interface MessageRow {
   content: string;
   suggestedCases: unknown;
   attachedCaseIds?: string[];
+  grounding?: unknown;
   createdAt: Date;
+}
+
+function readGrounding(value: unknown): GroundingView | null {
+  const parsed = groundingDeclarationSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
 }
 
 interface AttachedCaseRow {
@@ -179,6 +195,7 @@ function toMessageView(
     content: row.content,
     suggestedCases: read.kind === 'ok' ? read.cases : [],
     attachedCases,
+    grounding: readGrounding(row.grounding),
     createdAt: row.createdAt.toISOString(),
     ...(sentProposalIds !== undefined ? { sentProposalIds } : {}),
   };
@@ -446,10 +463,23 @@ export class ChatService {
       return err('provider-unavailable');
     }
 
-    const attachedIdSet = new Set(caseIds);
-    const filteredCases = outcome.cases.map((suggested) =>
-      stripUnattachedTarget(suggested, attachedIdSet),
+    const manifest = buildGroundingManifest(
+      caseIds,
+      attachedFile !== undefined,
     );
+    const resolution = resolveGrounding(outcome.grounding, manifest);
+
+    const attachedIdSet = new Set(caseIds);
+    const filteredCases =
+      resolution.outcome === 'grounded'
+        ? outcome.cases.map((suggested) =>
+            stripUnattachedTarget(suggested, attachedIdSet),
+          )
+        : [];
+    const replyContent =
+      resolution.outcome === 'fabricated'
+        ? buildGroundingDeclineReply(locale)
+        : outcome.reply;
 
     const assistantRow = await this.prisma.$transaction(
       async (tx: TxClient) => {
@@ -463,8 +493,9 @@ export class ChatService {
           data: {
             threadId,
             role: 'assistant',
-            content: outcome.reply,
+            content: replyContent,
             suggestedCases: filteredCases,
+            grounding: resolution.view as Prisma.InputJsonValue,
             promptVersion: CHAT_PROMPT_VERSION,
             totalTokens: outcome.usage.totalTokens,
           },

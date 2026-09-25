@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { CaseContextBuilder } from './case-context-builder';
 import type { ChatAssistant, ChatReplyOutcome } from './chat.assistant';
+import { buildGroundingDeclineReply } from './chat-prompt';
 import { CHAT_PROMPT_VERSION } from './chat.contracts';
 import { ChatService } from './chat.service';
 
@@ -268,6 +269,7 @@ describe('ChatService', () => {
       reply: 'Here is a case worth adding.',
       cases: [suggestedCase],
       usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+      grounding: { status: 'grounded', references: [] },
     });
     const service = build(prisma, assistant);
 
@@ -316,6 +318,7 @@ describe('ChatService', () => {
       reply: 'Here is a case worth adding.',
       cases: [],
       usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      grounding: { status: 'grounded', references: [] },
     });
     const service = build(prisma, assistant);
 
@@ -438,6 +441,7 @@ describe('ChatService', () => {
       reply: 'Here is what I found.',
       cases: [],
       usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      grounding: { status: 'grounded', references: [] },
     });
     const service = build(prisma, assistant, undefined, caseContextBuilder);
 
@@ -821,6 +825,7 @@ describe('ChatService', () => {
       reply: 'Here is a case worth adding.',
       cases: [suggestedCase],
       usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+      grounding: { status: 'grounded', references: [] },
     });
     const service = build(prisma, assistant, fakeEntitlement(spendCredit));
 
@@ -829,6 +834,228 @@ describe('ChatService', () => {
     });
 
     expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+  });
+
+  describe('grounded-or-decline', () => {
+    it('persists a grounded reply and its references as-is', async () => {
+      const prisma = createPrisma();
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [suggestedCase],
+        usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+        grounding: {
+          status: 'grounded',
+          references: [{ kind: 'source-excerpt', id: 'case-1' }],
+        },
+      });
+      const service = build(prisma, assistant);
+
+      await service.sendMessage(org, user, 'project-1', 'thread-1', {
+        content: 'Improve this case',
+        caseIds: ['case-1'],
+      });
+
+      expect(prisma.chatMessage.create).toHaveBeenLastCalledWith(
+        containing({
+          data: containing({
+            content: 'Here is a case worth adding.',
+            suggestedCases: [suggestedCase],
+            grounding: {
+              status: 'grounded',
+              references: [{ kind: 'source-excerpt', id: 'case-1' }],
+            },
+          }),
+        }),
+      );
+    });
+
+    it('stores the model own insufficient decline as-is but clears any cases it still returned', async () => {
+      const prisma = createPrisma();
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'I do not have enough information to answer that.',
+        cases: [suggestedCase],
+        usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: { status: 'insufficient' },
+      });
+      const service = build(prisma, assistant);
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        { content: 'What is missing in checkout?' },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(prisma.chatMessage.create).toHaveBeenLastCalledWith(
+        containing({
+          data: containing({
+            content: 'I do not have enough information to answer that.',
+            suggestedCases: [],
+            grounding: { status: 'insufficient' },
+          }),
+        }),
+      );
+    });
+
+    it('downgrades a grounded claim citing a reference never sent this turn: replaces content, clears cases, still stores insufficient', async () => {
+      const prisma = createPrisma();
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [suggestedCase],
+        usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+        grounding: {
+          status: 'grounded',
+          references: [{ kind: 'source-excerpt', id: 'case-never-attached' }],
+        },
+      });
+      const service = build(prisma, assistant);
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        { content: 'What is missing in checkout?' },
+      );
+
+      expect(result.ok).toBe(true);
+      const calls = prisma.chatMessage.create.mock.calls as unknown[][];
+      const assistantCall = calls[1][0] as {
+        data: {
+          content: string;
+          suggestedCases: unknown[];
+          grounding: unknown;
+        };
+      };
+      expect(assistantCall.data.content).not.toBe(
+        'Here is a case worth adding.',
+      );
+      expect(assistantCall.data.content.length).toBeGreaterThan(0);
+      expect(assistantCall.data.suggestedCases).toEqual([]);
+      expect(assistantCall.data.grounding).toEqual({ status: 'insufficient' });
+    });
+
+    it('writes the locale-appropriate decline sentence when downgrading a fabricated reference', async () => {
+      const prisma = createPrisma();
+      prisma.user.findUnique.mockResolvedValue({ locale: 'en' });
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [],
+        usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: {
+          status: 'grounded',
+          references: [{ kind: 'attached-file', id: 'F1' }],
+        },
+      });
+      const service = build(prisma, assistant);
+
+      await service.sendMessage(org, user, 'project-1', 'thread-1', {
+        content: 'What is missing in checkout?',
+      });
+
+      const calls = prisma.chatMessage.create.mock.calls as unknown[][];
+      const assistantCall = calls[1][0] as { data: { content: string } };
+      expect(assistantCall.data.content).toBe(buildGroundingDeclineReply('en'));
+    });
+
+    it('spends the credit even when the reply is downgraded to a decline', async () => {
+      const prisma = createPrisma();
+      const spendCredit = jest.fn().mockResolvedValue(true);
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Here is a case worth adding.',
+        cases: [suggestedCase],
+        usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+        grounding: {
+          status: 'grounded',
+          references: [{ kind: 'source-excerpt', id: 'case-ghost' }],
+        },
+      });
+      const service = build(prisma, assistant, fakeEntitlement(spendCredit));
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        { content: 'What is missing in checkout?' },
+      );
+
+      expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+      expect(result.ok).toBe(true);
+    });
+
+    it('accepts a case reference cited by a case actually attached this turn, even without a file', async () => {
+      const prisma = createPrisma();
+      const assistant = createAssistant({
+        kind: 'replied',
+        reply: 'Updated the steps.',
+        cases: [{ ...suggestedCase, targetTestCaseId: 'case-1' }],
+        usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: {
+          status: 'grounded',
+          references: [{ kind: 'source-excerpt', id: 'case-1' }],
+        },
+      });
+      const service = build(prisma, assistant);
+
+      const result = await service.sendMessage(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+        { content: 'Improve this case', caseIds: ['case-1'] },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(prisma.chatMessage.create).toHaveBeenLastCalledWith(
+        containing({
+          data: containing({
+            suggestedCases: [{ ...suggestedCase, targetTestCaseId: 'case-1' }],
+          }),
+        }),
+      );
+    });
+
+    it('exposes the stored grounding on the message read model, tolerating a pre-existing row with no grounding field', async () => {
+      const prisma = createPrisma();
+      prisma.chatMessage.findMany.mockResolvedValue([
+        userRow,
+        { ...assistantRow, grounding: { status: 'insufficient' } },
+        { ...assistantRow, id: 'message-legacy', grounding: null },
+      ]);
+      const service = build(
+        prisma,
+        createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      );
+
+      const result = await service.getThread(
+        org,
+        user,
+        'project-1',
+        'thread-1',
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        value: containing({
+          messages: [
+            containing({ id: 'message-1' }),
+            containing({
+              id: 'message-2',
+              grounding: { status: 'insufficient' },
+            }),
+            containing({ id: 'message-legacy', grounding: null }),
+          ],
+        }),
+      });
+    });
   });
 
   it('reports quota-exhausted and does not call the assistant when the daily Aeris budget is spent', async () => {
@@ -884,6 +1111,7 @@ describe('ChatService', () => {
       reply: 'Here is a case worth adding.',
       cases: [suggestedCase],
       usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+      grounding: { status: 'grounded', references: [] },
     });
     const service = build(prisma, assistant, fakeEntitlement(spendCredit));
 
@@ -911,6 +1139,7 @@ describe('ChatService', () => {
       reply: 'Here is a case worth adding.',
       cases: [suggestedCase],
       usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+      grounding: { status: 'grounded', references: [] },
     });
     const service = build(prisma, assistant, fakeEntitlement(spendCredit));
 
@@ -958,6 +1187,7 @@ describe('ChatService', () => {
         reply: 'Here is a case worth adding.',
         cases: [suggestedCase],
         usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+        grounding: { status: 'grounded', references: [] },
       }),
     );
     await service.sendMessage(org, user, 'project-1', 'thread-1', {
@@ -1203,6 +1433,7 @@ describe('ChatService', () => {
         reply: 'Here is a case worth adding.',
         cases: [],
         usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: { status: 'grounded', references: [] },
       });
       const service = build(prisma, assistant);
 
@@ -1297,6 +1528,7 @@ describe('ChatService', () => {
         reply: 'Here is the update.',
         cases: [],
         usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: { status: 'grounded', references: [] },
       });
       const service = build(
         prisma,
@@ -1359,6 +1591,7 @@ describe('ChatService', () => {
           { ...suggestedCase, targetTestCaseId: 'case-outside-attachment' },
         ],
         usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: { status: 'grounded', references: [] },
       });
       const service = build(prisma, assistant);
 
@@ -1404,6 +1637,7 @@ describe('ChatService', () => {
         reply: 'Here is the update.',
         cases: [{ ...suggestedCase, targetTestCaseId: 'case-1' }],
         usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+        grounding: { status: 'grounded', references: [] },
       });
       const service = build(prisma, assistant);
 

@@ -14,6 +14,10 @@ import {
   type ChatProjectContext,
 } from './chat-prompt';
 import {
+  groundingDeclarationSchema,
+  type GroundingDeclaration,
+} from './chat-grounding';
+import {
   MAX_REPLY_LENGTH,
   MAX_SUGGESTED_CASES,
   suggestedCaseSchema,
@@ -39,6 +43,7 @@ export type ChatReplyOutcome =
       kind: 'replied';
       reply: string;
       cases: SuggestedCase[];
+      grounding: GroundingDeclaration;
       usage: TokenUsage;
     }
   | { kind: 'provider-unavailable'; reason: string };
@@ -83,13 +88,40 @@ export const RESPONSE_JSON_SCHEMA = {
         required: ['title', 'objective', 'steps', 'expectedResult', 'priority'],
       },
     },
+    grounding: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', enum: ['grounded', 'insufficient'] },
+        references: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              kind: {
+                type: 'string',
+                enum: [
+                  'source-excerpt',
+                  'code-change',
+                  'review',
+                  'attached-file',
+                ],
+              },
+              id: { type: 'string' },
+            },
+            required: ['kind', 'id'],
+          },
+        },
+      },
+      required: ['status'],
+    },
   },
-  required: ['reply', 'cases'],
+  required: ['reply', 'cases', 'grounding'],
 } as const;
 
 const envelopeSchema = z.object({
   reply: z.string().trim().min(1).max(MAX_REPLY_LENGTH),
   cases: z.array(z.unknown()).max(MAX_SUGGESTED_CASES),
+  grounding: groundingDeclarationSchema,
 });
 
 type ContentTurn = {
@@ -213,6 +245,7 @@ export class GeminiChatAssistant implements ChatAssistant {
       kind: 'replied',
       reply: envelope.data.reply,
       cases,
+      grounding: envelope.data.grounding,
       usage: {
         promptTokens: usage.promptTokenCount ?? 0,
         candidatesTokens: usage.candidatesTokenCount ?? 0,
