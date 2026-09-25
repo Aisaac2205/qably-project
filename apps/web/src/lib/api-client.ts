@@ -10,12 +10,19 @@ const NOT_A_MEMBER_ERROR_CODE = 'not-a-member'
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
+  readonly details?: Record<string, unknown>
 
-  constructor(status: number, message: string, code?: string) {
+  constructor(
+    status: number,
+    message: string,
+    code?: string,
+    details?: Record<string, unknown>,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.details = details
   }
 }
 
@@ -60,16 +67,26 @@ function buildHeaders(options: ApiRequestOptions, organizationId: string | undef
   return headers
 }
 
+const ERROR_ENVELOPE_KEYS = new Set(['message', 'code', 'statusCode', 'path', 'timestamp'])
+
 async function readErrorBody(
   response: Response,
   fallback: string,
-): Promise<{ message: string; code?: string }> {
+): Promise<{ message: string; code?: string; details?: Record<string, unknown> }> {
   try {
-    const payload = (await response.json()) as { message?: unknown; code?: unknown }
+    const payload = (await response.json()) as Record<string, unknown>
     const message = typeof payload.message === 'string' ? payload.message : fallback
-    return typeof payload.code === 'string'
-      ? { message, code: payload.code }
-      : { message }
+    const code = typeof payload.code === 'string' ? payload.code : undefined
+    const detailEntries = Object.entries(payload).filter(
+      ([key]) => !ERROR_ENVELOPE_KEYS.has(key),
+    )
+    const details = detailEntries.length > 0 ? Object.fromEntries(detailEntries) : undefined
+
+    return {
+      message,
+      ...(code === undefined ? {} : { code }),
+      ...(details === undefined ? {} : { details }),
+    }
   } catch {
     return { message: fallback }
   }
@@ -99,7 +116,10 @@ async function performRequest<T>(
   })
 
   if (!response.ok) {
-    const { message, code } = await readErrorBody(response, `Request to ${path} failed`)
+    const { message, code, details } = await readErrorBody(
+      response,
+      `Request to ${path} failed`,
+    )
 
     if (
       !isRetry &&
@@ -111,7 +131,7 @@ async function performRequest<T>(
       return performRequest<T>(path, options, true)
     }
 
-    throw new ApiError(response.status, message, code)
+    throw new ApiError(response.status, message, code, details)
   }
 
   if (response.status === 204) return undefined as T

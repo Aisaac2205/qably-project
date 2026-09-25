@@ -125,6 +125,60 @@ describe('apiRequest', () => {
     await expect(apiRequest('/runs')).rejects.toMatchObject({ code: undefined })
   })
 
+  it('carries structured details from the error body, like a 409 decision payload', async () => {
+    const decision = {
+      action: 'approved',
+      decidedAt: '2026-01-05T12:00:00.000Z',
+      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+    }
+    mockFetch({
+      ok: false,
+      status: 409,
+      json: () =>
+        Promise.resolve({
+          statusCode: 409,
+          code: 'invalid-transition',
+          message: 'This proposal was already decided',
+          decision,
+          path: '/review/proposals/proposal-1/approve',
+          timestamp: '2026-01-05T12:00:01.000Z',
+        }),
+    })
+
+    await expect(apiRequest('/review/proposals/proposal-1/approve')).rejects.toMatchObject({
+      status: 409,
+      code: 'invalid-transition',
+      details: { decision },
+    })
+  })
+
+  it('leaves details undefined when the error body carries no extra fields', async () => {
+    mockFetch({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ message: 'Project not found' }),
+    })
+
+    await expect(apiRequest('/projects/nope')).rejects.toMatchObject({ details: undefined })
+  })
+
+  it('carries a null value inside details, distinct from the field being absent', async () => {
+    mockFetch({
+      ok: false,
+      status: 409,
+      json: () =>
+        Promise.resolve({
+          code: 'invalid-transition',
+          message: 'This proposal was already decided',
+          decision: null,
+        }),
+    })
+
+    await expect(apiRequest('/review/proposals/proposal-1/approve')).rejects.toMatchObject({
+      details: { decision: null },
+    })
+  })
+
   it('forwards the organization header when one is given', async () => {
     const spy = mockFetch({ json: () => Promise.resolve([]) })
 
