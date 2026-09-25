@@ -5,6 +5,7 @@ import type {
   ProposalStatus,
   TraceabilityLink,
 } from '@qably/types';
+import type { ProposalClassification } from './lib/classify-proposal';
 
 export type {
   DuplicateCandidateView,
@@ -13,6 +14,16 @@ export type {
 
 export interface ProposalView extends ExtractedProposal {
   evidenceTitle: string;
+}
+
+export interface InboxSuite {
+  id: string;
+  name: string;
+}
+
+export interface InboxItem extends ProposalView {
+  suite: InboxSuite | null;
+  classification: ProposalClassification;
 }
 
 export interface ProposalDetailView extends ProposalView {
@@ -37,7 +48,7 @@ export interface ReviewInboxPageFilters {
 }
 
 export interface ReviewInboxPage {
-  items: ProposalView[];
+  items: InboxItem[];
   nextCursor: string | null;
 }
 
@@ -48,8 +59,14 @@ export interface ReviewInboxCountsFilters {
 
 export type ReviewInboxStatusCounts = Record<ProposalStatus, number>;
 
+export type ReviewInboxDuplicateKindCounts = Record<
+  'none' | 'update' | 'possible_duplicate',
+  number
+>;
+
 export interface ReviewInboxCounts {
   byStatus: ReviewInboxStatusCounts;
+  byDuplicateKind: ReviewInboxDuplicateKindCounts;
   version: string;
 }
 

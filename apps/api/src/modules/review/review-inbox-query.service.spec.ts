@@ -548,6 +548,11 @@ function pageRow(overrides: Record<string, unknown> = {}) {
     observations: null,
     evidence: { title: 'src/cart.spec.ts' },
     createdAt: new Date('2026-09-24T10:00:00.000Z'),
+    suite: null as { id: string; name: string } | null,
+    duplicateKind: null as string | null,
+    matchedCaseId: null as string | null,
+    duplicateScore: null as number | null,
+    duplicateReasons: null as unknown,
     ...overrides,
   };
 }
@@ -635,41 +640,44 @@ describe('ReviewInboxQueryService.page', () => {
     ]);
   });
 
-  it('ignores cursor and pagination for duplicatesOnly, returning a single unpaginated page', async () => {
+  it('filters by the persisted possible_duplicate classification, paginating normally like every other filter', async () => {
     const prisma = createPageFixture([pageRow({ id: 'dup' })]);
 
-    const result = await buildService(prisma).page(serviceOrg, {
+    await buildService(prisma).page(serviceOrg, {
       status: 'in_review',
-      limit: 1,
+      limit: 50,
       duplicatesOnly: true,
     });
 
-    expect(result.nextCursor).toBeNull();
-    const [duplicatesCall] = prisma.extractedProposal.findMany.mock.calls as [
-      [Record<string, unknown>],
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: Record<string, unknown>; take: number }],
     ];
-    expect(duplicatesCall[0]).not.toHaveProperty('take');
+    expect(call[0].where).toMatchObject({
+      duplicateKind: 'possible_duplicate',
+    });
+    expect(call[0].take).toBe(51);
   });
 
-  it('honors the requested limit for duplicatesOnly instead of returning every match', async () => {
+  it('combines duplicatesOnly with the cursor keyset filter, instead of replacing it', async () => {
     const prisma = createPageFixture([]);
-    const service = buildService(prisma);
-    jest
-      .spyOn(service, 'list')
-      .mockResolvedValue([
-        pageRow({ id: 'dup-a' }),
-        pageRow({ id: 'dup-b' }),
-        pageRow({ id: 'dup-c' }),
-      ] as never);
+    const cursor = encodeInboxCursor({
+      createdAt: '2026-09-24T10:00:00.000Z',
+      id: 'proposal-5',
+    });
 
-    const result = await service.page(serviceOrg, {
+    await buildService(prisma).page(serviceOrg, {
       status: 'in_review',
-      limit: 2,
+      limit: 50,
+      cursor,
       duplicatesOnly: true,
     });
 
-    expect(result.items.map((item) => item.id)).toEqual(['dup-a', 'dup-b']);
-    expect(result.nextCursor).toBeNull();
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: { AND: Record<string, unknown>[] } }],
+    ];
+    expect(call[0].where.AND[0]).toMatchObject({
+      duplicateKind: 'possible_duplicate',
+    });
   });
 
   it('omits the status filter entirely when status is "all"', async () => {
@@ -684,6 +692,89 @@ describe('ReviewInboxQueryService.page', () => {
       [{ where: Record<string, unknown> }],
     ];
     expect(call[0].where).not.toHaveProperty('status');
+  });
+
+  it('renders a never-classified proposal as classification kind none', async () => {
+    const prisma = createPageFixture([pageRow({ duplicateKind: null })]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    expect(result.items[0].classification).toEqual({
+      kind: 'none',
+      matchedCaseId: null,
+      score: null,
+      reasons: [],
+    });
+  });
+
+  it('surfaces the persisted classification for a proposal that has been classified', async () => {
+    const prisma = createPageFixture([
+      pageRow({
+        duplicateKind: 'possible_duplicate',
+        matchedCaseId: 'case-9',
+        duplicateScore: 0.75,
+        duplicateReasons: ['same-title', 'steps-overlap'],
+      }),
+    ]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    expect(result.items[0].classification).toEqual({
+      kind: 'possible_duplicate',
+      matchedCaseId: 'case-9',
+      score: 0.75,
+      reasons: ['same-title', 'steps-overlap'],
+    });
+  });
+
+  it('includes the suite id and name when the proposal has a suite', async () => {
+    const prisma = createPageFixture([
+      pageRow({ suite: { id: 'suite-1', name: 'Checkout' } }),
+    ]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    expect(result.items[0].suite).toEqual({ id: 'suite-1', name: 'Checkout' });
+  });
+
+  it('reports a null suite when the proposal has none', async () => {
+    const prisma = createPageFixture([pageRow({ suite: null })]);
+
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    expect(result.items[0].suite).toBeNull();
+  });
+
+  it('selects the classification and suite fields needed for the inbox contract', async () => {
+    const prisma = createPageFixture([pageRow()]);
+
+    await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ select: Record<string, unknown> }],
+    ];
+    expect(call[0].select).toMatchObject({
+      suite: { select: { id: true, name: true } },
+      duplicateKind: true,
+      matchedCaseId: true,
+      duplicateScore: true,
+      duplicateReasons: true,
+    });
   });
 });
 
@@ -745,6 +836,115 @@ describe('ReviewInboxQueryService.counts', () => {
         _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
       },
     ]);
+
+    const second = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(first.version).not.toBe(second.version);
+  });
+
+  it('returns zero byDuplicateKind counts when nothing matches', async () => {
+    const prisma = createPageFixture([]);
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.byDuplicateKind).toEqual({
+      none: 0,
+      update: 0,
+      possible_duplicate: 0,
+    });
+  });
+
+  it('maps groupBy duplicateKind rows onto byDuplicateKind by kind name', async () => {
+    const prisma = createPageFixture([]);
+    prisma.extractedProposal.groupBy.mockImplementation(
+      (args: { by: string[] }) =>
+        Promise.resolve(
+          args.by[0] === 'duplicateKind'
+            ? [
+                {
+                  duplicateKind: 'possible_duplicate',
+                  _count: { _all: 4 },
+                  _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+                },
+                {
+                  duplicateKind: 'update',
+                  _count: { _all: 2 },
+                  _max: { updatedAt: new Date('2026-09-23T10:00:00.000Z') },
+                },
+              ]
+            : [],
+        ),
+    );
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.byDuplicateKind).toEqual({
+      none: 0,
+      update: 2,
+      possible_duplicate: 4,
+    });
+  });
+
+  it('folds a null duplicateKind bucket and an explicit "none" bucket into the same none count', async () => {
+    const prisma = createPageFixture([]);
+    prisma.extractedProposal.groupBy.mockImplementation(
+      (args: { by: string[] }) =>
+        Promise.resolve(
+          args.by[0] === 'duplicateKind'
+            ? [
+                {
+                  duplicateKind: null,
+                  _count: { _all: 3 },
+                  _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+                },
+                {
+                  duplicateKind: 'none',
+                  _count: { _all: 5 },
+                  _max: { updatedAt: new Date('2026-09-23T10:00:00.000Z') },
+                },
+              ]
+            : [],
+        ),
+    );
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.byDuplicateKind.none).toBe(8);
+  });
+
+  it('changes the version hash when byDuplicateKind counts change, even if byStatus stays the same', async () => {
+    const prisma = createPageFixture([]);
+    prisma.extractedProposal.groupBy.mockImplementation(
+      (args: { by: string[] }) =>
+        Promise.resolve(
+          args.by[0] === 'duplicateKind'
+            ? [
+                {
+                  duplicateKind: 'possible_duplicate',
+                  _count: { _all: 1 },
+                  _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+                },
+              ]
+            : [],
+        ),
+    );
+
+    const first = await buildService(prisma).counts(serviceOrg, {});
+
+    prisma.extractedProposal.groupBy.mockImplementation(
+      (args: { by: string[] }) =>
+        Promise.resolve(
+          args.by[0] === 'duplicateKind'
+            ? [
+                {
+                  duplicateKind: 'possible_duplicate',
+                  _count: { _all: 2 },
+                  _max: { updatedAt: new Date('2026-09-24T10:00:00.000Z') },
+                },
+              ]
+            : [],
+        ),
+    );
 
     const second = await buildService(prisma).counts(serviceOrg, {});
 
