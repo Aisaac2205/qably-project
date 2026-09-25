@@ -1,5 +1,6 @@
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { ExtractedCase } from '../ai/extraction.contracts';
+import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import type { JobContext } from './extraction.types';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
 
@@ -93,8 +94,22 @@ function fakeEntitlement(
   return { spendCredit } as unknown as AiEntitlementService;
 }
 
-function build(prisma: FakePrisma, entitlement: AiEntitlementService) {
-  return new ExtractedProposalWriter(prisma as never, entitlement);
+function fakeReclassifier(
+  enqueue: jest.Mock = jest.fn().mockResolvedValue(undefined),
+): ProposalReclassifier {
+  return { enqueue } as unknown as ProposalReclassifier;
+}
+
+function build(
+  prisma: FakePrisma,
+  entitlement: AiEntitlementService,
+  reclassifier: ProposalReclassifier = fakeReclassifier(),
+) {
+  return new ExtractedProposalWriter(
+    prisma as never,
+    entitlement,
+    reclassifier,
+  );
 }
 
 interface CallArgs {
@@ -354,5 +369,81 @@ describe('ExtractedProposalWriter.persistExtracted — pending non-manual propos
     expect(persisted).toBe(true);
     expect(prisma.evidence.create).toHaveBeenCalledTimes(1);
     expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ExtractedProposalWriter.persistExtracted — reclassify trigger', () => {
+  it('enqueues a reclassify job for the resolved suite once persisting succeeds', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'suite-resolved' });
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+    const writer = build(prisma, fakeEntitlement(), fakeReclassifier(enqueue));
+
+    await writer.persistExtracted([extractedCase()], jobContext());
+
+    expect(enqueue).toHaveBeenCalledWith('suite-resolved');
+  });
+
+  it('uses knownSuiteId directly, skipping suite resolution, when the caller already knows it', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+    const writer = build(prisma, fakeEntitlement(), fakeReclassifier(enqueue));
+
+    await writer.persistExtracted(
+      [extractedCase()],
+      jobContext({ knownSuiteId: 'suite-known' }),
+    );
+
+    expect(prisma.suite.findFirst).not.toHaveBeenCalled();
+    expect(enqueue).toHaveBeenCalledWith('suite-known');
+  });
+
+  it('passes null through to the reclassifier when no suite could be resolved', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+    const writer = build(prisma, fakeEntitlement(), fakeReclassifier(enqueue));
+
+    await writer.persistExtracted([extractedCase()], jobContext());
+
+    expect(enqueue).toHaveBeenCalledWith(null);
+  });
+
+  it('enqueues the reclassify job once per call, not once per extracted case', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'suite-resolved' });
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+    const writer = build(prisma, fakeEntitlement(), fakeReclassifier(enqueue));
+
+    await writer.persistExtracted(
+      [
+        extractedCase(),
+        extractedCase({ automationKey: 'Cart > removes an item' }),
+      ],
+      jobContext(),
+    );
+
+    expect(enqueue).toHaveBeenCalledTimes(1);
+  });
+
+  it('never enqueues a reclassify job when the entitlement credit spend is rejected', async () => {
+    const prisma = createPrisma();
+    const entitlement = fakeEntitlement(jest.fn().mockResolvedValue(false));
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+    const writer = build(prisma, entitlement, fakeReclassifier(enqueue));
+
+    const persisted = await writer.persistExtracted(
+      [extractedCase()],
+      jobContext(),
+    );
+
+    expect(persisted).toBe(false);
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });

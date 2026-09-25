@@ -4,6 +4,8 @@ import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.proces
 import { INGESTION_QUEUE } from '../../src/modules/ingestion/ingestion.tokens';
 import { NOTIFICATIONS_QUEUE } from '../../src/modules/notifications/notifications.contracts';
 import { NotificationsProcessor } from '../../src/modules/notifications/notifications.processor';
+import { PROPOSAL_CLASSIFICATION_QUEUE } from '../../src/modules/proposal-classification/proposal-classification.contracts';
+import { ReclassifySuiteProcessor } from '../../src/modules/proposal-classification/reclassify-suite.processor';
 import { ExtractionProcessor } from '../../src/modules/review/extraction.processor';
 import { EXTRACTION_QUEUE } from '../../src/modules/review/review.contracts';
 import { RunIngestProcessor } from '../../src/modules/runs/run-ingest.processor';
@@ -40,5 +42,9 @@ export function stubQueues(
     .overrideProvider(getQueueToken(EXTRACTION_QUEUE))
     .useValue(queueStub())
     .overrideProvider(ExtractionProcessor)
+    .useValue({})
+    .overrideProvider(getQueueToken(PROPOSAL_CLASSIFICATION_QUEUE))
+    .useValue(queueStub())
+    .overrideProvider(ReclassifySuiteProcessor)
     .useValue({});
 }

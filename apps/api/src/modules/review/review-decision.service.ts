@@ -3,6 +3,7 @@ import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import type {
   ApprovalView,
   DecisionInput,
@@ -76,7 +77,10 @@ function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
 
 @Injectable()
 export class ReviewDecisionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reclassifier: ProposalReclassifier,
+  ) {}
 
   async approve(
     org: OrgContext,
@@ -98,7 +102,9 @@ export class ReviewDecisionService {
     if (target === null && suiteId === null) return err('missing-suite');
 
     try {
-      return ok(await this.publish(proposal.value, suiteId, input));
+      const approval = await this.publish(proposal.value, suiteId, input);
+      await this.reclassifier.enqueue(approval.suiteId);
+      return ok(approval);
     } catch (error) {
       if (isUniqueViolation(error)) return err('name-taken');
       if (error instanceof DecisionConflict) return err('invalid-transition');

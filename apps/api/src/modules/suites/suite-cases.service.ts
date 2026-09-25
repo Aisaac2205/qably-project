@@ -4,6 +4,7 @@ import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale'
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { SUITE_SELECT, toView, type SuiteRow } from './lib/suite-view';
 import { SuiteViewAssembler } from './suite-view.assembler';
 import type { SuiteError, SuiteView } from './suites.contracts';
@@ -36,6 +37,7 @@ export class SuiteCasesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly suiteViewAssembler: SuiteViewAssembler,
+    private readonly reclassifier: ProposalReclassifier,
   ) {}
 
   async addCase(
@@ -62,6 +64,8 @@ export class SuiteCasesService {
         select: SUITE_SELECT,
       });
     });
+
+    await this.reclassifier.enqueue(suiteId);
 
     const orgDefaultLocale = await resolveOrgDefaultLocale(
       this.prisma,
@@ -91,20 +95,21 @@ export class SuiteCasesService {
     );
     if (currentCase === undefined) return err('not-found');
 
+    let identityFieldsChanged = false;
+
     const row = await this.prisma.$transaction(async (tx) => {
       const locked = await this.lockCaseDocumentedFields(
         tx,
         caseId,
         currentCase,
       );
+      identityFieldsChanged = documentedFieldsChanged(input, locked);
 
       await tx.testCase.update({
         where: { id: caseId },
         data: {
           ...input,
-          ...(documentedFieldsChanged(input, locked)
-            ? { documentationSource: 'human' }
-            : {}),
+          ...(identityFieldsChanged ? { documentationSource: 'human' } : {}),
         },
       });
 
@@ -113,6 +118,10 @@ export class SuiteCasesService {
         select: SUITE_SELECT,
       });
     });
+
+    if (identityFieldsChanged) {
+      await this.reclassifier.enqueue(suiteId);
+    }
 
     const orgDefaultLocale = await resolveOrgDefaultLocale(
       this.prisma,

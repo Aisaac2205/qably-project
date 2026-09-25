@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import type { ExtractedCase } from '../ai/extraction.contracts';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { buildBlobUrl } from '../repository/source-reader';
 import type {
   ConnectionInfo,
@@ -22,6 +23,7 @@ export class ExtractedProposalWriter {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlement: AiEntitlementService,
+    private readonly reclassifier: ProposalReclassifier,
   ) {}
 
   async persistExtracted(
@@ -31,7 +33,9 @@ export class ExtractedProposalWriter {
     const connection = ctx.connection as ConnectionInfo;
     const automationKeys = cases.map((testCase) => testCase.automationKey);
 
-    return this.prisma.$transaction(async (tx: TxClient) => {
+    let resolvedSuiteId: string | null = null;
+
+    const persisted = await this.prisma.$transaction(async (tx: TxClient) => {
       const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
 
@@ -51,6 +55,7 @@ export class ExtractedProposalWriter {
       const suiteId =
         ctx.knownSuiteId ??
         (await this.resolveSuiteId(tx, ctx.projectId, ctx.filePath));
+      resolvedSuiteId = suiteId;
 
       const matchedCaseByKey =
         ctx.targetTestCaseId !== null || suiteId === null
@@ -143,6 +148,12 @@ export class ExtractedProposalWriter {
 
       return true;
     });
+
+    if (persisted) {
+      await this.reclassifier.enqueue(resolvedSuiteId);
+    }
+
+    return persisted;
   }
 
   async matchCasesByAutomationKey(

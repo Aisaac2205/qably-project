@@ -6,6 +6,7 @@ import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { AiModule } from '../ai/ai.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { ProposalClassificationModule } from '../proposal-classification/proposal-classification.module';
 import { SourceReader } from '../repository/source-reader';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
@@ -23,6 +24,7 @@ import { ReviewDecisionService } from './review-decision.service';
     OrganizationsModule,
     ConfigModule,
     AiModule,
+    ProposalClassificationModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ENV],

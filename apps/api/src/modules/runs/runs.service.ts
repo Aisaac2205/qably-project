@@ -5,6 +5,7 @@ import { err, ok, type Result } from '../../common/result';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import {
   OfficialCaseReconciler,
   type AdoptionTx,
@@ -48,6 +49,7 @@ export class RunsService {
     private readonly notifications: NotificationsPublisher,
     private readonly reportBatch: ReportBatchService,
     private readonly officialCaseReconciler: OfficialCaseReconciler,
+    private readonly reclassifier: ProposalReclassifier,
   ) {}
 
   async ingest(
@@ -77,21 +79,25 @@ export class RunsService {
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
     const reportExternalId = input.reportExternalId ?? input.externalId;
 
+    let createdCaseIds: string[] = [];
+
     const { run, cases } = await this.prisma.$transaction(async (tx) => {
       const suite =
         knownSuite ??
         (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
 
-      const testCaseIdByIdentity = await this.officialCaseReconciler.reconcile(
-        tx,
-        suite.id,
-        apiKey.projectId,
-        input.cases.map((testCase) => ({
-          name: testCase.name,
-          className: testCase.className,
-          filePath: testCase.filePath,
-        })),
-      );
+      const { caseIdByKey: testCaseIdByIdentity, createdCaseIds: created } =
+        await this.officialCaseReconciler.reconcile(
+          tx,
+          suite.id,
+          apiKey.projectId,
+          input.cases.map((testCase) => ({
+            name: testCase.name,
+            className: testCase.className,
+            filePath: testCase.filePath,
+          })),
+        );
+      createdCaseIds = created;
 
       const run = await tx.run.upsert({
         where: {
@@ -187,6 +193,10 @@ export class RunsService {
 
       return { run, cases };
     });
+
+    if (createdCaseIds.length > 0) {
+      await this.reclassifier.enqueue(run.suiteId);
+    }
 
     if (status === 'fail' || status === 'pass') {
       const suiteName = cases[0]?.suiteName ?? '';

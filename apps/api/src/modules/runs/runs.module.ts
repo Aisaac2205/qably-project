@@ -7,6 +7,7 @@ import type { Env } from '../../config/env';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { ProposalClassificationModule } from '../proposal-classification/proposal-classification.module';
 import {
   FLUSH_BATCH_SCRIPT,
   RECORD_SUITE_RESULT_SCRIPT,
@@ -27,6 +28,7 @@ import { RunsService } from './runs.service';
     OrganizationsModule,
     NotificationsModule,
     ConfigModule,
+    ProposalClassificationModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ENV],

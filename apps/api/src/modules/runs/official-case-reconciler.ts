@@ -32,6 +32,11 @@ export interface AdoptionTx {
   $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
 }
 
+export interface ReconcileResult {
+  caseIdByKey: Map<string, string>;
+  createdCaseIds: string[];
+}
+
 @Injectable()
 export class OfficialCaseReconciler {
   private readonly logger = new Logger(OfficialCaseReconciler.name);
@@ -41,7 +46,7 @@ export class OfficialCaseReconciler {
     suiteId: string,
     projectId: string,
     cases: RawCaseRef[],
-  ): Promise<Map<string, string>> {
+  ): Promise<ReconcileResult> {
     const collidingKeys = new Set(
       findCaseIdentityCollisions(cases).map((collision) => collision.key),
     );
@@ -146,7 +151,9 @@ export class OfficialCaseReconciler {
       );
     }
 
-    if (missingKeys.length === 0) return resultByKey;
+    if (missingKeys.length === 0) {
+      return { caseIdByKey: resultByKey, createdCaseIds: [] };
+    }
 
     const toCreate = missingKeys.map((key) => {
       const ref = refByKey.get(key) as RawCaseRef;
@@ -182,13 +189,15 @@ export class OfficialCaseReconciler {
       select: { id: true, automationKey: true },
     });
 
+    const createdCaseIds: string[] = [];
     for (const testCase of created) {
       if (testCase.automationKey !== null) {
         resultByKey.set(testCase.automationKey, testCase.id);
+        createdCaseIds.push(testCase.id);
       }
     }
 
-    return resultByKey;
+    return { caseIdByKey: resultByKey, createdCaseIds };
   }
 
   private async migrateAutomationKeys(

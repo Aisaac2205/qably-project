@@ -1,4 +1,5 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
+import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { SuiteCasesService } from './suite-cases.service';
 import { SuiteViewAssembler } from './suite-view.assembler';
 
@@ -84,10 +85,20 @@ function createPrisma(): FakePrisma {
   return prisma;
 }
 
-function build(prisma: FakePrisma) {
+function fakeReclassifier(
+  enqueue: jest.Mock = jest.fn().mockResolvedValue(undefined),
+): ProposalReclassifier {
+  return { enqueue } as unknown as ProposalReclassifier;
+}
+
+function build(
+  prisma: FakePrisma,
+  reclassifier: ProposalReclassifier = fakeReclassifier(),
+) {
   return new SuiteCasesService(
     prisma as never,
     new SuiteViewAssembler(prisma as never),
+    reclassifier,
   );
 }
 
@@ -195,6 +206,74 @@ describe('SuiteCasesService case mutations', () => {
 
     expect(result.ok).toBe(true);
     expect(result.ok && result.value.id).toBe('suite-1');
+  });
+
+  it('enqueues a reclassify job for the suite after a case is created', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).addCase(
+      owner,
+      'suite-1',
+      caseInput,
+    );
+
+    expect(enqueue).toHaveBeenCalledWith('suite-1');
+  });
+
+  it('enqueues a reclassify job when a case is renamed', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).updateCase(
+      owner,
+      'suite-1',
+      'case-1',
+      { name: 'Adds two items to cart' },
+    );
+
+    expect(enqueue).toHaveBeenCalledWith('suite-1');
+  });
+
+  it('never enqueues a reclassify job when only non-identity fields change', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).updateCase(
+      owner,
+      'suite-1',
+      'case-1',
+      { objective: 'Verify the cart accepts a new item' },
+    );
+
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('never enqueues a reclassify job when the case is not in the suite', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).updateCase(
+      owner,
+      'suite-1',
+      'case-from-elsewhere',
+      { name: 'Renamed' },
+    );
+
+    expect(enqueue).not.toHaveBeenCalled();
+  });
+
+  it('never enqueues a reclassify job when a case is removed', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).removeCase(
+      owner,
+      'suite-1',
+      'case-1',
+    );
+
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });
 

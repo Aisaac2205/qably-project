@@ -1,4 +1,5 @@
 import type { OrgContext } from '../organizations/organizations.contracts';
+import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { ReviewDecisionService } from './review-decision.service';
 
 const org: OrgContext = {
@@ -79,8 +80,17 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
   return prisma;
 }
 
-function build(prisma: FakePrisma) {
-  return new ReviewDecisionService(prisma as never);
+function fakeReclassifier(
+  enqueue: jest.Mock = jest.fn().mockResolvedValue(undefined),
+): ProposalReclassifier {
+  return { enqueue } as unknown as ProposalReclassifier;
+}
+
+function build(
+  prisma: FakePrisma,
+  reclassifier: ProposalReclassifier = fakeReclassifier(),
+) {
+  return new ReviewDecisionService(prisma as never, reclassifier);
 }
 
 describe('ReviewDecisionService.approve', () => {
@@ -462,6 +472,43 @@ describe('ReviewDecisionService.approve', () => {
     expect(prisma.testCase.create).not.toHaveBeenCalled();
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
+
+  it('enqueues a reclassify job for the suite of a newly created case', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(enqueue).toHaveBeenCalledWith('suite-1');
+  });
+
+  it('enqueues a reclassify job for the suite of an existing target case', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      suiteId: 'suite-of-existing-case',
+    });
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(enqueue).toHaveBeenCalledWith('suite-of-existing-case');
+  });
+
+  it('never enqueues a reclassify job when a concurrent decision wins the claim', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(enqueue).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReviewDecisionService.reject', () => {
@@ -511,6 +558,17 @@ describe('ReviewDecisionService.reject', () => {
 
     expect(result).toEqual({ ok: false, error: 'invalid-transition' });
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
+  });
+
+  it('never enqueues a reclassify job on reject, since nothing about the case identity changed', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(prisma, fakeReclassifier(enqueue)).reject(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(enqueue).not.toHaveBeenCalled();
   });
 
   it('still rejects a proposal that documents no steps', async () => {

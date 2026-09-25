@@ -1,4 +1,5 @@
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
+import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { deriveRunStatus } from './lib/derive-run-status';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import type { IngestRunInput } from './runs.schemas';
@@ -126,16 +127,24 @@ function createReportBatch() {
   return { recordAndMaybePublish: jest.fn().mockResolvedValue(undefined) };
 }
 
+function fakeReclassifier(
+  enqueue: jest.Mock = jest.fn().mockResolvedValue(undefined),
+): ProposalReclassifier {
+  return { enqueue } as unknown as ProposalReclassifier;
+}
+
 function build(
   prisma: FakePrisma,
   notifications: { publish: jest.Mock } = createNotifications(),
   reportBatch: { recordAndMaybePublish: jest.Mock } = createReportBatch(),
+  reclassifier: ProposalReclassifier = fakeReclassifier(),
 ) {
   return new RunsService(
     prisma as never,
     notifications as never,
     reportBatch as never,
     new OfficialCaseReconciler(),
+    reclassifier,
   );
 }
 
@@ -482,6 +491,50 @@ describe('RunsService.ingest test case linking', () => {
         testCaseId: 'draft-case-1',
       }),
     );
+  });
+
+  it('enqueues a reclassify job for the suite when the ingest creates a new official case', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-1', automationKey: 'Unmatched case' },
+      ]);
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(
+      prisma,
+      createNotifications(),
+      createReportBatch(),
+      fakeReclassifier(enqueue),
+    ).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'Unmatched case',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(enqueue).toHaveBeenCalledWith('suite-1');
+  });
+
+  it('never enqueues a reclassify job when the ingest only matches existing official cases', async () => {
+    const prisma = createPrisma();
+    const enqueue = jest.fn().mockResolvedValue(undefined);
+
+    await build(
+      prisma,
+      createNotifications(),
+      createReportBatch(),
+      fakeReclassifier(enqueue),
+    ).ingest(apiKey, baseInput);
+
+    expect(prisma.testCase.createMany).not.toHaveBeenCalled();
+    expect(enqueue).not.toHaveBeenCalled();
   });
 
   it('persists the reported className and filePath onto a freshly created draft', async () => {

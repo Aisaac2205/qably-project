@@ -177,7 +177,9 @@ function build(
     dailyBudget,
     testFileLocator,
     new ExtractionFailureRecorder(prisma as never),
-    new ExtractedProposalWriter(prisma as never, entitlement),
+    new ExtractedProposalWriter(prisma as never, entitlement, {
+      enqueue: jest.fn().mockResolvedValue(undefined),
+    } as never),
   );
 }
 
