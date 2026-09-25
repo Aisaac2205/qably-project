@@ -9,6 +9,25 @@ import { ApiError } from '@/lib/api-client'
 import { approveProposal } from '@/features/review-inbox/api/review.api'
 
 let searchParamsQuery = ''
+let isMobileViewport = false
+
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      get matches() {
+        return isMobileViewport
+      },
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({}),
@@ -49,6 +68,8 @@ describe('ReviewInboxPage', () => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
     searchParamsQuery = ''
+    isMobileViewport = false
+    window.history.replaceState(null, '', '/review-inbox')
   })
 
   describe('?proposal= preselection', () => {
@@ -301,6 +322,82 @@ describe('ReviewInboxPage', () => {
   it('renders clean queue items without checkboxes', () => {
     renderWithQuery(<ReviewInboxPage />)
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+  })
+
+  describe('mobile responsive behavior', () => {
+    beforeEach(() => {
+      isMobileViewport = true
+    })
+
+    it('shows only the queue, never the detail pane, when nothing is deep-linked', () => {
+      renderWithQuery(<ReviewInboxPage />)
+
+      const queueRegion = screen.getByRole('region', { name: 'Proposals queue' })
+      const detailRegion = screen.getByRole('region', { name: 'Proposal details' })
+      expect(queueRegion.className).not.toMatch(/\bhidden\b/)
+      expect(detailRegion.className).toMatch(/\bhidden\b/)
+    })
+
+    it('opens the detail pane and hides the queue when a proposal row is tapped', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      await user.click(screen.getByText('Checkout with empty cart blocked'))
+
+      const queueRegion = screen.getByRole('region', { name: 'Proposals queue' })
+      const detailRegion = screen.getByRole('region', { name: 'Proposal details' })
+      expect(detailRegion.className).not.toMatch(/\bhidden\b/)
+      expect(queueRegion.className).toMatch(/\bhidden\b/)
+      expect(
+        screen.getByRole('heading', { name: 'Checkout with empty cart blocked' }),
+      ).toBeInTheDocument()
+      expect(screen.getByText(/of \d+ proposals?/i)).toBeInTheDocument()
+    })
+
+    it('restores the queue when the back button is pressed', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      await user.click(screen.getByText('Checkout with empty cart blocked'))
+      expect(
+        screen.getByRole('heading', { name: 'Checkout with empty cart blocked' }),
+      ).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Back to queue' }))
+
+      await waitFor(() => {
+        const queueRegion = screen.getByRole('region', { name: 'Proposals queue' })
+        expect(queueRegion.className).not.toMatch(/\bhidden\b/)
+      })
+      const detailRegion = screen.getByRole('region', { name: 'Proposal details' })
+      expect(detailRegion.className).toMatch(/\bhidden\b/)
+    })
+
+    it('opens the deep-linked proposal directly on mobile', async () => {
+      searchParamsQuery = 'proposal=proposal-ai-1'
+
+      renderWithQuery(<ReviewInboxPage />)
+
+      expect(
+        await screen.findByRole('heading', { name: 'Valid checkout completes order' }),
+      ).toBeInTheDocument()
+      const queueRegion = screen.getByRole('region', { name: 'Proposals queue' })
+      expect(queueRegion.className).toMatch(/\bhidden\b/)
+    })
+
+    it('advances to the next pending proposal after approving, staying in the detail pane', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      await user.click(screen.getByText('Checkout with empty cart blocked'))
+      const approveButton = screen.getByRole('button', { name: 'Approve & publish' })
+      await user.click(approveButton)
+
+      await waitFor(() => {
+        const detailRegion = screen.getByRole('region', { name: 'Proposal details' })
+        expect(detailRegion.className).not.toMatch(/\bhidden\b/)
+      })
+    })
   })
 })
 

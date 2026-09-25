@@ -1,8 +1,10 @@
 'use client'
 
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useEffect, useRef } from 'react'
+import { CaretLeft, CaretRight, ArrowLeft } from '@phosphor-icons/react'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
+import { cn } from '@/lib/utils'
 import { useInboxPage } from '../hooks/use-inbox-page'
 import { useInboxCounts } from '../hooks/use-inbox-counts'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
@@ -33,6 +35,7 @@ export function ReviewInboxPage() {
     duplicatesOnly: filters.duplicateOnly || undefined,
     search,
   })
+  const fetchNextPageVoid = useCallback(() => void fetchNextPage(), [fetchNextPage])
 
   const { counts } = useInboxCounts({ projectId: selectedProjectId, search })
 
@@ -46,10 +49,21 @@ export function ReviewInboxPage() {
     [counts],
   )
 
-  const { activeSelectedId, selectedProposal, setSelectedId, selectNextPending } = useReviewInboxSelection(
-    proposals,
-    proposals,
-  )
+  const selection = useReviewInboxSelection(proposals, proposals, {
+    hasNextPage,
+    fetchNextPage: fetchNextPageVoid,
+  })
+  const {
+    activeSelectedId,
+    selectedProposal,
+    selectFromList,
+    closeDetail,
+    selectNextPending,
+    isDetailOpenOnMobile,
+    position,
+    goToPrevious,
+    goToNext,
+  } = selection
 
   const { approve, reject, isDeciding } = useProposalDecision({
     onApproved: (proposalId, result) => {
@@ -102,6 +116,17 @@ export function ReviewInboxPage() {
     feedback.showInfo(next ? t('reviewInbox.duplicateFilterEnabled') : t('reviewInbox.duplicateFilterDisabled'))
   }, [filters, feedback, t])
 
+  const backButtonRef = useRef<HTMLButtonElement>(null)
+  const queueSectionRef = useRef<HTMLElement>(null)
+  const wasDetailOpenOnMobileRef = useRef(isDetailOpenOnMobile)
+
+  useEffect(() => {
+    if (wasDetailOpenOnMobileRef.current === isDetailOpenOnMobile) return
+    wasDetailOpenOnMobileRef.current = isDetailOpenOnMobile
+    if (isDetailOpenOnMobile) backButtonRef.current?.focus()
+    else queueSectionRef.current?.focus()
+  }, [isDetailOpenOnMobile])
+
   useKeyboardShortcuts({
     a: () => {
       if (selectedProposal?.status === 'in_review') handleApprove(selectedProposal.id)
@@ -130,13 +155,18 @@ export function ReviewInboxPage() {
           className="h-full"
           first={
             <section
+              ref={queueSectionRef}
+              tabIndex={-1}
               aria-label={t('reviewInbox.queueTitle')}
-              className="flex h-full min-h-0 flex-col bg-surface"
+              className={cn(
+                'h-full min-h-0 flex-col bg-surface outline-none md:flex',
+                isDetailOpenOnMobile ? 'hidden' : 'flex',
+              )}
             >
               <ReviewInboxQueue
                 proposals={proposals}
                 selectedId={activeSelectedId}
-                onSelect={(id) => setSelectedId(id)}
+                onSelect={(id) => selectFromList(id)}
                 selectedProjectId={filters.selectedProjectId}
                 onSelectProject={filters.setSelectedProjectId}
                 statusFilter={filters.statusFilter}
@@ -148,22 +178,69 @@ export function ReviewInboxPage() {
                 statusCounts={statusCounts}
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
-                onLoadMore={() => void fetchNextPage()}
+                onLoadMore={fetchNextPageVoid}
               />
             </section>
           }
           second={
             <section
               aria-label={t('reviewInbox.inspectorTitle')}
-              className="flex h-full min-h-0 flex-col border-t border-border bg-surface md:border-t-0"
+              className={cn(
+                'h-full min-h-0 flex-col border-t border-border bg-surface md:flex md:border-t-0',
+                isDetailOpenOnMobile ? 'flex' : 'hidden',
+              )}
             >
               {selectedProposal ? (
-                <ReviewProposalInspector
-                  proposal={selectedProposal}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                  isSubmitting={isDeciding(selectedProposal.id)}
-                />
+                <>
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-1.5 md:hidden">
+                    <button
+                      ref={backButtonRef}
+                      type="button"
+                      onClick={closeDetail}
+                      aria-label={t('reviewInbox.backToQueue')}
+                      className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-muted transition-colors hover:text-default"
+                    >
+                      <ArrowLeft size={18} aria-hidden="true" />
+                      {t('reviewInbox.backToQueue')}
+                    </button>
+
+                    {position && (
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={goToPrevious}
+                          disabled={position.index <= 1}
+                          aria-label={t('reviewInbox.previousProposal')}
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-muted transition-colors hover:text-default disabled:opacity-30"
+                        >
+                          <CaretLeft size={16} aria-hidden="true" />
+                        </button>
+                        <span className="px-1 text-xs tabular-nums text-muted">
+                          {t('reviewInbox.positionOfTotal', {
+                            index: position.index,
+                            count: position.total,
+                          })}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={goToNext}
+                          disabled={position.index >= position.total}
+                          aria-label={t('reviewInbox.nextProposal')}
+                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded text-muted transition-colors hover:text-default disabled:opacity-30"
+                        >
+                          <CaretRight size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <ReviewProposalInspector
+                    proposal={selectedProposal}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                    isSubmitting={isDeciding(selectedProposal.id)}
+                  />
+                </>
               ) : (
                 <div className="h-full flex items-center justify-center p-8">
                   <StateView

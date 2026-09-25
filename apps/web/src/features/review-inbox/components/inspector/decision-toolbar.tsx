@@ -40,7 +40,7 @@ export function DecisionToolbar({
             onClick={() => onApprove(proposal.id)}
             aria-label={t('reviewInbox.actionApprove')}
             title={hasNothingToPublish ? t('reviewInbox.approveBlocked') : undefined}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs sm:text-sm font-semibold text-primary-fg shadow-2xs transition-all duration-150 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-xs sm:text-sm font-semibold text-primary-fg shadow-2xs transition-all duration-150 hover:bg-primary-hover active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-primary"
           >
             <CheckCircle size={16} weight="fill" aria-hidden="true" />
             {t('reviewInbox.actionApprove')}
@@ -51,7 +51,7 @@ export function DecisionToolbar({
             disabled={isSubmitting}
             onClick={() => onReject(proposal.id)}
             aria-label={t('reviewInbox.actionReject')}
-            className="inline-flex items-center gap-2 rounded-full bg-surface border border-fail/40 px-5 py-2.5 text-xs sm:text-sm font-semibold text-fail transition-all duration-150 hover:bg-fail-bg/50 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-fail"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-surface border border-fail/40 px-5 py-2.5 text-xs sm:text-sm font-semibold text-fail transition-all duration-150 hover:bg-fail-bg/50 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-fail"
           >
             <XCircle size={16} weight="fill" aria-hidden="true" />
             {t('reviewInbox.actionReject')}
