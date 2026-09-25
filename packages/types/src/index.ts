@@ -727,14 +727,6 @@ export interface DocumentFilesResult {
   casesSkipped: DocumentFilesSkip[]
   suiteQueued?: boolean
 }
-export type DuplicateMatchReason = 'automation-key' | 'title' | 'token-overlap'
-export interface DuplicateCandidateView {
-  id: string
-  title: string
-  steps: string[]
-  expectedResult: string
-  matchReason: DuplicateMatchReason
-}
 export interface ReviewDecision {
   id: string
   proposalId: string

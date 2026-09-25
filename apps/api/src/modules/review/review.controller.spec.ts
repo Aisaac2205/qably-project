@@ -27,7 +27,6 @@ function fakeReview(result: unknown, lastDecision: unknown = null) {
     approve: jest.fn().mockResolvedValue(result),
     reject: jest.fn().mockResolvedValue(result),
     lastDecision: jest.fn().mockResolvedValue(lastDecision),
-    getDuplicateCandidates: jest.fn().mockResolvedValue(result),
   };
 }
 
@@ -102,44 +101,5 @@ describe('ReviewController error codes', () => {
     await expect(
       build(review).approve(org, user, 'proposal-1', {}),
     ).rejects.toMatchObject({ response: { code: 'name-taken' } });
-  });
-});
-
-describe('ReviewController duplicates', () => {
-  it('throws a coded NotFoundException when the proposal is outside the organization', async () => {
-    const review = fakeReview({ ok: false, error: 'not-found' });
-
-    await expect(
-      build(review).duplicates(org, 'proposal-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('returns the ranked candidates the service produces', async () => {
-    const candidates = [
-      {
-        id: 'case-1',
-        title: 'Empties the cart',
-        steps: ['Open the cart'],
-        expectedResult: 'The cart is empty',
-        matchReason: 'title' as const,
-      },
-    ];
-    const review = fakeReview({ ok: true, value: candidates });
-
-    const response = await build(review).duplicates(org, 'proposal-1');
-
-    expect(review.getDuplicateCandidates).toHaveBeenCalledWith(
-      org,
-      'proposal-1',
-    );
-    expect(response).toEqual(candidates);
-  });
-
-  it('returns an empty array when the proposal has no plausible duplicates', async () => {
-    const review = fakeReview({ ok: true, value: [] });
-
-    const response = await build(review).duplicates(org, 'proposal-1');
-
-    expect(response).toEqual([]);
   });
 });

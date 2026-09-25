@@ -7,11 +7,6 @@ import type {
 } from '@qably/types';
 import type { ProposalClassification } from './lib/classify-proposal';
 
-export type {
-  DuplicateCandidateView,
-  DuplicateMatchReason,
-} from '@qably/types';
-
 export interface ProposalView extends ExtractedProposal {
   evidenceTitle: string;
 }

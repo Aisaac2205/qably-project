@@ -7,7 +7,6 @@ import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type {
   ApprovalView,
-  DuplicateCandidateView,
   ProposalDetailView,
   RejectionView,
 } from './review.contracts';
@@ -30,14 +29,6 @@ export class ReviewController {
     @Param('id') id: string,
   ): Promise<ProposalDetailView> {
     return unwrap(await this.queries.findOne(org, id));
-  }
-
-  @Get(':id/duplicates')
-  async duplicates(
-    @CurrentOrg() org: OrgContext,
-    @Param('id') id: string,
-  ): Promise<DuplicateCandidateView[]> {
-    return unwrap(await this.queries.getDuplicateCandidates(org, id));
   }
 
   @Post(':id/approve')
