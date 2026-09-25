@@ -693,4 +693,17 @@ describe('ReviewDecisionService.lastDecision', () => {
     ];
     expect(call[0].orderBy).toEqual([{ decidedAt: 'desc' }, { id: 'desc' }]);
   });
+
+  it('throws instead of silently trusting an unexpected decision action', async () => {
+    const prisma = createPrisma();
+    prisma.reviewDecision.findFirst.mockResolvedValue({
+      action: 'changes_requested',
+      decidedAt: new Date('2026-02-01T08:30:00.000Z'),
+      actor: { id: 'user-3', name: 'Ada Lovelace' },
+    });
+
+    await expect(build(prisma).lastDecision(org, 'proposal-1')).rejects.toThrow(
+      'Unexpected review decision action: changes_requested',
+    );
+  });
 });

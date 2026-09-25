@@ -61,6 +61,11 @@ interface ProposalRow {
   targetTestCase: { automationFilePath: string | null } | null;
 }
 
+function toDecidedAction(action: string): 'approved' | 'rejected' {
+  if (action === 'approved' || action === 'rejected') return action;
+  throw new Error(`Unexpected review decision action: ${action}`);
+}
+
 function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
   if (proposal.automationKey === null) return {};
 
@@ -170,7 +175,7 @@ export class ReviewDecisionService {
     if (decision === null) return null;
 
     return {
-      action: decision.action as 'approved' | 'rejected',
+      action: toDecidedAction(decision.action),
       decidedAt: decision.decidedAt.toISOString(),
       decidedBy: { id: decision.actor.id, name: decision.actor.name },
     };
