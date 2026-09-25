@@ -314,7 +314,7 @@ describe('ReviewDecisionService.approve', () => {
     });
   });
 
-  it('records the produced and version_of traceability links', async () => {
+  it('records the produced, version_of, and proposal-to-version traceability links', async () => {
     const prisma = createPrisma();
 
     await build(prisma).approve(org, 'proposal-1', { actorId: 'user-1' });
@@ -337,6 +337,14 @@ describe('ReviewDecisionService.approve', () => {
             toType: 'test_case',
             toId: 'case-new',
             relation: 'version_of',
+          },
+          {
+            projectId: 'project-1',
+            fromType: 'proposal',
+            fromId: 'proposal-1',
+            toType: 'test_case_version',
+            toId: 'version-1',
+            relation: 'produced',
           },
         ],
         skipDuplicates: true,
@@ -413,7 +421,7 @@ describe('ReviewDecisionService.approve', () => {
     expect(result).toEqual({ ok: false, error: 'name-taken' });
   });
 
-  it('returns name-taken when refreshing an existing case collides', async () => {
+  it('returns name-taken when refreshing an existing case collides, and commits no link or decision', async () => {
     const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
     prisma.testCase.update.mockRejectedValue({ code: 'P2002' });
 
@@ -422,7 +430,8 @@ describe('ReviewDecisionService.approve', () => {
     });
 
     expect(result).toEqual({ ok: false, error: 'name-taken' });
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.traceabilityLink.createMany).not.toHaveBeenCalled();
+    expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
 
   it('never swallows a failure that is not a unique violation', async () => {
@@ -471,6 +480,8 @@ describe('ReviewDecisionService.approve', () => {
 
     expect(result).toEqual({ ok: false, error: 'invalid-transition' });
     expect(prisma.testCase.create).not.toHaveBeenCalled();
+    expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
+    expect(prisma.traceabilityLink.createMany).not.toHaveBeenCalled();
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
 

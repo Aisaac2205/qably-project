@@ -74,7 +74,11 @@ describe('Review (e2e)', () => {
     testCase: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
     testCaseVersion: { count: jest.fn(), create: jest.fn() },
     reviewDecision: { create: jest.fn(), findFirst: jest.fn() },
-    traceabilityLink: { findMany: jest.fn(), createMany: jest.fn() },
+    traceabilityLink: {
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+      createMany: jest.fn(),
+    },
     runCase: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -106,7 +110,8 @@ describe('Review (e2e)', () => {
     prisma.reviewDecision.create.mockResolvedValue({ id: 'decision-1' });
     prisma.reviewDecision.findFirst.mockResolvedValue(null);
     prisma.traceabilityLink.findMany.mockResolvedValue([]);
-    prisma.traceabilityLink.createMany.mockResolvedValue({ count: 2 });
+    prisma.traceabilityLink.findFirst.mockResolvedValue(null);
+    prisma.traceabilityLink.createMany.mockResolvedValue({ count: 3 });
     prisma.runCase.findMany.mockResolvedValue([]);
 
     const moduleFixture = await stubQueues(
@@ -166,6 +171,7 @@ describe('Review (e2e)', () => {
         suiteId: 'suite-9',
         suite: { name: 'Cart suite' },
         currentVersion: {
+          id: 'version-2',
           version: 2,
           title: 'Empties the cart',
           objective: 'Confirm the cart resets',
@@ -181,10 +187,13 @@ describe('Review (e2e)', () => {
         pullRequestNumber: 42,
       },
     });
+    prisma.traceabilityLink.findFirst.mockResolvedValue({
+      fromId: 'proposal-1',
+    });
     prisma.reviewDecision.findFirst.mockImplementation(
-      (args: { where: { proposalId?: string } }) =>
+      (args: { where: { action?: string } }) =>
         Promise.resolve(
-          args.where.proposalId === undefined
+          args.where.action === 'approved'
             ? { actor: { id: 'user-2', name: 'Grace Hopper' } }
             : null,
         ),
@@ -270,6 +279,28 @@ describe('Review (e2e)', () => {
       version: 1,
       decisionId: 'decision-1',
     });
+  });
+
+  it('links the proposal to the version it produced so publishedBy can be attributed later', async () => {
+    await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({ comment: 'Matches the evidence' })
+      .expect(201);
+
+    expect(prisma.traceabilityLink.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          {
+            projectId: 'project-1',
+            fromType: 'proposal',
+            fromId: 'proposal-1',
+            toType: 'test_case_version',
+            toId: 'version-1',
+            relation: 'produced',
+          },
+        ]) as unknown,
+      }),
+    );
   });
 
   it('takes the actor from the session, never from the body', async () => {

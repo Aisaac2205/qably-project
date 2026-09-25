@@ -274,6 +274,14 @@ export class ReviewDecisionService {
             toId: testCaseId,
             relation: 'version_of',
           },
+          {
+            projectId: proposal.projectId,
+            fromType: 'proposal',
+            fromId: proposal.id,
+            toType: 'test_case_version',
+            toId: version.id,
+            relation: 'produced',
+          },
         ],
         skipDuplicates: true,
       });

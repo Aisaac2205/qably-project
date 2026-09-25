@@ -45,6 +45,7 @@ interface CaseRefRow {
 }
 
 interface VersionRow {
+  id: string;
   version: number;
   title: string;
   objective: string;
@@ -61,6 +62,7 @@ const CASE_REF_SELECT = {
   suite: { select: { name: true } },
   currentVersion: {
     select: {
+      id: true,
       version: true,
       title: true,
       objective: true,
@@ -389,7 +391,7 @@ export class ReviewInboxQueryService {
 
     const [publishedVersion, recentRuns] = await Promise.all([
       this.publishedVersionFor(org, caseRef),
-      this.recentRunsFor(caseRef),
+      this.recentRunsFor(org, caseRef),
     ]);
 
     return ok({
@@ -411,14 +413,28 @@ export class ReviewInboxQueryService {
     const version = caseRef?.currentVersion ?? null;
     if (version === null) return null;
 
-    const approval = await this.prisma.reviewDecision.findFirst({
+    const link = await this.prisma.traceabilityLink.findFirst({
       where: {
-        action: 'approved',
-        decidedAt: version.publishedAt,
-        proposal: { project: { organizationId: org.organizationId } },
+        fromType: 'proposal',
+        toType: 'test_case_version',
+        toId: version.id,
+        relation: 'produced',
+        project: { organizationId: org.organizationId },
       },
-      select: { actor: { select: { id: true, name: true } } },
+      select: { fromId: true },
     });
+
+    const approval =
+      link === null
+        ? null
+        : await this.prisma.reviewDecision.findFirst({
+            where: {
+              proposalId: link.fromId,
+              action: 'approved',
+              proposal: { project: { organizationId: org.organizationId } },
+            },
+            select: { actor: { select: { id: true, name: true } } },
+          });
 
     return {
       version: version.version,
@@ -436,12 +452,17 @@ export class ReviewInboxQueryService {
   }
 
   private async recentRunsFor(
+    org: OrgContext,
     caseRef: CaseRefRow | null,
   ): Promise<RecentRunView[]> {
     if (caseRef === null) return [];
 
     const rows = (await this.prisma.runCase.findMany({
-      where: { testCaseId: caseRef.id, recordedAt: { not: null } },
+      where: {
+        testCaseId: caseRef.id,
+        recordedAt: { not: null },
+        testCase: { project: { organizationId: org.organizationId } },
+      },
       orderBy: { recordedAt: 'desc' },
       take: RECENT_RUNS_LIMIT,
       select: { runId: true, status: true, recordedAt: true },

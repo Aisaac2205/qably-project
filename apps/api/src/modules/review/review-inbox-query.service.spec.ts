@@ -39,7 +39,7 @@ const row = {
 interface FakePrisma {
   extractedProposal: { findMany: jest.Mock; findFirst: jest.Mock };
   testCase: { findMany: jest.Mock };
-  traceabilityLink: { findMany: jest.Mock };
+  traceabilityLink: { findMany: jest.Mock; findFirst: jest.Mock };
   runCase: { findMany: jest.Mock };
   reviewDecision: { findFirst: jest.Mock };
 }
@@ -51,7 +51,10 @@ function createPrisma(): FakePrisma {
       findFirst: jest.fn().mockResolvedValue(row),
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
-    traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
+    traceabilityLink: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     reviewDecision: { findFirst: jest.fn().mockResolvedValue(null) },
   };
@@ -257,7 +260,7 @@ describe('ReviewInboxQueryService.findOne', () => {
     if (result.ok) expect(result.value.publishedVersion).toBeNull();
   });
 
-  it('resolves publishedBy from the approved decision made at the same instant as the version was published', async () => {
+  it('resolves publishedBy via the traceability link from the producing proposal', async () => {
     const prisma = createPrisma();
     const publishedAt = new Date('2026-02-01T10:00:00.000Z');
     prisma.extractedProposal.findFirst.mockResolvedValue({
@@ -269,6 +272,7 @@ describe('ReviewInboxQueryService.findOne', () => {
         suiteId: 'suite-9',
         suite: { name: 'Cart suite' },
         currentVersion: {
+          id: 'version-2',
           version: 2,
           title: 'Empties the cart',
           objective: 'Confirm the cart resets',
@@ -278,6 +282,9 @@ describe('ReviewInboxQueryService.findOne', () => {
           publishedAt,
         },
       },
+    });
+    prisma.traceabilityLink.findFirst.mockResolvedValue({
+      fromId: 'proposal-1',
     });
     prisma.reviewDecision.findFirst.mockResolvedValue({
       actor: { id: 'user-2', name: 'Grace Hopper' },
@@ -298,17 +305,75 @@ describe('ReviewInboxQueryService.findOne', () => {
         publishedBy: { id: 'user-2', name: 'Grace Hopper' },
       });
     }
+    expect(prisma.traceabilityLink.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          fromType: 'proposal',
+          toType: 'test_case_version',
+          toId: 'version-2',
+          relation: 'produced',
+        }) as unknown,
+      }),
+    );
     expect(prisma.reviewDecision.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
+          proposalId: 'proposal-1',
           action: 'approved',
-          decidedAt: publishedAt,
         }) as unknown,
       }),
     );
   });
 
-  it('reports publishedBy as null when no approved decision matches the version (a manual edit)', async () => {
+  it('attributes the correct approver even when another decision in the same org shares the exact same millisecond', async () => {
+    const prisma = createPrisma();
+    const collidingInstant = new Date('2026-02-01T10:00:00.000Z');
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...row,
+      targetTestCaseId: 'case-9',
+      targetTestCase: {
+        id: 'case-9',
+        name: 'Empties the cart',
+        suiteId: 'suite-9',
+        suite: { name: 'Cart suite' },
+        currentVersion: {
+          id: 'version-2',
+          version: 2,
+          title: 'Empties the cart',
+          objective: 'Confirm the cart resets',
+          preconditions: [],
+          steps: ['Open the cart', 'Remove every item'],
+          expectedResult: 'The cart shows zero items',
+          publishedAt: collidingInstant,
+        },
+      },
+    });
+    // The producing proposal is NOT the requested proposal-1: another
+    // proposal in the same org was approved at the exact same instant.
+    prisma.traceabilityLink.findFirst.mockResolvedValue({
+      fromId: 'proposal-other',
+    });
+    prisma.reviewDecision.findFirst.mockImplementation(
+      (args: { where: { proposalId: string } }) =>
+        Promise.resolve(
+          args.where.proposalId === 'proposal-other'
+            ? { actor: { id: 'user-9', name: 'Katherine Johnson' } }
+            : { actor: { id: 'user-wrong', name: 'Wrong approver' } },
+        ),
+    );
+
+    const result = await build(prisma).findOne(org, 'proposal-1');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.publishedVersion?.publishedBy).toEqual({
+        id: 'user-9',
+        name: 'Katherine Johnson',
+      });
+    }
+  });
+
+  it('reports publishedBy as null when there is no producing-proposal link (a manual edit)', async () => {
     const prisma = createPrisma();
     prisma.extractedProposal.findFirst.mockResolvedValue({
       ...row,
@@ -319,6 +384,7 @@ describe('ReviewInboxQueryService.findOne', () => {
         suiteId: 'suite-9',
         suite: { name: 'Cart suite' },
         currentVersion: {
+          id: 'version-3',
           version: 3,
           title: 'Empties the cart',
           objective: '',
@@ -329,13 +395,14 @@ describe('ReviewInboxQueryService.findOne', () => {
         },
       },
     });
-    prisma.reviewDecision.findFirst.mockResolvedValue(null);
+    prisma.traceabilityLink.findFirst.mockResolvedValue(null);
 
     const result = await build(prisma).findOne(org, 'proposal-1');
 
     expect(result.ok).toBe(true);
     if (result.ok)
       expect(result.value.publishedVersion?.publishedBy).toBeNull();
+    expect(prisma.reviewDecision.findFirst).not.toHaveBeenCalled();
   });
 
   it('returns a null source when the proposal has no code change', async () => {
@@ -440,7 +507,11 @@ describe('ReviewInboxQueryService.findOne', () => {
     }
     expect(prisma.runCase.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { testCaseId: 'case-9', recordedAt: { not: null } },
+        where: {
+          testCaseId: 'case-9',
+          recordedAt: { not: null },
+          testCase: { project: { organizationId: 'org-1' } },
+        },
         orderBy: { recordedAt: 'desc' },
         take: 5,
       }),
