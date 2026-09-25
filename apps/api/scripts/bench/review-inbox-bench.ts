@@ -27,6 +27,8 @@ import { PrismaModule } from '../../src/prisma/prisma.module';
 import { ReviewModule } from '../../src/modules/review/review.module';
 import { ExtractionProcessor } from '../../src/modules/review/extraction.processor';
 import { EXTRACTION_QUEUE } from '../../src/modules/review/review.contracts';
+import { PROPOSAL_CLASSIFICATION_QUEUE } from '../../src/modules/proposal-classification/proposal-classification.contracts';
+import { ReclassifySuiteProcessor } from '../../src/modules/proposal-classification/reclassify-suite.processor';
 import { AllExceptionsFilter } from '../../src/common/filters/all-exceptions.filter';
 
 function noopQueue(): { add: () => Promise<{ id: string }> } {
@@ -137,6 +139,10 @@ async function buildApp(
     .useValue(noopQueue())
     .overrideProvider(ExtractionProcessor)
     .useValue({})
+    .overrideProvider(getQueueToken(PROPOSAL_CLASSIFICATION_QUEUE))
+    .useValue(noopQueue())
+    .overrideProvider(ReclassifySuiteProcessor)
+    .useValue({})
     .compile();
 
   const app = moduleFixture.createNestApplication();
@@ -231,6 +237,17 @@ async function main(): Promise<void> {
         { length: WARMUP_SAMPLES + MEASURED_SAMPLES },
         () => () =>
           request(server).get('/review/inbox?search=bench').expect(200),
+      ),
+    ),
+  );
+
+  results.push(
+    await measure(
+      'GET /review/inbox?duplicatesOnly=true',
+      Array.from(
+        { length: WARMUP_SAMPLES + MEASURED_SAMPLES },
+        () => () =>
+          request(server).get('/review/inbox?duplicatesOnly=true').expect(200),
       ),
     ),
   );
