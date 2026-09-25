@@ -24,8 +24,8 @@ import type { ChatAssistant, ChatHistoryEntry } from './chat.assistant';
 import {
   CHAT_ASSISTANT,
   CHAT_PROMPT_VERSION,
-  MAX_EXCERPT_LENGTH,
   MAX_HISTORY_MESSAGES,
+  MAX_SUGGESTED_CASES,
   suggestedCasesSchema,
   type AttachedCaseView,
   type ChatError,
@@ -198,6 +198,27 @@ function targetedChatCaseKey(
   return `${messageId}:${targetTestCaseId}`;
 }
 
+const UNTARGETED_CHAT_CASE_KEY_MARKER = ':new:';
+
+function untargetedChatCaseKey(messageId: string, caseIndex: number): string {
+  return `${messageId}${UNTARGETED_CHAT_CASE_KEY_MARKER}${caseIndex}`;
+}
+
+function parseUntargetedChatCaseKey(
+  key: string,
+): { messageId: string; caseIndex: number } | null {
+  const markerIndex = key.indexOf(UNTARGETED_CHAT_CASE_KEY_MARKER);
+  if (markerIndex === -1) return null;
+
+  const messageId = key.slice(0, markerIndex);
+  const caseIndex = Number(
+    key.slice(markerIndex + UNTARGETED_CHAT_CASE_KEY_MARKER.length),
+  );
+  if (messageId === '' || Number.isNaN(caseIndex)) return null;
+
+  return { messageId, caseIndex };
+}
+
 function lineAnchor(
   provider: RepoConnectionProvider,
   startLine: number,
@@ -302,7 +323,11 @@ export class ChatService {
     });
 
     const [sentProposalIdsByMessage, attachedCasesById] = await Promise.all([
-      this.loadSentProposalIds(projectId, threadId),
+      this.loadSentProposalIds(
+        projectId,
+        threadId,
+        messages.filter((row) => row.role === 'assistant').map((row) => row.id),
+      ),
       this.loadAttachedCases(
         messages.flatMap((row) => row.attachedCaseIds ?? []),
       ),
@@ -484,6 +509,18 @@ export class ChatService {
       return ok({ proposalId: existingProposal.id, alreadySent: true });
     }
 
+    const chatCaseKey = untargetedChatCaseKey(messageId, input.caseIndex);
+
+    const existingByChatCaseKey = await this.prisma.extractedProposal.findFirst(
+      {
+        where: { projectId, chatCaseKey },
+        select: { id: true },
+      },
+    );
+    if (existingByChatCaseKey !== null) {
+      return ok({ proposalId: existingByChatCaseKey.id, alreadySent: true });
+    }
+
     const suite = await this.prisma.suite.findFirst({
       where: { projectId },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
@@ -491,46 +528,70 @@ export class ChatService {
     });
     if (suite === null) return err('missing-suite');
 
-    const prompt = await this.prisma.chatMessage.findFirst({
+    const precedingUserMessage = await this.prisma.chatMessage.findFirst({
       where: { threadId, role: 'user', createdAt: { lt: message.createdAt } },
       orderBy: { createdAt: 'desc' },
-      select: { content: true },
+      select: { attachedFilePath: true },
     });
+    const filePath = precedingUserMessage?.attachedFilePath?.trim();
+    if (filePath === undefined || filePath.length === 0) {
+      return err('no-code-evidence');
+    }
 
-    const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
-      const evidence = await tx.evidence.create({
-        data: {
-          projectId,
-          kind: 'ARTIFACT',
-          title: `Chat: ${thread.title}`,
-          uri: evidenceUri,
-          excerpt: (prompt?.content ?? message.content).slice(
-            0,
-            MAX_EXCERPT_LENGTH,
-          ),
-        },
-        select: { id: true },
+    const connection = await this.findConnection(projectId);
+    const evidenceResult = await this.buildUntargetedEvidence(
+      filePath,
+      connection,
+    );
+    if (evidenceResult.kind === 'no-code-evidence') {
+      return err('no-code-evidence');
+    }
+    const evidence = evidenceResult.evidence;
+
+    try {
+      const proposal = await this.prisma.$transaction(async (tx: TxClient) => {
+        const evidenceRow = await tx.evidence.create({
+          data: {
+            projectId,
+            kind: 'SOURCE_EXCERPT',
+            title: `Chat: ${thread.title}`,
+            uri: evidence.uri,
+            excerpt: evidence.excerpt,
+          },
+          select: { id: true },
+        });
+
+        return tx.extractedProposal.create({
+          data: {
+            projectId,
+            evidenceId: evidenceRow.id,
+            suiteId: suite.id,
+            chatCaseKey,
+            status: 'in_review',
+            title: suggested.title,
+            objective: suggested.objective,
+            preconditions: suggested.preconditions,
+            steps: suggested.steps,
+            expectedResult: suggested.expectedResult,
+            priority: suggested.priority,
+            promptVersion: CHAT_PROMPT_VERSION,
+          },
+          select: { id: true },
+        });
       });
 
-      return tx.extractedProposal.create({
-        data: {
-          projectId,
-          evidenceId: evidence.id,
-          suiteId: suite.id,
-          status: 'in_review',
-          title: suggested.title,
-          objective: suggested.objective,
-          preconditions: suggested.preconditions,
-          steps: suggested.steps,
-          expectedResult: suggested.expectedResult,
-          priority: suggested.priority,
-          promptVersion: CHAT_PROMPT_VERSION,
-        },
+      return ok({ proposalId: proposal.id });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+
+      const winner = await this.prisma.extractedProposal.findFirst({
+        where: { projectId, chatCaseKey },
         select: { id: true },
       });
-    });
+      if (winner === null) throw error;
 
-    return ok({ proposalId: proposal.id });
+      return ok({ proposalId: winner.id, alreadySent: true });
+    }
   }
 
   private async sendTargetedToReview(
@@ -644,6 +705,36 @@ export class ChatService {
     return this.toTargetedEvidence(connection.provider, blobUrl, excerpt);
   }
 
+  private async buildUntargetedEvidence(
+    filePath: string,
+    connection: CaseContextConnection | null,
+  ): Promise<TargetedEvidenceResult> {
+    if (connection === null) {
+      const gated = gate(null);
+      return gated.kind === 'no-code-evidence'
+        ? gated
+        : { kind: 'no-code-evidence', reason: 'no-evidence' };
+    }
+
+    const { ref, excerpt } = await this.caseContextBuilder.locateForEvidence(
+      { automationKey: null, automationFilePath: filePath },
+      connection,
+    );
+
+    const gated = gate(excerpt);
+    if (gated.kind === 'no-code-evidence') {
+      return gated;
+    }
+
+    const uri = buildBlobUrl(
+      connection.provider,
+      connection.repo,
+      ref,
+      filePath,
+    );
+    return { kind: 'ok', evidence: { uri, excerpt: gated.excerpt } };
+  }
+
   private toTargetedEvidence(
     provider: RepoConnectionProvider,
     blobUrl: string,
@@ -669,16 +760,41 @@ export class ChatService {
   private async loadSentProposalIds(
     projectId: string,
     threadId: string,
+    assistantMessageIds: readonly string[],
   ): Promise<Map<string, Record<number, string>>> {
     const prefix = `qably://chat/${threadId}/`;
-    const proposals = await this.prisma.extractedProposal.findMany({
-      where: { projectId, evidence: { uri: { startsWith: prefix } } },
-      select: { id: true, evidence: { select: { uri: true } } },
-    });
+    const candidateChatCaseKeys = assistantMessageIds.flatMap((messageId) =>
+      Array.from({ length: MAX_SUGGESTED_CASES }, (_, caseIndex) =>
+        untargetedChatCaseKey(messageId, caseIndex),
+      ),
+    );
+
+    const [legacyProposals, chatCaseKeyProposals] = await Promise.all([
+      this.prisma.extractedProposal.findMany({
+        where: { projectId, evidence: { uri: { startsWith: prefix } } },
+        select: { id: true, evidence: { select: { uri: true } } },
+      }),
+      candidateChatCaseKeys.length === 0
+        ? Promise.resolve([])
+        : this.prisma.extractedProposal.findMany({
+            where: { projectId, chatCaseKey: { in: candidateChatCaseKeys } },
+            select: { id: true, chatCaseKey: true },
+          }),
+    ]);
 
     const map = new Map<string, Record<number, string>>();
-    for (const proposal of proposals) {
+    for (const proposal of legacyProposals) {
       const parsed = parseChatEvidenceUri(prefix, proposal.evidence.uri);
+      if (parsed === null) continue;
+
+      const existing = map.get(parsed.messageId) ?? {};
+      existing[parsed.caseIndex] = proposal.id;
+      map.set(parsed.messageId, existing);
+    }
+    for (const proposal of chatCaseKeyProposals) {
+      if (typeof proposal.chatCaseKey !== 'string') continue;
+
+      const parsed = parseUntargetedChatCaseKey(proposal.chatCaseKey);
       if (parsed === null) continue;
 
       const existing = map.get(parsed.messageId) ?? {};

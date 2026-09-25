@@ -349,8 +349,89 @@ describe('ChatService', () => {
     expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
   });
 
-  it('turns a suggested case into a proposal under review with the chat as evidence', async () => {
+  it('creates a SOURCE_EXCERPT proposal from the file path attached to the preceding user message, with no targetTestCaseId', async () => {
     const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    const caseContextBuilder = fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: {
+          kind: 'file-head',
+          excerpt: 'export function checkout() {}',
+        },
+      }),
+    );
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      {
+        caseIndex: 0,
+      },
+    );
+
+    expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+    expect(caseContextBuilder.locateForEvidence).toHaveBeenCalledWith(
+      { automationKey: null, automationFilePath: 'src/checkout.spec.ts' },
+      {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    );
+    expect(prisma.evidence.create).toHaveBeenCalledWith(
+      containing({
+        data: containing({
+          kind: 'SOURCE_EXCERPT',
+          uri: 'https://github.com/acme/shop/blob/sha123/src/checkout.spec.ts',
+          excerpt: 'export function checkout() {}',
+        }),
+      }),
+    );
+    expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+      containing({
+        data: containing({
+          status: 'in_review',
+          title: suggestedCase.title,
+          suiteId: 'suite-1',
+          chatCaseKey: 'message-2:new:0',
+          promptVersion: CHAT_PROMPT_VERSION,
+        }),
+      }),
+    );
+    const calls = prisma.extractedProposal.create.mock.calls as unknown[][];
+    const created = calls[0][0] as { data: { targetTestCaseId?: string } };
+    expect(created.data.targetTestCaseId).toBeUndefined();
+  });
+
+  it('rejects an untargeted send with no attached file path, creating no rows', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: null });
     const service = build(
       prisma,
       createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
@@ -367,24 +448,180 @@ describe('ChatService', () => {
       },
     );
 
-    expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
-    expect(prisma.evidence.create).toHaveBeenCalledWith(
-      containing({
-        data: containing({
-          kind: 'ARTIFACT',
-          uri: 'qably://chat/thread-1/message-2/0',
-          excerpt: 'What is missing in checkout?',
-        }),
+    expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an untargeted send with a whitespace-only attached file path before attempting a repository read', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: '   ' });
+    const caseContextBuilder = fakeCaseContextBuilder();
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      {
+        caseIndex: 0,
+      },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+    expect(caseContextBuilder.locateForEvidence).not.toHaveBeenCalled();
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an untargeted send when the typed path cannot be located in the repo, creating no rows', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/missing.ts' });
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    const caseContextBuilder = fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: { kind: 'unavailable', reason: 'http-404' },
       }),
     );
-    expect(prisma.extractedProposal.create).toHaveBeenCalledWith(
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      {
+        caseIndex: 0,
+      },
+    );
+
+    expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent for a repeated untargeted send via chatCaseKey, even without the legacy evidence uri', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+    prisma.extractedProposal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'already-sent-new-proposal' });
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      {
+        caseIndex: 0,
+      },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { proposalId: 'already-sent-new-proposal', alreadySent: true },
+    });
+    expect(prisma.extractedProposal.findFirst).toHaveBeenLastCalledWith(
       containing({
-        data: containing({
-          status: 'in_review',
-          title: suggestedCase.title,
-          suiteId: 'suite-1',
-          promptVersion: CHAT_PROMPT_VERSION,
-        }),
+        where: { projectId: 'project-1', chatCaseKey: 'message-2:new:0' },
+      }),
+    );
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('recovers the existing proposal instead of a raw 500 when a double submit races the unique chatCaseKey on an untargeted send', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+    prisma.extractedProposal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'winner-new-proposal' });
+    prisma.extractedProposal.create.mockRejectedValue({ code: 'P2002' });
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    const caseContextBuilder = fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: {
+          kind: 'file-head',
+          excerpt: 'export function checkout() {}',
+        },
+      }),
+    );
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      {
+        caseIndex: 0,
+      },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      value: { proposalId: 'winner-new-proposal', alreadySent: true },
+    });
+    expect(prisma.extractedProposal.findFirst).toHaveBeenLastCalledWith(
+      containing({
+        where: { projectId: 'project-1', chatCaseKey: 'message-2:new:0' },
       }),
     );
   });
@@ -690,6 +927,44 @@ describe('ChatService', () => {
           containing({
             id: 'message-2',
             sentProposalIds: { 0: 'proposal-1' },
+          }),
+        ],
+      }),
+    });
+  });
+
+  it('maps existing chatCaseKey-based proposals back onto the thread messages as sentProposalIds', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'proposal-2', chatCaseKey: 'message-2:new:1' },
+      ]);
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+    );
+
+    const result = await service.getThread(org, user, 'project-1', 'thread-1');
+
+    expect(prisma.extractedProposal.findMany).toHaveBeenLastCalledWith(
+      containing({
+        where: {
+          projectId: 'project-1',
+          chatCaseKey: {
+            in: expect.arrayContaining(['message-2:new:1']) as unknown,
+          },
+        },
+      }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: containing({
+        messages: [
+          containing({ id: 'message-1' }),
+          containing({
+            id: 'message-2',
+            sentProposalIds: { 1: 'proposal-2' },
           }),
         ],
       }),
@@ -1330,14 +1605,17 @@ describe('ChatService', () => {
       );
     });
 
-    it('keeps the qably://chat evidence uri scheme and no chatCaseKey for a non-targeted case', async () => {
+    it('still short-circuits a legacy qably://chat resend for a non-targeted case without re-evaluating the gate', async () => {
       const prisma = createPrisma();
+      prisma.extractedProposal.findFirst.mockResolvedValue({
+        id: 'legacy-already-sent-proposal',
+      });
       const service = build(
         prisma,
         createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
       );
 
-      await service.sendToReview(
+      const result = await service.sendToReview(
         org,
         user,
         'project-1',
@@ -1348,14 +1626,15 @@ describe('ChatService', () => {
         },
       );
 
-      const calls = prisma.extractedProposal.create.mock.calls as unknown[][];
-      const created = calls[0][0] as { data: { chatCaseKey?: string } };
-      expect(created.data.chatCaseKey).toBeUndefined();
-      expect(prisma.evidence.create).toHaveBeenCalledWith(
-        containing({
-          data: containing({ uri: 'qably://chat/thread-1/message-2/0' }),
-        }),
-      );
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          proposalId: 'legacy-already-sent-proposal',
+          alreadySent: true,
+        },
+      });
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     });
   });
 });
