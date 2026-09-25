@@ -228,6 +228,46 @@ describe('useProjectChat', () => {
     )
   })
 
+  it('forwards a typed file path to sendMessage', async () => {
+    listThreads.mockResolvedValue([])
+    createThread.mockResolvedValue(thread)
+    sendMessage.mockResolvedValue(assistantMessage)
+    getThread.mockResolvedValue(threadDetail)
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([]))
+
+    await act(async () => {
+      await result.current.send('Look at this file', [], 'src/foo.ts')
+    })
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      'proj-1',
+      'thread-1',
+      'Look at this file',
+      [],
+      'src/foo.ts',
+    )
+  })
+
+  it('classifies a file-unreadable 422 distinctly from other errors', async () => {
+    listThreads.mockResolvedValue([thread])
+    getThread.mockResolvedValue(threadDetail)
+    sendMessage.mockRejectedValue(new ApiError(422, 'Unreadable', 'file-unreadable'))
+    const { result } = renderHook(() => useProjectChat('proj-1'), { wrapper })
+    await waitFor(() => expect(result.current.threads).toEqual([thread]))
+
+    act(() => {
+      result.current.selectThread('thread-1')
+    })
+    await waitFor(() => expect(result.current.messages.length).toBe(2))
+
+    await act(async () => {
+      await result.current.send('Look at this file', [], 'src/missing.ts')
+    })
+
+    expect(result.current.pendingMessage).toMatchObject({ errorKind: 'file-unreadable' })
+  })
+
   it('classifies a too-many-cases 400 distinctly from a plain too-long 400', async () => {
     listThreads.mockResolvedValue([thread])
     getThread.mockResolvedValue(threadDetail)

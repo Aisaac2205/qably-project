@@ -193,4 +193,103 @@ describe('ChatComposer', () => {
       expect(screen.getByText('You can attach up to 5 cases.')).toBeInTheDocument()
     })
   })
+
+  describe('file attachment', () => {
+    it('opens an inline path input when the file button is clicked', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<ChatComposer projectId="proj-1" onSend={vi.fn()} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+
+      expect(screen.getByRole('textbox', { name: 'File path' })).toBeInTheDocument()
+    })
+
+    it('cancels the inline input on Escape', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<ChatComposer projectId="proj-1" onSend={vi.fn()} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+      await user.type(screen.getByRole('textbox', { name: 'File path' }), 'src/foo.ts{Escape}')
+
+      expect(screen.queryByRole('textbox', { name: 'File path' })).not.toBeInTheDocument()
+    })
+
+    it('confirms a valid path into a removable chip and disables the button', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<ChatComposer projectId="proj-1" onSend={vi.fn()} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+      await user.type(
+        screen.getByRole('textbox', { name: 'File path' }),
+        'src/components/Button.tsx{enter}',
+      )
+
+      expect(screen.getByText('src/components/Button.tsx')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reference a file' })).toBeDisabled()
+    })
+
+    it('shows an inline error for an unsafe path and does not create a chip', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<ChatComposer projectId="proj-1" onSend={vi.fn()} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+      await user.type(screen.getByRole('textbox', { name: 'File path' }), '../secrets.env{enter}')
+
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+      expect(screen.queryByText('../secrets.env')).not.toBeInTheDocument()
+    })
+
+    it('removes the file chip and re-enables the button', async () => {
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<ChatComposer projectId="proj-1" onSend={vi.fn()} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+      await user.type(screen.getByRole('textbox', { name: 'File path' }), 'src/foo.ts{enter}')
+      await user.click(screen.getByRole('button', { name: 'Remove src/foo.ts' }))
+
+      expect(screen.queryByText('src/foo.ts')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Reference a file' })).not.toBeDisabled()
+    })
+
+    it('sends the attached file path and clears it after sending', async () => {
+      const onSend = vi.fn()
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(<ChatComposer projectId="proj-1" onSend={onSend} />)
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+      await user.type(screen.getByRole('textbox', { name: 'File path' }), 'src/foo.ts{enter}')
+      await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Look at this file{enter}')
+
+      expect(onSend).toHaveBeenCalledWith('Look at this file', undefined, 'src/foo.ts')
+      expect(screen.queryByText('src/foo.ts')).not.toBeInTheDocument()
+    })
+
+    it('sends both attached cases and a file path together', async () => {
+      const onSend = vi.fn()
+      const user = userEvent.setup()
+      await act(async () => {
+        renderWithQuery(
+          <ChatComposer projectId="proj-1" onSend={onSend} initialAttachedCase={attachedCase} />,
+        )
+      })
+
+      await user.click(screen.getByRole('button', { name: 'Reference a file' }))
+      await user.type(screen.getByRole('textbox', { name: 'File path' }), 'src/foo.ts{enter}')
+      await user.type(screen.getByRole('textbox', { name: 'Message' }), 'Improve this{enter}')
+
+      expect(onSend).toHaveBeenCalledWith('Improve this', [attachedCase], 'src/foo.ts')
+    })
+  })
 })

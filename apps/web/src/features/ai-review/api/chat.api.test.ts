@@ -90,6 +90,28 @@ describe('chat.api', () => {
     expect(init.body).toBe(JSON.stringify({ content: 'Hello' }))
   })
 
+  it('sends a message with an attached file path', async () => {
+    await sendMessage('proj-1', 'thread-1', 'Look at this file', [], 'src/foo.ts')
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(
+      JSON.stringify({ content: 'Look at this file', filePath: 'src/foo.ts' }),
+    )
+  })
+
+  it('sends a message with both attached cases and a file path', async () => {
+    await sendMessage('proj-1', 'thread-1', 'Improve this', ['tc-1'], 'src/foo.ts')
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(
+      JSON.stringify({
+        content: 'Improve this',
+        caseIds: ['tc-1'],
+        filePath: 'src/foo.ts',
+      }),
+    )
+  })
+
   it('sends a suggested case to review', async () => {
     await sendToReview('proj-1', 'thread-1', 'message-1', 2)
 

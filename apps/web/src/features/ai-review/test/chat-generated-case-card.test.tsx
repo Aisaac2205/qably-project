@@ -198,4 +198,27 @@ describe('ChatGeneratedCaseCard', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/documented by a person/i)
   })
+
+  it('disables send and shows guidance for a no-code-evidence rejection', async () => {
+    vi.spyOn(chatApi, 'sendToReview').mockRejectedValue(
+      new ApiError(422, 'No code evidence', 'no-code-evidence'),
+    )
+    const user = userEvent.setup()
+    await act(async () => {
+      renderWithQuery(
+        <ChatGeneratedCaseCard
+          projectId="proj-1"
+          threadId="thread-1"
+          messageId="message-1"
+          caseIndex={0}
+          suggestedCase={suggestedCase}
+        />,
+      )
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Send to review' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/attach a case or reference a file/i)
+    expect(screen.getByRole('button', { name: 'Send to review' })).toBeDisabled()
+  })
 })

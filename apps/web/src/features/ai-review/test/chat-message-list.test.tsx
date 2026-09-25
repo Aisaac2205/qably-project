@@ -133,6 +133,19 @@ describe('ChatMessageList', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/too many cases/i)
   })
 
+  it('shows a file-unreadable error message', async () => {
+    await act(async () => {
+      render(
+        <ChatMessageList
+          projectId="proj-1"
+          messages={[]}
+          pendingMessage={{ content: 'Hi', status: 'error', errorKind: 'file-unreadable' }}
+        />,
+      )
+    })
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn't read that file/i)
+  })
+
   it('shows no prompt starter cards in the empty state', async () => {
     await act(async () => {
       render(<ChatMessageList projectId="proj-1" messages={[]} />)

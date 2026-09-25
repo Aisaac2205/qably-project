@@ -109,6 +109,53 @@ describe('ChatMessageBubble', () => {
     expect(screen.getByText('Authentication')).toBeInTheDocument()
   })
 
+  it('shows a grounding-insufficient indicator for an explicit decline', async () => {
+    const message: ChatMessageRecord = {
+      id: 'm7',
+      threadId: 't1',
+      role: 'assistant',
+      content: 'I do not have verifiable information in this chat to answer that with confidence.',
+      suggestedCases: [],
+      grounding: { status: 'insufficient' },
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    await act(async () => {
+      renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
+    })
+    expect(screen.getByText(/without citing specific data/i)).toBeInTheDocument()
+  })
+
+  it('does not show the grounding indicator for a legacy message with no grounding data', async () => {
+    const message: ChatMessageRecord = {
+      id: 'm8',
+      threadId: 't1',
+      role: 'assistant',
+      content: 'Here is what I found',
+      suggestedCases: [],
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    await act(async () => {
+      renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
+    })
+    expect(screen.queryByText(/without citing specific data/i)).not.toBeInTheDocument()
+  })
+
+  it('does not show the grounding indicator for a grounded reply', async () => {
+    const message: ChatMessageRecord = {
+      id: 'm9',
+      threadId: 't1',
+      role: 'assistant',
+      content: 'Here is what I found',
+      suggestedCases: [],
+      grounding: { status: 'grounded', references: [] },
+      createdAt: '2026-01-01T00:00:00Z',
+    }
+    await act(async () => {
+      renderWithQuery(<ChatMessageBubble projectId="proj-1" message={message} />)
+    })
+    expect(screen.queryByText(/without citing specific data/i)).not.toBeInTheDocument()
+  })
+
   it('leaves a user message unattributed', async () => {
     const message: ChatMessageRecord = {
       id: 'm4',

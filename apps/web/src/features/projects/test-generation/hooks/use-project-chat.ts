@@ -21,6 +21,7 @@ export type ChatSendErrorKind =
   | 'throttled'
   | 'too-long'
   | 'too-many-cases'
+  | 'file-unreadable'
   | 'error'
 
 export interface PendingMessage {
@@ -43,6 +44,9 @@ function classifySendError(error: unknown): ChatSendErrorKind {
     }
     if (error.code === 'too-many-cases') {
       return 'too-many-cases'
+    }
+    if (error.code === 'file-unreadable') {
+      return 'file-unreadable'
     }
     if (error.status === 403) {
       return 'forbidden'
@@ -109,7 +113,7 @@ export function useProjectChat(projectId: string) {
   )
 
   const send = useCallback(
-    async (text: string, attachedCases: AttachedCaseRecord[] = []) => {
+    async (text: string, attachedCases: AttachedCaseRecord[] = [], filePath?: string) => {
       const content = text.trim()
       if (!content) return
 
@@ -126,8 +130,12 @@ export function useProjectChat(projectId: string) {
           void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
         }
 
-        if (caseIds.length > 0) {
+        if (caseIds.length > 0 && filePath !== undefined) {
+          await sendMessage(projectId, threadId, content, caseIds, filePath)
+        } else if (caseIds.length > 0) {
           await sendMessage(projectId, threadId, content, caseIds)
+        } else if (filePath !== undefined) {
+          await sendMessage(projectId, threadId, content, [], filePath)
         } else {
           await sendMessage(projectId, threadId, content)
         }

@@ -693,7 +693,15 @@
     "chatProposalSent": "Enviada a revisión",
     "chatWhatAerisProposes": "Lo que propone Aeris",
     "chatCaseTitle": "Título",
-    "chatUpdatesCase": "Actualiza: {{name}}"
+    "chatUpdatesCase": "Actualiza: {{name}}",
+    "chatAttachFile": "Referenciar un archivo",
+    "chatFilePathLabel": "Ruta del archivo",
+    "chatFilePathPlaceholder": "ej. src/components/Button.tsx",
+    "chatFilePathInvalid": "Ingresa una ruta válida relativa a la raíz del repositorio.",
+    "chatRemoveFile": "Quitar {{path}}",
+    "chatFileUnreadable": "No se pudo leer ese archivo. Verifica la ruta e intenta de nuevo.",
+    "chatNoCodeEvidence": "Esta propuesta todavía no tiene evidencia de código. Adjunta un caso o referencia un archivo en el chat para enviarla a revisión.",
+    "chatGroundingInsufficient": "Respondió sin citar datos específicos de este proyecto."
   },
   "reviewFlow": {
     "provenance": "Procedencia",

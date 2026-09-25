@@ -51,13 +51,15 @@ export function sendMessage(
   threadId: string,
   content: string,
   caseIds: string[] = [],
+  filePath?: string,
 ): Promise<ChatMessageRecord> {
+  const body: { content: string; caseIds?: string[]; filePath?: string } = { content }
+  if (caseIds.length > 0) body.caseIds = caseIds
+  if (filePath !== undefined) body.filePath = filePath
+
   return apiRequest<ChatMessageRecord>(
     `/projects/${projectId}/chat/threads/${threadId}/messages`,
-    {
-      method: 'POST',
-      body: caseIds.length > 0 ? { content, caseIds } : { content },
-    },
+    { method: 'POST', body },
   )
 }
 

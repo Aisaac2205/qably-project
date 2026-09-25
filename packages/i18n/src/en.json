@@ -693,7 +693,15 @@
     "chatProposalSent": "Sent to review",
     "chatWhatAerisProposes": "What Aeris proposes",
     "chatCaseTitle": "Title",
-    "chatUpdatesCase": "Updates: {{name}}"
+    "chatUpdatesCase": "Updates: {{name}}",
+    "chatAttachFile": "Reference a file",
+    "chatFilePathLabel": "File path",
+    "chatFilePathPlaceholder": "e.g. src/components/Button.tsx",
+    "chatFilePathInvalid": "Enter a valid path relative to the repository root.",
+    "chatRemoveFile": "Remove {{path}}",
+    "chatFileUnreadable": "Couldn't read that file. Check the path and try again.",
+    "chatNoCodeEvidence": "This proposal has no code evidence yet. Attach a case or reference a file in the chat to send it to review.",
+    "chatGroundingInsufficient": "Answered without citing specific data from this project."
   },
   "reviewFlow": {
     "provenance": "Provenance",

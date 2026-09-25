@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState, type KeyboardEvent } from 'react'
-import { PaperPlaneRight, Paperclip } from '@phosphor-icons/react'
-import { ASSISTANT_MODEL_NAME, type AttachedCaseRecord } from '@qably/types'
+import { Check, FileCode, PaperPlaneRight, Paperclip, X } from '@phosphor-icons/react'
+import { ASSISTANT_MODEL_NAME, isSafeRepoRelativePath, type AttachedCaseRecord } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
 import { cn } from '@/lib/utils'
 import { useAutoResizeTextarea } from '@/features/projects/test-generation/hooks/use-auto-resize-textarea'
@@ -11,6 +11,7 @@ import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { MAX_ATTACHED_CASES, flattenAttachableCases } from '@/features/ai-review/lib/attachable-cases'
 import { ChatCaseChip } from './chat-case-chip'
 import { ChatCasePicker } from './chat-case-picker'
+import { ChatFileChip } from './chat-file-chip'
 
 const MIN_HEIGHT = 44
 const MAX_HEIGHT = 200
@@ -24,7 +25,7 @@ export function ChatComposer({
   initialAttachedCase,
 }: {
   projectId: string
-  onSend: (text: string, attachedCases?: AttachedCaseRecord[]) => void
+  onSend: (text: string, attachedCases?: AttachedCaseRecord[], filePath?: string) => void
   disabled?: boolean
   initialValue?: string
   initialAttachedCase?: AttachedCaseRecord
@@ -34,6 +35,10 @@ export function ChatComposer({
   const [attachedCases, setAttachedCases] = useState<AttachedCaseRecord[]>(
     initialAttachedCase ? [initialAttachedCase] : [],
   )
+  const [attachedFilePath, setAttachedFilePath] = useState<string | null>(null)
+  const [isFilePathInputOpen, setIsFilePathInputOpen] = useState(false)
+  const [filePathDraft, setFilePathDraft] = useState('')
+  const [filePathInputError, setFilePathInputError] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const { suites } = useSuites(projectId)
   const availableCases = useMemo(() => flattenAttachableCases(suites), [suites])
@@ -46,13 +51,18 @@ export function ChatComposer({
   const handleSend = () => {
     const trimmed = value.trim()
     if (!trimmed || disabled) return
-    if (attachedCases.length > 0) {
+    if (attachedCases.length > 0 && attachedFilePath) {
+      onSend(trimmed, attachedCases, attachedFilePath)
+    } else if (attachedCases.length > 0) {
       onSend(trimmed, attachedCases)
+    } else if (attachedFilePath) {
+      onSend(trimmed, undefined, attachedFilePath)
     } else {
       onSend(trimmed)
     }
     setValue('')
     setAttachedCases([])
+    setAttachedFilePath(null)
     adjustHeight(true)
   }
 
@@ -76,11 +86,49 @@ export function ChatComposer({
     }
   }
 
+  const handleOpenFilePathInput = () => {
+    setFilePathDraft('')
+    setFilePathInputError(false)
+    setIsFilePathInputOpen(true)
+  }
+
+  const handleCancelFilePathInput = () => {
+    setIsFilePathInputOpen(false)
+    setFilePathDraft('')
+    setFilePathInputError(false)
+  }
+
+  const handleConfirmFilePath = () => {
+    const trimmedPath = filePathDraft.trim()
+    if (!isSafeRepoRelativePath(trimmedPath)) {
+      setFilePathInputError(true)
+      return
+    }
+    setAttachedFilePath(trimmedPath)
+    setIsFilePathInputOpen(false)
+    setFilePathDraft('')
+    setFilePathInputError(false)
+  }
+
+  const handleFilePathKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      handleConfirmFilePath()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      handleCancelFilePathInput()
+    }
+  }
+
+  const handleRemoveFilePath = () => {
+    setAttachedFilePath(null)
+  }
+
   return (
     <div className="bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-4 sm:pb-4">
       <div className="max-w-3xl mx-auto w-full">
         <div className="flex flex-col gap-2 bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
-          {attachedCases.length > 0 && (
+          {(attachedCases.length > 0 || attachedFilePath) && (
             <div className="flex flex-wrap items-center gap-1.5">
               {attachedCases.map((attachedCase) => (
                 <ChatCaseChip
@@ -89,6 +137,57 @@ export function ChatComposer({
                   onRemove={handleRemoveCase}
                 />
               ))}
+              {attachedFilePath && (
+                <ChatFileChip filePath={attachedFilePath} onRemove={handleRemoveFilePath} />
+              )}
+            </div>
+          )}
+
+          {isFilePathInputOpen && (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="chat-composer-file-path" className="sr-only">
+                  {t('aiReview.chatFilePathLabel')}
+                </label>
+                <input
+                  id="chat-composer-file-path"
+                  type="text"
+                  value={filePathDraft}
+                  autoFocus
+                  onChange={(event) => {
+                    setFilePathDraft(event.target.value)
+                    if (filePathInputError) setFilePathInputError(false)
+                  }}
+                  onKeyDown={handleFilePathKeyDown}
+                  placeholder={t('aiReview.chatFilePathPlaceholder')}
+                  aria-invalid={filePathInputError}
+                  aria-describedby={filePathInputError ? 'chat-composer-file-path-error' : undefined}
+                  className="w-full min-w-0 rounded-lg border border-border bg-canvas px-2 py-1 text-xs text-default placeholder:text-muted outline-none focus-visible:border-border-strong"
+                />
+                <button
+                  type="button"
+                  onClick={handleConfirmFilePath}
+                  aria-label={t('common.confirm')}
+                  title={t('common.confirm')}
+                  className="size-7 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary/40 cursor-pointer"
+                >
+                  <Check size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelFilePathInput}
+                  aria-label={t('common.cancel')}
+                  title={t('common.cancel')}
+                  className="size-7 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary/40 cursor-pointer"
+                >
+                  <X size={14} aria-hidden="true" />
+                </button>
+              </div>
+              {filePathInputError && (
+                <p id="chat-composer-file-path-error" role="alert" className="px-1 text-[11px] text-fail">
+                  {t('aiReview.chatFilePathInvalid')}
+                </p>
+              )}
             </div>
           )}
 
@@ -128,6 +227,17 @@ export function ChatComposer({
                 className="size-7 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 <Paperclip size={15} aria-hidden="true" />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenFilePathInput}
+                disabled={attachedFilePath !== null}
+                aria-label={t('aiReview.chatAttachFile')}
+                title={t('aiReview.chatAttachFile')}
+                className="size-7 shrink-0 rounded-lg inline-flex items-center justify-center text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus-visible:ring-1 focus-visible:ring-primary/40 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <FileCode size={15} aria-hidden="true" />
               </button>
 
               {atAttachLimit && (

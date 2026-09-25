@@ -13,7 +13,7 @@ import { reviewInboxPath } from '@/features/projects/lib/routes'
 import { ApiError } from '@/lib/api-client'
 
 type SendState = 'idle' | 'pending' | 'error'
-type SendErrorKind = 'human-documented' | 'error'
+type SendErrorKind = 'human-documented' | 'no-code-evidence' | 'error'
 
 export function ChatGeneratedCaseCard({
   projectId,
@@ -54,11 +54,15 @@ export function ChatGeneratedCaseCard({
       setErrorKind(
         error instanceof ApiError && error.code === 'human-documented'
           ? 'human-documented'
-          : 'error',
+          : error instanceof ApiError && error.code === 'no-code-evidence'
+            ? 'no-code-evidence'
+            : 'error',
       )
       setState('error')
     }
   }
+
+  const isBlocked = state === 'error' && errorKind === 'no-code-evidence'
 
   return (
     <div className="rounded-lg border border-ai/30 bg-ai-bg p-3 mt-2 space-y-2">
@@ -109,7 +113,12 @@ export function ChatGeneratedCaseCard({
           {t('aiReview.viewInReviewQueue')}
         </Link>
       ) : (
-        <Button size="sm" variant="outline" onClick={handleSend} disabled={state === 'pending'}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleSend}
+          disabled={state === 'pending' || isBlocked}
+        >
           {state === 'pending' ? t('aiReview.sendingToReview') : t('aiReview.sendToReview')}
         </Button>
       )}
@@ -118,7 +127,9 @@ export function ChatGeneratedCaseCard({
         <p role="alert" className="text-xs text-fail">
           {errorKind === 'human-documented'
             ? t('aiReview.chatHumanDocumented')
-            : t('aiReview.sendToReviewError')}
+            : errorKind === 'no-code-evidence'
+              ? t('aiReview.chatNoCodeEvidence')
+              : t('aiReview.sendToReviewError')}
         </p>
       )}
     </div>

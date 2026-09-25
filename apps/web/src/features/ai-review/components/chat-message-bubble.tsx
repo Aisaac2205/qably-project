@@ -1,7 +1,9 @@
 'use client'
 
+import { Info } from '@phosphor-icons/react'
 import { ASSISTANT_MODEL_NAME, type AttachedCaseRecord, type ChatMessageRecord } from '@qably/types'
 import { AerisIcon } from '@/components/icons/aeris-icon'
+import { useTranslation } from '@/lib/i18n'
 import { ChatGeneratedCaseCard } from './chat-generated-case-card'
 import { ChatCaseChip } from './chat-case-chip'
 
@@ -14,8 +16,10 @@ export function ChatMessageBubble({
   message: ChatMessageRecord
   attachedCasesForProposals?: AttachedCaseRecord[]
 }) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
   const attachedCases = message.attachedCases ?? []
+  const isDeclined = !isUser && message.grounding?.status === 'insufficient'
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -42,6 +46,12 @@ export function ChatMessageBubble({
           )}
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
+        {isDeclined && (
+          <p className="inline-flex items-center gap-1 self-start rounded-full border border-border/60 bg-canvas/50 px-2 py-0.5 text-[10px] font-medium text-muted">
+            <Info size={11} aria-hidden="true" />
+            {t('aiReview.chatGroundingInsufficient')}
+          </p>
+        )}
         {message.suggestedCases.map((suggestedCase, index) => (
           <div key={index} className="w-full">
             <ChatGeneratedCaseCard

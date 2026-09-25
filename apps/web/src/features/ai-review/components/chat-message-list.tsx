@@ -21,6 +21,8 @@ function pendingErrorCopy(
       return t('aiReview.chatMessageTooLong')
     case 'too-many-cases':
       return t('aiReview.chatTooManyCases')
+    case 'file-unreadable':
+      return t('aiReview.chatFileUnreadable')
     case 'throttled':
       return t('aiReview.chatThrottled')
     default:
