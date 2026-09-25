@@ -5,7 +5,13 @@ import { truncateTo } from '../../common/text/truncate-to';
 export const MAX_SOURCE_CONTENT_LENGTH = 60_000;
 export const MAX_EXTRACTED_CASES = 20;
 
-const AUTOMATION_KEY_MAX_LENGTH_MATCHING_JUNIT_INGESTION = 120;
+const JUNIT_INGESTION_NAME_MAX_LENGTH = 120;
+const JUNIT_INGESTION_CLASSNAME_MAX_LENGTH = 250;
+const COMPOSITE_KEY_SEPARATOR_LENGTH = '::'.length;
+const AUTOMATION_KEY_MAX_LENGTH =
+  JUNIT_INGESTION_CLASSNAME_MAX_LENGTH +
+  COMPOSITE_KEY_SEPARATOR_LENGTH +
+  JUNIT_INGESTION_NAME_MAX_LENGTH;
 
 export const shortText = (max: number) => z.string().trim().min(1).max(max);
 
@@ -13,9 +19,7 @@ const automationKeyText = z
   .string()
   .trim()
   .min(1)
-  .transform((value) =>
-    truncateTo(value, AUTOMATION_KEY_MAX_LENGTH_MATCHING_JUNIT_INGESTION),
-  );
+  .transform((value) => truncateTo(value, AUTOMATION_KEY_MAX_LENGTH));
 
 const LEADING_ORDINAL = /^\d+[.)]\s*/;
 
