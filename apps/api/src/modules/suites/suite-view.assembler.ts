@@ -49,6 +49,11 @@ interface DuplicateKeyCandidateRow {
   automationKey: string | null;
 }
 
+interface OpenCollisionCountRow {
+  suiteId: string;
+  _count: { _all: number };
+}
+
 @Injectable()
 export class SuiteViewAssembler {
   constructor(private readonly prisma: PrismaService) {}
@@ -103,11 +108,14 @@ export class SuiteViewAssembler {
       ),
     ];
 
+    const suiteIds = views.map((view) => view.id);
+
     const [
       lastResultRows,
       pendingProposalRows,
       recentResultRows,
       duplicateKeyRows,
+      openCollisionRows,
     ] = await Promise.all([
       automatedCaseIds.length === 0
         ? Promise.resolve([] as LastResultRow[])
@@ -168,6 +176,13 @@ export class SuiteViewAssembler {
               automationKey: true,
             },
           }) as Promise<DuplicateKeyCandidateRow[]>),
+      suiteIds.length === 0
+        ? Promise.resolve([] as OpenCollisionCountRow[])
+        : (this.prisma.caseIdentityCollision.groupBy({
+            by: ['suiteId'],
+            where: { suiteId: { in: suiteIds }, closedAt: null },
+            _count: { _all: true },
+          }) as unknown as Promise<OpenCollisionCountRow[]>),
     ]);
 
     const lastResultByCaseId = new Map<string, CaseLastResult>();
@@ -218,6 +233,11 @@ export class SuiteViewAssembler {
         hasAnyRun: recentResultsByCaseId.has(testCase.id),
       })),
     );
+
+    const openCollisionsBySuiteId = new Map<string, number>();
+    for (const row of openCollisionRows) {
+      openCollisionsBySuiteId.set(row.suiteId, row._count._all);
+    }
 
     const visibleCaseIds = new Set(visibleInputs.map((input) => input.id));
     const shadowInputs: CaseHealthInput[] = duplicateKeyRows
@@ -306,6 +326,7 @@ export class SuiteViewAssembler {
         undocumentedCount,
         staleLocaleCount,
         incompleteCount,
+        openCollisions: openCollisionsBySuiteId.get(view.id) ?? 0,
       };
     });
   }

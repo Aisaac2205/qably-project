@@ -86,17 +86,21 @@ export class RunsService {
         knownSuite ??
         (await this.adoptSuiteByName(tx, apiKey, input.suiteName as string));
 
-      const { caseIdByKey: testCaseIdByIdentity, createdCaseIds: created } =
-        await this.officialCaseReconciler.reconcile(
-          tx,
-          suite.id,
-          apiKey.projectId,
-          input.cases.map((testCase) => ({
-            name: testCase.name,
-            className: testCase.className,
-            filePath: testCase.filePath,
-          })),
-        );
+      const {
+        caseIdByKey: testCaseIdByIdentity,
+        createdCaseIds: created,
+        identityKeys,
+        legacyKeys,
+      } = await this.officialCaseReconciler.reconcile(
+        tx,
+        suite.id,
+        apiKey.projectId,
+        input.cases.map((testCase) => ({
+          name: testCase.name,
+          className: testCase.className,
+          filePath: testCase.filePath,
+        })),
+      );
       createdCaseIds = created;
 
       const run = await tx.run.upsert({
@@ -147,6 +151,23 @@ export class RunsService {
         },
         select: RUN_SELECT,
       });
+
+      const resolvedLegacyKeys = [
+        ...new Set(input.cases.map((testCase) => testCase.name)),
+      ].filter(
+        (name) => !legacyKeys.some((collision) => collision.key === name),
+      );
+
+      await this.officialCaseReconciler.syncCollisions(
+        tx,
+        apiKey.projectId,
+        suite.id,
+        run.id,
+        identityKeys,
+        legacyKeys,
+        [...testCaseIdByIdentity.keys()],
+        resolvedLegacyKeys,
+      );
 
       await tx.runCase.deleteMany({ where: { runId: run.id } });
 

@@ -53,6 +53,7 @@ interface FakePrisma {
   runCase: { findMany: jest.Mock };
   extractedProposal: { findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
+  caseIdentityCollision: { groupBy: jest.Mock };
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -74,6 +75,7 @@ function createPrisma(): FakePrisma {
     orgMember: {
       findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
     },
+    caseIdentityCollision: { groupBy: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),
     $queryRaw: jest.fn().mockResolvedValue([]),
   };

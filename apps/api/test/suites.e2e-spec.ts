@@ -84,6 +84,7 @@ describe('Suites (e2e)', () => {
     },
     extractedProposal: { findMany: jest.fn() },
     runCase: { findMany: jest.fn() },
+    caseIdentityCollision: { groupBy: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
@@ -91,6 +92,7 @@ describe('Suites (e2e)', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     read.mockResolvedValue(session);
+    prisma.caseIdentityCollision.groupBy.mockResolvedValue([]);
     prisma.$transaction.mockImplementation(
       (run: (tx: typeof prisma) => unknown) => run(prisma),
     );

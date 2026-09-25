@@ -638,6 +638,7 @@ interface PageFakePrisma {
   };
   testCase: { findMany: jest.Mock };
   traceabilityLink: { findMany: jest.Mock };
+  caseIdentityCollision: { count: jest.Mock };
 }
 
 function createPageFixture(rows: Record<string, unknown>[]): PageFakePrisma {
@@ -649,6 +650,7 @@ function createPageFixture(rows: Record<string, unknown>[]): PageFakePrisma {
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
     traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
+    caseIdentityCollision: { count: jest.fn().mockResolvedValue(0) },
   };
 }
 
@@ -1099,5 +1101,36 @@ describe('ReviewInboxQueryService.counts', () => {
     const second = await buildService(prisma).counts(serviceOrg, {});
 
     expect(first.version).not.toBe(second.version);
+  });
+
+  it('reports the open case identity collision count from the collisions table', async () => {
+    const prisma = createPageFixture([]);
+    prisma.caseIdentityCollision.count.mockResolvedValue(5);
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.openCollisions).toBe(5);
+  });
+
+  it('scopes the open collisions count to the organization and, when given, the project', async () => {
+    const prisma = createPageFixture([]);
+
+    await buildService(prisma).counts(serviceOrg, { projectId: 'project-1' });
+
+    expect(prisma.caseIdentityCollision.count).toHaveBeenCalledWith({
+      where: {
+        closedAt: null,
+        project: { organizationId: serviceOrg.organizationId },
+        projectId: 'project-1',
+      },
+    });
+  });
+
+  it('defaults open collisions to zero when nothing is open', async () => {
+    const prisma = createPageFixture([]);
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(result.openCollisions).toBe(0);
   });
 });

@@ -75,6 +75,7 @@ describe('Review inbox (e2e)', () => {
       groupBy: jest.fn(),
     },
     testCase: { findMany: jest.fn() },
+    caseIdentityCollision: { count: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -94,6 +95,7 @@ describe('Review inbox (e2e)', () => {
       },
     ]);
     prisma.testCase.findMany.mockResolvedValue([]);
+    prisma.caseIdentityCollision.count.mockResolvedValue(0);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({

@@ -233,6 +233,7 @@ export interface Suite {
   updatedAt: string
   healthSummary?: CaseHealthSummary
   documentation?: SuiteDocumentationState
+  openCollisions?: number
 }
 
 export interface RunCaseOfficialCase {

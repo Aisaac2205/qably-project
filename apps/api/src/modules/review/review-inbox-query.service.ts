@@ -309,20 +309,30 @@ export class ReviewInboxQueryService {
   ): Promise<ReviewInboxCounts> {
     const where = this.baseWhere(org, filters);
 
-    const [groupedByStatus, groupedByDuplicateKind] = await Promise.all([
-      this.prisma.extractedProposal.groupBy({
-        by: ['status'],
-        where,
-        _count: { _all: true },
-        _max: { updatedAt: true },
-      }) as unknown as Promise<GroupedStatusRow[]>,
-      this.prisma.extractedProposal.groupBy({
-        by: ['duplicateKind'],
-        where,
-        _count: { _all: true },
-        _max: { updatedAt: true },
-      }) as unknown as Promise<GroupedDuplicateKindRow[]>,
-    ]);
+    const [groupedByStatus, groupedByDuplicateKind, openCollisions] =
+      await Promise.all([
+        this.prisma.extractedProposal.groupBy({
+          by: ['status'],
+          where,
+          _count: { _all: true },
+          _max: { updatedAt: true },
+        }) as unknown as Promise<GroupedStatusRow[]>,
+        this.prisma.extractedProposal.groupBy({
+          by: ['duplicateKind'],
+          where,
+          _count: { _all: true },
+          _max: { updatedAt: true },
+        }) as unknown as Promise<GroupedDuplicateKindRow[]>,
+        this.prisma.caseIdentityCollision.count({
+          where: {
+            closedAt: null,
+            project: { organizationId: org.organizationId },
+            ...(filters.projectId === undefined
+              ? {}
+              : { projectId: filters.projectId }),
+          },
+        }),
+      ]);
 
     const byStatus = emptyStatusCounts();
     for (const row of groupedByStatus) {
@@ -339,11 +349,11 @@ export class ReviewInboxQueryService {
 
     const version = createHash('sha1')
       .update(
-        `${hashCounts(groupedByStatus)}|${hashDuplicateKindCounts(groupedByDuplicateKind)}`,
+        `${hashCounts(groupedByStatus)}|${hashDuplicateKindCounts(groupedByDuplicateKind)}|collisions:${openCollisions}`,
       )
       .digest('hex');
 
-    return { byStatus, byDuplicateKind, version };
+    return { byStatus, byDuplicateKind, openCollisions, version };
   }
 
   async findOne(

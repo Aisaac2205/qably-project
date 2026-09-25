@@ -68,6 +68,10 @@ interface FakePrisma {
     createManyAndReturn: jest.Mock;
     findMany: jest.Mock;
   };
+  caseIdentityCollision: {
+    upsert: jest.Mock;
+    updateMany: jest.Mock;
+  };
   txRunCaseFindMany: jest.Mock;
   $transaction: jest.Mock;
   $executeRawUnsafe: jest.Mock;
@@ -97,6 +101,10 @@ function createPrisma(): FakePrisma {
       createManyAndReturn: jest.fn().mockResolvedValue([caseRow({})]),
       findMany: jest.fn().mockResolvedValue([caseRow({})]),
     },
+    caseIdentityCollision: {
+      upsert: jest.fn().mockResolvedValue({}),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     txRunCaseFindMany: jest.fn().mockResolvedValue([caseRow({})]),
     $transaction: jest.fn(),
     $executeRawUnsafe: jest.fn().mockResolvedValue(undefined),
@@ -112,6 +120,7 @@ function createPrisma(): FakePrisma {
         createManyAndReturn: prisma.runCase.createManyAndReturn,
         findMany: prisma.txRunCaseFindMany,
       },
+      caseIdentityCollision: prisma.caseIdentityCollision,
       $executeRawUnsafe: prisma.$executeRawUnsafe,
     }),
   );
@@ -1653,5 +1662,74 @@ describe('RunsService.ingest report batching', () => {
 
     expect(reportBatch.recordAndMaybePublish).not.toHaveBeenCalled();
     expect(notifications.publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('RunsService.ingest case identity collisions', () => {
+  it('upserts an open identity collision tagged with the newly created run when two reported cases collide', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'tests.checkout.test_checkout::test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+        {
+          name: 'test_add_item',
+          className: 'tests.checkout.test_checkout',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    const [call] = prisma.caseIdentityCollision.upsert.mock.calls[0] as [
+      {
+        where: {
+          suiteId_kind_key: { suiteId: string; kind: string; key: string };
+        };
+        create: { claimantCount: number; lastRunId: string };
+      },
+    ];
+    expect(call.where).toEqual({
+      suiteId_kind_key: {
+        suiteId: 'suite-1',
+        kind: 'identity',
+        key: 'tests.checkout.test_checkout::test_add_item',
+      },
+    });
+    expect(call.create.claimantCount).toBe(2);
+    expect(call.create.lastRunId).toBe('run-1');
+  });
+
+  it('closes a previously open collision for a key that resolves unambiguously on this ingest', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.caseIdentityCollision.updateMany).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-1',
+        kind: 'identity',
+        key: { in: ['Adds to cart'] },
+        closedAt: null,
+      },
+      data: { closedAt: expect.any(Date) as Date },
+    });
+  });
+
+  it('never writes a collision row when nothing collides and nothing needs closing', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.caseIdentityCollision.upsert).not.toHaveBeenCalled();
   });
 });

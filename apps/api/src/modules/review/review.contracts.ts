@@ -96,6 +96,7 @@ export type ReviewInboxDuplicateKindCounts = Record<
 export interface ReviewInboxCounts {
   byStatus: ReviewInboxStatusCounts;
   byDuplicateKind: ReviewInboxDuplicateKindCounts;
+  openCollisions: number;
   version: string;
 }
 

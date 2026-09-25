@@ -491,11 +491,17 @@ function createFakeDb() {
     ),
   };
 
+  const caseIdentityCollisionApi = {
+    upsert: jest.fn(() => Promise.resolve({})),
+    updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
+  };
+
   const tx = {
     suite: suiteApi,
     testCase: testCaseApi,
     run: runApi,
     runCase: runCaseApi,
+    caseIdentityCollision: caseIdentityCollisionApi,
   };
   type Tx = typeof tx;
 
@@ -505,6 +511,7 @@ function createFakeDb() {
     testCase: testCaseApi,
     run: runApi,
     runCase: runCaseApi,
+    caseIdentityCollision: caseIdentityCollisionApi,
     $transaction: jest.fn((fn: (transaction: Tx) => unknown) => fn(tx)),
     seedApiKey(row: FakeApiKeyRow) {
       apiKeys.set(row.lookupId, row);

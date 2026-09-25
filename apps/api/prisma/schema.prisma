@@ -198,6 +198,7 @@ model Project {
   proposals         ExtractedProposal[]
   traceabilityLinks TraceabilityLink[]
   chatThreads       ChatThread[]
+  caseIdentityCollisions CaseIdentityCollision[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -248,6 +249,7 @@ model Suite {
   documentationOutcomeAt     DateTime?
   documentationMissing       String[]            @default([])
   documentationSkipReason    String?
+  identityCollisions         CaseIdentityCollision[]
 
   @@unique([projectId, name])
   @@unique([projectId, ingestionKey])
@@ -606,6 +608,7 @@ model Run {
   commitMessage    String?
   commitAuthor     String?
   cases            RunCase[]
+  identityCollisions CaseIdentityCollision[]
 
   @@unique([projectId, source, externalId])
   @@index([projectId, startedAt])
@@ -642,6 +645,31 @@ model RunCase {
   @@index([runId])
   @@index([testCaseId])
   @@map("run_case")
+}
+
+enum CaseCollisionKind {
+  identity
+  legacy_key
+}
+
+model CaseIdentityCollision {
+  id            String            @id @default(cuid())
+  projectId     String
+  project       Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  suiteId       String
+  suite         Suite             @relation(fields: [suiteId], references: [id], onDelete: Cascade)
+  kind          CaseCollisionKind
+  key           String
+  claimantCount Int
+  firstSeenAt   DateTime          @default(now())
+  lastSeenAt    DateTime          @default(now())
+  lastRunId     String?
+  lastRun       Run?              @relation(fields: [lastRunId], references: [id], onDelete: SetNull)
+  closedAt      DateTime?
+
+  @@unique([suiteId, kind, key])
+  @@index([projectId, closedAt])
+  @@map("case_identity_collision")
 }
 
 enum NotificationEventType {

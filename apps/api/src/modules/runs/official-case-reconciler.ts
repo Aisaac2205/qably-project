@@ -6,6 +6,8 @@ import {
   findCaseIdentityCollisions,
   findLegacyKeyCollisions,
   resolveCaseIdentityKey,
+  type CaseIdentityCollision,
+  type LegacyKeyCollision,
 } from './lib/case-identity';
 import {
   buildSuiteIndex,
@@ -32,9 +34,18 @@ export interface AdoptionTx {
   $executeRawUnsafe: PrismaService['$executeRawUnsafe'];
 }
 
+export interface CollisionTx {
+  caseIdentityCollision: {
+    upsert: PrismaService['caseIdentityCollision']['upsert'];
+    updateMany: PrismaService['caseIdentityCollision']['updateMany'];
+  };
+}
+
 export interface ReconcileResult {
   caseIdByKey: Map<string, string>;
   createdCaseIds: string[];
+  identityKeys: CaseIdentityCollision[];
+  legacyKeys: LegacyKeyCollision[];
 }
 
 @Injectable()
@@ -47,8 +58,9 @@ export class OfficialCaseReconciler {
     projectId: string,
     cases: RawCaseRef[],
   ): Promise<ReconcileResult> {
+    const identityCollisions = findCaseIdentityCollisions(cases);
     const collidingKeys = new Set(
-      findCaseIdentityCollisions(cases).map((collision) => collision.key),
+      identityCollisions.map((collision) => collision.key),
     );
 
     const refByKey = new Map<string, RawCaseRef>();
@@ -78,8 +90,9 @@ export class OfficialCaseReconciler {
       automationClassName?: string;
     }
 
+    const legacyCollisions = findLegacyKeyCollisions(cases);
     const ambiguousLegacyKeys = new Set(
-      findLegacyKeyCollisions(cases).map((collision) => collision.key),
+      legacyCollisions.map((collision) => collision.key),
     );
 
     const resultByKey = new Map<string, string>();
@@ -152,7 +165,12 @@ export class OfficialCaseReconciler {
     }
 
     if (missingKeys.length === 0) {
-      return { caseIdByKey: resultByKey, createdCaseIds: [] };
+      return {
+        caseIdByKey: resultByKey,
+        createdCaseIds: [],
+        identityKeys: identityCollisions,
+        legacyKeys: legacyCollisions,
+      };
     }
 
     const toCreate = missingKeys.map((key) => {
@@ -197,7 +215,109 @@ export class OfficialCaseReconciler {
       }
     }
 
-    return { caseIdByKey: resultByKey, createdCaseIds };
+    return {
+      caseIdByKey: resultByKey,
+      createdCaseIds,
+      identityKeys: identityCollisions,
+      legacyKeys: legacyCollisions,
+    };
+  }
+
+  async syncCollisions(
+    tx: CollisionTx,
+    projectId: string,
+    suiteId: string,
+    runId: string,
+    identityKeys: readonly CaseIdentityCollision[],
+    legacyKeys: readonly LegacyKeyCollision[],
+    resolvedIdentityKeys: readonly string[],
+    resolvedLegacyKeys: readonly string[],
+  ): Promise<void> {
+    const now = new Date();
+
+    await Promise.all(
+      identityKeys.map((collision) =>
+        tx.caseIdentityCollision.upsert({
+          where: {
+            suiteId_kind_key: {
+              suiteId,
+              kind: 'identity',
+              key: collision.key,
+            },
+          },
+          create: {
+            projectId,
+            suiteId,
+            kind: 'identity',
+            key: collision.key,
+            claimantCount: collision.count,
+            firstSeenAt: now,
+            lastSeenAt: now,
+            lastRunId: runId,
+          },
+          update: {
+            claimantCount: collision.count,
+            lastSeenAt: now,
+            lastRunId: runId,
+            closedAt: null,
+          },
+        }),
+      ),
+    );
+
+    await Promise.all(
+      legacyKeys.map((collision) =>
+        tx.caseIdentityCollision.upsert({
+          where: {
+            suiteId_kind_key: {
+              suiteId,
+              kind: 'legacy_key',
+              key: collision.key,
+            },
+          },
+          create: {
+            projectId,
+            suiteId,
+            kind: 'legacy_key',
+            key: collision.key,
+            claimantCount: collision.count,
+            firstSeenAt: now,
+            lastSeenAt: now,
+            lastRunId: runId,
+          },
+          update: {
+            claimantCount: collision.count,
+            lastSeenAt: now,
+            lastRunId: runId,
+            closedAt: null,
+          },
+        }),
+      ),
+    );
+
+    if (resolvedIdentityKeys.length > 0) {
+      await tx.caseIdentityCollision.updateMany({
+        where: {
+          suiteId,
+          kind: 'identity',
+          key: { in: [...resolvedIdentityKeys] },
+          closedAt: null,
+        },
+        data: { closedAt: now },
+      });
+    }
+
+    if (resolvedLegacyKeys.length > 0) {
+      await tx.caseIdentityCollision.updateMany({
+        where: {
+          suiteId,
+          kind: 'legacy_key',
+          key: { in: [...resolvedLegacyKeys] },
+          closedAt: null,
+        },
+        data: { closedAt: now },
+      });
+    }
   }
 
   private async migrateAutomationKeys(

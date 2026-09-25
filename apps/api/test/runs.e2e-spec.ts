@@ -126,6 +126,10 @@ describe('Runs ingestion (e2e)', () => {
       createManyAndReturn: jest.fn(),
       findMany: jest.fn(),
     },
+    caseIdentityCollision: {
+      upsert: jest.fn(),
+      updateMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -158,6 +162,8 @@ describe('Runs ingestion (e2e)', () => {
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
     prisma.runCase.findMany.mockResolvedValue([runCaseRow()]);
+    prisma.caseIdentityCollision.upsert.mockResolvedValue({});
+    prisma.caseIdentityCollision.updateMany.mockResolvedValue({ count: 0 });
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({

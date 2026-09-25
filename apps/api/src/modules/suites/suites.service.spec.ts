@@ -61,6 +61,7 @@ interface FakePrisma {
   project: { findFirst: jest.Mock };
   extractedProposal: { findMany: jest.Mock };
   orgMember: { findFirst: jest.Mock };
+  caseIdentityCollision: { groupBy: jest.Mock };
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -90,6 +91,7 @@ function createPrisma(): FakePrisma {
     orgMember: {
       findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
     },
+    caseIdentityCollision: { groupBy: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
@@ -818,6 +820,43 @@ describe('SuitesService health signals', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.cases[0].healthSignals).toContain('flaky');
+  });
+});
+
+describe('SuitesService open case identity collisions', () => {
+  it('reports the open collision count from the collisions table for this suite', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+    prisma.caseIdentityCollision.groupBy.mockResolvedValue([
+      { suiteId: 'suite-1', _count: { _all: 2 } },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.openCollisions).toBe(2);
+  });
+
+  it('reports zero open collisions for a suite with none open', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.openCollisions).toBe(0);
+  });
+
+  it('scopes the open-collisions query to only the closed=null rows for the visible suites', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    await build(prisma).list(owner);
+
+    expect(prisma.caseIdentityCollision.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['suiteId'],
+        where: { suiteId: { in: ['suite-1'] }, closedAt: null },
+      }),
+    );
   });
 });
 
