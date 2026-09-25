@@ -203,6 +203,7 @@ function seedInboxCounts(client: QueryClient): void {
 
     client.setQueryData(reviewKeys.inboxCounts(filters), {
       byStatus: proposalInboxCountsFixtures(filters),
+      openCollisions: 0,
       version: 'test-version',
     })
   }

@@ -123,6 +123,7 @@ export type ReviewInboxStatusCounts = Record<
 
 export interface ReviewInboxCountsResult {
   byStatus: ReviewInboxStatusCounts
+  openCollisions: number
   version: string
 }
 

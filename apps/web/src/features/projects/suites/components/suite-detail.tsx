@@ -39,6 +39,7 @@ import { describeCase } from '@/features/projects/suites/lib/case-title'
 import { CASE_HEALTH_SIGNAL_ORDER } from '@/features/projects/suites/lib/case-health-presentation'
 import { groupCasesForDisplay } from '@/features/projects/suites/lib/case-groups'
 import { HealthSignalChip } from './health-signal-chip'
+import { SuiteCollisionsPanel } from './suite-collisions-panel'
 import { DocumentWithAeris, useDocumentFiles } from './document-with-aeris'
 import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
 import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confirmable-cases'
@@ -358,6 +359,8 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             ))}
           </div>
         )}
+
+        <SuiteCollisionsPanel openCollisions={suite.openCollisions} />
       </header>
 
       {/* Case list */}

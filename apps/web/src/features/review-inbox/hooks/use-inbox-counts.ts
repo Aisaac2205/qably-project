@@ -48,6 +48,7 @@ export function useInboxCounts(filters: ReviewInboxCountsFilters) {
 
   return {
     counts: query.data?.byStatus ?? EMPTY_COUNTS,
+    openCollisions: query.data?.openCollisions ?? 0,
     version: query.data?.version,
     isLoading: query.isLoading,
     isError: query.isError,

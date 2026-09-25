@@ -19,6 +19,7 @@ import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcu
 import { ReviewInboxQueue } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
 import { ReviewInboxFeedback } from './review-inbox-feedback'
+import { InboxCollisionsNotice } from './inbox-collisions-notice'
 
 export function ReviewInboxPage() {
   const { t, locale } = useTranslation()
@@ -37,7 +38,10 @@ export function ReviewInboxPage() {
   })
   const fetchNextPageVoid = useCallback(() => void fetchNextPage(), [fetchNextPage])
 
-  const { counts } = useInboxCounts({ projectId: selectedProjectId, search })
+  const { counts, openCollisions } = useInboxCounts({
+    projectId: selectedProjectId,
+    search,
+  })
 
   const statusCounts: ReviewInboxStatusCounts = useMemo(
     () => ({
@@ -162,6 +166,7 @@ export function ReviewInboxPage() {
       className="flex h-full min-h-0 w-full flex-col gap-4 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
       <div className="shrink-0 space-y-4 empty:hidden">
+        <InboxCollisionsNotice openCollisions={openCollisions} />
         <ReviewInboxFeedback toast={feedback.toast} onDismiss={feedback.dismiss} />
       </div>
 

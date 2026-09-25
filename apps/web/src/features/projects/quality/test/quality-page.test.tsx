@@ -161,6 +161,7 @@ const suiteMetrics: SuiteMetricsRecord = {
 
 const inboxCounts: ReviewInboxCountsResult = {
   byStatus: { in_review: 2, approved: 0, rejected: 0, changes_requested: 0 },
+  openCollisions: 0,
   version: 'v1',
 }
 
