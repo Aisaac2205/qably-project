@@ -122,6 +122,30 @@ describe('rankDuplicateCandidates', () => {
     expect(rankDuplicateCandidates(target, [unrelated])).toEqual([]);
   });
 
+  it('never matches an empty-string automation key against another empty-string key', () => {
+    const target = { title: 'Zebra quokka umbrella', automationKey: '' };
+    const emptyKeyCandidate = candidate({
+      id: 'case-empty-key',
+      title: 'Xylophone yak zeppelin',
+      automationKey: '',
+    });
+
+    expect(rankDuplicateCandidates(target, [emptyKeyCandidate])).toEqual([]);
+  });
+
+  it('never matches a whitespace-only automation key against another whitespace-only key', () => {
+    const target = { title: 'Zebra quokka umbrella', automationKey: '   ' };
+    const whitespaceKeyCandidate = candidate({
+      id: 'case-whitespace-key',
+      title: 'Xylophone yak zeppelin',
+      automationKey: '   ',
+    });
+
+    expect(rankDuplicateCandidates(target, [whitespaceKeyCandidate])).toEqual(
+      [],
+    );
+  });
+
   it('resolves an identical-timestamp tie deterministically regardless of input order', () => {
     const target = { title: 'Empties the cart', automationKey: null };
     const timestamp = new Date('2024-01-01T00:00:00.000Z');

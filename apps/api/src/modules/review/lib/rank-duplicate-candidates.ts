@@ -40,14 +40,19 @@ interface ScoredCandidate {
   score: number;
 }
 
+export function normalizeAutomationKey(key: string | null): string | null {
+  if (key === null) return null;
+  const trimmed = key.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
+
 function matchFor(
   target: DuplicateRankTarget,
   candidate: DuplicateRankCandidate,
 ): ScoredCandidate | null {
-  if (
-    target.automationKey !== null &&
-    candidate.automationKey === target.automationKey
-  ) {
+  const targetKey = normalizeAutomationKey(target.automationKey);
+  const candidateKey = normalizeAutomationKey(candidate.automationKey);
+  if (targetKey !== null && candidateKey === targetKey) {
     return { candidate, matchReason: 'automation-key', score: 1 };
   }
 

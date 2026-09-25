@@ -1,4 +1,5 @@
 import {
+  normalizeAutomationKey,
   scoreDuplicateCandidate,
   type DuplicateReason,
 } from './rank-duplicate-candidates';
@@ -30,12 +31,6 @@ export interface ProposalClassification {
 }
 
 const POSSIBLE_DUPLICATE_THRESHOLD = 0.6;
-
-function normalizeAutomationKey(key: string | null): string | null {
-  if (key === null) return null;
-  const trimmed = key.trim();
-  return trimmed.length === 0 ? null : trimmed;
-}
 
 interface ScoredCandidate {
   candidate: ClassifyProposalCandidate;
