@@ -1,4 +1,5 @@
 import type {
+  CaseStatus,
   Evidence,
   ExtractedProposal,
   ProposalStatus,
@@ -35,9 +36,51 @@ export interface ProposalListItem extends ExtractedProposal {
   classification?: ProposalClassification
 }
 
+export interface MatchedCaseView {
+  id: string
+  name: string
+  suiteId: string
+  suiteName: string
+}
+
+export interface PublishedVersionView {
+  version: number
+  title: string
+  objective: string
+  preconditions: string[]
+  steps: string[]
+  expectedResult: string
+  publishedAt: string
+  publishedBy: { id: string; name: string } | null
+}
+
+export interface ProposalSourceView {
+  filePath: string
+  uri: string
+  commitSha: string | null
+  pullRequestNumber: number | null
+}
+
+export interface RecentRunView {
+  runId: string
+  status: CaseStatus
+  recordedAt: string
+}
+
+export interface LastDecisionView {
+  action: 'approved' | 'rejected'
+  decidedAt: string
+  decidedBy: { id: string; name: string }
+}
+
 export interface ProposalDetail extends ProposalListItem {
   evidence: Evidence | null
   links: TraceabilityLink[]
+  matchedCase: MatchedCaseView | null
+  publishedVersion: PublishedVersionView | null
+  source: ProposalSourceView | null
+  recentRuns: RecentRunView[]
+  decision: LastDecisionView | null
 }
 
 export interface ApprovalResult {

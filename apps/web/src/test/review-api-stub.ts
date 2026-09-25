@@ -65,5 +65,10 @@ export function proposalDetailFixtures(): ProposalDetail[] {
         (link) => link.from.id === proposal.id || link.to.id === proposal.id,
       ),
     ),
+    matchedCase: null,
+    publishedVersion: null,
+    source: null,
+    recentRuns: [],
+    decision: null,
   }))
 }

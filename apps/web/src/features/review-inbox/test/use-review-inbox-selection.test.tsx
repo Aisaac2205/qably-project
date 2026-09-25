@@ -77,6 +77,11 @@ describe('useReviewInboxSelection', () => {
       ...proposal({ id: 'approved-1', status: 'approved', title: 'Valid checkout completes order' }),
       evidence: null,
       links: [],
+      matchedCase: null,
+      publishedVersion: null,
+      source: null,
+      recentRuns: [],
+      decision: null,
     }
     client.setQueryData(reviewKeys.detail('approved-1'), approvedDetail)
 
