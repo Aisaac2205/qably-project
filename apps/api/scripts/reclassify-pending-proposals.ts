@@ -58,7 +58,12 @@ async function main(): Promise<void> {
       await queue.add(
         RECLASSIFY_SUITE_JOB,
         { suiteId },
-        { jobId: buildJobId('reclassify', [suiteId]) },
+        {
+          deduplication: {
+            id: buildJobId('reclassify', [suiteId]),
+            keepLastIfActive: true,
+          },
+        },
       );
     }
 

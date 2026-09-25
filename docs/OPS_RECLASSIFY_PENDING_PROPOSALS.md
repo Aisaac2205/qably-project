@@ -18,9 +18,13 @@ until they are reclassified at least once.
 The script does not classify anything itself. It finds every suite that
 currently has at least one `in_review` proposal and enqueues one
 `reclassify-suite` BullMQ job per suite, using the same
-`ProposalReclassifier` job id (`buildJobId('reclassify', [suiteId])`) the
-rest of the app uses — so a job already queued for a suite is a no-op,
-and re-running this script is always safe.
+`ProposalReclassifier` deduplication id (`buildJobId('reclassify',
+[suiteId])`) and `keepLastIfActive` setting the rest of the app uses. A
+suite already queued (waiting) for that id is a no-op; a suite whose job
+is currently running gets exactly one more run scheduled after it
+finishes, so re-running this script never loses or duplicates work, and
+a suite whose previous job failed is never blocked — the deduplication
+key clears on both completion and failure.
 
 ## Pre-checks
 
