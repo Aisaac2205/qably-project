@@ -14,6 +14,7 @@ type ErrorBody = {
   timestamp: string;
   issues?: unknown;
   code?: string;
+  decision?: unknown;
 };
 
 @Catch()
@@ -57,6 +58,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         issues?: unknown;
         code?: unknown;
       };
+      const hasDecision =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'decision' in payload;
+      const decision = hasDecision ? payload.decision : undefined;
 
       return {
         statusCode,
@@ -67,6 +73,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         timestamp,
         ...(issues === undefined ? {} : { issues }),
         ...(typeof code === 'string' ? { code } : {}),
+        ...(hasDecision ? { decision } : {}),
       };
     }
 

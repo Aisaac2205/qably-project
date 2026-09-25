@@ -26,7 +26,7 @@ import {
   type DecisionBody,
   type ListProposalsQuery,
 } from './review.schemas';
-import { unwrap } from './lib/review-error-http';
+import { unwrap, unwrapDecision } from './lib/review-error-http';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
 import { ReviewDecisionService } from './review-decision.service';
 
@@ -70,8 +70,9 @@ export class ReviewController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(decisionSchema)) body: DecisionBody,
   ): Promise<ApprovalView> {
-    return unwrap(
+    return unwrapDecision(
       await this.review.approve(org, id, { actorId: user.id, ...body }),
+      () => this.review.lastDecision(org, id),
     );
   }
 
@@ -82,8 +83,9 @@ export class ReviewController {
     @Param('id') id: string,
     @Body(new ZodValidationPipe(decisionSchema)) body: DecisionBody,
   ): Promise<RejectionView> {
-    return unwrap(
+    return unwrapDecision(
       await this.review.reject(org, id, { actorId: user.id, ...body }),
+      () => this.review.lastDecision(org, id),
     );
   }
 }

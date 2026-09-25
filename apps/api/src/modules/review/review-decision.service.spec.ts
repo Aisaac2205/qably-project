@@ -39,7 +39,7 @@ interface FakePrisma {
   suite: { findFirst: jest.Mock; update: jest.Mock };
   testCase: { create: jest.Mock; update: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
-  reviewDecision: { create: jest.Mock };
+  reviewDecision: { create: jest.Mock; findFirst: jest.Mock };
   traceabilityLink: { createMany: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
 }
@@ -65,6 +65,7 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
     },
     reviewDecision: {
       create: jest.fn().mockResolvedValue({ id: 'decision-1' }),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     traceabilityLink: {
       createMany: jest.fn().mockResolvedValue({ count: 2 }),
@@ -612,5 +613,72 @@ describe('ReviewDecisionService.publish locale', () => {
       [{ data: Record<string, unknown> }],
     ];
     expect(call[0].data).toMatchObject({ locale: 'es' });
+  });
+});
+
+describe('ReviewDecisionService.lastDecision', () => {
+  it('returns the most recent decision with the actor who made it', async () => {
+    const prisma = createPrisma();
+    prisma.reviewDecision.findFirst.mockResolvedValue({
+      action: 'approved',
+      decidedAt: new Date('2026-01-05T12:00:00.000Z'),
+      actor: { id: 'user-2', name: 'Grace Hopper' },
+    });
+
+    const decision = await build(prisma).lastDecision(org, 'proposal-1');
+
+    expect(decision).toEqual({
+      action: 'approved',
+      decidedAt: '2026-01-05T12:00:00.000Z',
+      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+    });
+  });
+
+  it('returns a different action for a rejected proposal', async () => {
+    const prisma = createPrisma();
+    prisma.reviewDecision.findFirst.mockResolvedValue({
+      action: 'rejected',
+      decidedAt: new Date('2026-02-01T08:30:00.000Z'),
+      actor: { id: 'user-3', name: 'Ada Lovelace' },
+    });
+
+    const decision = await build(prisma).lastDecision(org, 'proposal-1');
+
+    expect(decision).toEqual({
+      action: 'rejected',
+      decidedAt: '2026-02-01T08:30:00.000Z',
+      decidedBy: { id: 'user-3', name: 'Ada Lovelace' },
+    });
+  });
+
+  it('returns null when the proposal has no recorded decision', async () => {
+    const prisma = createPrisma();
+    prisma.reviewDecision.findFirst.mockResolvedValue(null);
+
+    const decision = await build(prisma).lastDecision(org, 'proposal-1');
+
+    expect(decision).toBeNull();
+  });
+
+  it('scopes the lookup to the caller organization', async () => {
+    const prisma = createPrisma();
+    prisma.reviewDecision.findFirst.mockResolvedValue(null);
+
+    await build(prisma).lastDecision(org, 'proposal-1');
+
+    const [call] = prisma.reviewDecision.findFirst.mock.calls as [
+      [
+        {
+          where: {
+            proposalId: string;
+            proposal: { project: { organizationId: string } };
+          };
+        },
+      ],
+    ];
+    expect(call[0].where).toMatchObject({
+      proposalId: 'proposal-1',
+      proposal: { project: { organizationId: 'org-1' } },
+    });
   });
 });

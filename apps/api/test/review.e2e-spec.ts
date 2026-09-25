@@ -69,7 +69,7 @@ describe('Review (e2e)', () => {
     suite: { findFirst: jest.fn() },
     testCase: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
     testCaseVersion: { count: jest.fn(), create: jest.fn() },
-    reviewDecision: { create: jest.fn() },
+    reviewDecision: { create: jest.fn(), findFirst: jest.fn() },
     traceabilityLink: { findMany: jest.fn(), createMany: jest.fn() },
     $transaction: jest.fn(),
   };
@@ -99,6 +99,7 @@ describe('Review (e2e)', () => {
       version: 1,
     });
     prisma.reviewDecision.create.mockResolvedValue({ id: 'decision-1' });
+    prisma.reviewDecision.findFirst.mockResolvedValue(null);
     prisma.traceabilityLink.findMany.mockResolvedValue([]);
     prisma.traceabilityLink.createMany.mockResolvedValue({ count: 2 });
 
@@ -200,16 +201,48 @@ describe('Review (e2e)', () => {
     expect(call[0].data.actorId).toBe('user-1');
   });
 
-  it('answers 409 when the proposal was already decided', async () => {
+  it('answers 409 with who decided, what, and when when the proposal was already decided', async () => {
     prisma.extractedProposal.findFirst.mockResolvedValue({
       ...proposalRow,
       status: 'approved',
     });
+    prisma.reviewDecision.findFirst.mockResolvedValue({
+      action: 'approved',
+      decidedAt: new Date('2026-01-05T12:00:00.000Z'),
+      actor: { id: 'user-2', name: 'Grace Hopper' },
+    });
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post('/review/proposals/proposal-1/approve')
       .send({})
       .expect(409);
+
+    expect(response.body).toMatchObject({
+      code: 'invalid-transition',
+      decision: {
+        action: 'approved',
+        decidedAt: '2026-01-05T12:00:00.000Z',
+        decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+      },
+    });
+  });
+
+  it('answers 409 with a null decision when the proposal was decided by something the audit trail lost', async () => {
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...proposalRow,
+      status: 'approved',
+    });
+    prisma.reviewDecision.findFirst.mockResolvedValue(null);
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/reject')
+      .send({})
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      code: 'invalid-transition',
+      decision: null,
+    });
   });
 
   it('answers 422 when the backing evidence is gone', async () => {

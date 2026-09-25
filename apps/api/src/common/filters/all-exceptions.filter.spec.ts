@@ -124,6 +124,56 @@ describe('AllExceptionsFilter', () => {
     expect(body).not.toHaveProperty('code');
   });
 
+  it('passes through a decision payload from a conflict response', () => {
+    const { host, json } = createHost();
+    const decision = {
+      action: 'approved',
+      decidedAt: '2026-01-05T12:00:00.000Z',
+      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+    };
+
+    new AllExceptionsFilter(false).catch(
+      new ConflictException({
+        code: 'invalid-transition',
+        message: 'This proposal was already decided',
+        decision,
+      }),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 409, decision }),
+    );
+  });
+
+  it('passes through a null decision, distinct from a missing one', () => {
+    const { host, json } = createHost();
+
+    new AllExceptionsFilter(false).catch(
+      new ConflictException({
+        code: 'invalid-transition',
+        message: 'This proposal was already decided',
+        decision: null,
+      }),
+      host,
+    );
+
+    const [body] = json.mock.calls[0] as [Record<string, unknown>];
+    expect(body).toHaveProperty('decision', null);
+  });
+
+  it('omits the decision field when the exception response carries none', () => {
+    const { host, json } = createHost();
+
+    new AllExceptionsFilter(false).catch(
+      new NotFoundException('Project not found'),
+      host,
+    );
+
+    const [body] = json.mock.calls[0] as [Record<string, unknown>];
+    expect(body).not.toHaveProperty('decision');
+  });
+
   it('includes the request path and a timestamp on every response', () => {
     const { host, json } = createHost('/runs/42');
 

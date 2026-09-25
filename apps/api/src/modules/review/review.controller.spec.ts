@@ -21,11 +21,12 @@ const user: AuthenticatedUser = {
   locale: null,
 };
 
-function fakeReview(result: unknown) {
+function fakeReview(result: unknown, lastDecision: unknown = null) {
   return {
     findOne: jest.fn().mockResolvedValue(result),
     approve: jest.fn().mockResolvedValue(result),
     reject: jest.fn().mockResolvedValue(result),
+    lastDecision: jest.fn().mockResolvedValue(lastDecision),
     getDuplicateCandidates: jest.fn().mockResolvedValue(result),
   };
 }
@@ -46,12 +47,31 @@ describe('ReviewController error codes', () => {
     ).rejects.toMatchObject({ response: { code: 'not-found' } });
   });
 
-  it('throws a coded ConflictException when the proposal was already decided', async () => {
-    const review = fakeReview({ ok: false, error: 'invalid-transition' });
+  it('throws a coded ConflictException carrying who decided, what, and when', async () => {
+    const decision = {
+      action: 'approved' as const,
+      decidedAt: '2026-01-05T12:00:00.000Z',
+      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+    };
+    const review = fakeReview(
+      { ok: false, error: 'invalid-transition' },
+      decision,
+    );
 
     await expect(
       build(review).approve(org, user, 'proposal-1', {}),
-    ).rejects.toMatchObject({ response: { code: 'invalid-transition' } });
+    ).rejects.toMatchObject({
+      response: { code: 'invalid-transition', decision },
+    });
+    expect(review.lastDecision).toHaveBeenCalledWith(org, 'proposal-1');
+  });
+
+  it('throws with a null decision when none was ever recorded for that proposal', async () => {
+    const review = fakeReview({ ok: false, error: 'invalid-transition' }, null);
+
+    await expect(
+      build(review).reject(org, user, 'proposal-1', {}),
+    ).rejects.toMatchObject({ response: { decision: null } });
   });
 
   it('throws a coded UnprocessableEntityException when evidence is missing', async () => {

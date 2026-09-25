@@ -7,6 +7,7 @@ import { ProposalReclassifier } from '../proposal-classification/proposal-reclas
 import type {
   ApprovalView,
   DecisionInput,
+  LastDecisionView,
   RejectionView,
   ReviewError,
 } from './review.contracts';
@@ -147,6 +148,32 @@ export class ReviewDecisionService {
       if (error instanceof DecisionConflict) return err('invalid-transition');
       throw error;
     }
+  }
+
+  async lastDecision(
+    org: OrgContext,
+    proposalId: string,
+  ): Promise<LastDecisionView | null> {
+    const decision = await this.prisma.reviewDecision.findFirst({
+      where: {
+        proposalId,
+        proposal: { project: { organizationId: org.organizationId } },
+      },
+      orderBy: { decidedAt: 'desc' },
+      select: {
+        action: true,
+        decidedAt: true,
+        actor: { select: { id: true, name: true } },
+      },
+    });
+
+    if (decision === null) return null;
+
+    return {
+      action: decision.action,
+      decidedAt: decision.decidedAt.toISOString(),
+      decidedBy: { id: decision.actor.id, name: decision.actor.name },
+    };
   }
 
   private async pending(

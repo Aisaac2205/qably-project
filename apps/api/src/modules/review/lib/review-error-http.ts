@@ -4,7 +4,23 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { isErr, type Result } from '../../../common/result';
-import type { ReviewError } from '../review.contracts';
+import type { LastDecisionView, ReviewError } from '../review.contracts';
+
+export async function unwrapDecision<T>(
+  result: Result<T, ReviewError>,
+  lastDecision: () => Promise<LastDecisionView | null>,
+): Promise<T> {
+  if (isErr(result) && result.error === 'invalid-transition') {
+    const decision = await lastDecision();
+    throw new ConflictException({
+      code: 'invalid-transition',
+      message: 'This proposal was already decided',
+      decision,
+    });
+  }
+
+  return unwrap(result);
+}
 
 export function unwrap<T>(result: Result<T, ReviewError>): T {
   if (!isErr(result)) return result.value;
