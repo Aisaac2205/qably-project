@@ -40,11 +40,13 @@ export function describeCase(input: CaseTitleInput): DescribedCase {
   const className = input.automationClassName ?? input.className
   const filePath = input.automationFilePath ?? input.filePath
   const humanized = humanizeTestName({ name: raw, className, filePath })
+  const title =
+    input.automationKey !== undefined && input.name.length > 0 ? input.name : humanized.title
 
   return humanized.parameter === undefined
-    ? { title: humanized.title, path: humanized.path, raw: humanized.raw, isAutomated: true }
+    ? { title, path: humanized.path, raw: humanized.raw, isAutomated: true }
     : {
-        title: humanized.title,
+        title,
         path: humanized.path,
         raw: humanized.raw,
         parameter: humanized.parameter,

@@ -36,6 +36,36 @@ describe('describeCase', () => {
     expect(result.raw).toBe('useCreateRun > redirects to dashboard on valid login')
   })
 
+  it('prefers the persisted case name over the mechanical derivation once Aeris (or a human) has given it a real title', () => {
+    const testCase = createMockTestCase({
+      name: 'Reintenta la documentación cuando se reintenta tras un fallo',
+      executionMode: 'automated',
+      automationKey: 'useCreateRun > redirects to dashboard on valid login',
+      automationClassName: undefined,
+      automationFilePath: 'src/features/runs/hooks/use-create-run.test.ts',
+    })
+
+    const result = describeCase(testCase)
+
+    expect(result.title).toBe('Reintenta la documentación cuando se reintenta tras un fallo')
+    expect(result.path).toEqual(['useCreateRun'])
+    expect(result.raw).toBe('useCreateRun > redirects to dashboard on valid login')
+  })
+
+  it('falls back to the mechanical derivation when the persisted name is empty', () => {
+    const testCase = createMockTestCase({
+      name: '',
+      executionMode: 'automated',
+      automationKey: 'useCreateRun > redirects to dashboard on valid login',
+      automationClassName: undefined,
+      automationFilePath: 'src/features/runs/hooks/use-create-run.test.ts',
+    })
+
+    const result = describeCase(testCase)
+
+    expect(result.title).toBe('Redirects to dashboard on valid login')
+  })
+
   it('falls back to the raw name when automationKey is missing', () => {
     const testCase = createMockTestCase({
       name: 'legacy_case_name',
