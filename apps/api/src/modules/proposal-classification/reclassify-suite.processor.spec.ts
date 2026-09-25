@@ -16,6 +16,7 @@ interface FakeProposal {
 interface FakeCase {
   id: string;
   suiteId: string;
+  projectId: string;
   automationKey: string | null;
   name: string;
   steps: string[];
@@ -29,9 +30,14 @@ function job(suiteId: string): Job<ReclassifySuiteJobData> {
   } as unknown as Job<ReclassifySuiteJobData>;
 }
 
-function buildPrisma(proposals: FakeProposal[], cases: FakeCase[]) {
+function buildPrisma(
+  proposals: FakeProposal[],
+  cases: FakeCase[],
+  suiteProjectId: string | null = 'project-1',
+) {
   const updates: { id: string; data: Record<string, unknown> }[] = [];
   const testCaseFindManyCalls: unknown[] = [];
+  const suiteFindUniqueCalls: unknown[] = [];
 
   const prisma = {
     extractedProposal: {
@@ -58,11 +64,20 @@ function buildPrisma(proposals: FakeProposal[], cases: FakeCase[]) {
         },
       ),
     },
+    suite: {
+      findUnique: jest.fn((args: unknown) => {
+        suiteFindUniqueCalls.push(args);
+        return Promise.resolve(
+          suiteProjectId === null ? null : { projectId: suiteProjectId },
+        );
+      }),
+    },
     testCase: {
       findMany: jest.fn(
         (args: {
           where: {
             suiteId?: string | { not: string };
+            projectId?: string;
             automationKey?: { in: string[] };
           };
         }) => {
@@ -76,12 +91,14 @@ function buildPrisma(proposals: FakeProposal[], cases: FakeCase[]) {
           }
 
           const excludedSuiteId = where.suiteId?.not;
+          const projectId = where.projectId;
           const keys = where.automationKey?.in ?? [];
 
           return Promise.resolve(
             cases.filter(
               (row) =>
                 row.suiteId !== excludedSuiteId &&
+                row.projectId === projectId &&
                 row.automationKey !== null &&
                 keys.includes(row.automationKey),
             ),
@@ -91,7 +108,7 @@ function buildPrisma(proposals: FakeProposal[], cases: FakeCase[]) {
     },
   };
 
-  return { prisma, updates, testCaseFindManyCalls };
+  return { prisma, updates, testCaseFindManyCalls, suiteFindUniqueCalls };
 }
 
 function proposal(overrides: Partial<FakeProposal> = {}): FakeProposal {
@@ -112,6 +129,7 @@ function testCase(overrides: Partial<FakeCase> = {}): FakeCase {
   return {
     id: 'case-1',
     suiteId: 'suite-1',
+    projectId: 'project-1',
     automationKey: null,
     name: 'Adds an item to the cart',
     steps: ['Open the product page', 'Click add to cart'],
@@ -221,6 +239,7 @@ describe('ReclassifySuiteProcessor', () => {
         testCase({
           id: 'case-other-suite',
           suiteId: 'suite-2',
+          projectId: 'project-1',
           automationKey: 'CartTest.addsItem',
         }),
       ],
@@ -236,14 +255,47 @@ describe('ReclassifySuiteProcessor', () => {
     expect(updates[0].data.duplicateReasons).toEqual(['cross-suite-key']);
   });
 
+  it('ignores a cross-suite case with a matching key from a different project (cross-tenant)', async () => {
+    const { prisma, updates } = buildPrisma(
+      [
+        proposal({
+          automationKey: 'CartTest.addsItem',
+          title: 'Zebra quokka umbrella',
+          steps: ['Xylophone yak zeppelin'],
+          expectedResult: 'Wombat narwhal',
+        }),
+      ],
+      [
+        testCase({
+          id: 'case-other-project',
+          suiteId: 'suite-in-other-project',
+          projectId: 'project-2',
+          automationKey: 'CartTest.addsItem',
+        }),
+      ],
+      'project-1',
+    );
+    const processor = new ReclassifySuiteProcessor(prisma as never);
+
+    await processor.process(job('suite-1'));
+
+    expect(updates[0].data).toMatchObject({
+      duplicateKind: 'none',
+      matchedCaseId: null,
+    });
+    expect(updates[0].data.duplicateReasons).toEqual([]);
+  });
+
   it('does nothing and never queries test cases when the suite has no in_review proposals', async () => {
-    const { prisma, updates, testCaseFindManyCalls } = buildPrisma([], []);
+    const { prisma, updates, testCaseFindManyCalls, suiteFindUniqueCalls } =
+      buildPrisma([], []);
     const processor = new ReclassifySuiteProcessor(prisma as never);
 
     await processor.process(job('suite-1'));
 
     expect(updates).toHaveLength(0);
     expect(testCaseFindManyCalls).toHaveLength(0);
+    expect(suiteFindUniqueCalls).toHaveLength(0);
   });
 
   it('ignores decided proposals outside in_review when reclassifying the suite', async () => {

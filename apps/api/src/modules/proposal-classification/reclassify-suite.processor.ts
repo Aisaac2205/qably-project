@@ -76,7 +76,18 @@ export class ReclassifySuiteProcessor extends WorkerHost {
 
     if (proposals.length === 0) return;
 
-    const candidates = await this.loadCandidates(suiteId, proposals);
+    const suite = await this.prisma.suite.findUnique({
+      where: { id: suiteId },
+      select: { projectId: true },
+    });
+
+    if (suite === null) return;
+
+    const candidates = await this.loadCandidates(
+      suiteId,
+      suite.projectId,
+      proposals,
+    );
 
     for (const proposal of proposals) {
       await this.classifyAndPersist(suiteId, proposal, candidates);
@@ -89,6 +100,7 @@ export class ReclassifySuiteProcessor extends WorkerHost {
 
   private async loadCandidates(
     suiteId: string,
+    projectId: string,
     proposals: readonly ProposalToClassify[],
   ): Promise<ClassifyProposalCandidate[]> {
     const suiteCases = (await this.prisma.testCase.findMany({
@@ -109,6 +121,7 @@ export class ReclassifySuiteProcessor extends WorkerHost {
         ? []
         : ((await this.prisma.testCase.findMany({
             where: {
+              projectId,
               suiteId: { not: suiteId },
               automationKey: { in: proposalKeys },
             },
