@@ -19,6 +19,7 @@ export type DuplicateReason =
 export interface ProposalClassification {
   kind: ProposalDuplicateKind
   matchedCaseId: string | null
+  matchedCaseName: string | null
   score: number | null
   reasons: DuplicateReason[]
 }

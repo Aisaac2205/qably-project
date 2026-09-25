@@ -34,9 +34,17 @@ export function DuplicateComparison({
         ) : (
           <CopySimple size={16} weight="bold" aria-hidden="true" />
         )}
-        {isUpdate
-          ? t('reviewInbox.classificationUpdate')
-          : t('reviewInbox.classificationPossibleDuplicate')}
+        {classification.matchedCaseName === null
+          ? isUpdate
+            ? t('reviewInbox.classificationUpdate')
+            : t('reviewInbox.classificationPossibleDuplicate')
+          : isUpdate
+            ? t('reviewInbox.classificationUpdateNamed', {
+                name: classification.matchedCaseName,
+              })
+            : t('reviewInbox.classificationPossibleDuplicateNamed', {
+                name: classification.matchedCaseName,
+              })}
       </div>
 
       {displayedReasons.length > 0 && (

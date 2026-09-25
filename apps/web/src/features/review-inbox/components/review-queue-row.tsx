@@ -103,13 +103,21 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
               className="text-[10px] px-1.5 py-0.5 font-medium rounded-full ml-auto"
             >
               <ArrowsClockwise size={10} weight="bold" aria-hidden="true" />
-              {t('reviewInbox.classificationUpdate')}
+              {classification.matchedCaseName === null
+                ? t('reviewInbox.classificationUpdate')
+                : t('reviewInbox.classificationUpdateNamed', {
+                    name: classification.matchedCaseName,
+                  })}
             </Badge>
           )}
           {classification.kind === 'possible_duplicate' && (
             <Badge variant="warn" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full ml-auto">
               <CopySimple size={10} weight="bold" aria-hidden="true" />
-              {t('reviewInbox.classificationPossibleDuplicate')}
+              {classification.matchedCaseName === null
+                ? t('reviewInbox.classificationPossibleDuplicate')
+                : t('reviewInbox.classificationPossibleDuplicateNamed', {
+                    name: classification.matchedCaseName,
+                  })}
             </Badge>
           )}
         </div>

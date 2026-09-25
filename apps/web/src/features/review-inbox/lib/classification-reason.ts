@@ -21,6 +21,7 @@ export function classificationScorePercent(score: number | null): number | null 
 const NONE_CLASSIFICATION: ProposalClassification = {
   kind: 'none',
   matchedCaseId: null,
+  matchedCaseName: null,
   score: null,
   reasons: [],
 }

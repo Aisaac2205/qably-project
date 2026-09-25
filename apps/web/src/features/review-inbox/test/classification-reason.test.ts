@@ -52,6 +52,7 @@ describe('resolveClassification', () => {
     expect(resolveClassification(undefined)).toEqual({
       kind: 'none',
       matchedCaseId: null,
+      matchedCaseName: null,
       score: null,
       reasons: [],
     })
@@ -61,6 +62,7 @@ describe('resolveClassification', () => {
     const classification = {
       kind: 'possible_duplicate' as const,
       matchedCaseId: 'case-1',
+      matchedCaseName: 'Empties the cart',
       score: 0.72,
       reasons: ['same-title' as const],
     }

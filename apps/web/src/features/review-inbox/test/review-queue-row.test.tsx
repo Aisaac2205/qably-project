@@ -48,6 +48,7 @@ describe('ReviewQueueRow', () => {
           classification: {
             kind: 'update',
             matchedCaseId: 'case-1',
+            matchedCaseName: null,
             score: 1,
             reasons: ['same-automation-key'],
           },
@@ -68,6 +69,7 @@ describe('ReviewQueueRow', () => {
           classification: {
             kind: 'possible_duplicate',
             matchedCaseId: 'case-2',
+            matchedCaseName: null,
             score: 0.72,
             reasons: ['same-title'],
           },
@@ -79,6 +81,48 @@ describe('ReviewQueueRow', () => {
 
     expect(
       screen.getByText('Possible duplicate of an existing case in this suite'),
+    ).toBeInTheDocument()
+  })
+
+  it('names the matched case in the update badge when the name is known', () => {
+    render(
+      <ReviewQueueRow
+        proposal={proposal({
+          classification: {
+            kind: 'update',
+            matchedCaseId: 'case-1',
+            matchedCaseName: 'Empties the cart',
+            score: 1,
+            reasons: ['same-automation-key'],
+          },
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText('Updates Empties the cart')).toBeInTheDocument()
+  })
+
+  it('names the matched case in the possible-duplicate badge when the name is known', () => {
+    render(
+      <ReviewQueueRow
+        proposal={proposal({
+          classification: {
+            kind: 'possible_duplicate',
+            matchedCaseId: 'case-2',
+            matchedCaseName: 'Checks the login flow',
+            score: 0.72,
+            reasons: ['same-title'],
+          },
+        })}
+        isSelected={false}
+        onSelect={vi.fn()}
+      />,
+    )
+
+    expect(
+      screen.getByText('Possible duplicate of Checks the login flow'),
     ).toBeInTheDocument()
   })
 

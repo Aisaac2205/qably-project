@@ -8,6 +8,7 @@ describe('DuplicateComparison', () => {
     const classification: ProposalClassification = {
       kind: 'none',
       matchedCaseId: null,
+      matchedCaseName: null,
       score: null,
       reasons: [],
     }
@@ -21,6 +22,7 @@ describe('DuplicateComparison', () => {
     const classification: ProposalClassification = {
       kind: 'update',
       matchedCaseId: 'case-1',
+      matchedCaseName: null,
       score: 1,
       reasons: ['same-automation-key'],
     }
@@ -36,6 +38,7 @@ describe('DuplicateComparison', () => {
     const classification: ProposalClassification = {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-2',
+      matchedCaseName: null,
       score: 0.72,
       reasons: ['same-title', 'steps-overlap'],
     }
@@ -52,10 +55,25 @@ describe('DuplicateComparison', () => {
     expect(screen.queryByText('steps-overlap')).not.toBeInTheDocument()
   })
 
+  it('names the matched case when the name is known', () => {
+    const classification: ProposalClassification = {
+      kind: 'possible_duplicate',
+      matchedCaseId: 'case-2',
+      matchedCaseName: 'Checks the login flow',
+      score: 0.72,
+      reasons: ['same-title'],
+    }
+
+    render(<DuplicateComparison classification={classification} />)
+
+    expect(screen.getByText('Possible duplicate of Checks the login flow')).toBeInTheDocument()
+  })
+
   it('labels the reasons list with an accessible heading', () => {
     const classification: ProposalClassification = {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-2',
+      matchedCaseName: null,
       score: 0.72,
       reasons: ['same-title', 'steps-overlap'],
     }
@@ -69,6 +87,7 @@ describe('DuplicateComparison', () => {
     const classification: ProposalClassification = {
       kind: 'update',
       matchedCaseId: 'case-1',
+      matchedCaseName: null,
       score: 1,
       reasons: ['same-automation-key', 'cross-suite-key'],
     }
@@ -85,6 +104,7 @@ describe('DuplicateComparison', () => {
     const classification: ProposalClassification = {
       kind: 'update',
       matchedCaseId: 'case-1',
+      matchedCaseName: null,
       score: 1,
       reasons: ['same-automation-key'],
     }
