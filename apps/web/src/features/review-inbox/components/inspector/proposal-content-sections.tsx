@@ -1,22 +1,80 @@
 'use client'
 
 import type { ExtractedProposal } from '@qably/types'
-import { Target, ClipboardText, ListNumbers, CheckCircle } from '@phosphor-icons/react'
+import { Target, ClipboardText, ListNumbers, CheckCircle, GitDiff } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import type { PublishedVersionView } from '../../api/review.api'
+import { diffAgainstPublishedVersion } from '../../lib/diff-published-version'
 
 interface ProposalContentSectionsProps {
   proposal: ExtractedProposal
   needsManualReview: boolean
+  publishedVersion?: PublishedVersionView | null
 }
 
 export function ProposalContentSections({
   proposal,
   needsManualReview,
+  publishedVersion = null,
 }: ProposalContentSectionsProps) {
   const { t } = useTranslation()
+  const diff = diffAgainstPublishedVersion(proposal, publishedVersion)
 
   return (
     <>
+      {diff && (
+        <div className="space-y-2.5 rounded-xl border border-border/80 bg-canvas/40 p-4">
+          <div className="flex items-center gap-2">
+            <GitDiff size={16} weight="bold" className="text-muted shrink-0" aria-hidden="true" />
+            <h4 className="text-xs sm:text-sm font-semibold text-default">
+              {t('reviewInbox.diffHeading', { version: publishedVersion?.version ?? 0 })}
+            </h4>
+          </div>
+
+          {!diff.hasChanges && (
+            <p className="text-sm text-muted pl-6">{t('reviewInbox.diffNoChanges')}</p>
+          )}
+
+          {diff.scalarChanges.map((change) => (
+            <div key={change.field} className="pl-6 text-sm leading-relaxed">
+              <p className="text-xs font-semibold text-default">{t(`reviewInbox.diffField_${change.field}`)}</p>
+              <p>
+                <del className="text-fail decoration-fail">{change.previous}</del>
+              </p>
+              <p>
+                <ins className="text-pass decoration-pass no-underline font-medium">{change.next}</ins>
+              </p>
+            </div>
+          ))}
+
+          {diff.listChanges.map((change) => (
+            <div key={change.field} className="pl-6 text-sm leading-relaxed space-y-1">
+              <p className="text-xs font-semibold text-default">{t(`reviewInbox.diffField_${change.field}`)}</p>
+              {change.removed.length > 0 && (
+                <p>
+                  <span className="text-xs font-semibold text-fail">{t('reviewInbox.diffRemoved')}: </span>
+                  {change.removed.map((item, idx) => (
+                    <del key={idx} className="mr-2 text-fail decoration-fail">
+                      {item}
+                    </del>
+                  ))}
+                </p>
+              )}
+              {change.added.length > 0 && (
+                <p>
+                  <span className="text-xs font-semibold text-pass">{t('reviewInbox.diffAdded')}: </span>
+                  {change.added.map((item, idx) => (
+                    <ins key={idx} className="mr-2 text-pass decoration-pass no-underline font-medium">
+                      {item}
+                    </ins>
+                  ))}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {!needsManualReview && proposal.objective && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">

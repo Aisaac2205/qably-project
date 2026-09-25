@@ -1,11 +1,14 @@
-import { screen, act } from '@testing-library/react'
+import { screen, act, render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
 import type { ExtractedProposal } from '@qably/types'
 import { ReviewProposalInspector } from '../components/review-proposal-inspector'
+import { reviewKeys } from '../lib/query-keys'
+import type { ProposalDetail } from '../api/review.api'
 import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { renderWithQuery, createTestQueryClient } from '@/lib/query-test-utils'
 import * as suitesApi from '@/test/suites-api-stub'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
@@ -48,6 +51,32 @@ function renderInspector(value: ExtractedProposal) {
       onApprove={vi.fn()}
       onReject={vi.fn()}
     />,
+  )
+}
+
+function renderInspectorWithDetail(
+  value: ExtractedProposal,
+  detail: Partial<ProposalDetail>,
+) {
+  const client = createTestQueryClient()
+  const fullDetail: ProposalDetail = {
+    ...value,
+    evidenceTitle: '',
+    evidence: null,
+    links: [],
+    matchedCase: null,
+    publishedVersion: null,
+    source: null,
+    recentRuns: [],
+    decision: null,
+    ...detail,
+  }
+  client.setQueryData(reviewKeys.detail(value.id), fullDetail)
+
+  return render(
+    <QueryClientProvider client={client}>
+      <ReviewProposalInspector proposal={value} onApprove={vi.fn()} onReject={vi.fn()} />
+    </QueryClientProvider>,
   )
 }
 
@@ -128,11 +157,16 @@ describe('ReviewProposalInspector', () => {
     expect(screen.getByRole('button', { name: /approve/i })).toBeEnabled()
   })
 
-  it('gives the options button a descriptive accessible name, not a generic one', () => {
+  it('renders no inert options menu', () => {
     renderInspector(proposal())
 
-    expect(screen.getByRole('button', { name: 'Proposal options' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Opciones' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /options/i })).not.toBeInTheDocument()
+  })
+
+  it('renders no placeholder chat affordance', () => {
+    renderInspector(proposal())
+
+    expect(screen.queryByText('Chat')).not.toBeInTheDocument()
   })
 
   describe('re-documenting an incomplete extraction', () => {
@@ -207,6 +241,52 @@ describe('ReviewProposalInspector', () => {
       )
 
       expect(documentCase).toHaveBeenCalledWith('suite-1', 'case-1')
+    })
+  })
+
+  describe('publication and diff detail (S5c)', () => {
+    it('shows the diff against the published version and the matched case link once the detail loads', async () => {
+      await act(async () => {
+        renderInspectorWithDetail(proposal({ objective: 'Confirm the cart is fully empty' }), {
+          matchedCase: {
+            id: 'case-1',
+            name: 'Empties the cart',
+            suiteId: 'suite-1',
+            suiteName: 'Checkout',
+          },
+          publishedVersion: {
+            version: 4,
+            title: 'Empties the cart',
+            objective: 'Confirm the cart resets',
+            preconditions: [],
+            steps: ['Open the cart', 'Remove every item'],
+            expectedResult: 'The cart shows zero items',
+            publishedAt: '2026-09-20T10:00:00.000Z',
+            publishedBy: { id: 'user-1', name: 'Sam' },
+          },
+        })
+      })
+
+      expect(screen.getByText('Changes from published version 4')).toBeInTheDocument()
+      expect(screen.getByText('Confirm the cart resets').tagName).toBe('DEL')
+      expect(
+        screen.getByRole('link', { name: /Empties the cart/ }),
+      ).toBeInTheDocument()
+      expect(screen.getByText(/Published by Sam/)).toBeInTheDocument()
+    })
+
+    it('shows who rejected the proposal when there is a decision but nothing was published', async () => {
+      await act(async () => {
+        renderInspectorWithDetail(proposal(), {
+          decision: {
+            action: 'rejected',
+            decidedAt: '2026-09-20T10:00:00.000Z',
+            decidedBy: { id: 'user-2', name: 'Robin' },
+          },
+        })
+      })
+
+      expect(screen.getByText(/Rejected by Robin/)).toBeInTheDocument()
     })
   })
 })

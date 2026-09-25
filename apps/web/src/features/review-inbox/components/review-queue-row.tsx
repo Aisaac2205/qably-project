@@ -7,7 +7,6 @@ import {
   XCircle,
   Clock,
   CaretRight,
-  ChatCircleText,
   FileText,
 } from '@phosphor-icons/react'
 import type { ProposalListItem } from '../api/review.api'
@@ -44,7 +43,7 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
         hour: '2-digit',
         minute: '2-digit',
       })
-    : 'Sep 9, 01:23 PM'
+    : null
 
   return (
     <li className="flex items-stretch">
@@ -148,15 +147,12 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
             </span>
           )}
 
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted">
-            <Clock size={12} className="shrink-0 text-muted" aria-hidden="true" />
-            <span>{formattedDate}</span>
-          </span>
-
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted ml-auto sm:ml-0">
-            <ChatCircleText size={12} className="shrink-0 text-muted" aria-hidden="true" />
-            <span>0</span>
-          </span>
+          {formattedDate && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-muted">
+              <Clock size={12} className="shrink-0 text-muted" aria-hidden="true" />
+              <span>{formattedDate}</span>
+            </span>
+          )}
         </div>
       </button>
     </li>

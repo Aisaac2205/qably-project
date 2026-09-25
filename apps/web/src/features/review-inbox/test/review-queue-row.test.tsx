@@ -138,4 +138,20 @@ describe('ReviewQueueRow', () => {
       screen.queryByText('Possible duplicate of an existing case in this suite'),
     ).not.toBeInTheDocument()
   })
+
+  it('hides the date instead of showing a placeholder timestamp when createdAt is missing', () => {
+    render(
+      <ReviewQueueRow proposal={proposal()} isSelected={false} onSelect={vi.fn()} />,
+    )
+
+    expect(screen.queryByText('Sep 9, 01:23 PM')).not.toBeInTheDocument()
+  })
+
+  it('renders no placeholder comment count', () => {
+    render(
+      <ReviewQueueRow proposal={proposal()} isSelected={false} onSelect={vi.fn()} />,
+    )
+
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
 })

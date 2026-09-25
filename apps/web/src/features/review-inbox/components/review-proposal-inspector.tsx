@@ -7,6 +7,7 @@ import { InspectorHeader } from './inspector/inspector-header'
 import { ManualReviewNotice } from './inspector/manual-review-notice'
 import { ProposalContentSections } from './inspector/proposal-content-sections'
 import { InspectorEvidence } from './inspector/inspector-evidence'
+import { InspectorPublication } from './inspector/inspector-publication'
 import { DecisionToolbar } from './inspector/decision-toolbar'
 import type { InboxSuite, ProposalClassification } from '../api/review.api'
 import { resolveClassification } from '../lib/classification-reason'
@@ -46,7 +47,7 @@ export function ReviewProposalInspector({
         hour: '2-digit',
         minute: '2-digit',
       })
-    : 'Sep 9, 01:23 PM'
+    : null
 
   return (
     <div className="h-full flex flex-col justify-between overflow-hidden bg-surface">
@@ -65,12 +66,25 @@ export function ReviewProposalInspector({
 
         {needsManualReview && <ManualReviewNotice proposal={proposal} />}
 
-        <ProposalContentSections proposal={proposal} needsManualReview={needsManualReview} />
+        <ProposalContentSections
+          proposal={proposal}
+          needsManualReview={needsManualReview}
+          publishedVersion={detail?.publishedVersion ?? null}
+        />
 
         <InspectorEvidence
           observations={proposal.observations}
           evidence={evidence}
           links={links}
+        />
+
+        <InspectorPublication
+          projectId={proposal.projectId}
+          matchedCase={detail?.matchedCase ?? null}
+          source={detail?.source ?? null}
+          recentRuns={detail?.recentRuns ?? []}
+          decision={detail?.decision ?? null}
+          publishedVersion={detail?.publishedVersion ?? null}
         />
       </div>
 
