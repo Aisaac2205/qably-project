@@ -553,6 +553,72 @@ describe('ChatService', () => {
     expect(created.data.targetTestCaseId).toBeUndefined();
   });
 
+  it('creates the same SOURCE_EXCERPT proposal via a Bitbucket connection, proving the untargeted flow is provider-agnostic', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+    prisma.project.findFirst.mockResolvedValue({
+      id: 'project-1',
+      name: 'Shop',
+      connection: {
+        provider: 'BITBUCKET',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    });
+    const caseContextBuilder = fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: {
+          kind: 'file-head',
+          excerpt: 'export function checkout() {}',
+        },
+      }),
+    );
+    const service = build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      caseContextBuilder,
+    );
+
+    const result = await service.sendToReview(
+      org,
+      user,
+      'project-1',
+      'thread-1',
+      'message-2',
+      {
+        caseIndex: 0,
+      },
+    );
+
+    expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+    expect(caseContextBuilder.locateForEvidence).toHaveBeenCalledWith(
+      { automationKey: null, automationFilePath: 'src/checkout.spec.ts' },
+      {
+        provider: 'BITBUCKET',
+        repo: 'acme/shop',
+        encryptedAccessToken: null,
+      },
+    );
+    expect(prisma.evidence.create).toHaveBeenCalledWith(
+      containing({
+        data: containing({
+          kind: 'SOURCE_EXCERPT',
+          uri: 'https://bitbucket.org/acme/shop/src/sha123/src/checkout.spec.ts',
+          excerpt: 'export function checkout() {}',
+        }),
+      }),
+    );
+    const calls = prisma.extractedProposal.create.mock.calls as unknown[][];
+    const created = calls[0][0] as { data: { targetTestCaseId?: string } };
+    expect(created.data.targetTestCaseId).toBeUndefined();
+  });
+
   it('rejects an untargeted send with no attached file path, creating no rows', async () => {
     const prisma = createPrisma();
     prisma.chatMessage.findFirst.mockReset();
