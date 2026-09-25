@@ -121,6 +121,39 @@ describe('reinsertAt', () => {
 
     expect(result).toBeUndefined()
   })
+
+  it('does not insert an item whose id already exists in any page (a refetch raced the rollback)', () => {
+    const data: InfiniteData<ReviewInboxPageResult> = {
+      pages: [page('a', 'b'), page('c')],
+      pageParams: [null, 'cursor-1'],
+    }
+
+    const result = reinsertAt(data, {
+      pageIndex: 0,
+      itemIndex: 1,
+      item: proposal('b'),
+    })
+
+    expect(result?.pages[0].items.map((i) => i.id)).toEqual(['a', 'b'])
+    expect(result).toBe(data)
+  })
+
+  it('does not insert a duplicate even when the id resurfaced on a different page than it was removed from', () => {
+    const data: InfiniteData<ReviewInboxPageResult> = {
+      pages: [page('a'), page('b', 'c')],
+      pageParams: [null, 'cursor-1'],
+    }
+
+    const result = reinsertAt(data, {
+      pageIndex: 0,
+      itemIndex: 0,
+      item: proposal('b'),
+    })
+
+    expect(result?.pages[0].items.map((i) => i.id)).toEqual(['a'])
+    expect(result?.pages[1].items.map((i) => i.id)).toEqual(['b', 'c'])
+    expect(result).toBe(data)
+  })
 })
 
 describe('adjustCounts', () => {

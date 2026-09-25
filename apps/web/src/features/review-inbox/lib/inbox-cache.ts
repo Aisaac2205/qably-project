@@ -44,6 +44,11 @@ export function reinsertAt(
   if (data === undefined) return undefined
   if (position.pageIndex >= data.pages.length) return data
 
+  const alreadyPresent = data.pages.some((page) =>
+    page.items.some((item) => item.id === position.item.id),
+  )
+  if (alreadyPresent) return data
+
   const pages = data.pages.map((page, pageIndex) => {
     if (pageIndex !== position.pageIndex) return page
     const items = [...page.items]
