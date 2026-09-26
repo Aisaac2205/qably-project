@@ -10,7 +10,7 @@ import {
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v9');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v10');
   });
 });
 
@@ -130,6 +130,21 @@ describe('buildSystemInstruction', () => {
 
       expect(instruction).toContain(TARGET_CASES_OPEN);
       expect(instruction).toContain('"automationKey"');
+    }
+  });
+
+  it('mentions no targetRef field when there are no targets', () => {
+    for (const locale of ['es', 'en'] as const) {
+      expect(buildSystemInstruction(locale)).not.toContain('targetRef');
+    }
+  });
+
+  it('tells the model to copy the cited tag into "targetRef" only when targets are present', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale, true);
+
+      expect(instruction).toContain('"targetRef"');
+      expect(instruction).toContain('T1');
     }
   });
 
@@ -278,15 +293,15 @@ describe('buildFileContentTurn', () => {
     expect(turn.trimEnd().endsWith(FILE_CONTENT_CLOSE)).toBe(true);
   });
 
-  it('adds a target-cases block listing every requested automationKey', () => {
+  it('adds a target-cases block with a tag line per requested automationKey, tagged by array position', () => {
     const turn = buildFileContentTurn({
       ...input,
       targetAutomationKeys: ['Cart > adds an item', 'Cart > removes an item'],
     });
 
     expect(turn).toContain(TARGET_CASES_OPEN);
-    expect(turn).toContain('Cart > adds an item');
-    expect(turn).toContain('Cart > removes an item');
+    expect(turn).toContain('T1: Cart > adds an item');
+    expect(turn).toContain('T2: Cart > removes an item');
     expect(turn.trimEnd().endsWith(TARGET_CASES_CLOSE)).toBe(true);
   });
 

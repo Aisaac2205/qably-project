@@ -2,8 +2,14 @@ import {
   sanitizeUntrustedText,
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
+import {
+  renderTargetLines,
+  targetTagAt,
+  type TargetManifestEntry,
+  type TargetTag,
+} from './target-reference';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v9';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v10';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -89,8 +95,13 @@ If the file contains no test declarations, respond with an empty "cases" array. 
 };
 
 const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
-  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con los valores de "automationKey" que importan: prioriza extraer exactamente esos casos, hasta el límite de casos del esquema. Cuando una prueba del archivo corresponde a una de esas entradas, usa exactamente esa cadena como su "automationKey", copiada del bloque, sin derivarla ni reformatearla.`,
-  en: `The message includes a ${TARGET_CASES_OPEN} block listing the "automationKey" values that matter: prioritize extracting exactly those cases, up to the schema's case limit. When a test in the file corresponds to one of those entries, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
+  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con líneas "T{n}: automationKey" que identifican los casos que importan: prioriza extraer exactamente esos casos, hasta el límite de casos del esquema. Cuando una prueba del archivo corresponde a una de esas líneas, usa exactamente esa cadena como su "automationKey", copiada del bloque, sin derivarla ni reformatearla.`,
+  en: `The message includes a ${TARGET_CASES_OPEN} block with "T{n}: automationKey" lines identifying the cases that matter: prioritize extracting exactly those cases, up to the schema's case limit. When a test in the file corresponds to one of those lines, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
+};
+
+const TARGET_REF_SENTENCE: Record<'es' | 'en', string> = {
+  es: `Cada línea del bloque empieza con una etiqueta como "T1" o "T2": copia esa etiqueta tal cual, sin traducirla ni modificarla, en el campo "targetRef" del caso correspondiente. Cuando el archivo no contenga una prueba para una línea, simplemente omite "targetRef" en los demás casos.`,
+  en: `Each line in the block starts with a tag like "T1" or "T2": copy that tag exactly, without translating or altering it, into that case's "targetRef" field. When the file has no test for a line, simply omit "targetRef" on the other cases.`,
 };
 
 const DECLARATION_COUNT_SENTENCE: Record<
@@ -121,7 +132,7 @@ export function buildSystemInstruction(
   let base = `${PREFIX_INSTRUCTION[locale]}\n\n${declarationRule}\n\n${SUFFIX_INSTRUCTION[locale]}`;
 
   if (hasTargets) {
-    base += `\n\n${TARGET_CASES_SENTENCE[locale]}`;
+    base += `\n\n${TARGET_CASES_SENTENCE[locale]}\n\n${TARGET_REF_SENTENCE[locale]}`;
     if (requestSuiteSummary) base += `\n\n${SUITE_SUMMARY_SENTENCE[locale]}`;
   }
 
@@ -130,14 +141,38 @@ export function buildSystemInstruction(
     : `${base}\n\n${DECLARATION_COUNT_SENTENCE[locale](declarationCountHint)}`;
 }
 
+// Tags are positional: T{i+1} is the tag for index i of the exact
+// targetAutomationKeys array the caller sends. This module has no
+// testCaseId to sort by (only bare automationKey strings), so it never
+// calls target-reference.ts's buildTargetManifest — the caller (the
+// processor) is responsible for handing this array in the same order it
+// used to build its own testCaseId-sorted manifest, which keeps both sides
+// agreeing on what each tag means.
+function buildPositionalTargetManifest(
+  keys: readonly string[],
+): ReadonlyMap<
+  TargetTag,
+  TargetManifestEntry<{ readonly automationKey: string }>
+> {
+  return new Map(
+    keys.map((key, index) => {
+      const tag = targetTagAt(index);
+      return [tag, { tag, target: { automationKey: key } }] as const;
+    }),
+  );
+}
+
 function buildTargetCasesBlock(
   targetAutomationKeys: readonly string[],
 ): string {
   if (targetAutomationKeys.length === 0) return '';
 
-  const lines = targetAutomationKeys
-    .map((key) => stripBlockDelimiters(key, ALL_DELIMITERS))
-    .join('\n');
+  const strippedKeys = targetAutomationKeys.map((key) =>
+    stripBlockDelimiters(key, ALL_DELIMITERS),
+  );
+  const lines = renderTargetLines(
+    buildPositionalTargetManifest(strippedKeys),
+  ).join('\n');
 
   return `\n\n${TARGET_CASES_OPEN}\n${lines}\n${TARGET_CASES_CLOSE}`;
 }
