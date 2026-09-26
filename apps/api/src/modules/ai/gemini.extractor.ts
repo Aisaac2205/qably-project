@@ -38,7 +38,6 @@ export const RESPONSE_JSON_SCHEMA = {
   properties: {
     cases: {
       type: 'array',
-      maxItems: MAX_EXTRACTED_CASES,
       items: {
         type: 'object',
         properties: {
@@ -342,12 +341,21 @@ export class GeminiExtractor implements TestCaseExtractor {
 
     if (validCases.length === 0) return { kind: 'no-tests-found' };
 
+    const cappedCases = validCases.slice(0, MAX_EXTRACTED_CASES);
+    const overCap = validCases.length - cappedCases.length;
+
+    if (overCap > 0) {
+      this.logger.warn(
+        `Gemini response for ${filePath} exceeded the ${MAX_EXTRACTED_CASES}-case cap: dropped ${overCap} valid case(s) beyond the cap`,
+      );
+    }
+
     const usage = response.usageMetadata ?? {};
     const suite = extractedSuiteSchema.safeParse(envelope.data.suite);
 
     return {
       kind: 'extracted',
-      cases: validCases,
+      cases: cappedCases,
       suite: suite.success ? suite.data : null,
       usage: {
         promptTokens: usage.promptTokenCount ?? 0,

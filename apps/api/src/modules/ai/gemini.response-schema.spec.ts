@@ -25,11 +25,11 @@ describe('RESPONSE_JSON_SCHEMA', () => {
     expect(keys.some((key) => key.endsWith('.minLength'))).toBe(false);
   });
 
-  it('limits array length only at the top level, never on a nested array', () => {
+  it('carries no array length limits anywhere, since the provider compiles the schema into a constrained-decoding automaton that rejects bounded schemas as they grow', () => {
     const arrayLimits = keys.filter(
       (key) => key.endsWith('.maxItems') || key.endsWith('.minItems'),
     );
-    expect(arrayLimits).toEqual(['properties.cases.maxItems']);
+    expect(arrayLimits).toEqual([]);
   });
 
   it('still names every field the Zod boundary requires', () => {
@@ -66,6 +66,13 @@ describe('TARGETED_RESPONSE_JSON_SCHEMA', () => {
   it('carries no string length limits on targetRef either', () => {
     expect(targetedKeys.some((key) => key.endsWith('.maxLength'))).toBe(false);
     expect(targetedKeys.some((key) => key.endsWith('.minLength'))).toBe(false);
+  });
+
+  it('carries no array length limits anywhere, since it inherits the base schema and adds no bound of its own', () => {
+    const arrayLimits = targetedKeys.filter(
+      (key) => key.endsWith('.maxItems') || key.endsWith('.minItems'),
+    );
+    expect(arrayLimits).toEqual([]);
   });
 
   it('keeps every other field identical to the non-targeted schema', () => {

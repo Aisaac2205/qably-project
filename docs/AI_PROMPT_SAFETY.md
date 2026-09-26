@@ -72,7 +72,7 @@ Delimiters are not a security boundary. A model can still be talked out of a rul
 The defenses that actually bound the damage are the ones outside the prompt, and they were already in place:
 
 - The response is constrained by `responseMimeType: 'application/json'` and `responseJsonSchema`, then re-validated with Zod (`envelopeSchema`, `suggestedCaseSchema`); anything that does not fit the shape is dropped, so a hijacked model cannot return arbitrary content.
-- Field lengths are capped in the schema.
+- Field lengths and the case count are capped in Zod and in code after the response comes back, never in the schema sent to the provider (see the "no bounds in a provider schema" rule in `AI_EXTRACTION.md`).
 - The assistant has no tools and no write access. It returns text and case suggestions.
 - A person reviews and approves every suggested case before it becomes a test case.
 - The reply is rendered as text (`chat-message-bubble.tsx` renders `message.content` inside a `<p className="whitespace-pre-wrap">`), never as HTML, so an injected `<script>` or `<img onerror>` is displayed rather than executed.

@@ -4,6 +4,7 @@ import type {
   ExtractionInput,
   SuiteSummaryInput,
 } from './extraction.contracts';
+import { MAX_EXTRACTED_CASES } from './extraction.contracts';
 import {
   FILE_CONTENT_CLOSE,
   FILE_CONTENT_OPEN,
@@ -161,6 +162,11 @@ describe('GeminiExtractor', () => {
 
     const config = received.config as Record<string, unknown>;
     expect(config.responseJsonSchema).toBe(TARGETED_RESPONSE_JSON_SCHEMA);
+    const json = JSON.stringify(config.responseJsonSchema);
+    expect(json).not.toContain('maxItems');
+    expect(json).not.toContain('minItems');
+    expect(json).not.toContain('maxLength');
+    expect(json).not.toContain('minLength');
   });
 
   it('keeps a case whose targetRef is malformed, dropping only the field, never the whole case', async () => {
@@ -300,6 +306,35 @@ describe('GeminiExtractor', () => {
     if (outcome.kind === 'extracted') {
       expect(outcome.cases).toHaveLength(1);
     }
+  });
+
+  it(`keeps only the first ${MAX_EXTRACTED_CASES} valid cases when the model returns more, and warns about the cap`, async () => {
+    const rawCases = Array.from({ length: 25 }, (_, index) =>
+      validRawCase({
+        automationKey: `Cart > case ${index}`,
+        title: `Case ${index}`,
+      }),
+    );
+    const client = fakeClient(() =>
+      Promise.resolve({ text: JSON.stringify({ cases: rawCases }) }),
+    );
+    const extractor = new GeminiExtractor(client, env());
+    const warnSpy = jest.spyOn(extractor['logger'], 'warn');
+
+    const outcome = await extractor.extract(input());
+
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.cases).toHaveLength(MAX_EXTRACTED_CASES);
+    expect(outcome.cases.map((c) => c.automationKey)).toEqual(
+      rawCases.slice(0, MAX_EXTRACTED_CASES).map((c) => c.automationKey),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(input().filePath),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`${rawCases.length - MAX_EXTRACTED_CASES}`),
+    );
   });
 
   it('returns no-tests-found when every case is individually invalid', async () => {

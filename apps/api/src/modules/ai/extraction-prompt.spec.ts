@@ -7,10 +7,11 @@ import {
   buildFileContentTurn,
   buildSystemInstruction,
 } from './extraction-prompt';
+import { MAX_EXTRACTED_CASES } from './extraction.contracts';
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v10');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v11');
   });
 });
 
@@ -95,6 +96,21 @@ describe('buildSystemInstruction', () => {
       'exactamente esa cadena',
     );
     expect(buildSystemInstruction('en', true)).toContain('exactly that string');
+  });
+
+  it('states the case cap as an explicit number instead of a vague reference to the schema', () => {
+    expect(buildSystemInstruction('es', true)).toContain(
+      `hasta ${MAX_EXTRACTED_CASES} casos`,
+    );
+    expect(buildSystemInstruction('en', true)).toContain(
+      `up to ${MAX_EXTRACTED_CASES} cases`,
+    );
+    expect(buildSystemInstruction('es', true)).not.toContain(
+      'límite de casos del esquema',
+    );
+    expect(buildSystemInstruction('en', true)).not.toContain(
+      "schema's case limit",
+    );
   });
 
   it('separates the vitest join from the jest-junit join in the key convention', () => {

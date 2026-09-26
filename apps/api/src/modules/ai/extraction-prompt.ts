@@ -2,6 +2,7 @@ import {
   sanitizeUntrustedText,
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
+import { MAX_EXTRACTED_CASES } from './extraction.contracts';
 import {
   renderTargetLines,
   targetTagAt,
@@ -9,7 +10,7 @@ import {
   type TargetTag,
 } from './target-reference';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v10';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v11';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -95,8 +96,8 @@ If the file contains no test declarations, respond with an empty "cases" array. 
 };
 
 const TARGET_CASES_SENTENCE: Record<'es' | 'en', string> = {
-  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con líneas "T{n}: automationKey" que identifican los casos que importan: prioriza extraer exactamente esos casos, hasta el límite de casos del esquema. Cuando una prueba del archivo corresponde a una de esas líneas, usa exactamente esa cadena como su "automationKey", copiada del bloque, sin derivarla ni reformatearla.`,
-  en: `The message includes a ${TARGET_CASES_OPEN} block with "T{n}: automationKey" lines identifying the cases that matter: prioritize extracting exactly those cases, up to the schema's case limit. When a test in the file corresponds to one of those lines, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
+  es: `El mensaje incluye un bloque ${TARGET_CASES_OPEN} con líneas "T{n}: automationKey" que identifican los casos que importan: prioriza extraer exactamente esos casos, hasta ${MAX_EXTRACTED_CASES} casos. Cuando una prueba del archivo corresponde a una de esas líneas, usa exactamente esa cadena como su "automationKey", copiada del bloque, sin derivarla ni reformatearla.`,
+  en: `The message includes a ${TARGET_CASES_OPEN} block with "T{n}: automationKey" lines identifying the cases that matter: prioritize extracting exactly those cases, up to ${MAX_EXTRACTED_CASES} cases. When a test in the file corresponds to one of those lines, use exactly that string as its "automationKey", copied from the block, never derived or reformatted.`,
 };
 
 const TARGET_REF_SENTENCE: Record<'es' | 'en', string> = {
