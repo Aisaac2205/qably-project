@@ -3,7 +3,27 @@ import {
   extractedSuiteSchema,
   extractionOutputSchema,
   MAX_EXTRACTED_CASES,
+  type ExtractedCase,
 } from './extraction.contracts';
+import type { TargetTag } from './target-reference';
+
+type AssertEqual<T, U> = [T] extends [U]
+  ? [U] extends [T]
+    ? true
+    : false
+  : false;
+// Record<string, never> extends Pick<T, K> only holds when K is an OPTIONAL
+// key of T — a required key (even one typed `X | undefined`) fails this
+// check. This is what guards against Zod 4's `z.unknown()` producing a
+// required key on the inferred type unless the schema itself is wrapped in
+// `.optional()`.
+type IsOptionalKey<T, K extends keyof T> =
+  Record<string, never> extends Pick<T, K> ? true : false;
+// Compile-time only — the return type is what forces `tsc`/the typecheck
+// push-gate to evaluate T; the runtime body never does anything meaningful.
+function assertType<T extends true>(): T {
+  return true as T;
+}
 
 function validCase(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -188,6 +208,49 @@ describe('extractedCaseSchema', () => {
     );
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('ExtractedCase targetRef type', () => {
+  it('is an optional key typed TargetTag | undefined (compile-time check)', () => {
+    assertType<IsOptionalKey<ExtractedCase, 'targetRef'>>();
+    assertType<
+      AssertEqual<ExtractedCase['targetRef'], TargetTag | undefined>
+    >();
+  });
+});
+
+describe('extractedCaseSchema targetRef', () => {
+  it('parses a case with no targetRef key at all', () => {
+    const result = extractedCaseSchema.safeParse(validCase());
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.targetRef).toBeUndefined();
+  });
+
+  it('parses a case with a valid targetRef and preserves it', () => {
+    const result = extractedCaseSchema.safeParse(
+      validCase({ targetRef: 'T2' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.targetRef).toBe('T2');
+  });
+
+  it('turns a malformed targetRef into undefined instead of failing the case', () => {
+    const result = extractedCaseSchema.safeParse(
+      validCase({ targetRef: 'not-a-tag' }),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.targetRef).toBeUndefined();
+  });
+
+  it('turns a wrong-type targetRef into undefined instead of failing the case', () => {
+    const result = extractedCaseSchema.safeParse(validCase({ targetRef: 42 }));
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.targetRef).toBeUndefined();
   });
 });
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizeTitleForComparison } from '@qably/types';
 import { truncateTo } from '../../common/text/truncate-to';
+import { parseTargetRef } from './target-reference';
 
 export const MAX_SOURCE_CONTENT_LENGTH = 60_000;
 export const MAX_EXTRACTED_CASES = 20;
@@ -42,15 +43,19 @@ export const extractedCaseObjectSchema = z.object({
   observations: z.array(shortText(200)).max(5).optional(),
 });
 
-export const extractedCaseSchema = extractedCaseObjectSchema.refine(
-  (data) =>
-    normalizeTitleForComparison(data.title) !==
-    normalizeTitleForComparison(data.automationKey),
-  {
-    message: 'title must be different from the raw automationKey',
-    path: ['title'],
-  },
-);
+export const extractedCaseSchema = extractedCaseObjectSchema
+  .extend({
+    targetRef: z.unknown().transform(parseTargetRef).optional(),
+  })
+  .refine(
+    (data) =>
+      normalizeTitleForComparison(data.title) !==
+      normalizeTitleForComparison(data.automationKey),
+    {
+      message: 'title must be different from the raw automationKey',
+      path: ['title'],
+    },
+  );
 
 export const extractedSuiteSchema = z.object({
   title: shortText(80),
