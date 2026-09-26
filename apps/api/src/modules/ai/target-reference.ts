@@ -1,3 +1,5 @@
+import { sanitizeUntrustedText } from '../../common/prompt/untrusted-text';
+
 export type TargetTag = `T${number}`;
 
 export interface TargetManifestEntry<T> {
@@ -5,8 +7,10 @@ export interface TargetManifestEntry<T> {
   readonly target: T;
 }
 
-const TARGET_TAG_PATTERN = /^T([1-9]\d*)(?!\d)/i;
-const CRLF_RUN = /(?:\r\n|\r|\n)+/g;
+// Composite automationKey ingestion cap (250-char classname + "::" + 120-char
+// name, see extraction.contracts.ts) — never truncate a real key below this.
+const AUTOMATION_KEY_MAX_LENGTH = 372;
+const TARGET_TAG_PATTERN = /^T([1-9]\d*)(?=$|[\s:])/i;
 
 export function targetTagAt(index: number): TargetTag {
   return `T${index + 1}`;
@@ -18,12 +22,13 @@ export function parseTargetRef(raw: unknown): TargetTag | undefined {
   const match = TARGET_TAG_PATTERN.exec(raw.trim());
   if (match === null) return undefined;
 
-  return `T${Number(match[1])}`;
+  return `T${match[1]}` as TargetTag;
 }
 
 export function renderTargetLines(keys: readonly string[]): string[] {
   return keys.map(
-    (key, index) => `${targetTagAt(index)}: ${key.replace(CRLF_RUN, ' ')}`,
+    (key, index) =>
+      `${targetTagAt(index)}: ${sanitizeUntrustedText(key, AUTOMATION_KEY_MAX_LENGTH)}`,
   );
 }
 

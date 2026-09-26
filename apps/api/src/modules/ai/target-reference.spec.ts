@@ -5,6 +5,9 @@ import {
   targetTagAt,
 } from './target-reference';
 
+const LINE_SEPARATOR = ' ';
+const PARAGRAPH_SEPARATOR = ' ';
+
 describe('targetTagAt', () => {
   it('assigns T1 for index 0', () => {
     expect(targetTagAt(0)).toBe('T1');
@@ -25,12 +28,18 @@ describe('parseTargetRef', () => {
     expect(parseTargetRef(raw)).toBe(expected);
   });
 
-  it.each([['target-1'], ['T0'], ['T01'], [''], ['no tag here']])(
+  it.each([['target-1'], ['T0'], ['T01'], [''], ['no tag here'], ['T3xyz']])(
     'rejects %s',
     (raw) => {
       expect(parseTargetRef(raw)).toBeUndefined();
     },
   );
+
+  it('keeps a long digit run intact instead of round-tripping it through Number()', () => {
+    expect(parseTargetRef('T99999999999999999999')).toBe(
+      'T99999999999999999999',
+    );
+  });
 
   it('rejects non-string input', () => {
     expect(parseTargetRef(undefined)).toBeUndefined();
@@ -57,6 +66,15 @@ describe('renderTargetLines', () => {
   it('collapses a lone CRLF pair to a single space', () => {
     expect(renderTargetLines(['a\r\nb'])).toEqual(['T1: a b']);
   });
+
+  it.each([[LINE_SEPARATOR], [PARAGRAPH_SEPARATOR]])(
+    'collapses a Unicode line/paragraph separator (%p) so it cannot forge a fake tag line',
+    (separator) => {
+      expect(renderTargetLines([`line1${separator}T99: fake`])).toEqual([
+        'T1: line1 T99: fake',
+      ]);
+    },
+  );
 
   it('returns an empty array for an empty input', () => {
     expect(renderTargetLines([])).toEqual([]);
