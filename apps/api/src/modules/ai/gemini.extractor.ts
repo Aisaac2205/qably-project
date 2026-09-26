@@ -91,6 +91,23 @@ export const RESPONSE_JSON_SCHEMA = {
   required: ['cases'],
 } as const;
 
+export const TARGETED_RESPONSE_JSON_SCHEMA = {
+  ...RESPONSE_JSON_SCHEMA,
+  properties: {
+    ...RESPONSE_JSON_SCHEMA.properties,
+    cases: {
+      ...RESPONSE_JSON_SCHEMA.properties.cases,
+      items: {
+        ...RESPONSE_JSON_SCHEMA.properties.cases.items,
+        properties: {
+          ...RESPONSE_JSON_SCHEMA.properties.cases.items.properties,
+          targetRef: { type: 'string' },
+        },
+      },
+    },
+  },
+} as const;
+
 const envelopeSchema = z.object({
   cases: z.array(z.unknown()),
   suite: z.unknown().optional(),
@@ -146,6 +163,7 @@ export class GeminiExtractor implements TestCaseExtractor {
 
   async extract(input: ExtractionInput): Promise<ExtractionOutcome> {
     try {
+      const hasTargets = (input.targetAutomationKeys?.length ?? 0) > 0;
       const response = await this.client.models.generateContent({
         model: this.model,
         contents: buildFileContentTurn({
@@ -157,12 +175,14 @@ export class GeminiExtractor implements TestCaseExtractor {
         config: {
           systemInstruction: buildSystemInstruction(
             input.locale,
-            (input.targetAutomationKeys?.length ?? 0) > 0,
+            hasTargets,
             input.declarationCountHint,
             input.requestSuiteSummary ?? true,
           ),
           responseMimeType: 'application/json',
-          responseJsonSchema: RESPONSE_JSON_SCHEMA,
+          responseJsonSchema: hasTargets
+            ? TARGETED_RESPONSE_JSON_SCHEMA
+            : RESPONSE_JSON_SCHEMA,
           temperature: TEMPERATURE,
           maxOutputTokens: MAX_OUTPUT_TOKENS,
           httpOptions: {

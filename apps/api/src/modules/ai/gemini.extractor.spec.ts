@@ -12,7 +12,9 @@ import {
 import { buildSuiteSummaryInstruction } from './suite-summary-prompt';
 import {
   GeminiExtractor,
+  RESPONSE_JSON_SCHEMA,
   SUITE_SUMMARY_RESPONSE_JSON_SCHEMA,
+  TARGETED_RESPONSE_JSON_SCHEMA,
   type GeminiClient,
 } from './gemini.extractor';
 
@@ -131,6 +133,71 @@ describe('GeminiExtractor', () => {
 
     const contents = received.contents as string;
     expect(contents).toContain('Cart > adds an item');
+  });
+
+  it('sends the base (non-targeted) response schema when there are no targets', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(input());
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.responseJsonSchema).toBe(RESPONSE_JSON_SCHEMA);
+  });
+
+  it('sends the targeted response schema, with targetRef, only when targets are present', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ targetAutomationKeys: ['Cart > adds an item'] }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.responseJsonSchema).toBe(TARGETED_RESPONSE_JSON_SCHEMA);
+  });
+
+  it('keeps a case whose targetRef is malformed, dropping only the field, never the whole case', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          cases: [{ ...validRawCase(), targetRef: 'not-a-tag' }],
+        }),
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).extract(
+      input({ targetAutomationKeys: ['Cart > adds an item'] }),
+    );
+
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.cases).toHaveLength(1);
+    expect(outcome.cases[0].targetRef).toBeUndefined();
+  });
+
+  it('keeps a case whose targetRef is a valid tag, preserving it', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          cases: [{ ...validRawCase(), targetRef: 'T1' }],
+        }),
+      }),
+    );
+
+    const outcome = await new GeminiExtractor(client, env()).extract(
+      input({ targetAutomationKeys: ['Cart > adds an item'] }),
+    );
+
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.cases[0].targetRef).toBe('T1');
   });
 
   it('tells the system instruction about the target-cases block only when targets are present', async () => {
