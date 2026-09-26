@@ -108,6 +108,16 @@ describe('buildSystemInstruction', () => {
     }
   });
 
+  it('tells the model to build a composite classname::name key for vitest, since the reporter classname is the test file path and never a prefix of the describe/it chain', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+
+      expect(instruction).toContain(
+        'src/features/cart/cart.test.ts::Cart > adds an item',
+      );
+    }
+  });
+
   it('omits the target-cases sentence by default', () => {
     for (const locale of ['es', 'en'] as const) {
       expect(buildSystemInstruction(locale)).not.toContain(TARGET_CASES_OPEN);

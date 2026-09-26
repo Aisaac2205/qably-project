@@ -17,7 +17,7 @@ const ALL_DELIMITERS = [
   TARGET_CASES_CLOSE,
 ];
 
-const AUTOMATION_KEY_RULES = `- vitest (JUnit reporter): the enclosing describe chain and the it/test title joined by " > " (e.g. "Cart > adds an item").
+const AUTOMATION_KEY_RULES = `- vitest (JUnit reporter): the reporter's classname is the test file's own relative path, which is never a prefix of the describe/it chain, so the real key joins that file path to the enclosing describe chain and the it/test title (themselves joined by " > ") with "::" (e.g. "src/features/cart/cart.test.ts::Cart > adds an item" for a test file at "src/features/cart/cart.test.ts").
 - jest with jest-junit (default templates): the enclosing describe chain and the it/test title joined by a single space (e.g. "Cart adds an item").
 - pytest: the module path derived from the file path (replace "/" with "." and drop the ".py" extension) joined to the bare function name with "::", because the reporter's classname is a module path that is never a prefix of the function name (e.g. "tests.checkout.test_checkout::test_adds_item_to_cart" for a test file at "tests/checkout/test_checkout.py").
 - JUnit (Java/Kotlin): the fully qualified class name (the file's own package declaration plus its class name) joined to the bare method name with "::", because the reporter's classname is never a prefix of the method name (e.g. "com.example.CartTest::addsItemToCart").
