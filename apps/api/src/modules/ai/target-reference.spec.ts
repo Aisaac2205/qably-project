@@ -50,34 +50,63 @@ describe('parseTargetRef', () => {
 });
 
 describe('renderTargetLines', () => {
-  it('renders one T{n}: <key> line per key, in array order', () => {
-    expect(renderTargetLines(['alpha', 'beta'])).toEqual([
-      'T1: alpha',
-      'T2: beta',
+  const targetOf = (testCaseId: string, automationKey: string) => ({
+    testCaseId,
+    automationKey,
+  });
+
+  it('renders one T{n}: <key> line per manifest entry, in manifest (testCaseId) order', () => {
+    const manifest = buildTargetManifest([
+      targetOf('b', 'beta'),
+      targetOf('a', 'alpha'),
     ]);
+
+    expect(renderTargetLines(manifest)).toEqual(['T1: alpha', 'T2: beta']);
+  });
+
+  it('never disagrees with buildTargetManifest on tag order, however the caller orders its input array', () => {
+    const targets = [
+      targetOf('c', 'gamma'),
+      targetOf('a', 'alpha'),
+      targetOf('b', 'beta'),
+    ];
+    const manifest = buildTargetManifest(targets);
+
+    const lines = renderTargetLines(manifest);
+
+    for (const [tag, entry] of manifest) {
+      expect(lines).toContain(`${tag}: ${entry.target.automationKey}`);
+    }
+    expect(lines[0]).toBe('T1: alpha');
+    expect(lines[1]).toBe('T2: beta');
+    expect(lines[2]).toBe('T3: gamma');
   });
 
   it('collapses a run of CR/LF characters in a key to a single space', () => {
-    expect(renderTargetLines(['line1\n\nT99: fake'])).toEqual([
-      'T1: line1 T99: fake',
-    ]);
+    const manifest = buildTargetManifest([targetOf('a', 'line1\n\nT99: fake')]);
+
+    expect(renderTargetLines(manifest)).toEqual(['T1: line1 T99: fake']);
   });
 
   it('collapses a lone CRLF pair to a single space', () => {
-    expect(renderTargetLines(['a\r\nb'])).toEqual(['T1: a b']);
+    const manifest = buildTargetManifest([targetOf('a', 'a\r\nb')]);
+
+    expect(renderTargetLines(manifest)).toEqual(['T1: a b']);
   });
 
   it.each([[LINE_SEPARATOR], [PARAGRAPH_SEPARATOR]])(
     'collapses a Unicode line/paragraph separator (%p) so it cannot forge a fake tag line',
     (separator) => {
-      expect(renderTargetLines([`line1${separator}T99: fake`])).toEqual([
-        'T1: line1 T99: fake',
+      const manifest = buildTargetManifest([
+        targetOf('a', `line1${separator}T99: fake`),
       ]);
+
+      expect(renderTargetLines(manifest)).toEqual(['T1: line1 T99: fake']);
     },
   );
 
-  it('returns an empty array for an empty input', () => {
-    expect(renderTargetLines([])).toEqual([]);
+  it('returns an empty array for an empty manifest', () => {
+    expect(renderTargetLines(buildTargetManifest([]))).toEqual([]);
   });
 });
 

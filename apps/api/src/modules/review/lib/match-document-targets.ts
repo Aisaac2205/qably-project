@@ -3,6 +3,7 @@ import { parseTargetRef } from '../../ai/target-reference';
 import { normalizeAutomationKey } from './normalize-automation-key';
 
 export interface TargetLike {
+  readonly testCaseId: string;
   readonly automationKey: string;
 }
 
@@ -41,7 +42,7 @@ function hasConflictingTarget<T extends TargetLike>(
 ): boolean {
   return targets.some(
     (candidate) =>
-      candidate !== taggedTarget &&
+      candidate.testCaseId !== taggedTarget.testCaseId &&
       normalizeAutomationKey(candidate.automationKey) === normalizedCaseKey,
   );
 }
@@ -73,7 +74,7 @@ export function matchRound<T extends TargetLike, C extends MatchableCase>(
     }
   }
 
-  const tagMatchByTarget = new Map<T, C>();
+  const tagMatchByTestCaseId = new Map<string, C>();
   const consumed = new Set<C>();
 
   for (const [tag, citations] of citationsByTag) {
@@ -88,7 +89,7 @@ export function matchRound<T extends TargetLike, C extends MatchableCase>(
       continue;
     }
 
-    tagMatchByTarget.set(entry.target, testCase);
+    tagMatchByTestCaseId.set(entry.target.testCaseId, testCase);
     consumed.add(testCase);
   }
 
@@ -104,7 +105,7 @@ export function matchRound<T extends TargetLike, C extends MatchableCase>(
   const unmatched: T[] = [];
 
   for (const target of targets) {
-    const tagMatch = tagMatchByTarget.get(target);
+    const tagMatch = tagMatchByTestCaseId.get(target.testCaseId);
     if (tagMatch !== undefined) {
       matched.push({ target, testCase: tagMatch });
       continue;

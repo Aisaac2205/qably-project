@@ -25,10 +25,12 @@ export function parseTargetRef(raw: unknown): TargetTag | undefined {
   return `T${match[1]}` as TargetTag;
 }
 
-export function renderTargetLines(keys: readonly string[]): string[] {
-  return keys.map(
-    (key, index) =>
-      `${targetTagAt(index)}: ${sanitizeUntrustedText(key, AUTOMATION_KEY_MAX_LENGTH)}`,
+export function renderTargetLines<T extends { readonly automationKey: string }>(
+  manifest: ReadonlyMap<TargetTag, TargetManifestEntry<T>>,
+): string[] {
+  return [...manifest.values()].map(
+    (entry) =>
+      `${entry.tag}: ${sanitizeUntrustedText(entry.target.automationKey, AUTOMATION_KEY_MAX_LENGTH)}`,
   );
 }
 

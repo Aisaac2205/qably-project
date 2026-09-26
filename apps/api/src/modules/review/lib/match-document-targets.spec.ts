@@ -186,6 +186,23 @@ describe('matchRound', () => {
     ]);
   });
 
+  it('resolves a tag match even when the targets array passed in is a different-but-equal array from the one the manifest was built from', () => {
+    // Regression: matching used to key an internal map by object identity
+    // against the manifest's target reference, so any caller that rebuilds
+    // its targets array between building the manifest and calling
+    // matchRound (a fresh query, a .map(), a retry round) would silently
+    // lose every tag match with no error.
+    const t1 = target('case-1', 'Key One');
+    const manifest = buildTargetManifest([t1]);
+    const clonedT1 = target('case-1', 'Key One');
+
+    const drifted = testCase('gArBaGe key that matches nothing', 'T1');
+    const { matched, unmatched } = matchRound([clonedT1], [drifted], manifest);
+
+    expect(matched).toEqual([{ target: clonedT1, testCase: drifted }]);
+    expect(unmatched).toEqual([]);
+  });
+
   it('leaves a target unmatched when no case cites it by tag or key', () => {
     const t1 = target('case-1', 'Alpha');
     const t2 = target('case-2', 'Beta');
