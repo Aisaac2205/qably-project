@@ -66,6 +66,13 @@ export function matchRound<T extends TargetLike, C extends MatchableCase>(
   targets: readonly T[],
   cases: readonly C[],
   manifest: ReadonlyMap<TargetTag, TargetManifestEntry<T>>,
+  // The universe checked for a drifted-key conflict, independent of which
+  // targets this call is actually resolving. Defaults to `targets` for a
+  // single-round call. A caller running a later round over only its
+  // still-unmatched subset must pass the FULL original target set here, or
+  // a citation whose key belongs to a target an earlier round already
+  // matched would go undetected (that target is no longer in `targets`).
+  conflictScope: readonly T[] = targets,
 ): MatchRoundResult<T, C> {
   const citationsByTag = new Map<TargetTag, C[]>();
 
@@ -93,7 +100,7 @@ export function matchRound<T extends TargetLike, C extends MatchableCase>(
     if (entry === undefined) continue;
 
     const normalizedCaseKey = normalizeAutomationKey(testCase.automationKey);
-    if (hasConflictingTarget(targets, entry.target, normalizedCaseKey)) {
+    if (hasConflictingTarget(conflictScope, entry.target, normalizedCaseKey)) {
       continue;
     }
 

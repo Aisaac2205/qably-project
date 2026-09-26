@@ -732,13 +732,25 @@ export class ExtractionProcessor extends WorkerHost {
 
     const locale = resolveLocale(ctx.locale);
 
+    // Both the prompt (targetAutomationKeys, tagged positionally) and the
+    // manifest (buildTargetManifest, tagged by testCaseId-sorted order)
+    // must derive tag numbers from the identical order for the same target
+    // set — ctx.targets arrives in unspecified DB order, so sort once here
+    // and use sortedTargets for every downstream derivation instead of
+    // reading ctx.targets directly again.
+    const sortedTargets = [...ctx.targets].sort((a, b) =>
+      a.testCaseId.localeCompare(b.testCaseId),
+    );
+
     const { outcome, incomplete } = await this.extractWithDeclarationRetry(
       {
         filePath: ctx.filePath,
         language: detectLanguage(ctx.filePath),
         content: source.content,
         locale,
-        targetAutomationKeys: ctx.targets.map((target) => target.automationKey),
+        targetAutomationKeys: sortedTargets.map(
+          (target) => target.automationKey,
+        ),
         requestSuiteSummary: ctx.requestSuiteSummary,
       },
       source.content,
@@ -773,8 +785,8 @@ export class ExtractionProcessor extends WorkerHost {
     // dropped by a raw-key collision before its tag is read. matchRound
     // handles the key-phase's dedupe internally, over only the cases a tag
     // did not already consume.
-    const manifest = buildTargetManifest(ctx.targets);
-    const firstRound = matchRound(ctx.targets, outcome.cases, manifest);
+    const manifest = buildTargetManifest(sortedTargets);
+    const firstRound = matchRound(sortedTargets, outcome.cases, manifest);
 
     let matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] = [
       ...firstRound.matched,
@@ -801,6 +813,11 @@ export class ExtractionProcessor extends WorkerHost {
           unmatched,
           retryOutcome.cases,
           retryManifest,
+          // Conflict-check against the FULL original target set, not just
+          // this round's still-unmatched subset — a citation whose key
+          // belongs to a target round 1 already matched must still be
+          // caught, or it silently binds the wrong test case.
+          sortedTargets,
         );
 
         const matchedByTestCaseId = new Map(

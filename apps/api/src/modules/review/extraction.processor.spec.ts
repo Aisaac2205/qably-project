@@ -2220,6 +2220,74 @@ describe('ExtractionProcessor — document-file tag-first matching', () => {
     expect(byTestCaseId.has('case-1')).toBe(false);
   });
 
+  it('keeps the prompt tag order and the resolution manifest in agreement even when ctx.targets arrives in non-testCaseId order', async () => {
+    // Regression: ctx.targets reflects Prisma's findMany order (no
+    // explicit orderBy upstream), which need not be testCaseId-ascending.
+    // buildTargetManifest always sorts by testCaseId; the prompt side must
+    // sort the same way before deriving targetAutomationKeys, or "T1" shown
+    // to the model and "T1" resolved by the manifest mean different targets.
+    const scrambledTargets = [
+      { testCaseId: 'case-3', automationKey: 'Key C' },
+      { testCaseId: 'case-1', automationKey: 'Key A' },
+      { testCaseId: 'case-2', automationKey: 'Key B' },
+    ];
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-3', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+
+    // All three targets are cited by tag in round 1, so no retry round
+    // happens — this isolates the assertion to round 1's own agreement.
+    const extract = jest.fn().mockResolvedValueOnce(
+      extractedOutcome([
+        extractedCase({
+          automationKey: 'garbage 1',
+          targetRef: 'T1',
+          title: 'Cites T1',
+        }),
+        extractedCase({
+          automationKey: 'garbage 2',
+          targetRef: 'T2',
+          title: 'Cites T2',
+        }),
+        extractedCase({
+          automationKey: 'garbage 3',
+          targetRef: 'T3',
+          title: 'Cites T3',
+        }),
+      ]),
+    );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob({ targets: scrambledTargets }),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(1);
+    const [callArgs] = extract.mock.calls[0] as [
+      { targetAutomationKeys?: string[] },
+    ];
+    // The prompt must show tags in testCaseId-sorted order — the same
+    // order buildTargetManifest uses — not raw ctx.targets array order.
+    expect(callArgs.targetAutomationKeys).toEqual(['Key A', 'Key B', 'Key C']);
+
+    const versionCalls = prisma.testCaseVersion.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    const titleByTestCaseId = new Map(
+      versionCalls.map(([call]) => [call.data.testCaseId, call.data.title]),
+    );
+    // T1/T2/T3 in sorted order are case-1/case-2/case-3 (Key A/B/C) — never
+    // case-3/case-1/case-2, which is what a naive "T{index in ctx.targets}"
+    // reading (scrambledTargets' own array order) would have bound them to.
+    expect(titleByTestCaseId.get('case-1')).toBe('Cites T1');
+    expect(titleByTestCaseId.get('case-2')).toBe('Cites T2');
+    expect(titleByTestCaseId.get('case-3')).toBe('Cites T3');
+  });
+
   it('honors a tag citation over a raw-automationKey collision, since tag resolution runs before any dedupe', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);

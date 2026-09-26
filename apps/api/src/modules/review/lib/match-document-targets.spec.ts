@@ -187,6 +187,28 @@ describe('matchRound', () => {
     ]);
   });
 
+  it('rejects a tag when the citing case key collides with a target OUTSIDE this round (e.g. already matched in an earlier round)', () => {
+    // Regression: the retry round only scans its own (unmatched) targets for
+    // conflicts, so a round-2 tag citation whose key actually belongs to a
+    // target that round 1 already matched would slip through undetected.
+    // conflictScope lets the caller widen the conflict check to the full
+    // original target set without widening what this call is resolving.
+    const alreadyMatchedT1 = target('case-1', 'Key One');
+    const stillOpenT2 = target('case-2', 'Key Two');
+    const manifest = buildTargetManifest([stillOpenT2]);
+
+    const collidingCase = testCase('Key One', 'T1');
+    const { matched, unmatched } = matchRound(
+      [stillOpenT2],
+      [collidingCase],
+      manifest,
+      [alreadyMatchedT1, stillOpenT2],
+    );
+
+    expect(matched).toEqual([]);
+    expect(unmatched).toEqual([stillOpenT2]);
+  });
+
   it('resolves a tag match even when the targets array passed in is a different-but-equal array from the one the manifest was built from', () => {
     // Regression: matching used to key an internal map by object identity
     // against the manifest's target reference, so any caller that rebuilds
