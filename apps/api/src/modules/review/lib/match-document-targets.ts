@@ -20,7 +20,15 @@ export interface MatchRoundResult<
   readonly unmatched: readonly T[];
 }
 
-function dedupeCasesByAutomationKey<C extends MatchableCase>(
+/**
+ * Deduplicates by the RAW (non-normalized) automationKey, first occurrence
+ * wins. This is the single source of truth for that rule: extraction.processor.ts
+ * imports this instead of keeping its own copy, since it already depends on
+ * this module for `matchRound` — importing one more thing from the same
+ * module adds no new dependency edge (and the reverse direction, this file
+ * importing from the processor, would create a cycle).
+ */
+export function dedupeByAutomationKey<C extends MatchableCase>(
   cases: readonly C[],
 ): C[] {
   const seen = new Set<string>();
@@ -95,7 +103,7 @@ export function matchRound<T extends TargetLike, C extends MatchableCase>(
 
   const unconsumedCases = cases.filter((testCase) => !consumed.has(testCase));
   const byAutomationKey = new Map(
-    dedupeCasesByAutomationKey(unconsumedCases).map((testCase) => [
+    dedupeByAutomationKey(unconsumedCases).map((testCase) => [
       normalizeAutomationKey(testCase.automationKey),
       testCase,
     ]),

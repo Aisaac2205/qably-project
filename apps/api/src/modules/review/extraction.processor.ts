@@ -21,6 +21,7 @@ import type {
   TestCaseExtractor,
 } from '../ai/extraction.contracts';
 import { countTestDeclarations } from '../ai/count-test-declarations';
+import { buildTargetManifest } from '../ai/target-reference';
 import { SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
@@ -33,6 +34,10 @@ import {
   type PublishTestCaseVersionFields,
 } from './lib/publish-test-case-version';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
+import {
+  dedupeByAutomationKey,
+  matchRound,
+} from './lib/match-document-targets';
 import { resolveAutomationFilePath } from './lib/resolve-automation-file-path';
 import { locateAndPersistAutomationFilePath } from './lib/locate-and-persist-automation-file-path';
 import {
@@ -158,21 +163,6 @@ function mergeSuiteTags(
   }
 
   return merged;
-}
-
-function dedupeByAutomationKey(
-  cases: readonly ExtractedCase[],
-): ExtractedCase[] {
-  const seen = new Set<string>();
-  const deduped: ExtractedCase[] = [];
-
-  for (const testCase of cases) {
-    if (seen.has(testCase.automationKey)) continue;
-    seen.add(testCase.automationKey);
-    deduped.push(testCase);
-  }
-
-  return deduped;
 }
 
 @Processor(EXTRACTION_QUEUE, {
@@ -778,17 +768,18 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
-    const byAutomationKey = new Map(
-      dedupeByAutomationKey(outcome.cases).map((testCase) => [
-        normalizeAutomationKey(testCase.automationKey),
-        testCase,
-      ]),
-    );
+    // Tag resolution runs over the raw, pre-dedupe cases array — a tag
+    // citation is per-case, not per-automationKey, so a case must never be
+    // dropped by a raw-key collision before its tag is read. matchRound
+    // handles the key-phase's dedupe internally, over only the cases a tag
+    // did not already consume.
+    const manifest = buildTargetManifest(ctx.targets);
+    const firstRound = matchRound(ctx.targets, outcome.cases, manifest);
 
-    let { matched, unmatched } = this.matchTargets(
-      ctx.targets,
-      byAutomationKey,
-    );
+    let matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] = [
+      ...firstRound.matched,
+    ];
+    let unmatched: DocumentFileTarget[] = [...firstRound.unmatched];
 
     if (unmatched.length > 0) {
       const retryOutcome = await this.extractor.extract({
@@ -801,15 +792,35 @@ export class ExtractionProcessor extends WorkerHost {
       });
 
       if (retryOutcome.kind === 'extracted') {
-        for (const testCase of dedupeByAutomationKey(retryOutcome.cases)) {
-          const key = normalizeAutomationKey(testCase.automationKey);
-          if (!byAutomationKey.has(key)) byAutomationKey.set(key, testCase);
-        }
+        // A fresh manifest, renumbered from T1 and scoped to only the
+        // still-unmatched subset: a tag means a different thing in each
+        // round, so round 1's and round 2's manifests/case pools must
+        // never mix.
+        const retryManifest = buildTargetManifest(unmatched);
+        const retryRound = matchRound(
+          unmatched,
+          retryOutcome.cases,
+          retryManifest,
+        );
 
-        ({ matched, unmatched } = this.matchTargets(
-          ctx.targets,
-          byAutomationKey,
-        ));
+        const matchedByTestCaseId = new Map(
+          [...firstRound.matched, ...retryRound.matched].map((entry) => [
+            entry.target.testCaseId,
+            entry,
+          ]),
+        );
+
+        matched = ctx.targets
+          .map((target) => matchedByTestCaseId.get(target.testCaseId))
+          .filter(
+            (
+              entry,
+            ): entry is {
+              target: DocumentFileTarget;
+              testCase: ExtractedCase;
+            } => entry !== undefined,
+          );
+        unmatched = [...retryRound.unmatched];
       }
     }
 
@@ -852,31 +863,6 @@ export class ExtractionProcessor extends WorkerHost {
         NO_MATCHING_CASE_REASON,
       );
     }
-  }
-
-  private matchTargets(
-    targets: readonly DocumentFileTarget[],
-    byAutomationKey: ReadonlyMap<string, ExtractedCase>,
-  ): {
-    matched: { target: DocumentFileTarget; testCase: ExtractedCase }[];
-    unmatched: DocumentFileTarget[];
-  } {
-    const matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] =
-      [];
-    const unmatched: DocumentFileTarget[] = [];
-
-    for (const target of targets) {
-      const testCase = byAutomationKey.get(
-        normalizeAutomationKey(target.automationKey),
-      );
-      if (testCase === undefined) {
-        unmatched.push(target);
-      } else {
-        matched.push({ target, testCase });
-      }
-    }
-
-    return { matched, unmatched };
   }
 
   private applyTargetIncompleteNote(

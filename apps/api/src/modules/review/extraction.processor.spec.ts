@@ -2136,6 +2136,178 @@ describe('ExtractionProcessor — document-file documentation state', () => {
   });
 });
 
+describe('ExtractionProcessor — document-file tag-first matching', () => {
+  const firstTargetRow = {
+    projectId: 'project-1',
+    project: { organizationId: 'org-1', connection },
+  };
+
+  // testCaseId order is 'case-1' < 'case-2' < 'case-3', matching
+  // buildTargetManifest's ascending sort, so manifest1 = T1=case-1,
+  // T2=case-2, T3=case-3.
+  const targets = [
+    { testCaseId: 'case-1', automationKey: 'Key A' },
+    { testCaseId: 'case-2', automationKey: 'Key B' },
+    { testCaseId: 'case-3', automationKey: 'Key C' },
+  ];
+
+  function documentFileJob(overrides: Record<string, unknown> = {}) {
+    return {
+      data: {
+        kind: 'document-file',
+        filePath: 'src/cart.spec.ts',
+        targets,
+        ...overrides,
+      },
+    } as never;
+  }
+
+  it('renumbers the retry manifest from T1 for only the still-unmatched subset, independent of the original numbering', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-3', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+
+    // Round 1: only T2 (target case-2) is cited, and correctly, so case-1
+    // and case-3 stay unmatched (their keys are garbage, no tag cited).
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({
+            automationKey: 'garbage that matches nothing',
+            targetRef: 'T2',
+            title: 'Matched via tag T2',
+          }),
+        ]),
+      )
+      // Retry manifest is built from [case-1, case-3] only: sorted by
+      // testCaseId, that's T1=case-1, T2=case-3. Citing "T2" here must
+      // resolve to case-3, NOT to whatever T2 meant in round 1 (case-2).
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({
+            automationKey: 'still garbage',
+            targetRef: 'T2',
+            title: 'Matched via retry tag T2',
+          }),
+        ]),
+      );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    const [retryArgs] = extract.mock.calls[1] as [
+      { targetAutomationKeys?: string[] },
+    ];
+    // Retry only re-requests the still-unmatched targets (case-1, case-3).
+    expect(retryArgs.targetAutomationKeys).toEqual(['Key A', 'Key C']);
+
+    const versionCalls = prisma.testCaseVersion.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    const byTestCaseId = new Map(
+      versionCalls.map(([call]) => [call.data.testCaseId, call.data.title]),
+    );
+    expect(byTestCaseId.get('case-2')).toBe('Matched via tag T2');
+    expect(byTestCaseId.get('case-3')).toBe('Matched via retry tag T2');
+    expect(byTestCaseId.has('case-1')).toBe(false);
+  });
+
+  it('honors a tag citation over a raw-automationKey collision, since tag resolution runs before any dedupe', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-3', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+
+    const sharedRawKey = 'duplicated raw automationKey';
+    const extract = jest.fn().mockResolvedValue(
+      extractedOutcome([
+        // No tag, matches nothing by key either (Key A/B/C are the real
+        // targets) — present only to collide on the raw automationKey.
+        extractedCase({ automationKey: sharedRawKey, title: 'First, no tag' }),
+        // Same raw automationKey, but cites T2 (case-2). If tag resolution
+        // ran AFTER a raw-key dedupe (the old order), this case would have
+        // been dropped before its tag was ever read.
+        extractedCase({
+          automationKey: sharedRawKey,
+          targetRef: 'T2',
+          title: 'Second, cites T2',
+        }),
+        extractedCase({ automationKey: 'Key C', title: 'Matched by key' }),
+      ]),
+    );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(2); // case-1 still unmatched, retry fires
+    const versionCalls = prisma.testCaseVersion.create.mock.calls as [
+      { data: Record<string, unknown> },
+    ][];
+    const byTestCaseId = new Map(
+      versionCalls.map(([call]) => [call.data.testCaseId, call.data.title]),
+    );
+    expect(byTestCaseId.get('case-2')).toBe('Second, cites T2');
+    expect(byTestCaseId.get('case-3')).toBe('Matched by key');
+  });
+
+  it('assesses documentation completeness using the target automationKey, never the raw case key or the tag string, when a tag match has a drifted key', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-3', suiteId: 'suite-1', documentationSource: 'ingestion' },
+    ]);
+
+    const extract = jest.fn().mockResolvedValue(
+      extractedOutcome([
+        extractedCase({ automationKey: 'Key A', title: 'A' }),
+        extractedCase({
+          automationKey: 'T3: nonsense, not "Key B" or "Key C"',
+          targetRef: 'T2',
+          title: 'B via tag',
+        }),
+        extractedCase({ automationKey: 'Key C', title: 'C' }),
+      ]),
+    );
+    const extractor = fakeExtractor(extract);
+
+    await build(prisma, fakeSourceReader(), extractor).process(
+      documentFileJob(),
+    );
+
+    // Round 1 matches all three targets (no retry needed).
+    expect(extract).toHaveBeenCalledTimes(1);
+    const caseUpdateCalls = prisma.testCase.update.mock.calls as [
+      { where: { id: string }; data: Record<string, unknown> },
+    ][];
+    const case2Update = caseUpdateCalls.find(
+      ([call]) => call.where.id === 'case-2',
+    );
+    // documentationOutcome/documentationMissing come from
+    // assessCaseDocumentation, which is fed target.automationKey ("Key B"),
+    // not the drifted raw case key and never the "T2" tag string. A title
+    // + objective + steps + expectedResult all present means "complete"
+    // regardless of what the raw key looked like.
+    expect(case2Update?.[0].data).toMatchObject({
+      documentationOutcome: 'complete',
+    });
+  });
+});
+
 describe('ExtractionProcessor — resilience', () => {
   it('lands an uncaught error (e.g. token decryption throwing) in the manual-review fallback', async () => {
     const prisma = createPrisma();

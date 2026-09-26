@@ -1,5 +1,6 @@
 import { buildTargetManifest } from '../../ai/target-reference';
 import {
+  dedupeByAutomationKey,
   matchRound,
   type MatchableCase,
   type TargetLike,
@@ -216,5 +217,22 @@ describe('matchRound', () => {
 
     expect(matched).toEqual([{ target: t1, testCase: testCase('Alpha') }]);
     expect(unmatched).toEqual([t2]);
+  });
+});
+
+describe('dedupeByAutomationKey', () => {
+  it('keeps the first case for a repeated raw automationKey', () => {
+    const first = testCase('Cart > adds an item');
+    const duplicate = testCase('Cart > adds an item');
+    const other = testCase('Cart > removes an item');
+
+    expect(dedupeByAutomationKey([first, duplicate, other])).toEqual([
+      first,
+      other,
+    ]);
+  });
+
+  it('returns an empty array for an empty input', () => {
+    expect(dedupeByAutomationKey([])).toEqual([]);
   });
 });
