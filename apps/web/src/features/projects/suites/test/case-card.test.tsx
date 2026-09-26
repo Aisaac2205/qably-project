@@ -126,11 +126,10 @@ describe('CaseCard observations', () => {
 })
 
 describe('CaseCard', () => {
-  it('shows the raw automation key in mono under the humanized title when it differs', async () => {
+  it('does not show the raw automation key under the humanized title', async () => {
     await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
     expect(screen.getByText('Redirects to dashboard on valid login')).toBeInTheDocument()
-    const raw = screen.getByText('useCreateRun > redirects to dashboard on valid login')
-    expect(raw.closest('p')?.className).toContain('font-mono')
+    expect(screen.queryByText('useCreateRun > redirects to dashboard on valid login')).not.toBeInTheDocument()
   })
 
   it('does not show a redundant raw name line for a manual case', async () => {

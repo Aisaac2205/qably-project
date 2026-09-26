@@ -41,7 +41,6 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWith
   const [observationsOpen, setObservationsOpen] = useState(false)
   const observations = testCase.observations ?? []
   const described = useMemo(() => describeCase(testCase), [testCase])
-  const showRawName = described.raw !== described.title
   const staleLocale = testCase.localeStale === true
   const attention = deriveCaseAttention(testCase)
   const documentationBadge = deriveCaseDocumentationBadge(testCase)
@@ -69,11 +68,9 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWith
               {described.title}
             </span>
           </div>
-          {(showRawName || testCase.automationFilePath) && (
-            <p className="mt-0.5 font-mono text-xs text-muted truncate flex items-center gap-1">
-              {showRawName && <span>{described.raw}</span>}
-              {showRawName && testCase.automationFilePath && <span aria-hidden="true">·</span>}
-              {testCase.automationFilePath && <span>{testCase.automationFilePath}</span>}
+          {testCase.automationFilePath && (
+            <p className="mt-0.5 font-mono text-xs text-muted truncate">
+              {testCase.automationFilePath}
             </p>
           )}
           {testCase.objective && (
