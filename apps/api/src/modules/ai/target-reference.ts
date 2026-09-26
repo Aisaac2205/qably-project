@@ -34,17 +34,28 @@ export function renderTargetLines<T extends { readonly automationKey: string }>(
   );
 }
 
+export interface TargetManifest<T> {
+  readonly manifest: ReadonlyMap<TargetTag, TargetManifestEntry<T>>;
+  // The same targets, in the exact order the manifest numbered them
+  // (testCaseId-ascending). This is the ONLY correct order for anything
+  // derived from these targets that must agree with the manifest (e.g. the
+  // prompt's target-cases block) — never re-sort independently elsewhere.
+  readonly sortedTargets: readonly T[];
+}
+
 export function buildTargetManifest<
   T extends { readonly testCaseId: string; readonly automationKey: string },
->(targets: readonly T[]): ReadonlyMap<TargetTag, TargetManifestEntry<T>> {
-  const sorted = [...targets].sort((a, b) =>
+>(targets: readonly T[]): TargetManifest<T> {
+  const sortedTargets = [...targets].sort((a, b) =>
     a.testCaseId.localeCompare(b.testCaseId),
   );
 
-  return new Map(
-    sorted.map((target, index) => {
+  const manifest = new Map(
+    sortedTargets.map((target, index) => {
       const tag = targetTagAt(index);
       return [tag, { tag, target }];
     }),
   );
+
+  return { manifest, sortedTargets };
 }

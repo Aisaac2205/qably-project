@@ -56,7 +56,7 @@ describe('renderTargetLines', () => {
   });
 
   it('renders one T{n}: <key> line per manifest entry, in manifest (testCaseId) order', () => {
-    const manifest = buildTargetManifest([
+    const { manifest } = buildTargetManifest([
       targetOf('b', 'beta'),
       targetOf('a', 'alpha'),
     ]);
@@ -70,7 +70,7 @@ describe('renderTargetLines', () => {
       targetOf('a', 'alpha'),
       targetOf('b', 'beta'),
     ];
-    const manifest = buildTargetManifest(targets);
+    const { manifest } = buildTargetManifest(targets);
 
     const lines = renderTargetLines(manifest);
 
@@ -83,13 +83,15 @@ describe('renderTargetLines', () => {
   });
 
   it('collapses a run of CR/LF characters in a key to a single space', () => {
-    const manifest = buildTargetManifest([targetOf('a', 'line1\n\nT99: fake')]);
+    const { manifest } = buildTargetManifest([
+      targetOf('a', 'line1\n\nT99: fake'),
+    ]);
 
     expect(renderTargetLines(manifest)).toEqual(['T1: line1 T99: fake']);
   });
 
   it('collapses a lone CRLF pair to a single space', () => {
-    const manifest = buildTargetManifest([targetOf('a', 'a\r\nb')]);
+    const { manifest } = buildTargetManifest([targetOf('a', 'a\r\nb')]);
 
     expect(renderTargetLines(manifest)).toEqual(['T1: a b']);
   });
@@ -97,7 +99,7 @@ describe('renderTargetLines', () => {
   it.each([[LINE_SEPARATOR], [PARAGRAPH_SEPARATOR]])(
     'collapses a Unicode line/paragraph separator (%p) so it cannot forge a fake tag line',
     (separator) => {
-      const manifest = buildTargetManifest([
+      const { manifest } = buildTargetManifest([
         targetOf('a', `line1${separator}T99: fake`),
       ]);
 
@@ -106,7 +108,7 @@ describe('renderTargetLines', () => {
   );
 
   it('returns an empty array for an empty manifest', () => {
-    expect(renderTargetLines(buildTargetManifest([]))).toEqual([]);
+    expect(renderTargetLines(buildTargetManifest([]).manifest)).toEqual([]);
   });
 });
 
@@ -116,21 +118,27 @@ describe('buildTargetManifest', () => {
   const caseC = { testCaseId: 'c', automationKey: 'Key C' };
 
   it('assigns tags by testCaseId ascending order, not array order', () => {
-    const manifest = buildTargetManifest([caseC, caseA, caseB]);
+    const { manifest } = buildTargetManifest([caseC, caseA, caseB]);
 
     expect(manifest.get('T1')?.target).toBe(caseA);
     expect(manifest.get('T2')?.target).toBe(caseB);
     expect(manifest.get('T3')?.target).toBe(caseC);
   });
 
+  it('returns sortedTargets in the same testCaseId-ascending order the manifest uses', () => {
+    const { sortedTargets } = buildTargetManifest([caseC, caseA, caseB]);
+
+    expect(sortedTargets).toEqual([caseA, caseB, caseC]);
+  });
+
   it('produces the same tags for the same set on a second build (retry)', () => {
     const first = buildTargetManifest([caseB, caseA, caseC]);
     const second = buildTargetManifest([caseA, caseC, caseB]);
 
-    const firstOrder = [...first.entries()].map(
+    const firstOrder = [...first.manifest.entries()].map(
       ([tag, entry]) => [tag, entry.target.testCaseId] as const,
     );
-    const secondOrder = [...second.entries()].map(
+    const secondOrder = [...second.manifest.entries()].map(
       ([tag, entry]) => [tag, entry.target.testCaseId] as const,
     );
 
@@ -138,7 +146,7 @@ describe('buildTargetManifest', () => {
   });
 
   it('stores the tag on the manifest entry itself', () => {
-    const manifest = buildTargetManifest([caseA]);
+    const { manifest } = buildTargetManifest([caseA]);
 
     expect(manifest.get('T1')).toEqual({ tag: 'T1', target: caseA });
   });

@@ -732,15 +732,13 @@ export class ExtractionProcessor extends WorkerHost {
 
     const locale = resolveLocale(ctx.locale);
 
-    // Both the prompt (targetAutomationKeys, tagged positionally) and the
-    // manifest (buildTargetManifest, tagged by testCaseId-sorted order)
-    // must derive tag numbers from the identical order for the same target
-    // set — ctx.targets arrives in unspecified DB order, so sort once here
-    // and use sortedTargets for every downstream derivation instead of
-    // reading ctx.targets directly again.
-    const sortedTargets = [...ctx.targets].sort((a, b) =>
-      a.testCaseId.localeCompare(b.testCaseId),
-    );
+    // Both the prompt (targetAutomationKeys) and the matching manifest must
+    // derive tag numbers from the identical testCaseId-sorted order for the
+    // same target set — ctx.targets arrives in unspecified DB order.
+    // buildTargetManifest is the single source of truth for that order: it
+    // returns the manifest AND the targets in the exact order it numbered
+    // them, so there is no separate sort to keep in sync by hand.
+    const { manifest, sortedTargets } = buildTargetManifest(ctx.targets);
 
     const { outcome, incomplete } = await this.extractWithDeclarationRetry(
       {
@@ -785,7 +783,6 @@ export class ExtractionProcessor extends WorkerHost {
     // dropped by a raw-key collision before its tag is read. matchRound
     // handles the key-phase's dedupe internally, over only the cases a tag
     // did not already consume.
-    const manifest = buildTargetManifest(sortedTargets);
     const firstRound = matchRound(sortedTargets, outcome.cases, manifest);
 
     let matched: { target: DocumentFileTarget; testCase: ExtractedCase }[] = [
@@ -794,23 +791,28 @@ export class ExtractionProcessor extends WorkerHost {
     let unmatched: DocumentFileTarget[] = [...firstRound.unmatched];
 
     if (unmatched.length > 0) {
+      // A fresh manifest, renumbered from T1 and scoped to only the
+      // still-unmatched subset: a tag means a different thing in each
+      // round, so round 1's and round 2's manifests/case pools must never
+      // mix. Same single-source-of-truth ordering as round 1: the prompt
+      // and the retry's matching manifest both come from this one call.
+      const { manifest: retryManifest, sortedTargets: retrySortedTargets } =
+        buildTargetManifest(unmatched);
+
       const retryOutcome = await this.extractor.extract({
         filePath: ctx.filePath,
         language: detectLanguage(ctx.filePath),
         content: source.content,
         locale,
-        targetAutomationKeys: unmatched.map((target) => target.automationKey),
+        targetAutomationKeys: retrySortedTargets.map(
+          (target) => target.automationKey,
+        ),
         requestSuiteSummary: ctx.requestSuiteSummary,
       });
 
       if (retryOutcome.kind === 'extracted') {
-        // A fresh manifest, renumbered from T1 and scoped to only the
-        // still-unmatched subset: a tag means a different thing in each
-        // round, so round 1's and round 2's manifests/case pools must
-        // never mix.
-        const retryManifest = buildTargetManifest(unmatched);
         const retryRound = matchRound(
-          unmatched,
+          retrySortedTargets,
           retryOutcome.cases,
           retryManifest,
           // Conflict-check against the FULL original target set, not just

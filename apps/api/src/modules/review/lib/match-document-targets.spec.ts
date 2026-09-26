@@ -31,7 +31,7 @@ describe('matchRound', () => {
     const t1 = target('case-1', 'Key One');
     const t2 = target('case-2', 'Key Two');
     const t3 = target('case-3', 'Key Three');
-    const manifest = buildTargetManifest([t1, t2, t3]);
+    const { manifest } = buildTargetManifest([t1, t2, t3]);
 
     const drifted = testCase('gArBaGe key that matches nothing', 'T3');
     const { matched, unmatched } = matchRound(
@@ -47,7 +47,7 @@ describe('matchRound', () => {
   it('rejects a tag when the citing case key normalizes to a DIFFERENT target and falls back to key matching', () => {
     const t1 = target('case-1', 'Key One');
     const t2 = target('case-2', 'Key Two');
-    const manifest = buildTargetManifest([t1, t2]);
+    const { manifest } = buildTargetManifest([t1, t2]);
 
     const conflicted = testCase('Key   Two', 'T1');
     const { matched, unmatched } = matchRound([t1, t2], [conflicted], manifest);
@@ -59,7 +59,7 @@ describe('matchRound', () => {
   it('accepts a tag when the case key normalizes to the SAME tagged target (no conflict)', () => {
     const t1 = target('case-1', 'Key One');
     const t2 = target('case-2', 'Key Two');
-    const manifest = buildTargetManifest([t1, t2]);
+    const { manifest } = buildTargetManifest([t1, t2]);
 
     const selfConsistent = testCase('Key One', 'T1');
     const { matched, unmatched } = matchRound(
@@ -74,7 +74,7 @@ describe('matchRound', () => {
 
   it('ignores a malformed targetRef and falls back to key matching', () => {
     const t1 = target('case-1', 'Key One');
-    const manifest = buildTargetManifest([t1]);
+    const { manifest } = buildTargetManifest([t1]);
 
     const malformed = testCase('Key One', 'target-1');
     const { matched, unmatched } = matchRound([t1], [malformed], manifest);
@@ -87,7 +87,7 @@ describe('matchRound', () => {
     const t1 = target('case-1', 'Key One');
     const t2 = target('case-2', 'Key Two');
     const t3 = target('case-3', 'Key Three');
-    const manifest = buildTargetManifest([t1, t2, t3]);
+    const { manifest } = buildTargetManifest([t1, t2, t3]);
 
     const outOfRange = testCase('Key Two', 'T9');
     const { matched, unmatched } = matchRound(
@@ -102,7 +102,7 @@ describe('matchRound', () => {
 
   it('rejects both cases when two distinct cases cite the identical tag, leaving the target available for key matching', () => {
     const t1 = target('case-1', 'Key One');
-    const manifest = buildTargetManifest([t1]);
+    const { manifest } = buildTargetManifest([t1]);
 
     const claimA = testCase('some other key A', 'T1');
     const claimB = testCase('Key One', 'T1');
@@ -114,7 +114,7 @@ describe('matchRound', () => {
 
   it('excludes a tag-consumed case from the key-matching pool even when its raw automationKey duplicates another case', () => {
     const t1 = target('case-1', 'Solo Key');
-    const manifest = buildTargetManifest([t1]);
+    const { manifest } = buildTargetManifest([t1]);
 
     // Drifted enough that it matches no target's key by itself, so the tag
     // claim is conflict-free and the case is consumed.
@@ -135,7 +135,7 @@ describe('matchRound', () => {
   it('rejects a tag when two targets share an identical normalized key (accepted edge case), falling both back to the same key match', () => {
     const t1 = target('case-1', 'Shared Key');
     const t2 = target('case-2', 'Shared Key');
-    const manifest = buildTargetManifest([t1, t2]);
+    const { manifest } = buildTargetManifest([t1, t2]);
 
     const exactMatch = testCase('Shared Key', 'T1');
     const { matched, unmatched } = matchRound([t1, t2], [exactMatch], manifest);
@@ -150,7 +150,7 @@ describe('matchRound', () => {
   it('matches a fully tagless case list purely by normalized key, identical to pre-change behavior', () => {
     const t1 = target('case-1', 'Key One');
     const t2 = target('case-2', 'Key Two');
-    const manifest = buildTargetManifest([t1, t2]);
+    const { manifest } = buildTargetManifest([t1, t2]);
 
     const caseForT2 = testCase('Key   Two');
     const caseForT1 = testCase('Key    One');
@@ -171,7 +171,7 @@ describe('matchRound', () => {
     const t1 = target('case-1', 'Alpha');
     const t2 = target('case-2', 'Beta');
     const t3 = target('case-3', 'Gamma');
-    const manifest = buildTargetManifest([t1, t2, t3]);
+    const { manifest } = buildTargetManifest([t1, t2, t3]);
 
     const caseGamma = testCase('Gamma');
     const caseAlpha = testCase('Alpha');
@@ -195,7 +195,7 @@ describe('matchRound', () => {
     // original target set without widening what this call is resolving.
     const alreadyMatchedT1 = target('case-1', 'Key One');
     const stillOpenT2 = target('case-2', 'Key Two');
-    const manifest = buildTargetManifest([stillOpenT2]);
+    const { manifest } = buildTargetManifest([stillOpenT2]);
 
     const collidingCase = testCase('Key One', 'T1');
     const { matched, unmatched } = matchRound(
@@ -216,7 +216,7 @@ describe('matchRound', () => {
     // matchRound (a fresh query, a .map(), a retry round) would silently
     // lose every tag match with no error.
     const t1 = target('case-1', 'Key One');
-    const manifest = buildTargetManifest([t1]);
+    const { manifest } = buildTargetManifest([t1]);
     const clonedT1 = target('case-1', 'Key One');
 
     const drifted = testCase('gArBaGe key that matches nothing', 'T1');
@@ -229,7 +229,7 @@ describe('matchRound', () => {
   it('leaves a target unmatched when no case cites it by tag or key', () => {
     const t1 = target('case-1', 'Alpha');
     const t2 = target('case-2', 'Beta');
-    const manifest = buildTargetManifest([t1, t2]);
+    const { manifest } = buildTargetManifest([t1, t2]);
 
     const { matched, unmatched } = matchRound(
       [t1, t2],
