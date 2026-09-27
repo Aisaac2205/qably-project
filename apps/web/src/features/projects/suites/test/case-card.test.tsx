@@ -483,7 +483,9 @@ describe('CaseCard', () => {
         )
       })
 
-      const link = screen.getByRole('link', { name: /view file on github/i })
+      const link = screen.getByRole('link', {
+        name: 'src/features/runs/hooks/use-create-run.test.ts',
+      })
       expect(link).toHaveAttribute(
         'href',
         'https://github.com/acme/ecommerce-app/blob/HEAD/src/features/runs/hooks/use-create-run.test.ts',
@@ -523,6 +525,71 @@ describe('CaseCard', () => {
       })
 
       expect(screen.queryByRole('link', { name: /view file on github/i })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('case list redesign', () => {
+    it('clamps the objective to two lines instead of truncating it to one', async () => {
+      await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+      const objective = screen.getByTestId('case-objective')
+      expect(objective.className).toContain('line-clamp-2')
+      expect(objective.className).not.toContain('truncate')
+    })
+
+    it('shows the title with no describe-chain prefix', async () => {
+      await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+      const title = screen.getByText('Redirects to dashboard on valid login')
+      expect(title.textContent).toBe('Redirects to dashboard on valid login')
+    })
+
+    it('renders the file path as a link plus the describe chain in one provenance line, when a repo is known', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={automatedCase}
+            githubRepo="acme/ecommerce-app"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const link = screen.getByRole('link', {
+        name: 'src/features/runs/hooks/use-create-run.test.ts',
+      })
+      expect(link).toHaveAttribute(
+        'href',
+        'https://github.com/acme/ecommerce-app/blob/HEAD/src/features/runs/hooks/use-create-run.test.ts',
+      )
+      expect(screen.getByText('useCreateRun')).toBeInTheDocument()
+    })
+
+    it('renders the file path as plain text with no link when the project has no known repo', async () => {
+      await act(async () => { renderWithQuery(<CaseCard testCase={automatedCase} onEdit={noop} onDelete={noop} />) })
+      expect(
+        screen.getByText('src/features/runs/hooks/use-create-run.test.ts'),
+      ).toBeInTheDocument()
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('lets the meta cluster wrap so a long badge never pushes the actions menu out of view', async () => {
+      await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+      const meta = screen.getByText('Critical').parentElement
+      expect(meta?.className).toContain('flex-wrap')
+    })
+
+    it('orders the meta cluster as priority, then status, then actions', async () => {
+      await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+      const priority = screen.getByText('Critical')
+      const status = screen.getByText('Active')
+      const actions = screen.getByRole('button', { name: 'Case actions' })
+
+      expect(
+        priority.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
+      expect(
+        status.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy()
     })
   })
 
@@ -600,7 +667,10 @@ describe('CaseCard', () => {
         )
       })
 
-      expect(screen.getByText('Incomplete: missing Objective, Steps')).toBeInTheDocument()
+      const badge = screen.getByText('Incomplete: missing Objective, Steps')
+      expect(badge).toBeInTheDocument()
+      expect(badge.className).toContain('min-w-0')
+      expect(badge.className).not.toContain('shrink-0')
     })
 
     it('shows the skip reason for a skipped outcome', async () => {

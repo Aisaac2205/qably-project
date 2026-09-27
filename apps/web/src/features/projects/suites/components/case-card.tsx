@@ -55,63 +55,84 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWith
       : null
 
   return (
-    <div className="py-4 px-4 sm:px-5 group bg-surface space-y-2.5">
-      <div className="flex items-center gap-2.5 flex-wrap">
-        <div className="flex-1 min-w-[200px] truncate">
-          <div className="flex items-center gap-1.5 min-w-0">
-            {described.path.length > 0 && (
-              <span className="text-xs font-medium text-muted shrink-0">
-                {described.path.join(' › ')} ›
-              </span>
-            )}
-            <span className="text-sm font-semibold text-default truncate">
-              {described.title}
-            </span>
-          </div>
-          {testCase.automationFilePath && (
-            <p className="mt-0.5 font-mono text-xs text-muted truncate">
-              {testCase.automationFilePath}
-            </p>
-          )}
+    <div className="py-3.5 px-4 sm:px-5 group bg-surface space-y-2.5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-default leading-snug text-pretty line-clamp-2">
+            {described.title}
+          </p>
           {testCase.objective && (
-            <p data-testid="case-objective" className="mt-0.5 text-sm text-muted truncate">
+            <p data-testid="case-objective" className="mt-0.5 text-sm text-muted leading-snug line-clamp-2">
               {testCase.objective}
             </p>
           )}
+          {testCase.automationFilePath && (
+            <div className="mt-1.5 flex min-w-0 items-center gap-1.5 font-mono text-xs text-muted">
+              {githubFileUrl ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <a
+                        href={githubFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={testCase.automationFilePath}
+                      />
+                    }
+                    className="inline-flex min-w-0 shrink basis-auto items-center gap-1 truncate text-muted transition-colors duration-150 hover:text-default outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
+                  >
+                    <Image
+                      src="/logos/github.svg"
+                      alt=""
+                      width={12}
+                      height={12}
+                      aria-hidden="true"
+                      className="shrink-0"
+                    />
+                    {testCase.automationFilePath}
+                  </TooltipTrigger>
+                  <TooltipContent>{t('suites.viewInGithub')}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <span
+                  className="min-w-0 shrink basis-auto truncate"
+                  title={testCase.automationFilePath}
+                >
+                  {testCase.automationFilePath}
+                </span>
+              )}
+              {described.path.length > 0 && (
+                <>
+                  <span aria-hidden="true">›</span>
+                  <span
+                    className="min-w-0 shrink basis-auto truncate"
+                    title={described.path.join(' › ')}
+                  >
+                    {described.path.join(' › ')}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
-        {githubFileUrl && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <a
-                  href={githubFileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={t('suites.viewInGithub')}
-                />
-              }
-              className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-            >
-              <Image src="/logos/github.svg" alt="" width={14} height={14} aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent>{t('suites.viewInGithub')}</TooltipContent>
-          </Tooltip>
-        )}
-        <PriorityBadge priority={testCase.priority} />
-        {documentationBadge !== null ? (
-          <CaseDocumentationBadge badge={documentationBadge} />
-        ) : attention === null || attention === 'in-review' ? (
-          <StatusChip status={testCase.state} scope="lifecycle" />
-        ) : (
-          <CaseAttentionChip attention={attention} />
-        )}
 
-        <CaseActionsMenu
-          testCase={testCase}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onImproveWithAeris={onImproveWithAeris}
-        />
+        <div className="flex flex-wrap items-center gap-2 sm:max-w-1/2 sm:shrink-0 sm:justify-end">
+          <PriorityBadge priority={testCase.priority} />
+          {documentationBadge !== null ? (
+            <CaseDocumentationBadge badge={documentationBadge} />
+          ) : attention === null || attention === 'in-review' ? (
+            <StatusChip status={testCase.state} scope="lifecycle" />
+          ) : (
+            <CaseAttentionChip attention={attention} />
+          )}
+
+          <CaseActionsMenu
+            testCase={testCase}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onImproveWithAeris={onImproveWithAeris}
+          />
+        </div>
       </div>
 
       {qualitySignals.length > 0 && (

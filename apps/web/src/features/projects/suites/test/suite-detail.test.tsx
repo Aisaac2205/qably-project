@@ -675,6 +675,26 @@ describe('SuiteDetail (redesigned)', () => {
           Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy()
     })
+
+    it('renders the group label and count with no eyebrow styling', async () => {
+      const cases = Array.from({ length: 9 }, (_, i) => documentedCase(`c${i}`))
+      const bigDocumentedSuite = createMockSuite({
+        id: 'suite-big-documented-2',
+        manualCases: 0,
+        automatedCases: 9,
+        undocumentedCount: 0,
+        cases,
+      })
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(bigDocumentedSuite)
+
+      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-big-documented-2" />)
+      await act(async () => {})
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+
+      const heading = screen.getByRole('heading', { level: 3, name: 'Documented' })
+      expect(heading.className).not.toContain('uppercase')
+      expect(within(heading.parentElement as HTMLElement).getByText('9')).toBeInTheDocument()
+    })
   })
 
   describe('Aeris documentation watch', () => {

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CaretDown, CaretRight } from '@phosphor-icons/react'
+import { CaretRight } from '@phosphor-icons/react'
 
 const TONE_CLASSES = {
   default: 'text-default hover:text-primary bg-canvas/70 border-border/70',
@@ -22,15 +22,17 @@ export function CaseDisclosureToggle({
   return (
     <button
       onClick={onToggle}
-      className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 border cursor-pointer ${TONE_CLASSES[tone]}`}
+      data-state={isOpen ? 'open' : 'closed'}
+      className={`inline-flex items-center gap-1.5 text-xs font-semibold outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 border cursor-pointer transition-[transform,color,background-color] duration-150 ease-out-quart motion-reduce:transition-none active:scale-97 ${TONE_CLASSES[tone]}`}
       aria-expanded={isOpen}
       type="button"
     >
-      {isOpen ? (
-        <CaretDown size={13} weight="bold" aria-hidden="true" />
-      ) : (
-        <CaretRight size={13} weight="bold" aria-hidden="true" />
-      )}
+      <CaretRight
+        size={13}
+        weight="bold"
+        aria-hidden="true"
+        className={`transition-transform duration-150 ease-out-quart motion-reduce:transition-none ${isOpen ? 'rotate-90' : ''}`}
+      />
       {label}
     </button>
   )
@@ -42,5 +44,10 @@ export interface CaseDisclosurePanelProps {
 }
 
 export function CaseDisclosurePanel({ isOpen, children }: CaseDisclosurePanelProps) {
-  return isOpen ? children : null
+  if (!isOpen) return null
+  return (
+    <div data-state="open" className="disclosure-panel">
+      {children}
+    </div>
+  )
 }

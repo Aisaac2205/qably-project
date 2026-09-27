@@ -154,6 +154,9 @@
      shadow-card: resting cards. shadow-pop: dialogs, menus, popovers. */
   --shadow-card:              0 1px 1px 0 oklch(0.185 0.004 85 / 0.025);
   --shadow-pop:               0 4px 12px -2px oklch(0.12 0 0 / 0.08), 0 2px 4px -2px oklch(0.12 0 0 / 0.04);
+
+  /* Strong ease-out curve for disclosures and micro-interactions */
+  --ease-out-quart:           cubic-bezier(0.23, 1, 0.32, 1);
   --color-blocked:            var(--status-blocked);
   --color-blocked-bg:         var(--status-blocked-bg);
   --color-skip:               var(--status-skip);
@@ -301,6 +304,32 @@ button:focus-visible,
 @media (prefers-reduced-motion: no-preference) {
   .animate-page-enter {
     animation: page-enter 200ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+}
+
+/* ─── Disclosure panel ────────────────────────────────────────────
+   Enter-only reveal: opacity + a 2px rise, no height animation. Exit
+   is an instant unmount, which is the intended enter/exit asymmetry. */
+
+.disclosure-panel {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 150ms var(--ease-out-quart), transform 150ms var(--ease-out-quart);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-panel {
+    transition: opacity 150ms var(--ease-out-quart);
+    transform: none;
+
+    @starting-style {
+      transform: none;
+    }
   }
 }
 

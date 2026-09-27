@@ -395,15 +395,15 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
             ) : caseGroups ? (
               caseGroups.map((group) => (
                 <Fragment key={group.key}>
-                  <div className="flex items-center gap-2 py-2 px-4 sm:px-5 bg-surface-hover text-xs font-bold uppercase tracking-wide text-muted">
-                    {t(
-                      group.key === 'needsAttention'
-                        ? 'suites.caseGroupNeedsAttention'
-                        : 'suites.caseGroupDocumented',
-                    )}
-                    <span className="font-mono tabular-nums normal-case tracking-normal rounded-full border border-border bg-surface px-2 text-[11px] text-default">
-                      {group.cases.length}
-                    </span>
+                  <div className="flex items-baseline gap-2 px-4 sm:px-5 py-2 bg-canvas">
+                    <h3 className="text-sm font-medium text-default">
+                      {t(
+                        group.key === 'needsAttention'
+                          ? 'suites.caseGroupNeedsAttention'
+                          : 'suites.caseGroupDocumented',
+                      )}
+                    </h3>
+                    <span className="text-xs tabular-nums text-muted">{group.cases.length}</span>
                   </div>
                   {group.cases.map((tc) => (
                     <CaseCard
