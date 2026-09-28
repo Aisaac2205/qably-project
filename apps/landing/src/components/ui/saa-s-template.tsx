@@ -135,14 +135,14 @@ export const Hero = React.memo(({ locale = 'es' }: { locale?: Locale }) => {
           {/* Mobile view (< md): Dedicated iPhone 16 Pro mockup */}
           <div className="block md:hidden">
             {(!mounted || !isDesktop) && (
-              <MobileDashboardIphone tDashboard={dashboard} locale={locale} />
+              <MobileDashboardIphone locale={locale} />
             )}
           </div>
 
           {/* Desktop view (>= md): Full Desktop MacBook Window (Direct, no extra card) */}
           <div className="hidden md:block">
             {(!mounted || isDesktop) && (
-              <DashboardWindowFrame tDashboard={dashboard} tHero={hero} locale={locale} />
+              <DashboardWindowFrame tHero={hero} locale={locale} />
             )}
           </div>
         </div>
