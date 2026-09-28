@@ -61,7 +61,7 @@ export function SuiteFiltersSheet({
             data-testid="suite-filters-trigger"
             className={cn(
               buttonVariants({ variant: 'outline' }),
-              'h-11 w-full gap-2 px-4 text-sm',
+              'w-full gap-2',
               className,
             )}
           />
@@ -126,7 +126,7 @@ export function SuiteFiltersSheet({
             <Button
               type="button"
               variant="outline"
-              className="h-11 flex-1"
+              className="flex-1"
               onClick={() => {
                 onStatusChange('all')
                 onTagChange('all')
@@ -136,7 +136,7 @@ export function SuiteFiltersSheet({
             </Button>
           )}
           <SheetClose
-            render={<Button type="button" className="h-11 flex-1" />}
+            render={<Button type="button" className="flex-1" />}
           >
             {t('suites.applyFilters')}
           </SheetClose>

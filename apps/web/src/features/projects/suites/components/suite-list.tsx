@@ -139,7 +139,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
         <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
           <Link
             href={suiteNewPath(projectId)}
-            className={cn(buttonVariants(), 'h-11 w-full px-4 text-sm md:h-10 md:w-auto')}
+            className={cn(buttonVariants(), 'w-full md:w-auto')}
           >
             <Plus size={16} weight="bold" aria-hidden="true" />
             {t('suites.newSuite')}

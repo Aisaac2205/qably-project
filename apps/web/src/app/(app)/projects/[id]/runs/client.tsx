@@ -37,7 +37,7 @@ export function RunListPageClient({ projectId }: { projectId: string }) {
               disabled
               focusableWhenDisabled
               aria-describedby="new-run-no-manual-hint"
-              className="h-11 w-full px-4 text-sm md:h-10 md:w-auto"
+              className="w-full md:w-auto"
             >
               <Plus size={16} weight="bold" aria-hidden="true" />
               {t('runs.newRun')}
@@ -49,7 +49,7 @@ export function RunListPageClient({ projectId }: { projectId: string }) {
         ) : (
           <Link
             href={`/projects/${projectId}/runs/new`}
-            className={cn(buttonVariants(), 'h-11 w-full px-4 text-sm md:h-10 md:w-auto')}
+            className={cn(buttonVariants(), 'w-full md:w-auto')}
           >
             <Plus size={16} weight="bold" aria-hidden="true" />
             {t('runs.newRun')}
