@@ -4,12 +4,9 @@ import { useState } from 'react'
 import type { DashboardPeriod } from '@qably/types'
 import { DASHBOARD_PERIODS } from '@qably/types'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
-import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/page-header'
-import { StateView } from '@/components/ui/state-view'
 import AnimatedDropdown from '@/components/ui/animated-dropdown'
 import { KpiStrip } from '@/features/dashboard/components/kpi-strip'
-import { useDashboardSummary } from '@/features/dashboard/hooks/use-dashboard-summary'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { projectRootPath } from '@/features/projects/lib/routes'
 import { useTranslation } from '@/lib/i18n'
@@ -19,54 +16,10 @@ import { DailyActivityBarChart } from './daily-activity-bar-chart'
 const SHELL_CLASSES =
   'mx-auto w-full max-w-dashboard space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter'
 
-interface RetryStateViewProps {
-  title: string
-  description: string
-  onRetry: () => void
-  retryLabel: string
-}
-
-function RetryStateView({ title, description, onRetry, retryLabel }: RetryStateViewProps) {
-  return (
-    <StateView
-      kind="error"
-      title={title}
-      description={description}
-      action={
-        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
-          {retryLabel}
-        </Button>
-      }
-    />
-  )
-}
-
 export function QualityPage({ projectId }: { projectId: string }) {
   const { t } = useTranslation()
   const [period, setPeriod] = useState<DashboardPeriod>(30)
   const { project } = useProject(projectId)
-  const summaryQuery = useDashboardSummary(projectId)
-
-  if (summaryQuery.isLoading) {
-    return (
-      <div className={SHELL_CLASSES}>
-        <StateView kind="loading" title={t('quality.loading')} />
-      </div>
-    )
-  }
-
-  if (summaryQuery.isError || summaryQuery.summary === undefined) {
-    return (
-      <div className={SHELL_CLASSES}>
-        <RetryStateView
-          title={t('quality.loadErrorTitle')}
-          description={t('quality.loadErrorDescription')}
-          retryLabel={t('common.retry')}
-          onRetry={() => void summaryQuery.refetch()}
-        />
-      </div>
-    )
-  }
 
   return (
     <div className={SHELL_CLASSES}>

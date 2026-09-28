@@ -143,32 +143,35 @@ describe('QualityPage', () => {
     getPushPassRate.mockResolvedValue(pushPassRate)
   })
 
-  it('shows a loading state while the quality summary is being fetched', async () => {
-    getDashboardSummary.mockReturnValue(new Promise(() => {}))
+  it('renders the page header without waiting for the chart queries', async () => {
+    getDashboardOverview.mockReturnValue(new Promise(() => {}))
+    getPushPassRate.mockReturnValue(new Promise(() => {}))
 
     await act(async () => {
       renderPage()
     })
 
-    expect(screen.getByRole('status')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ecommerce App' })).toBeInTheDocument()
   })
 
-  it('shows an error state with a retry action when the summary fails to load', async () => {
-    getDashboardSummary.mockRejectedValue(new Error('network down'))
+  it('never requests the dashboard summary, which the page does not read', async () => {
+    await act(async () => {
+      renderPage()
+    })
+
+    expect(getDashboardSummary).not.toHaveBeenCalled()
+  })
+
+  it('keeps the header and the other sections up when one query fails', async () => {
+    getPushPassRate.mockRejectedValue(new Error('network down'))
 
     await act(async () => {
       renderPage()
     })
 
     expect(await screen.findByRole('alert')).toBeInTheDocument()
-    const retryButton = screen.getByRole('button', { name: 'Retry' })
-
-    getDashboardSummary.mockResolvedValue(summary)
-    await act(async () => {
-      retryButton.click()
-    })
-
-    expect(await screen.findByRole('heading', { name: 'Ecommerce App' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ecommerce App' })).toBeInTheDocument()
+    expect(await screen.findByText('Executed cases')).toBeInTheDocument()
   })
 
   describe('once loaded', () => {
