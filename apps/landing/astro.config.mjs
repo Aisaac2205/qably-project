@@ -26,6 +26,20 @@ export default defineConfig({
   },
   vite: {
     plugins: [tailwindcss()],
+    ssr: {
+      noExternal: [
+        'd3-scale',
+        'd3-shape',
+        'd3-array',
+        '@number-flow/react',
+        '@base-ui/react',
+        '@central-icons-react/all',
+        'class-variance-authority',
+        'clsx',
+        'tailwind-merge',
+        'zustand',
+      ],
+    },
     server: {
       allowedHosts: ['qably.dev', 'www.qably.dev', '.qably.dev', 'localhost', '127.0.0.1'],
     },
