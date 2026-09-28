@@ -414,6 +414,26 @@ export interface RegressionsRecord {
   runsScanned: number
 }
 
+export interface PushPassRateCandle {
+  commitSha: string
+  shortSha: string
+  startedAt: string
+  open: number
+  close: number
+  high: number
+  low: number
+  runCount: number
+  passRate: number
+  executed: number
+  passed: number
+  failed: number
+  blocked: number
+}
+
+export interface PushPassRateRecord {
+  items: PushPassRateCandle[]
+}
+
 export interface CiCommitActivityRecord {
   commitSha: string
   shortSha: string
@@ -472,6 +492,8 @@ export interface KpiMetric {
 
 export interface DailyPoint {
   date: string
+  /** Last day covered by this bucket. Equal to `date` when the granularity is daily. */
+  rangeEnd: string
   passRate: number | null
   runs: number
   failedRuns: number
@@ -543,6 +565,13 @@ export interface DashboardOverviewKpis {
   avgRunDurationMs: KpiMetric
 }
 
+export interface CasePriorityCounts {
+  critical: number
+  high: number
+  medium: number
+  low: number
+}
+
 export interface DashboardOverviewRecord {
   period: DashboardPeriod
   timeZone: string
@@ -550,8 +579,11 @@ export interface DashboardOverviewRecord {
   passRateSeries: {
     current: DailyPoint[]
     previous: DailyPoint[]
+    /** Bucket granularity resolved from `period` — 'week' when period is 90, 'day' otherwise. */
+    granularity: 'day' | 'week'
   }
   casesPassing: RunCaseCounts
+  casePriorities?: CasePriorityCounts
   projects: DashboardProjectRow[]
   recentActivity: DashboardActivityEntry[]
 }
@@ -685,6 +717,7 @@ export interface IngestionBatch {
   status: 'pending' | 'completed' | 'failed'
   codeChangeIds: string[]
   createdAt: string
+  branch?: string | null
 }
 export interface ExtractedProposal {
   id: string

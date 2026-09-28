@@ -17,6 +17,12 @@ import { NotificationsPublisher } from '../notifications/notifications.publisher
 import { PrismaService } from '../../prisma/prisma.service';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
+  PUSH_PASS_RATE_SQL,
+  toShortSha,
+  type PushPassRateRow,
+} from './lib/push-pass-rate';
+import { resolveSinceDate } from './lib/resolve-since-date';
+import {
   CASE_READ_SELECT,
   CASE_SELECT,
   RUN_LIST_SELECT,
@@ -32,6 +38,7 @@ import {
   type RankedRunRow,
 } from './lib/suite-metrics';
 import type {
+  PushPassRateOhlcView,
   RegressionsView,
   RunQueryError,
   RunsPageView,
@@ -148,13 +155,16 @@ export class RunQueriesService {
   ) {}
 
   async list(org: OrgContext, query: ListRunsQuery): Promise<RunsPageView> {
-    const { projectId, source, limit, cursor } = query;
+    const { projectId, source, limit, cursor, days } = query;
 
     const rows = (await this.prisma.run.findMany({
       where: {
         organizationId: org.organizationId,
         ...(projectId === undefined ? {} : { projectId }),
         ...(source === undefined ? {} : { source }),
+        ...(days === undefined
+          ? {}
+          : { startedAt: { gte: resolveSinceDate(new Date(), days) } }),
       },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
       ...(limit === undefined ? {} : { take: limit + 1 }),
@@ -350,6 +360,39 @@ export class RunQueriesService {
     }
 
     return { items, runsScanned: scannedRuns.length };
+  }
+
+  async pushPassRateOhlc(
+    org: OrgContext,
+    projectId: string,
+    days: number,
+  ): Promise<PushPassRateOhlcView> {
+    const since = resolveSinceDate(new Date(), days);
+
+    const rows = await this.prisma.$queryRawUnsafe<PushPassRateRow[]>(
+      PUSH_PASS_RATE_SQL,
+      org.organizationId,
+      projectId,
+      since,
+    );
+
+    return {
+      items: rows.map((row) => ({
+        commitSha: row.commitSha,
+        shortSha: toShortSha(row.commitSha),
+        startedAt: row.startedAt.toISOString(),
+        open: row.open,
+        close: row.close,
+        high: row.high,
+        low: row.low,
+        runCount: row.runCount,
+        passRate: row.passRate,
+        executed: row.executed,
+        passed: row.passed,
+        failed: row.failed,
+        blocked: row.blocked,
+      })),
+    };
   }
 
   async findOne(

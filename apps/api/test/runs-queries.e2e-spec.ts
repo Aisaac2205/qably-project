@@ -96,6 +96,7 @@ describe('Runs queries (e2e)', () => {
     },
     suite: { findFirst: jest.fn(), findMany: jest.fn() },
     $queryRaw: jest.fn().mockResolvedValue([]),
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn(),
   };
 
