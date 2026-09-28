@@ -653,7 +653,12 @@ const TimeSeriesChartCore = memo(function TimeSeriesChartCore({
       value={referenceAreaRegistration}
     >
       <ChartProvider value={contextValue}>
-        <svg aria-hidden="true" height={height} width={width}>
+        <svg
+          aria-hidden="true"
+          height={height}
+          style={{ touchAction: "none" }}
+          width={width}
+        >
           <defs>
             {defsChildren}
             {useClipReveal ? (
