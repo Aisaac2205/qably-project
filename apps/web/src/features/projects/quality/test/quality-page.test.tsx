@@ -190,14 +190,14 @@ describe('QualityPage', () => {
     })
 
     it('exposes the pass-rate change per push through an accessible table', async () => {
-      const table = await screen.findByRole('table', { name: /pass-rate change/i })
+      const table = await screen.findByRole('table', { name: /pass rate over the last/i })
       expect(within(table).getByText('Commit')).toBeInTheDocument()
       expect(within(table).getByText('commit2')).toBeInTheDocument()
       expect(within(table).getByText('+20%')).toBeInTheDocument()
     })
 
     it('omits the first push, which has no predecessor to compare against', async () => {
-      const table = await screen.findByRole('table', { name: /pass-rate change/i })
+      const table = await screen.findByRole('table', { name: /pass rate over the last/i })
       expect(within(table).queryByText('commit1')).not.toBeInTheDocument()
     })
 
