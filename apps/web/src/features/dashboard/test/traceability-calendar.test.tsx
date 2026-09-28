@@ -161,3 +161,58 @@ describe('TraceabilityCalendar accessibility', () => {
     expect(grid.querySelector('colgroup')).not.toBeNull()
   })
 })
+
+const zeroRecord: TraceabilityCalendarRecord = {
+  year: 2026,
+  timeZone: 'America/Guatemala',
+  totals: { scm: 0, proposals: 0, official: 0, runs: 0 },
+  days: [],
+}
+
+function renderEmptyCalendar(props: { isLoading?: boolean } = {}) {
+  const grid = buildTraceabilityGrid(zeroRecord, 'all', MONTHS, 'en')
+
+  return render(
+    <TraceabilityCalendar
+      weeks={grid.weeks}
+      monthLabels={grid.monthLabels}
+      locale="en"
+      caption="2026 traceability calendar"
+      dayLabel={(day) => `${day.count} events on ${day.date}`}
+      emptyTitle="No traceability events yet"
+      emptyDescription="Connect a repository to start tracking commits, proposals, official cases and CI runs."
+      emptyActionLabel="Connect a repository"
+      isLoading={props.isLoading}
+    />,
+  )
+}
+
+describe('TraceabilityCalendar empty state', () => {
+  it('shows the empty state instead of the grid when every stage total is zero', () => {
+    renderEmptyCalendar()
+
+    expect(screen.getByText('No traceability events yet')).toBeInTheDocument()
+    expect(screen.queryByRole('grid')).not.toBeInTheDocument()
+  })
+
+  it('links the empty-state CTA to the integrations route', () => {
+    renderEmptyCalendar()
+
+    const cta = screen.getByRole('link', { name: 'Connect a repository' })
+    expect(cta).toHaveAttribute('href', '/integrations')
+  })
+
+  it('does not show the empty state while the query is still loading', () => {
+    renderEmptyCalendar({ isLoading: true })
+
+    expect(screen.queryByText('No traceability events yet')).not.toBeInTheDocument()
+    expect(screen.getByRole('grid')).toBeInTheDocument()
+  })
+
+  it('renders the grid when at least one stage has events for the year', () => {
+    renderCalendar()
+
+    expect(screen.queryByText('No traceability events yet')).not.toBeInTheDocument()
+    expect(screen.getByRole('grid')).toBeInTheDocument()
+  })
+})

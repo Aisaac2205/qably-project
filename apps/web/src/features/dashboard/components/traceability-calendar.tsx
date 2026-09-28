@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useRef, useCallback, useId } from 'react'
+import { useState, useRef, useCallback, useId, useMemo } from 'react'
+import Link from 'next/link'
 import { TraceabilityTooltip } from './traceability-tooltip'
 import { weekdayNames } from '../lib/traceability-grid'
+import { StateView } from '@/components/ui/state-view'
+import { buttonVariants } from '@/components/ui/button'
 import type {
   CalendarDayData,
   CalendarWeekData,
@@ -29,6 +32,10 @@ export interface TraceabilityCalendarProps {
   readonly lessLabel?: string
   readonly moreLabel?: string
   readonly dayLabel: (day: CalendarDayData) => string
+  readonly isLoading?: boolean
+  readonly emptyTitle?: string
+  readonly emptyDescription?: string
+  readonly emptyActionLabel?: string
 }
 
 interface FocusPosition {
@@ -55,6 +62,16 @@ function monthSpans(
   }))
 }
 
+function isYearEmpty(weeks: readonly CalendarWeekData[]): boolean {
+  return weeks.every((week) =>
+    week.days.every((day) => {
+      if (day === null) return true
+      const { scm, proposals, official, runs } = day.breakdown
+      return scm + proposals + official + runs === 0
+    }),
+  )
+}
+
 export function TraceabilityCalendar({
   weeks,
   monthLabels,
@@ -63,6 +80,10 @@ export function TraceabilityCalendar({
   lessLabel = 'Menos',
   moreLabel = 'Más',
   dayLabel,
+  isLoading = false,
+  emptyTitle = 'Aún no hay eventos de trazabilidad',
+  emptyDescription = 'Conecte un repositorio para empezar a registrar commits, propuestas, casos oficiales y ejecuciones de CI.',
+  emptyActionLabel = 'Conectar un repositorio',
 }: TraceabilityCalendarProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const captionId = useId()
@@ -72,6 +93,7 @@ export function TraceabilityCalendar({
 
   const names = weekdayNames(locale)
   const spans = monthSpans(monthLabels, weeks.length)
+  const isEmpty = useMemo(() => isYearEmpty(weeks), [weeks])
 
   const show = useCallback((day: CalendarDayData, element: HTMLElement) => {
     const rect = element.getBoundingClientRect()
@@ -132,6 +154,22 @@ export function TraceabilityCalendar({
     },
     [moveFocus],
   )
+
+  if (!isLoading && isEmpty) {
+    return (
+      <StateView
+        kind="empty"
+        title={emptyTitle}
+        description={emptyDescription}
+        className="min-h-52"
+        action={
+          <Link href="/integrations" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            {emptyActionLabel}
+          </Link>
+        }
+      />
+    )
+  }
 
   return (
     <div className="relative" ref={containerRef}>
