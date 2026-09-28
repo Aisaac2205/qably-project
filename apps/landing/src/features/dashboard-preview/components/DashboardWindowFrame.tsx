@@ -257,7 +257,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
             </div>
           </header>
 
-          <main className="@container m-3 mt-0 flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-app-surface shadow-app-pop ring-1 ring-app-border">
+          <main className="@container flex min-h-0 flex-1 flex-col overflow-y-auto border-l border-app-border bg-app-surface">
             <section
               aria-label="Dashboard"
               className="w-full space-y-5 px-4 py-5 text-app-default @md:space-y-6 @md:px-6 @2xl:px-8"
@@ -273,7 +273,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                       onClick={() => setSelectedPeriod(period)}
                       className={`rounded-md px-2.5 py-1 transition-colors ${
                         selectedPeriod === period
-                          ? 'bg-app-surface font-semibold text-app-default shadow-xs'
+                          ? 'bg-app-surface text-app-default'
                           : 'text-app-muted hover:text-app-default'
                       }`}
                     >
@@ -374,7 +374,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
 
               {/* 2. Hero: Executed Cases Comparison Chart */}
               <section aria-label={tDashboard.heroTitle} className="mx-auto w-full max-w-dashboard">
-                <div className="flex flex-col rounded-xl border border-app-border bg-app-surface shadow-app-card">
+                <div className="flex flex-col rounded-xl border border-app-border bg-app-surface">
                   <div className="flex flex-col gap-0.5 p-4 pb-2 sm:p-5 sm:pb-3">
                     <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.heroTitle}</h2>
                     <span className="text-xs text-app-muted">{MOCK_DASHBOARD_DATA.hero.rangeLabel}</span>
@@ -457,7 +457,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                   {/* Projects Table (@3xl:col-span-2) */}
                   <section
                     aria-label={tDashboard.projectsTitle}
-                    className="min-w-0 @3xl:col-span-2 flex flex-col justify-between rounded-xl border border-app-border bg-app-surface shadow-app-card"
+                    className="min-w-0 @3xl:col-span-2 flex flex-col justify-between rounded-xl border border-app-border bg-app-surface"
                   >
                     <div className="flex items-center justify-between p-4 pb-3 sm:p-5 sm:pb-4">
                       <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.projectsTitle}</h2>
@@ -524,7 +524,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                   {/* Cases Gauge Card (col-span-1) */}
                   <section
                     aria-label={tDashboard.casesTitle}
-                    className="min-w-0 flex flex-col justify-between rounded-xl border border-app-border bg-app-surface p-4 shadow-app-card sm:p-5"
+                    className="min-w-0 flex flex-col justify-between rounded-xl border border-app-border bg-app-surface p-4 sm:p-5"
                   >
                     <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.casesTitle}</h2>
 
@@ -578,7 +578,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                   {/* Channels Card */}
                   <section
                     aria-label={tDashboard.channelsTitle}
-                    className="min-w-0 flex flex-col rounded-xl border border-app-border bg-app-surface shadow-app-card"
+                    className="min-w-0 flex flex-col rounded-xl border border-app-border bg-app-surface"
                   >
                     <div className="flex items-center justify-between p-4 pb-2 sm:p-5 sm:pb-3">
                       <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.channelsTitle}</h2>
@@ -635,7 +635,7 @@ export function DashboardWindowFrame({ tDashboard }: DashboardWindowFrameProps) 
                   {/* Activity Card */}
                   <section
                     aria-label={tDashboard.activityTitle}
-                    className="min-w-0 flex flex-col rounded-xl border border-app-border bg-app-surface shadow-app-card"
+                    className="min-w-0 flex flex-col rounded-xl border border-app-border bg-app-surface"
                   >
                     <div className="flex items-center justify-between p-4 pb-2 sm:p-5 sm:pb-3">
                       <h2 className="text-sm font-semibold text-app-default sm:text-base">{tDashboard.activityTitle}</h2>
