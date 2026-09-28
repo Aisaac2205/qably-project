@@ -12,41 +12,8 @@ import React, { useState, useRef, FC, ReactNode } from 'react'
  */
 import { CaretDown } from '@phosphor-icons/react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
-
-const Button = React.forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }
->(({ className, variant, size, ...props }, ref) => (
-  <button
-    ref={ref}
-    className={cn(
-      'inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-      variant === 'outline'
-        ? 'border border-border bg-surface text-default hover:bg-surface-hover hover:text-default'
-        : variant === 'ghost'
-        ? 'hover:bg-surface-hover hover:text-default'
-        : variant === 'link'
-        ? 'text-primary underline-offset-4 hover:underline'
-        : 'bg-primary text-primary-fg hover:bg-primary-hover',
-      size === 'sm'
-        ? 'h-11 px-2.5 text-xs md:h-8'
-        : size === 'lg'
-        ? 'h-12 px-8 md:h-11'
-        : size === 'icon'
-        ? 'size-11 md:size-10'
-        : 'h-11 px-4 py-2 md:h-10',
-      className,
-    )}
-    {...props}
-  />
-))
-Button.displayName = 'Button'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () => void) {
   React.useEffect(() => {
