@@ -14,7 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
 import {
@@ -44,7 +43,6 @@ import {
   projectSuitesPath,
 } from '@/features/projects/lib/routes'
 import { useTranslation } from '@/lib/i18n'
-import { cn } from '@/lib/utils'
 
 interface NavItem {
   label: string
@@ -101,7 +99,7 @@ export function Sidebar() {
   return (
     <ShadcnSidebar variant="sidebar" collapsible="icon" className="border-r-0! bg-sidebar">
       <nav aria-label="Sidebar" className="flex h-full flex-col">
-      <SidebarHeader className={cn('justify-center p-2', isCollapsed ? undefined : 'h-14')}>
+      <SidebarHeader className="h-14 justify-center border-b border-border p-2">
         {isCollapsed ? (
           <>
             <Link
@@ -118,12 +116,9 @@ export function Sidebar() {
                 priority
               />
             </Link>
-            <div className="flex items-center justify-center">
-              <SidebarTrigger className="shrink-0" />
-            </div>
           </>
         ) : (
-          <div className="flex h-10 w-full items-center justify-between gap-1.5 px-0.5">
+          <div className="flex h-10 w-full items-center px-0.5">
             <Link
               href="/dashboard"
               aria-label="Qably"
@@ -138,7 +133,6 @@ export function Sidebar() {
                 priority
               />
             </Link>
-            <SidebarTrigger className="shrink-0 text-sidebar-fg-muted hover:text-sidebar-foreground hover:bg-sidebar-hover" />
           </div>
         )}
       </SidebarHeader>
@@ -150,7 +144,7 @@ export function Sidebar() {
             <Link
               href="/projects"
               aria-label={`${t('sidebar.projects')}: ${project.name}`}
-              className="flex min-h-9 items-center gap-1.5 px-2 text-xs font-medium text-sidebar-fg-muted transition-all duration-150 active:scale-[0.98] hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              className="flex min-h-9 items-center gap-1.5 px-2 text-sm font-medium text-sidebar-fg-muted transition-colors duration-150 hover:text-sidebar-foreground focus-visible:outline-2 focus-visible:outline-primary"
             >
               <CaretLeft size={18} weight="bold" aria-hidden="true" />
               {!isCollapsed && <span className="truncate">{project.name}</span>}

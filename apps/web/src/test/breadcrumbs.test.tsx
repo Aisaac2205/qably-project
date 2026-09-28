@@ -60,8 +60,35 @@ describe('Breadcrumbs', () => {
         />,
       )
     })
-    // Should have 2 separator elements (between A-B and B-C)
+    // 2 separator carets (between A-B and B-C) plus the mobile-only "…"
+    // marker that appears once the trail has more than 2 crumbs to collapse.
     const separators = document.querySelectorAll('[aria-hidden="true"]')
-    expect(separators.length).toBe(2)
+    expect(separators.length).toBe(3)
+  })
+
+  it('collapses to the immediate parent and current page below md, keeping every crumb in the DOM', async () => {
+    await act(async () => {
+      render(
+        <Breadcrumbs
+          items={[
+            { label: 'Projects', href: '/projects' },
+            { label: 'Ecommerce App', href: '/projects/proj-1' },
+            { label: 'Suites', href: '/projects/proj-1/suites' },
+            { label: 'Notifications for collisions across every active project' },
+          ]}
+        />,
+      )
+    })
+
+    // All four crumbs stay in the DOM (for SEO and assistive tech); only
+    // the first two are hidden below md via CSS.
+    const projects = screen.getByText('Projects')
+    const app = screen.getByText('Ecommerce App')
+    expect(projects.closest('li')).toHaveClass('hidden', 'md:flex')
+    expect(app.closest('li')).toHaveClass('hidden', 'md:flex')
+
+    const current = screen.getByText('Notifications for collisions across every active project')
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(current.closest('li')).not.toHaveClass('hidden')
   })
 })

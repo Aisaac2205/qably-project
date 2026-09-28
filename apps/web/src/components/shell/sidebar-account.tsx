@@ -87,10 +87,10 @@ export function SidebarAccount({ name, image, role, collapsed }: SidebarAccountP
           className={triggerClassName}
         >
           {collapsed ? (
-            <UserAvatar name={name} image={image} size={36} className="shadow-xs" />
+            <UserAvatar name={name} image={image} size={36} className="" />
           ) : (
             <>
-              <UserAvatar name={name} image={image} size={32} className="shadow-xs" />
+              <UserAvatar name={name} image={image} size={32} className="" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium leading-tight text-sidebar-foreground">{name}</span>
                 <span className="block truncate text-xs leading-normal text-sidebar-fg-muted">{role}</span>

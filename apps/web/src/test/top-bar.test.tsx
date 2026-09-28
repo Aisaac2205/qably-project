@@ -82,23 +82,24 @@ vi.mock('@/features/projects/hooks/use-project', async () => {
 
 
 describe('TopBar', () => {
-  it('renders a Dashboard title heading on /dashboard', async () => {
+  it('shows Dashboard as breadcrumb context on /dashboard, never as a page heading', async () => {
     mockPathname.mockReturnValue('/dashboard')
     const { container } = render(<TopBar />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
     // Unimplemented controls stay out of the keyboard order.
     expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /user menu/i })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /notifications/i })).toBeInTheDocument()
     expect(screen.getByText('AR')).toBeInTheDocument()
-    expect(container.firstElementChild).toHaveClass('bg-sidebar')
-    expect(container.firstElementChild).not.toHaveClass('border-b')
+    expect(container.firstElementChild).toHaveClass('bg-surface', 'border-b', 'border-border')
   })
 
-  it('shows the sub-route title on project routes', async () => {
+  it('shows the sub-route title on project routes, not as a page heading', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/runs')
     await act(async () => { render(<TopBar />) })
-    expect(screen.getByRole('heading', { level: 1, name: 'Runs' })).toBeInTheDocument()
+    expect(screen.getByText('Runs')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
   it('does not expose the deferred search command as a dead control', async () => {
@@ -107,34 +108,39 @@ describe('TopBar', () => {
     expect(screen.queryByRole('button', { name: /search/i })).not.toBeInTheDocument()
   })
 
-  it('renders a Review Inbox title heading on /review-inbox', async () => {
+  it('shows Review Inbox as breadcrumb context on /review-inbox, not as a page heading', async () => {
     mockPathname.mockReturnValue('/review-inbox')
     render(<TopBar />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Review Inbox' })).toBeInTheDocument()
+    expect(screen.getByText('Review Inbox')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
-  it('renders a Project Chat title heading on the aeris sub-route', async () => {
+  it('shows Project Chat as breadcrumb context on the aeris sub-route, not as a page heading', async () => {
     mockPathname.mockReturnValue('/projects/proj-1/aeris')
     await act(async () => { render(<TopBar />) })
-    expect(screen.getByRole('heading', { level: 1, name: 'Project Chat' })).toBeInTheDocument()
+    expect(screen.getByText('Project Chat')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
-  it('renders a Projects title heading on /projects', async () => {
+  it('shows Projects as breadcrumb context on /projects, not as a page heading', async () => {
     mockPathname.mockReturnValue('/projects')
     render(<TopBar />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Projects' })).toBeInTheDocument()
+    expect(screen.getByText('Projects')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
-  it('renders a Notifications title heading on /notifications', async () => {
+  it('shows Notifications as breadcrumb context on /notifications, not as a page heading', async () => {
     mockPathname.mockReturnValue('/notifications')
     render(<TopBar />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Notifications' })).toBeInTheDocument()
+    expect(screen.getByText('Notifications')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
-  it('renders a Settings title heading on /settings', async () => {
+  it('shows Settings as breadcrumb context on /settings, not as a page heading', async () => {
     mockPathname.mockReturnValue('/settings')
     render(<TopBar />)
-    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.queryByRole('heading')).not.toBeInTheDocument()
   })
 
   it('shows the signed-in user, not a hardcoded name', async () => {

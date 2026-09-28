@@ -26,7 +26,6 @@ export function UserAvatar({ name, image, size, className }: UserAvatarProps) {
         width={size}
         height={size}
         className={`${classes} object-cover`}
-        style={style}
       />
     )
   }

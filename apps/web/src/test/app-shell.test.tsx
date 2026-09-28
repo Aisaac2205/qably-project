@@ -120,7 +120,7 @@ describe('AppShell', () => {
     expect(screen.getByRole('banner')).toBeInTheDocument()
   })
 
-  it('keeps shell chrome flat and frames only the central workspace', async () => {
+  it('keeps the workspace on one flat surface, divided from the sidebar by a hairline border', async () => {
     const { container } = render(
       <AppShell>
         <div>Content</div>
@@ -128,16 +128,14 @@ describe('AppShell', () => {
     )
 
     expect(container.querySelector('[data-slot="sidebar"]')).toHaveAttribute('data-variant', 'sidebar')
-    expect(container.querySelector('[data-slot="sidebar-wrapper"]')).toHaveClass('bg-sidebar')
-    expect(container.querySelector('[data-slot="sidebar-inset"]')).toHaveClass('bg-sidebar')
-    expect(screen.getByRole('main')).toHaveClass(
+    expect(container.querySelector('[data-slot="sidebar-wrapper"]')).toHaveClass('bg-surface')
+    expect(container.querySelector('[data-slot="sidebar-inset"]')).toHaveClass(
       'bg-surface',
-      'overflow-auto',
-      'md:m-3',
-      'md:mt-0',
-      'md:rounded-2xl',
-      'md:ring-1',
+      'md:border-l',
+      'md:border-border',
     )
+    expect(screen.getByRole('main')).toHaveClass('bg-surface', 'overflow-auto')
+    expect(screen.getByRole('main')).not.toHaveClass('md:rounded-2xl', 'md:ring-1', 'md:shadow-pop')
   })
 
   it('starts keyboard order with a visible-on-focus skip link and one main landmark', async () => {

@@ -44,23 +44,22 @@ export function TopBar() {
   const title = getPageTitle(pathname, project, t)
 
   return (
-    <div className="flex h-14 items-center justify-between bg-sidebar px-4 md:px-6">
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <SidebarTrigger className="md:hidden -ml-1" />
+    <div className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:px-6">
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <SidebarTrigger className="-ml-1.5 shrink-0" />
         {title && (
-          <h1
-            id={pathname === '/dashboard' || pathname === '/' ? 'dashboard-title' : 'page-title'}
-            className="text-base md:text-lg font-semibold tracking-[-0.015em] text-default"
-          >
+          <p className="truncate text-base md:text-lg font-semibold tracking-[-0.015em] text-default">
             {title}
-          </h1>
+          </p>
         )}
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
         <NotificationsMenu />
 
-        <UserAvatar name={currentUser.name} image={currentUser.image} size={28} />
+        <div className="md:hidden">
+          <UserAvatar name={currentUser.name} image={currentUser.image} size={28} />
+        </div>
       </div>
     </div>
   )

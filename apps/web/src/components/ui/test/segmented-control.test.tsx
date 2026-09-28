@@ -10,7 +10,7 @@ const options = [
 ] as const
 
 describe('SegmentedControl', () => {
-  it('paints the selected option with the primary surface', () => {
+  it('marks the selected option with a visible border, not fill alone', () => {
     render(
       <SegmentedControl
         label="Status"
@@ -20,8 +20,8 @@ describe('SegmentedControl', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Open' })).toHaveClass('bg-primary')
-    expect(screen.getByRole('button', { name: 'All' })).not.toHaveClass('bg-primary')
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveClass('border-primary/60', 'bg-surface')
+    expect(screen.getByRole('button', { name: 'All' })).not.toHaveClass('border-primary/60', 'bg-surface')
   })
 
   it('describes a filter group as pressed buttons', () => {
