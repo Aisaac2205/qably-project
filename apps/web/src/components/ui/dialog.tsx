@@ -43,7 +43,7 @@ function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.
         <DialogPrimitive.Popup
           data-slot="dialog-content"
           className={cn(
-            "fixed z-50 grid w-full max-w-lg gap-4 border border-border bg-background p-6 shadow-pop duration-200",
+            "fixed z-50 grid w-[calc(100%-2rem)] max-w-lg max-h-[calc(100dvh-2rem)] gap-4 overflow-y-auto border border-border bg-background p-6 shadow-pop duration-200",
             "left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] rounded-lg",
             "data-[ending-style]:opacity-0 data-[ending-style]:scale-95 data-[starting-style]:opacity-0 data-[starting-style]:scale-95",
             "sm:rounded-lg",
@@ -54,7 +54,7 @@ function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.
           {children}
           <DialogPrimitive.Close
             className={cn(
-              "absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100",
+              "absolute right-3 top-3 flex size-6 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100",
               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
               "disabled:pointer-events-none",
             )}
@@ -72,7 +72,7 @@ function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1.5 text-center sm:text-left", className)}
+      className={cn("flex flex-col gap-1.5 pr-8 text-center sm:text-left", className)}
       {...props}
     />
   )
