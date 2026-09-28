@@ -179,9 +179,13 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
         <section className="rule-bleed space-y-4 border-y border-border py-5 sm:py-6" aria-labelledby="repository-source-heading">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-canvas/80 p-2.5 text-default">
-                <Image src={`/logos/${source.provider.toLowerCase()}.svg`} alt="" width={22} height={22} className="size-full object-contain" />
-              </div>
+              <Image
+                src={`/logos/${source.provider.toLowerCase()}.svg`}
+                alt=""
+                width={28}
+                height={28}
+                className="size-7 shrink-0 object-contain"
+              />
               <div className="min-w-0">
                 <h2 id="repository-source-heading" className="sr-only">
                   {t('repository.sourceHeading')}
