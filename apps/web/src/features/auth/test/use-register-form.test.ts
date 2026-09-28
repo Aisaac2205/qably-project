@@ -51,7 +51,7 @@ describe('useRegisterForm', () => {
 
     await fillAndSubmit(result)
 
-    expect(push).toHaveBeenCalledWith('/projects')
+    expect(push).toHaveBeenCalledWith('/dashboard')
   })
 
   it('returns to the invite it came from once registration succeeds', async () => {
@@ -83,6 +83,6 @@ describe('useRegisterForm', () => {
 
     await fillAndSubmit(result)
 
-    expect(push).toHaveBeenCalledWith('/projects')
+    expect(push).toHaveBeenCalledWith('/dashboard')
   })
 })

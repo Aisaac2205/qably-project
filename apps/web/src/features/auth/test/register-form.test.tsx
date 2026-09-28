@@ -120,7 +120,7 @@ describe('RegisterForm', () => {
     await user.type(screen.getByLabelText('Confirm password'), 'longenoughpassword')
     await user.click(screen.getByRole('button', { name: 'Create account' }))
 
-    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/projects'))
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'))
   })
 
   it('registers against the api with the trimmed name', async () => {
@@ -171,7 +171,7 @@ describe('RegisterForm', () => {
     await vi.waitFor(() =>
       expect(signInSocial).toHaveBeenCalledWith({
         provider: 'github',
-        callbackURL: `${window.location.origin}/projects`,
+        callbackURL: `${window.location.origin}/dashboard`,
       }),
     )
   })

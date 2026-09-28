@@ -35,7 +35,7 @@ export interface RegisterForm {
   continueWithGithub: () => Promise<void>
 }
 
-const DESTINATION = '/projects'
+const DESTINATION = '/dashboard'
 
 export function useRegisterForm(): RegisterForm {
   const router = useRouter()
