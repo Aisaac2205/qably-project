@@ -583,7 +583,7 @@ export interface DashboardOverviewRecord {
     granularity: 'day' | 'week'
   }
   casesPassing: RunCaseCounts
-  casePriorities?: CasePriorityCounts
+  casePriorities: CasePriorityCounts
   projects: DashboardProjectRow[]
   recentActivity: DashboardActivityEntry[]
 }

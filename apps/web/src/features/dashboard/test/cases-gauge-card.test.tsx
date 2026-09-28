@@ -21,6 +21,41 @@ describe('CasesGaugeCard', () => {
     getOverview.mockResolvedValue(dashboardOverviewFixture)
   })
 
+  it('totals the real case priorities instead of a share of the executed run cases', async () => {
+    getOverview.mockResolvedValue({
+      ...dashboardOverviewFixture,
+      casesPassing: { total: 900, pending: 0, running: 0, pass: 900, fail: 0, skip: 0, blocked: 0 },
+      casePriorities: { critical: 1, high: 2, medium: 3, low: 4 },
+    })
+
+    await act(async () => {
+      renderWithQuery(<CasesGaugeCard period={30} />)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByRole('img', { name: 'Case distribution by priority' })).toBeInTheDocument()
+    })
+    expect(screen.queryByText('900')).not.toBeInTheDocument()
+  })
+
+  it('shows the empty state when the project has no cases, rather than a fabricated split', async () => {
+    getOverview.mockResolvedValue({
+      ...dashboardOverviewFixture,
+      casesPassing: { total: 500, pending: 0, running: 0, pass: 500, fail: 0, skip: 0, blocked: 0 },
+      casePriorities: { critical: 0, high: 0, medium: 0, low: 0 },
+    })
+
+    await act(async () => {
+      renderWithQuery(<CasesGaugeCard period={30} />)
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('img', { name: 'Case distribution by priority' }),
+      ).not.toBeInTheDocument()
+    })
+  })
+
   it('titles the section with an h2 under the page h1', async () => {
     await act(async () => {
       renderWithQuery(<CasesGaugeCard period={30} />)

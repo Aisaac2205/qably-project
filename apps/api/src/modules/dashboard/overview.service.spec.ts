@@ -74,6 +74,65 @@ describe('OverviewService organization scope', () => {
   });
 });
 
+describe('OverviewService case priorities', () => {
+  it('counts active cases per priority, scoped to the organization', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC');
+
+    expect(prisma.testCase.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['priority'],
+        where: {
+          state: 'active',
+          project: { organizationId: 'org-1' },
+        },
+      }),
+    );
+  });
+
+  it('narrows the priority count to one project when one is requested', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).overview(org, 7, 'UTC', 'project-1');
+
+    expect(prisma.testCase.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['priority'],
+        where: {
+          state: 'active',
+          project: { organizationId: 'org-1', id: 'project-1' },
+        },
+      }),
+    );
+  });
+
+  it('reports the counted priorities rather than inferring them from run cases', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.groupBy.mockImplementation((args: { by: string[] }) =>
+      Promise.resolve(
+        args.by[0] === 'priority'
+          ? [
+              { priority: 'critical', _count: { _all: 2 } },
+              { priority: 'low', _count: { _all: 7 } },
+            ]
+          : [],
+      ),
+    );
+
+    const result = await build(prisma).overview(org, 7, 'UTC');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.casePriorities).toEqual({
+      critical: 2,
+      high: 0,
+      medium: 0,
+      low: 7,
+    });
+  });
+});
+
 describe('OverviewService casesPassing query scoping', () => {
   it('scopes the casesPassing CTE to the organization on the run side too (defense in depth)', async () => {
     const prisma = createPrisma();

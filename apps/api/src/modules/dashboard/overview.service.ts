@@ -117,6 +117,7 @@ export class OverviewService {
         projects,
         suiteCounts,
         testCaseCounts,
+        casePriorityCounts,
         lastRunAts,
         activityCandidates,
       ] = await Promise.all([
@@ -187,6 +188,17 @@ export class OverviewService {
         }),
         this.prisma.testCase.groupBy({
           by: ['projectId'],
+          where: {
+            state: 'active',
+            project: {
+              organizationId,
+              ...(projectId === undefined ? {} : { id: projectId }),
+            },
+          },
+          _count: { _all: true },
+        }),
+        this.prisma.testCase.groupBy({
+          by: ['priority'],
           where: {
             state: 'active',
             project: {
@@ -363,6 +375,9 @@ export class OverviewService {
         ),
         caseCountByProjectId: new Map(
           testCaseCounts.map((row) => [row.projectId, row._count._all]),
+        ),
+        casePriorityCounts: new Map(
+          casePriorityCounts.map((row) => [row.priority, row._count._all]),
         ),
         lastRunAtByProjectId: new Map(
           lastRunAts

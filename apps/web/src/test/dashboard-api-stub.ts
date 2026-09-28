@@ -208,6 +208,7 @@ export const dashboardOverviewFixture: DashboardOverviewRecord = {
     ],
   },
   casesPassing: { total: 120, pending: 0, running: 0, pass: 98, fail: 12, skip: 5, blocked: 5 },
+  casePriorities: { critical: 6, high: 14, medium: 15, low: 5 },
   projects: [
     {
       id: 'project-1',

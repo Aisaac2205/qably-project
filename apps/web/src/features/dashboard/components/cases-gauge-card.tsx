@@ -43,6 +43,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
   const pieData: PieData[] = useMemo(() => {
     if (!overview) return []
     const total = overview.casesPassing.total || totalDecided || 0
+    if (total === 0) return []
     const critical = overview.casePriorities?.critical ?? Math.round(total * 0.28)
     const high = overview.casePriorities?.high ?? Math.round(total * 0.48)
     const mediumLow = overview.casePriorities
@@ -66,7 +67,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
         color: '#a855f7',
       },
     ]
-  }, [overview, totalDecided, t])
+  }, [overview, t, totalDecided])
 
   const totalValue = useMemo(() => pieData.reduce((acc, curr) => acc + curr.value, 0), [pieData])
 

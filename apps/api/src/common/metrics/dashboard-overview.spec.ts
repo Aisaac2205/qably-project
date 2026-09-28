@@ -29,6 +29,65 @@ function runRow(overrides: Partial<RunCountRow> = {}): RunCountRow {
   };
 }
 
+describe('buildDashboardOverview case priorities', () => {
+  function overviewWithPriorities(counts: ReadonlyMap<string, number>) {
+    return buildDashboardOverview({
+      period: 7,
+      zone: 'UTC',
+      currentDayKeys: [],
+      previousDayKeys: [],
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      casePriorityCounts: counts,
+      lastRunAtByProjectId: new Map(),
+    });
+  }
+
+  it('reports the counted cases per priority', () => {
+    const record = overviewWithPriorities(
+      new Map([
+        ['critical', 4],
+        ['high', 9],
+        ['medium', 12],
+        ['low', 3],
+      ]),
+    );
+
+    expect(record.casePriorities).toEqual({
+      critical: 4,
+      high: 9,
+      medium: 12,
+      low: 3,
+    });
+  });
+
+  it('reports zero for a priority with no cases instead of inferring one', () => {
+    const record = overviewWithPriorities(new Map([['high', 5]]));
+
+    expect(record.casePriorities).toEqual({
+      critical: 0,
+      high: 5,
+      medium: 0,
+      low: 0,
+    });
+  });
+
+  it('reports every priority as zero when the project has no cases at all', () => {
+    const record = overviewWithPriorities(new Map());
+
+    expect(record.casePriorities).toEqual({
+      critical: 0,
+      high: 0,
+      medium: 0,
+      low: 0,
+    });
+  });
+});
+
 describe('buildDashboardOverview daily granularity', () => {
   it('reports null passRate, 0 runs and 0 failedRuns for a day with no data', () => {
     const record = buildDashboardOverview({
@@ -42,6 +101,7 @@ describe('buildDashboardOverview daily granularity', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -83,6 +143,7 @@ describe('buildDashboardOverview daily granularity', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -104,6 +165,7 @@ describe('buildDashboardOverview daily granularity', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -148,6 +210,7 @@ describe('buildDashboardOverview daily granularity', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -183,6 +246,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -205,6 +269,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -225,6 +290,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -245,6 +311,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -271,6 +338,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -293,6 +361,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -315,6 +384,7 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -342,6 +412,7 @@ describe('buildDashboardOverview KPI aggregation', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -369,6 +440,7 @@ describe('buildDashboardOverview KPI aggregation', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -394,6 +466,7 @@ describe('buildDashboardOverview KPI aggregation', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -420,6 +493,7 @@ describe('buildDashboardOverview casesPassing', () => {
       projects: [],
       suiteCountByProjectId: new Map(),
       caseCountByProjectId: new Map(),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map(),
     });
 
@@ -469,6 +543,7 @@ describe('buildDashboardOverview project rows', () => {
         ['project-1', 10],
         ['project-2', 2],
       ]),
+      casePriorityCounts: new Map(),
       lastRunAtByProjectId: new Map([
         ['project-1', new Date('2026-06-10T09:00:00.000Z')],
       ]),

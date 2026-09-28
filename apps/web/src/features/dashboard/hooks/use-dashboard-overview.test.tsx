@@ -29,6 +29,7 @@ const overview: DashboardOverviewRecord = {
   },
   passRateSeries: { current: [], previous: [], granularity: 'day' },
   casesPassing: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
+  casePriorities: { critical: 0, high: 0, medium: 0, low: 0 },
   projects: [],
   recentActivity: [],
 }

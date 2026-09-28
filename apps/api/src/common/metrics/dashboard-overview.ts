@@ -1,5 +1,6 @@
 import { computePassRate } from '@qably/types';
 import type {
+  CasePriorityCounts,
   CaseStatus,
   DailyPoint,
   DashboardOverviewKpis,
@@ -50,6 +51,7 @@ export interface BuildDashboardOverviewInput {
   projects: readonly ProjectRow[];
   suiteCountByProjectId: ReadonlyMap<string, number>;
   caseCountByProjectId: ReadonlyMap<string, number>;
+  casePriorityCounts: ReadonlyMap<string, number>;
   lastRunAtByProjectId: ReadonlyMap<string, Date>;
 }
 
@@ -226,6 +228,17 @@ function buildKpi(
   };
 }
 
+function buildCasePriorities(
+  counts: ReadonlyMap<string, number>,
+): CasePriorityCounts {
+  return {
+    critical: counts.get('critical') ?? 0,
+    high: counts.get('high') ?? 0,
+    medium: counts.get('medium') ?? 0,
+    low: counts.get('low') ?? 0,
+  };
+}
+
 function buildCasesPassing(rows: readonly CasesPassingRow[]): RunCaseCounts {
   const counts = emptyCaseCounts();
 
@@ -325,6 +338,7 @@ export function buildDashboardOverview(
       granularity: bucketGranularity(input.period),
     },
     casesPassing: buildCasesPassing(input.casesPassingRows),
+    casePriorities: buildCasePriorities(input.casePriorityCounts),
     projects: buildProjectRows(
       input.projects,
       input.suiteCountByProjectId,
