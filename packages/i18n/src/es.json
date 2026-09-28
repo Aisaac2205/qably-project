@@ -458,6 +458,8 @@
     "casesTotalLabel": "Total de casos",
     "priorityCritical": "Crítico",
     "priorityHigh": "Alta prioridad",
+    "priorityMedium": "Media",
+    "priorityLow": "Baja",
     "priorityMediumLow": "Media y baja",
     "casesPassedOf": "{{passed}}/{{total}} con éxito",
     "casesFailedLabel": "Fallidos",

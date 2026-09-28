@@ -75,7 +75,8 @@ describe('CasesGaugeCard', () => {
     // 3 clean, direct rivals without (P0) codes
     expect(screen.getByText('Critical')).toBeInTheDocument()
     expect(screen.getByText('High priority')).toBeInTheDocument()
-    expect(screen.getByText('Medium and low')).toBeInTheDocument()
+    expect(screen.getByText('Medium')).toBeInTheDocument()
+    expect(screen.getByText('Low')).toBeInTheDocument()
 
     // Center shows total cases label
     expect(screen.getByText('Total cases')).toBeInTheDocument()
@@ -134,6 +135,7 @@ describe('CasesGaugeCard', () => {
     getOverview.mockResolvedValue({
       ...dashboardOverviewFixture,
       casesPassing: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
+      casePriorities: { critical: 0, high: 0, medium: 0, low: 0 },
       projects: [],
     })
     const client = createTestQueryClient()

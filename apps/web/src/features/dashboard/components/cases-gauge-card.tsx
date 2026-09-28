@@ -32,42 +32,33 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
 
   const title = t('dashboard.casesTitle')
 
-  const totalDecided =
-    overview === undefined
-      ? 0
-      : overview.casesPassing.pass +
-        overview.casesPassing.fail +
-        overview.casesPassing.blocked +
-        overview.casesPassing.skip
-
   const pieData: PieData[] = useMemo(() => {
-    if (!overview) return []
-    const total = overview.casesPassing.total || totalDecided || 0
-    if (total === 0) return []
-    const critical = overview.casePriorities?.critical ?? Math.round(total * 0.28)
-    const high = overview.casePriorities?.high ?? Math.round(total * 0.48)
-    const mediumLow = overview.casePriorities
-      ? overview.casePriorities.medium + overview.casePriorities.low
-      : Math.max(0, total - critical - high)
+    const priorities = overview?.casePriorities
+    if (!priorities) return []
 
     return [
       {
         label: t('dashboard.priorityCritical'),
-        value: critical,
+        value: priorities.critical,
         color: '#ef4444',
       },
       {
         label: t('dashboard.priorityHigh'),
-        value: high,
+        value: priorities.high,
         color: '#0ea5e9',
       },
       {
-        label: t('dashboard.priorityMediumLow'),
-        value: mediumLow,
+        label: t('dashboard.priorityMedium'),
+        value: priorities.medium,
         color: '#a855f7',
       },
+      {
+        label: t('dashboard.priorityLow'),
+        value: priorities.low,
+        color: '#c8a4f6',
+      },
     ]
-  }, [overview, t, totalDecided])
+  }, [overview, t])
 
   const totalValue = useMemo(() => pieData.reduce((acc, curr) => acc + curr.value, 0), [pieData])
 
