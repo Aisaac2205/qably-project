@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import { SealCheck } from '@phosphor-icons/react'
 import { ChannelStat, DeliveryBars } from '@qably/ui/dashboard'
 import type { DashboardWebhookChannel, NotificationWebhookType } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
@@ -18,10 +19,16 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="flex flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+    <div className="group flex flex-1 flex-col justify-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border">
-          <Image src={LOGO_SRC[webhook.type]} alt="" width={20} height={20} className="size-5 shrink-0" />
+        <div className="flex size-8 shrink-0 items-center justify-center">
+          <Image
+            src={LOGO_SRC[webhook.type]}
+            alt=""
+            width={24}
+            height={24}
+            className="size-6 shrink-0 object-contain transition-transform duration-150 ease-out group-hover:scale-105"
+          />
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-default">{webhook.name}</p>
@@ -36,20 +43,26 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
           failedLabel={t('dashboard.channelsFailedLabel')}
           className="w-28"
         />
-        <div className="ml-auto flex shrink-0 items-end gap-3 sm:ml-0">
-          <ChannelStat
-            value={webhook.sent}
-            unit={t('dashboard.channelsSentUnit', { count: webhook.sent })}
-            srText={t('dashboard.channelsSentCount', { count: webhook.sent })}
-            data-testid="channel-sent-count"
-          />
-          <ChannelStat
-            value={webhook.failed}
-            unit={t('dashboard.channelsFailedUnit', { count: webhook.failed })}
-            srText={t('dashboard.channelsFailedCount', { count: webhook.failed })}
-            tone={webhook.failed > 0 ? 'fail' : 'pass'}
-            data-testid="channel-failed-count"
-          />
+        <div className="ml-auto flex shrink-0 items-center sm:ml-0">
+          <span className="inline-flex h-8 md:h-7 items-center gap-1 px-2.5 text-xs font-medium text-muted">
+            <span>{t('dashboard.channelsStatusConnected')}</span>
+            <SealCheck size={12} weight="bold" className="text-status-pass shrink-0" aria-hidden="true" />
+          </span>
+          <div className="sr-only">
+            <ChannelStat
+              value={webhook.sent}
+              unit={t('dashboard.channelsSentUnit', { count: webhook.sent })}
+              srText={t('dashboard.channelsSentCount', { count: webhook.sent })}
+              data-testid="channel-sent-count"
+            />
+            <ChannelStat
+              value={webhook.failed}
+              unit={t('dashboard.channelsFailedUnit', { count: webhook.failed })}
+              srText={t('dashboard.channelsFailedCount', { count: webhook.failed })}
+              tone={webhook.failed > 0 ? 'fail' : 'pass'}
+              data-testid="channel-failed-count"
+            />
+          </div>
         </div>
       </div>
     </div>
