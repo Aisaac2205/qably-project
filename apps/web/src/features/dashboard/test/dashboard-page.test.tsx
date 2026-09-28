@@ -1,5 +1,6 @@
-import { screen, act } from '@testing-library/react'
+import { screen, act, render } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 if (typeof window !== 'undefined' && !window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
@@ -20,8 +21,31 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
 import { DashboardPage } from '@/features/dashboard/components/dashboard-page'
 import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
-import { dashboardOverviewFixture, dashboardChannelsFixture } from '@/test/dashboard-api-stub'
+import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
+import { getBrowserTimeZone } from '@/lib/time-zone'
+import {
+  dashboardOverviewFixture,
+  dashboardChannelsFixture,
+  emptyDashboardOverviewFixture,
+  emptyDashboardChannelsFixture,
+} from '@/test/dashboard-api-stub'
 import { getDashboardOverview, getDashboardChannels } from '@/features/dashboard/api/dashboard.api'
+
+function renderEmptyDashboard() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity, staleTime: 0 } },
+  })
+  const tz = getBrowserTimeZone()
+
+  client.setQueryData(dashboardKeys.overview(7, 'all', tz), emptyDashboardOverviewFixture)
+  client.setQueryData(dashboardKeys.channels(tz), emptyDashboardChannelsFixture)
+
+  return render(
+    <QueryClientProvider client={client}>
+      <DashboardPage />
+    </QueryClientProvider>,
+  )
+}
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -90,5 +114,24 @@ describe('DashboardPage', () => {
 
     expect(screen.queryByLabelText('Quality overview')).not.toBeInTheDocument()
     expect(screen.queryByRole('table', { name: 'Project status' })).not.toBeInTheDocument()
+  })
+
+  it('shows an explicit empty state on every card for a brand-new account with zero data', async () => {
+    getOverview.mockResolvedValue(emptyDashboardOverviewFixture)
+    getChannels.mockResolvedValue(emptyDashboardChannelsFixture)
+
+    await act(async () => {
+      renderEmptyDashboard()
+    })
+
+    expect(
+      await screen.findByText('No executed cases data for the selected period'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('No runs recorded for the selected period')).toBeInTheDocument()
+    expect(screen.getByText('No cases recorded yet')).toBeInTheDocument()
+    expect(screen.getByText('No recent activity')).toBeInTheDocument()
+
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument()
+    expect(document.body.innerHTML).not.toContain('NaN')
   })
 })

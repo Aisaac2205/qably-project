@@ -241,6 +241,26 @@ export function getDashboardOverview(): Promise<DashboardOverviewRecord> {
   return Promise.resolve(dashboardOverviewFixture)
 }
 
+export const emptyDashboardOverviewFixture: DashboardOverviewRecord = {
+  period: 7,
+  timeZone: 'UTC',
+  kpis: {
+    passRate: { value: null, previous: null, series: [] },
+    runs: { value: 0, previous: 0, series: [] },
+    failedCases: { value: 0, previous: 0, series: [] },
+    avgRunDurationMs: { value: null, previous: null, series: [] },
+  },
+  passRateSeries: {
+    granularity: 'day',
+    current: [],
+    previous: [],
+  },
+  casesPassing: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
+  casePriorities: { critical: 0, high: 0, medium: 0, low: 0 },
+  projects: [],
+  recentActivity: [],
+}
+
 export const dashboardChannelsFixture: DashboardChannelsRecord = {
   webhooks: [
     {
@@ -301,4 +321,11 @@ export const dashboardChannelsFixture: DashboardChannelsRecord = {
 
 export function getDashboardChannels(): Promise<DashboardChannelsRecord> {
   return Promise.resolve(dashboardChannelsFixture)
+}
+
+export const emptyDashboardChannelsFixture: DashboardChannelsRecord = {
+  webhooks: [],
+  email: { enabled: false, eventTypes: [], sent: 0, failed: 0, daily: [] },
+  inApp: { sent: 0, unread: 0, daily: [] },
+  lastDelivery: null,
 }
