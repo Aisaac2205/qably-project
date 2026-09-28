@@ -1,9 +1,9 @@
 'use client'
 
 import { useMutation } from '@tanstack/react-query'
-import { rotateWebhookSecret } from '../api/repository.api'
+import { rotateWebhookSecret } from '@/features/projects/repository/api/repository.api'
 
-export function useRotateWebhookSecret(projectId: string) {
+export function useRotateSigningKey(projectId: string) {
   return useMutation({
     mutationFn: () => rotateWebhookSecret(projectId),
   })

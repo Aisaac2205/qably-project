@@ -18,6 +18,7 @@ const batchRow = {
   source: 'WEBHOOK',
   status: 'COMPLETED',
   createdAt: new Date('2026-08-30T00:00:00.000Z'),
+  scmEvent: { branch: 'main' },
   codeChanges: [
     {
       id: 'change-1',
@@ -141,6 +142,7 @@ describe('RepositoryService.findOne', () => {
           status: 'completed',
           codeChangeIds: ['change-1'],
           createdAt: '2026-08-30T00:00:00.000Z',
+          branch: 'main',
         },
         codeChanges: [
           {

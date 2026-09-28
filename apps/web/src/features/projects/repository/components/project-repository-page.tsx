@@ -10,7 +10,7 @@ import {
   Sparkle,
 } from '@phosphor-icons/react'
 import type { CodeChange, Evidence } from '@qably/types'
-import { PageHeader } from '@/components/ui/page-header'
+import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,15 +20,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { EntityList } from '@/components/ui/entity-list'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { StateView } from '@/components/ui/state-view'
 import { WebhookSetupPanel } from '@/features/integrations'
 import { useTranslation } from '@/lib/i18n'
-import { reviewInboxPath } from '@/features/projects/lib/routes'
+import { projectRootPath, reviewInboxPath } from '@/features/projects/lib/routes'
 import { useProposal, useTraceabilityLinks } from '@/lib/use-mock-store'
+import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRepository } from '../hooks/use-project-repository'
-import { WebhookSecretSection } from './webhook-secret-section'
 import { matchDeclaredTestPattern } from '../lib/test-file-patterns'
+import { deriveRepositoryLinks } from '../lib/repository-links'
 import { TestFilePatternsEditor } from './test-file-patterns-editor'
 
 function ChangedFileItem({
@@ -50,7 +52,7 @@ function ChangedFileItem({
   const proposal = useProposal(proposalLink?.to.id ?? '')
 
   return (
-    <li className="min-w-0 rounded-2xl border border-border/70 bg-surface p-4 sm:p-5 transition-all duration-150 hover:border-border hover:shadow-xs space-y-3">
+    <li className="min-w-0 py-3.5 sm:py-4 space-y-2.5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
           <Code size={16} className="shrink-0 text-muted" aria-hidden="true" />
@@ -78,7 +80,7 @@ function ChangedFileItem({
       ) : null}
 
       {proposal ? (
-        <div className="rounded-xl border border-border/80 bg-canvas/40 p-3.5 sm:flex sm:items-center sm:justify-between sm:gap-4">
+        <div className="rounded-lg border border-border/80 bg-canvas/40 p-3.5 sm:flex sm:items-center sm:justify-between sm:gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-xs font-medium text-muted">
               <Sparkle size={13} className="text-accent-ai" />
@@ -109,6 +111,7 @@ function formatTimestamp(timestamp: string, locale: 'en' | 'es') {
 
 export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   const { t, locale } = useTranslation()
+  const { project } = useProject(projectId)
   const { repository, isLoading, isError } = useProjectRepository(projectId)
   const [patternFilter, setPatternFilter] = useState<string>('all')
   const [setupOpen, setSetupOpen] = useState(false)
@@ -127,11 +130,24 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
     ? changedFiles
     : changedFiles.filter((item) => item.detectedPattern === patternFilter)
   const commitSha = batchChanges[0]?.commitSha
+  const primaryEvidence = batchChanges[0] ? evidenceById.get(batchChanges[0].evidenceId) : undefined
+  const { repoUrl, commitUrl } = deriveRepositoryLinks(primaryEvidence?.uri, commitSha)
+
+  const breadcrumbs = (
+    <Breadcrumbs
+      items={[
+        { label: t('suites.breadcrumbProjects'), href: '/projects' },
+        ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+        { label: t('repository.title') },
+      ]}
+    />
+  )
 
   if (isLoading) {
     return (
       <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6">
-        <PageHeader title={t('repository.title')} description={t('repository.subtitle')} />
+        {breadcrumbs}
+        <p className="text-sm text-muted">{t('repository.subtitle')}</p>
         <StateView kind="loading" title={t('repository.loadingTitle')} />
       </div>
     )
@@ -140,7 +156,8 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
   if (isError || repository === undefined) {
     return (
       <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6">
-        <PageHeader title={t('repository.title')} description={t('repository.subtitle')} />
+        {breadcrumbs}
+        <p className="text-sm text-muted">{t('repository.subtitle')}</p>
         <StateView
           kind="error"
           title={t('repository.loadErrorTitle')}
@@ -152,31 +169,51 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
-      <PageHeader title={t('repository.title')} description={t('repository.subtitle')} />
+      <div className="space-y-1">
+        {breadcrumbs}
+        <h1 className="sr-only">{t('repository.title')}</h1>
+        <p className="text-sm text-muted">{t('repository.subtitle')}</p>
+      </div>
 
       {source ? (
-        <section className="rounded-2xl border border-border/70 bg-surface p-6 sm:p-7 shadow-xs hover:border-border transition-all duration-200 space-y-4" aria-labelledby="repository-source-heading">
+        <section className="rule-bleed space-y-4 border-y border-border py-5 sm:py-6" aria-labelledby="repository-source-heading">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3.5 min-w-0">
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-canvas/80 p-2.5 text-default shadow-2xs">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-canvas/80 p-2.5 text-default">
                 <Image src={`/logos/${source.provider.toLowerCase()}.svg`} alt="" width={22} height={22} className="size-full object-contain" />
               </div>
               <div className="min-w-0">
-                <h2 id="repository-source-heading" className="text-xs font-semibold uppercase tracking-wider text-muted">
-                  {PROVIDER_LABEL[source.provider]}
+                <h2 id="repository-source-heading" className="sr-only">
+                  {t('repository.sourceHeading')}
                 </h2>
-                <p className="text-base sm:text-lg font-bold text-default tracking-tight truncate mt-0.5">
-                  {source.repo}
+                <p className="flex min-w-0 items-center gap-1.5">
+                  {repoUrl ? (
+                    <a
+                      href={repoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="truncate text-base sm:text-lg font-semibold text-default tracking-tight hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                    >
+                      {source.repo}
+                    </a>
+                  ) : (
+                    <span className="truncate text-base sm:text-lg font-semibold text-default tracking-tight">
+                      {source.repo}
+                    </span>
+                  )}
+                  {repoUrl ? (
+                    <ArrowSquareOut size={13} className="shrink-0 text-muted" aria-hidden="true" />
+                  ) : null}
+                </p>
+                <p className="mt-0.5 text-xs font-medium text-muted">
+                  {PROVIDER_LABEL[source.provider]}
                 </p>
               </div>
             </div>
 
             {batch?.status === 'completed' ? (
               <div className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 sm:self-auto">
-                <span className="relative flex size-2">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
-                </span>
+                <span className="size-2 rounded-full bg-emerald-500" aria-hidden="true" />
                 <span>{t('repository.activeSync')}</span>
               </div>
             ) : null}
@@ -200,41 +237,64 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
         />
       )}
 
-      {source ? <WebhookSecretSection projectId={projectId} /> : null}
-
       {batch ? (
         <section className="space-y-6" aria-labelledby="repository-ingestion-heading">
-          <div className="space-y-3">
-            <h2 id="repository-ingestion-heading" className="text-base font-semibold text-default">
-              {t('repository.ingestionHeading')}
-            </h2>
-            <div className="overflow-hidden rounded-2xl border border-border/70 bg-surface shadow-xs">
-              <dl className="grid grid-cols-1 divide-y divide-border/60 text-sm sm:grid-cols-4 sm:divide-y-0 sm:divide-x sm:divide-border/60">
-                <div className="p-4 sm:p-5">
-                  <dt className="text-xs font-medium text-muted">{t('repository.ingestionSource')}</dt>
-                  <dd className="mt-1 font-semibold text-default">{t(`repository.source${batch.source === 'repository' ? 'Repository' : 'Webhook'}`)}</dd>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <dt className="text-xs font-medium text-muted">{t('repository.ingestionStatus')}</dt>
-                  <dd className="mt-1 font-semibold text-default">{t(`repository.status${batch.status === 'completed' ? 'Completed' : batch.status === 'pending' ? 'Pending' : 'Failed'}`)}</dd>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <dt className="text-xs font-medium text-muted">{t('repository.ingestionCreated')}</dt>
-                  <dd className="mt-1 font-medium text-default text-xs sm:text-sm">{formatTimestamp(batch.createdAt, locale)}</dd>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <dt className="text-xs font-medium text-muted">{t('repository.commit')}</dt>
-                  <dd className="mt-1">
-                    {commitSha ? (
-                      <span className="font-mono text-xs font-medium text-default bg-canvas/80 px-2 py-0.5 rounded-md border border-border">
-                        {commitSha.slice(0, 7)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted">—</span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
+          <h2 id="repository-ingestion-heading" className="sr-only">
+            {t('repository.ingestionHeading')}
+          </h2>
+
+          {/* Stripe-style commit header — compact inline metadata with full-bleed divider */}
+          <div className="rule-bleed border-b border-border py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-0 sm:divide-x divide-border">
+              <div className="flex items-center gap-2 sm:pr-5">
+                <span className="text-xs font-medium text-muted">{t('repository.branch')}</span>
+                {repoUrl ? (
+                  <a
+                    href={`${repoUrl}/tree/${batch.branch ?? 'main'}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-default font-mono hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                  >
+                    <Image src="/git.png" alt="" width={14} height={14} className="size-3.5 object-contain" />
+                    <span>{batch.branch ?? 'main'}</span>
+                  </a>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-default font-mono">
+                    <Image src="/git.png" alt="" width={14} height={14} className="size-3.5 object-contain" />
+                    <span>{batch.branch ?? 'main'}</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 sm:px-5">
+                <span className="text-xs font-medium text-muted">{t('repository.ingestionStatus')}</span>
+                <span className="text-xs font-semibold text-default">{t(`repository.status${batch.status === 'completed' ? 'Completed' : batch.status === 'pending' ? 'Pending' : 'Failed'}`)}</span>
+              </div>
+              <div className="flex items-center gap-2 sm:px-5">
+                <span className="text-xs font-medium text-muted">{t('repository.ingestionCreated')}</span>
+                <span className="text-xs font-medium text-default">{formatTimestamp(batch.createdAt, locale)}</span>
+              </div>
+              <div className="flex items-center gap-2 sm:pl-5">
+                <span className="text-xs font-medium text-muted">{t('repository.commit')}</span>
+                {commitSha ? (
+                  commitUrl ? (
+                    <a
+                      href={commitUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-xs font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                    >
+                      {commitSha.slice(0, 7)}
+                      <ArrowSquareOut size={11} aria-hidden="true" className="shrink-0" />
+                    </a>
+                  ) : (
+                    <span className="font-mono text-xs font-medium text-default">
+                      {commitSha.slice(0, 7)}
+                    </span>
+                  )
+                ) : (
+                  <span className="text-xs text-muted">—</span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -246,23 +306,41 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
             />
           ) : changedFiles.length > 0 ? (
             <section
-              className="rounded-2xl border border-border/70 bg-surface p-5 sm:p-6 shadow-xs space-y-4"
+              className="space-y-4"
               aria-labelledby="repository-changed-files-heading"
             >
-              <div>
-                <h3 id="repository-changed-files-heading" className="text-sm font-semibold text-default">
-                  {t('repository.changedFilesHeading')}
-                </h3>
-                <p className="mt-1 text-xs sm:text-sm text-muted">
-                  {t('repository.changedFilesSummary', {
-                    files: changedFiles.length,
-                    tests: detectedCount,
-                  })}
-                </p>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 id="repository-changed-files-heading" className="text-base font-semibold text-default">
+                    {t('repository.changedFilesHeading')}
+                  </h3>
+                  <p className="mt-0.5 text-xs sm:text-sm text-muted">
+                    {t('repository.changedFilesSummary', {
+                      files: changedFiles.length,
+                      tests: detectedCount,
+                    })}
+                  </p>
+                </div>
+
+                {detectedCount > 0 && (
+                  <SegmentedControl
+                    className="flex-wrap"
+                    label={t('repository.detectedPattern')}
+                    options={[
+                      { value: 'all', label: t('repository.filterAll') },
+                      ...(source?.testFilePatterns ?? []).map((pattern) => ({
+                        value: pattern,
+                        label: <span className="font-mono">{pattern}</span>,
+                      })),
+                    ]}
+                    value={patternFilter}
+                    onChange={setPatternFilter}
+                  />
+                )}
               </div>
 
-              {detectedCount === 0 ? (
-                <div className="rounded-xl border border-border/60 bg-canvas/60 px-4 py-3 space-y-1">
+              {detectedCount === 0 && (
+                <div className="rounded-lg border border-border/60 bg-surface/50 px-4 py-3 space-y-1">
                   <p className="text-xs sm:text-sm font-medium text-default">
                     {t('repository.noTestsTitle')}
                   </p>
@@ -272,33 +350,21 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
                     })}
                   </p>
                 </div>
-              ) : (
-                <SegmentedControl
-                  className="flex-wrap"
-                  label={t('repository.detectedPattern')}
-                  options={[
-                    { value: 'all', label: t('repository.filterAll') },
-                    ...(source?.testFilePatterns ?? []).map((pattern) => ({
-                      value: pattern,
-                      label: <span className="font-mono">{pattern}</span>,
-                    })),
-                  ]}
-                  value={patternFilter}
-                  onChange={setPatternFilter}
-                />
               )}
 
-              <ul className="space-y-3 pt-1">
-                {visibleFiles.map((item) => (
-                  <ChangedFileItem
-                    key={item.change.id}
-                    change={item.change}
-                    detectedPattern={item.detectedPattern}
-                    originEvidence={evidenceById.get(item.change.evidenceId)}
-                    projectId={projectId}
-                  />
-                ))}
-              </ul>
+              <div className="rule-bleed border-t border-border">
+                <EntityList className="divide-y divide-border">
+                  {visibleFiles.map((item) => (
+                    <ChangedFileItem
+                      key={item.change.id}
+                      change={item.change}
+                      detectedPattern={item.detectedPattern}
+                      originEvidence={evidenceById.get(item.change.evidenceId)}
+                      projectId={projectId}
+                    />
+                  ))}
+                </EntityList>
+              </div>
             </section>
           ) : null}
         </section>
@@ -314,7 +380,7 @@ export function ProjectRepositoryPage({ projectId }: { projectId: string }) {
               {t('repository.viewWebhookSetup')}
             </Button>
           }
-          className="rounded-2xl border border-dashed border-border/70 bg-surface/50 p-8 sm:p-12 text-center"
+          className="rounded-lg border border-dashed border-border bg-surface/50 p-8 sm:p-12 text-center"
         />
       ) : null}
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { Trash } from '@phosphor-icons/react'
+import { Key, Trash } from '@phosphor-icons/react'
 import type { ApiKey } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,6 +24,7 @@ export function ApiKeyRow({ apiKey, onRevoke }: ApiKeyRowProps) {
 
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-5 sm:py-3.5">
+      <Key size={28} className="shrink-0 text-accent-icon" aria-hidden="true" />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-default truncate">{apiKey.name}</span>

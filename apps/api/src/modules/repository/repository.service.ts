@@ -44,6 +44,9 @@ const BATCH_SELECT = {
   source: true,
   status: true,
   createdAt: true,
+  scmEvent: {
+    select: { branch: true },
+  },
   codeChanges: {
     orderBy: { filePath: 'asc' },
     select: {
@@ -102,6 +105,7 @@ interface BatchRow {
   source: keyof typeof BATCH_SOURCE;
   status: keyof typeof BATCH_STATUS;
   createdAt: Date;
+  scmEvent?: { branch: string } | null;
   codeChanges: CodeChangeRow[];
 }
 
@@ -142,6 +146,7 @@ function toBatch(row: BatchRow, projectId: string): IngestionBatch {
     status: BATCH_STATUS[row.status],
     codeChangeIds: row.codeChanges.map((change) => change.id),
     createdAt: row.createdAt.toISOString(),
+    branch: row.scmEvent?.branch ?? null,
   };
 }
 

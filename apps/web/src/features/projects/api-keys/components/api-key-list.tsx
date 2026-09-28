@@ -73,10 +73,10 @@ export function ApiKeyList({
         </Button>
       </div>
 
-      {active.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-default">{t('apiKeys.active')}</h2>
-          <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-default">{t('apiKeys.active')}</h2>
+        {active.length > 0 && (
+          <Card className="rounded-lg border border-border bg-surface overflow-hidden">
             <CardContent className="p-0">
               <EntityList aria-label={t('apiKeys.ariaKeyList')}>
                 {active.map((key) => (
@@ -87,13 +87,13 @@ export function ApiKeyList({
               </EntityList>
             </CardContent>
           </Card>
-        </section>
-      )}
+        )}
+      </section>
 
       {revoked.length > 0 && (
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-muted">{t('apiKeys.revoked')}</h2>
-          <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden opacity-70">
+          <Card className="rounded-lg border border-border bg-surface overflow-hidden opacity-70">
             <CardContent className="p-0">
               <EntityList aria-label={t('apiKeys.revoked')}>
                 {revoked.map((key) => (

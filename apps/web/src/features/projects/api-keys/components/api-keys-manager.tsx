@@ -6,6 +6,7 @@ import { useApiKeys } from '../hooks/use-api-keys'
 import { useCreateApiKey, useRevokeApiKey } from '../hooks/use-api-key-mutations'
 import { ApiKeyList } from './api-key-list'
 import { CreateApiKeyDialog } from './create-api-key-dialog'
+import { SigningKeySection } from './signing-key-section'
 import { SecretRevealDialog } from '@/components/security/secret-reveal-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTranslation } from '@/lib/i18n'
@@ -33,7 +34,7 @@ export function ApiKeysManager({ projectId }: { projectId: string }) {
   }
 
   return (
-    <>
+    <div className="space-y-6">
       <ApiKeyList
         apiKeys={apiKeys}
         isLoading={isLoading}
@@ -42,6 +43,8 @@ export function ApiKeysManager({ projectId }: { projectId: string }) {
         onCreateClick={() => setCreateOpen(true)}
         onRevoke={(key) => setRevokeTarget(key)}
       />
+
+      <SigningKeySection projectId={projectId} />
 
       <CreateApiKeyDialog
         open={createOpen}
@@ -74,6 +77,6 @@ export function ApiKeysManager({ projectId }: { projectId: string }) {
           if (revokeTarget) revokeApiKeyMutation.mutate(revokeTarget.id)
         }}
       />
-    </>
+    </div>
   )
 }
