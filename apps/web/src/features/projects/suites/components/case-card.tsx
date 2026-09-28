@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import type { TestCase } from '@qably/types'
 import { PriorityBadge } from './priority-badge'
 import { Translate } from '@phosphor-icons/react'
@@ -23,6 +24,7 @@ import { CaseDocumentationBadge } from './case-documentation-badge'
 import { CaseActionsMenu } from './case-actions-menu'
 import { CaseDocumentationAction } from './case-documentation-action'
 import { CaseDisclosureToggle, CaseDisclosurePanel } from './case-disclosure'
+import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
 interface CaseCardProps {
   testCase: TestCase
@@ -33,8 +35,8 @@ interface CaseCardProps {
   onImproveWithAeris?: (testCase: TestCase) => void
 }
 
-export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWithAeris }: CaseCardProps) {
-  const { t } = useTranslation()
+export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, onImproveWithAeris }: CaseCardProps) {
+  const { t, locale } = useTranslation()
   const [preconditionsOpen, setPreconditionsOpen] = useState(false)
   const [stepsOpen, setStepsOpen] = useState(false)
   const [expectedOpen, setExpectedOpen] = useState(false)
@@ -55,7 +57,7 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWith
       : null
 
   return (
-    <div className="py-3.5 px-4 sm:px-5 group bg-surface space-y-2.5">
+    <div className="py-3.5 px-4 sm:px-5 group bg-surface space-y-2.5" data-testid={`case-row-${testCase.id}`}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-default leading-snug text-pretty line-clamp-2">
@@ -101,30 +103,37 @@ export function CaseCard({ testCase, githubRepo, onEdit, onDelete, onImproveWith
                   {testCase.automationFilePath}
                 </span>
               )}
-              {described.path.length > 0 && (
-                <>
-                  <span aria-hidden="true">›</span>
-                  <span
-                    className="min-w-0 shrink basis-auto truncate"
-                    title={described.path.join(' › ')}
-                  >
-                    {described.path.join(' › ')}
-                  </span>
-                </>
-              )}
             </div>
           )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:max-w-1/2 sm:shrink-0 sm:justify-end">
           <PriorityBadge priority={testCase.priority} />
+          {testCase.lastResult && (
+            <span className="flex items-center gap-1.5">
+              <StatusChip status={testCase.lastResult.status} />
+              {projectId && testCase.lastResult.commitSha ? (
+                <Link
+                  href={`/projects/${projectId}/runs/${testCase.lastResult.runId}`}
+                  className="font-mono text-xs text-muted transition-colors hover:text-default hover:underline focus-visible:outline-2 focus-visible:outline-primary rounded-sm"
+                  title={t('suites.lastResult')}
+                >
+                  {testCase.lastResult.commitSha.slice(0, 7)}
+                </Link>
+              ) : (
+                <span className="text-xs text-muted">
+                  {formatRelative(testCase.lastResult.recordedAt, locale, t('suites.never'))}
+                </span>
+              )}
+            </span>
+          )}
           {documentationBadge !== null ? (
             <CaseDocumentationBadge badge={documentationBadge} />
-          ) : attention === null || attention === 'in-review' ? (
-            <StatusChip status={testCase.state} scope="lifecycle" />
-          ) : (
+          ) : attention !== null && attention !== 'in-review' ? (
             <CaseAttentionChip attention={attention} />
-          )}
+          ) : testCase.state !== 'active' ? (
+            <StatusChip status={testCase.state} scope="lifecycle" />
+          ) : null}
 
           <CaseActionsMenu
             testCase={testCase}

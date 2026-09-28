@@ -113,81 +113,13 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.queryByText('Default suite')).not.toBeInTheDocument()
   })
 
-  it('renders the manual-case icon with an accessible count when the suite has only manual cases', async () => {
+  it('leaves the last run, its source mark and the pass rate to the detail page', async () => {
     const { container } = renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
-    const composition = container.querySelector('[role="img"][aria-label*="manual"]')
-    expect(composition).toBeInTheDocument()
-    expect(composition).toHaveAttribute('aria-label', '1 manual case')
-  })
 
-  it('renders last run reference with relative time', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
-    })
-    // Should show "3 hours ago" or similar
-    expect(screen.getByText(/ago/i)).toBeInTheDocument()
-  })
-
-  it('shows the Qably mark, not text, for a manual last run', async () => {
-    const { container } = renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
-    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
-    expect(container.querySelector('[aria-label="Manual"]')).toBeInTheDocument()
-  })
-
-  it('shows the GitHub Actions mark, not text, for a CI last run', async () => {
-    const ciRunMetrics = { ...metrics, lastRun: { ...mockRun, source: 'github_actions' as const } }
-    const { container } = renderWithQuery(<SuiteRow suite={mockSuite} metrics={ciRunMetrics} />)
-    expect(screen.queryByText('CI')).not.toBeInTheDocument()
-    expect(container.querySelector('[aria-label="CI"]')).toBeInTheDocument()
-  })
-
-  it('labels an api-sourced last run as API, not Manual', async () => {
-    const apiRunMetrics = { ...metrics, lastRun: { ...mockRun, source: 'api' as const } }
-    renderWithQuery(<SuiteRow suite={mockSuite} metrics={apiRunMetrics} />)
-    expect(screen.getByText('API')).toBeInTheDocument()
-    expect(screen.queryByText('Manual')).not.toBeInTheDocument()
-  })
-
-  it('renders "Never" when no last run', async () => {
-    const noRunMetrics = { ...metrics, lastRun: undefined }
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mockSuite} metrics={noRunMetrics} />)
-    })
-    expect(screen.getByText('Never')).toBeInTheDocument()
-  })
-
-  it('renders the fallback instead of throwing when startedAt is invalid', async () => {
-    const invalidRunMetrics = {
-      ...metrics,
-      lastRun: { ...mockRun, startedAt: 'not-a-date' },
-    }
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mockSuite} metrics={invalidRunMetrics} />)
-    })
-    expect(screen.getByText('Never')).toBeInTheDocument()
-  })
-
-  it('renders the pass rate percentage', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mockSuite} metrics={metrics} />)
-    })
-    expect(screen.getByText('80%')).toBeInTheDocument()
-  })
-
-  it('shows "Not measured yet" instead of 0% when the suite has no completed runs', async () => {
-    const notMeasuredMetrics = { ...metrics, recentPassRate: null, history: [] as RunStatus[] }
-    await act(async () => {
-      renderWithQuery(<SuiteRow suite={mockSuite} metrics={notMeasuredMetrics} />)
-    })
-    expect(screen.getByText('Not measured yet')).toBeInTheDocument()
-    expect(screen.queryByText('0%')).not.toBeInTheDocument()
-  })
-
-  it('renders a run history strip with role="img"', async () => {
-    const { container } = renderWithQuery(
-      <SuiteRow suite={mockSuite} metrics={metrics} />,
-    )
-    expect(container.querySelector('[role="img"]')).toBeInTheDocument()
+    expect(screen.queryByText(/ago/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('80%')).not.toBeInTheDocument()
+    expect(container.querySelector('[aria-label="Manual"]')).toBeNull()
+    expect(container.querySelector('[role="img"]')).toBeNull()
   })
 
   it('renders the status chip', async () => {
@@ -197,7 +129,7 @@ describe('SuiteRow (enriched)', () => {
     expect(screen.getByText('Pass')).toBeInTheDocument()
   })
 
-  it('shows both the automated and manual icons with combined accessible counts for a mixed suite', async () => {
+  it('carries no case-composition icons, which navigate nowhere and repeat the detail page', async () => {
     const mixedSuite = createMockSuite({
       ...mockSuite,
       manualCases: 2,
@@ -206,9 +138,8 @@ describe('SuiteRow (enriched)', () => {
     const { container } = renderWithQuery(
       <SuiteRow suite={mixedSuite} metrics={{ ...metrics, suite: mixedSuite }} />,
     )
-    const composition = container.querySelector('[role="img"][aria-label*="automated"]')
-    expect(composition).toHaveAttribute('aria-label', '3 automated cases · 2 manual cases')
-    expect(container.querySelector('img[src="/logos/github.svg"]')).toBeInTheDocument()
+    expect(container.querySelector('[role="img"][aria-label*="automated"]')).toBeNull()
+    expect(container.querySelector('img[src="/logos/github.svg"]')).toBeNull()
   })
 
   it('click name enters edit mode', async () => {

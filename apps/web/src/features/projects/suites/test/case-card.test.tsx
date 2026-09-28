@@ -174,12 +174,46 @@ describe('CaseCard', () => {
     expect(screen.getByText('Critical')).toBeInTheDocument()
   })
 
-  it('shows state badge', async () => {
+  it('never shows the active lifecycle state, which every healthy case shares', async () => {
     await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
-    expect(screen.getByText('Active')).toBeInTheDocument()
-    const chip = screen.getByText('Active').closest('span')
-    expect(chip).toHaveAttribute('data-status', 'active')
-    expect(chip?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.queryByText('Active')).not.toBeInTheDocument()
+  })
+
+  it('shows the lifecycle state only when it departs from active', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseCard testCase={{ ...mockCase, state: 'deprecated' }} onEdit={noop} onDelete={noop} />,
+      )
+    })
+    const chip = screen.getByText('Deprecated').closest('span')
+    expect(chip).toHaveAttribute('data-status', 'deprecated')
+  })
+
+  it('shows the last execution result as the case status', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseCard
+          testCase={{
+            ...mockCase,
+            lastResult: {
+              status: 'fail',
+              runId: 'run-1',
+              commitSha: 'abcdef1234',
+              recordedAt: '2026-03-01T00:00:00Z',
+            },
+          }}
+          projectId="proj-1"
+          onEdit={noop}
+          onDelete={noop}
+        />,
+      )
+    })
+    const chip = screen.getByText('Fail').closest('span')
+    expect(chip).toHaveAttribute('data-status', 'fail')
+    expect(screen.getByRole('link', { name: 'abcdef1' })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/runs/run-1',
+    )
   })
 
   it('shows the objective as a line under the title when present', async () => {
@@ -561,7 +595,7 @@ describe('CaseCard', () => {
         'href',
         'https://github.com/acme/ecommerce-app/blob/HEAD/src/features/runs/hooks/use-create-run.test.ts',
       )
-      expect(screen.getByText('useCreateRun')).toBeInTheDocument()
+      expect(screen.queryByText('useCreateRun')).not.toBeInTheDocument()
     })
 
     it('renders the file path as plain text with no link when the project has no known repo', async () => {
@@ -579,9 +613,25 @@ describe('CaseCard', () => {
     })
 
     it('orders the meta cluster as priority, then status, then actions', async () => {
-      await act(async () => { renderWithQuery(<CaseCard testCase={mockCase} onEdit={noop} onDelete={noop} />) })
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...mockCase,
+              lastResult: {
+                status: 'pass',
+                runId: 'run-1',
+                commitSha: null as unknown as undefined,
+                recordedAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
       const priority = screen.getByText('Critical')
-      const status = screen.getByText('Active')
+      const status = screen.getByText('Pass')
       const actions = screen.getByRole('button', { name: 'Case actions' })
 
       expect(
@@ -721,7 +771,7 @@ describe('CaseCard', () => {
       expect(screen.getByText('Aeris error')).toBeInTheDocument()
     })
 
-    it('leaves the lifecycle state untouched once the outcome is complete', async () => {
+    it('shows no lifecycle chip for an active case once the outcome is complete', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
@@ -741,7 +791,7 @@ describe('CaseCard', () => {
         )
       })
 
-      expect(screen.getByText('Active')).toBeInTheDocument()
+      expect(screen.queryByText('Active')).not.toBeInTheDocument()
       expect(screen.queryByText('Documenting')).not.toBeInTheDocument()
     })
   })
