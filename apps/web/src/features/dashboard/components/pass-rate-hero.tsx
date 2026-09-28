@@ -129,7 +129,7 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
           ) : isLoading || overview === undefined ? (
             <HeroSkeleton />
           ) : points.length === 0 ? (
-            <p className="py-12 text-center text-xs text-muted">{t('dashboard.heroEmptyLabel')}</p>
+            <StateView kind="empty" title={t('dashboard.heroEmptyLabel')} className="min-h-60" />
           ) : (
             <div
               className={cn(
