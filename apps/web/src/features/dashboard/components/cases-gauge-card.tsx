@@ -40,22 +40,22 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
       {
         label: t('dashboard.priorityCritical'),
         value: priorities.critical,
-        color: '#ef4444',
+        color: 'var(--qb-chart-fail)',
       },
       {
         label: t('dashboard.priorityHigh'),
         value: priorities.high,
-        color: '#0ea5e9',
+        color: 'var(--qb-chart-warn)',
       },
       {
         label: t('dashboard.priorityMedium'),
         value: priorities.medium,
-        color: '#a855f7',
+        color: 'var(--qb-chart-accent)',
       },
       {
         label: t('dashboard.priorityLow'),
         value: priorities.low,
-        color: '#c8a4f6',
+        color: 'var(--qb-chart-line)',
       },
     ]
   }, [overview, t])
@@ -67,7 +67,7 @@ export function CasesGaugeCard({ period, projectId }: CasesGaugeCardProps) {
       label: item.label,
       value: item.value,
       maxValue: totalValue,
-      color: item.color || '#0ea5e9',
+      color: item.color || 'var(--qb-chart-warn)',
     }))
   }, [pieData, totalValue])
 
