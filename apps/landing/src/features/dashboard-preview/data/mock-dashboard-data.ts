@@ -1,279 +1,311 @@
 /**
  * Mock data for the Qably dashboard preview.
- * Shapes faithfully mirror apps/web so the landing preview is a 1:1 replica of the real product.
+ * Conforms 100% to @qably/types (DashboardOverviewRecord, DashboardChannelsRecord)
+ * so the preview renders identically to apps/web without requiring live backend queries.
  */
 import type {
-  DashboardChannelDailyPoint,
-  DashboardProjectRow,
-  DashboardRecentRun,
-  RunCaseCounts,
+  DashboardChannelsRecord,
+  DashboardOverviewRecord,
+  DashboardPeriod,
+  DailyPoint,
 } from '@qably/types'
 
-export interface MockHeroPoint {
-  id: string
-  label: string
-  current: number
-  previous: number
-  passed: number
-  failed: number
-  blocked: number
+export const MOCK_DEMO_USER = {
+  name: 'Isaac Sarceño',
+  email: 'isaac@qably.dev',
+  initials: 'IS',
 }
 
-export interface MockKpiMetric {
-  value: string
-  delta?: string
-  deltaTone?: 'better' | 'worse' | 'neutral'
-  srText?: string
-  series: (number | null)[]
-}
 
-export interface MockDashboardData {
-  period: 30
-  kpis: {
-    passRate: MockKpiMetric
-    runs: MockKpiMetric
-    failedCases: MockKpiMetric
-    avgRunDuration: MockKpiMetric
-  }
-  hero: {
-    rangeLabel: string
-    trendPercent?: number
-    trendText: string
-    trendSubtitle: string
-    trendDirection: 'up' | 'down' | 'equal'
-    points: MockHeroPoint[]
-  }
-  casesPassing: RunCaseCounts & { rate: number }
-  projects: (DashboardProjectRow & { lastRunText: string })[]
-  recentRuns: (DashboardRecentRun & { relativeTime: string })[]
-}
-
-export interface MockChannelItem {
-  id: string
-  name: string
-  type: 'in-app' | 'email' | 'slack' | 'discord'
-  iconUrl: string
-  eventTypesLabel?: string
-  sent: number
-  failed?: number
-  unread?: number
-  daily: DashboardChannelDailyPoint[]
-}
-
-export const MOCK_DASHBOARD_DATA: MockDashboardData = {
-  period: 30,
-  kpis: {
-    passRate: {
-      value: '100%',
-      series: [95, 96, 98, 97, 99, 100, 100, 98, 100, 100],
-    },
-    runs: {
-      value: '7,321',
-      delta: '↑ 7,321',
-      deltaTone: 'better',
-      srText: 'Ejecuciones aumentaron en 7,321 vs. período anterior',
-      series: [10, 12, 15, 110, 35, 80, 220, 15, 60, 15],
-    },
-    failedCases: {
-      value: '54',
-      delta: '↑ 54',
-      deltaTone: 'worse',
-      srText: 'Casos fallidos aumentaron en 54 vs. período anterior',
-      series: [2, 2, 4, 25, 8, 15, 48, 3, 8, 2],
-    },
-    avgRunDuration: {
-      value: '0s',
-      series: [0, 2],
-    },
-  },
-  hero: {
-    rangeLabel: '24 ago – 22 sept',
-    trendPercent: 12.4,
-    trendText: 'Más casos ejecutados que en el período anterior',
-    trendSubtitle: 'Casos ejecutados en los últimos 30 días',
-    trendDirection: 'up',
-    points: [
-      { id: '1', label: '24 ago', current: 10, previous: 5, passed: 10, failed: 0, blocked: 0 },
-      { id: '2', label: '27 ago', current: 20, previous: 5, passed: 20, failed: 0, blocked: 0 },
-      { id: '3', label: '31 ago', current: 2100, previous: 10, passed: 2050, failed: 50, blocked: 0 },
-      { id: '4', label: '4 sept', current: 40, previous: 10, passed: 40, failed: 0, blocked: 0 },
-      { id: '5', label: '8 sept', current: 850, previous: 15, passed: 840, failed: 10, blocked: 0 },
-      { id: '6', label: '11 sept', current: 2600, previous: 20, passed: 2570, failed: 30, blocked: 0 },
-      { id: '7', label: '15 sept', current: 950, previous: 20, passed: 940, failed: 10, blocked: 0 },
-      { id: '8', label: '18 sept', current: 5980, previous: 25, passed: 5920, failed: 60, blocked: 0 },
-      { id: '9', label: '22 sept', current: 1800, previous: 25, passed: 1780, failed: 20, blocked: 0 },
-    ],
-  },
-  casesPassing: {
-    total: 154,
-    pass: 142,
-    fail: 12,
-    skip: 4,
-    blocked: 2,
-    pending: 0,
-    running: 0,
-    rate: 91,
-  },
-  projects: [
-    {
-      id: 'proj-1',
-      name: 'Checkout Web',
-      suites: 3,
-      cases: 40,
-      passRate: 0.82,
-      lastRunAt: '2026-09-22T10:00:00.000Z',
-      lastRunText: 'hace 10 min',
-    },
-    {
-      id: 'proj-2',
-      name: 'API Backend',
-      suites: 4,
-      cases: 64,
-      passRate: 0.96,
-      lastRunAt: '2026-09-22T09:30:00.000Z',
-      lastRunText: 'hace 35 min',
-    },
-    {
-      id: 'proj-3',
-      name: 'Mobile App',
-      suites: 2,
-      cases: 18,
-      passRate: 0.45,
-      lastRunAt: '2026-09-22T08:00:00.000Z',
-      lastRunText: 'hace 1 h',
-    },
-    {
-      id: 'proj-4',
-      name: 'Billing Service',
-      suites: 3,
-      cases: 32,
-      passRate: 0.94,
-      lastRunAt: '2026-09-22T06:00:00.000Z',
-      lastRunText: 'hace 3 h',
-    },
-  ],
-  recentRuns: [
-    {
-      id: 'run-1',
-      projectId: 'proj-1',
-      projectName: 'Checkout Web',
-      suiteId: 'suite-1',
-      suiteName: 'Checkout',
-      name: 'Regression suite',
-      status: 'pass',
-      source: 'github_actions',
-      startedAt: '2026-09-22T10:00:00.000Z',
-      commitSha: 'd2f363de80e51157947e36f40d2965404e162b21',
-      commitMessage: 'fix(ci): retry throttled run reports',
-      casesPassed: 12,
-      casesTotal: 12,
-      passRate: 1,
-      relativeTime: 'hace 10 min',
-    },
-    {
-      id: 'run-2',
-      projectId: 'proj-2',
-      projectName: 'API Backend',
-      suiteId: 'suite-2',
-      suiteName: 'Auth',
-      name: 'Integration tests',
-      status: 'running',
-      source: 'github_actions',
-      startedAt: '2026-09-22T10:08:00.000Z',
-      commitSha: 'a1b2c3d4e5f60718293a4b5c6d7e8f901a2b3c4',
-      commitMessage: 'feat(auth): add device binding',
-      casesPassed: 24,
-      casesTotal: 24,
-      passRate: null,
-      relativeTime: 'hace 2 min',
-    },
-    {
-      id: 'run-3',
-      projectId: 'proj-3',
-      projectName: 'Mobile App',
-      suiteId: 'suite-3',
-      suiteName: 'Auth smoke',
-      name: 'Smoke tests',
-      status: 'fail',
-      source: 'api',
-      startedAt: '2026-09-22T09:25:00.000Z',
-      casesPassed: 3,
-      casesTotal: 5,
-      passRate: 0.6,
-      relativeTime: 'hace 35 min',
-    },
-    {
-      id: 'run-4',
-      projectId: 'proj-4',
-      projectName: 'Billing Service',
-      suiteId: 'suite-4',
-      suiteName: 'Billing Ingestion',
-      name: 'Ingestion pipeline',
-      status: 'pass',
-      source: 'manual',
-      startedAt: '2026-09-22T09:00:00.000Z',
-      casesPassed: 18,
-      casesTotal: 18,
-      passRate: 1,
-      relativeTime: 'hace 1 h',
-    },
-  ],
-}
-
-function generate14DayStrip(
-  sentPattern: number[],
-  failedPattern: number[],
-): DashboardChannelDailyPoint[] {
-  return Array.from({ length: 14 }, (_, index) => ({
-    date: `2026-09-${String(index + 9).padStart(2, '0')}`,
-    sent: sentPattern[index % sentPattern.length] ?? 2,
-    failed: failedPattern[index % failedPattern.length] ?? 0,
-  }))
-}
-
-export const MOCK_CHANNELS: MockChannelItem[] = [
+const MOCK_PROJECTS = [
   {
-    id: 'ch-in-app',
-    name: 'Qably In-App',
-    type: 'in-app',
-    iconUrl: '/icono-qably.png',
-    sent: 124,
-    unread: 2,
-    daily: generate14DayStrip([4, 6, 8, 5, 9, 12, 10, 8, 14, 11, 9, 13, 15, 12], [0]),
+    id: 'proj-core',
+    name: 'Qably Platform Core',
+    suites: 24,
+    cases: 840,
+    passRate: 0.994,
+    lastRunAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
   },
   {
-    id: 'ch-email',
-    name: 'Gmail & Correo',
-    type: 'email',
-    iconUrl: '/logos/gmail.svg',
-    eventTypesLabel: 'Regresión de casos, Seguridad',
-    sent: 48,
-    failed: 0,
-    daily: generate14DayStrip([2, 3, 2, 4, 3, 5, 4, 2, 6, 4, 3, 5, 4, 3], [0]),
+    id: 'proj-billing',
+    name: 'Billing & Subscriptions API',
+    suites: 16,
+    cases: 420,
+    passRate: 0.982,
+    lastRunAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
   },
   {
-    id: 'ch-slack',
-    name: 'Team Slack',
-    type: 'slack',
-    iconUrl: '/logos/slack.svg',
-    eventTypesLabel: 'Fallos de corrida, Alertas críticas',
-    sent: 86,
-    failed: 2,
-    daily: generate14DayStrip([5, 8, 6, 7, 9, 8, 7, 6, 10, 8, 7, 9, 8, 6], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]),
+    id: 'proj-auth',
+    name: 'Auth & Identity Service',
+    suites: 12,
+    cases: 310,
+    passRate: 1,
+    lastRunAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
   },
   {
-    id: 'ch-discord',
-    name: 'Discord Webhook',
-    type: 'discord',
-    iconUrl: '/logos/discord.svg',
-    eventTypesLabel: 'Alertas de regresión, Corridas',
-    sent: 34,
-    failed: 0,
-    daily: generate14DayStrip([1, 2, 3, 2, 4, 3, 2, 4, 3, 2, 3, 2, 1, 2], [0]),
+    id: 'proj-sdk',
+    name: 'Typescript Ingestion SDK',
+    suites: 8,
+    cases: 195,
+    passRate: 0.968,
+    lastRunAt: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
   },
 ]
 
-export const MOCK_DEMO_USER = {
-  name: 'Demo',
-  initials: 'D',
-} as const
+const PORTFOLIO_CASE_TOTAL = MOCK_PROJECTS.reduce((sum, project) => sum + project.cases, 0)
+
+function buildCasePriorities(totalCases: number) {
+  const critical = Math.round(totalCases * 0.08)
+  const high = Math.round(totalCases * 0.19)
+  const low = Math.round(totalCases * 0.14)
+  const medium = Math.max(0, totalCases - critical - high - low)
+  return { critical, high, medium, low }
+}
+
+function generateDailyPoints(days: number, isCurrent: boolean): DailyPoint[] {
+  const points: DailyPoint[] = []
+  const today = new Date(2026, 8, 28) // Sept 28, 2026
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    if (isCurrent) {
+      d.setDate(today.getDate() - i)
+    } else {
+      d.setDate(today.getDate() - days - i)
+    }
+
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
+    // Deterministic organic curve
+    const cycle = Math.sin((i / days) * Math.PI * 2) * 0.4 + 1
+    const baseExecuted = Math.round((isCurrent ? 280 : 210) * cycle + (i % 3 === 0 ? 95 : 30))
+    const runs = Math.max(1, Math.round(baseExecuted / 38))
+    const failed = i % 5 === 0 ? Math.round(baseExecuted * 0.04) : i % 3 === 0 ? 2 : 0
+    const blocked = i % 7 === 0 ? 1 : 0
+    const passed = Math.max(0, baseExecuted - failed - blocked)
+    const failedRuns = failed > 0 ? 1 : 0
+    const passRate = baseExecuted > 0 ? passed / baseExecuted : 1
+
+    points.push({
+      date: dateStr,
+      rangeEnd: dateStr,
+      executed: baseExecuted,
+      runs,
+      failed,
+      failedRuns,
+      passed,
+      blocked,
+      passRate,
+    })
+  }
+
+  return points
+}
+
+const POINTS_7_CURRENT = generateDailyPoints(7, true)
+const POINTS_7_PREV = generateDailyPoints(7, false)
+
+const POINTS_30_CURRENT = generateDailyPoints(30, true)
+const POINTS_30_PREV = generateDailyPoints(30, false)
+
+const POINTS_90_CURRENT = generateDailyPoints(90, true)
+const POINTS_90_PREV = generateDailyPoints(90, false)
+
+function createOverview(period: DashboardPeriod): DashboardOverviewRecord {
+  const current =
+    period === 7 ? POINTS_7_CURRENT : period === 30 ? POINTS_30_CURRENT : POINTS_90_CURRENT
+  const previous =
+    period === 7 ? POINTS_7_PREV : period === 30 ? POINTS_30_PREV : POINTS_90_PREV
+
+  const totalExecuted = current.reduce((sum, p) => sum + p.executed, 0)
+  const prevExecuted = previous.reduce((sum, p) => sum + p.executed, 0)
+
+  const totalRuns = current.reduce((sum, p) => sum + p.runs, 0)
+  const prevRuns = previous.reduce((sum, p) => sum + p.runs, 0)
+
+  const totalFailed = current.reduce((sum, p) => sum + p.failed, 0)
+  const prevFailed = previous.reduce((sum, p) => sum + p.failed, 0)
+
+  const totalPassed = current.reduce((sum, p) => sum + p.passed, 0)
+  const passRate = totalExecuted > 0 ? totalPassed / totalExecuted : 1
+
+  return {
+    period,
+    timeZone: 'America/Guatemala',
+    kpis: {
+      passRate: {
+        value: passRate,
+        previous: 0.984,
+        series: current.map((p) => p.passRate),
+      },
+      runs: {
+        value: totalRuns,
+        previous: prevRuns,
+        series: current.map((p) => p.runs),
+      },
+      failedCases: {
+        value: totalFailed,
+        previous: prevFailed,
+        series: current.map((p) => p.failed),
+      },
+      avgRunDurationMs: {
+        value: 4200,
+        previous: 4500,
+        series: [4100, 4200, 4300, 4200],
+      },
+    },
+    passRateSeries: {
+      current,
+      previous,
+      granularity: period === 90 ? 'week' : 'day',
+    },
+    casesPassing: {
+      total: totalExecuted,
+      pending: 0,
+      running: 0,
+      pass: totalPassed,
+      fail: totalFailed,
+      blocked: 12,
+      skip: 28,
+    },
+    casePriorities: buildCasePriorities(PORTFOLIO_CASE_TOTAL),
+    projects: MOCK_PROJECTS,
+    recentActivity: [
+      {
+        kind: 'commit',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
+        projectId: 'proj-core',
+        projectName: 'Qably Platform Core',
+        status: 'pass',
+        source: 'github_actions',
+        suiteCount: 24,
+        casesPassed: 835,
+        casesTotal: 840,
+        commitSha: 'd8c72f1a9b402e1c7f5a8e2',
+        commitMessage: 'feat(runs): optimize daily pass-rate aggregation queries',
+      },
+      {
+        kind: 'run',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+        projectId: 'proj-billing',
+        projectName: 'Billing & Subscriptions API',
+        runId: 'run-9842',
+        runName: 'Nightly E2E Regression #412',
+        suiteName: 'All E2E Test Suites',
+        status: 'pass',
+        source: 'github_actions',
+        casesPassed: 412,
+        casesTotal: 420,
+      },
+      {
+        kind: 'commit',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
+        projectId: 'proj-auth',
+        projectName: 'Auth & Identity Service',
+        status: 'pass',
+        source: 'api',
+        suiteCount: 12,
+        casesPassed: 310,
+        casesTotal: 310,
+        commitSha: '4b901ec419f8a32',
+        commitMessage: 'fix(session): enforce token revocation on logout',
+      },
+      {
+        kind: 'run',
+        occurredAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+        projectId: 'proj-sdk',
+        projectName: 'Typescript Ingestion SDK',
+        runId: 'run-9840',
+        runName: 'Integration Tests CI',
+        suiteName: 'SDK Suite',
+        status: 'fail',
+        source: 'github_actions',
+        casesPassed: 189,
+        casesTotal: 195,
+      },
+    ],
+  }
+}
+
+export const MOCK_DASHBOARD_OVERVIEWS: Record<DashboardPeriod, DashboardOverviewRecord> = {
+  7: createOverview(7),
+  30: createOverview(30),
+  90: createOverview(90),
+}
+
+export const MOCK_DASHBOARD_CHANNELS: DashboardChannelsRecord = {
+  webhooks: [
+    {
+      id: 'wh-slack',
+      type: 'slack',
+      name: 'Slack #qa-incidents',
+      eventTypes: ['run_failed', 'case_regressed'],
+      sent: 1420,
+      failed: 0,
+      daily: [
+        { date: '2026-09-22', sent: 18, failed: 0 },
+        { date: '2026-09-23', sent: 24, failed: 0 },
+        { date: '2026-09-24', sent: 12, failed: 0 },
+        { date: '2026-09-25', sent: 35, failed: 0 },
+        { date: '2026-09-26', sent: 48, failed: 0 },
+        { date: '2026-09-27', sent: 15, failed: 0 },
+        { date: '2026-09-28', sent: 22, failed: 0 },
+      ],
+    },
+    {
+      id: 'wh-discord',
+      type: 'discord',
+      name: 'Discord #engineering',
+      eventTypes: ['run_failed'],
+      sent: 850,
+      failed: 2,
+      daily: [
+        { date: '2026-09-22', sent: 10, failed: 0 },
+        { date: '2026-09-23', sent: 14, failed: 1 },
+        { date: '2026-09-24', sent: 8, failed: 0 },
+        { date: '2026-09-25', sent: 20, failed: 0 },
+        { date: '2026-09-26', sent: 32, failed: 1 },
+        { date: '2026-09-27', sent: 12, failed: 0 },
+        { date: '2026-09-28', sent: 16, failed: 0 },
+      ],
+    },
+  ],
+  email: {
+    enabled: true,
+    eventTypes: ['run_failed'],
+    sent: 320,
+    failed: 0,
+    daily: [
+      { date: '2026-09-22', sent: 4, failed: 0 },
+      { date: '2026-09-23', sent: 6, failed: 0 },
+      { date: '2026-09-24', sent: 2, failed: 0 },
+      { date: '2026-09-25', sent: 8, failed: 0 },
+      { date: '2026-09-26', sent: 12, failed: 0 },
+      { date: '2026-09-27', sent: 3, failed: 0 },
+      { date: '2026-09-28', sent: 5, failed: 0 },
+    ],
+  },
+  inApp: {
+    sent: 2450,
+    unread: 4,
+    daily: [
+      { date: '2026-09-22', sent: 45, failed: 0 },
+      { date: '2026-09-23', sent: 62, failed: 0 },
+      { date: '2026-09-24', sent: 38, failed: 0 },
+      { date: '2026-09-25', sent: 88, failed: 0 },
+      { date: '2026-09-26', sent: 120, failed: 0 },
+      { date: '2026-09-27', sent: 42, failed: 0 },
+      { date: '2026-09-28', sent: 58, failed: 0 },
+    ],
+  },
+  lastDelivery: {
+    webhookId: 'wh-slack',
+    channel: 'slack',
+    eventType: 'run_failed',
+    status: 'sent',
+    deliveredAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+  },
+}

@@ -50,67 +50,111 @@
 }
 
 /* ─── Product app tokens (dashboard preview only) ───────────────────────
-   Mirror of apps/web/src/app/globals.css. The landing page is dark; the
-   product shell rendered inside the window frame is light, so the app
-   palette is namespaced under `app-*` and never leaks into landing UI. */
+   Exact mirror of apps/web/src/app/globals.css. The landing page is dark;
+   the product shell rendered inside the window frame / iphone is light.
+   Scoped under [data-dashboard-preview] so it never leaks into landing UI. */
 
-:root {
-  --app-bg:                oklch(0.978 0.002 85);
-  --app-surface:           oklch(1.000 0.000 0);
-  --app-surface-raised:    oklch(0.995 0.002 85);
-  --app-surface-hover:     oklch(0.930 0.004 85);
+[data-dashboard-preview] {
+  --bg:                oklch(0.970 0.006 260);
+  --bg-surface:        oklch(1.000 0.000 0);
+  --bg-surface-raised: oklch(0.995 0.002 85);
+  --bg-sidebar:        oklch(1.000 0.000 0);
+  --bg-sidebar-hover:  oklch(0.958 0.007 260);
+  --bg-sidebar-active: oklch(0.945 0.008 260);
+  --surface-hover:     oklch(0.935 0.008 260);
 
-  --app-sidebar:           oklch(0.950 0.003 85);
-  --app-sidebar-hover:     oklch(0.920 0.004 85);
-  --app-sidebar-active:    oklch(0.995 0.001 85);
+  --fg:                oklch(0.185 0.004 85);
+  --fg-muted:          oklch(0.475 0.008 85);
+  --fg-sidebar:        oklch(0.205 0.004 85);
+  --fg-sidebar-muted:  oklch(0.465 0.008 85);
 
-  --app-fg:                oklch(0.185 0.004 85);
-  --app-fg-muted:          oklch(0.475 0.008 85);
-  --app-fg-sidebar:        oklch(0.205 0.004 85);
-  --app-fg-sidebar-muted:  oklch(0.465 0.008 85);
+  --border:            oklch(0.890 0.004 85);
+  --border-strong:     oklch(0.820 0.006 85);
+  --border-sidebar:    oklch(0.890 0.004 85);
 
-  --app-border:            oklch(0.890 0.004 85);
-  --app-border-strong:     oklch(0.820 0.006 85);
-  --app-border-sidebar:    oklch(0.865 0.005 85);
+  --landing-border:        var(--border);
+  --landing-border-strong: var(--border-strong);
 
-  --app-primary:           oklch(0.185 0.004 85);
-  --app-primary-hover:     oklch(0.290 0.006 85);
-  --app-primary-fg:        oklch(0.990 0.000 0);
+  --primary:           oklch(0.185 0.004 85);
+  --primary-hover:     oklch(0.290 0.006 85);
+  --primary-fg:        oklch(0.990 0.000 0);
+  --primary-foreground: oklch(0.990 0.000 0);
 
-  --app-accent-ai:         oklch(0.405 0.008 85);
-  --app-accent-ai-bg:      oklch(0.940 0.003 85);
+  --card:              var(--bg-surface);
+  --card-foreground:   var(--fg);
+  --background:        var(--bg-surface);
+  --foreground:        var(--fg);
+  --muted:             var(--fg-muted);
+  --muted-foreground:  var(--fg-muted);
 
-  --app-status-pass:       oklch(0.45 0.15 145);
-  --app-status-pass-bg:    oklch(0.95 0.05 145);
-  --app-status-fail:       oklch(0.45 0.20 25);
-  --app-status-fail-bg:    oklch(0.96 0.05 25);
-  --app-status-blocked:    oklch(0.55 0.18 50);
-  --app-status-blocked-bg: oklch(0.97 0.04 50);
-  --app-status-skip:       oklch(0.55 0.00 0);
-  --app-status-skip-bg:    oklch(0.94 0.00 0);
-  --app-status-running:    oklch(0.50 0.18 240);
-  --app-status-running-bg: oklch(0.95 0.05 240);
-  --app-status-warn:       oklch(0.53 0.15 80);
-  --app-status-warn-bg:    oklch(0.97 0.05 80);
+  --accent-icon:       oklch(0.623 0.214 259.815);
+  --accent-ai:         oklch(0.405 0.008 85);
+  --accent-ai-bg:      oklch(0.940 0.003 85);
+  --brand-github-actions: oklch(0.635 0.199 256);
 
-  --app-heatmap-l0:        oklch(0.930 0.004 85);
-  --app-heatmap-l1:        oklch(0.850 0.090 145);
-  --app-heatmap-l2:        oklch(0.700 0.150 145);
-  --app-heatmap-l3:        oklch(0.560 0.180 145);
-  --app-heatmap-l4:        oklch(0.440 0.200 145);
+  --status-pass:       oklch(0.45 0.15 145);
+  --status-pass-bg:    oklch(0.95 0.05 145);
+  --status-fail:       oklch(0.45 0.20 25);
+  --status-fail-bg:    oklch(0.96 0.05 25);
+  --status-blocked:    oklch(0.55 0.18 50);
+  --status-blocked-bg: oklch(0.97 0.04 50);
+  --status-skip:       oklch(0.55 0.00 0);
+  --status-skip-bg:    oklch(0.94 0.00 0);
+  --status-running:    oklch(0.50 0.18 240);
+  --status-running-bg: oklch(0.95 0.05 240);
+  --status-warn:       oklch(0.53 0.15 80);
+  --status-warn-bg:    oklch(0.97 0.05 80);
 
-  --qb-chart-line:    var(--app-primary);
-  --qb-chart-grid:    var(--app-border);
-  --qb-chart-pass:    oklch(0.62 0.16 145);
-  --qb-chart-fail:    oklch(0.42 0.19 25);
-  --qb-chart-skip:    oklch(0.62 0.00 0);
-  --qb-chart-warn:    var(--app-status-warn);
-  --qb-chart-compare: var(--app-fg-muted);
+  --qb-chart-line:    oklch(0.623 0.214 259.815);
+  --qb-chart-grid:    var(--border);
+  --qb-chart-pass:    oklch(0.723 0.219 149.579);
+  --qb-chart-fail:    oklch(0.637 0.237 25.331);
+  --qb-chart-skip:    oklch(0.704 0.040 256.788);
+  --qb-chart-warn:    oklch(0.769 0.188 70.080);
+  --qb-chart-compare: oklch(0.707 0.022 261.325);
+  --qb-chart-info:    oklch(0.715 0.143 215.221);
+  --qb-chart-accent:  oklch(0.606 0.250 292.717);
+
+  --chart-1:               var(--qb-chart-line);
+  --chart-2:               var(--qb-chart-pass);
+  --chart-3:               var(--qb-chart-fail);
+  --chart-4:               var(--qb-chart-warn);
+  --chart-5:               var(--qb-chart-accent);
+  --chart-6:               var(--qb-chart-info);
+  --chart-background:      var(--bg-surface);
+  --chart-foreground:      var(--fg);
+  --chart-foreground-muted: var(--fg-muted);
+  --chart-line-primary:    var(--qb-chart-line);
+  --chart-line-secondary:  var(--qb-chart-compare);
+  --chart-crosshair:       var(--qb-chart-line);
+  --chart-grid:            var(--qb-chart-grid);
+  --chart-brush-border:    var(--qb-chart-grid);
+  --chart-tooltip-background: var(--bg-surface);
+  --chart-tooltip-foreground: var(--fg);
+  --chart-tooltip-muted:   var(--fg-muted);
+  --chart-marker-background: var(--bg-surface);
+  --chart-marker-border:   var(--border);
+  --chart-marker-foreground: var(--fg);
+  --chart-marker-badge-background: var(--bg-surface);
+  --chart-marker-badge-foreground: var(--fg);
+  --chart-indicator-color: var(--qb-chart-line);
+  --chart-indicator-secondary-color: var(--qb-chart-compare);
+  --chart-segment-background: var(--surface-hover);
+  --chart-segment-line:    var(--qb-chart-grid);
+  --chart-label:           var(--fg-muted);
+  --chart-scale-01:        oklch(0.98 0.003 106);
+  --chart-scale-02:        oklch(0.92 0.008 106);
+  --chart-scale-03:        oklch(0.82 0.015 106);
+  --chart-scale-04:        oklch(0.68 0.02 106);
+  --chart-scale-05:        oklch(0.55 0.025 106);
+  --chart-scale-pattern-color: oklch(0.96 0.005 106);
 }
 
 @theme inline {
   --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --container-dashboard: 1128px;
 
   --color-bg:          var(--landing-bg);
   --color-bg-elevated: var(--landing-bg-elevated);
@@ -124,11 +168,20 @@
   --color-primary:       var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-fg:    var(--primary-fg);
+  --color-primary-foreground: var(--primary-foreground);
 
   --color-pass:        var(--status-pass);
+  --color-pass-bg:     var(--status-pass-bg);
   --color-fail:        var(--status-fail);
+  --color-fail-bg:     var(--status-fail-bg);
   --color-warn:        var(--status-warn);
+  --color-warn-bg:     var(--status-warn-bg);
   --color-running:     var(--status-running);
+  --color-running-bg:  var(--status-running-bg);
+  --color-blocked:     var(--status-blocked);
+  --color-blocked-bg:  var(--status-blocked-bg);
+  --color-skip:        var(--status-skip);
+  --color-skip-bg:     var(--status-skip-bg);
 
   --color-code-plain:       var(--code-plain);
   --color-code-comment:     var(--code-comment);
@@ -140,84 +193,30 @@
 
   --color-border:        var(--landing-border);
   --color-border-strong: var(--landing-border-strong);
+  --color-border-sidebar: var(--border-sidebar);
 
-  /* Product app palette — `bg-app-surface`, `text-app-muted`, … */
-  --color-app-canvas:          var(--app-bg);
-  --color-app-canvas-hover:    var(--app-surface-hover);
-  --color-app-surface:         var(--app-surface);
-  --color-app-surface-raised:  var(--app-surface-raised);
-  --color-app-surface-hover:   var(--app-surface-hover);
+  --color-canvas:             var(--bg);
+  --color-canvas-hover:       var(--surface-hover);
+  --color-surface:            var(--bg-surface);
+  --color-surface-raised:     var(--bg-surface-raised);
+  --color-surface-hover:      var(--surface-hover);
+  --color-sidebar:            var(--bg-sidebar);
+  --color-sidebar-hover:      var(--bg-sidebar-hover);
+  --color-sidebar-active:     var(--bg-sidebar-active);
 
-  --color-app-sidebar:         var(--app-sidebar);
-  --color-app-sidebar-hover:   var(--app-sidebar-hover);
-  --color-app-sidebar-active:  var(--app-sidebar-active);
+  --color-default:            var(--fg);
+  --color-muted:              var(--fg-muted);
+  --color-sidebar-fg:         var(--fg-sidebar);
+  --color-sidebar-fg-muted:   var(--fg-sidebar-muted);
 
-  --color-app-default:         var(--app-fg);
-  --color-app-muted:           var(--app-fg-muted);
-  --color-app-sidebar-fg:      var(--app-fg-sidebar);
-  --color-app-sidebar-fg-muted: var(--app-fg-sidebar-muted);
+  --color-card:               var(--card);
+  --color-card-foreground:    var(--card-foreground);
+  --color-muted-foreground:   var(--muted-foreground);
 
-  --color-app-border:          var(--app-border);
-  --color-app-border-strong:   var(--app-border-strong);
-  --color-app-border-sidebar:  var(--app-border-sidebar);
+  --color-brand-github-actions: var(--brand-github-actions);
 
-  --color-app-primary:         var(--app-primary);
-  --color-app-primary-hover:   var(--app-primary-hover);
-  --color-app-primary-fg:      var(--app-primary-fg);
-
-  --color-app-ai:              var(--app-accent-ai);
-  --color-app-ai-bg:           var(--app-accent-ai-bg);
-
-  --color-app-pass:            var(--app-status-pass);
-  --color-app-pass-bg:         var(--app-status-pass-bg);
-  --color-app-fail:            var(--app-status-fail);
-  --color-app-fail-bg:         var(--app-status-fail-bg);
-  --color-app-blocked:         var(--app-status-blocked);
-  --color-app-blocked-bg:      var(--app-status-blocked-bg);
-  --color-app-skip:            var(--app-status-skip);
-  --color-app-skip-bg:         var(--app-status-skip-bg);
-  --color-app-running:         var(--app-status-running);
-  --color-app-running-bg:      var(--app-status-running-bg);
-  --color-app-warn:            var(--app-status-warn);
-  --color-app-warn-bg:         var(--app-status-warn-bg);
-
-  --shadow-app-card:           0 1px 1px 0 oklch(0.185 0.004 85 / 0.025);
-  --shadow-app-pop:            0 4px 12px -2px oklch(0.12 0 0 / 0.08), 0 2px 4px -2px oklch(0.12 0 0 / 0.04);
-
-  /* @qably/ui contract, bound to the app-* mirror so the shared dashboard
-     blocks render the product palette inside the dark landing. */
-  --color-qb-canvas:          var(--app-bg);
-  --color-qb-canvas-hover:    var(--app-surface-hover);
-  --color-qb-surface:         var(--app-surface);
-  --color-qb-surface-raised:  var(--app-surface-raised);
-  --color-qb-fg:              var(--app-fg);
-  --color-qb-muted:           var(--app-fg-muted);
-  --color-qb-border:          var(--app-border);
-  --color-qb-border-strong:   var(--app-border-strong);
-  --color-qb-primary:         var(--app-primary);
-  --color-qb-primary-hover:   var(--app-primary-hover);
-  --color-qb-primary-fg:      var(--app-primary-fg);
-  --color-qb-ai:              var(--app-accent-ai);
-  --color-qb-ai-bg:           var(--app-accent-ai-bg);
-  --color-qb-pass:            var(--app-status-pass);
-  --color-qb-pass-bg:         var(--app-status-pass-bg);
-  --color-qb-fail:            var(--app-status-fail);
-  --color-qb-fail-bg:         var(--app-status-fail-bg);
-  --color-qb-blocked:         var(--app-status-blocked);
-  --color-qb-blocked-bg:      var(--app-status-blocked-bg);
-  --color-qb-skip:            var(--app-status-skip);
-  --color-qb-skip-bg:         var(--app-status-skip-bg);
-  --color-qb-running:         var(--app-status-running);
-  --color-qb-running-bg:      var(--app-status-running-bg);
-  --color-qb-warn:            var(--app-status-warn);
-  --color-qb-warn-bg:         var(--app-status-warn-bg);
-  --color-qb-heatmap-l0:      var(--app-heatmap-l0);
-  --color-qb-heatmap-l1:      var(--app-heatmap-l1);
-  --color-qb-heatmap-l2:      var(--app-heatmap-l2);
-  --color-qb-heatmap-l3:      var(--app-heatmap-l3);
-  --color-qb-heatmap-l4:      var(--app-heatmap-l4);
-  --shadow-qb-card:           var(--shadow-app-card);
-  --shadow-qb-pop:            var(--shadow-app-pop);
+  --shadow-pop:               0 4px 12px -2px oklch(0.12 0 0 / 0.08), 0 2px 4px -2px oklch(0.12 0 0 / 0.04);
+  --shadow-card:              0 1px 1px 0 oklch(0.185 0.004 85 / 0.025);
 }
 
 *,
