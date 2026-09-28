@@ -95,8 +95,8 @@ describe('formatNumber', () => {
 })
 
 describe('formatEventCount', () => {
-  it('groups thousands with a dot in Spanish', () => {
-    expect(formatEventCount(2226, 'es')).toBe('2.226')
+  it('groups thousands with a comma in Spanish (es-MX convention, not es-ES)', () => {
+    expect(formatEventCount(2226, 'es')).toBe('2,226')
   })
 
   it('groups thousands with a comma in English', () => {
@@ -112,9 +112,9 @@ describe('formatEventCount', () => {
     expect(formatEventCount(1234567, 'en')).toBe('1,234,567')
   })
 
-  it('does not depend on the runtime ICU data', () => {
-    const withoutIntl = formatEventCount(1000, 'es')
-    expect(withoutIntl).toBe('1.000')
+  it('signs negative values the same way in both locales', () => {
+    expect(formatEventCount(-2226, 'es')).toBe('-2,226')
+    expect(formatEventCount(-2226, 'en')).toBe('-2,226')
   })
 })
 

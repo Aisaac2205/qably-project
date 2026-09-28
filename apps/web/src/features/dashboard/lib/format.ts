@@ -1,3 +1,5 @@
+import { resolveNumberLocale } from '@/lib/i18n'
+
 export type FormatLocale = 'es' | 'en'
 
 const RELATIVE_TIME_COPY = {
@@ -51,18 +53,14 @@ export function formatNumber(n: number): string {
 }
 
 export function formatCompactNumber(value: number, locale: 'es' | 'en'): string {
-  return new Intl.NumberFormat(locale === 'es' ? 'es-ES' : 'en-US', {
+  return new Intl.NumberFormat(resolveNumberLocale(locale), {
     notation: 'compact',
     maximumFractionDigits: 1,
   }).format(value)
 }
 
 export function formatEventCount(value: number, locale: 'es' | 'en'): string {
-  const separator = locale === 'es' ? '.' : ','
-  const sign = value < 0 ? '-' : ''
-  const digits = Math.trunc(Math.abs(value)).toString()
-
-  return sign + digits.replace(/\B(?=(\d{3})+(?!\d))/g, separator)
+  return new Intl.NumberFormat(resolveNumberLocale(locale)).format(value)
 }
 
 export function formatRunDuration(ms: number): string {
