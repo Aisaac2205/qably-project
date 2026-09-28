@@ -19,7 +19,7 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="group flex flex-1 flex-col justify-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50 sm:flex-row sm:items-center sm:justify-between">
+    <div className="group grid flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center">
           <Image
@@ -35,16 +35,16 @@ export function ChannelRow({ webhook }: ChannelRowProps) {
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
+      <div className="contents">
         <DeliveryBars
           points={webhook.daily}
           label={t('dashboard.channelsDeliveryLabel', { name: webhook.name })}
           sentLabel={t('dashboard.channelsSentLabel')}
           failedLabel={t('dashboard.channelsFailedLabel')}
-          className="w-28"
+          className="shrink-0"
         />
-        <div className="ml-auto flex shrink-0 items-center sm:ml-0">
-          <span className="inline-flex h-8 md:h-7 items-center gap-1 px-2.5 text-xs font-medium text-muted">
+        <div className="flex shrink-0 items-center">
+          <span className="inline-flex h-8 md:h-7 items-center gap-1 pl-2.5 text-xs font-medium text-muted">
             <span>{t('dashboard.channelsStatusConnected')}</span>
             <SealCheck size={12} weight="bold" className="text-status-pass shrink-0" aria-hidden="true" />
           </span>

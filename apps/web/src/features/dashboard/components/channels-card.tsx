@@ -33,7 +33,7 @@ function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
   const name = t('dashboard.channelsInAppName')
 
   return (
-    <div className="group flex flex-1 flex-col justify-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50 sm:flex-row sm:items-center sm:justify-between">
+    <div className="group grid flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center">
           <Image
@@ -49,16 +49,16 @@ function InAppChannelRow({ inApp }: { inApp: DashboardInAppChannel }) {
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
+      <div className="contents">
         <DeliveryBars
           points={inApp.daily}
           label={t('dashboard.channelsDeliveryLabel', { name })}
           sentLabel={t('dashboard.channelsSentLabel')}
           failedLabel={t('dashboard.channelsFailedLabel')}
-          className="w-28"
+          className="shrink-0"
         />
-        <div className="ml-auto flex shrink-0 items-center sm:ml-0">
-          <span className="inline-flex h-8 md:h-7 items-center gap-1 px-2.5 text-xs font-medium text-muted">
+        <div className="flex shrink-0 items-center">
+          <span className="inline-flex h-8 md:h-7 items-center gap-1 pl-2.5 text-xs font-medium text-muted">
             <span>{t('dashboard.channelsStatusConnected')}</span>
             <SealCheck size={12} weight="bold" className="text-status-pass shrink-0" aria-hidden="true" />
           </span>
@@ -88,7 +88,7 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
   const name = t('dashboard.channelsEmailName')
 
   return (
-    <div className="group flex flex-1 flex-col justify-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50 sm:flex-row sm:items-center sm:justify-between">
+    <div className="group grid flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center">
           <Image
@@ -104,16 +104,16 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 items-center justify-between gap-4 sm:w-auto sm:justify-end">
+      <div className="contents">
         <DeliveryBars
           points={email.daily}
           label={t('dashboard.channelsDeliveryLabel', { name })}
           sentLabel={t('dashboard.channelsSentLabel')}
           failedLabel={t('dashboard.channelsFailedLabel')}
-          className="w-28"
+          className="shrink-0"
         />
-        <div className="ml-auto flex shrink-0 items-center sm:ml-0">
-          <span className="inline-flex h-8 md:h-7 items-center gap-1 px-2.5 text-xs font-medium text-muted">
+        <div className="flex shrink-0 items-center">
+          <span className="inline-flex h-8 md:h-7 items-center gap-1 pl-2.5 text-xs font-medium text-muted">
             <span>{t('dashboard.channelsStatusConnected')}</span>
             <SealCheck size={12} weight="bold" className="text-status-pass shrink-0" aria-hidden="true" />
           </span>
@@ -148,7 +148,7 @@ function UnconfiguredChannelRow({ type }: UnconfiguredChannelRowProps) {
   const logo = type === 'slack' ? '/logos/slack.svg' : '/logos/discord.svg'
 
   return (
-    <div className="group flex flex-1 flex-col justify-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50 sm:flex-row sm:items-center sm:justify-between">
+    <div className="group grid flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center opacity-85 transition-all duration-150 ease-out group-hover:opacity-100 group-hover:scale-105">
           <Image src={logo} alt="" width={24} height={24} className="size-6 shrink-0 object-contain" />
@@ -158,7 +158,7 @@ function UnconfiguredChannelRow({ type }: UnconfiguredChannelRowProps) {
         </div>
       </div>
 
-      <div className="flex w-full shrink-0 items-center justify-end sm:w-auto">
+      <div className="col-start-3 flex items-center justify-end">
         <Link
           href="/settings?tab=integrations"
           aria-label={t('dashboard.channelsConnectAria', { name })}
