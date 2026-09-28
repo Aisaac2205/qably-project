@@ -49,14 +49,14 @@ describe('ChannelsCard', () => {
       renderWithQuery(<ChannelsCard />)
     })
 
-    expect(screen.getByText('Email')).toBeInTheDocument()
+    expect(screen.getByText('Gmail')).toBeInTheDocument()
     expect(screen.queryByText('Case regressed, Connection security')).not.toBeInTheDocument()
     const sentStats = screen.getAllByTestId('channel-sent-count')
     const failedStats = screen.getAllByTestId('channel-failed-count')
     expect(sentStats.some((stat) => within(stat).queryByText('12 sent', { selector: '.sr-only' }))).toBe(true)
     expect(failedStats.some((stat) => within(stat).queryByText('1 failed', { selector: '.sr-only' }))).toBe(true)
     expect(
-      screen.getByRole('img', { name: 'Email deliveries over the last 14 days' }),
+      screen.getByRole('img', { name: 'Gmail deliveries over the last 14 days' }),
     ).toBeInTheDocument()
   })
 
@@ -75,7 +75,7 @@ describe('ChannelsCard', () => {
     )
 
     await waitFor(() => expect(screen.getByText('Team Slack')).toBeInTheDocument())
-    expect(screen.queryByText('Email')).not.toBeInTheDocument()
+    expect(screen.queryByText('Gmail')).not.toBeInTheDocument()
   })
 
   it('renders the built-in in-app notifications row with its sent and unread counts', async () => {
@@ -123,7 +123,7 @@ describe('ChannelsCard', () => {
       renderWithQuery(<ChannelsCard />)
     })
 
-    expect(screen.getByText(/Last delivery: sent to Team Slack/)).toBeInTheDocument()
+    expect(screen.getByText(/Last delivery sent to Team Slack/)).toBeInTheDocument()
   })
 
   it('pins the last-delivery footer to the bottom of the card regardless of row count', async () => {
@@ -135,7 +135,7 @@ describe('ChannelsCard', () => {
     const rowList = card?.querySelector('.divide-y')
     expect(rowList).toHaveClass('flex-grow')
 
-    const footer = screen.getByText(/Last delivery:/).closest('div')
+    const footer = screen.getByText(/Last delivery/).closest('div')
     expect(footer).toHaveClass('mt-auto')
   })
 
@@ -194,5 +194,67 @@ describe('ChannelsCard', () => {
     )
 
     expect(await screen.findByText('No channels configured')).toBeInTheDocument()
+  })
+
+  it('renders an unconfigured Slack row with Connect button when Slack webhook is not configured', async () => {
+    getChannels.mockResolvedValue({
+      ...dashboardChannelsFixture,
+      webhooks: [
+        {
+          id: 'webhook-2',
+          type: 'discord',
+          name: 'QA Alerts',
+          eventTypes: ['run_completed'],
+          sent: 8,
+          failed: 0,
+          daily: [],
+        },
+      ],
+    })
+    const client = createTestQueryClient()
+    client.removeQueries({ queryKey: dashboardKeys.channels(getBrowserTimeZone()) })
+
+    render(
+      <QueryClientProvider client={client}>
+        <ChannelsCard />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByText('QA Alerts')).toBeInTheDocument())
+    expect(screen.getByText('Slack')).toBeInTheDocument()
+    const connectButton = screen.getByRole('link', { name: /Connect Slack/i })
+    expect(connectButton).toBeInTheDocument()
+    expect(connectButton).toHaveAttribute('href', '/settings?tab=integrations')
+  })
+
+  it('renders an unconfigured Discord row with Connect button when Discord webhook is not configured', async () => {
+    getChannels.mockResolvedValue({
+      ...dashboardChannelsFixture,
+      webhooks: [
+        {
+          id: 'webhook-1',
+          type: 'slack',
+          name: 'Team Slack',
+          eventTypes: ['run_failed'],
+          sent: 12,
+          failed: 2,
+          daily: [],
+        },
+      ],
+    })
+    const client = createTestQueryClient()
+    client.removeQueries({ queryKey: dashboardKeys.channels(getBrowserTimeZone()) })
+
+    render(
+      <QueryClientProvider client={client}>
+        <ChannelsCard />
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => expect(screen.getByText('Team Slack')).toBeInTheDocument())
+    expect(screen.getByText('Discord')).toBeInTheDocument()
+    const connectButton = screen.getByRole('link', { name: /Connect Discord/i })
+    expect(connectButton).toBeInTheDocument()
+    expect(connectButton).toHaveAttribute('href', '/settings?tab=integrations')
   })
 })
