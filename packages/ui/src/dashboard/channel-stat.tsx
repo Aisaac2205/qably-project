@@ -27,9 +27,9 @@ export function ChannelStat({
   'data-testid': dataTestId,
 }: ChannelStatProps) {
   return (
-    <div className={cn('flex flex-col items-end', className)} data-testid={dataTestId}>
-      <span aria-hidden="true" className="flex flex-col items-end gap-0.5">
-        <span className={cn('font-mono text-base font-semibold tabular-nums tracking-tight', TONE_CLASSES[tone])}>{value}</span>
+    <div className={cn('flex items-center gap-1', className)} data-testid={dataTestId}>
+      <span aria-hidden="true" className="flex items-center gap-1">
+        <span className={cn('font-mono text-xs tabular-nums', TONE_CLASSES[tone])}>{value}</span>
         <span className="text-xs text-qb-muted">{unit}</span>
       </span>
       <span className="sr-only">{srText}</span>
