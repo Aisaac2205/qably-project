@@ -153,6 +153,10 @@ export interface SelectSimpleProps<T = string | number | null> {
   readonly triggerClassName?: string
   readonly badgeInTrigger?: boolean
   readonly iconInTrigger?: boolean
+  readonly disabled?: boolean
+  readonly id?: string
+  readonly 'aria-label'?: string
+  readonly 'aria-describedby'?: string
 }
 
 /**
@@ -166,6 +170,10 @@ function SelectSimple<T extends string | number | null>({
   triggerClassName,
   badgeInTrigger = true,
   iconInTrigger = true,
+  disabled,
+  id,
+  'aria-label': ariaLabel,
+  'aria-describedby': ariaDescribedby,
 }: SelectSimpleProps<T>) {
   const activeOption = options.find((o) => o.value === value)
 
@@ -173,8 +181,14 @@ function SelectSimple<T extends string | number | null>({
     <Select
       value={value}
       onValueChange={(val) => onValueChange?.(val as T)}
+      disabled={disabled}
     >
-      <SelectTrigger className={triggerClassName}>
+      <SelectTrigger
+        id={id}
+        aria-label={ariaLabel}
+        aria-describedby={ariaDescribedby}
+        className={triggerClassName}
+      >
         <SelectValue placeholder={placeholder}>
           {activeOption ? (
             <span className="flex items-center gap-1.5">

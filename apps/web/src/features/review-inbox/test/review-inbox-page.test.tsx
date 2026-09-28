@@ -151,12 +151,14 @@ describe('ReviewInboxPage', () => {
     const projectSelect = screen.getByRole('combobox', { name: /Project/i })
     expect(projectSelect).toBeInTheDocument()
 
-    await user.selectOptions(projectSelect, 'proj-1')
-    expect(projectSelect).toHaveValue('proj-1')
+    fireEvent.click(projectSelect)
+    await user.click(screen.getByRole('option', { name: 'Ecommerce App' }))
+    expect(projectSelect).toHaveTextContent('Ecommerce App')
     expect(screen.getByText('Invalid login shows error message')).toBeInTheDocument()
 
-    await user.selectOptions(projectSelect, 'proj-2')
-    expect(projectSelect).toHaveValue('proj-2')
+    fireEvent.click(projectSelect)
+    await user.click(screen.getByRole('option', { name: 'Mobile App' }))
+    expect(projectSelect).toHaveTextContent('Mobile App')
     expect(screen.queryByText('Invalid login shows error message')).not.toBeInTheDocument()
   })
 

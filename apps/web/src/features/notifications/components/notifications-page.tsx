@@ -23,6 +23,7 @@ import { useProjects } from '@/features/projects/hooks/use-projects'
 import { useTranslation } from '@/lib/i18n'
 import { Button } from '@/components/ui/button'
 import { SegmentedControl } from '@/components/ui/segmented-control'
+import { SelectSimple } from '@/components/ui/select'
 
 const SEVERITY_CONFIG: Record<
   NotificationSeverity,
@@ -237,34 +238,32 @@ export function NotificationsPage() {
           </div>
 
           {/* Severity filter dropdown */}
-          <select
+          <SelectSimple
+            options={[
+              { value: 'all', label: t('notifications.severityAll') },
+              { value: 'critical', label: t('notifications.severityCritical') },
+              { value: 'high', label: t('notifications.severityHigh') },
+              { value: 'medium', label: t('notifications.severityMedium') },
+              { value: 'low', label: t('notifications.severityLow') },
+            ]}
             value={severityFilter}
-            onChange={(e) => setSeverityFilter(e.target.value as NotificationSeverity | 'all')}
-            className="text-xs rounded-md border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shrink-0"
+            onValueChange={setSeverityFilter}
             aria-label={t('notifications.severityAll')}
-          >
-            <option value="all">{t('notifications.severityAll')}</option>
-            <option value="critical">{t('notifications.severityCritical')}</option>
-            <option value="high">{t('notifications.severityHigh')}</option>
-            <option value="medium">{t('notifications.severityMedium')}</option>
-            <option value="low">{t('notifications.severityLow')}</option>
-          </select>
+            triggerClassName="w-auto shrink-0"
+          />
 
           {/* Project dropdown */}
           {projects.length > 1 && (
-            <select
+            <SelectSimple
+              options={[
+                { value: 'all', label: t('notifications.allProjects') },
+                ...projects.map((p) => ({ value: p.id, label: p.name })),
+              ]}
               value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="text-xs rounded-md border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shrink-0"
+              onValueChange={setProjectFilter}
               aria-label={t('notifications.allProjects')}
-            >
-              <option value="all">{t('notifications.allProjects')}</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              triggerClassName="w-auto shrink-0"
+            />
           )}
 
           {/* Total filtered count */}

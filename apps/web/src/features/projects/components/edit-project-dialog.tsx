@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { SelectSimple } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { TechSelector } from './tech-selector'
 import { useUpdateProject } from '../hooks/use-update-project'
@@ -139,21 +140,17 @@ function EditProjectDialogContent({
 
         <div className="grid gap-2">
           <Label htmlFor="edit-project-repo">{t('projects.repoConnectionLabel')}</Label>
-          <select
+          <SelectSimple
             id="edit-project-repo"
+            options={[
+              { value: '', label: t('projects.repoConnectionNone') },
+              ...connections.map((connection) => ({ value: connection.id, label: connection.repo })),
+            ]}
             value={connectionId}
-            onChange={(e) => setConnectionId(e.target.value)}
+            onValueChange={setConnectionId}
             disabled={connections.length === 0}
-            className="w-full px-2.5 py-1.5 rounded border border-border bg-surface text-default text-sm focus:outline-none focus:border-primary transition-colors disabled:opacity-50"
             aria-describedby={connections.length === 0 ? 'edit-connection-empty' : undefined}
-          >
-            <option value="">{t('projects.repoConnectionNone')}</option>
-            {connections.map((connection) => (
-              <option key={connection.id} value={connection.id}>
-                {connection.repo}
-              </option>
-            ))}
-          </select>
+          />
           {connections.length === 0 && (
             <p id="edit-connection-empty" className="text-xs text-muted">
               {t('projects.repoConnectionEmpty')}

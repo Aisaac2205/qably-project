@@ -3,6 +3,7 @@
 import { MagnifyingGlass, CopySimple } from '@phosphor-icons/react'
 import type { ReviewQueueStatusFilter } from './review-inbox-queue'
 import { SegmentedControl } from '@/components/ui/segmented-control'
+import { SelectSimple } from '@/components/ui/select'
 import { useTranslation } from '@/lib/i18n'
 
 export interface ReviewInboxFiltersProps {
@@ -52,19 +53,15 @@ export function ReviewInboxFilters({
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[130px]">
-          <select
+          <SelectSimple
+            options={[
+              { value: 'all', label: t('reviewInbox.allProjects') },
+              ...projects.map((p) => ({ value: p.id, label: p.name })),
+            ]}
             value={selectedProjectId}
-            onChange={(e) => onSelectProject(e.target.value)}
+            onValueChange={onSelectProject}
             aria-label={t('reviewInbox.project')}
-            className="w-full rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-default focus:border-primary focus:outline-none"
-          >
-            <option value="all">{t('reviewInbox.allProjects')}</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
 
         <button

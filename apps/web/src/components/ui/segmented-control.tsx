@@ -21,8 +21,8 @@ interface SegmentedControlProps<T extends string> {
 }
 
 const SIZES = {
-  sm: 'min-h-7 px-3 text-xs',
-  md: 'min-h-8 px-3.5 text-sm',
+  sm: 'min-h-9 px-3 text-xs md:min-h-8',
+  md: 'min-h-11 px-3.5 text-sm md:min-h-10',
 } as const
 
 export function SegmentedControl<T extends string>({
