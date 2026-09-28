@@ -113,10 +113,10 @@ describe('ReviewInboxPage', () => {
     })
   })
 
-  it('renders the governance statement, queue, and inspector without a local page heading', () => {
+  it('renders the governance statement, queue, and inspector with a single, visually hidden page heading', () => {
     const { container } = renderWithQuery(<ReviewInboxPage />)
 
-    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Review Inbox' })).toBeInTheDocument()
     expect(container.querySelector('[aria-labelledby="page-title"]')).toBeInTheDocument()
 
     expect(

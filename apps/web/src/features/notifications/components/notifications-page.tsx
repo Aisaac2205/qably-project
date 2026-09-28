@@ -158,7 +158,7 @@ export function NotificationsPage() {
             variant="outline"
             size="sm"
             onClick={() => markAllAsRead()}
-            className="shrink-0 inline-flex items-center gap-2 self-start sm:self-auto rounded-full px-4 sm:px-5 py-2 active:scale-[0.98] transition-all text-xs sm:text-sm font-medium border-border/80 bg-surface hover:bg-canvas shadow-xs"
+            className="shrink-0 inline-flex items-center gap-2 self-start sm:self-auto rounded-md px-4 sm:px-5 py-2 transition-colors text-xs sm:text-sm font-medium border-border/80 bg-surface hover:bg-canvas"
           >
             <Check size={15} weight="bold" aria-hidden="true" />
             <span>{t('notifications.markAllRead')}</span>
@@ -222,7 +222,7 @@ export function NotificationsPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('notifications.searchPlaceholder')}
-              className="w-full rounded-full border border-border/80 bg-surface pl-9 pr-8 py-1.5 text-xs text-default placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors shadow-2xs"
+              className="w-full rounded-md border border-border/80 bg-surface pl-9 pr-8 py-1.5 text-xs text-default placeholder:text-muted outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
             />
             {searchQuery && (
               <button
@@ -240,7 +240,7 @@ export function NotificationsPage() {
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value as NotificationSeverity | 'all')}
-            className="text-xs rounded-full border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shadow-2xs shrink-0"
+            className="text-xs rounded-md border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shrink-0"
             aria-label={t('notifications.severityAll')}
           >
             <option value="all">{t('notifications.severityAll')}</option>
@@ -255,7 +255,7 @@ export function NotificationsPage() {
             <select
               value={projectFilter}
               onChange={(e) => setProjectFilter(e.target.value)}
-              className="text-xs rounded-full border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shadow-2xs shrink-0"
+              className="text-xs rounded-md border border-border/80 bg-surface px-3 py-1.5 text-default outline-none focus:border-primary cursor-pointer hover:border-border transition-colors shrink-0"
               aria-label={t('notifications.allProjects')}
             >
               <option value="all">{t('notifications.allProjects')}</option>
@@ -297,7 +297,7 @@ export function NotificationsPage() {
             {t('notifications.emptyDescription')}
           </p>
           {hasActiveFilters && (
-            <Button size="sm" variant="outline" onClick={handleClearFilters} className="mt-4 text-xs rounded-full px-4 py-2">
+            <Button size="sm" variant="outline" onClick={handleClearFilters} className="mt-4 text-xs px-4 py-2">
               {t('notifications.clearFilters')}
             </Button>
           )}
@@ -405,7 +405,7 @@ export function NotificationsPage() {
                     <Link
                       href={link}
                       onClick={() => isUnread && markAsRead(n.id)}
-                      className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-surface px-4 py-2 text-xs sm:text-sm font-semibold text-default hover:bg-canvas hover:border-border-strong transition-all duration-150 active:scale-[0.98] shadow-xs group/link"
+                      className="inline-flex items-center gap-2 rounded-md border border-border/80 bg-surface px-4 py-2 text-xs sm:text-sm font-semibold text-default hover:bg-canvas hover:border-border-strong transition-colors duration-150 group/link"
                     >
                       <span>{t('notifications.viewDetails')}</span>
                       <ArrowSquareOut size={15} aria-hidden="true" className="text-muted group-hover/link:text-default transition-colors" />
@@ -416,7 +416,7 @@ export function NotificationsPage() {
                     <button
                       type="button"
                       onClick={() => markAsRead(n.id)}
-                      className="inline-flex size-8 sm:size-9 items-center justify-center rounded-full border border-border/70 bg-surface text-muted hover:text-default hover:bg-canvas hover:border-border transition-all cursor-pointer active:scale-[0.98] shadow-xs"
+                      className="inline-flex size-8 sm:size-9 items-center justify-center rounded-full border border-border/70 bg-surface text-muted hover:text-default hover:bg-canvas hover:border-border transition-all cursor-pointer active:scale-[0.98]"
                       title={t('notifications.markAsRead')}
                       aria-label={t('notifications.markAsRead')}
                     >

@@ -165,6 +165,8 @@ export function ReviewInboxPage() {
       aria-labelledby="page-title"
       className="flex h-full min-h-0 w-full flex-col gap-4 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6"
     >
+      <h1 id="page-title" className="sr-only">{t('sidebar.reviewInbox')}</h1>
+
       <div className="shrink-0 space-y-4 empty:hidden">
         <InboxCollisionsNotice openCollisions={openCollisions} />
         <ReviewInboxFeedback toast={feedback.toast} onDismiss={feedback.dismiss} />

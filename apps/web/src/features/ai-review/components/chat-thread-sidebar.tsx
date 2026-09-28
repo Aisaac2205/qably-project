@@ -57,7 +57,7 @@ export function ChatThreadSidebar({
           onClick={onNewChat}
           aria-label={t('aiReview.newChat')}
           title={t('aiReview.newChat')}
-          className="mt-2 size-9 rounded-lg inline-flex items-center justify-center bg-primary text-primary-fg hover:bg-primary-hover transition-all duration-150 active:scale-[0.98] shadow-xs focus-visible:ring-2 focus-visible:ring-primary cursor-pointer shrink-0"
+          className="mt-2 size-9 rounded-lg inline-flex items-center justify-center bg-primary text-primary-fg hover:bg-primary-hover transition-all duration-150 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary cursor-pointer shrink-0"
         >
           <Plus size={16} weight="bold" aria-hidden="true" />
         </button>
@@ -76,7 +76,7 @@ export function ChatThreadSidebar({
                 className={cn(
                   'size-9 rounded-lg inline-flex items-center justify-center transition-all cursor-pointer shrink-0',
                   isActive
-                    ? 'bg-primary/10 text-primary border border-primary/20 shadow-xs'
+                    ? 'bg-primary/10 text-primary border border-primary/20'
                     : 'text-muted hover:text-default hover:bg-surface-hover',
                 )}
               >
@@ -104,7 +104,7 @@ export function ChatThreadSidebar({
           onClick={onNewChat}
           className={cn(
             'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-[0.98]',
-            'shadow-xs focus-visible:outline-2 focus-visible:outline-primary cursor-pointer',
+            ' focus-visible:outline-2 focus-visible:outline-primary cursor-pointer',
             activeThreadId === null
               ? 'bg-primary text-primary-fg hover:bg-primary-hover'
               : 'bg-surface hover:bg-surface-hover text-default border border-border',
@@ -157,7 +157,7 @@ export function ChatThreadSidebar({
                 className={cn(
                   'group relative flex items-center rounded-lg transition-all duration-150',
                   isActive
-                    ? 'bg-surface shadow-xs border border-border'
+                    ? 'bg-surface border border-border'
                     : 'border border-transparent hover:bg-surface/70',
                 )}
               >

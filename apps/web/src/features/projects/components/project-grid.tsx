@@ -10,7 +10,7 @@ export function ProjectCardSkeleton() {
   return (
     <div
       data-slot="project-card-skeleton"
-      className="flex flex-col h-52 rounded-xl bg-surface border border-border/60 p-5 shadow-card animate-pulse"
+      className="flex flex-col h-52 rounded-xl bg-surface border border-border/60 p-5 animate-pulse"
       aria-hidden="true"
     >
       {/* Header Skeleton */}
@@ -59,7 +59,7 @@ export function ProjectGrid() {
 
   if (isError) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-fail/30 bg-surface/40 px-6 py-16 text-center" role="alert">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-fail/30 bg-surface/40 px-6 py-16 text-center" role="alert">
         <p className="text-sm font-medium text-fail">{t('projects.loadFailed')}</p>
       </div>
     )
@@ -67,8 +67,8 @@ export function ProjectGrid() {
 
   if (sorted.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-surface/40 px-6 py-16 text-center animate-page-enter">
-        <div className="flex size-12 items-center justify-center rounded-xl border border-border/60 bg-surface-raised text-muted shadow-2xs">
+      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border/80 bg-surface/40 px-6 py-16 text-center animate-page-enter">
+        <div className="flex size-12 items-center justify-center rounded-xl border border-border/60 bg-surface-raised text-muted">
           <FolderOpen size={24} weight="duotone" aria-hidden="true" />
         </div>
         <h3 className="mt-4 text-base font-semibold text-default">

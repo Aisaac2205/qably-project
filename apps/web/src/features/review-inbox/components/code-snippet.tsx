@@ -23,7 +23,7 @@ export function CodeSnippet({
   }, [code])
 
   return (
-    <div className="bg-canvas border border-border rounded-xl overflow-hidden shadow-2xs">
+    <div className="bg-canvas border border-border rounded-xl overflow-hidden">
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-surface/80">
         <span className="text-xs font-mono font-medium text-muted">{language || 'Code'}</span>
         <button

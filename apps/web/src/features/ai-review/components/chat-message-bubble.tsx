@@ -34,8 +34,8 @@ export function ChatMessageBubble({
         <div
           className={`text-xs sm:text-sm leading-relaxed ${
             isUser
-              ? 'bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-xs'
-              : 'bg-surface border border-border text-default rounded-2xl rounded-tl-xs p-4 shadow-xs'
+              ? 'bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5'
+              : 'bg-surface border border-border text-default rounded-2xl rounded-tl-xs p-4'
           }`}
         >
           {!isUser && (

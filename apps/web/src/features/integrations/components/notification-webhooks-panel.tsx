@@ -85,7 +85,7 @@ export function NotificationWebhooksPanel() {
           }
         />
       ) : (
-        <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+        <Card className="rounded-xl border border-border bg-surface overflow-hidden">
           <CardContent className="p-0">
             <EntityList aria-label={t('settings.webhooks.title')}>
               {webhooks.map((webhook) => (

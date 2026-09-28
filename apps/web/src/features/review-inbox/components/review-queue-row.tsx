@@ -54,7 +54,7 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
         onClick={() => onSelect(proposal.id)}
         className={`group flex-1 min-w-0 text-left p-3.5 sm:p-4 transition-all duration-150 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-border/70 ${
           isSelected
-            ? 'bg-surface-hover/90 border-l-4 border-l-primary shadow-xs'
+            ? 'bg-surface-hover/90 border-l-4 border-l-primary'
             : 'border-l-4 border-l-transparent'
         }`}
       >

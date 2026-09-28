@@ -127,7 +127,7 @@ export function ChatComposer({
   return (
     <div className="bg-surface px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-4 sm:pb-4">
       <div className="max-w-3xl mx-auto w-full">
-        <div className="flex flex-col gap-2 bg-surface border border-border rounded-2xl p-3 shadow-xs hover:border-border-strong focus-within:border-border-strong transition-colors">
+        <div className="flex flex-col gap-2 bg-surface border border-border rounded-2xl p-3 hover:border-border-strong focus-within:border-border-strong transition-colors">
           {(attachedCases.length > 0 || attachedFilePath) && (
             <div className="flex flex-wrap items-center gap-1.5">
               {attachedCases.map((attachedCase) => (
@@ -255,7 +255,7 @@ export function ChatComposer({
               className={cn(
                 'size-8 shrink-0 rounded-lg flex items-center justify-center transition-all duration-150',
                 value.trim() && !disabled
-                  ? 'bg-primary text-primary-fg hover:bg-primary-hover shadow-xs active:scale-95'
+                  ? 'bg-primary text-primary-fg hover:bg-primary-hover active:scale-95'
                   : 'bg-canvas text-muted/40 cursor-not-allowed',
               )}
             >
