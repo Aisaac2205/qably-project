@@ -1,11 +1,9 @@
 'use client'
 
-import { Fragment } from 'react'
 import Link from 'next/link'
 import type { RunSource, RunSummaryRecord } from '@qably/types'
 import { useRunsPage } from '../hooks/use-runs'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StatusChip } from './status-chip'
@@ -17,7 +15,6 @@ import { GitCommit } from '@phosphor-icons/react'
 import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
 import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { formatPassRate, isCiRun, runTitleParts } from '../lib/format'
-import { groupConsecutiveRuns, type RunReportGroup } from '../lib/group-runs'
 import { RunDeltaChip } from './run-delta-chip'
 
 const REPORT_CI_ANCHOR = 'step-4-report-ci'
@@ -50,7 +47,7 @@ function RunRow({
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
-      className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 hover:bg-surface-hover/60 transition-colors"
+      className="flex items-center justify-between px-5 py-3 sm:px-7 lg:px-9 sm:py-3.5 hover:bg-surface-hover/60 transition-colors"
     >
       <div className="min-w-0 flex-1 flex items-center gap-3.5">
         <StatusChip status={run.status} />
@@ -58,16 +55,16 @@ function RunRow({
           <div className="text-sm font-semibold text-default truncate">{title}</div>
           {subtitle && <div className="text-xs text-muted truncate mt-0.5">{subtitle}</div>}
           {run.commitSha && (
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted min-w-0">
-              <GitCommit size={12} weight="bold" aria-hidden="true" className="shrink-0" />
-              <span className="font-mono text-default">{run.commitSha.slice(0, 7)}</span>
-              {!isCi && run.commitMessage && <span className="truncate">{run.commitMessage}</span>}
-            </div>
+             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted min-w-0">
+               <GitCommit size={12} weight="bold" aria-hidden="true" className="shrink-0" />
+               <span className="font-mono text-default">{run.commitSha.slice(0, 7)}</span>
+               {!isCi && run.commitMessage && <span className="truncate">{run.commitMessage}</span>}
+             </div>
           )}
         </div>
       </div>
 
-      <div className="shrink-0 flex items-center gap-4">
+      <div className="shrink-0 flex items-center gap-2.5 sm:gap-4">
         <RunDeltaChip delta={run.delta} />
         <span className="text-sm font-semibold tabular-nums font-mono text-default w-12 text-right">
           {formatPassRate(run.passRate)}
@@ -108,38 +105,6 @@ function RunRow({
   )
 }
 
-function RunReportGroupHeader({ group }: { group: RunReportGroup }) {
-  const { t } = useTranslation()
-  const suiteCount = group.runs.length
-  const failedCount = group.runs.filter((run) => run.status === 'fail').length
-
-  return (
-    <div
-      data-testid="run-report-group-header"
-      className="flex items-center gap-1.5 px-4 pt-3 pb-1.5 sm:px-5 text-xs text-muted"
-    >
-      <span className="sr-only">{t('runs.sourceTooltipCi')}</span>
-      <GithubActionsIcon
-        className="size-3.5 text-brand-github-actions shrink-0"
-        aria-hidden="true"
-      />
-      <span className="font-mono font-semibold tabular-nums text-default">{suiteCount}</span>
-      <span>{t('runs.reportSuite', { count: suiteCount })}</span>
-      <span aria-hidden="true">·</span>
-      {failedCount === 0 ? (
-        <span>{t('runs.reportAllPassed')}</span>
-      ) : (
-        <>
-          <span className="font-mono font-semibold tabular-nums text-default">
-            {failedCount}
-          </span>
-          <span>{t('runs.reportFailed', { count: failedCount })}</span>
-        </>
-      )}
-    </div>
-  )
-}
-
 export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
   const { runs, hasNextPage, isFetchingNextPage, fetchNextPage } = useRunsPage(
     projectId,
@@ -173,41 +138,24 @@ export function RunList({ projectId, source }: { projectId: string; source?: Run
     )
   }
 
-  const groups = groupConsecutiveRuns(runs)
-
   return (
     <div className="space-y-4">
-      <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
-        <CardContent className="p-0">
-          <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
-            {groups.map((group) =>
-              group.runs.length === 1 ? (
-                <li key={group.runs[0].id}>
-                  <RunRow run={group.runs[0]} projectId={projectId} />
-                </li>
-              ) : (
-                <Fragment key={group.key}>
-                  <li>
-                    <RunReportGroupHeader group={group} />
-                  </li>
-                  {group.runs.map((run) => (
-                    <li key={run.id}>
-                      <RunRow run={run} projectId={projectId} />
-                    </li>
-                  ))}
-                </Fragment>
-              ),
-            )}
-          </EntityList>
-        </CardContent>
-      </Card>
+      <div className="rule-bleed !px-0 border-y border-border">
+        <EntityList aria-label={t('runs.ariaRunCases')} className="divide-y divide-border">
+          {runs.map((run) => (
+            <li key={run.id}>
+              <RunRow run={run} projectId={projectId} />
+            </li>
+          ))}
+        </EntityList>
+      </div>
 
       {hasNextPage && (
         <div className="flex justify-center">
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            className="h-10 w-full sm:w-auto px-4 text-sm"
             onClick={() => void fetchNextPage()}
             disabled={isFetchingNextPage}
           >

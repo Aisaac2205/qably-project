@@ -17,7 +17,7 @@ export function RunDeltaChip({ delta }: { delta: RunDeltaCounts | null }) {
         fixes: delta.fixes,
         unchanged: delta.unchanged,
       })}
-      className="inline-flex items-center gap-2 rounded-md border border-border bg-canvas/60 px-2 py-0.5 text-xs font-mono tabular-nums"
+      className="shrink-0 inline-flex items-center gap-1.5 sm:gap-2 rounded-md border border-border bg-canvas/60 px-1.5 sm:px-2 py-0.5 text-xs font-mono tabular-nums"
     >
       <span className={delta.regressions > 0 ? 'inline-flex items-center gap-0.5 text-fail' : 'inline-flex items-center gap-0.5 text-muted'}>
         <ArrowDown size={11} weight="bold" aria-hidden="true" />

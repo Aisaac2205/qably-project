@@ -65,13 +65,15 @@ describe('t pluralization', () => {
     expect(t('suites.case_other')).toBe('cases')
   })
 
-  it('resolves the run report group singular and plural forms in Spanish', () => {
+  it('resolves the singular and plural forms in Spanish, not just English', () => {
     useI18nStore.setState({ locale: 'es' })
     const { t } = useI18nStore.getState()
 
-    expect(t('runs.reportSuite', { count: 1 })).toBe('suite')
-    expect(t('runs.reportSuite', { count: 3 })).toBe('suites')
-    expect(t('runs.reportFailed', { count: 1 })).toBe('falló')
-    expect(t('runs.reportFailed', { count: 2 })).toBe('fallaron')
+    expect(t('suites.documentSuiteWithAeris', { count: 1 })).toBe(
+      'Documentar 1 caso con Aeris',
+    )
+    expect(t('suites.documentSuiteWithAeris', { count: 3 })).toBe(
+      'Documentar 3 casos con Aeris',
+    )
   })
 })

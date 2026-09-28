@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { RunList } from '@/features/runs/components/run-list'
 import { useTranslation } from '@/lib/i18n'
@@ -26,38 +25,37 @@ export function RunListPageClient({ projectId }: { projectId: string }) {
         ]}
       />
 
-      <PageHeader
-        title={t('runs.title')}
-        description={t('runs.subtitle')}
-        actions={
-          hasNoManualCases ? (
-            <div className="flex flex-col items-end gap-1">
-              <Button
-                type="button"
-                disabled
-                focusableWhenDisabled
-                aria-describedby="new-run-no-manual-hint"
-                className="text-sm font-semibold"
-                size="sm"
-              >
-                <Plus size={14} weight="bold" aria-hidden="true" />
-                {t('runs.newRun')}
-              </Button>
-              <p id="new-run-no-manual-hint" className="text-xs text-muted max-w-[260px] text-right">
-                {t('runs.noManualCasesInProject')}
-              </p>
-            </div>
-          ) : (
-            <Link
-              href={`/projects/${projectId}/runs/new`}
-              className={cn(buttonVariants({ size: 'sm' }), 'font-semibold')}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <h1 className="sr-only">{t('runs.title')}</h1>
+          <p className="text-sm text-muted">{t('runs.subtitle')}</p>
+        </div>
+        {hasNoManualCases ? (
+          <div className="flex flex-col md:items-end gap-1 w-full md:w-auto">
+            <Button
+              type="button"
+              disabled
+              focusableWhenDisabled
+              aria-describedby="new-run-no-manual-hint"
+              className="h-11 w-full px-4 text-sm md:h-10 md:w-auto"
             >
-              <Plus size={14} weight="bold" aria-hidden="true" />
+              <Plus size={16} weight="bold" aria-hidden="true" />
               {t('runs.newRun')}
-            </Link>
-          )
-        }
-      />
+            </Button>
+            <p id="new-run-no-manual-hint" className="text-xs text-muted max-w-[260px] text-left md:text-right">
+              {t('runs.noManualCasesInProject')}
+            </p>
+          </div>
+        ) : (
+          <Link
+            href={`/projects/${projectId}/runs/new`}
+            className={cn(buttonVariants(), 'h-11 w-full px-4 text-sm md:h-10 md:w-auto')}
+          >
+            <Plus size={16} weight="bold" aria-hidden="true" />
+            {t('runs.newRun')}
+          </Link>
+        )}
+      </div>
 
       <div className="space-y-6">
         <RunList projectId={projectId} />

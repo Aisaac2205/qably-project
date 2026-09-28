@@ -1,5 +1,6 @@
 import type {
   CaseStatus,
+  PushPassRateRecord,
   RegressionsRecord,
   RunRecord,
   RunsPageRecord,
@@ -23,6 +24,7 @@ export interface ListRunsParams {
   source?: RunSource
   limit?: number
   cursor?: string
+  days?: number
 }
 
 export function listRuns(
@@ -35,10 +37,25 @@ export function listRuns(
   if (params.source !== undefined) search.set('source', params.source)
   if (params.limit !== undefined) search.set('limit', String(params.limit))
   if (params.cursor !== undefined) search.set('cursor', params.cursor)
+  if (params.days !== undefined) search.set('days', String(params.days))
 
   const query = search.size === 0 ? '' : `?${search.toString()}`
 
   return apiRequest<RunsPageRecord>(`/runs${query}`, { signal })
+}
+
+export function getPushPassRate(
+  projectId: string,
+  days?: number,
+  signal?: AbortSignal,
+): Promise<PushPassRateRecord> {
+  const search = new URLSearchParams({ projectId })
+  if (days !== undefined) search.set('days', String(days))
+
+  return apiRequest<PushPassRateRecord>(
+    `/runs/push-pass-rate?${search.toString()}`,
+    { signal },
+  )
 }
 
 export function getSuiteMetrics(
