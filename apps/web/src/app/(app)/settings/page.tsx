@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { LanguageSection } from '@/features/settings/components/language-section'
 import { PlanUsageSection } from '@/features/settings/components/plan-usage-section'
 import { MembersSettingsPanel } from '@/features/settings/components/members-settings-panel'
@@ -10,9 +11,15 @@ import { useTranslation } from '@/lib/i18n'
 
 type SettingsTab = 'all' | 'members' | 'notifications' | 'integrations' | 'plan' | 'language'
 
-export default function SettingsPage() {
+const VALID_TABS: SettingsTab[] = ['all', 'members', 'notifications', 'integrations', 'plan', 'language']
+
+function SettingsContent() {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState<SettingsTab>('all')
+  const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab') as SettingsTab | null
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'all',
+  )
 
   const tabs: { id: SettingsTab; label: string }[] = [
     { id: 'all', label: t('settings.tabs.general') },
@@ -70,3 +77,12 @@ export default function SettingsPage() {
     </div>
   )
 }
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsContent />
+    </Suspense>
+  )
+}
+
