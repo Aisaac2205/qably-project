@@ -29,19 +29,17 @@ export function SecretCard({
 }: SecretCardProps) {
   return (
     <section
-      className="rounded-2xl border border-border/70 bg-surface p-6 sm:p-7 shadow-xs hover:border-border transition-colors duration-150 space-y-3"
+      className="rounded-lg border border-border bg-surface px-4 py-3 sm:px-5 sm:py-3.5 space-y-3"
       aria-labelledby={headingId}
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3.5 min-w-0">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-canvas/80 text-default shadow-2xs">
-            {icon}
-          </div>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="shrink-0 text-default">{icon}</span>
           <div className="min-w-0">
-            <h2 id={headingId} className="text-base font-semibold text-default tracking-tight">
+            <h2 id={headingId} className="truncate text-sm font-semibold text-default">
               {title}
             </h2>
-            <p className="mt-0.5 text-xs sm:text-sm text-muted">{description}</p>
+            <p className="mt-0.5 text-xs text-muted">{description}</p>
           </div>
         </div>
 

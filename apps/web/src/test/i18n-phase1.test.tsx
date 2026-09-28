@@ -46,11 +46,11 @@ describe('Phase 1 i18n', () => {
     expect(screen.getByText('Alertas de ejecuciones críticas, propuestas de revisión y riesgos de calidad.')).toBeInTheDocument()
   })
 
-  it('renders the Review Inbox page in Spanish without a duplicate page heading', () => {
+  it('renders the Review Inbox page in Spanish with exactly one page heading', () => {
     useI18nStore.setState({ locale: 'es' })
     renderWithQuery(<ReviewInboxPage />)
 
-    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Bandeja de revisión' })).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Buscar por título, archivo u objetivo/i)).toBeInTheDocument()
     expect(screen.getByText(/^Todos los proyectos$/i)).toBeInTheDocument()
     expect(

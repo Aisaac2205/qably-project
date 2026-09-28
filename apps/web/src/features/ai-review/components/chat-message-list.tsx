@@ -99,7 +99,7 @@ export function ChatMessageList({
 
           {pendingMessage.content && (
             <div className="flex justify-end">
-              <div className="max-w-[85%] sm:max-w-[80%] bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 shadow-xs text-xs sm:text-sm">
+              <div className="max-w-[85%] sm:max-w-[80%] bg-primary text-primary-fg rounded-2xl rounded-tr-xs px-4 py-2.5 text-xs sm:text-sm">
                 {pendingMessage.content}
               </div>
             </div>

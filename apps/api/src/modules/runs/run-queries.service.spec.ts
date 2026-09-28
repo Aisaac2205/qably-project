@@ -84,6 +84,7 @@ interface FakePrisma {
   };
   suite: { findFirst: jest.Mock; findMany: jest.Mock };
   $queryRaw: jest.Mock;
+  $queryRawUnsafe: jest.Mock;
   txRunCaseFindMany: jest.Mock;
   $transaction: jest.Mock;
 }
@@ -113,6 +114,7 @@ function createPrisma(): FakePrisma {
         .mockResolvedValue([{ id: 'suite-1', name: 'Checkout' }]),
     },
     $queryRaw: jest.fn().mockResolvedValue([]),
+    $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     txRunCaseFindMany: jest.fn().mockResolvedValue([runCaseRow()]),
     $transaction: jest.fn(),
   };
@@ -175,6 +177,35 @@ describe('RunQueriesService.list', () => {
         where: { organizationId: 'org-1', source: 'github_actions' },
       }),
     );
+  });
+
+  it('filters by a calendar time window when days is given, instead of only a row count', async () => {
+    const prisma = createPrisma();
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-16T12:00:00.000Z'));
+
+    await build(prisma).list(org, { days: 7 });
+
+    jest.useRealTimers();
+
+    expect(prisma.run.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: 'org-1',
+          startedAt: { gte: new Date('2026-06-09T12:00:00.000Z') },
+        },
+      }),
+    );
+  });
+
+  it('omits the startedAt filter entirely when no days window is given', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).list(org, {});
+
+    const [[args]] = prisma.run.findMany.mock.calls as [
+      [{ where: Record<string, unknown> }],
+    ];
+    expect(args.where).not.toHaveProperty('startedAt');
   });
 
   it('orders runs by startedAt descending with id as the tiebreaker', async () => {

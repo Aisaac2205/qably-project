@@ -11,11 +11,11 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
-import { Card, CardContent } from '@/components/ui/card'
 import { buttonVariants } from '@/components/ui/button'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
+import { SuiteFiltersSheet } from './suite-filters-sheet'
 import { SuiteRow } from './suite-row'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import type { SuiteRunStatus } from '@qably/types'
@@ -123,11 +123,29 @@ export function SuiteList({ projectId }: SuiteListProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex-1 min-w-0">
-          <SuiteFilterBar
-            search={search}
-            onSearchChange={setSearch}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+        <SuiteFilterBar
+          className="md:min-w-0 md:flex-1"
+          search={search}
+          onSearchChange={setSearch}
+          status={status}
+          onStatusChange={setStatus}
+          tag={tag}
+          onTagChange={setTag}
+          sort={sort}
+          onSortChange={setSort}
+          availableTags={availableTags}
+        />
+        <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
+          <Link
+            href={suiteNewPath(projectId)}
+            className={cn(buttonVariants(), 'h-11 w-full px-4 text-sm md:h-10 md:w-auto')}
+          >
+            <Plus size={16} weight="bold" aria-hidden="true" />
+            {t('suites.newSuite')}
+          </Link>
+          <SuiteFiltersSheet
+            className="md:hidden"
             status={status}
             onStatusChange={setStatus}
             tag={tag}
@@ -137,10 +155,6 @@ export function SuiteList({ projectId }: SuiteListProps) {
             availableTags={availableTags}
           />
         </div>
-        <Link href={suiteNewPath(projectId)} className={cn(buttonVariants({ size: 'sm' }), 'shrink-0')}>
-          <Plus size={14} weight="bold" aria-hidden="true" />
-          {t('suites.newSuite')}
-        </Link>
       </div>
 
       {sorted.length === 0 ? (
@@ -163,22 +177,20 @@ export function SuiteList({ projectId }: SuiteListProps) {
           ) : undefined}
         />
       ) : (
-        <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
-          <CardContent className="p-0">
-            <EntityList aria-label={t('suites.ariaFilterSuites')} className="divide-y divide-border">
+        <div className="rule-bleed border-y border-border">
+          <EntityList aria-label={t('suites.ariaFilterSuites')} className="divide-y divide-border">
             {sorted.map((m) => (
               <li key={m.suite.id}>
                 <Link
                   href={`/projects/${projectId}/suites/${m.suite.id}`}
-                  className="block focus-visible:outline-2 focus-visible:outline-primary"
+                  className="block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
                 >
                   <SuiteRow suite={m.suite} metrics={m} />
                 </Link>
               </li>
             ))}
-            </EntityList>
-          </CardContent>
-        </Card>
+          </EntityList>
+        </div>
       )}
     </div>
   )

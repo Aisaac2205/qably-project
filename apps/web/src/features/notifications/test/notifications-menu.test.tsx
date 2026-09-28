@@ -72,4 +72,20 @@ describe('NotificationsMenu', () => {
 
     expect(markRead).toHaveBeenCalledWith('notification-1')
   })
+
+  it('switches between unread and read tabs', async () => {
+    const user = userEvent.setup()
+    await act(async () => {
+      renderMenu()
+    })
+
+    await user.click(await screen.findByRole('button', { name: /notifications, 1 unread/i }))
+    expect(await screen.findByText('The run "#12" in Checkout failed.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /^read/i }))
+    expect(
+      await screen.findByText('Discount total regressed in Checkout during run "#10".'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('The run "#12" in Checkout failed.')).not.toBeInTheDocument()
+  })
 })

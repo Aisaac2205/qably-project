@@ -1,5 +1,6 @@
 import type {
   JunitIngestRecord,
+  PushPassRateRecord,
   RegressionsRecord,
   RunCaseRecord,
   RunRecord,
@@ -20,6 +21,7 @@ export type RunSummaryView = RunSummaryRecord;
 export type RunsPageView = RunsPageRecord;
 export type SuiteMetricsView = SuiteMetricsRecord;
 export type RegressionsView = RegressionsRecord;
+export type PushPassRateOhlcView = PushPassRateRecord;
 export type JunitIngestView = JunitIngestRecord;
 
 export interface RunIngestJobData {

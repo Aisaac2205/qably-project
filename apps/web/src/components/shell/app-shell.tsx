@@ -17,7 +17,7 @@ export function AppShell({ children }: AppShellProps) {
   const { t } = useTranslation()
 
   return (
-    <SidebarProvider defaultOpen={true} className="h-dvh w-full overflow-hidden bg-sidebar">
+    <SidebarProvider defaultOpen={true} className="h-dvh w-full overflow-hidden bg-surface">
       <a
         href="#main-content"
         onClick={focusMainContent}
@@ -26,14 +26,14 @@ export function AppShell({ children }: AppShellProps) {
         {t('common.skipToMain')}
       </a>
       <Sidebar />
-      <SidebarInset className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-sidebar">
+      <SidebarInset className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface md:border-l md:border-border">
         <header className="shrink-0">
           <TopBar />
         </header>
         <main
           id="main-content"
           tabIndex={-1}
-          className="min-h-0 flex-1 overflow-auto bg-surface md:m-3 md:mt-0 md:rounded-2xl md:ring-1 md:ring-border md:shadow-pop flex flex-col"
+          className="min-h-0 flex-1 overflow-auto bg-surface flex flex-col"
         >
           {children}
         </main>

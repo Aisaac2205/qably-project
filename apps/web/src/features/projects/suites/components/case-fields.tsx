@@ -103,15 +103,15 @@ export function CaseFields({
       </div>
 
       {automated && (
-        <div className="grid gap-1.5 rounded-lg border border-border/70 bg-canvas/50 p-3">
-          <div className="flex items-baseline gap-2">
+        <div className="grid min-w-0 gap-1.5 rounded-lg border border-border/70 bg-canvas/50 p-3">
+          <div className="flex min-w-0 items-baseline gap-2">
             <span className="text-xs font-semibold text-muted shrink-0">{t('cases.rawName')}</span>
-            <span className="font-mono text-xs text-default truncate">{automated.raw}</span>
+            <span className="min-w-0 flex-1 font-mono text-xs text-default truncate">{automated.raw}</span>
           </div>
           {automated.filePath && (
-            <div className="flex items-baseline gap-2">
+            <div className="flex min-w-0 items-baseline gap-2">
               <span className="text-xs font-semibold text-muted shrink-0">{t('cases.filePath')}</span>
-              <span className="font-mono text-xs text-default truncate">{automated.filePath}</span>
+              <span className="min-w-0 flex-1 font-mono text-xs text-default truncate">{automated.filePath}</span>
             </div>
           )}
         </div>

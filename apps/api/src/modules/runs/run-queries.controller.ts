@@ -21,6 +21,7 @@ import { CurrentOrg } from '../organizations/decorators/current-org.decorator';
 import { OrgScopeGuard } from '../organizations/guards/org-scope.guard';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type {
+  PushPassRateOhlcView,
   RegressionsView,
   RunQueryError,
   RunsPageView,
@@ -30,11 +31,13 @@ import type {
 import {
   createManualRunSchema,
   listRunsQuerySchema,
+  pushPassRateQuerySchema,
   regressionsQuerySchema,
   suiteMetricsQuerySchema,
   updateRunCaseStatusSchema,
   type CreateManualRunInput,
   type ListRunsQuery,
+  type PushPassRateQuery,
   type RegressionsQuery,
   type SuiteMetricsQuery,
   type UpdateRunCaseStatusInput,
@@ -109,6 +112,15 @@ export class RunQueriesController {
     query: RegressionsQuery,
   ): Promise<RegressionsView> {
     return this.runs.regressions(org, query.projectId, query.limit);
+  }
+
+  @Get('push-pass-rate')
+  pushPassRate(
+    @CurrentOrg() org: OrgContext,
+    @Query(new ZodValidationPipe(pushPassRateQuerySchema))
+    query: PushPassRateQuery,
+  ): Promise<PushPassRateOhlcView> {
+    return this.runs.pushPassRateOhlc(org, query.projectId, query.days);
   }
 
   @Get(':id')

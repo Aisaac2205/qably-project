@@ -8,6 +8,6 @@ export const runKeys = {
     ['runs', 'suite-metrics', projectId] as const,
   regressions: (projectId: string, limit: number) =>
     ['runs', 'regressions', projectId, limit] as const,
-  recent: (projectId: string, limit: number) =>
-    ['runs', 'recent', projectId, limit] as const,
+  pushPassRate: (projectId: string, days: number) =>
+    ['runs', 'push-pass-rate', projectId, days] as const,
 }

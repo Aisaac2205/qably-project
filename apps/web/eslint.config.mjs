@@ -12,6 +12,14 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored @bklit registry source. No longer byte-identical to upstream:
+    // chart-formatters.ts and chart-stat-flow.tsx resolve the app locale, and
+    // stacked-bar.tsx is ours. Re-syncing with `shadcn add` overwrites those.
+    "src/components/charts/**",
+    "src/components/stat-card-chart.tsx",
+    "src/components/stat-card-hover-bridge.tsx",
+    "src/components/trend-badge.tsx",
+    "src/components/shimmering-text.tsx",
   ]),
   {
     rules: {

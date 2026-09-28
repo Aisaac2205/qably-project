@@ -189,7 +189,7 @@ export function RunDetail({
       </div>
 
       {/* Two-pane workspace card: case list + detail */}
-      <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr] divide-y md:divide-y-0 md:divide-x divide-border min-h-[440px]">
+      <div className="rounded-xl border border-border bg-surface overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr] divide-y md:divide-y-0 md:divide-x divide-border min-h-[440px]">
         <div className="flex flex-col overflow-y-auto">
           <CaseList
             cases={sortedCases}
@@ -213,7 +213,7 @@ export function RunDetail({
       {isEditable && automatedCoverage.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-default">{t('runs.coveredByCi')}</h2>
-          <div className="rounded-xl border border-border bg-surface shadow-card overflow-hidden divide-y divide-border">
+          <div className="rounded-xl border border-border bg-surface overflow-hidden divide-y divide-border">
             {automatedCoverage.map((tc) => {
               const described = describeCase(tc)
               return (

@@ -11,10 +11,10 @@ describe('ReviewInboxPage route', () => {
     useI18nStore.setState({ locale: 'en' })
   })
 
-  it('renders the real review inbox workstation without a duplicate page heading', () => {
+  it('renders the real review inbox workstation with a single, visually hidden page heading', () => {
     const { container } = renderWithQuery(<ReviewInboxPage />)
 
-    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Review Inbox' })).toBeInTheDocument()
     expect(container.querySelector('[aria-labelledby="page-title"]')).toBeInTheDocument()
 
     expect(

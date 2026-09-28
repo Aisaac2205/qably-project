@@ -48,6 +48,7 @@ describe('buildDashboardOverview daily granularity', () => {
     expect(record.passRateSeries.current).toEqual([
       {
         date: '2026-06-10',
+        rangeEnd: '2026-06-10',
         passRate: null,
         runs: 0,
         failedRuns: 0,
@@ -58,6 +59,7 @@ describe('buildDashboardOverview daily granularity', () => {
       },
       {
         date: '2026-06-11',
+        rangeEnd: '2026-06-11',
         passRate: null,
         runs: 0,
         failedRuns: 0,
@@ -67,6 +69,24 @@ describe('buildDashboardOverview daily granularity', () => {
         blocked: 0,
       },
     ]);
+  });
+
+  it('reports the daily granularity in the passRateSeries envelope', () => {
+    const record = buildDashboardOverview({
+      period: 7,
+      zone: 'UTC',
+      currentDayKeys: ['2026-06-10'],
+      previousDayKeys: [],
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+    });
+
+    expect(record.passRateSeries.granularity).toBe('day');
   });
 
   it('produces one bucket per calendar day and merges case + run rows into it', () => {
@@ -89,6 +109,7 @@ describe('buildDashboardOverview daily granularity', () => {
 
     expect(record.passRateSeries.current[0]).toEqual({
       date: '2026-06-10',
+      rangeEnd: '2026-06-10',
       passRate: 0.75,
       runs: 4,
       failedRuns: 1,
@@ -99,6 +120,7 @@ describe('buildDashboardOverview daily granularity', () => {
     });
     expect(record.passRateSeries.current[1]).toEqual({
       date: '2026-06-11',
+      rangeEnd: '2026-06-11',
       passRate: null,
       runs: 0,
       failedRuns: 0,
@@ -189,6 +211,45 @@ describe('buildDashboardOverview weekly granularity (period 90)', () => {
     expect(record.passRateSeries.current).toHaveLength(13);
     expect(record.passRateSeries.current[0].date).toBe(currentDayKeys[0]);
     expect(record.passRateSeries.current[12].date).toBe(currentDayKeys[84]);
+  });
+
+  it('reports the weekly granularity in the passRateSeries envelope', () => {
+    const record = buildDashboardOverview({
+      period: 90,
+      zone: 'UTC',
+      currentDayKeys: daysFrom('2026-06-03', 90),
+      previousDayKeys: [],
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+    });
+
+    expect(record.passRateSeries.granularity).toBe('week');
+  });
+
+  it('sets rangeEnd to the last day of each 7-day chunk, and to the last day of the window for the trailing partial chunk', () => {
+    const currentDayKeys = daysFrom('2026-06-03', 90);
+
+    const record = buildDashboardOverview({
+      period: 90,
+      zone: 'UTC',
+      currentDayKeys,
+      previousDayKeys: [],
+      caseCountRows: [],
+      runCountRows: [],
+      casesPassingRows: [],
+      projects: [],
+      suiteCountByProjectId: new Map(),
+      caseCountByProjectId: new Map(),
+      lastRunAtByProjectId: new Map(),
+    });
+
+    expect(record.passRateSeries.current[0].rangeEnd).toBe(currentDayKeys[6]);
+    expect(record.passRateSeries.current[12].rangeEnd).toBe(currentDayKeys[89]);
   });
 
   it('assigns a run on the chunk boundary day to the chunk it falls into, by index', () => {

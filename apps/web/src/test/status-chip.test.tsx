@@ -68,7 +68,7 @@ describe('StatusChip (global)', () => {
     await act(async () => {
       render(<StatusChip status="fail" />)
     })
-    const chip = screen.getByText('Fallido').closest('span')
+    const chip = screen.getByText('Fallo').closest('span')
     expect(chip?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
   })
 

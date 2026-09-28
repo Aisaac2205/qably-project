@@ -21,7 +21,7 @@ afterEach(() => {
 })
 
 describe('LanguageSection', () => {
-  it('marks the active language with the solid brand fill instead of a faint tint', async () => {
+  it('marks the active language with a bordered surface instead of a faint tint', async () => {
     await act(async () => {
       render(<LanguageSection />)
     })
@@ -30,12 +30,12 @@ describe('LanguageSection', () => {
     const spanish = screen.getByRole('button', { name: 'Spanish' })
 
     expect(english).toHaveAttribute('aria-pressed', 'true')
-    expect(english).toHaveClass('bg-primary', 'text-primary-fg')
+    expect(english).toHaveClass('border-primary/60', 'bg-surface')
     expect(spanish).toHaveAttribute('aria-pressed', 'false')
-    expect(spanish).not.toHaveClass('bg-primary')
+    expect(spanish).not.toHaveClass('border-primary/60')
   })
 
-  it('moves the fill to the language the user picks instantly, before the request settles', async () => {
+  it('moves the border to the language the user picks instantly, before the request settles', async () => {
     const user = userEvent.setup()
     await act(async () => {
       render(<LanguageSection />)
@@ -45,8 +45,8 @@ describe('LanguageSection', () => {
 
     const spanish = screen.getByRole('button', { name: 'Español' })
     expect(spanish).toHaveAttribute('aria-pressed', 'true')
-    expect(spanish).toHaveClass('bg-primary', 'text-primary-fg')
-    expect(screen.getByRole('button', { name: 'Inglés' })).not.toHaveClass('bg-primary')
+    expect(spanish).toHaveClass('border-primary/60', 'bg-surface')
+    expect(screen.getByRole('button', { name: 'Inglés' })).not.toHaveClass('border-primary/60')
   })
 
   it('persists the chosen locale to the server', async () => {

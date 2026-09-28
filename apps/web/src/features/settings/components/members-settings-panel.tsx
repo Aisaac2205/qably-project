@@ -161,7 +161,7 @@ export function MembersSettingsPanel() {
       ) : members.length === 0 ? (
         <StateView kind="empty" title={t('settings.members.noMembers')} />
       ) : (
-        <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+        <Card className="rounded-xl border border-border bg-surface overflow-hidden">
           <CardContent className="p-0">
             <EntityList aria-label={t('settings.members.title')}>
               {members.map((member) => {
@@ -229,7 +229,7 @@ export function MembersSettingsPanel() {
         {!invitesLoading && invites.length === 0 ? (
           <p className="text-xs text-muted">{t('settings.members.pendingInvitesEmpty')}</p>
         ) : (
-          <Card className="rounded-xl border border-border bg-surface shadow-card overflow-hidden">
+          <Card className="rounded-xl border border-border bg-surface overflow-hidden">
             <CardContent className="p-0">
               <EntityList aria-label={t('settings.members.pendingInvitesTitle')}>
                 {invites.map((invite) => (

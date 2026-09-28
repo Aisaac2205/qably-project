@@ -5,16 +5,32 @@ import type { ProjectRepositoryView } from '@qably/types'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useI18nStore } from '@/lib/i18n'
 import { __resetStore } from '@/lib/mock-store'
-import { getProjectRepository, rotateWebhookSecret } from '../api/repository.api'
+import * as useProjectModule from '@/features/projects/hooks/use-project'
+import { getProjectRepository } from '../api/repository.api'
 import { ProjectRepositoryPage } from '../components/project-repository-page'
 
 vi.mock('../api/repository.api', () => ({
   getProjectRepository: vi.fn(),
-  rotateWebhookSecret: vi.fn(),
 }))
 
 const readRepository = vi.mocked(getProjectRepository)
-const rotateSecret = vi.mocked(rotateWebhookSecret)
+
+function stubProject() {
+  vi.spyOn(useProjectModule, 'useProject').mockReturnValue({
+    project: {
+      id: 'proj-1',
+      name: 'Ecommerce App',
+      organizationId: 'org-1',
+      technologies: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      hasManualCases: true,
+    },
+    isLoading: false,
+    isError: false,
+    error: null,
+  } as ReturnType<typeof useProjectModule.useProject>)
+}
 
 const view: ProjectRepositoryView = {
   source: {
@@ -28,6 +44,7 @@ const view: ProjectRepositoryView = {
     projectId: 'proj-1',
     source: 'webhook',
     status: 'completed',
+    branch: 'main',
     codeChangeIds: ['change-1', 'change-2', 'change-3', 'change-4'],
     createdAt: '2026-06-16T10:45:00Z',
   },
@@ -112,8 +129,8 @@ async function renderPage(projectId = 'proj-1') {
 
 describe('ProjectRepositoryPage', () => {
   beforeEach(() => {
+    stubProject()
     readRepository.mockResolvedValue(structuredClone(view))
-    rotateSecret.mockResolvedValue({ webhookSecret: 'f'.repeat(64) })
   })
 
   afterEach(() => {
@@ -122,7 +139,7 @@ describe('ProjectRepositoryPage', () => {
       __resetStore()
     })
     readRepository.mockReset()
-    rotateSecret.mockReset()
+    vi.restoreAllMocks()
   })
 
   it('renders the connected GitHub source in project context', async () => {
@@ -133,6 +150,13 @@ describe('ProjectRepositoryPage', () => {
     expect(screen.getByText('acme/ecommerce-app')).toBeInTheDocument()
     expect(screen.getByText('Pushes to this repository are ingested automatically.')).toBeInTheDocument()
     expect(readRepository).toHaveBeenCalledWith('proj-1', expect.anything())
+  })
+
+  it('links the repository name to the provider when the connection is traceable to evidence', async () => {
+    await renderPage()
+
+    const repoLink = screen.getByRole('link', { name: 'acme/ecommerce-app' })
+    expect(repoLink).toHaveAttribute('href', 'https://github.com/acme/ecommerce-app')
   })
 
   it('formats the ingestion timestamp in the local zone instead of forcing UTC', async () => {
@@ -162,8 +186,18 @@ describe('ProjectRepositoryPage', () => {
 
     expect(screen.getByRole('heading', { level: 2, name: 'Received changes' })).toBeInTheDocument()
     expect(screen.getByText('Completed')).toBeInTheDocument()
-    expect(screen.getByText('Webhook')).toBeInTheDocument()
+    expect(screen.getByText('main')).toBeInTheDocument()
     expect(screen.getByText('8f3c2a1')).toBeInTheDocument()
+  })
+
+  it('links the commit to the provider when the ingested evidence traces back to it', async () => {
+    await renderPage()
+
+    const commitLink = screen.getByRole('link', { name: /8f3c2a1/ })
+    expect(commitLink).toHaveAttribute(
+      'href',
+      'https://github.com/acme/ecommerce-app/commit/8f3c2a1d4e5f',
+    )
   })
 
   it('never renders a diff row or a pull request number the webhook does not provide', async () => {
@@ -298,9 +332,10 @@ describe('ProjectRepositoryPage', () => {
     await renderPage('proj-2')
 
     const description = screen.getByText('Este proyecto no tiene un repositorio de código configurado.')
-    expect(description.closest('[data-state-kind]')).toHaveAttribute('data-state-kind', 'no-source')
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    const stateView = description.closest('[data-state-kind]')
+    expect(stateView).toHaveAttribute('data-state-kind', 'no-source')
+    expect(within(stateView as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(stateView as HTMLElement).queryByRole('link')).not.toBeInTheDocument()
   })
 
   it('states the setup requirement instead of asserting a push is enough when no batch exists yet', async () => {
@@ -344,44 +379,5 @@ describe('ProjectRepositoryPage', () => {
     await renderPage()
 
     expect(screen.getByRole('alert')).toHaveTextContent('Repository unavailable')
-  })
-
-  it('offers rotating the webhook secret from the connected source card', async () => {
-    await renderPage()
-
-    expect(screen.getByRole('button', { name: 'Rotate secret' })).toBeInTheDocument()
-    expect(rotateSecret).not.toHaveBeenCalled()
-  })
-
-  it('warns before rotating and reveals the new secret once confirmed', async () => {
-    const user = userEvent.setup()
-    await renderPage()
-
-    await user.click(screen.getByRole('button', { name: 'Rotate secret' }))
-
-    const confirm = await screen.findByRole('alertdialog').catch(() => screen.getByRole('dialog'))
-    expect(within(confirm).getByText(/stops being valid immediately/i)).toBeInTheDocument()
-
-    await user.click(within(confirm).getByRole('button', { name: 'Rotate secret' }))
-
-    await waitFor(() => {
-      expect(rotateSecret).toHaveBeenCalledWith('proj-1')
-    })
-    expect(await screen.findByText('f'.repeat(64))).toBeInTheDocument()
-  })
-
-  it('reports a rotation that fails without revealing a secret', async () => {
-    const user = userEvent.setup()
-    rotateSecret.mockRejectedValue(new Error('nope'))
-    await renderPage()
-
-    await user.click(screen.getByRole('button', { name: 'Rotate secret' }))
-    const confirm = await screen.findByRole('alertdialog').catch(() => screen.getByRole('dialog'))
-    await user.click(within(confirm).getByRole('button', { name: 'Rotate secret' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The secret could not be rotated. Try again.',
-    )
-    expect(screen.queryByText('f'.repeat(64))).not.toBeInTheDocument()
   })
 })

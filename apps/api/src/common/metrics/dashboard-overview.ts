@@ -55,6 +55,7 @@ export interface BuildDashboardOverviewInput {
 
 interface DayAggregate {
   date: string;
+  rangeEnd: string;
   counts: RunCaseCounts;
   runs: number;
   failedRuns: number;
@@ -65,6 +66,7 @@ interface DayAggregate {
 function emptyDayAggregate(date: string): DayAggregate {
   return {
     date,
+    rangeEnd: date,
     counts: emptyCaseCounts(),
     runs: 0,
     failedRuns: 0,
@@ -117,6 +119,7 @@ function groupWeekly(dayAggregates: readonly DayAggregate[]): DayAggregate[] {
   for (let start = 0; start < dayAggregates.length; start += WEEK_CHUNK_SIZE) {
     const chunk = dayAggregates.slice(start, start + WEEK_CHUNK_SIZE);
     const bucket = emptyDayAggregate(chunk[0].date);
+    bucket.rangeEnd = chunk[chunk.length - 1].date;
 
     for (const day of chunk) {
       bucket.counts = sumCaseCounts([bucket.counts, day.counts]);
@@ -154,6 +157,7 @@ function resolveBuckets(
 function toDailyPoint(bucket: DayAggregate): DailyPoint {
   return {
     date: bucket.date,
+    rangeEnd: bucket.rangeEnd,
     passRate: computePassRate(bucket.counts),
     runs: bucket.runs,
     failedRuns: bucket.failedRuns,
@@ -318,6 +322,7 @@ export function buildDashboardOverview(
     passRateSeries: {
       current: currentBuckets.map(toDailyPoint),
       previous: previousBuckets.map(toDailyPoint),
+      granularity: bucketGranularity(input.period),
     },
     casesPassing: buildCasesPassing(input.casesPassingRows),
     projects: buildProjectRows(

@@ -88,7 +88,15 @@ export const listRunsQuerySchema = z.object({
   source: z.enum(['manual', 'api', 'github_actions']).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().min(1).optional(),
+  days: z.coerce.number().int().min(1).max(365).optional(),
 });
+
+export const pushPassRateQuerySchema = z.object({
+  projectId: z.string().min(1),
+  days: z.coerce.number().int().min(1).max(365).default(30),
+});
+
+export type PushPassRateQuery = z.infer<typeof pushPassRateQuerySchema>;
 
 export const createManualRunSchema = z.object({
   projectId: z.string().min(1),

@@ -26,53 +26,35 @@ describe('CasesGaugeCard', () => {
       renderWithQuery(<CasesGaugeCard period={30} />)
     })
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Cases passing' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Cases by priority' })).toBeInTheDocument()
   })
 
-  it('renders a gauge with the decided pass rate of the cases in scope', async () => {
+  it('renders a donut pie chart with 3 balanced priority rivals', async () => {
     await act(async () => {
       renderWithQuery(<CasesGaugeCard period={30} />)
     })
 
-    // 98 / (98 + 12 + 5) = 85.2% -> rounds to 85
-    const meter = screen.getByRole('meter')
-    expect(meter).toHaveAttribute('aria-valuenow', '85')
+    const chart = screen.getByRole('img', { name: 'Case distribution by priority' })
+    expect(chart).toBeInTheDocument()
+
+    // 3 clean, direct rivals without (P0) codes
+    expect(screen.getByText('Critical')).toBeInTheDocument()
+    expect(screen.getByText('High priority')).toBeInTheDocument()
+    expect(screen.getByText('Medium and low')).toBeInTheDocument()
+
+    // Center shows total cases label
+    expect(screen.getByText('Total cases')).toBeInTheDocument()
   })
 
-  it('uses text-2xl font-medium and tracking-tight for the gauge value, never text-3xl or font-semibold, so it never overlaps the arc', async () => {
+  it('removes the redundant 3 stat boxes and passed-of-total text for a clean UI', async () => {
     await act(async () => {
       renderWithQuery(<CasesGaugeCard period={30} />)
     })
 
-    const value = screen.getByText('85%')
-    expect(value).toHaveClass('text-2xl', 'font-medium', 'tracking-tight')
-    expect(value).not.toHaveClass('text-3xl')
-    expect(value).not.toHaveClass('font-semibold')
-  })
-
-  it('shows the failed, skipped and blocked counts in bordered stat boxes, failed and blocked coloured by tone', async () => {
-    await act(async () => {
-      renderWithQuery(<CasesGaugeCard period={30} />)
-    })
-
-    const failed = screen.getByTestId('cases-failed')
-    expect(failed).toHaveClass('text-fail')
-    expect(failed.closest('div')).toHaveClass('border')
-
-    const blocked = screen.getByTestId('cases-blocked')
-    expect(blocked).toHaveClass('text-warn')
-    expect(blocked.closest('div')).toHaveClass('border')
-  })
-
-  it('shows passed of total plus the failed, skipped and blocked counts', async () => {
-    await act(async () => {
-      renderWithQuery(<CasesGaugeCard period={30} />)
-    })
-
-    expect(screen.getByText('98/120 passed')).toBeInTheDocument()
-    expect(screen.getByTestId('cases-failed')).toHaveTextContent('12')
-    expect(screen.getByTestId('cases-skipped')).toHaveTextContent('5')
-    expect(screen.getByTestId('cases-blocked')).toHaveTextContent('5')
+    expect(screen.queryByTestId('cases-failed')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('cases-skipped')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('cases-blocked')).not.toBeInTheDocument()
+    expect(screen.queryByText('98/120 passed')).not.toBeInTheDocument()
   })
 
   it('shows a loading state while the overview loads', async () => {
@@ -86,7 +68,7 @@ describe('CasesGaugeCard', () => {
       </QueryClientProvider>,
     )
 
-    expect(screen.queryByRole('meter')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
     expect(document.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0)
   })
 
@@ -110,13 +92,14 @@ describe('CasesGaugeCard', () => {
       retryButton.click()
     })
 
-    await waitFor(() => expect(screen.getByRole('meter')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('img')).toBeInTheDocument())
   })
 
-  it('shows an empty state when there are no decided cases', async () => {
+  it('shows an empty state when there are no cases recorded', async () => {
     getOverview.mockResolvedValue({
       ...dashboardOverviewFixture,
       casesPassing: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
+      projects: [],
     })
     const client = createTestQueryClient()
     client.removeQueries({ queryKey: dashboardKeys.overview(30, 'all', getBrowserTimeZone()) })
@@ -128,6 +111,6 @@ describe('CasesGaugeCard', () => {
     )
 
     expect(await screen.findByText('No cases recorded yet')).toBeInTheDocument()
-    expect(screen.queryByRole('meter')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
 })

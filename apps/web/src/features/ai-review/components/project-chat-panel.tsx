@@ -85,6 +85,8 @@ export function ProjectChatPanel({
 
   return (
     <div className="flex h-full min-h-0">
+      <h1 className="sr-only">{t('aiReview.projectChat')}</h1>
+
       <div className="hidden md:flex md:h-full md:min-h-0">
         <ChatThreadSidebar
           threads={threads}

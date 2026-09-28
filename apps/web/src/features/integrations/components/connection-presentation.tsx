@@ -104,7 +104,7 @@ export function ConnectionLogo({ name, type }: { name: string; type?: Connection
   }
 
   return (
-    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-surface p-2 shadow-2xs">
+    <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/80 bg-surface p-2">
       {src ? (
         <Image src={src} alt="" width={22} height={22} className="size-full object-contain" />
       ) : (

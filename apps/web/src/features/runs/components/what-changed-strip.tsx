@@ -63,7 +63,7 @@ export function WhatChangedStrip({
   return (
     <section
       aria-labelledby="what-changed-heading"
-      className="rounded-xl border border-border bg-surface shadow-xs px-4 py-3 space-y-2"
+      className="rounded-xl border border-border bg-surface px-4 py-3 space-y-2"
     >
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <h2 id="what-changed-heading" className="text-sm font-semibold text-default">

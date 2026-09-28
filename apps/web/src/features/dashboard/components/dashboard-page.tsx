@@ -11,7 +11,7 @@ import { ChannelsCard } from '@/features/dashboard/components/channels-card'
 import { ActivityCard } from '@/features/dashboard/components/activity-card'
 
 export function DashboardPage() {
-  const [period, setPeriod] = useState<DashboardPeriod>(30)
+  const [period, setPeriod] = useState<DashboardPeriod>(7)
 
   return (
     <section

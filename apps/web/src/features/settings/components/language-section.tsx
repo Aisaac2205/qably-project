@@ -31,7 +31,7 @@ export function LanguageSection() {
   }
 
   return (
-    <section className="rounded-xl border border-border bg-surface p-5 shadow-2xs" aria-labelledby="language-heading">
+    <section className="rounded-xl border border-border bg-surface p-5" aria-labelledby="language-heading">
       <div className="space-y-0.5">
         <h2 id="language-heading" className="text-sm font-semibold text-default">
           {t('settings.language.title')}

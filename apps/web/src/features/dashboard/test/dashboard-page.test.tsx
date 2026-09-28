@@ -1,5 +1,5 @@
 import { screen, act } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 if (typeof window !== 'undefined' && !window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
@@ -22,8 +22,6 @@ import { __resetStore } from '@/lib/mock-store'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import { dashboardOverviewFixture, dashboardChannelsFixture } from '@/test/dashboard-api-stub'
 import { getDashboardOverview, getDashboardChannels } from '@/features/dashboard/api/dashboard.api'
-
-const originalResizeObserver = globalThis.ResizeObserver
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
@@ -49,12 +47,6 @@ describe('DashboardPage', () => {
     __resetStore()
     getOverview.mockResolvedValue(dashboardOverviewFixture)
     getChannels.mockResolvedValue(dashboardChannelsFixture)
-    // @ts-expect-error -- intentionally undefined for this suite
-    delete globalThis.ResizeObserver
-  })
-
-  afterEach(() => {
-    globalThis.ResizeObserver = originalResizeObserver
   })
 
   it('renders the header, hero, projects, gauge, channels and activity in that order', async () => {
@@ -68,7 +60,7 @@ describe('DashboardPage', () => {
     expect(headings).toEqual([
       'Executed cases',
       'Projects',
-      'Cases passing',
+      'Cases by priority',
       'Notification channels',
       'Recent activity',
     ])

@@ -3,24 +3,19 @@
 /**
  * SuiteRow — enriched row for the suites list.
  *
- * Desktop layout (md+): 6-column grid
- *   [icon] [info: name + description + tags + default] [cases] [last run] [pass + sparkline] [status]
+ * Desktop layout (md+): 3-column grid
+ *   [icon] [info: name + description + tags + default] [status]
  * Mobile layout: 2 columns (icon + info + status)
  */
 import { memo } from 'react'
-import Image from 'next/image'
-import { TestTube, Star, PencilSimple } from '@phosphor-icons/react'
+import { TestTube, Star } from '@phosphor-icons/react'
 import type { Suite } from '@qably/types'
 import { Badge } from '@/components/ui/badge'
 import { StatusChip } from '@/components/ui/status-chip'
-import { RunHistoryStrip } from './run-history-strip'
 import { InlineEditableText } from './inline-editable-text'
-import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
-import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { useUpdateSuite } from '@/features/projects/suites/hooks/use-suite-mutations'
 import type { SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { useTranslation } from '@/lib/i18n'
-import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
 const STATUS_TONE: Record<string, 'text-pass' | 'text-fail' | 'text-warn' | 'text-running' | 'text-muted'> = {
   pass: 'text-pass',
@@ -36,9 +31,9 @@ interface SuiteRowProps {
 }
 
 function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
-  const { lastRun, recentPassRate, history, status } = metrics
+  const { status } = metrics
   const toneClass = STATUS_TONE[status] ?? 'text-muted'
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
   const updateSuiteMutation = useUpdateSuite()
 
   function handleSave(newName: string) {
@@ -47,7 +42,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
 
   return (
     <div
-      className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3.5 md:gap-4 items-center py-3.5 px-4 sm:px-5 hover:bg-surface-hover/60 transition-colors group"
+      className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto] gap-3.5 md:gap-4 items-center py-3.5 px-4 sm:px-5 hover:bg-surface-hover/60 transition-colors group"
       data-testid={`suite-row-${suite.id}`}
     >
       {/* Col 1: status-tinted icon */}
@@ -90,80 +85,7 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         )}
       </div>
 
-      {/* Col 3: case composition, icon-only (hidden on mobile) */}
-      <div
-        role="img"
-        aria-label={
-          [
-            suite.automatedCases > 0
-              ? t('suites.automatedCasesCount', { count: suite.automatedCases })
-              : null,
-            suite.manualCases > 0
-              ? t('suites.manualCasesCount', { count: suite.manualCases })
-              : null,
-          ]
-            .filter((part): part is string => part !== null)
-            .join(' · ') || `${suite.cases.length} ${t('suites.caseSuffix_other')}`
-        }
-        className="hidden md:flex items-center gap-2 shrink-0 w-12"
-      >
-        {suite.automatedCases > 0 && (
-          <Image src="/logos/github.svg" alt="" width={18} height={18} aria-hidden="true" className="opacity-70" />
-        )}
-        {suite.manualCases > 0 && (
-          <PencilSimple size={18} weight="bold" aria-hidden="true" className="text-muted" />
-        )}
-        {suite.automatedCases === 0 && suite.manualCases === 0 && (
-          <span className="text-xs text-muted" aria-hidden="true">0</span>
-        )}
-      </div>
-
-      {/* Col 4: last run reference (hidden on mobile) */}
-      <div className="hidden md:flex flex-col items-end gap-0.5 shrink-0 w-24">
-        <span className="text-xs font-medium text-default">
-          {formatRelative(lastRun?.startedAt, locale, t('suites.never'))}
-        </span>
-        {lastRun && (
-          <span
-            aria-label={
-              lastRun.source === 'github_actions'
-                ? t('suites.sourceCi')
-                : lastRun.source === 'manual'
-                  ? t('suites.sourceManual')
-                  : t('suites.sourceApi')
-            }
-            title={
-              lastRun.source === 'github_actions'
-                ? t('suites.sourceCi')
-                : lastRun.source === 'manual'
-                  ? t('suites.sourceManual')
-                  : t('suites.sourceApi')
-            }
-            className={
-              lastRun.source === 'github_actions'
-                ? 'text-brand-github-actions'
-                : lastRun.source === 'manual'
-                  ? 'text-primary'
-                  : 'text-xs font-medium text-muted'
-            }
-          >
-            {lastRun.source === 'github_actions' ? (
-              <GithubActionsIcon className="size-3.5" />
-            ) : lastRun.source === 'manual' ? (
-              <QablyMarkIcon className="size-3.5" />
-            ) : (
-              t('suites.sourceApi')
-            )}
-          </span>
-        )}
-      </div>
-
-      {/* Col 5: run history strip (hidden on mobile) */}
-      <div className="hidden md:flex items-center justify-end shrink-0 w-20">
-        <RunHistoryStrip history={history} passRate={recentPassRate} />
-      </div>
-
-      {/* Col 6: status chip (visible on all sizes). Fixed width sized to the
+      {/* Col 3: status chip (visible on all sizes). Fixed width sized to the
           longest status label ("Requiere atención") so this column — and
           the 1fr name column before it — align the same way on every row. */}
       <div className="flex justify-end shrink-0 md:w-32">

@@ -15,7 +15,7 @@ export function SuiteCollisionsPanel({ openCollisions }: SuiteCollisionsPanelPro
   return (
     <div
       role="status"
-      className="space-y-1 rounded-xl border border-warn/40 bg-warn-bg/60 p-4"
+      className="space-y-1 rounded-lg border border-warn/40 bg-warn-bg/60 p-4"
     >
       <div className="flex items-center gap-1.5">
         <Warning size={14} weight="bold" className="shrink-0 text-warn" aria-hidden="true" />

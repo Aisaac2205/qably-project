@@ -82,7 +82,7 @@ export function AIDiff({
           : undefined
       }
       className={cn(
-        'w-full overflow-hidden rounded-xl border border-border bg-surface shadow-card',
+        'w-full overflow-hidden rounded-xl border border-border bg-surface',
         className
       )}
       layout={!shouldReduceMotion}

@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { Suite, TestCase } from '@qably/types'
 import { CaretLeft, Plus, Trash, WarningCircle } from '@phosphor-icons/react'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { BackButton } from '@/components/ui/back-button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -516,13 +517,7 @@ export function SuiteForm({ projectId, suite }: { projectId: string; suite?: Sui
       className="flex h-full min-h-0 w-full flex-col animate-page-enter"
     >
       <div className="flex shrink-0 items-center gap-1.5 px-5 py-4 sm:px-7">
-        <Link
-          href={backHref}
-          aria-label={t('common.back')}
-          className="shrink-0 size-6 inline-flex items-center justify-center rounded text-muted hover:text-default hover:bg-surface-hover transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-        >
-          <CaretLeft size={14} weight="bold" aria-hidden="true" />
-        </Link>
+        <BackButton onClick={() => router.push(backHref)} />
         <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-default">
           {isEdit ? t('suites.editSuite') : t('suites.newSuite')}
         </h1>

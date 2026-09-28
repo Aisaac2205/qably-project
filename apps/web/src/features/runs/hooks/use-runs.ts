@@ -2,7 +2,13 @@
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type { RunSource } from '@qably/types'
-import { getRegressions, getRun, getSuiteMetrics, listRuns } from '../api/runs.api'
+import {
+  getPushPassRate,
+  getRegressions,
+  getRun,
+  getSuiteMetrics,
+  listRuns,
+} from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
 
 export const RUNS_PAGE_SIZE = 25
@@ -42,15 +48,15 @@ export function useRunsPage(projectId: string, source?: RunSource) {
   }
 }
 
-export function useRecentRuns(projectId: string, limit: number) {
+export function usePushPassRate(projectId: string, days: number) {
   const query = useQuery({
-    queryKey: runKeys.recent(projectId, limit),
-    queryFn: ({ signal }) => listRuns({ projectId, limit }, signal),
+    queryKey: runKeys.pushPassRate(projectId, days),
+    queryFn: ({ signal }) => getPushPassRate(projectId, days, signal),
     enabled: projectId !== '',
   })
 
   return {
-    runs: query.data?.items ?? [],
+    candles: query.data?.items ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

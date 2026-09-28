@@ -212,20 +212,9 @@ describe('SuiteDetail (redesigned)', () => {
     expect(badge?.className).toContain('whitespace-nowrap')
   })
 
-  it('renders a health strip with status, pass rate, last run, cases', async () => {
+  it('carries no health strip, which restated the hero and the case list', async () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
-    const strip = screen.getByRole('group', { name: /Suite health/i })
-    expect(within(strip).getByText(/Status/i)).toBeInTheDocument()
-    expect(within(strip).getByText(/Pass rate/i)).toBeInTheDocument()
-    expect(within(strip).getByText(/Last run/i)).toBeInTheDocument()
-    expect(within(strip).getByText(/Cases/i)).toBeInTheDocument()
-  })
-
-  it('shows "Not measured yet" instead of 0% pass rate for a suite with no completed runs', async () => {
-    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-3" />) })
-    const strip = screen.getByRole('group', { name: /Suite health/i })
-    expect(within(strip).getByText('Not measured yet')).toBeInTheDocument()
-    expect(within(strip).queryByText('0%')).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /Suite health/i })).not.toBeInTheDocument()
   })
 
   it('has a "Run this suite" button', async () => {
@@ -522,7 +511,7 @@ describe('SuiteDetail (redesigned)', () => {
     })
   })
 
-  it('lists automated cases with their last result under "Covered by CI"', async () => {
+  it('shows each case its own last result, with no separate CI section repeating them', async () => {
     const mixedSuite = createMockSuite({
       id: 'suite-mixed',
       name: 'Mixed',
@@ -552,13 +541,14 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
     expect(screen.getByRole('button', { name: /run this suite/i })).toBeInTheDocument()
-    const heading = screen.getByRole('heading', { level: 2, name: /covered by ci/i })
-    expect(heading).toBeInTheDocument()
-    const section = heading.closest('section')
-    expect(section).not.toBeNull()
     expect(
-      within(section as HTMLElement).getByText('Redirects to dashboard on valid login'),
-    ).toBeInTheDocument()
+      screen.queryByRole('heading', { level: 2, name: /covered by ci/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.getAllByText('Redirects to dashboard on valid login')).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'abc1234' })).toHaveAttribute(
+      'href',
+      '/projects/proj-1/runs/run-1',
+    )
   })
 
   it('returns to the test library after deleting the suite', async () => {
@@ -626,7 +616,7 @@ describe('SuiteDetail (redesigned)', () => {
       expect(screen.queryByText('Documented')).not.toBeInTheDocument()
     })
 
-    it('groups a large, fully documented suite under a single "Documented" header', async () => {
+    it('renders a large documented suite flat, with no group headers', async () => {
       const cases = Array.from({ length: 9 }, (_, i) => documentedCase(`c${i}`))
       const bigDocumentedSuite = createMockSuite({
         id: 'suite-big-documented',
@@ -642,12 +632,11 @@ describe('SuiteDetail (redesigned)', () => {
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
       expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
-      const heading = screen.getByText('Documented')
-      expect(heading).toBeInTheDocument()
-      expect(within(heading.parentElement as HTMLElement).getByText('9')).toBeInTheDocument()
+      expect(screen.queryByText('Documented')).not.toBeInTheDocument()
+      expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument()
     })
 
-    it('splits a large mixed suite into needs-attention and documented groups', async () => {
+    it('keeps cases that need attention ahead of documented ones without labelling the groups', async () => {
       const cases = [
         ...Array.from({ length: 7 }, (_, i) => documentedCase(`d${i}`)),
         undocumentedCase('u1'),
@@ -666,34 +655,14 @@ describe('SuiteDetail (redesigned)', () => {
       await act(async () => {})
       await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 
-      const attentionHeading = screen.getByText('Needs attention')
-      const documentedHeading = screen.getByText('Documented')
-      expect(within(attentionHeading.parentElement as HTMLElement).getByText('2')).toBeInTheDocument()
-      expect(within(documentedHeading.parentElement as HTMLElement).getByText('7')).toBeInTheDocument()
-      expect(
-        attentionHeading.compareDocumentPosition(documentedHeading) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy()
-    })
+      expect(screen.queryByText('Needs attention')).not.toBeInTheDocument()
+      expect(screen.queryByText('Documented')).not.toBeInTheDocument()
 
-    it('renders the group label and count with no eyebrow styling', async () => {
-      const cases = Array.from({ length: 9 }, (_, i) => documentedCase(`c${i}`))
-      const bigDocumentedSuite = createMockSuite({
-        id: 'suite-big-documented-2',
-        manualCases: 0,
-        automatedCases: 9,
-        undocumentedCount: 0,
-        cases,
-      })
-      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValueOnce(bigDocumentedSuite)
-
-      renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-big-documented-2" />)
-      await act(async () => {})
-      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
-
-      const heading = screen.getByRole('heading', { level: 3, name: 'Documented' })
-      expect(heading.className).not.toContain('uppercase')
-      expect(within(heading.parentElement as HTMLElement).getByText('9')).toBeInTheDocument()
+      const order = screen
+        .getAllByTestId(/^case-row-/)
+        .map((row) => row.getAttribute('data-testid'))
+      expect(order).toHaveLength(9)
+      expect(order.slice(0, 2)).toEqual(['case-row-u1', 'case-row-u2'])
     })
   })
 

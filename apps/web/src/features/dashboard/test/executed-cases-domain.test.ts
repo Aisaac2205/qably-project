@@ -9,6 +9,7 @@ import {
 function day(overrides: Partial<DailyPoint> = {}): DailyPoint {
   return {
     date: '2026-06-16',
+    rangeEnd: '2026-06-16',
     passRate: 0.8,
     runs: 4,
     failedRuns: 1,

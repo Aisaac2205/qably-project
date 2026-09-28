@@ -51,13 +51,14 @@ describe('SuiteFilterBar', () => {
     expect(screen.getByPlaceholderText(/Search by name/i)).toBeInTheDocument()
   })
 
-  it('renders 3 selects (status, tag, sort)', async () => {
+  it('renders 3 listbox triggers (status, tag, sort)', async () => {
     await act(async () => {
       render(<ControlledHarness />)
     })
-    expect(screen.getByRole('combobox', { name: /status filter/i })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: /tag filter/i })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: /sort suites/i })).toBeInTheDocument()
+    for (const name of [/status filter/i, /tag filter/i, /sort suites/i]) {
+      const trigger = screen.getByRole('button', { name })
+      expect(trigger).toHaveAttribute('aria-haspopup', 'listbox')
+    }
   })
 
   it('calls onSearchChange and updates the input when typing', async () => {
@@ -99,10 +100,16 @@ describe('SuiteFilterBar', () => {
     expect(container.querySelector('[role="search"]')).toBeInTheDocument()
   })
 
-  it('uses a 2-column grid on mobile and flex on desktop', async () => {
+  it('stacks on mobile and lays out in a row on desktop', async () => {
     const { container } = render(<ControlledHarness />)
     const root = container.querySelector('[role="search"]')
-    expect(root?.className).toContain('grid-cols-2')
-    expect(root?.className).toContain('md:flex')
+    expect(root?.className).toContain('flex-col')
+    expect(root?.className).toContain('md:flex-row')
+  })
+
+  it('hides the three dropdowns below the md breakpoint', async () => {
+    const { container } = render(<ControlledHarness />)
+    const group = container.querySelector('[aria-label="Status filter"]')?.closest('div.hidden')
+    expect(group?.className).toContain('md:flex')
   })
 })

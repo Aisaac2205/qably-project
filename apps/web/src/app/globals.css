@@ -1,16 +1,17 @@
 @import "tailwindcss";
+
 @source "../../../../packages/ui/src";
 
 /* ─── Qably Design Tokens ──────────────────────────────────────── */
 
 :root {
   /* Backgrounds */
-  --bg:                oklch(0.978 0.002 85);
+  --bg:                oklch(0.970 0.006 260);
   --bg-surface:        oklch(1.000 0.000 0);
   --bg-surface-raised: oklch(0.995 0.002 85);
-  --bg-sidebar:        oklch(0.950 0.003 85);
-  --bg-sidebar-hover:  oklch(0.920 0.004 85);
-  --bg-sidebar-active: oklch(0.995 0.001 85);
+  --bg-sidebar:        oklch(1.000 0.000 0);
+  --bg-sidebar-hover:  oklch(0.958 0.007 260);
+  --bg-sidebar-active: oklch(0.945 0.008 260);
 
   /* Foregrounds */
   --fg:                oklch(0.185 0.004 85);
@@ -21,12 +22,16 @@
   /* Borders */
   --border:            oklch(0.890 0.004 85);
   --border-strong:     oklch(0.820 0.006 85);
-  --border-sidebar:    oklch(0.865 0.005 85);
+  --border-sidebar:    oklch(0.890 0.004 85);
 
   /* Brand */
   --primary:           oklch(0.185 0.004 85);
   --primary-hover:     oklch(0.290 0.006 85);
   --primary-fg:        oklch(0.990 0.000 0);
+
+  /* Entity icons — the mark that identifies a credential, connection or
+     resource in a list or section header. One hue for all of them. */
+  --accent-icon:       oklch(0.623 0.214 259.815);
 
   /* AI accent — only for AI-generated content markers */
   --accent-ai:         oklch(0.405 0.008 85);
@@ -53,11 +58,11 @@
 
   /* Hover surface — for ghost/outline interactive states. Distinct from
      --fg-muted: that token is a TEXT color, this one is a BACKGROUND. */
-  --surface-hover:     oklch(0.930 0.004 85);
+  --surface-hover:     oklch(0.935 0.008 260);
 
   /* Traceability heatmap — encodes event VOLUME, not quality. Shares hue 145
      with --status-pass; see docs/DASHBOARD_UI.md. */
-  --heatmap-l0:        oklch(0.930 0.004 85);
+  --heatmap-l0:        oklch(0.935 0.008 260);
   --heatmap-l1:        oklch(0.850 0.090 145);
   --heatmap-l2:        oklch(0.700 0.150 145);
   --heatmap-l3:        oklch(0.560 0.180 145);
@@ -75,6 +80,8 @@
   --foreground: var(--fg);
   --card: var(--bg-surface);
   --card-foreground: var(--fg);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--fg);
   --border-default: var(--border);
   --ring: var(--primary);
   --primary-foreground: var(--primary-fg);
@@ -90,13 +97,54 @@
   /* @qably/ui chart bridge. Chart steps are re-stepped from the status hues so
      pass and fail stay apart under deuteranopia (validated: dE 17.4); chips
      keep the status tokens because they carry an icon and a label. */
-  --qb-chart-line:    var(--primary);
+  --qb-chart-line:    oklch(0.623 0.214 259.815);
   --qb-chart-grid:    var(--border);
-  --qb-chart-pass:    oklch(0.62 0.16 145);
-  --qb-chart-fail:    oklch(0.42 0.19 25);
-  --qb-chart-skip:    oklch(0.62 0.00 0);
-  --qb-chart-warn:    var(--status-warn);
-  --qb-chart-compare: var(--fg-muted);
+  --qb-chart-pass:    oklch(0.723 0.219 149.579);
+  --qb-chart-fail:    oklch(0.637 0.237 25.331);
+  --qb-chart-skip:    oklch(0.704 0.040 256.788);
+  --qb-chart-warn:    oklch(0.769 0.188 70.080);
+  --qb-chart-compare: oklch(0.707 0.022 261.325);
+  --qb-chart-info:    oklch(0.715 0.143 215.221);
+  --qb-chart-accent:  oklch(0.606 0.250 292.717);
+
+  /* @bklit charts bridge. Bklit's chart primitives (packages/ui/src/charts)
+     read --chart-* directly (see chartCssVars in chart-context.tsx); every
+     slot aliases back to the --qb-chart-* / semantic tokens above so the two
+     chart systems (recharts-based @qably/ui/chart and bklit-based
+     @qably/ui/charts) stay visually identical. No new colors introduced. */
+  --chart-1:               var(--qb-chart-line);
+  --chart-2:               var(--qb-chart-pass);
+  --chart-3:               var(--qb-chart-fail);
+  --chart-4:               var(--qb-chart-warn);
+  --chart-5:               var(--qb-chart-accent);
+  --chart-6:               var(--qb-chart-info);
+  --chart-background:      var(--bg-surface);
+  --chart-foreground:      var(--fg);
+  --chart-foreground-muted: var(--fg-muted);
+  --chart-line-primary:    var(--qb-chart-line);
+  --chart-line-secondary:  var(--qb-chart-compare);
+  --chart-crosshair:       var(--qb-chart-line);
+  --chart-grid:            var(--qb-chart-grid);
+  --chart-brush-border:    var(--qb-chart-grid);
+  --chart-tooltip-background: var(--bg-surface);
+  --chart-tooltip-foreground: var(--fg);
+  --chart-tooltip-muted:   var(--fg-muted);
+  --chart-marker-background: var(--bg-surface);
+  --chart-marker-border:   var(--border);
+  --chart-marker-foreground: var(--fg);
+  --chart-marker-badge-background: var(--bg-surface);
+  --chart-marker-badge-foreground: var(--fg);
+  --chart-indicator-color: var(--qb-chart-line);
+  --chart-indicator-secondary-color: var(--qb-chart-compare);
+  --chart-segment-background: var(--surface-hover);
+  --chart-segment-line:    var(--qb-chart-grid);
+  --chart-label:           var(--fg-muted);
+  --chart-scale-01:                oklch(0.98 0.003 106);
+  --chart-scale-02:                oklch(0.92 0.008 106);
+  --chart-scale-03:                oklch(0.82 0.015 106);
+  --chart-scale-04:                oklch(0.68 0.02 106);
+  --chart-scale-05:                oklch(0.55 0.025 106);
+  --chart-scale-pattern-color:                oklch(0.96 0.005 106);
 }
 
 /* ─── Tailwind v4 theme mapping ─────────────────────────────────── */
@@ -131,6 +179,7 @@
   --color-primary-fg:         var(--primary-fg);
   --color-primary-foreground: var(--primary-foreground);
 
+  --color-accent-icon:        var(--accent-icon);
   --color-ai:                 var(--accent-ai);
   --color-ai-bg:              var(--accent-ai-bg);
   --color-brand-github-actions: var(--brand-github-actions);
@@ -173,6 +222,8 @@
   --color-foreground:         var(--foreground);
   --color-card:               var(--card);
   --color-card-foreground:    var(--card-foreground);
+  --color-popover:            var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-muted-foreground:   var(--fg-muted);
   --color-ring:               var(--ring);
 
@@ -218,6 +269,53 @@
   --color-qb-heatmap-l4:      var(--heatmap-l4);
   --shadow-qb-card:           var(--shadow-card);
   --shadow-qb-pop:            var(--shadow-pop);
+
+  /* @bklit charts bridge — Tailwind utilities. Only the four tokens the
+     bklit tooltip/axis components consume as classes (text-chart-label,
+     bg-chart-tooltip-background, ...); everything else is read as a raw
+     var(--chart-*) and needs no Tailwind utility. */
+  --color-chart-label:              var(--chart-label);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-muted:      var(--chart-tooltip-muted);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-chart-scale-01:           var(--chart-scale-01);
+  --color-chart-scale-02:           var(--chart-scale-02);
+  --color-chart-scale-03:           var(--chart-scale-03);
+  --color-chart-scale-04:           var(--chart-scale-04);
+  --color-chart-scale-05:           var(--chart-scale-05);
+  --color-chart-scale-pattern-color: var(--chart-scale-pattern-color);
+  --color-chart-1:                  var(--chart-1);
+  --color-chart-2:                  var(--chart-2);
+  --color-chart-3:                  var(--chart-3);
+  --color-chart-4:                  var(--chart-4);
+  --color-chart-5:                  var(--chart-5);
+  --color-chart-6:                  var(--chart-6);
+}
+
+/* ─── Full-bleed rules ─────────────────────────────────────────────
+   A divider inside a padded page container has to reach both edges,
+   the way Linear, Stripe and Cloudflare separate sections. The element
+   escapes the shell's horizontal padding and re-applies it inside, so
+   the line spans edge to edge while its content stays aligned.
+   Mirrors the shell's own px-5 / sm:px-7 / lg:px-9. */
+
+.rule-bleed {
+  margin-inline: -1.25rem;
+  padding-inline: 1.25rem;
+}
+
+@media (min-width: 40rem) {
+  .rule-bleed {
+    margin-inline: -1.75rem;
+    padding-inline: 1.75rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  .rule-bleed {
+    margin-inline: -2.25rem;
+    padding-inline: 2.25rem;
+  }
 }
 
 /* ─── Base styles ───────────────────────────────────────────────── */
@@ -385,6 +483,171 @@ button:focus-visible,
   .spinner-marker:last-child {
     transform: rotate(180deg) translate(155%);
   }
+}
+
+/* ─── Transitions.dev — Notification badge ───────────────────────── */
+
+:root {
+  --badge-slide-dur: 260ms;
+  --badge-pop-dur: 500ms;
+  --badge-pop-close-dur: 180ms;
+  --badge-fade-dur: 400ms;
+  --badge-fade-close-dur: 180ms;
+  --badge-blur: 2px;
+  --badge-offset-x: -8.2px;
+  --badge-offset-y: 12.4px;
+  --badge-slide-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --badge-pop-ease: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --badge-close-ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes t-badge-slide-in {
+  from { transform: translate(var(--badge-offset-x), var(--badge-offset-y)); }
+  to   { transform: translate(0, 0); }
+}
+
+/* .t-badge is the absolutely-positioned wrapper for the dot. */
+.t-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.t-badge[data-open="true"] {
+  animation: t-badge-slide-in var(--badge-slide-dur) var(--badge-slide-ease);
+}
+
+.t-badge-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.25rem;
+  border-radius: 9999px;
+  background-color: var(--status-fail);
+  color: var(--primary-fg);
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 1px 2px oklch(0.185 0.004 85 / 0.15), 0 0 0 1.5px var(--bg-surface);
+  transform-origin: center;
+  transform: scale(1);
+  opacity: 1;
+  filter: blur(0);
+  transition:
+    transform var(--badge-pop-dur)  var(--badge-pop-ease),
+    opacity   var(--badge-fade-dur) var(--badge-pop-ease),
+    filter    var(--badge-pop-dur)  var(--badge-pop-ease);
+  will-change: transform, opacity, filter;
+}
+
+.t-badge[data-open="false"] .t-badge-dot {
+  transform: scale(0);
+  opacity: 0;
+  filter: blur(var(--badge-blur));
+  transition:
+    transform var(--badge-pop-close-dur)  var(--badge-close-ease),
+    opacity   var(--badge-fade-close-dur) var(--badge-close-ease),
+    filter    var(--badge-pop-close-dur)  var(--badge-close-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-badge, .t-badge-dot { animation: none !important; transition: none !important; }
+}
+
+/* ─── Notification Menu Styles ───────────────────────────────────── */
+
+.notif-menu-header {
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+  padding: 0.875rem 1rem 0.75rem;
+}
+
+.notif-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  padding: 0.375rem 0.75rem;
+}
+
+.notif-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fg-muted);
+  transition: background-color 150ms var(--ease-out-quart), color 150ms var(--ease-out-quart);
+  cursor: pointer;
+}
+
+.notif-tab-btn:hover {
+  color: var(--fg);
+  background-color: var(--surface-hover);
+}
+
+.notif-tab-btn[data-active="true"] {
+  color: var(--fg);
+  background-color: var(--bg-surface);
+  font-weight: 600;
+  box-shadow: 0 1px 2px oklch(0.185 0.004 85 / 0.05);
+}
+
+.notif-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1rem;
+  height: 1rem;
+  padding: 0 0.25rem;
+  border-radius: 9999px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  background-color: color-mix(in oklch, var(--fg-muted) 15%, transparent);
+  color: var(--fg);
+}
+
+.notif-tab-btn[data-active="true"] .notif-tab-badge {
+  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+
+.notif-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background-color 150ms var(--ease-out-quart);
+}
+
+.notif-item:hover {
+  background-color: var(--surface-hover);
+}
+
+.notif-item[data-unread="true"] {
+  background-color: color-mix(in oklch, var(--primary) 2.5%, transparent);
+}
+
+.notif-icon-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  border: 1px solid color-mix(in oklch, currentColor 20%, transparent);
 }
 
 /* Global reduced-motion guard: kill residual animation/transition time

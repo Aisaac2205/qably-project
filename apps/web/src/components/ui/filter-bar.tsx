@@ -19,7 +19,7 @@ export function FilterBar({ label, children, className, onSubmit }: FilterBarPro
       role="search"
       aria-label={label}
       onSubmit={preventSubmit}
-      className={cn('grid grid-cols-2 gap-2 md:flex md:items-center', className)}
+      className={cn('grid grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:items-center', className)}
     >
       {children}
     </form>

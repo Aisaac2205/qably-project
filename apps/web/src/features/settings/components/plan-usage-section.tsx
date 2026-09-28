@@ -128,7 +128,7 @@ export function PlanUsageSection() {
         {t('settings.planUsage.description')}
       </p>
 
-      <Card className="rounded-xl border border-border bg-surface shadow-card">
+      <Card className="rounded-xl border border-border bg-surface">
         <CardContent className="p-5 sm:p-6 grid grid-cols-1 gap-5 sm:grid-cols-3">
           <UsageMeter
             icon={Users}
@@ -159,7 +159,7 @@ export function PlanUsageSection() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-xl border border-border bg-surface shadow-card">
+      <Card className="rounded-xl border border-border bg-surface">
         <CardContent className="p-5 sm:p-6">
           <h3 className="text-sm font-semibold text-default">
             {t('settings.planUsage.includedFeaturesTitle')}

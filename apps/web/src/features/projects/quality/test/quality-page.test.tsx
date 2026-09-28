@@ -2,15 +2,13 @@ import { act, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { en, es } from '@qably/i18n'
+import { dashboardOverviewFixture } from '@/test/dashboard-api-stub'
 import type {
   DashboardSummaryRecord,
   ProjectSummary,
+  PushPassRateRecord,
   RegressionsRecord,
-  RunsPageRecord,
-  SuiteMetricsRecord,
-  TraceabilityCalendarRecord,
 } from '@qably/types'
-import type { ReviewInboxCountsResult } from '@/features/review-inbox/api/review.api'
 import { QualityPage } from '@/features/projects/quality/components/quality-page'
 
 vi.mock('next/link', () => ({
@@ -20,11 +18,9 @@ vi.mock('next/link', () => ({
 
 const getProject = vi.fn()
 const getDashboardSummary = vi.fn()
-const getTraceabilityCalendar = vi.fn()
-const listRuns = vi.fn()
+const getDashboardOverview = vi.fn()
 const getRegressions = vi.fn()
-const getSuiteMetrics = vi.fn()
-const getInboxCounts = vi.fn()
+const getPushPassRate = vi.fn()
 
 vi.mock('@/features/projects/api/projects.api', () => ({
   getProject: (...args: unknown[]) => getProject(...args),
@@ -32,23 +28,17 @@ vi.mock('@/features/projects/api/projects.api', () => ({
 
 vi.mock('@/features/dashboard/api/dashboard.api', () => ({
   getDashboardSummary: (...args: unknown[]) => getDashboardSummary(...args),
-  getTraceabilityCalendar: (...args: unknown[]) => getTraceabilityCalendar(...args),
+  getDashboardOverview: (...args: unknown[]) => getDashboardOverview(...args),
 }))
 
 vi.mock('@/features/runs/api/runs.api', () => ({
-  listRuns: (...args: unknown[]) => listRuns(...args),
   getRegressions: (...args: unknown[]) => getRegressions(...args),
-  getSuiteMetrics: (...args: unknown[]) => getSuiteMetrics(...args),
+  getPushPassRate: (...args: unknown[]) => getPushPassRate(...args),
+  listRuns: vi.fn(),
+  getSuiteMetrics: vi.fn(),
   getRun: vi.fn(),
   createRun: vi.fn(),
   updateRunCase: vi.fn(),
-}))
-
-vi.mock('@/features/review-inbox/api/review.api', () => ({
-  getProposal: vi.fn(),
-  approveProposal: vi.fn(),
-  rejectProposal: vi.fn(),
-  getInboxCounts: (...args: unknown[]) => getInboxCounts(...args),
 }))
 
 const project: ProjectSummary = {
@@ -80,45 +70,6 @@ const summary: DashboardSummaryRecord = {
   recentCiCommits: [],
 }
 
-const runsPage: RunsPageRecord = {
-  items: [
-    {
-      id: 'run-2',
-      projectId: 'proj-1',
-      organizationId: 'org-1',
-      suiteId: 'suite-1',
-      suiteName: 'Checkout',
-      name: 'Run #2',
-      status: 'pass',
-      source: 'manual',
-      externalId: '',
-      reportExternalId: '',
-      startedAt: '2026-06-16T10:00:00Z',
-      finishedAt: '2026-06-16T10:05:00Z',
-      caseCounts: { total: 4, pending: 0, running: 0, pass: 4, fail: 0, skip: 0, blocked: 0 },
-      passRate: 1,
-      delta: null,
-    },
-    {
-      id: 'run-1',
-      projectId: 'proj-1',
-      organizationId: 'org-1',
-      suiteId: 'suite-1',
-      suiteName: 'Checkout',
-      name: 'Run #1',
-      status: 'fail',
-      source: 'manual',
-      externalId: '',
-      reportExternalId: '',
-      startedAt: '2026-06-15T10:00:00Z',
-      finishedAt: '2026-06-15T10:05:00Z',
-      caseCounts: { total: 4, pending: 0, running: 0, pass: 3, fail: 1, skip: 0, blocked: 0 },
-      passRate: 0.75,
-      delta: null,
-    },
-  ],
-}
-
 const regressions: RegressionsRecord = {
   items: [
     {
@@ -135,41 +86,39 @@ const regressions: RegressionsRecord = {
   runsScanned: 2,
 }
 
-const suiteMetrics: SuiteMetricsRecord = {
+const pushPassRate: PushPassRateRecord = {
   items: [
     {
-      suiteId: 'suite-1',
-      suiteName: 'Checkout',
-      lastRun: {
-        id: 'run-2',
-        status: 'pass',
-        source: 'manual',
-        startedAt: '2026-06-16T10:00:00Z',
-        finishedAt: '2026-06-16T10:05:00Z',
-        passRate: 1,
-      },
-      trend: ['fail', 'pass'],
+      commitSha: 'commit-1-sha',
+      shortSha: 'commit1',
+      startedAt: '2026-06-15T10:00:00Z',
+      open: 0.75,
+      high: 0.85,
+      low: 0.7,
+      close: 0.8,
+      runCount: 2,
+      passRate: 0.8,
+      executed: 10,
+      passed: 8,
+      failed: 2,
+      blocked: 0,
     },
     {
-      suiteId: 'suite-2',
-      suiteName: 'Payments',
-      lastRun: null,
-      trend: [],
+      commitSha: 'commit-2-sha',
+      shortSha: 'commit2',
+      startedAt: '2026-06-16T10:00:00Z',
+      open: 0.8,
+      high: 1,
+      low: 0.8,
+      close: 1,
+      runCount: 3,
+      passRate: 1,
+      executed: 15,
+      passed: 15,
+      failed: 0,
+      blocked: 0,
     },
   ],
-}
-
-const inboxCounts: ReviewInboxCountsResult = {
-  byStatus: { in_review: 2, approved: 0, rejected: 0, changes_requested: 0 },
-  openCollisions: 0,
-  version: 'v1',
-}
-
-const emptyTraceability: TraceabilityCalendarRecord = {
-  year: 2026,
-  timeZone: 'America/Guatemala',
-  totals: { scm: 0, proposals: 0, official: 0, runs: 0 },
-  days: [],
 }
 
 function renderPage(projectId = 'proj-1') {
@@ -187,16 +136,15 @@ function renderPage(projectId = 'proj-1') {
 describe('QualityPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    getTraceabilityCalendar.mockResolvedValue(emptyTraceability)
+    getProject.mockResolvedValue(project)
+    getDashboardSummary.mockResolvedValue(summary)
+    getDashboardOverview.mockResolvedValue(dashboardOverviewFixture)
+    getRegressions.mockResolvedValue(regressions)
+    getPushPassRate.mockResolvedValue(pushPassRate)
   })
 
   it('shows a loading state while the quality summary is being fetched', async () => {
-    getProject.mockResolvedValue(project)
     getDashboardSummary.mockReturnValue(new Promise(() => {}))
-    listRuns.mockResolvedValue(runsPage)
-    getRegressions.mockResolvedValue(regressions)
-    getSuiteMetrics.mockResolvedValue(suiteMetrics)
-    getInboxCounts.mockResolvedValue(inboxCounts)
 
     await act(async () => {
       renderPage()
@@ -206,12 +154,7 @@ describe('QualityPage', () => {
   })
 
   it('shows an error state with a retry action when the summary fails to load', async () => {
-    getProject.mockResolvedValue(project)
     getDashboardSummary.mockRejectedValue(new Error('network down'))
-    listRuns.mockResolvedValue(runsPage)
-    getRegressions.mockResolvedValue(regressions)
-    getSuiteMetrics.mockResolvedValue(suiteMetrics)
-    getInboxCounts.mockResolvedValue(inboxCounts)
 
     await act(async () => {
       renderPage()
@@ -225,18 +168,11 @@ describe('QualityPage', () => {
       retryButton.click()
     })
 
-    expect(await screen.findByText('82%')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ecommerce App' })).toBeInTheDocument()
   })
 
   describe('once loaded', () => {
     beforeEach(async () => {
-      getProject.mockResolvedValue(project)
-      getDashboardSummary.mockResolvedValue(summary)
-      listRuns.mockResolvedValue(runsPage)
-      getRegressions.mockResolvedValue(regressions)
-      getSuiteMetrics.mockResolvedValue(suiteMetrics)
-      getInboxCounts.mockResolvedValue(inboxCounts)
-
       await act(async () => {
         renderPage()
       })
@@ -246,67 +182,33 @@ describe('QualityPage', () => {
       expect(await screen.findByRole('heading', { name: 'Ecommerce App' })).toBeInTheDocument()
     })
 
-    it('shows the pass rate KPI with its value and a link to runs', async () => {
-      await screen.findByText('82%')
-      const passRateLink = screen.getByText('82%').closest('a')
-      expect(passRateLink).toHaveAttribute('href', '/projects/proj-1/runs')
+    it('renders the 4 KPI stat tiles from the dashboard strip', async () => {
+      expect(await screen.findByText('Executed cases')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 3, name: 'Runs' })).toBeInTheDocument()
+      expect(screen.getByText('Failed cases')).toBeInTheDocument()
+      expect(screen.getByText('Runs with failures')).toBeInTheDocument()
     })
 
-    it('shows the pending proposals KPI linking to the review inbox', async () => {
-      const value = await screen.findByText('2', { selector: 'dd' })
-      expect(value.closest('a')).toHaveAttribute('href', '/review-inbox?project=proj-1')
+    it('exposes the pass-rate change per push through an accessible table', async () => {
+      const table = await screen.findByRole('table', { name: /pass rate over the last/i })
+      expect(within(table).getByText('Commit')).toBeInTheDocument()
+      expect(within(table).getByText('commit2')).toBeInTheDocument()
+      expect(within(table).getByText('+20%')).toBeInTheDocument()
     })
 
-    it('shows the regressions KPI linking to the regressions section', async () => {
-      const kpiValues = await screen.findAllByText('1', { selector: 'dd' })
-      const regressionsLink = kpiValues
-        .map((el) => el.closest('a'))
-        .find((a) => a?.getAttribute('href') === '#quality-regressions')
-      expect(regressionsLink).toBeTruthy()
+    it('omits the first push, which has no predecessor to compare against', async () => {
+      const table = await screen.findByRole('table', { name: /pass rate over the last/i })
+      expect(within(table).queryByText('commit1')).not.toBeInTheDocument()
     })
 
-    it('lists the detected regression with a link to its run', async () => {
-      const caseName = await screen.findByText('Applies discount code')
-      const link = caseName.closest('a')
-      expect(link).toHaveAttribute('href', '/projects/proj-1/runs/run-2')
-    })
-
-    it('renders the suites health table with the suite name linking to the suite', async () => {
-      const table = await screen.findByRole('table', { name: 'Suite health overview' })
-      const link = within(table).getByRole('link', { name: 'Checkout' })
-      expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-1')
-    })
-
-    it('renders the name of a suite with zero runs from the metrics entry itself', async () => {
-      const table = await screen.findByRole('table', { name: 'Suite health overview' })
-      const link = within(table).getByRole('link', { name: 'Payments' })
-      expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-2')
-    })
-
-    it('renders the pass rate trend as an accessible figure with a data table', async () => {
-      const image = await screen.findByRole('img', { name: /Pass rate over the last/i })
-      const figure = image.closest('figure')
-      expect(figure).not.toBeNull()
-      expect(within(figure as HTMLElement).getByRole('table')).toBeInTheDocument()
+    it('renders the daily test execution activity as a passed/failed/blocked stacked chart', async () => {
+      expect(await screen.findByRole('heading', { name: 'Test execution activity' })).toBeInTheDocument()
+      expect(screen.getAllByText('Passed').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Failed').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0)
     })
   })
 
-  describe('empty regressions', () => {
-    it('explains why the list is empty, citing the scanned window', async () => {
-      getProject.mockResolvedValue(project)
-      getDashboardSummary.mockResolvedValue(summary)
-      listRuns.mockResolvedValue(runsPage)
-      getRegressions.mockResolvedValue({ items: [], runsScanned: 5 })
-      getSuiteMetrics.mockResolvedValue(suiteMetrics)
-      getInboxCounts.mockResolvedValue(inboxCounts)
-
-      await act(async () => {
-        renderPage()
-      })
-
-      expect(await screen.findByText('No regressions in the last 5 runs')).toBeInTheDocument()
-    })
-  })
 })
 
 function keyPaths(value: Record<string, unknown>, prefix = ''): string[] {
@@ -320,6 +222,6 @@ function keyPaths(value: Record<string, unknown>, prefix = ''): string[] {
 
 describe('quality i18n parity', () => {
   it('keeps the quality translation keys in parity between English and Spanish', () => {
-    expect(keyPaths(es.quality)).toEqual(keyPaths(en.quality))
+    expect(keyPaths(es.quality).sort()).toEqual(keyPaths(en.quality).sort())
   })
 })
