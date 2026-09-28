@@ -1,5 +1,5 @@
 import { render, screen, act, waitFor, within } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 
 if (typeof window !== 'undefined' && !window.matchMedia) {
@@ -31,18 +31,10 @@ vi.mock('@/features/dashboard/api/dashboard.api', () => ({
 
 const getOverview = vi.mocked(getDashboardOverview)
 
-const originalResizeObserver = globalThis.ResizeObserver
-
 describe('PassRateHero', () => {
   beforeEach(() => {
     __resetStore()
     getOverview.mockResolvedValue(dashboardOverviewFixture)
-    // @ts-expect-error test-only override
-    delete globalThis.ResizeObserver
-  })
-
-  afterEach(() => {
-    globalThis.ResizeObserver = originalResizeObserver
   })
 
   it('renders the "Executed cases" title with a period-range description', async () => {
@@ -93,8 +85,9 @@ describe('PassRateHero', () => {
     getOverview.mockResolvedValue({
       ...dashboardOverviewFixture,
       passRateSeries: {
-        current: [{ date: '2026-06-16', passRate: 0.8, runs: 4, failedRuns: 1, executed: 10, passed: 8, failed: 1, blocked: 1 }],
-        previous: [{ date: '2026-05-17', passRate: 0.8, runs: 4, failedRuns: 1, executed: 10, passed: 8, failed: 1, blocked: 1 }],
+        granularity: 'day',
+        current: [{ date: '2026-06-16', rangeEnd: '2026-06-16', passRate: 0.8, runs: 4, failedRuns: 1, executed: 10, passed: 8, failed: 1, blocked: 1 }],
+        previous: [{ date: '2026-05-17', rangeEnd: '2026-05-17', passRate: 0.8, runs: 4, failedRuns: 1, executed: 10, passed: 8, failed: 1, blocked: 1 }],
       },
     })
     const client = createTestQueryClient()
@@ -113,8 +106,9 @@ describe('PassRateHero', () => {
     getOverview.mockResolvedValue({
       ...dashboardOverviewFixture,
       passRateSeries: {
-        current: [{ date: '2026-06-16', passRate: 1, runs: 4, failedRuns: 0, executed: 10, passed: 10, failed: 0, blocked: 0 }],
-        previous: [{ date: '2026-05-17', passRate: null, runs: 0, failedRuns: 0, executed: 0, passed: 0, failed: 0, blocked: 0 }],
+        granularity: 'day',
+        current: [{ date: '2026-06-16', rangeEnd: '2026-06-16', passRate: 1, runs: 4, failedRuns: 0, executed: 10, passed: 10, failed: 0, blocked: 0 }],
+        previous: [{ date: '2026-05-17', rangeEnd: '2026-05-17', passRate: null, runs: 0, failedRuns: 0, executed: 0, passed: 0, failed: 0, blocked: 0 }],
       },
     })
     const client = createTestQueryClient()
@@ -126,17 +120,18 @@ describe('PassRateHero', () => {
       </QueryClientProvider>,
     )
 
-    expect(await screen.findByText('More executed cases than the previous period')).toBeInTheDocument()
+    expect(await screen.findByText('No data before June 16')).toBeInTheDocument()
     expect(screen.queryByText(/%/)).not.toBeInTheDocument()
   })
 
-  it('exposes the chart as a keyboard-focusable, accessible element', async () => {
+  it('keeps the visual chart out of the accessibility tree and exposes its data through the sr-only table instead', async () => {
     await act(async () => {
       renderWithQuery(<PassRateHero period={30} />)
     })
 
-    const svg = document.querySelector('svg.recharts-surface[tabindex="0"]')
-    expect(svg).not.toBeNull()
+    const table = screen.getByRole('table', { name: 'Executed cases comparison chart' })
+    expect(table).toBeInTheDocument()
+    expect(table).not.toHaveAttribute('aria-hidden')
   })
 
   it('caps content width with the dashboard token, never an arbitrary value', async () => {

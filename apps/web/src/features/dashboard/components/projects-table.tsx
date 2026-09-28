@@ -106,10 +106,10 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                         </div>
                       </div>
                     </td>
-                    <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
+                    <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center text-xs font-semibold text-default tabular-nums">
                       {project.suites}
                     </td>
-                    <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center font-mono text-xs font-medium text-default tabular-nums">
+                    <td className="hidden @lg:table-cell w-20 py-3 px-3 text-center text-xs font-semibold text-default tabular-nums">
                       {project.cases}
                     </td>
                     <td className="py-3 pl-3 pr-5">
@@ -119,7 +119,7 @@ export function ProjectsTable({ period, projectId }: ProjectsTableProps) {
                           label={t('dashboard.projectsRowPassRateLabel', { name: project.name })}
                           className="h-1.5 flex-1"
                         />
-                        <span className="w-11 text-right font-mono text-xs font-semibold text-default tabular-nums">
+                        <span className="w-11 text-right text-xs font-semibold text-default tabular-nums">
                           {passRateText}
                         </span>
                       </div>

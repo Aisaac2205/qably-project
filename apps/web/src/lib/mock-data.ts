@@ -411,6 +411,7 @@ export const mockGithubIntegration: GithubIntegration = {
 export const mockIngestionBatches: IngestionBatch[] = [
   {
     id: 'batch-repository-1', projectId: 'proj-1', source: 'repository', status: 'completed',
+    branch: 'main',
     codeChangeIds: [
       'change-empty-cart-1',
       'change-cart-total-1',
@@ -420,6 +421,7 @@ export const mockIngestionBatches: IngestionBatch[] = [
   },
   {
     id: 'batch-repository-failed-1', projectId: 'proj-3', source: 'repository', status: 'failed',
+    branch: 'main',
     codeChangeIds: [], createdAt: '2026-06-15T09:20:00Z',
   },
 ]

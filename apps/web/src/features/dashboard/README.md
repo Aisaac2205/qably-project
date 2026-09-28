@@ -23,25 +23,19 @@ features/dashboard/
 │   ├── project-monogram.tsx      # Neutral initials badge (see docs/DASHBOARD_UI.md deviations)
 │   ├── cases-gauge-card.tsx      # Gauge over the latest finished run of every in-scope suite
 │   ├── channels-card.tsx / channel-row.tsx   # Webhook, email and Qably in-app delivery rows
-│   ├── activity-card.tsx / activity-row.tsx  # 4 most recent runs
-│   ├── traceability-calendar.tsx # GitHub-style contribution heatmap grid (weeks and days rendering)
-│   ├── traceability-section.tsx  # Card shell and filter toolbar wrapping the calendar (used by /quality)
-│   └── traceability-tooltip.tsx  # Day tooltip content and describeDay() copy builder
+│   └── activity-card.tsx / activity-row.tsx  # 4 most recent runs
 ├── hooks/
 │   ├── use-dashboard-overview.ts   # GET /dashboard/overview, keyed by period + projectId + tz
 │   ├── use-dashboard-channels.ts   # GET /dashboard/channels, keyed by tz
-│   ├── use-dashboard-summary.ts    # GET /dashboard/summary — still consumed by /quality only
-│   └── use-traceability-calendar.ts # Fetches and builds the calendar grid for a year and filter
+│   └── use-dashboard-summary.ts    # GET /dashboard/summary
 ├── lib/
 │   ├── format.ts                 # formatRelativeTime, formatKpiValue/formatKpiDelta, formatCompactNumber, formatEventCount
 │   ├── kpi-delta.ts              # DASHBOARD_KPI_POLARITY + resolveKpiDeltaTone(value, previous, polarity)
 │   ├── executed-cases-domain.ts  # buildExecutedCasesPoints, resolveExecutedCasesTrend, resolvePeriodRangeLabel
 │   ├── dashboard-projects.ts     # sortDashboardProjects — ascending by passRate, nulls last
 │   ├── resolve-last-delivery.ts  # resolveLastDeliveryWebhookName — looks up a webhook name for the channels footer
-│   ├── query-keys.ts             # TanStack Query key factory for dashboard queries
-│   └── traceability-grid.ts      # Transforms TraceabilityCalendarRecord into grid data
+│   └── query-keys.ts             # TanStack Query key factory for dashboard queries
 ├── types/
-│   └── traceability-calendar.ts  # Calendar domain types (CalendarDayData, TraceabilityFilter)
 ├── test/                         # Vitest and React 19 tests for components, hooks, and helpers
 └── README.md
 ```
@@ -51,10 +45,7 @@ features/dashboard/
 `useDashboardOverview(period, projectId?)` and `useDashboardChannels(projectId?)` both include the
 browser's resolved IANA time zone (`useBrowserTimeZone()`) in their query key, so switching zones
 invalidates and refetches rather than silently serving buckets computed for a different zone.
-`useDashboardSummary()`, `useProjects()` and `useTraceabilityCalendar()` remain — the first two are
-now `/quality`-only; the calendar is rendered by this slice's own `TraceabilitySection` but that
-component is only mounted from `/quality`, not from `/dashboard`. Nothing on either page reads a
-mock store. Each widget manages its own async state (`isLoading`, `isError`, `retry`) independently:
+Nothing on either page reads a mock store. Each widget manages its own async state (`isLoading`, `isError`, `retry`) independently:
 a slow or failed query only affects the Card it belongs to, never the rest of the page.
 
 ## Presentational primitives live in `@qably/ui`

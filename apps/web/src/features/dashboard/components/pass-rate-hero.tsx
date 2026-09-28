@@ -1,14 +1,12 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { TrendDown, TrendUp } from '@phosphor-icons/react'
-import {
-  ChartContainer,
-  ChartTooltip,
-  useCoarsePointer,
-  type ChartConfig,
-} from '@qably/ui/chart'
+import { Area, AreaChart } from '@/components/charts'
+import { Grid } from '@/components/charts/grid'
+import { XAxis } from '@/components/charts/x-axis'
+import { YAxis } from '@/components/charts/y-axis'
+import { ChartTooltip } from '@/components/charts/tooltip'
 import { ChartDataTable } from '@qably/ui/dashboard'
 import type { DashboardPeriod } from '@qably/types'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
@@ -23,15 +21,17 @@ import {
   type ExecutedCasesPoint,
 } from '@/features/dashboard/lib/executed-cases-domain'
 import { formatCompactNumber } from '@/features/dashboard/lib/format'
+import { parseSeriesDate } from '@/features/dashboard/lib/series-date'
 import { useTranslation } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 
 export interface PassRateHeroProps {
   period: DashboardPeriod
   projectId?: string
 }
 
-const CURRENT_COLOR: `var(--qb-chart-${string})` = 'var(--qb-chart-line)'
-const PREVIOUS_COLOR: `var(--qb-chart-${string})` = 'var(--qb-chart-compare)'
+const CURRENT_COLOR = 'var(--qb-chart-line)'
+const PREVIOUS_COLOR = 'var(--qb-chart-compare)'
 
 function HeroSkeleton() {
   return (
@@ -41,93 +41,30 @@ function HeroSkeleton() {
   )
 }
 
-function resolveXTickIds(points: readonly ExecutedCasesPoint[]): string[] {
-  const tickCount = Math.min(5, points.length)
-
-  return Array.from(
-    new Set(
-      Array.from({ length: tickCount }, (_, index) => {
-        const pointIndex = Math.round((index * (points.length - 1)) / (tickCount - 1 || 1))
-        return points[pointIndex]?.id
-      }),
-    ),
-  ).filter((id): id is string => id !== undefined)
-}
-
-function metricRow(label: string, value: number) {
-  return (
-    <div key={label} className="flex items-center justify-between gap-4">
-      <span>{label}</span>
-      <span className="font-mono tabular-nums text-qb-fg">{value}</span>
-    </div>
-  )
-}
-
-function HeroTooltipContent({
-  active,
-  point,
-  seriesLabels,
-  metricLabels,
-}: {
-  active: boolean
-  point: ExecutedCasesPoint | undefined
-  seriesLabels: { current: string; previous: string }
-  metricLabels: { passed: string; failed: string; blocked: string }
-}) {
-  if (!active || !point) return null
-
-  return (
-    <div className="grid min-w-36 gap-1.5 rounded-lg border border-qb-border/50 bg-qb-surface px-2.5 py-1.5 text-xs shadow-qb-pop">
-      <div className="font-medium text-qb-fg">{point.label}</div>
-      <div className="grid gap-1.5">
-        <div className="flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
-            style={{ backgroundColor: CURRENT_COLOR }}
-          />
-          <div className="flex flex-1 items-center justify-between gap-4">
-            <span className="text-qb-muted">{seriesLabels.current}</span>
-            <span className="font-mono font-medium tabular-nums text-qb-fg">{point.current}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="h-0 w-2.5 shrink-0 border-t-2 border-dashed"
-            style={{ borderColor: PREVIOUS_COLOR }}
-          />
-          <div className="flex flex-1 items-center justify-between gap-4">
-            <span className="text-qb-muted">{seriesLabels.previous}</span>
-            <span className="font-mono font-medium tabular-nums text-qb-fg">{point.previous}</span>
-          </div>
-        </div>
-      </div>
-      <div className="grid gap-1 border-t border-qb-border/40 pt-1.5 text-qb-muted">
-        {metricRow(metricLabels.passed, point.passed)}
-        {metricRow(metricLabels.failed, point.failed)}
-        {metricRow(metricLabels.blocked, point.blocked)}
-      </div>
-    </div>
-  )
-}
-
 export function PassRateHero({ period, projectId }: PassRateHeroProps) {
-  const { overview, isLoading, isError, retry } = useDashboardOverview(period, projectId)
+  const { overview, isLoading, isRefreshing, isError, retry } = useDashboardOverview(period, projectId)
   const { t, locale } = useTranslation()
-  const isCoarsePointer = useCoarsePointer()
-  const trigger = isCoarsePointer ? 'click' : 'hover'
 
   const dateFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale === 'es' ? 'es-ES' : 'en-US', { month: 'short', day: 'numeric' }),
     [locale],
   )
-  const formatLabel = useCallback((date: string) => dateFormatter.format(new Date(date)), [dateFormatter])
+  const formatLabel = useCallback((date: string) => dateFormatter.format(parseSeriesDate(date)), [dateFormatter])
+
+  const longDateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale === 'es' ? 'es-ES' : 'en-US', { day: 'numeric', month: 'long' }),
+    [locale],
+  )
 
   const points =
     overview === undefined
       ? []
       : buildExecutedCasesPoints(overview.passRateSeries.current, overview.passRateSeries.previous, formatLabel)
+
+  const chartData = useMemo(
+    () => points.map((point) => ({ ...point, date: parseSeriesDate(point.id) })),
+    [points],
+  )
 
   const trend = resolveExecutedCasesTrend(points)
   const periodRangeLabel = resolvePeriodRangeLabel(points, formatLabel)
@@ -142,13 +79,13 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
     blocked: t('dashboard.heroMetricBlocked'),
   }
 
-  const config: ChartConfig = {
-    current: { label: seriesLabels.current, color: CURRENT_COLOR },
-    previous: { label: seriesLabels.previous, color: PREVIOUS_COLOR },
-  }
+  const hasBaseline = points.some((point) => point.previous > 0)
+  const firstDataPoint = points.find((point) => point.current > 0)
+  const firstDataLabel = firstDataPoint ? longDateFormatter.format(parseSeriesDate(firstDataPoint.id)) : ''
 
-  const footerTrendText =
-    trend.direction === 'equal'
+  const footerTrendText = !hasBaseline
+    ? t('dashboard.heroFooterNoBaseline', { date: firstDataLabel })
+    : trend.direction === 'equal'
       ? t('dashboard.heroFooterNoChange')
       : trend.percent === null
         ? t(
@@ -160,9 +97,13 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
             percent: trend.percent,
           })
 
-  const TrendIcon = trend.direction === 'up' ? TrendUp : trend.direction === 'down' ? TrendDown : null
-  const xTickIds = resolveXTickIds(points)
-  const idToLabel = new Map(points.map((point) => [point.id, point.label]))
+  const TrendIcon = !hasBaseline
+    ? null
+    : trend.direction === 'up'
+      ? TrendUp
+      : trend.direction === 'down'
+        ? TrendDown
+        : null
 
   return (
     <div className="mx-auto w-full max-w-dashboard">
@@ -190,80 +131,94 @@ export function PassRateHero({ period, projectId }: PassRateHeroProps) {
           ) : points.length === 0 ? (
             <p className="py-12 text-center text-xs text-muted">{t('dashboard.heroEmptyLabel')}</p>
           ) : (
-            <div className="h-60 min-w-0">
-              <ChartContainer config={config} initialDimension={{ width: 640, height: 224 }} className="aspect-auto h-full w-full">
-                <LineChart
-                  data={points as ExecutedCasesPoint[]}
-                  accessibilityLayer
-                  tabIndex={0}
-                  aria-label={t('dashboard.heroLabel')}
-                  className="touch-pan-y"
-                  margin={{ top: 16, right: 16, bottom: 0, left: 0 }}
-                >
-                  <CartesianGrid vertical={false} strokeDasharray="3 5" stroke="var(--qb-chart-grid)" />
-                  <XAxis
-                    dataKey="id"
-                    ticks={xTickIds}
-                    tickFormatter={(id: string) => idToLabel.get(id) ?? ''}
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                    tick={{ className: 'fill-qb-muted font-mono', fontSize: 11 }}
-                  />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    width={40}
-                    tickFormatter={(value: number) => formatCompactNumber(value, locale)}
-                    tick={{ className: 'fill-qb-muted font-mono tabular-nums', fontSize: 11 }}
-                  />
-                  <ChartTooltip
-                    cursor={{ stroke: 'var(--qb-chart-line)', strokeOpacity: 0.18, strokeWidth: 1 }}
-                    trigger={trigger}
-                    allowEscapeViewBox={{ x: false, y: true }}
-                    content={(tooltipProps) => (
-                      <HeroTooltipContent
-                        active={Boolean(tooltipProps.active)}
-                        point={
-                          tooltipProps.active
-                            ? (tooltipProps.payload?.[0]?.payload as ExecutedCasesPoint | undefined)
-                            : undefined
-                        }
-                        seriesLabels={seriesLabels}
-                        metricLabels={metricLabels}
-                      />
-                    )}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="current"
-                    stroke={CURRENT_COLOR}
-                    strokeWidth={2}
-                    dot={false}
-                    isAnimationActive={false}
-                    activeDot={{ r: 4, stroke: CURRENT_COLOR, strokeWidth: 2, className: 'fill-qb-surface' }}
-                  />
-                  <Line
-                    type="monotone"
+            <div
+              className={cn(
+                'h-60 min-w-0 transition-opacity duration-200',
+                isRefreshing && 'opacity-60',
+              )}
+            >
+              <AreaChart
+                aspectRatio="auto"
+                className="h-full w-full touch-none"
+                data={chartData as unknown as Record<string, unknown>[]}
+                margin={{ top: 16, right: 16, bottom: 44, left: 48 }}
+              >
+                <Grid horizontal />
+                <Area
+                  dataKey="current"
+                  fill={CURRENT_COLOR}
+                  fillOpacity={0.2}
+                  showHighlight
+                  stroke={CURRENT_COLOR}
+                  strokeWidth={2}
+                />
+                {hasBaseline ? (
+                  <Area
                     dataKey="previous"
+                    dashArray="5 5"
+                    dashFromIndex={0}
+                    fill={PREVIOUS_COLOR}
+                    fillOpacity={0}
+                    showHighlight={false}
                     stroke={PREVIOUS_COLOR}
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={false}
-                    isAnimationActive={false}
-                    activeDot={{ r: 3, fill: PREVIOUS_COLOR, className: 'stroke-qb-surface' }}
+                    strokeWidth={1.5}
                   />
-                </LineChart>
-              </ChartContainer>
+                ) : null}
+                <XAxis />
+                <YAxis formatValue={(value) => formatCompactNumber(value, locale)} />
+                <ChartTooltip
+                  rows={(point) => [
+                    {
+                      color: CURRENT_COLOR,
+                      label: seriesLabels.current,
+                      value: Number(point.current ?? 0),
+                    },
+                    ...(hasBaseline
+                      ? [
+                          {
+                            color: PREVIOUS_COLOR,
+                            label: seriesLabels.previous,
+                            value: Number(point.previous ?? 0),
+                          },
+                        ]
+                      : []),
+                    {
+                      color: 'var(--qb-chart-pass)',
+                      label: metricLabels.passed,
+                      value: Number(point.passed ?? 0),
+                    },
+                    {
+                      color: 'var(--qb-chart-fail)',
+                      label: metricLabels.failed,
+                      value: Number(point.failed ?? 0),
+                    },
+                    {
+                      color: 'var(--qb-chart-warn)',
+                      label: metricLabels.blocked,
+                      value: Number(point.blocked ?? 0),
+                    },
+                  ]}
+                  showCrosshair
+                  showDots
+                />
+              </AreaChart>
 
               <ChartDataTable
                 caption={t('dashboard.heroLabel')}
                 rows={points}
-                rowKey={(point) => point.id}
+                rowKey={(point: ExecutedCasesPoint) => point.id}
                 columns={[
                   { key: 'day', header: t('dashboard.heroDayLabel'), render: (point) => point.label },
                   { key: 'current', header: seriesLabels.current, render: (point) => point.current },
-                  { key: 'previous', header: seriesLabels.previous, render: (point) => point.previous },
+                  ...(hasBaseline
+                    ? [
+                        {
+                          key: 'previous',
+                          header: seriesLabels.previous,
+                          render: (point: ExecutedCasesPoint) => point.previous,
+                        },
+                      ]
+                    : []),
                   { key: 'passed', header: metricLabels.passed, render: (point) => point.passed },
                   { key: 'failed', header: metricLabels.failed, render: (point) => point.failed },
                   { key: 'blocked', header: metricLabels.blocked, render: (point) => point.blocked },

@@ -1,3 +1,4 @@
+import userEvent from '@testing-library/user-event'
 import { render, screen } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { DashboardHeader } from '@/features/dashboard/components/dashboard-header'
@@ -15,26 +16,24 @@ describe('DashboardHeader', () => {
     expect(subtitle.tagName).toBe('P')
   })
 
-  it('offers a 7/30/90 day period toggle group with 30 marked pressed by default', () => {
-    render(<DashboardHeader period={30} onPeriodChange={vi.fn()} />)
-    const group = screen.getByRole('group', { name: 'Time period' })
-    expect(group).toBeInTheDocument()
-
-    const button30 = screen.getByRole('button', { name: '30d' })
-    expect(button30).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: '7d' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: '90d' })).toHaveAttribute('aria-pressed', 'false')
+  it('offers a 7/30/90 day period dropdown with the selected period displayed', () => {
+    render(<DashboardHeader period={7} onPeriodChange={vi.fn()} />)
+    const button = screen.getByRole('button', { name: 'Time period' })
+    expect(button).toBeInTheDocument()
+    expect(button).toHaveTextContent('7 days')
   })
 
-  it('calls onPeriodChange with the numeric period when a toggle is clicked', () => {
+  it('calls onPeriodChange with the numeric period when an option is selected', async () => {
+    const user = userEvent.setup()
     const onPeriodChange = vi.fn()
-    render(<DashboardHeader period={30} onPeriodChange={onPeriodChange} />)
+    render(<DashboardHeader period={7} onPeriodChange={onPeriodChange} />)
 
-    screen.getByRole('button', { name: '7d' }).click()
-    expect(onPeriodChange).toHaveBeenCalledWith(7)
+    const trigger = screen.getByRole('button', { name: 'Time period' })
+    await user.click(trigger)
 
-    screen.getByRole('button', { name: '90d' }).click()
-    expect(onPeriodChange).toHaveBeenCalledWith(90)
+    const option30 = await screen.findByRole('option', { name: '30 days' })
+    await user.click(option30)
+    expect(onPeriodChange).toHaveBeenCalledWith(30)
   })
 
   it('caps content width with the dashboard token, never an arbitrary value', () => {

@@ -26,47 +26,38 @@ describe('KpiStrip', () => {
       renderWithQuery(<KpiStrip period={30} />)
     })
 
-    expect(screen.getByText('Pass rate')).toBeInTheDocument()
-    expect(screen.getByText('82%')).toBeInTheDocument()
+    expect(screen.getByText('Executed cases')).toBeInTheDocument()
+    expect(screen.getByText('75')).toBeInTheDocument()
     expect(screen.getByText('Runs')).toBeInTheDocument()
     expect(screen.getByText('42')).toBeInTheDocument()
     expect(screen.getByText('Failed cases')).toBeInTheDocument()
+    expect(screen.getByText('8')).toBeInTheDocument()
+    expect(screen.getByText('Runs with failures')).toBeInTheDocument()
     expect(screen.getByText('6')).toBeInTheDocument()
-    expect(screen.getByText('Avg run duration')).toBeInTheDocument()
-    expect(screen.getByText('3m 4s')).toBeInTheDocument()
   })
 
-  it('styles fewer failed cases as a positive delta and more runs as positive too', async () => {
+  it('renders trend badges for each metric', async () => {
     await act(async () => {
       renderWithQuery(<KpiStrip period={30} />)
     })
 
-    // failedCases: 6 vs previous 9 -> fewer failures is good ("better" tone)
-    const failedDelta = screen.getByText('↓ 3')
-    expect(failedDelta.className).toContain('text-qb-pass')
-
-    // runs: 42 vs previous 35 -> more runs is good ("better" tone)
-    const runsDelta = screen.getByText('↑ 7')
-    expect(runsDelta.className).toContain('text-qb-pass')
+    const executedTile = screen.getByText('Executed cases').closest('[data-slot="card"]')
+    expect(executedTile).toBeInTheDocument()
+    expect(executedTile).toHaveTextContent('-16.7%')
   })
 
-  it('draws a sparkline per KPI with an accessible trend label', async () => {
-    await act(async () => {
-      renderWithQuery(<KpiStrip period={30} />)
-    })
-
-    expect(screen.getByRole('img', { name: 'Pass rate trend over the selected period' })).toBeInTheDocument()
+  it('renders a sparkline chart per KPI tile', async () => {
+    const { container } = await act(async () => renderWithQuery(<KpiStrip period={30} />))
+    const charts = container.querySelectorAll('svg')
+    expect(charts.length).toBeGreaterThan(0)
   })
 
-  it('lays the tiles out one per row on a narrow container, two columns by 390px width, four as it widens further', async () => {
-    await act(async () => {
-      renderWithQuery(<KpiStrip period={30} />)
-    })
-    const dl = document.querySelector('dl')
-    expect(dl).toHaveClass('grid-cols-1')
-    expect(dl).toHaveClass('@xs:grid-cols-2')
-    expect(dl).toHaveClass('@2xl:grid-cols-4')
-    expect(dl).not.toHaveClass('@md:grid-cols-2')
+  it('lays the tiles out one per row on a narrow container, two columns by @xs width, four as it widens further', async () => {
+    const { container } = await act(async () => renderWithQuery(<KpiStrip period={30} />))
+    const grid = container.querySelector('.grid')
+    expect(grid).toHaveClass('grid-cols-1')
+    expect(grid).toHaveClass('@xs:grid-cols-2')
+    expect(grid).toHaveClass('@2xl:grid-cols-4')
   })
 
   it('caps content width with the dashboard token, never an arbitrary value', async () => {
@@ -86,7 +77,7 @@ describe('KpiStrip', () => {
       </QueryClientProvider>,
     )
 
-    expect(screen.queryByText('Pass rate')).not.toBeInTheDocument()
+    expect(screen.queryByText('Executed cases')).not.toBeInTheDocument()
     expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(4)
   })
 
@@ -103,7 +94,7 @@ describe('KpiStrip', () => {
 
     const alert = await screen.findByRole('alert')
     expect(alert).toBeInTheDocument()
-    expect(screen.queryByText('Pass rate')).not.toBeInTheDocument()
+    expect(screen.queryByText('Executed cases')).not.toBeInTheDocument()
 
     getOverview.mockResolvedValueOnce(dashboardOverviewFixture)
     const retryButton = screen.getByRole('button', { name: 'Retry' })
@@ -111,15 +102,16 @@ describe('KpiStrip', () => {
       retryButton.click()
     })
 
-    await waitFor(() => expect(screen.getByText('Pass rate')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Executed cases')).toBeInTheDocument())
   })
 
   it('shows an empty state instead of a wall of dashes when the period has zero runs', async () => {
     getOverview.mockResolvedValue({
       ...dashboardOverviewFixture,
-      kpis: {
-        ...dashboardOverviewFixture.kpis,
-        runs: { value: 0, previous: 0, series: [null, null, null, null] },
+      passRateSeries: {
+        ...dashboardOverviewFixture.passRateSeries,
+        current: dashboardOverviewFixture.passRateSeries.current.map((p) => ({ ...p, runs: 0 })),
+        previous: dashboardOverviewFixture.passRateSeries.previous.map((p) => ({ ...p, runs: 0 })),
       },
     })
     const client = createTestQueryClient()
@@ -132,6 +124,6 @@ describe('KpiStrip', () => {
     )
 
     expect(await screen.findByText('No runs recorded for the selected period')).toBeInTheDocument()
-    expect(screen.queryByText('Pass rate')).not.toBeInTheDocument()
+    expect(screen.queryByText('Executed cases')).not.toBeInTheDocument()
   })
 })

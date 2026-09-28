@@ -27,7 +27,7 @@ const overview: DashboardOverviewRecord = {
     failedCases: { value: 2, previous: 3, series: [] },
     avgRunDurationMs: { value: 1000, previous: 1200, series: [] },
   },
-  passRateSeries: { current: [], previous: [] },
+  passRateSeries: { current: [], previous: [], granularity: 'day' },
   casesPassing: { total: 0, pending: 0, running: 0, pass: 0, fail: 0, skip: 0, blocked: 0 },
   projects: [],
   recentActivity: [],
