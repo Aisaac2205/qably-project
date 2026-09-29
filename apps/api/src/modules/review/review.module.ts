@@ -9,6 +9,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 import { ProposalClassificationModule } from '../proposal-classification/proposal-classification.module';
 import { SourceReader } from '../repository/source-reader';
 import { TestFileLocator } from '../repository/test-file-locator';
+import { ApprovalConflictDiagnoser } from './approval-conflict-diagnoser';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
 import { ExtractionProcessor } from './extraction.processor';
@@ -44,6 +45,7 @@ import { ReviewDecisionService } from './review-decision.service';
   providers: [
     ReviewInboxQueryService,
     ReviewDecisionService,
+    ApprovalConflictDiagnoser,
     ExtractionService,
     ExtractionProcessor,
     ExtractionFailureRecorder,

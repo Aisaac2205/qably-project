@@ -15,6 +15,7 @@ type ErrorBody = {
   issues?: unknown;
   code?: string;
   decision?: unknown;
+  conflictingCase?: unknown;
 };
 
 @Catch()
@@ -63,6 +64,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         payload !== null &&
         'decision' in payload;
       const decision = hasDecision ? payload.decision : undefined;
+      const hasConflictingCase =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'conflictingCase' in payload;
+      const conflictingCase = hasConflictingCase
+        ? payload.conflictingCase
+        : undefined;
 
       return {
         statusCode,
@@ -74,6 +82,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ...(issues === undefined ? {} : { issues }),
         ...(typeof code === 'string' ? { code } : {}),
         ...(hasDecision ? { decision } : {}),
+        ...(hasConflictingCase ? { conflictingCase } : {}),
       };
     }
 

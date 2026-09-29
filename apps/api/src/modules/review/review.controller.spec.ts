@@ -93,13 +93,19 @@ describe('ReviewController error codes', () => {
   });
 
   it('throws a coded ConflictException when the title is already taken', async () => {
-    const review = fakeReview({ ok: false, error: 'name-taken' });
+    const review = fakeReview({
+      ok: false,
+      error: { code: 'name-taken', conflictingCase: null },
+    });
 
     await expect(
       build(review).approve(org, user, 'proposal-1', {}),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
       build(review).approve(org, user, 'proposal-1', {}),
-    ).rejects.toMatchObject({ response: { code: 'name-taken' } });
+    ).rejects.toMatchObject({
+      response: { code: 'name-taken', conflictingCase: null },
+    });
+    expect(review.lastDecision).not.toHaveBeenCalled();
   });
 });

@@ -84,7 +84,7 @@ Keeping the prefix was chosen because every proposal goes through human review b
 
 #### Title
 
-The title becomes the official name of the case on approval, and `TestCase` has `@@unique([suiteId, name])` (`apps/api/prisma/schema.prisma`). The review inbox does not allow editing the title before approving: `POST /review/proposals/:id/approve` accepts only a comment. So a name collision on approval currently ends in a 409 with no way out for the reviewer.
+The title becomes the official name of the case on approval, and `TestCase` has `@@unique([suiteId, name])` (`apps/api/prisma/schema.prisma`). The review inbox does not allow editing the title before approving: `POST /review/proposals/:id/approve` accepts only a comment. So a name collision on approval ends in a 409 that the reviewer can only resolve by rejecting the proposal. The 409 body names the failing constraint and the official case that already holds the title; see [Review approval conflicts](REVIEW_APPROVAL_CONFLICTS.md).
 
 | Option | Cases lost | Risk to identity |
 |---|---|---|

@@ -4,6 +4,8 @@ import type {
   Evidence,
   ExtractedProposal,
   ProposalStatus,
+  ReviewApprovalConflictCode,
+  ReviewConflictingCase,
   TraceabilityLink,
 } from '@qably/types';
 import type { ProposalClassification } from './lib/classify-proposal';
@@ -141,8 +143,14 @@ export type ReviewError =
   | 'invalid-transition'
   | 'missing-evidence'
   | 'incomplete-proposal'
-  | 'missing-suite'
-  | 'name-taken';
+  | 'missing-suite';
+
+export interface ApprovalConflict {
+  readonly code: ReviewApprovalConflictCode;
+  readonly conflictingCase: ReviewConflictingCase | null;
+}
+
+export type ApprovalError = ReviewError | ApprovalConflict;
 
 export interface DecisionInput {
   actorId: string;

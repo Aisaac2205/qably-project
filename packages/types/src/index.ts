@@ -806,6 +806,15 @@ export interface ReviewScenario {
   id: 'approval-new' | 'approval-version' | 'rejection-evidence'
   proposalId: string
 }
+export type ReviewApprovalConflictCode =
+  | 'name-taken'
+  | 'automation-key-taken'
+  | 'publish-conflict'
+export interface ReviewConflictingCase {
+  id: string
+  name: string
+  suiteId: string
+}
 export type ProposalMutationResult =
   | { ok: true; decision: ReviewDecision }
   | { ok: false; reason: 'not_found' | 'invalid_transition' | 'missing_evidence' }

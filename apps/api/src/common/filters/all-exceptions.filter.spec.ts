@@ -174,6 +174,50 @@ describe('AllExceptionsFilter', () => {
     expect(body).not.toHaveProperty('decision');
   });
 
+  it('passes through the conflicting case of an approval conflict, including a null one', () => {
+    const { host, json } = createHost();
+    const conflictingCase = { id: 'case-1', name: 'Login', suiteId: 'suite-1' };
+
+    const filter = new AllExceptionsFilter(false);
+    filter.catch(
+      new ConflictException({
+        code: 'name-taken',
+        message: 'Another official case in this suite already uses that title',
+        conflictingCase,
+      }),
+      host,
+    );
+    filter.catch(
+      new ConflictException({
+        code: 'publish-conflict',
+        message: 'x',
+        conflictingCase: null,
+      }),
+      host,
+    );
+
+    const [first] = json.mock.calls[0] as [Record<string, unknown>];
+    const [second] = json.mock.calls[1] as [Record<string, unknown>];
+    expect(first).toMatchObject({
+      statusCode: 409,
+      code: 'name-taken',
+      conflictingCase,
+    });
+    expect(second).toHaveProperty('conflictingCase', null);
+  });
+
+  it('omits the conflicting case field when the exception response carries none', () => {
+    const { host, json } = createHost();
+
+    new AllExceptionsFilter(false).catch(
+      new NotFoundException('Project not found'),
+      host,
+    );
+
+    const [body] = json.mock.calls[0] as [Record<string, unknown>];
+    expect(body).not.toHaveProperty('conflictingCase');
+  });
+
   it('includes the request path and a timestamp on every response', () => {
     const { host, json } = createHost('/runs/42');
 

@@ -5,7 +5,9 @@ import type { OrgContext } from '../organizations/organizations.contracts';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
+import { ApprovalConflictDiagnoser } from './approval-conflict-diagnoser';
 import type {
+  ApprovalError,
   ApprovalView,
   DecisionInput,
   LastDecisionView,
@@ -39,7 +41,7 @@ const PROPOSAL_SELECT = {
   locale: true,
   evidence: { select: { id: true } },
   codeChange: { select: { filePath: true } },
-  targetTestCase: { select: { automationFilePath: true } },
+  targetTestCase: { select: { automationFilePath: true, suiteId: true } },
 } as const;
 
 interface ProposalRow {
@@ -59,7 +61,10 @@ interface ProposalRow {
   automationKey: string | null;
   evidence: { id: string } | null;
   codeChange: { filePath: string } | null;
-  targetTestCase: { automationFilePath: string | null } | null;
+  targetTestCase: {
+    automationFilePath: string | null;
+    suiteId: string;
+  } | null;
 }
 
 function toDecidedAction(action: string): 'approved' | 'rejected' {
@@ -111,13 +116,14 @@ export class ReviewDecisionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly reclassifier: ProposalReclassifier,
+    private readonly conflicts: ApprovalConflictDiagnoser,
   ) {}
 
   async approve(
     org: OrgContext,
     proposalId: string,
     input: DecisionInput,
-  ): Promise<Result<ApprovalView, ReviewError>> {
+  ): Promise<Result<ApprovalView, ApprovalError>> {
     const proposal = await this.pending(org, proposalId);
 
     if (!proposal.ok) return proposal;
@@ -137,7 +143,11 @@ export class ReviewDecisionService {
       await this.reclassifier.enqueue(approval.suiteId);
       return ok(approval);
     } catch (error) {
-      if (isUniqueViolation(error)) return err('name-taken');
+      if (isUniqueViolation(error)) {
+        return err(
+          await this.conflicts.diagnose(org, proposal.value, suiteId, error),
+        );
+      }
       if (error instanceof DecisionConflict) return err('invalid-transition');
       throw error;
     }

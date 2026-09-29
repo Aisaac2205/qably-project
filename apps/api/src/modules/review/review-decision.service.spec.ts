@@ -1,5 +1,12 @@
+import { Logger } from '@nestjs/common';
+import {
+  testCaseAutomationKeyViolation,
+  testCaseNameViolation,
+  testCaseVersionViolation,
+} from '../../../test/support/prisma-unique-violation';
 import type { OrgContext } from '../organizations/organizations.contracts';
-import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
+import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
+import { ApprovalConflictDiagnoser } from './approval-conflict-diagnoser';
 import { ReviewDecisionService } from './review-decision.service';
 
 const org: OrgContext = {
@@ -26,7 +33,10 @@ const proposalRow = {
   suiteId: null as string | null,
   automationKey: null as string | null,
   codeChange: null as { filePath: string } | null,
-  targetTestCase: null as { automationFilePath: string | null } | null,
+  targetTestCase: null as {
+    automationFilePath: string | null;
+    suiteId: string;
+  } | null,
   needsManualReview: false,
 };
 
@@ -37,7 +47,7 @@ interface FakePrisma {
     updateMany: jest.Mock;
   };
   suite: { findFirst: jest.Mock; update: jest.Mock };
-  testCase: { create: jest.Mock; update: jest.Mock };
+  testCase: { create: jest.Mock; update: jest.Mock; findFirst: jest.Mock };
   testCaseVersion: { count: jest.Mock; create: jest.Mock };
   reviewDecision: { create: jest.Mock; findFirst: jest.Mock };
   traceabilityLink: { createMany: jest.Mock; findMany: jest.Mock };
@@ -58,6 +68,7 @@ function createPrisma(overrides: Partial<typeof proposalRow> = {}): FakePrisma {
     testCase: {
       create: jest.fn().mockResolvedValue({ id: 'case-new' }),
       update: jest.fn().mockResolvedValue({ id: 'case-new' }),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     testCaseVersion: {
       count: jest.fn().mockResolvedValue(0),
@@ -91,7 +102,11 @@ function build(
   prisma: FakePrisma,
   reclassifier: ProposalReclassifier = fakeReclassifier(),
 ) {
-  return new ReviewDecisionService(prisma as never, reclassifier);
+  return new ReviewDecisionService(
+    prisma as never,
+    reclassifier,
+    new ApprovalConflictDiagnoser(prisma as never, reclassifier),
+  );
 }
 
 describe('ReviewDecisionService.approve', () => {
@@ -296,7 +311,10 @@ describe('ReviewDecisionService.approve', () => {
     const prisma = createPrisma({
       targetTestCaseId: 'case-existing',
       automationKey: 'Cart > adds an item',
-      targetTestCase: { automationFilePath: 'src/cart.spec.ts' },
+      targetTestCase: {
+        automationFilePath: 'src/cart.spec.ts',
+        suiteId: 'suite-9',
+      },
     });
     prisma.testCaseVersion.count.mockResolvedValue(1);
     prisma.testCaseVersion.create.mockResolvedValue({
@@ -469,26 +487,126 @@ describe('ReviewDecisionService.approve', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('returns name-taken when the title collides with another case in the suite', async () => {
+  it('returns name-taken with the official case that already uses the title', async () => {
     const prisma = createPrisma();
-    prisma.testCase.create.mockRejectedValue({ code: 'P2002' });
+    prisma.testCase.create.mockRejectedValue(testCaseNameViolation());
+    prisma.testCase.findFirst.mockResolvedValue({
+      id: 'case-owner',
+      name: 'Empties the cart',
+      suiteId: 'suite-1',
+    });
 
     const result = await build(prisma).approve(org, 'proposal-1', {
       actorId: 'user-1',
     });
 
-    expect(result).toEqual({ ok: false, error: 'name-taken' });
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'name-taken',
+        conflictingCase: {
+          id: 'case-owner',
+          name: 'Empties the cart',
+          suiteId: 'suite-1',
+        },
+      },
+    });
+    expect(prisma.testCase.findFirst).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-1',
+        project: { organizationId: 'org-1' },
+        name: 'Empties the cart',
+      },
+      select: { id: true, name: true, suiteId: true },
+    });
   });
 
-  it('returns name-taken when refreshing an existing case collides, and commits no link or decision', async () => {
-    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
-    prisma.testCase.update.mockRejectedValue({ code: 'P2002' });
+  it('returns publish-conflict without looking up a case when the failing constraint is not a case identity', async () => {
+    const prisma = createPrisma();
+    prisma.testCaseVersion.create.mockRejectedValue(testCaseVersionViolation());
 
     const result = await build(prisma).approve(org, 'proposal-1', {
       actorId: 'user-1',
     });
 
-    expect(result).toEqual({ ok: false, error: 'name-taken' });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'publish-conflict', conflictingCase: null },
+    });
+    expect(prisma.testCase.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('still answers the automation-key-taken 409 when the real reclassifier fails to enqueue', async () => {
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const prisma = createPrisma({ automationKey: 'cart > empties' });
+    prisma.testCase.create.mockRejectedValue(testCaseAutomationKeyViolation());
+    prisma.testCase.findFirst.mockResolvedValue({
+      id: 'case-ingested',
+      name: 'Empties cart',
+      suiteId: 'suite-1',
+    });
+    const add = jest.fn().mockRejectedValue(new Error('redis is down'));
+    const reclassifier = new ProposalReclassifier({ add } as never);
+
+    const result = await build(prisma, reclassifier).approve(
+      org,
+      'proposal-1',
+      { actorId: 'user-1' },
+    );
+
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'automation-key-taken',
+        conflictingCase: {
+          id: 'case-ingested',
+          name: 'Empties cart',
+          suiteId: 'suite-1',
+        },
+      },
+    });
+    warn.mockRestore();
+  });
+
+  it('looks for the other case in the target suite, excluding the target, when refreshing an existing case collides, and commits no link or decision', async () => {
+    const prisma = createPrisma({
+      targetTestCaseId: 'case-existing',
+      targetTestCase: { automationFilePath: null, suiteId: 'suite-9' },
+    });
+    prisma.testCase.update.mockRejectedValue(testCaseNameViolation());
+    prisma.testCase.findFirst.mockResolvedValue({
+      id: 'case-other',
+      name: 'Empties the cart',
+      suiteId: 'suite-9',
+    });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'name-taken',
+        conflictingCase: {
+          id: 'case-other',
+          name: 'Empties the cart',
+          suiteId: 'suite-9',
+        },
+      },
+    });
+    expect(prisma.testCase.findFirst).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-9',
+        project: { organizationId: 'org-1' },
+        id: { not: 'case-existing' },
+        name: 'Empties the cart',
+      },
+      select: { id: true, name: true, suiteId: true },
+    });
     expect(prisma.traceabilityLink.createMany).not.toHaveBeenCalled();
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });

@@ -15,6 +15,11 @@ import { OrganizationsModule } from '../src/modules/organizations/organizations.
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ReviewModule } from '../src/modules/review/review.module';
+import {
+  testCaseAutomationKeyViolation,
+  testCaseNameViolation,
+  testCaseVersionViolation,
+} from './support/prisma-unique-violation';
 import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
@@ -58,9 +63,68 @@ const proposalRow = {
   },
 };
 
+interface OfficialCaseRow {
+  id: string;
+  name: string;
+  suiteId: string;
+  automationKey: string | null;
+  organizationId: string;
+}
+
+interface TestCaseFindFirst {
+  where: {
+    suiteId?: string;
+    name?: string;
+    automationKey?: string;
+    id?: { not: string };
+    project?: { organizationId: string };
+  };
+  select: { id: true; name: true; suiteId: true };
+}
+
+function seededOfficialCases(): OfficialCaseRow[] {
+  return [
+    {
+      id: 'case-title-owner',
+      name: 'Empties the cart',
+      suiteId: 'suite-1',
+      automationKey: null,
+      organizationId: 'org-1',
+    },
+    {
+      id: 'case-key-owner',
+      name: 'Cart empties the cart',
+      suiteId: 'suite-1',
+      automationKey: 'cart empties the cart',
+      organizationId: 'org-1',
+    },
+  ];
+}
+
+function findOfficialCase(
+  rows: readonly OfficialCaseRow[],
+  { where }: TestCaseFindFirst,
+): { id: string; name: string; suiteId: string } | null {
+  const row = rows.find(
+    (candidate) =>
+      (where.suiteId === undefined || candidate.suiteId === where.suiteId) &&
+      (where.name === undefined || candidate.name === where.name) &&
+      (where.automationKey === undefined ||
+        candidate.automationKey === where.automationKey) &&
+      (where.id === undefined || candidate.id !== where.id.not) &&
+      (where.project === undefined ||
+        candidate.organizationId === where.project.organizationId),
+  );
+
+  return row === undefined
+    ? null
+    : { id: row.id, name: row.name, suiteId: row.suiteId };
+}
+
 describe('Review (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
+  const officialCases: OfficialCaseRow[] = [];
   const prisma = {
     orgMember: { findFirst: jest.fn() },
     organization: { create: jest.fn(), findUniqueOrThrow: jest.fn() },
@@ -71,7 +135,12 @@ describe('Review (e2e)', () => {
       updateMany: jest.fn(),
     },
     suite: { findFirst: jest.fn() },
-    testCase: { create: jest.fn(), update: jest.fn(), findMany: jest.fn() },
+    testCase: {
+      create: jest.fn(),
+      update: jest.fn(),
+      findMany: jest.fn(),
+      findFirst: jest.fn(),
+    },
     testCaseVersion: { count: jest.fn(), create: jest.fn() },
     reviewDecision: { create: jest.fn(), findFirst: jest.fn() },
     traceabilityLink: {
@@ -102,6 +171,10 @@ describe('Review (e2e)', () => {
     prisma.testCase.create.mockResolvedValue({ id: 'case-new' });
     prisma.testCase.update.mockResolvedValue({ id: 'case-new' });
     prisma.testCase.findMany.mockResolvedValue([]);
+    officialCases.splice(0, officialCases.length, ...seededOfficialCases());
+    prisma.testCase.findFirst.mockImplementation((args: TestCaseFindFirst) =>
+      Promise.resolve(findOfficialCase(officialCases, args)),
+    );
     prisma.testCaseVersion.count.mockResolvedValue(0);
     prisma.testCaseVersion.create.mockResolvedValue({
       id: 'version-1',
@@ -371,13 +444,99 @@ describe('Review (e2e)', () => {
       .expect(422);
   });
 
-  it('answers 409 when the title collides with another case in the suite', async () => {
-    prisma.testCase.create.mockRejectedValue({ code: 'P2002' });
+  it('answers 409 name-taken with the official case that already uses the title', async () => {
+    prisma.testCase.create.mockRejectedValue(testCaseNameViolation());
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({})
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      statusCode: 409,
+      code: 'name-taken',
+      message: 'Another official case in this suite already uses that title',
+      conflictingCase: {
+        id: 'case-title-owner',
+        name: 'Empties the cart',
+        suiteId: 'suite-1',
+      },
+    });
+    expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
+  });
+
+  it('answers 409 automation-key-taken with the official case that already owns the automationKey', async () => {
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...proposalRow,
+      automationKey: 'cart empties the cart',
+    });
+    prisma.testCase.create.mockRejectedValue(testCaseAutomationKeyViolation());
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({})
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      statusCode: 409,
+      code: 'automation-key-taken',
+      message:
+        'Another official case in this suite already runs as that automated test',
+      conflictingCase: {
+        id: 'case-key-owner',
+        name: 'Cart empties the cart',
+        suiteId: 'suite-1',
+      },
+    });
+  });
+
+  it('answers 409 publish-conflict with no conflicting case when another unique constraint fails', async () => {
+    prisma.testCaseVersion.create.mockRejectedValue(testCaseVersionViolation());
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({})
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      code: 'publish-conflict',
+      conflictingCase: null,
+    });
+  });
+
+  it('never reveals a colliding case that belongs to another organization', async () => {
+    officialCases.splice(0, officialCases.length, {
+      id: 'case-foreign',
+      name: 'Empties the cart',
+      suiteId: 'suite-1',
+      automationKey: null,
+      organizationId: 'org-2',
+    });
+    prisma.testCase.create.mockRejectedValue(testCaseNameViolation());
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({})
+      .expect(409);
+
+    expect(response.body).toMatchObject({
+      code: 'name-taken',
+      conflictingCase: null,
+    });
+  });
+
+  it('still lets the reviewer reject a proposal whose approval collides', async () => {
+    prisma.testCase.create.mockRejectedValue(testCaseNameViolation());
 
     await request(app.getHttpServer())
       .post('/review/proposals/proposal-1/approve')
       .send({})
       .expect(409);
+
+    await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/reject')
+      .send({})
+      .expect(201);
   });
 
   it('records a rejection without publishing an official case', async () => {
