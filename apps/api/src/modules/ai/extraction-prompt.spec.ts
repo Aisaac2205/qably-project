@@ -191,6 +191,57 @@ describe('buildSystemInstruction', () => {
     );
   });
 
+  it('keeps the one-entry-per-declaration count sentence when a hint is given without targets', () => {
+    expect(buildSystemInstruction('en', false, 5)).toContain(
+      'The file contains 5 test declarations; return one entry for each.',
+    );
+    expect(buildSystemInstruction('es', false, 5)).toContain(
+      'El archivo contiene 5 declaraciones de prueba; devuelve una entrada por cada una.',
+    );
+  });
+
+  it('never tells a targeted call to return one entry per declaration when a hint is given', () => {
+    expect(buildSystemInstruction('en', true, 5)).not.toContain(
+      'return one entry for each.',
+    );
+    expect(buildSystemInstruction('es', true, 5)).not.toContain(
+      'devuelve una entrada por cada una.',
+    );
+  });
+
+  it('scopes the declaration count to the target-cases block when a hint is given with targets', () => {
+    const english = buildSystemInstruction('en', true, 5);
+    const spanish = buildSystemInstruction('es', true, 5);
+
+    expect(english).toContain('The file contains 5 test declarations');
+    expect(english).toContain(
+      `return an entry for each line of the ${TARGET_CASES_OPEN} block whose test is in the file`,
+    );
+    expect(english).toContain('ignore the other declarations');
+    expect(spanish).toContain('El archivo contiene 5 declaraciones de prueba');
+    expect(spanish).toContain(
+      `devuelve una entrada por cada línea del bloque ${TARGET_CASES_OPEN} cuya prueba esté en el archivo`,
+    );
+    expect(spanish).toContain('ignora las demás declaraciones');
+  });
+
+  it('keeps the targets-only rule and adds no count sentence to a targeted call without a hint', () => {
+    for (const locale of ['es', 'en'] as const) {
+      const withoutHint = buildSystemInstruction(locale, true);
+      const withHint = buildSystemInstruction(locale, true, 5);
+
+      expect(withoutHint).not.toMatch(
+        /contains \d+ test declarations|contiene \d+ declaraciones/,
+      );
+      expect(withHint.startsWith(withoutHint)).toBe(true);
+      expect(withHint).toContain(
+        locale === 'es'
+          ? 'Extrae únicamente las declaraciones de prueba'
+          : 'Extract only the test declarations',
+      );
+    }
+  });
+
   it('requires a title different from the raw automation key, in every mode', () => {
     for (const locale of ['es', 'en'] as const) {
       for (const hasTargets of [false, true]) {

@@ -115,6 +115,16 @@ const DECLARATION_COUNT_SENTENCE: Record<
     `The file contains ${count} test declarations; return one entry for each.`,
 };
 
+const TARGETED_DECLARATION_COUNT_SENTENCE: Record<
+  'es' | 'en',
+  (count: number) => string
+> = {
+  es: (count) =>
+    `El archivo contiene ${count} declaraciones de prueba; devuelve una entrada por cada línea del bloque ${TARGET_CASES_OPEN} cuya prueba esté en el archivo e ignora las demás declaraciones.`,
+  en: (count) =>
+    `The file contains ${count} test declarations; return an entry for each line of the ${TARGET_CASES_OPEN} block whose test is in the file, and ignore the other declarations.`,
+};
+
 const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {
   es: `Incluye además un objeto "suite" con "title" (hasta 80 caracteres), "description" (hasta 300 caracteres) y "tags" (hasta 20 etiquetas cortas en lenguaje de negocio, por ejemplo "pagos" o "autenticación") que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
   en: `Also include a "suite" object with "title" (up to 80 characters), "description" (up to 300 characters) and "tags" (up to 20 short business-language labels, for example "payments" or "authentication") summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
@@ -137,9 +147,13 @@ export function buildSystemInstruction(
     if (requestSuiteSummary) base += `\n\n${SUITE_SUMMARY_SENTENCE[locale]}`;
   }
 
-  return declarationCountHint === undefined
-    ? base
-    : `${base}\n\n${DECLARATION_COUNT_SENTENCE[locale](declarationCountHint)}`;
+  if (declarationCountHint === undefined) return base;
+
+  const countSentence = hasTargets
+    ? TARGETED_DECLARATION_COUNT_SENTENCE
+    : DECLARATION_COUNT_SENTENCE;
+
+  return `${base}\n\n${countSentence[locale](declarationCountHint)}`;
 }
 
 // Tags are positional: T{i+1} is the tag for index i of the exact

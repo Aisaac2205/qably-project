@@ -1641,6 +1641,54 @@ describe('ExtractionProcessor — document-file job', () => {
     expect(data.documentationSkipReason).toBe('extraction-incomplete');
   });
 
+  it('retries a targeted extraction once with the same target keys and the file-wide declaration count', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findUnique.mockResolvedValue(firstTargetRow);
+    prisma.testCase.findMany.mockResolvedValue([
+      { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      { id: 'case-2', suiteId: 'suite-2', documentationSource: 'ingestion' },
+    ]);
+    const extract = jest
+      .fn()
+      .mockResolvedValueOnce({ kind: 'no-tests-found' })
+      .mockResolvedValueOnce(
+        extractedOutcome([
+          extractedCase({ automationKey: 'Cart > adds an item' }),
+          extractedCase({
+            automationKey: 'Cart > removes an item',
+            title: 'Removes an item',
+          }),
+        ]),
+      );
+    const sourceReader = fakeSourceReader(
+      jest.fn().mockResolvedValue({
+        kind: 'content',
+        content:
+          "it('adds an item', () => {})\nit('removes an item', () => {})\nit('clears the cart', () => {})",
+        truncated: false,
+      }),
+    );
+
+    await build(prisma, sourceReader, fakeExtractor(extract)).process(
+      documentFileJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(2);
+    const [firstArgs] = extract.mock.calls[0] as [
+      { targetAutomationKeys?: string[]; declarationCountHint?: number },
+    ];
+    const [retryArgs] = extract.mock.calls[1] as [
+      { targetAutomationKeys?: string[]; declarationCountHint?: number },
+    ];
+    expect(firstArgs.declarationCountHint).toBeUndefined();
+    expect(retryArgs.targetAutomationKeys).toEqual([
+      'Cart > adds an item',
+      'Cart > removes an item',
+    ]);
+    expect(retryArgs.declarationCountHint).toBe(3);
+    expect(prisma.testCaseVersion.create).toHaveBeenCalledTimes(2);
+  });
+
   it('creates no manual-review proposal for any target when the project has no repository connection', async () => {
     const prisma = createPrisma();
     prisma.testCase.findUnique.mockResolvedValue({

@@ -279,6 +279,30 @@ describe('GeminiExtractor', () => {
     expect(config.systemInstruction).not.toBe(buildSystemInstruction('es'));
   });
 
+  it('scopes the declaration count to the targets when a hint arrives with target keys', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({
+        locale: 'es',
+        targetAutomationKeys: ['Cart > adds an item'],
+        declarationCountHint: 5,
+      }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(config.systemInstruction).toBe(
+      buildSystemInstruction('es', true, 5),
+    );
+    expect(config.systemInstruction).not.toContain(
+      'devuelve una entrada por cada una.',
+    );
+  });
+
   it('returns no-tests-found when the model returns an empty cases array', async () => {
     const client = fakeClient(() =>
       Promise.resolve({
