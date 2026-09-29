@@ -136,14 +136,26 @@ Conflicting case lookup failed: proposal=<proposalId> suite=<suiteId>
 
 Which constraint fired for the September 2026 production reports (`cmulizy510ey40lqzlzdouhnk`, `cmulizy4s0ey20lqzuo9padfx`, `cmulizy4j0ey00lqzo8hukcmp`, `cmum2xnkw008d0lmti0qmjkhk`) is unverified. The new log line answers it the next time a reviewer hits the conflict.
 
+## What the reviewer sees
+
+The web client (`apps/web/src/features/review-inbox`) turns each conflict into an alert and keeps the queue usable.
+
+- **Message.** Each `code` has its own message that names the proposal: `aiReview.decisionNameTaken`, `decisionAutomationKeyTaken`, `decisionAutomationKeyTakenWithCase` and `decisionPublishConflict`. The `automation-key-taken` message names the conflicting case when `conflictingCase` is present. `name-taken` and `automation-key-taken` also show a **View existing case** link to that case. `publish-conflict` never has a case, so it has no link.
+- **No promise of success.** `publish-conflict` is also the fallback for a constraint the API could not classify, and retrying that fails the same way. Its message says the proposal could not be published because of a conflict and offers trying again later or rejecting.
+- **Queue.** Every code except `invalid-transition` reverts the optimistic removal, so the proposal returns to the queue with both decisions enabled.
+- **Guarded re-selection.** `useReviewInboxSelection.reselectAfterFailure` brings the failed proposal back into the inspector only on desktop, and only when nothing is selected (the list emptied after the optimistic removal) or the live selection is that same proposal. A proposal the reviewer already moved to is never replaced.
+- **Mobile never reopens the detail.** A late failure on a narrow viewport only shows the error. It does not push history, select the proposal or move focus, so it cannot pull someone away from the list they are browsing.
+- **Unmounted page.** A failure that arrives after the page unmounted does not touch history, selection or focus.
+- **Error list cap.** At most three alerts show, newest last. Older ones collapse into one line, "And N more errors", whose **Clear** control removes only the hidden ones. Identical messages merge into one alert with "Happened N times", and dismissing it removes every occurrence. The list scrolls past a maximum height, so it cannot push the queue out of view.
+
 ## Follow-ups
 
-None of these is implemented. This slice only makes the 409 precise; it does not give the reviewer a way to resolve it.
+The API slice only makes the 409 precise. The web now shows each conflict; the paths that resolve one are not built.
 
 | Owner | Work | Contract | Status |
 |---|---|---|---|
-| Web | Handle `automation-key-taken` and `publish-conflict` in `apps/web/src/features/review-inbox/lib/decision-error.ts`. Both fall back to the generic `error` today | `code` as above | Not implemented |
-| Web | Show `conflictingCase.name` and link to the case so the reviewer can compare before rejecting | `conflictingCase: { id, name, suiteId } \| null` | Not implemented |
+| Web | Handle `automation-key-taken` and `publish-conflict` in `apps/web/src/features/review-inbox/lib/decision-error.ts`, each with its own message | `code` as above | Implemented |
+| Web | Show `conflictingCase.name` and link to the case so the reviewer can compare before rejecting | `conflictingCase: { id, name, suiteId } \| null` | Implemented |
 | Web | After `automation-key-taken`, refetch the proposal: it should come back as an update once the reclassify job runs | Existing proposal detail endpoint | Not implemented |
 | API and web | Give reviewers a way out of `name-taken` besides rejecting: an optional title override on approve, validated like extraction titles (1 to 120 characters) | Proposed: `POST /review/proposals/:id/approve` body `{ comment?: string, title?: string }` | Not implemented. The approve body accepts no `title` today |
 | API and web | Let the reviewer resolve `name-taken` or `automation-key-taken` by publishing the proposal as a new version of `conflictingCase`, as an explicit human choice made after seeing that case | Not designed | Not implemented |

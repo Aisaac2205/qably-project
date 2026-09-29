@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
 import type { ProposalListItem } from '../api/review.api'
@@ -18,6 +18,7 @@ export interface UseReviewInboxSelectionResult {
   isMobile: boolean
   isDetailOpenOnMobile: boolean
   selectFromList: (id: string) => void
+  reselectAfterFailure: (id: string) => void
   closeDetail: () => void
   selectNextPending: () => void
   position: ReviewInboxPosition | null
@@ -49,15 +50,21 @@ export function useReviewInboxSelection(
   const [selectedId, setSelectedId] = useState<string | undefined>(
     () => searchParams.get('proposal') ?? undefined,
   )
+  const selectedIdRef = useRef(selectedId)
+
+  const commitSelectedId = useCallback((id: string | undefined) => {
+    selectedIdRef.current = id
+    setSelectedId(id)
+  }, [])
 
   useEffect(() => {
     function onPopState() {
       const params = new URLSearchParams(window.location.search)
-      setSelectedId(params.get('proposal') ?? undefined)
+      commitSelectedId(params.get('proposal') ?? undefined)
     }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  }, [commitSelectedId])
 
   const isLoaded = selectedId !== undefined && proposals.some((p) => p.id === selectedId)
   const { proposal: fallbackProposal } = useProposal(
@@ -76,19 +83,57 @@ export function useReviewInboxSelection(
     proposals.find((p) => p.id === activeSelectedId) ??
     (fallbackProposal?.id === activeSelectedId ? fallbackProposal : undefined)
 
-  const advanceTo = useCallback((id: string) => {
-    window.history.replaceState(null, '', buildProposalUrl(id))
-    setSelectedId(id)
+  const firstFilteredId = filteredProposals[0]?.id
+  const renderedRef = useRef({ selectedId, activeSelectedId, firstFilteredId, isMobile })
+
+  useLayoutEffect(() => {
+    renderedRef.current = { selectedId, activeSelectedId, firstFilteredId, isMobile }
+  })
+
+  const getLiveSelectedId = useCallback((): string | undefined => {
+    const rendered = renderedRef.current
+    const live = selectedIdRef.current
+    if (live === rendered.selectedId) return rendered.activeSelectedId
+    if (live !== undefined) return live
+    return rendered.isMobile ? undefined : rendered.firstFilteredId
   }, [])
+
+  const advanceTo = useCallback(
+    (id: string) => {
+      window.history.replaceState(null, '', buildProposalUrl(id))
+      commitSelectedId(id)
+    },
+    [commitSelectedId],
+  )
+
+  const mountedRef = useRef(true)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
+
+  const reselectAfterFailure = useCallback(
+    (id: string) => {
+      if (!mountedRef.current) return
+      if (renderedRef.current.isMobile) return
+      const liveSelectedId = getLiveSelectedId()
+      if (liveSelectedId !== undefined && liveSelectedId !== id) return
+      advanceTo(id)
+    },
+    [getLiveSelectedId, advanceTo],
+  )
 
   const selectFromList = useCallback(
     (id: string) => {
-      const opening = isMobile && selectedId === undefined
+      const opening = renderedRef.current.isMobile && selectedIdRef.current === undefined
       if (opening) window.history.pushState(null, '', buildProposalUrl(id))
       else window.history.replaceState(null, '', buildProposalUrl(id))
-      setSelectedId(id)
+      commitSelectedId(id)
     },
-    [isMobile, selectedId],
+    [commitSelectedId],
   )
 
   const closeDetail = useCallback(() => {
@@ -97,8 +142,8 @@ export function useReviewInboxSelection(
       return
     }
     window.history.replaceState(null, '', buildProposalUrl(undefined))
-    setSelectedId(undefined)
-  }, [])
+    commitSelectedId(undefined)
+  }, [commitSelectedId])
 
   const pendingAdvanceRef = useRef(false)
 
@@ -159,6 +204,7 @@ export function useReviewInboxSelection(
     isMobile,
     isDetailOpenOnMobile: isMobile && activeSelectedId !== undefined,
     selectFromList,
+    reselectAfterFailure,
     closeDetail,
     selectNextPending,
     position,

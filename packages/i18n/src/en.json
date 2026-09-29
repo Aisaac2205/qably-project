@@ -183,7 +183,13 @@
     "manualReviewReasonUnknown": "The extraction failed for a reason Qably doesn't recognize yet. Try again, or document this case by hand.",
     "approveBlocked": "A proposal with no steps cannot be published",
     "approvedWithCase": "{{caseName}} published",
-    "viewCase": "View case"
+    "viewCase": "View case",
+    "viewExistingCase": "View existing case",
+    "errorRepeated_one": "Happened {{count}} time",
+    "errorRepeated_other": "Happened {{count}} times",
+    "hiddenErrors_one": "And {{count}} more error",
+    "hiddenErrors_other": "And {{count}} more errors",
+    "clearErrors": "Clear"
   },
   "notifications": {
     "title": "Notifications",
@@ -692,7 +698,10 @@
     "decisionConflictRejected": "{{name}} already rejected this {{time}}.",
     "decisionMissingEvidence": "The evidence backing this proposal is no longer available.",
     "decisionMissingSuite": "This project has no suite to publish the official case into.",
-    "decisionNameTaken": "Another official case in this suite already uses that title.",
+    "decisionNameTaken": "Couldn't publish “{{title}}”: an official case with the same title already exists in this suite. Reject the proposal, or rename or remove that case and approve again.",
+    "decisionAutomationKeyTaken": "Couldn't publish “{{title}}”: an official case with the same automation key already exists in this suite. Reject the proposal, or find that case in the suite and compare them.",
+    "decisionAutomationKeyTakenWithCase": "Couldn't publish “{{title}}”: the official case “{{name}}” already has the same automation key in this suite. Open that case to compare them, or reject the proposal.",
+    "decisionPublishConflict": "Couldn't publish “{{title}}” because of a conflict with the official cases. Try again later, or reject the proposal.",
     "decisionIncompleteProposal": "This proposal has no steps — Aeris couldn't extract them. Reject it, or document the case by hand.",
     "decisionError": "Couldn't process this decision. Try again.",
     "noDuplicates": "No possible duplicates",

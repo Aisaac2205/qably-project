@@ -8,6 +8,8 @@ import * as reviewApi from '@/features/review-inbox/api/review.api'
 import type { ProposalListItem, ReviewInboxPageResult, ReviewInboxCountsResult } from '@/features/review-inbox/api/review.api'
 import { suiteKeys, projectKeys } from '@/features/projects/lib/query-keys'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
+import { useProposal } from '@/features/review-inbox/hooks/use-proposals'
+import { approvalConflictError, conflictingCaseFixture } from './approval-conflict-fixture'
 
 function makeClient() {
   return new QueryClient({
@@ -137,11 +139,16 @@ describe('useProposalDecision', () => {
     })
 
     await waitFor(() => expect(onError).toHaveBeenCalled())
-    expect(onError).toHaveBeenCalledWith('invalid-transition', 'proposal-1', {
-      action: 'approved',
-      decidedAt: '2026-01-05T12:00:00.000Z',
-      decidedBy: { id: 'user-2', name: 'Grace Hopper' },
-    })
+    expect(onError).toHaveBeenCalledWith(
+      'invalid-transition',
+      'proposal-1',
+      {
+        action: 'approved',
+        decidedAt: '2026-01-05T12:00:00.000Z',
+        decidedBy: { id: 'user-2', name: 'Grace Hopper' },
+      },
+      null,
+    )
   })
 
   it('passes null as the conflict when the server sent no decision details', async () => {
@@ -160,7 +167,7 @@ describe('useProposalDecision', () => {
     })
 
     await waitFor(() => expect(onError).toHaveBeenCalled())
-    expect(onError).toHaveBeenCalledWith('invalid-transition', 'proposal-1', null)
+    expect(onError).toHaveBeenCalledWith('invalid-transition', 'proposal-1', null, null)
   })
 
   it('reports missing-suite and rolls back the optimistic removal', async () => {
@@ -392,5 +399,229 @@ describe('useProposalDecision', () => {
         expect.objectContaining({ queryKey: reviewKeys.all }),
       ),
     )
+  })
+
+  it('reports a late failure of an earlier decision to the callbacks of the latest render', async () => {
+    const a = deferred<reviewApi.ApprovalResult>()
+    const b = deferred<reviewApi.ApprovalResult>()
+    vi.spyOn(reviewApi, 'approveProposal')
+      .mockReturnValueOnce(a.promise)
+      .mockReturnValueOnce(b.promise)
+    const client = makeClient()
+    seedInboxPage(client, 'a', 'b', 'c')
+    const firstOnError = vi.fn()
+    const latestOnError = vi.fn()
+    const { result, rerender } = renderHook(
+      ({ onError }: { onError: typeof firstOnError }) =>
+        useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+      { wrapper: wrapperFor(client), initialProps: { onError: firstOnError } },
+    )
+
+    act(() => {
+      result.current.approve('a')
+    })
+    act(() => {
+      result.current.approve('b')
+    })
+    rerender({ onError: latestOnError })
+
+    const conflict = await approvalConflictError('name-taken', conflictingCaseFixture)
+    await act(async () => {
+      a.reject(conflict)
+    })
+
+    await waitFor(() => expect(latestOnError).toHaveBeenCalled())
+    expect(latestOnError).toHaveBeenCalledWith('name-taken', 'a', null, conflictingCaseFixture)
+    expect(firstOnError).not.toHaveBeenCalled()
+  })
+
+  describe('approval conflicts', () => {
+    it.each([
+      ['name-taken', conflictingCaseFixture],
+      ['automation-key-taken', conflictingCaseFixture],
+      ['publish-conflict', null],
+    ] as const)(
+      'reports %s, puts the card back in the inbox and forwards the conflicting case',
+      async (code, conflictingCase) => {
+        vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+          await approvalConflictError(code, conflictingCase),
+        )
+        const client = makeClient()
+        seedInboxPage(client, 'a', 'b', 'c')
+        seedCounts(client, 3)
+        const onError = vi.fn()
+        const { result } = renderHook(
+          () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+          { wrapper: wrapperFor(client) },
+        )
+
+        act(() => {
+          result.current.approve('b')
+        })
+
+        await waitFor(() => expect(result.current.decisionError).toBe(code))
+        expect(onError).toHaveBeenCalledWith(code, 'b', null, conflictingCase)
+        expect(inboxData(client)?.pages[0].items.map((i) => i.id)).toEqual(['a', 'b', 'c'])
+        expect(counts(client)?.byStatus.in_review).toBe(3)
+      },
+    )
+
+    it('forwards a null conflicting case when the API could not name one', async () => {
+      vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+        await approvalConflictError('name-taken', null),
+      )
+      const client = makeClient()
+      const onError = vi.fn()
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('a')
+      })
+
+      await waitFor(() => expect(onError).toHaveBeenCalled())
+      expect(onError).toHaveBeenCalledWith('name-taken', 'a', null, null)
+    })
+
+    it('forwards a null conflicting case when an older API sent no such field', async () => {
+      vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+        new ApiError(409, 'Conflict', 'name-taken'),
+      )
+      const client = makeClient()
+      const onError = vi.fn()
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('a')
+      })
+
+      await waitFor(() => expect(onError).toHaveBeenCalled())
+      expect(onError).toHaveBeenCalledWith('name-taken', 'a', null, null)
+    })
+
+    it('does not forward a conflicting case for a failure that is not an approval conflict', async () => {
+      vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+        new ApiError(422, 'Unprocessable', 'missing-suite', {
+          conflictingCase: conflictingCaseFixture,
+        }),
+      )
+      const client = makeClient()
+      const onError = vi.fn()
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('a')
+      })
+
+      await waitFor(() => expect(onError).toHaveBeenCalled())
+      expect(onError).toHaveBeenCalledWith('missing-suite', 'a', null, null)
+    })
+
+    it('lets the reviewer approve the same proposal again once the conflict is reported', async () => {
+      const approveSpy = vi
+        .spyOn(reviewApi, 'approveProposal')
+        .mockRejectedValueOnce(await approvalConflictError('publish-conflict', null))
+        .mockResolvedValueOnce(approvalResult)
+      const client = makeClient()
+      seedInboxPage(client, 'a')
+      const onApproved = vi.fn()
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved, onRejected: vi.fn() }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('a')
+      })
+      await waitFor(() => expect(result.current.decisionError).toBe('publish-conflict'))
+      await waitFor(() => expect(result.current.isDeciding('a')).toBe(false))
+
+      act(() => {
+        result.current.approve('a')
+      })
+
+      await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1))
+      expect(approveSpy).toHaveBeenCalledTimes(2)
+      expect(result.current.decisionError).toBeNull()
+    })
+
+    it('lets the reviewer reject the proposal after an approval conflict', async () => {
+      vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+        await approvalConflictError('name-taken', conflictingCaseFixture),
+      )
+      const rejectSpy = vi
+        .spyOn(reviewApi, 'rejectProposal')
+        .mockResolvedValue({ decisionId: 'decision-1' })
+      const client = makeClient()
+      seedInboxPage(client, 'a')
+      const onRejected = vi.fn()
+      const { result } = renderHook(
+        () => useProposalDecision({ onApproved: vi.fn(), onRejected }),
+        { wrapper: wrapperFor(client) },
+      )
+
+      act(() => {
+        result.current.approve('a')
+      })
+      await waitFor(() => expect(result.current.decisionError).toBe('name-taken'))
+      await waitFor(() => expect(result.current.isDeciding('a')).toBe(false))
+
+      act(() => {
+        result.current.reject('a')
+      })
+
+      await waitFor(() => expect(onRejected).toHaveBeenCalledTimes(1))
+      expect(rejectSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('refetches the proposal and the inbox lists exactly once after automation-key-taken', async () => {
+      vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+        await approvalConflictError('automation-key-taken', conflictingCaseFixture),
+      )
+      const detail: reviewApi.ProposalDetail = {
+        ...proposal('a'),
+        evidence: null,
+        links: [],
+        matchedCase: null,
+        publishedVersion: null,
+        source: null,
+        recentRuns: [],
+        decision: null,
+      }
+      const detailSpy = vi.spyOn(reviewApi, 'getProposal').mockResolvedValue(detail)
+      const client = makeClient()
+      seedInboxPage(client, 'a')
+      const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+      const { result } = renderHook(
+        () => ({
+          decision: useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+          detail: useProposal('a'),
+        }),
+        { wrapper: wrapperFor(client) },
+      )
+      await waitFor(() => expect(result.current.detail.proposal).toBeDefined())
+      expect(detailSpy).toHaveBeenCalledTimes(1)
+
+      act(() => {
+        result.current.decision.approve('a')
+      })
+
+      await waitFor(() => expect(result.current.decision.decisionError).toBe('automation-key-taken'))
+      await waitFor(() => expect(detailSpy).toHaveBeenCalledTimes(2))
+      const reviewInvalidations = invalidateSpy.mock.calls.filter(
+        ([filters]) => filters?.queryKey === reviewKeys.all,
+      )
+      expect(reviewInvalidations).toHaveLength(1)
+      expect(inboxData(client)?.pages[0].items.map((i) => i.id)).toEqual(['a'])
+      expect(detailSpy).toHaveBeenCalledTimes(2)
+    })
   })
 })

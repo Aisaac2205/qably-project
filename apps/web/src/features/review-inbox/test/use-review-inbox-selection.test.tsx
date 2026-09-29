@@ -201,6 +201,155 @@ describe('useReviewInboxSelection', () => {
     expect(result.current.isDetailOpenOnMobile).toBe(false)
   })
 
+  it('pushes a history entry from a selectFromList captured while the detail was still open', async () => {
+    isMobileViewport = true
+    const client = newClient()
+    const proposals = [proposal({ id: 'pending-1' }), proposal({ id: 'pending-2' })]
+
+    const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+      wrapper: wrapper(client),
+    })
+
+    act(() => result.current.selectFromList('pending-1'))
+    await waitFor(() => expect(result.current.isDetailOpenOnMobile).toBe(true))
+    const selectFromListCapturedWithDetailOpen = result.current.selectFromList
+
+    act(() => result.current.closeDetail())
+    await waitFor(() => expect(result.current.isDetailOpenOnMobile).toBe(false))
+
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    act(() => selectFromListCapturedWithDetailOpen('pending-2'))
+
+    expect(pushSpy).toHaveBeenCalledWith(null, '', '/review-inbox?proposal=pending-2')
+    expect(result.current.isDetailOpenOnMobile).toBe(true)
+    pushSpy.mockRestore()
+  })
+
+  describe('reselectAfterFailure', () => {
+    it('brings the failed proposal back on desktop when nothing else is left to show', () => {
+      const client = newClient()
+      const proposals: ProposalListItem[] = []
+      const replaceSpy = vi.spyOn(window.history, 'replaceState')
+
+      const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+
+      act(() => result.current.reselectAfterFailure('pending-1'))
+
+      expect(result.current.selectedId).toBe('pending-1')
+      expect(replaceSpy).toHaveBeenCalledWith(null, '', '/review-inbox?proposal=pending-1')
+      replaceSpy.mockRestore()
+    })
+
+    it('keeps the proposal the desktop inspector already shows, even when it is another one', () => {
+      const client = newClient()
+      const proposals = [proposal({ id: 'pending-1' }), proposal({ id: 'pending-2' })]
+      const replaceSpy = vi.spyOn(window.history, 'replaceState')
+
+      const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+
+      act(() => result.current.reselectAfterFailure('pending-2'))
+
+      expect(result.current.selectedId).toBeUndefined()
+      expect(result.current.activeSelectedId).toBe('pending-1')
+      expect(replaceSpy).not.toHaveBeenCalled()
+      replaceSpy.mockRestore()
+    })
+
+    it('keeps a selection made in the same tick, before it has rendered', () => {
+      const client = newClient()
+      const proposals = [proposal({ id: 'pending-1' }), proposal({ id: 'pending-2' })]
+
+      const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+
+      act(() => {
+        result.current.selectNextPending()
+        result.current.reselectAfterFailure('pending-1')
+      })
+
+      expect(result.current.selectedId).toBe('pending-2')
+    })
+
+    it('re-selects the proposal that is already the live selection', () => {
+      searchParamsQuery = 'proposal=pending-2'
+      const client = newClient()
+      const proposals = [proposal({ id: 'pending-1' }), proposal({ id: 'pending-2' })]
+
+      const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+
+      act(() => result.current.reselectAfterFailure('pending-2'))
+
+      expect(result.current.selectedId).toBe('pending-2')
+      expect(window.location.search).toBe('?proposal=pending-2')
+    })
+
+    it('never opens the detail on mobile while the list is showing', () => {
+      isMobileViewport = true
+      const client = newClient()
+      const proposals = [proposal({ id: 'pending-1' }), proposal({ id: 'pending-2' })]
+      const pushSpy = vi.spyOn(window.history, 'pushState')
+      const replaceSpy = vi.spyOn(window.history, 'replaceState')
+
+      const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+
+      act(() => result.current.reselectAfterFailure('pending-1'))
+
+      expect(result.current.selectedId).toBeUndefined()
+      expect(result.current.isDetailOpenOnMobile).toBe(false)
+      expect(pushSpy).not.toHaveBeenCalled()
+      expect(replaceSpy).not.toHaveBeenCalled()
+      pushSpy.mockRestore()
+      replaceSpy.mockRestore()
+    })
+
+    it('never moves the detail the reviewer is reading on mobile', () => {
+      isMobileViewport = true
+      searchParamsQuery = 'proposal=pending-2'
+      const client = newClient()
+      const proposals = [proposal({ id: 'pending-1' }), proposal({ id: 'pending-2' })]
+      const replaceSpy = vi.spyOn(window.history, 'replaceState')
+
+      const { result } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+
+      act(() => result.current.reselectAfterFailure('pending-1'))
+
+      expect(result.current.selectedId).toBe('pending-2')
+      expect(replaceSpy).not.toHaveBeenCalled()
+      replaceSpy.mockRestore()
+    })
+
+    it('never touches the history after the page unmounted', () => {
+      const client = newClient()
+      const proposals: ProposalListItem[] = []
+      const pushSpy = vi.spyOn(window.history, 'pushState')
+      const replaceSpy = vi.spyOn(window.history, 'replaceState')
+
+      const { result, unmount } = renderHook(() => useReviewInboxSelection(proposals, proposals), {
+        wrapper: wrapper(client),
+      })
+      const reselectAfterFailure = result.current.reselectAfterFailure
+      unmount()
+
+      reselectAfterFailure('pending-1')
+
+      expect(pushSpy).not.toHaveBeenCalled()
+      expect(replaceSpy).not.toHaveBeenCalled()
+      pushSpy.mockRestore()
+      replaceSpy.mockRestore()
+    })
+  })
+
   it('advances to the next pending proposal after a decision, using replaceState not pushState', () => {
     isMobileViewport = true
     searchParamsQuery = 'proposal=pending-1'

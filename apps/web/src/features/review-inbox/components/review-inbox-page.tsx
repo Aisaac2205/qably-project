@@ -9,18 +9,25 @@ import { cn } from '@/lib/utils'
 import { useInboxPage } from '../hooks/use-inbox-page'
 import { useInboxCounts } from '../hooks/use-inbox-counts'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
-import { decisionConflictMessageKey } from '../lib/decision-error'
+import { decisionConflictMessageKey, isApprovalConflictCode } from '../lib/decision-error'
 import { useReviewInboxFilters } from '../hooks/use-review-inbox-filters'
 import { useReviewInboxSelection } from '../hooks/use-review-inbox-selection'
 import { useInboxFeedback } from '../hooks/use-inbox-feedback'
 import type { ReviewInboxStatusCounts } from './review-inbox-queue'
 import { useTranslation } from '@/lib/i18n'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
+import { suiteEditCasePath } from '@/features/projects/lib/routes'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { ReviewInboxQueue } from './review-inbox-queue'
 import { ReviewProposalInspector } from './review-proposal-inspector'
 import { ReviewInboxFeedback } from './review-inbox-feedback'
+import { ReviewInboxErrorList } from './review-inbox-error-list'
 import { InboxCollisionsNotice } from './inbox-collisions-notice'
+
+interface DecidedProposal {
+  projectId: string
+  title: string
+}
 
 export function ReviewInboxPage() {
   const { t, locale } = useTranslation()
@@ -62,6 +69,7 @@ export function ReviewInboxPage() {
     activeSelectedId,
     selectedProposal,
     selectFromList,
+    reselectAfterFailure,
     closeDetail,
     selectNextPending,
     isDetailOpenOnMobile,
@@ -70,49 +78,100 @@ export function ReviewInboxPage() {
     goToNext,
   } = selection
 
+  const lastOpenedRowIdRef = useRef<string | undefined>(undefined)
+  const decidedProposalsRef = useRef(new Map<string, DecidedProposal>())
+
+  const handleSelectFromList = useCallback(
+    (id: string) => {
+      lastOpenedRowIdRef.current = id
+      selectFromList(id)
+    },
+    [selectFromList],
+  )
+
   const { approve, reject, isDeciding } = useProposalDecision({
     onApproved: (proposalId, result) => {
-      const proposal = proposals.find((p) => p.id === proposalId)
+      const decided = decidedProposalsRef.current.get(proposalId)
+      feedback.clearError(proposalId)
       feedback.showSuccess(
         t('reviewInbox.approvedWithCase', { caseName: result.testCaseName }),
-        proposal && result.suiteId
+        decided && result.suiteId
           ? {
-              href: `/projects/${proposal.projectId}/suites/${result.suiteId}`,
+              href: `/projects/${decided.projectId}/suites/${result.suiteId}`,
               linkLabel: t('reviewInbox.viewCase'),
             }
           : undefined,
       )
     },
-    onRejected: () => {
+    onRejected: (proposalId) => {
+      feedback.clearError(proposalId)
       feedback.showInfo(t('reviewInbox.rejectedSuccess'))
     },
-    onError: (code, _proposalId, conflict) => {
+    onError: (code, proposalId, conflict, conflictingCase) => {
       if (code === 'invalid-transition' && conflict !== null) {
         feedback.showError(
           t(`aiReview.${decisionConflictMessageKey(conflict.action)}`, {
             name: conflict.decidedBy.name,
             time: formatRelative(conflict.decidedAt, locale, ''),
           }),
+          { key: proposalId },
         )
         return
       }
-      feedback.showError(t(`aiReview.${decisionErrorKey(code)}`))
+
+      const decided = decidedProposalsRef.current.get(proposalId)
+      const link =
+        conflictingCase !== null && decided !== undefined
+          ? {
+              href: suiteEditCasePath(decided.projectId, conflictingCase.suiteId, conflictingCase.id),
+              linkLabel: t('reviewInbox.viewExistingCase'),
+            }
+          : undefined
+
+      feedback.showError(
+        t(`aiReview.${decisionErrorKey(code, conflictingCase)}`, {
+          title: decided?.title ?? '',
+          name: conflictingCase?.name ?? '',
+        }),
+        { key: proposalId, link },
+      )
+
+      if (isApprovalConflictCode(code)) reselectAfterFailure(proposalId)
     },
   })
 
+  const rememberDecidedProposal = useCallback(
+    (proposalId: string): boolean => {
+      const proposal =
+        selectedProposal?.id === proposalId
+          ? selectedProposal
+          : proposals.find((p) => p.id === proposalId)
+      if (proposal === undefined) return false
+      decidedProposalsRef.current.set(proposalId, {
+        projectId: proposal.projectId,
+        title: proposal.title,
+      })
+      feedback.clearError(proposalId)
+      return true
+    },
+    [selectedProposal, proposals, feedback],
+  )
+
   const handleApprove = useCallback(
     (proposalId: string) => {
+      if (!rememberDecidedProposal(proposalId)) return
       approve(proposalId)
       selectNextPending()
     },
-    [approve, selectNextPending],
+    [rememberDecidedProposal, approve, selectNextPending],
   )
   const handleReject = useCallback(
     (proposalId: string) => {
+      if (!rememberDecidedProposal(proposalId)) return
       reject(proposalId)
       selectNextPending()
     },
-    [reject, selectNextPending],
+    [rememberDecidedProposal, reject, selectNextPending],
   )
 
   const toggleDuplicateOnly = useCallback(() => {
@@ -123,7 +182,6 @@ export function ReviewInboxPage() {
 
   const detailHeadingRef = useRef<HTMLHeadingElement>(null)
   const queueSectionRef = useRef<HTMLElement>(null)
-  const lastOpenedRowIdRef = useRef<string | undefined>(undefined)
   const wasDetailOpenOnMobileRef = useRef(isDetailOpenOnMobile)
 
   useEffect(() => {
@@ -143,14 +201,6 @@ export function ReviewInboxPage() {
     else queueSectionRef.current?.focus()
   }, [isDetailOpenOnMobile])
 
-  const handleSelectFromList = useCallback(
-    (id: string) => {
-      lastOpenedRowIdRef.current = id
-      selectFromList(id)
-    },
-    [selectFromList],
-  )
-
   useKeyboardShortcuts({
     a: () => {
       if (selectedProposal?.status === 'in_review') handleApprove(selectedProposal.id)
@@ -161,6 +211,8 @@ export function ReviewInboxPage() {
     d: () => toggleDuplicateOnly(),
   })
 
+  const { notice } = feedback
+
   return (
     <section
       aria-labelledby="page-title"
@@ -170,7 +222,14 @@ export function ReviewInboxPage() {
 
       <div className="shrink-0 space-y-4 empty:hidden">
         <InboxCollisionsNotice openCollisions={openCollisions} />
-        <ReviewInboxFeedback toast={feedback.toast} onDismiss={feedback.dismiss} />
+        <ReviewInboxErrorList errors={feedback.errors} onDismiss={feedback.dismissMany} />
+        {notice ? (
+          <ReviewInboxFeedback
+            key={notice.id}
+            toast={notice}
+            onDismiss={() => feedback.dismiss(notice.id)}
+          />
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1">

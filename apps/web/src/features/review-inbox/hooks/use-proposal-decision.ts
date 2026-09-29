@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import {
   approveProposal,
@@ -10,9 +10,12 @@ import {
   type ReviewInboxPageResult,
   type ReviewInboxCountsResult,
 } from '../api/review.api'
+import type { ReviewConflictingCase } from '@qably/types'
 import {
   classifyDecisionError,
+  extractConflictingCase,
   extractDecisionConflict,
+  isApprovalConflictCode,
   type DecisionErrorCode,
   type DecisionConflict,
 } from '../lib/decision-error'
@@ -33,7 +36,12 @@ const INBOX_COUNTS_KEY = ['review', 'inbox-counts'] as const
 interface DecisionCallbacks {
   onApproved: (proposalId: string, result: ApprovalResult) => void
   onRejected: (proposalId: string, result: RejectionResult) => void
-  onError?: (code: DecisionErrorCode, proposalId: string, conflict: DecisionConflict | null) => void
+  onError?: (
+    code: DecisionErrorCode,
+    proposalId: string,
+    conflict: DecisionConflict | null,
+    conflictingCase: ReviewConflictingCase | null,
+  ) => void
 }
 
 interface DecisionVariables {
@@ -53,6 +61,11 @@ export function useProposalDecision({
   const queryClient = useQueryClient()
   const [decisionError, setDecisionError] = useState<DecisionErrorCode | null>(null)
   const inFlightRef = useRef<Set<string>>(new Set())
+  const callbacksRef = useRef<DecisionCallbacks>({ onApproved, onRejected, onError })
+
+  useLayoutEffect(() => {
+    callbacksRef.current = { onApproved, onRejected, onError }
+  })
 
   const applyOptimisticRemoval = async (proposalId: string): Promise<MutationContext> => {
     await queryClient.cancelQueries({ queryKey: reviewKeys.all })
@@ -112,8 +125,9 @@ export function useProposalDecision({
   const handleError = (error: unknown, proposalId: string) => {
     const code = classifyDecisionError(error)
     const conflict = code === 'invalid-transition' ? extractDecisionConflict(error) : null
+    const conflictingCase = isApprovalConflictCode(code) ? extractConflictingCase(error) : null
     setDecisionError(code)
-    onError?.(code, proposalId, conflict)
+    callbacksRef.current.onError?.(code, proposalId, conflict, conflictingCase)
   }
 
   const approval = useMutation({
@@ -122,7 +136,7 @@ export function useProposalDecision({
       approveProposal(proposalId, comment),
     onMutate: ({ proposalId }) => applyOptimisticRemoval(proposalId),
     onSuccess: (result, { proposalId }) => {
-      onApproved(proposalId, result)
+      callbacksRef.current.onApproved(proposalId, result)
     },
     onError: (error, { proposalId }, context) => {
       const code = classifyDecisionError(error)
@@ -141,7 +155,7 @@ export function useProposalDecision({
       rejectProposal(proposalId, comment),
     onMutate: ({ proposalId }) => applyOptimisticRemoval(proposalId),
     onSuccess: (result, { proposalId }) => {
-      onRejected(proposalId, result)
+      callbacksRef.current.onRejected(proposalId, result)
     },
     onError: (error, { proposalId }, context) => {
       const code = classifyDecisionError(error)
