@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { screen, act } from '@testing-library/react'
+import { screen, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ReviewInboxQueue } from '../components/review-inbox-queue'
@@ -74,6 +74,16 @@ describe('ReviewInboxQueue', () => {
     })
 
     expect(screen.getByText('Confirm the cart resets')).toBeInTheDocument()
+  })
+
+  it('does not render the project name on a queue row', async () => {
+    await act(async () => {
+      renderQueue([proposal({ projectId: 'proj-1' })])
+    })
+
+    const list = screen.getByRole('list', { name: 'Proposals queue' })
+    expect(within(list).getByText('Empties the cart')).toBeInTheDocument()
+    expect(within(list).queryByText('Ecommerce App')).not.toBeInTheDocument()
   })
 
   it('renders no load-more control when there is no next page', async () => {

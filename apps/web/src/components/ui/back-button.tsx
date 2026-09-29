@@ -6,21 +6,23 @@ import { useTranslation } from '@/lib/i18n'
 
 interface BackButtonProps {
   onClick: () => void
+  label?: string
   className?: string
 }
 
-export function BackButton({ onClick, className }: BackButtonProps) {
+export function BackButton({ onClick, label, className }: BackButtonProps) {
   const { t } = useTranslation()
 
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={t('common.back')}
+      aria-label={label ?? t('common.back')}
+      title={label}
       className={cn(
-        'inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-surface',
+        'inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-surface md:size-8',
         'text-muted transition-colors hover:bg-surface-hover hover:text-default',
-        'focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary',
+        'outline-none focus-visible:ring-2 focus-visible:ring-primary',
         className,
       )}
     >

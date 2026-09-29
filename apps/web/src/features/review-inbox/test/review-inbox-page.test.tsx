@@ -375,6 +375,18 @@ describe('ReviewInboxPage', () => {
       expect(detailRegion.className).toMatch(/\bhidden\b/)
     })
 
+    it('renders the back control as the shared chevron button named for the queue', async () => {
+      const user = userEvent.setup()
+      renderWithQuery(<ReviewInboxPage />)
+
+      await user.click(screen.getByText('Checkout with empty cart blocked'))
+
+      const back = screen.getByRole('button', { name: 'Back to queue' })
+      expect(back.textContent).toBe('')
+      expect(back).toHaveAttribute('title', 'Back to queue')
+      expect(back).toHaveClass('size-11', 'md:size-8')
+    })
+
     it('opens the deep-linked proposal directly on mobile', async () => {
       searchParamsQuery = 'proposal=proposal-ai-1'
 

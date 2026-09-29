@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useCallback, useEffect, useRef } from 'react'
-import { CaretLeft, CaretRight, ArrowLeft } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight } from '@phosphor-icons/react'
+import { BackButton } from '@/components/ui/back-button'
 import { ResizableSplit } from '@/components/ui/resizable-split'
 import { StateView } from '@/components/ui/state-view'
 import { cn } from '@/lib/utils'
@@ -219,15 +220,7 @@ export function ReviewInboxPage() {
               {selectedProposal ? (
                 <>
                   <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-1.5 md:hidden">
-                    <button
-                      type="button"
-                      onClick={closeDetail}
-                      aria-label={t('reviewInbox.backToQueue')}
-                      className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-muted transition-colors hover:text-default"
-                    >
-                      <ArrowLeft size={18} aria-hidden="true" />
-                      {t('reviewInbox.backToQueue')}
-                    </button>
+                    <BackButton onClick={closeDetail} label={t('reviewInbox.backToQueue')} />
 
                     {position && (
                       <div className="flex items-center gap-0.5">

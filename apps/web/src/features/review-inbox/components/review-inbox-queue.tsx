@@ -105,8 +105,6 @@ export function ReviewInboxQueue({
     previousHasNextPageRef.current = hasNextPage
   }, [proposals.length, hasNextPage])
 
-  const projectNameById = new Map(projects.map((p) => [p.id, p.name]))
-
   return (
     <Card className="rounded-none border-0 h-full flex flex-col justify-between overflow-hidden bg-surface">
       <ReviewInboxFilters
@@ -140,7 +138,6 @@ export function ReviewInboxQueue({
                     proposal={proposal}
                     isSelected={proposal.id === selectedId}
                     onSelect={onSelect}
-                    projectName={projectNameById.get(proposal.projectId)}
                   />
                 ))}
               </EntityList>

@@ -19,10 +19,9 @@ export interface ReviewQueueRowProps {
   proposal: ProposalListItem
   isSelected: boolean
   onSelect: (id: string) => void
-  projectName?: string
 }
 
-export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: ReviewQueueRowProps) {
+export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRowProps) {
   const { t } = useTranslation()
 
   const isPending = proposal.status === 'in_review'
@@ -71,12 +70,6 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect, projectName }: 
           >
             {proposal.priority}
           </Badge>
-
-          {projectName && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-border/70 bg-canvas/40 px-2 py-0.5 text-[10px] font-medium text-muted">
-              <span>{projectName}</span>
-            </span>
-          )}
 
           {isApproved && (
             <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-pass-bg text-pass">
