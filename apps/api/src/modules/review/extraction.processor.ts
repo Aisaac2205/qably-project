@@ -28,6 +28,11 @@ import { SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
+import {
+  describeTruncatedSource,
+  diagnoseNameCollision,
+  summarizeUnmatchedTargets,
+} from './document-file-diagnostics';
 import { detectLanguage } from './lib/detect-language';
 import {
   isSameDocumentation,
@@ -36,6 +41,7 @@ import {
   type PublishTestCaseVersionFields,
 } from './lib/publish-test-case-version';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
+import { testCaseUniqueConstraint } from './lib/test-case-unique-constraint';
 import {
   dedupeByAutomationKey,
   matchRound,
@@ -715,6 +721,12 @@ export class ExtractionProcessor extends WorkerHost {
       return;
     }
 
+    if (source.truncated) {
+      this.logger.warn(
+        describeTruncatedSource(ctx.filePath, source.content.length),
+      );
+    }
+
     // Only charge the daily budget once per logical extraction: a retry of
     // this same job (after a retryable provider failure) already spent a
     // unit on its first attempt, so re-checking here would double/triple
@@ -843,6 +855,19 @@ export class ExtractionProcessor extends WorkerHost {
           );
         unmatched = [...retryRound.unmatched];
       }
+    }
+
+    if (unmatched.length > 0) {
+      this.logger.warn(
+        summarizeUnmatchedTargets({
+          filePath: ctx.filePath,
+          matched: matched.length,
+          total: ctx.targets.length,
+          unmatchedKeys: unmatched.map((target) => target.automationKey),
+          sourceLength: source.content.length,
+          truncated: source.truncated,
+        }),
+      );
     }
 
     if (matched.length === 0) {
@@ -977,6 +1002,23 @@ export class ExtractionProcessor extends WorkerHost {
   }
 
   private async persistDocumentFileTargets(
+    matched: { target: DocumentFileTarget; testCase: ExtractedCase }[],
+    ctx: DocumentFileJobContext,
+    suite: ExtractedSuite | null,
+  ): Promise<boolean> {
+    try {
+      return await this.writeDocumentFileTargets(matched, ctx, suite);
+    } catch (error) {
+      if (testCaseUniqueConstraint(error) === 'name') {
+        this.logger.error(
+          await diagnoseNameCollision(this.prisma, ctx.filePath, matched),
+        );
+      }
+      throw error;
+    }
+  }
+
+  private async writeDocumentFileTargets(
     matched: { target: DocumentFileTarget; testCase: ExtractedCase }[],
     ctx: DocumentFileJobContext,
     suite: ExtractedSuite | null,
@@ -1223,6 +1265,12 @@ export class ExtractionProcessor extends WorkerHost {
     if (source.kind === 'unavailable') {
       await this.failureRecorder.recordExtractionFailure(ctx, source.reason);
       return;
+    }
+
+    if (source.truncated) {
+      this.logger.warn(
+        describeTruncatedSource(ctx.filePath, source.content.length),
+      );
     }
 
     // See the equivalent guard in runDocumentFileExtractionUnsafe: don't

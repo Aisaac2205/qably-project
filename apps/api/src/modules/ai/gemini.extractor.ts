@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { InjectEnv } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { GEMINI_CLIENT } from './ai.tokens';
+import { describeResponseDiagnostics } from './gemini-response-diagnostics';
 import { summarizeDroppedCases, type CaseIssue } from './dropped-case-summary';
 import {
   buildFileContentTurn,
@@ -132,8 +133,13 @@ export interface GeminiUsageMetadata {
   totalTokenCount?: number;
 }
 
+export interface GeminiCandidate {
+  finishReason?: string;
+}
+
 export interface GeminiGenerateContentResponse {
   text?: string;
+  candidates?: GeminiCandidate[];
   usageMetadata?: GeminiUsageMetadata;
 }
 
@@ -288,11 +294,24 @@ export class GeminiExtractor implements TestCaseExtractor {
     };
   }
 
+  private warnUnusableResponse(
+    subject: string,
+    problem: string,
+    response: GeminiGenerateContentResponse,
+  ): void {
+    this.logger.warn(
+      `${subject} ${problem} (${describeResponseDiagnostics(response, MAX_OUTPUT_TOKENS)})`,
+    );
+  }
+
   private toOutcome(
     response: GeminiGenerateContentResponse,
     filePath: string,
   ): ExtractionOutcome {
+    const subject = `Gemini response for ${filePath}`;
+
     if (response.text === undefined) {
+      this.warnUnusableResponse(subject, 'had no text', response);
       return {
         kind: 'provider-unavailable',
         reason: 'empty-response',
@@ -304,6 +323,7 @@ export class GeminiExtractor implements TestCaseExtractor {
     try {
       parsed = JSON.parse(response.text);
     } catch {
+      this.warnUnusableResponse(subject, 'was not valid JSON', response);
       return {
         kind: 'provider-unavailable',
         reason: 'invalid-json-response',
@@ -314,7 +334,7 @@ export class GeminiExtractor implements TestCaseExtractor {
     const envelope = envelopeSchema.safeParse(parsed);
 
     if (!envelope.success) {
-      this.logger.warn(`Gemini response for ${filePath} had no cases array`);
+      this.warnUnusableResponse(subject, 'had no cases array', response);
       return {
         kind: 'provider-unavailable',
         reason: 'schema-violation',
@@ -370,7 +390,10 @@ export class GeminiExtractor implements TestCaseExtractor {
     response: GeminiGenerateContentResponse,
     suiteName: string,
   ): SuiteSummaryOutcome {
+    const subject = `Gemini suite summary response for ${suiteName}`;
+
     if (response.text === undefined) {
+      this.warnUnusableResponse(subject, 'had no text', response);
       return {
         kind: 'provider-unavailable',
         reason: 'empty-response',
@@ -382,6 +405,7 @@ export class GeminiExtractor implements TestCaseExtractor {
     try {
       parsed = JSON.parse(response.text);
     } catch {
+      this.warnUnusableResponse(subject, 'was not valid JSON', response);
       return {
         kind: 'provider-unavailable',
         reason: 'invalid-json-response',
@@ -392,9 +416,7 @@ export class GeminiExtractor implements TestCaseExtractor {
     const result = suiteSummarySchema.safeParse(parsed);
 
     if (!result.success) {
-      this.logger.warn(
-        `Gemini suite summary response for ${suiteName} failed schema validation`,
-      );
+      this.warnUnusableResponse(subject, 'failed schema validation', response);
       return {
         kind: 'provider-unavailable',
         reason: 'schema-violation',
