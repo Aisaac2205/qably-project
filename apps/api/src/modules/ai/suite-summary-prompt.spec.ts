@@ -5,6 +5,7 @@ import {
   buildSuiteSummaryInstruction,
   buildSuiteSummaryTurn,
 } from './suite-summary-prompt';
+import { SUITE_LIMITS } from './extraction.contracts';
 
 describe('SUITE_SUMMARY_PROMPT_VERSION', () => {
   it('is versioned so suite metadata stays attributable to the prompt that produced it', () => {
@@ -25,6 +26,15 @@ describe('buildSuiteSummaryInstruction', () => {
 
     expect(instruction).toContain('English');
     expect(instruction).not.toContain('español');
+  });
+
+  it('renders its limits from the constants the suite summary schema enforces', () => {
+    expect(buildSuiteSummaryInstruction('es')).toContain(
+      `"title" (hasta ${SUITE_LIMITS.title} caracteres), "description" (hasta ${SUITE_LIMITS.description} caracteres) y "tags" (entre 1 y ${SUITE_LIMITS.tags} etiquetas cortas`,
+    );
+    expect(buildSuiteSummaryInstruction('en')).toContain(
+      `"title" (up to ${SUITE_LIMITS.title} characters), "description" (up to ${SUITE_LIMITS.description} characters) and "tags" (between 1 and ${SUITE_LIMITS.tags} short`,
+    );
   });
 
   it('declares the suite cases block as untrusted data in both locales', () => {

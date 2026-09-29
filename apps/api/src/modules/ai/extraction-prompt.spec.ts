@@ -7,11 +7,15 @@ import {
   buildFileContentTurn,
   buildSystemInstruction,
 } from './extraction-prompt';
-import { MAX_EXTRACTED_CASES } from './extraction.contracts';
+import {
+  CASE_LIMITS,
+  MAX_EXTRACTED_CASES,
+  SUITE_LIMITS,
+} from './extraction.contracts';
 
 describe('EXTRACTION_PROMPT_VERSION', () => {
   it('is bumped so proposals stay attributable to the prompt that produced them', () => {
-    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v11');
+    expect(EXTRACTION_PROMPT_VERSION).toBe('extraction-v12');
   });
 });
 
@@ -382,6 +386,289 @@ describe('buildFileContentTurn', () => {
   });
 });
 
+describe('buildSystemInstruction priority rubric', () => {
+  const locales = ['es', 'en'] as const;
+
+  it('no longer describes medium as the catch-all for standard behavior', () => {
+    expect(buildSystemInstruction('es')).not.toContain(
+      'comportamiento funcional estándar',
+    );
+    expect(buildSystemInstruction('en')).not.toContain(
+      'standard functional behavior',
+    );
+  });
+
+  it('checks the levels in a fixed order so medium is reached only after critical, high and low are ruled out', () => {
+    for (const locale of locales) {
+      const instruction = buildSystemInstruction(locale);
+      const positions = [
+        '1. "critical"',
+        '2. "high"',
+        '3. "low"',
+        '4. "medium"',
+      ].map((marker) => instruction.indexOf(marker));
+
+      expect(positions.every((position) => position >= 0)).toBe(true);
+      expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    }
+
+    expect(buildSystemInstruction('es')).toContain(
+      'usa la primera que se cumpla',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'use the first one that matches',
+    );
+  });
+
+  function ruleText(
+    instruction: string,
+    startMarker: string,
+    endMarker: string,
+  ): string {
+    const start = instruction.indexOf(startMarker);
+    const end = instruction.indexOf(endMarker, start);
+
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    return instruction.slice(start, end);
+  }
+
+  function rubricText(instruction: string): string {
+    return ruleText(instruction, '"priority"', '"sourceExcerpt"');
+  }
+
+  it('rates what each test asserts, not the feature or folder it belongs to', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      'se decide por prueba según lo que la prueba verifica, no según la funcionalidad o la carpeta a la que pertenece',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'is decided per test from what the test asserts, not from the feature or folder it belongs to',
+    );
+  });
+
+  it('gives every test of one behavior the same level, whichever branch it checks', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      'todas las pruebas de un mismo comportamiento reciben el mismo nivel, ya verifiquen el efecto principal, un efecto secundario, un rechazo o un caso límite',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'every test of the same behavior gets the same level, whether it checks the main effect, a side effect, a refusal or an edge case',
+    );
+  });
+
+  it('grounds critical in harm that cannot be undone or a security breach', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      'un daño que no se puede deshacer, o una brecha de seguridad',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'harm that cannot be undone, or a security breach',
+    );
+  });
+
+  it('grounds high in logic whose wrong answer goes unnoticed, including short tests with test doubles', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      'un resultado incorrecto no se notaría enseguida',
+    );
+    expect(buildSystemInstruction('es')).toContain('dobles de prueba');
+    expect(buildSystemInstruction('en')).toContain(
+      'a wrong answer would not be noticed right away',
+    );
+    expect(buildSystemInstruction('en')).toContain('test doubles');
+  });
+
+  it('sends single-value checks from high to medium and display formatting from high to low', () => {
+    const cases = [
+      {
+        locale: 'es' as const,
+        high: '2. "high"',
+        low: '3. "low"',
+        exclusions: [
+          'verificar un único valor de entrada por sí solo (su formato, longitud o presencia), que es "medium"',
+          'dar formato a un valor para mostrarlo, que es "low"',
+        ],
+      },
+      {
+        locale: 'en' as const,
+        high: '2. "high"',
+        low: '3. "low"',
+        exclusions: [
+          'checking one input value on its own (its format, length or presence), which is "medium"',
+          'formatting a value for display, which is "low"',
+        ],
+      },
+    ];
+
+    for (const { locale, high, low, exclusions } of cases) {
+      const highRule = ruleText(buildSystemInstruction(locale), high, low);
+
+      for (const exclusion of exclusions) {
+        expect(highRule).toContain(exclusion);
+      }
+      expect(highRule).not.toMatch(/fecha|date/i);
+    }
+  });
+
+  it('puts date and amount formatting in low and sends outcome messages from low to medium', () => {
+    const spanishLow = ruleText(
+      buildSystemInstruction('es'),
+      '3. "low"',
+      '4. "medium"',
+    );
+    const englishLow = ruleText(
+      buildSystemInstruction('en'),
+      '3. "low"',
+      '4. "medium"',
+    );
+
+    expect(spanishLow).toContain(
+      'el formato de un valor para mostrarlo (fechas, números e importes incluidos)',
+    );
+    expect(spanishLow).toContain(
+      'un mensaje que informa el resultado de una operación, como un error o una confirmación, que es "medium"',
+    );
+    expect(englishLow).toContain(
+      'formatting a value for display (dates, numbers and amounts included)',
+    );
+    expect(englishLow).toContain(
+      'a message that reports the outcome of an operation, such as an error or a confirmation, which is "medium"',
+    );
+  });
+
+  it('describes medium positively as visible, recoverable behavior, outcome messages included', () => {
+    const spanishMedium = ruleText(
+      buildSystemInstruction('es'),
+      '4. "medium"',
+      '"sourceExcerpt"',
+    );
+    const englishMedium = ruleText(
+      buildSystemInstruction('en'),
+      '4. "medium"',
+      '"sourceExcerpt"',
+    );
+
+    expect(spanishMedium).toContain('visible y recuperable');
+    expect(spanishMedium).toContain(
+      'el mensaje que se muestra cuando una operación termina bien o mal',
+    );
+    expect(englishMedium).toContain('visible and recoverable');
+    expect(englishMedium).toContain(
+      'the message shown after an operation succeeds or fails',
+    );
+  });
+
+  it('lets the file path settle only a tie between adjacent levels', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      'nunca fija un nivel por sí sola',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      'it never sets a level on its own',
+    );
+  });
+
+  it('names no identifier, domain or folder taken from the priority fixtures', () => {
+    for (const locale of locales) {
+      expect(rubricText(buildSystemInstruction(locale))).not.toMatch(
+        /purg|deleteMany|volumeDiscount|toHaveClass|canEditDocument|CSS|tier|tramo|discount|descuento|auth|permission|billing|payment|migration|stories|mocks|files|archivos/i,
+      );
+    }
+  });
+
+  it('keeps the rubric free of product-specific vocabulary', () => {
+    for (const locale of locales) {
+      for (const hasTargets of [false, true]) {
+        expect(buildSystemInstruction(locale, hasTargets)).not.toMatch(
+          /qably|aeris/i,
+        );
+      }
+    }
+  });
+});
+
+describe('buildSystemInstruction field limits', () => {
+  it('states every case field limit as a number in Spanish', () => {
+    const instruction = buildSystemInstruction('es');
+
+    expect(instruction).toContain('"title" hasta 120 caracteres');
+    expect(instruction).toContain('"objective" hasta 500 caracteres');
+    expect(instruction).toContain(
+      '"preconditions" como máximo 10 elementos de hasta 300 caracteres cada uno',
+    );
+    expect(instruction).toContain(
+      '"steps" entre 1 y 20 elementos de hasta 300 caracteres cada uno',
+    );
+    expect(instruction).toContain('"expectedResult" hasta 500 caracteres');
+    expect(instruction).toContain('"sourceExcerpt" hasta 600 caracteres');
+    expect(instruction).toContain(
+      '"observations" como máximo 5 elementos de hasta 200 caracteres cada uno',
+    );
+  });
+
+  it('states every case field limit as a number in English', () => {
+    const instruction = buildSystemInstruction('en');
+
+    expect(instruction).toContain('"title" up to 120 characters');
+    expect(instruction).toContain('"objective" up to 500 characters');
+    expect(instruction).toContain(
+      '"preconditions" at most 10 items of up to 300 characters each',
+    );
+    expect(instruction).toContain(
+      '"steps" between 1 and 20 items of up to 300 characters each',
+    );
+    expect(instruction).toContain('"expectedResult" up to 500 characters');
+    expect(instruction).toContain('"sourceExcerpt" up to 600 characters');
+    expect(instruction).toContain(
+      '"observations" at most 5 items of up to 200 characters each',
+    );
+  });
+
+  it('states the limits in targeted and untargeted calls alike', () => {
+    for (const hasTargets of [false, true]) {
+      expect(buildSystemInstruction('es', hasTargets)).toContain(
+        '"sourceExcerpt" hasta 600 caracteres',
+      );
+      expect(buildSystemInstruction('en', hasTargets)).toContain(
+        '"sourceExcerpt" up to 600 characters',
+      );
+    }
+  });
+
+  it('keeps the original short, literal quote wording for sourceExcerpt and adds only the number', () => {
+    expect(buildSystemInstruction('es')).toContain(
+      '"sourceExcerpt" debe ser una cita breve y literal de las líneas del archivo que justifican el caso, nunca una paráfrasis.',
+    );
+    expect(buildSystemInstruction('en')).toContain(
+      '"sourceExcerpt" must be a short, literal quote of the lines in the file that justify the case — never paraphrased.',
+    );
+
+    for (const locale of ['es', 'en'] as const) {
+      const instruction = buildSystemInstruction(locale);
+      const start = instruction.indexOf('"sourceExcerpt" ');
+      const sentence = instruction.slice(
+        start,
+        instruction.indexOf('"observations"', start),
+      );
+
+      expect(sentence).not.toMatch(/contigu|whole test|prueba completa/i);
+    }
+  });
+
+  it('renders every limit from the constants Zod enforces', () => {
+    const english = buildSystemInstruction('en');
+
+    expect(english).toContain(`"title" up to ${CASE_LIMITS.title} characters`);
+    expect(english).toContain(
+      `"steps" between 1 and ${CASE_LIMITS.steps} items of up to ${CASE_LIMITS.listItem} characters each`,
+    );
+    expect(english).toContain(
+      `"observations" at most ${CASE_LIMITS.observations} items of up to ${CASE_LIMITS.observation} characters each`,
+    );
+  });
+
+  it('states the observation count only once, in the limits sentence', () => {
+    expect(buildSystemInstruction('es')).not.toContain('hasta cinco');
+    expect(buildSystemInstruction('en')).not.toContain('up to five');
+  });
+});
+
 describe('buildSystemInstruction advisory and suite fields', () => {
   it('asks for advisory observations in both locales and forbids proposing code', () => {
     expect(buildSystemInstruction('es')).toContain('"observations"');
@@ -399,5 +686,20 @@ describe('buildSystemInstruction advisory and suite fields', () => {
   it('asks the suite summary to include business-language tags', () => {
     expect(buildSystemInstruction('es', true)).toContain('"tags"');
     expect(buildSystemInstruction('en', true)).toContain('"tags"');
+  });
+
+  it('renders the suite limits from the same constants as the suite schema', () => {
+    expect(SUITE_LIMITS).toEqual({
+      title: 80,
+      description: 300,
+      tag: 40,
+      tags: 20,
+    });
+    expect(buildSystemInstruction('es', true)).toContain(
+      `"title" (hasta ${SUITE_LIMITS.title} caracteres), "description" (hasta ${SUITE_LIMITS.description} caracteres) y "tags" (hasta ${SUITE_LIMITS.tags} etiquetas cortas`,
+    );
+    expect(buildSystemInstruction('en', true)).toContain(
+      `"title" (up to ${SUITE_LIMITS.title} characters), "description" (up to ${SUITE_LIMITS.description} characters) and "tags" (up to ${SUITE_LIMITS.tags} short`,
+    );
   });
 });

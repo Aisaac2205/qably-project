@@ -125,7 +125,7 @@ Gemini response for src/modules/ai/ai-entitlement.service.spec.ts dropped 3 inva
 #### Scope
 
 - The repair lives only in `extractedCaseSchema`, which `GeminiExtractor.toOutcome` and `extractionOutputSchema` use. Chat suggestions use `extractedCaseObjectSchema`, which stays strict; they have the same silent drop and remain as a follow-up.
-- The prompt did not change and stays at `extraction-v11`: it still gives no number for `sourceExcerpt`. Declaring the limits in the prompt would reduce the number of cuts, but it requires validating again against the real model.
+- The repair shipped with `extraction-v11`, which gave the model no numbers. Since `extraction-v12` the prompt states the case field limits as numbers (see "Field limits in the prompt" below). The repair remains the safety net; whether it now runs less often has not been measured.
 - `RESPONSE_JSON_SCHEMA` and `TARGETED_RESPONSE_JSON_SCHEMA` did not change and still carry no bounds, for the reason explained in the "Limits" list that precedes this section.
 
 #### Verified Zod behavior
@@ -136,6 +136,198 @@ The implementation depends on these Zod 4 behaviors. They were verified against 
 - `z.preprocess(fn, schema).default([])` returns `[]` when the field is missing, and a non-list input reaches the list schema and produces `invalid_type`.
 - `z.string().max(n)` counts UTF-16 units: two emoji measure 4.
 - `safeParse` exposes `error.issues`, and each issue carries `code` and `path`, with list indices as numbers.
+
+## Priority rubric (extraction-v12)
+
+`extraction-v12` replaces the one-line priority sentence with an ordered, generic rubric that the model can apply from a single file, and states the case field limits as numbers. On a set written after the rubric text was frozen (six fixtures in Python, Java and Kotlin, 11 cases per run), 10 of 11 cases landed in their accepted sets in each of two runs, and none was rated `critical`, including a formatter under `billing/` and screen copy under `auth/`. That set is not independent of the rubric; read its limits in "Measured before and after". Four fixtures miss on the real key, always by one level: three are rated one level too low (two branch tests on `medium`, one file-deletion test on `high`) and one, the Java DTO mapper, one level too high (`medium` instead of `low`). Those four are recorded as known gaps and run as expected failures instead of being hidden by widening their accepted sets (see "Known gaps" and "Known gaps run as expected failures").
+
+### Why the old sentence piled cases into medium
+
+`extraction-v11` said: `critical` for payments, authentication, authorization or destructive actions; `high` for core business flows; `medium` for standard functional behavior; `low` for cosmetic or purely informational checks.
+
+- **`medium` matched every test.** Every unit test verifies "standard functional behavior", so it was the one definition that always applied.
+- **`critical` and `high` needed product knowledge.** "Core business flows" cannot be recognized from one test file, and the model sees nothing else.
+- **`low` needed the word "cosmetic".** To the model, a formatting helper or a CSS-class assertion is functional code, so it went to `medium` as well.
+
+The baseline showed the error at both ends. Presentation-only tests were inflated to `medium`, and the main test of a tiered calculation was deflated to `medium`.
+
+### The rubric
+
+The model rates each test by what the test asserts, not by the feature or folder it belongs to. It checks four rules in order and takes the first one that matches. Each earlier rule names what it does not cover and which later rule does, so the overlaps found in review (interface text versus outcome messages, dates under `high` versus display formatting under `low`) resolve one way. That the model always follows the order is not claimed; see "Known gaps".
+
+| Order | Level | What the rule covers | What it hands on |
+|---|---|---|---|
+| 1 | `critical` | If the behavior is wrong, it can cause harm that cannot be undone, or a security breach: it removes or overwrites stored data, moves money, decides who can sign in or what someone may access, or exposes secrets or personal data to someone who should not see them. | — |
+| 2 | `high` | The behavior produces a result or a state that other code relies on, and a wrong answer would not be noticed right away: a computation with several cases or boundaries, a result combined from many records, a change of state or the rule that refuses one, a rule that keeps stored data consistent. A short test with test doubles qualifies. | Checking one input value on its own goes to `medium`; formatting a value for display goes to `low`. |
+| 3 | `low` | The test checks how something looks or reads, or code that makes no decision: layout, styling, icons, fixed text, formatting a value for display (dates, numbers and amounts included), a render with fixed input, or a getter, constant, default or function that only passes or copies values. | A message that reports the outcome of an operation goes to `medium`. |
+| 4 | `medium` | Any other single behavior whose failure is visible and recoverable: checking an input value and reporting the error, the message shown after an operation succeeds or fails, a simple successful path, reading data without changing it. | — |
+
+The file path only settles a choice between two adjacent levels when the test body supports both. It never sets a level on its own.
+
+| Decision | Why |
+|---|---|
+| `medium` is no longer the default for logic-bearing tests | Every level has a positive trigger, but rule 4 still hands `medium` any other single behavior whose failure is visible and recoverable, so a single behavior that matches no other rule lands there. What changed is that `medium` is no longer where a test goes just because it checks "standard functional behavior": in the rubric's order a computation, a state change or a refusal is claimed by rule 2 first, although the model does not always follow that order (see "Known gaps"). The first hypothesis, making `high` the fallback, would only move the pile: the baseline errors sat at both ends, and no single default fixes both. |
+| `low` is checked before `medium` | A presentation-only test has to be claimed before the last rule can absorb it. |
+| Explicit hand-offs | Earlier drafts listed "dates" under `high` and "interface copy" under `low`, so a date formatter or an error message matched two rules. Each rule now states the cases it passes to a later one. Unit tests pin that the exclusions sit inside the earlier rule and that the `high` rule no longer mentions dates. |
+| Judged by what the test asserts | A test that only checks the text of a sign-in button is about text, not about sign-in. The held-out fixture for this case stayed `low` in both runs. |
+| Same behavior, same level | The rubric asks for one level across every test of the same behavior, including refusals, side effects and edge cases. The model did not follow this reliably; see "Known gaps". |
+| An ordered checklist | `gemini-3.1-flash-lite` defaults to the `minimal` thinking level, and the extractor sets no `thinkingConfig`. A first-match lookup suits a model that does little reasoning before it answers. |
+| No few-shot block | Gemini's guidance warns that too many examples cause overfitting, and examples close to the fixtures would make the measurement circular. |
+| Generic vocabulary | The rubric names kinds of behavior, not domains, identifiers or folders. A unit test fails if the rubric mentions any identifier, domain or folder used by the design fixtures, or the words "Qably" or "Aeris". |
+
+### Field limits in the prompt
+
+Both locales state these case field limits as numbers, in one sentence:
+
+| Field | Limit stated |
+|---|---|
+| `title` | up to 120 characters |
+| `objective`, `expectedResult` | up to 500 characters |
+| `preconditions` | at most 10 items of up to 300 characters |
+| `steps` | 1 to 20 items of up to 300 characters |
+| `sourceExcerpt` | up to 600 characters |
+| `observations` | at most 5 items of up to 200 characters |
+
+- The numbers are rendered from `CASE_LIMITS` in `extraction.contracts.ts` (now exported), the object the Zod case schema uses. Changing a constant changes the prompt and the validator together, and the unit tests pin the rendered numbers.
+- The suite limits (80, 300 and 20) come from the new `SUITE_LIMITS`, which both suite schemas use. `suite-summary-prompt.ts` reads the same constants; its rendered text is byte-identical to before, so `suite-summary-v1` did not change. Validation behavior is unchanged: the existing contract tests for 81, 301 and 41 characters still pass.
+- The observations sentence no longer spells out "five": the count appears once, in the limits sentence. `ExtractionProcessor` also reads its observation cap (the point where it stops appending an incomplete-extraction note) from `CASE_LIMITS.observations` instead of its own literal 5, and its suite tag cap (`SUITE_TAG_CAP`) from `SUITE_LIMITS.tags` instead of its own literal 20; neither value changed.
+- `sourceExcerpt` keeps its original wording, "a short, literal quote of the lines in the file that justify the case", plus the number. A "contiguous, never the whole test" wording was tried and dropped, because it was never measured on its own.
+- Zod still repairs anything longer (see "Fields over the limit: repaired, not dropped"). Whether stating the numbers reduces the number of repairs has not been measured.
+- The 20-case cap stays in the targeted path only. There, `enqueueDocumentFiles` already chunks the target list to at most 20, so the stated cap matches the list. The untargeted path asks for one entry per declaration, and so does the declaration-count retry hint. Adding "at most 20" there would contradict both and let the model choose which cases to drop, including the one a document-case job is looking for. The cap stays enforced in code by `GeminiExtractor.toOutcome`.
+- `RESPONSE_JSON_SCHEMA` and `TARGETED_RESPONSE_JSON_SCHEMA` did not change and still carry no bounds.
+- Cost: the untargeted system instruction grows from 4,760 to 7,088 characters in Spanish and from 4,480 to 6,628 in English. Targeted calls grow by the same amount. Token counts were not measured.
+
+### Measured before and after
+
+All fixtures are synthetic test files in `gemini.extractor.integration.spec.ts`, none taken from the repository. Their locales alternate so both prompt variants run. Every run used the real key, the model set by `GEMINI_MODEL` for the API (default `gemini-3.1-flash-lite`) and temperature 0.2, as in production. Each column is a single run, so every result is one sample of a nondeterministic model.
+
+**Read the design set as circular.** The seven design fixtures informed the rubric: their failures drove the first draft. A later version was also tuned on them (a `critical` phrase added to fix one fixture, then removed as fixture-specific). They show that the rubric is followed, not that it generalizes.
+
+**Read the held-out set as partly post-hoc.** Six held-out fixtures were written after the first draft and first run against it (the "v12 draft" column). Three of their misses (stock reservation, idempotency, mapper) then informed the generic rewrite, so for those three the later columns are post-hoc. Activity aggregation and not-found response were reported as written before the final run and never used for tuning, but the rubric's phrases "a result combined from many records" and "reading data without changing it" match them closely, so treat them as weak evidence too.
+
+**Read the blind set as a check against surface-level overfitting only.** Six fixtures were written in a third pass, after the rubric text was frozen, by a writer who had not seen any earlier run. They use Python, Java and Kotlin, which no rubric draft was tested on, and two of them sit under paths that invite over-rating (`billing/`, `auth/`). The rubric was not changed after they ran. That is where their independence ends:
+
+- Each blind fixture instantiates a clause of the rubric, and each has a paired earlier fixture that exercises the same clause.
+- The rubric's own vocabulary ("refuses", "copies", "labels", "dates", "many records", "reading without changing") came from the held-out set.
+
+| Blind fixture | Paired earlier fixture |
+|---|---|
+| Amount formatting under `tests/billing/` | Formatting helper and date formatting helper |
+| Ticket lifecycle | State transition rule (order status) |
+| Screen copy under an `auth` package | Button text under an auth path (login) |
+| Rerunnable data migration | Idempotency key |
+| Failure message after an export | Error message after a failed save (settings) |
+| Field-copying DTO mapper | Pass-through mapper (to-user-summary) |
+
+So the blind set can show that the rubric does not depend on a language, on identifiers or on folder names. It cannot show that the rubric handles behaviors unlike the ones that shaped it. Both blind columns are the same prompt text: "before" is the frozen draft run on its own, "after" is the full spec run that closed the pass.
+
+Blind set, 6 fixtures (n = 11 cases per run):
+
+| Fixture | Language, locale | Accepted | Before | After |
+|---|---|---|---|---|
+| Amount formatting under `tests/billing/` | Python, es | low | low, low | low, low |
+| Ticket lifecycle (state transition) | Java, en | high | high, high | high, high |
+| Screen copy under an `auth` package | Kotlin, es | low, medium | low, low | low, low |
+| Rerunnable data migration | Python, en | high, critical | high, high | high, high |
+| Failure message after an export | Python, es | medium | medium, medium | medium, medium |
+| Field-copying DTO mapper | Java, en | low | medium | medium |
+
+Held-out set, 8 fixtures (n = 11 cases in the draft run, 15 in the later runs). "Pass 3 before" and "pass 3 after" are the frozen text of this pass, run twice:
+
+| Fixture | Locale | Accepted | v12 draft | Pass 2 final | Pass 3 before | Pass 3 after |
+|---|---|---|---|---|---|---|
+| Stock reservation | en | high | high, medium | high, medium | high, medium | high, medium |
+| Button text under an auth path | es | low, medium | low, low | low, low | low, low | low, low |
+| Date formatting helper | en | low | low, low | low, low | low, low | low, low |
+| Error message after a failed save | es | medium | medium, medium | medium, medium | medium, medium | medium, medium |
+| Idempotency key | en | high, critical | high, medium | high, medium | high, medium | high, medium |
+| Pass-through mapper | es | low | medium | low | low | low |
+| Activity aggregation | es | high | not run | high, high | high, high | high, high |
+| Not-found response | en | medium | not run | medium, medium | medium, medium | medium, medium |
+
+Design set, 7 fixtures (n = 14 cases per run):
+
+| Fixture | Locale | Accepted | v11 run 1 | v11 run 2 | v12 draft | Pass 2 final | Pass 3 |
+|---|---|---|---|---|---|---|---|
+| Formatting helper | es | low | timeout | medium, medium | low, low | low, low | low, low |
+| Cosmetic rendering | en | low | medium, medium | medium, medium | low, low | low, low | low, low |
+| Input validation | es | medium | medium, medium | medium, medium | medium, medium | medium, medium | medium, medium |
+| Tiered calculation | en | high, critical | medium, high | medium, high | high, high | high, high | high, high |
+| State transition rule | es | high, critical | high, high | high, high | high, high | high, high | high, high |
+| Permission decision | en | critical, high | high, high | critical, critical | critical, critical | high, high | high, high |
+| Destructive operation | es | critical | critical, high | critical, high | critical, critical | critical, high | critical, high |
+
+| Cases per level | n | low | medium | high | critical | In accepted set |
+|---|---|---|---|---|---|---|
+| Design, v11 run 2 | 14 | 0 | 7 | 4 | 3 | 8 |
+| Design, pass 3 | 14 | 4 | 2 | 7 | 1 | 13 |
+| Held-out, v12 draft | 11 | 4 | 5 | 2 | 0 | 8 |
+| Held-out, pass 3 (each run) | 15 | 5 | 6 | 4 | 0 | 13 |
+| Blind, pass 3 (each run) | 11 | 4 | 3 | 4 | 0 | 10 |
+
+- "v12 draft" is the rubric of the first pass: domain examples, path segment lists and "or any part of one". "Pass 2 final" and every "pass 3" column are the generic text now in the code. All are `extraction-v12`: the draft never shipped.
+- The v11, draft and pass 2 columns come from earlier passes and were not rerun in pass 3; the pass 3 columns were.
+- In v11 run 1 the formatting call hit the 60-second SDK timeout, so that run returned 12 cases.
+- No over-critical rating appeared in any set: the only `critical` is the purge test of the destructive fixture. A formatter under `billing/` and screen copy under two `auth` paths all stayed `low`.
+- Every miss is one level off, in both directions. Three are too low: two branch tests (the stock refusal and the different-keys test) rated `medium` instead of `high`, and the file-deletion test rated `high` instead of `critical`. One is too high: the Java DTO mapper rated `medium` instead of `low`. Three of the four misses land on `medium`. The TypeScript mapper, with the same shape as the DTO mapper, was `low`.
+- The two pass 3 runs of the held-out and blind sets returned identical levels, case by case. Two runs at temperature 0.2 give no estimate of variance, so that agreement does not show that a miss is systematic or that a pass is reliable. Judging a fixture takes at least three runs.
+- The design set puts 7 of 14 cases in `high`, exactly the half its distribution assertion allows.
+- Provider calls: 37 in the first pass, 30 in the second (both as reported by those passes), and 42 in the third (14 for the held-out and blind sets on the frozen text, 28 for the full spec run).
+
+**Exact and widened accepted sets.** Fourteen fixtures accept one level. Design: formatting helper, cosmetic rendering, input validation, destructive operation. Held-out: stock reservation, date formatting helper, error message, activity aggregation, not-found response, pass-through mapper. Blind: amount formatting, ticket lifecycle, failure message, DTO mapper. Each pins a behavior the complaint or the review is about, and widening one after it failed would hide the move the check exists to catch. Seven fixtures accept two adjacent levels because both are defensible: tiered calculation, state transition rule, permission decision, button text under an auth path, idempotency key, screen copy under an auth package and rerunnable data migration.
+
+In pass 3 four fixture checks failed, each time by one level: three exact-level fixtures (destructive operation and stock reservation too low, the DTO mapper too high) and the idempotency key, whose `medium` falls outside its two-level set (too low). Stock reservation, the DTO mapper and the idempotency key failed identically in both runs; destructive operation ran only in the full run. The spec marks those four as known gaps instead of widening their sets or leaving the spec red (see "Known gaps run as expected failures").
+
+The wide sets also hide something. A two-level set passes whichever of the two levels the model picks, so it cannot show which rule the model applied; see the first row of "Known gaps".
+
+**What this shows, and what it does not.** On surface-different inputs, the rubric spreads cases across `low`, `medium` and `high`, and rated `critical` only the purge test of the destructive fixture. It still under-rates branch tests and over-rates one kind of mapper, each by one level. The evidence is small: 11 blind cases, a single prompt text, temperature 0.2, two runs that agreed, and blind fixtures paired with earlier ones (see the pairing table above). It does not show that the rubric generalizes to unlike behaviors, and it is not proof for any codebase.
+
+### What the version bump triggers
+
+Nothing beyond the audit stamp. `EXTRACTION_PROMPT_VERSION` has one reader, `ExtractedProposalWriter`, which writes it to `ExtractedProposal.promptVersion` when it creates or refreshes a proposal. No query filters by that column, no job compares versions, and the web does not read it. Re-documentation (`mode: 'stale-locale'`) compares `TestCaseVersion.locale`, not the prompt version. The bump enqueues no job, marks nothing stale and spends no credits.
+
+- New proposals carry `extraction-v12`. An in-review proposal refreshed by a redelivered code-change job also moves to `extraction-v12` with the rest of its fields; that job runs for its own reasons, never because of the bump.
+- Existing proposals and published cases keep the priority `extraction-v11` gave them.
+
+### Known gaps
+
+Four fixtures fail on the real key. Each carries `knownGap: true` in the integration spec with its accepted set unchanged (see "Known gaps run as expected failures").
+
+| Fixture | Set | Accepted | Rated | Direction |
+|---|---|---|---|---|
+| Destructive operation | Design | `critical` | `high` (file-deletion test) | One level too low |
+| Stock reservation | Held-out | `high` | `medium` (refusal test) | One level too low |
+| Idempotency key | Held-out | `high`, `critical` | `medium` (different-keys test) | One level too low |
+| Field-copying DTO mapper | Blind | `low` | `medium` | One level too high |
+
+| Gap | Status |
+|---|---|
+| The wide accepted sets hide an unresolved ambiguity between rules 1 and 2 | Rule 1 comes first, so a test that meets it literally should be `critical`. But rule 2 ("a change of state or the rule that refuses one", "a rule that keeps stored data consistent") describes nearly the same tests, and the model does not always apply the order. The permission decision fixture meets rule 1 literally (it decides what someone may access), yet it came out `high` in some runs; its accepted set, `critical` or `high`, passes both. A case that overwrites stored data passes either way too: the rerunnable data migration accepts `high` and `critical`. A green result on those fixtures therefore does not say which rule the model applied. Resolving it needs exact-level fixtures on each side of the overlap, run at least three times each. |
+| Branch tests rated one level low | In every pass 3 run of the current text, the refusal test of the stock reservation and the different-keys test of the idempotency fixture got `medium`, and the file-deletion test of the account deletion got `high`. Three later reruns of those fixtures (one call each per run) repeated the stock refusal on `medium` and the file deletion on `high` every time, but rated the different-keys test `high` in two of the three. The "same behavior, same level" sentence did not fix it. The next attempt should be measured on its own, with at least three runs per fixture and a fresh blind set, since the current blind set has now been seen. |
+| A field-copying mapper rated `medium` (one level too high) | The blind Java DTO mapper (three `assertEquals` on copied fields) got `medium` in both runs, while the TypeScript mapper with one `toEqual` got `low`. In three later reruns it got `medium` twice and `low` once. Not tuned: changing the rubric after this result would turn the blind fixture into a design fixture. |
+| The existing corpus is not reclassified | Future work. Reclassifying needs a deliberate, budgeted job at one credit per file; nothing in this change starts one. |
+| The chat prompt keeps an older copy of the rubric | `apps/api/src/modules/chat/chat-prompt.ts` (Spanish and English) still says `medium` for standard behavior, so chat suggestions keep the old bias. Changing it needs its own `CHAT_PROMPT_VERSION` bump and a real-key run. |
+| Wording that may cause the misses (unmeasured hypothesis) | UNMEASURED. Three phrases could pull a test to the wrong level: "a simple successful path" and "checking an input value and reporting the error" in rule 4 fit the different-keys test, the stock refusal and the DTO mapper, all three rated `medium`; "stored data" in rule 1 may not read as covering stored files, which would explain the file-deletion test on `high`. No run has varied any of this wording, so it is a guess about cause, not a finding. Testing it means changing one phrase at a time, with at least three runs per fixture. |
+| Missing fixtures | No fixture covers ordinary persistence (saving or updating a record with no overwrite risk and no consistency rule), which rule 1 ("overwrites stored data"), rule 2 and rule 4 could each be read to claim. No fixture covers the file-path clause either: nothing puts a test body that supports two adjacent levels under a path that favors one of them, so "the file path only settles a choice between two adjacent levels" is untested. The `billing/` and `auth/` fixtures only show that a path did not raise a level. |
+| Temperature 0.2 | Gemini 3 guidance recommends the default temperature of 1.0 and warns that low values can cause looping or degraded output. Not changed here: it affects every field and needs its own measurement, as a separate future A/B of the same fixtures at 1.0 against 0.2, at least three runs each. |
+| Thinking level | Left at the model default (`minimal` on Flash-Lite). A higher level could help borderline cases at a latency and token cost; not measured. |
+| Real proposals | The next check is the level distribution of real `extraction-v12` proposals in the review inbox. |
+
+### Sources
+
+Checked through context7 on 2026-09-28 (`/websites/ai_google_dev_gemini-api`, `/googleapis/js-genai`). The installed SDK is `@google/genai` 2.21.0.
+
+| Fact | Source |
+|---|---|
+| Gemini 3.1 Flash-Lite supports the `minimal` (default), `low`, `medium` and `high` thinking levels. | ai.google.dev/gemini-api/docs/generate-content/whats-new-gemini-3.5 |
+| Gemini 3 models work best with direct, well-structured prompts with clear tasks and constraints; verbose prompt engineering can cause over-analysis. | ai.google.dev/gemini-api/docs/prompting-strategies; whats-new-gemini-3.5 |
+| Gemini detects patterns from a few examples, and too many examples risk overfitting the response to them. | ai.google.dev/gemini-api/docs/prompting-intro ("Optimal number of examples") |
+| Structured output supports a subset of JSON Schema, and very large or deeply nested schemas may be rejected. | ai.google.dev/gemini-api/docs/structured-output; json-mode |
+| Structured output is syntactically valid JSON but can be semantically wrong, so the application must validate the values. | ai.google.dev/gemini-api/docs/structured-output ("Best practices") |
+| Changing temperature, top_p or top_k is no longer recommended for Gemini 3.x; the default temperature of 1.0 is recommended, and low values risk looping or degraded performance. | ai.google.dev/gemini-api/docs/gemini-3; whats-new-gemini-3.5 |
+| `systemInstruction`, `responseMimeType`, `responseJsonSchema` and `thinkingConfig.thinkingLevel` are `generateContent` config fields in the JS SDK. | github.com/googleapis/js-genai, codegen_instructions.md |
+
+The documentation lists `minItems` and `maxItems` as supported array keywords. The 2026-09-26 incident in "Limits" shows that a supported bound can still push a schema past the serving state limit, so the project rule stands: the provider schema carries no bounds.
 
 ## Cost estimate per file
 
@@ -262,7 +454,7 @@ Two paths produce it:
 
 Both paths respect a suite name a person has already set: when `Suite.nameSource` is `'human'`, the name itself is left untouched, but the description and tags still refresh from the latest summary. A later Aeris write only ever renames a suite whose current name Aeris set (`nameSource: 'aeris'`, or the ingestion default).
 
-Tags are unioned, not replaced: `mergeSuiteTags` keeps every existing tag and appends newly proposed tags not already present, capped at 20 total (`SUITE_TAG_CAP`) so the list cannot grow without bound across repeated runs. A human-added tag Aeris never proposed is never dropped.
+Tags are unioned, not replaced: `mergeSuiteTags` keeps every existing tag and appends newly proposed tags not already present, capped at `SUITE_LIMITS.tags` (20) in total (`SUITE_TAG_CAP`) so the list cannot grow without bound across repeated runs. A human-added tag Aeris never proposed is never dropped.
 
 A proposed name can collide with another suite's unique name constraint within the project. Both paths open an explicit `SAVEPOINT` before writing and, on a caught `P2002`, roll back to it, log the skip, and retry the write without the name change, keeping the description and tag update. Without the savepoint, the caught error would leave the whole transaction aborted on PostgreSQL and lose any case documentation already written earlier in the same transaction.
 
@@ -360,7 +552,7 @@ Deletion is scoped through the same `findThread` used by every other thread oper
 
 ## Manual integration check
 
-`apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` calls the real Gemini API against all three prompts this module and the chat module send — `extraction-v11` (`GeminiExtractor.extract`), `suite-summary-v1` (`GeminiExtractor.summarizeSuite`) and `chat-v4` (`GeminiChatAssistant.reply`) — with tiny synthetic fixtures written for the test (never real customer code), and asserts each response matches its Zod schema (`extractionOutputSchema`, `suiteSummarySchema`, `suggestedCasesSchema`). It never asserts exact wording, since model output is not deterministic. Run it after any change to a response schema or a prompt: it is the only check in the repository that validates schema acceptance against the real model, and the unit suite (which mocks the client) cannot catch a provider-side rejection like the 2026-09-26 incident described in "Limits" above.
+`apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` calls the real Gemini API against all three prompts this module and the chat module send — `extraction-v12` (`GeminiExtractor.extract`), `suite-summary-v1` (`GeminiExtractor.summarizeSuite`) and `chat-v5` (`GeminiChatAssistant.reply`) — with tiny synthetic fixtures written for the test (never real customer code), and asserts each response matches its Zod schema (`extractionOutputSchema`, `suiteSummarySchema`, `suggestedCasesSchema`). It never asserts exact wording, since model output is not deterministic. Run it after any change to a response schema or a prompt: it is the only check in the repository that validates schema acceptance against the real model, and the unit suite (which mocks the client) cannot catch a provider-side rejection like the 2026-09-26 incident described in "Limits" above.
 
 Every `describe` block in the file is skipped unless `GEMINI_API_KEY` is present in the environment running the test, so it never runs in CI by default and costs nothing unless explicitly invoked with a key. **This is intentional and permanent**: the key is never added to CI, and this spec is run only locally by whoever holds the key.
 
@@ -386,4 +578,31 @@ GEMINI_API_KEY="<your key>" npx jest --maxWorkers=2 gemini.extractor.integration
 
 Both forms scope the key to that single command; neither leaves it set in the shell afterwards. `GEMINI_MODEL` is optional and defaults to `gemini-3.1-flash-lite` inside the spec when unset — export it the same way, before the `npx jest` call, to point the check at a different model.
 
-A pass reports all three `describe` blocks (`GeminiExtractor (manual integration, real API)`, `GeminiExtractor.summarizeSuite (manual integration, real API)`, `GeminiChatAssistant (manual integration, real API)`) as green, no failures and no skips. Without the key, the same command reports every test in the file as skipped, never failed — that is the expected state for every CI run and for a local run with nothing exported.
+The file has six `describe` blocks: `GeminiExtractor (manual integration, real API)`, three priority blocks (`GeminiExtractor priority rubric, design fixtures`, `... held-out fixtures` and `... blind fixtures`, each suffixed `(manual integration, real API)`), `GeminiExtractor.summarizeSuite (manual integration, real API)` and `GeminiChatAssistant (manual integration, real API)`. The schema, suite summary and chat blocks must be green. The priority blocks are a measurement: four of their fixtures are known gaps (three rated one level too low, one too high, as recorded in "Priority rubric (extraction-v12)"). They run as expected failures, so a run in the current state is green, and a change to the rubric should be judged against the tables there and not only against a green run (see "Known gaps run as expected failures"). Without the key, the same command reports every test in the file as skipped, never failed — that is the expected state for every CI run and for a local run with nothing exported.
+
+A full run makes 28 provider calls: five extraction checks, seven design fixtures, eight held-out fixtures, six blind fixtures, one suite summary and one chat reply. Each priority set rates a fixture the first time a test needs it and keeps the result for the rest of the run: the per-fixture tests each make one provider call, in sequence, and the distribution test reuses those results and rates only the fixtures nobody has asked for yet. No test depends on another having run first, and a fixture that no selected test needs makes no call. The priority blocks assert acceptable sets of levels rather than exact values, and print the level and automation key of every case, so the distribution can be compared with the tables in "Priority rubric (extraction-v12)".
+
+- Run one set with `-t "design fixtures"` (7 calls), `-t "held-out fixtures"` (8 calls) or `-t "blind fixtures"` (6 calls); `-t` takes a regular expression, so `-t "held-out fixtures|blind fixtures"` runs two sets.
+- Run the four known-gap fixtures alone with `-t "known gap"` (4 calls).
+- A single fixture can be rerun alone: `-t "stock reservation"` rates only that fixture, in one call.
+- Model output is nondeterministic, so go by the majority of reruns before changing the prompt.
+- Every real-key test allows 120 seconds. A 30-second jest limit sat below the SDK's own 60-second request timeout and failed the tiny-fixture test on a slow provider response. The third-pass full run finished in 177 seconds overall with no timeout.
+
+Jest does not load `.env` on its own, but preloading `dotenv` for one command does the same as exporting the key, without printing it: `NODE_OPTIONS="-r dotenv/config" npx jest --maxWorkers=2 gemini.extractor.integration`, from `apps/api`.
+
+### Known gaps run as expected failures
+
+A fixture that misses its accepted set is marked `knownGap: true` in `gemini.extractor.integration.spec.ts` and runs through `it.failing.each` (Jest 30) with its accepted set unchanged. Today those are destructive operation, stock reservation, idempotency key and the field-copying DTO mapper.
+
+| What happens on the real key | Result |
+|---|---|
+| The gap is still there | Green: the test fails as expected. |
+| A fixture that is not a known gap leaves its accepted set | Red, as a regression. |
+| A known-gap fixture now lands inside its accepted set | Red: "Failing test passed even though it was supposed to fail". Remove `knownGap` so the fixture becomes a normal test. |
+
+- Widening the accepted set was rejected: it would turn a recorded miss into a pass.
+- Leaving the spec red was rejected: a permanent red hides a new regression among the four known ones.
+- Each known-gap fixture also has a plain test, named with "(known gap)", that only checks the provider returned rated cases. Without it, a timeout or a provider error on that fixture would count as an expected failure and pass unnoticed.
+- Output is nondeterministic, so a red on a known-gap fixture may be one lucky run. Rerun before removing the flag, and promote the fixture only when it holds over at least three runs.
+- This already happened when the flag was added. Three reruns of the four fixtures on 2026-09-28: destructive operation and stock reservation missed every time; the idempotency key landed inside its set in two of three runs; the DTO mapper landed on `low` in one of three. Until more runs settle those two, expect the spec to turn red now and then on them without any change to the rubric.
+- Without `GEMINI_API_KEY` the whole file is skipped, known-gap tests included.

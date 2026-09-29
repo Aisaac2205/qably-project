@@ -2,7 +2,11 @@ import {
   sanitizeUntrustedText,
   stripBlockDelimiters,
 } from '../../common/prompt/untrusted-text';
-import { MAX_EXTRACTED_CASES } from './extraction.contracts';
+import {
+  CASE_LIMITS,
+  MAX_EXTRACTED_CASES,
+  SUITE_LIMITS,
+} from './extraction.contracts';
 import {
   renderTargetLines,
   targetTagAt,
@@ -10,7 +14,7 @@ import {
   type TargetTag,
 } from './target-reference';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v11';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v12';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
@@ -62,6 +66,26 @@ const TITLE_DIFFERS_SENTENCE: Record<'es' | 'en', string> = {
   en: `"title" is required and must be a readable title different from "automationKey": never return the "automationKey" value verbatim as "title".`,
 };
 
+const PRIORITY_RUBRIC: Record<'es' | 'en', string> = {
+  es: `"priority" se decide por prueba según lo que la prueba verifica, no según la funcionalidad o la carpeta a la que pertenece. Pruebas de comportamientos distintos en un mismo archivo pueden merecer niveles distintos; todas las pruebas de un mismo comportamiento reciben el mismo nivel, ya verifiquen el efecto principal, un efecto secundario, un rechazo o un caso límite. Revisa estas reglas en orden y usa la primera que se cumpla:
+1. "critical": si el comportamiento bajo prueba falla, puede causar un daño que no se puede deshacer, o una brecha de seguridad: elimina o sobrescribe datos almacenados, mueve dinero, decide quién puede iniciar sesión o a qué puede acceder alguien, o expone secretos o datos personales a quien no debe verlos.
+2. "high": el comportamiento bajo prueba produce un resultado o un estado del que depende otro código, y un resultado incorrecto no se notaría enseguida: un cómputo con varios casos o límites, un resultado que combina muchos registros, un cambio de estado o la regla que lo rechaza, o una regla que mantiene consistentes los datos almacenados. Una prueba corta con dobles de prueba califica cuando el código bajo prueba hace esto. No incluye verificar un único valor de entrada por sí solo (su formato, longitud o presencia), que es "medium", ni dar formato a un valor para mostrarlo, que es "low".
+3. "low": la prueba verifica cómo se ve o cómo se lee algo, o código que no toma decisiones: disposición, estilos, íconos, texto fijo como etiquetas y títulos, el formato de un valor para mostrarlo (fechas, números e importes incluidos), un renderizado con entrada fija, o un getter, constante, valor por defecto o función que solo pasa o copia valores. No incluye un mensaje que informa el resultado de una operación, como un error o una confirmación, que es "medium".
+4. "medium": cualquier otro comportamiento único cuyo fallo es visible y recuperable: verificar un valor de entrada e informar el error, el mensaje que se muestra cuando una operación termina bien o mal, un camino exitoso simple, o leer datos sin modificarlos.
+La ruta del archivo solo resuelve la elección entre dos niveles contiguos cuando el cuerpo de la prueba admite ambos; nunca fija un nivel por sí sola.`,
+  en: `"priority" is decided per test from what the test asserts, not from the feature or folder it belongs to. Tests of different behaviors in one file can deserve different levels; every test of the same behavior gets the same level, whether it checks the main effect, a side effect, a refusal or an edge case. Check these rules in order and use the first one that matches:
+1. "critical": if the behavior under test is wrong, it can cause harm that cannot be undone, or a security breach: it removes or overwrites stored data, moves money, decides who can sign in or what someone may access, or exposes secrets or personal data to someone who should not see them.
+2. "high": the behavior under test produces a result or a state that other code relies on, and a wrong answer would not be noticed right away: a computation with several cases or boundaries, a result combined from many records, a change of state or the rule that refuses one, or a rule that keeps stored data consistent. A short test with test doubles qualifies when the code under test does this. It does not cover checking one input value on its own (its format, length or presence), which is "medium", nor formatting a value for display, which is "low".
+3. "low": the test checks how something looks or reads, or code that makes no decision: layout, styling, icons, fixed text such as labels and headings, formatting a value for display (dates, numbers and amounts included), a render with fixed input, or a getter, constant, default or function that only passes or copies values. It does not cover a message that reports the outcome of an operation, such as an error or a confirmation, which is "medium".
+4. "medium": any other single behavior whose failure is visible and recoverable: checking an input value and reporting the error, the message shown after an operation succeeds or fails, a simple successful path, or reading data without changing it.
+The file path only settles a choice between two adjacent levels when the test body supports both; it never sets a level on its own.`,
+};
+
+const FIELD_LIMITS_SENTENCE: Record<'es' | 'en', string> = {
+  es: `Límites de los campos: "title" hasta ${CASE_LIMITS.title} caracteres; "objective" hasta ${CASE_LIMITS.objective} caracteres; "preconditions" como máximo ${CASE_LIMITS.preconditions} elementos de hasta ${CASE_LIMITS.listItem} caracteres cada uno; "steps" entre 1 y ${CASE_LIMITS.steps} elementos de hasta ${CASE_LIMITS.listItem} caracteres cada uno; "expectedResult" hasta ${CASE_LIMITS.expectedResult} caracteres; "sourceExcerpt" hasta ${CASE_LIMITS.sourceExcerpt} caracteres; "observations" como máximo ${CASE_LIMITS.observations} elementos de hasta ${CASE_LIMITS.observation} caracteres cada uno. Respétalos: el texto que supera un límite se recorta.`,
+  en: `Field limits: "title" up to ${CASE_LIMITS.title} characters; "objective" up to ${CASE_LIMITS.objective} characters; "preconditions" at most ${CASE_LIMITS.preconditions} items of up to ${CASE_LIMITS.listItem} characters each; "steps" between 1 and ${CASE_LIMITS.steps} items of up to ${CASE_LIMITS.listItem} characters each; "expectedResult" up to ${CASE_LIMITS.expectedResult} characters; "sourceExcerpt" up to ${CASE_LIMITS.sourceExcerpt} characters; "observations" at most ${CASE_LIMITS.observations} items of up to ${CASE_LIMITS.observation} characters each. Stay within them: text past a limit is cut off.`,
+};
+
 const SUFFIX_INSTRUCTION: Record<'es' | 'en', string> = {
   es: `"automationKey" debe ser el nombre exacto que el reporter emitiría en tiempo de ejecución para esa prueba, según la convención del propio framework:
 ${AUTOMATION_KEY_RULES}
@@ -71,11 +95,13 @@ ${TITLE_DIFFERS_SENTENCE.es}
 
 Los steps deben ser imperativos, ir en orden y sin numerarlos (la interfaz los numera), y describir solo acciones y aserciones presentes en el cuerpo de la prueba.
 
-"priority" debe reflejar el riesgo del comportamiento bajo prueba: "critical" para pagos, autenticación, autorización o acciones destructivas o irreversibles; "high" para flujos de negocio principales; "medium" para comportamiento funcional estándar; "low" para verificaciones cosméticas o meramente informativas.
+${PRIORITY_RUBRIC.es}
 
 "sourceExcerpt" debe ser una cita breve y literal de las líneas del archivo que justifican el caso, nunca una paráfrasis.
 
-"observations" es opcional: hasta cinco frases cortas por caso, en español, sobre la práctica de pruebas que el código muestra, por ejemplo una prueba sin aserción, una espera basada en tiempo fijo, o dos pruebas que verifican lo mismo. Son comentarios para una persona, no una entrega: nunca propongas código, no reescribas aserciones ni uses lenguaje de "corregir". Omite el campo cuando no haya nada relevante que señalar.
+"observations" es opcional: frases cortas por caso, en español, sobre la práctica de pruebas que el código muestra, por ejemplo una prueba sin aserción, una espera basada en tiempo fijo, o dos pruebas que verifican lo mismo. Son comentarios para una persona, no una entrega: nunca propongas código, no reescribas aserciones ni uses lenguaje de "corregir". Omite el campo cuando no haya nada relevante que señalar.
+
+${FIELD_LIMITS_SENTENCE.es}
 
 Si el archivo no contiene declaraciones de prueba, responde con un arreglo "cases" vacío. Responde solo con JSON, que coincida exactamente con el esquema indicado, con todos los campos salvo "automationKey" escritos en español.`,
   en: `"automationKey" must be the exact runtime name the test reporter would emit for that test, using the framework's own convention:
@@ -86,11 +112,13 @@ ${TITLE_DIFFERS_SENTENCE.en}
 
 Steps must be imperative, in order and without numbering them (the interface numbers them), and describe only actions and assertions present in the test body.
 
-"priority" must reflect the risk of the behavior under test: "critical" for payments, authentication, authorization or destructive/irreversible actions; "high" for core business flows; "medium" for standard functional behavior; "low" for cosmetic or purely informational checks.
+${PRIORITY_RUBRIC.en}
 
 "sourceExcerpt" must be a short, literal quote of the lines in the file that justify the case — never paraphrased.
 
-"observations" is optional: up to five short sentences per case, in English, about the testing practice the code shows, for example a test with no assertion, a wait based on a fixed delay, or two tests verifying the same thing. They are commentary for a person, not a deliverable: never propose code, never rewrite assertions, never use "fix" language. Omit the field when there is nothing worth pointing out.
+"observations" is optional: short sentences per case, in English, about the testing practice the code shows, for example a test with no assertion, a wait based on a fixed delay, or two tests verifying the same thing. They are commentary for a person, not a deliverable: never propose code, never rewrite assertions, never use "fix" language. Omit the field when there is nothing worth pointing out.
+
+${FIELD_LIMITS_SENTENCE.en}
 
 If the file contains no test declarations, respond with an empty "cases" array. Respond with JSON only, matching the provided schema exactly, with every field except "automationKey" written in English.`,
 };
@@ -126,8 +154,8 @@ const TARGETED_DECLARATION_COUNT_SENTENCE: Record<
 };
 
 const SUITE_SUMMARY_SENTENCE: Record<'es' | 'en', string> = {
-  es: `Incluye además un objeto "suite" con "title" (hasta 80 caracteres), "description" (hasta 300 caracteres) y "tags" (hasta 20 etiquetas cortas en lenguaje de negocio, por ejemplo "pagos" o "autenticación") que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
-  en: `Also include a "suite" object with "title" (up to 80 characters), "description" (up to 300 characters) and "tags" (up to 20 short business-language labels, for example "payments" or "authentication") summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
+  es: `Incluye además un objeto "suite" con "title" (hasta ${SUITE_LIMITS.title} caracteres), "description" (hasta ${SUITE_LIMITS.description} caracteres) y "tags" (hasta ${SUITE_LIMITS.tags} etiquetas cortas en lenguaje de negocio, por ejemplo "pagos" o "autenticación") que resuman, en español y en lenguaje de negocio, qué funcionalidad cubre este archivo como conjunto. El título nombra la funcionalidad, no el archivo ni una clase.`,
+  en: `Also include a "suite" object with "title" (up to ${SUITE_LIMITS.title} characters), "description" (up to ${SUITE_LIMITS.description} characters) and "tags" (up to ${SUITE_LIMITS.tags} short business-language labels, for example "payments" or "authentication") summarizing, in English and in business language, what feature this file covers as a whole. The title names the feature, not the file or a class.`,
 };
 
 export function buildSystemInstruction(

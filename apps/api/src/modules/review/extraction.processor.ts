@@ -13,12 +13,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import { TEST_CASE_EXTRACTOR } from '../ai/ai.tokens';
-import type {
-  ExtractedCase,
-  ExtractedSuite,
-  ExtractionInput,
-  ExtractionOutcome,
-  TestCaseExtractor,
+import {
+  CASE_LIMITS,
+  SUITE_LIMITS,
+  type ExtractedCase,
+  type ExtractedSuite,
+  type ExtractionInput,
+  type ExtractionOutcome,
+  type TestCaseExtractor,
 } from '../ai/extraction.contracts';
 import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildTargetManifest } from '../ai/target-reference';
@@ -58,7 +60,7 @@ import {
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
 
-const MAX_CASE_OBSERVATIONS = 5;
+const MAX_CASE_OBSERVATIONS = CASE_LIMITS.observations;
 const HEAD_REF = 'HEAD';
 const NOT_ENTITLED_REASON = 'ai-not-enabled';
 const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
@@ -75,7 +77,7 @@ const AERIS_NAME_SOURCE = 'aeris';
 const SUITE_METADATA_SAVEPOINT = 'suite_metadata';
 const SUITE_SUMMARY_SAVEPOINT = 'suite_summary_metadata';
 const SUITE_SUMMARY_MAX_CASES = 60;
-const SUITE_TAG_CAP = 20;
+const SUITE_TAG_CAP = SUITE_LIMITS.tags;
 const SUITE_STATES_FOR_SUMMARY = ['active', 'draft'] as const;
 
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {

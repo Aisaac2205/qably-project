@@ -16,7 +16,7 @@ const AUTOMATION_KEY_MAX_LENGTH =
   COMPOSITE_KEY_SEPARATOR_LENGTH +
   JUNIT_INGESTION_NAME_MAX_LENGTH;
 
-const CASE_LIMITS = {
+export const CASE_LIMITS = {
   title: 120,
   objective: 500,
   expectedResult: 500,
@@ -26,6 +26,13 @@ const CASE_LIMITS = {
   steps: 20,
   preconditions: 10,
   observations: 5,
+} as const;
+
+export const SUITE_LIMITS = {
+  title: 80,
+  description: 300,
+  tag: 40,
+  tags: 20,
 } as const;
 
 export const shortText = (max: number) => z.string().trim().min(1).max(max);
@@ -128,15 +135,15 @@ export const extractedCaseSchema = extractedCaseObjectSchema
   }));
 
 export const extractedSuiteSchema = z.object({
-  title: shortText(80),
-  description: shortText(300),
-  tags: z.array(shortText(40)).max(20).default([]),
+  title: shortText(SUITE_LIMITS.title),
+  description: shortText(SUITE_LIMITS.description),
+  tags: z.array(shortText(SUITE_LIMITS.tag)).max(SUITE_LIMITS.tags).default([]),
 });
 
 export const suiteSummarySchema = z.object({
-  title: shortText(80),
-  description: shortText(300),
-  tags: z.array(shortText(40)).min(1).max(20),
+  title: shortText(SUITE_LIMITS.title),
+  description: shortText(SUITE_LIMITS.description),
+  tags: z.array(shortText(SUITE_LIMITS.tag)).min(1).max(SUITE_LIMITS.tags),
 });
 
 export const extractionOutputSchema = z.object({
