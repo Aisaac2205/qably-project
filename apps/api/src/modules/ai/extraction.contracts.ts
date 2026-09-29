@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { normalizeTitleForComparison } from '@qably/types';
+import { truncateOnWordBoundary } from '../../common/text/truncate-on-word-boundary';
 import { truncateTo } from '../../common/text/truncate-to';
+import { fitCaseTitle } from './fit-case-title';
 import { parseTargetRef } from './target-reference';
 
 export const MAX_SOURCE_CONTENT_LENGTH = 60_000;
@@ -14,7 +16,30 @@ const AUTOMATION_KEY_MAX_LENGTH =
   COMPOSITE_KEY_SEPARATOR_LENGTH +
   JUNIT_INGESTION_NAME_MAX_LENGTH;
 
+const CASE_LIMITS = {
+  title: 120,
+  objective: 500,
+  expectedResult: 500,
+  listItem: 300,
+  sourceExcerpt: 600,
+  observation: 200,
+  steps: 20,
+  preconditions: 10,
+  observations: 5,
+} as const;
+
 export const shortText = (max: number) => z.string().trim().min(1).max(max);
+
+const repairedText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .transform((value) => truncateOnWordBoundary(value, max))
+    .pipe(z.string().max(max));
+
+const keepFirst = (limit: number) => (value: unknown) =>
+  Array.isArray(value) ? value.slice(0, limit) : value;
 
 const automationKeyText = z
   .string()
@@ -24,38 +49,83 @@ const automationKeyText = z
 
 const LEADING_ORDINAL = /^\d+[.)]\s*/;
 
-const listItem = (max: number) =>
-  z
-    .string()
-    .trim()
-    .transform((value) => value.replace(LEADING_ORDINAL, ''))
-    .pipe(shortText(max));
+const withoutOrdinal = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(LEADING_ORDINAL, ''));
+
+const listItem = (max: number) => withoutOrdinal.pipe(shortText(max));
+
+const repairedListItem = (max: number) =>
+  withoutOrdinal.pipe(repairedText(max));
 
 export const extractedCaseObjectSchema = z.object({
   automationKey: automationKeyText,
-  title: shortText(120),
-  objective: shortText(500),
-  preconditions: z.array(listItem(300)).max(10).default([]),
-  steps: z.array(listItem(300)).min(1).max(20),
-  expectedResult: shortText(500),
+  title: shortText(CASE_LIMITS.title),
+  objective: shortText(CASE_LIMITS.objective),
+  preconditions: z
+    .array(listItem(CASE_LIMITS.listItem))
+    .max(CASE_LIMITS.preconditions)
+    .default([]),
+  steps: z.array(listItem(CASE_LIMITS.listItem)).min(1).max(CASE_LIMITS.steps),
+  expectedResult: shortText(CASE_LIMITS.expectedResult),
   priority: z.enum(['critical', 'high', 'medium', 'low']),
-  sourceExcerpt: shortText(600),
-  observations: z.array(shortText(200)).max(5).optional(),
+  sourceExcerpt: shortText(CASE_LIMITS.sourceExcerpt),
+  observations: z
+    .array(shortText(CASE_LIMITS.observation))
+    .max(CASE_LIMITS.observations)
+    .optional(),
 });
+
+const repairedCaseFields = {
+  title: z.string().trim().min(1),
+  objective: repairedText(CASE_LIMITS.objective),
+  preconditions: z
+    .preprocess(
+      keepFirst(CASE_LIMITS.preconditions),
+      z
+        .array(repairedListItem(CASE_LIMITS.listItem))
+        .max(CASE_LIMITS.preconditions),
+    )
+    .default([]),
+  steps: z.preprocess(
+    keepFirst(CASE_LIMITS.steps),
+    z
+      .array(repairedListItem(CASE_LIMITS.listItem))
+      .min(1)
+      .max(CASE_LIMITS.steps),
+  ),
+  expectedResult: repairedText(CASE_LIMITS.expectedResult),
+  sourceExcerpt: repairedText(CASE_LIMITS.sourceExcerpt),
+  observations: z
+    .preprocess(
+      keepFirst(CASE_LIMITS.observations),
+      z
+        .array(repairedText(CASE_LIMITS.observation))
+        .max(CASE_LIMITS.observations),
+    )
+    .optional(),
+};
 
 export const extractedCaseSchema = extractedCaseObjectSchema
   .extend({
+    ...repairedCaseFields,
     targetRef: z.unknown().transform(parseTargetRef).optional(),
   })
   .refine(
     (data) =>
-      normalizeTitleForComparison(data.title) !==
-      normalizeTitleForComparison(data.automationKey),
+      normalizeTitleForComparison(
+        truncateTo(data.title, AUTOMATION_KEY_MAX_LENGTH),
+      ) !== normalizeTitleForComparison(data.automationKey),
     {
       message: 'title must be different from the raw automationKey',
       path: ['title'],
     },
-  );
+  )
+  .transform((data) => ({
+    ...data,
+    title: fitCaseTitle(data.title, CASE_LIMITS.title),
+  }));
 
 export const extractedSuiteSchema = z.object({
   title: shortText(80),

@@ -40,9 +40,102 @@ A `401`/`403` from the API (invalid key) is never retried and immediately resolv
 - Source content is capped at **60,000 characters** per file (`SourceReader`, `apps/api/src/modules/repository/source-reader.ts`); anything longer is truncated before it reaches the model.
 - `SourceReader` percent-encodes owner, repo, ref and each path segment when it builds the fetch URL, and `buildBlobUrl` does the same for the human-facing `Evidence.uri` shown to reviewers — a file path or branch name containing a space, `#` or other reserved character never breaks either link.
 - The model may return at most **20 cases** per file (`MAX_EXTRACTED_CASES`, `apps/api/src/modules/ai/extraction.contracts.ts`). The cap is enforced in code, not in the schema: `GeminiExtractor.toOutcome` keeps only the first `MAX_EXTRACTED_CASES` schema-valid cases and drops the rest with a `this.logger.warn` naming the file path and the number dropped — a warning distinct from the one it already logs for individually invalid cases. The Zod `extractionOutputSchema` (`z.array(extractedCaseSchema).max(MAX_EXTRACTED_CASES)`) carries the same bound, but it runs only in the integration and contract specs, never inside `toOutcome`; the live cap is the slice.
-- Each case field is length-bounded (title ≤120, objective/expectedResult ≤500, steps 1–20 × ≤300, preconditions ≤10 × ≤300, sourceExcerpt ≤600) and validated with Zod (`extractedCaseSchema`) before it is persisted. A case that violates the schema is dropped and counted, not persisted — it never fails the rest of the batch.
+- Each case field is length-bounded (title ≤120, objective/expectedResult ≤500, steps 1–20 × ≤300, preconditions ≤10 × ≤300, sourceExcerpt ≤600, observations ≤5 × ≤200) and validated with Zod (`extractedCaseSchema`) before it is persisted. Over-long free text and over-long lists are repaired instead of dropped; see "Fields over the limit: repaired, not dropped" below. A case that still violates the schema is dropped, and the warning names the failing fields; it never fails the rest of the batch.
 - Those bounds live **only** in Zod and in `GeminiExtractor.toOutcome`, never in the JSON schema sent to the provider. `RESPONSE_JSON_SCHEMA` and `TARGETED_RESPONSE_JSON_SCHEMA` name the fields, the enum and the required list, and carry no array or string bounds at all — no `maxLength`, no `minLength`, no `maxItems`, no `minItems`, anywhere, including the top-level `cases` array — because Gemini compiles the response schema into a constrained-decoding automaton and rejects a bounded one as "too many states for serving" (HTTP 400; `gemini-3.1-flash-lite` reports it only as a generic `INVALID_ARGUMENT`). **Incident, 2026-09-26**: `TARGETED_RESPONSE_JSON_SCHEMA` added one optional property (`targetRef`) to the case item while `RESPONSE_JSON_SCHEMA.properties.cases` still carried a top-level `maxItems: 20` — that combination alone was enough to cross the state limit, so every targeted extraction (document-file jobs, "Volver a documentar con Aeris") returned HTTP 400 before generating a token, while the unit suite stayed green because it mocks the client and never calls the provider. The fix removed `maxItems` entirely and moved the cap into `GeminiExtractor.toOutcome`; the rule going forward is that a provider schema carries no bounds anywhere, and every bound lives in code. `gemini.response-schema.spec.ts`, `chat.response-schema.spec.ts` and `gemini.suite-summary-response-schema.spec.ts` each pin the same invariant for their own response schema, so a future "tighten the schema" change on any of the three cannot silently reintroduce it. The manual integration spec (`gemini.extractor.integration.spec.ts`) is the only check that validates schema acceptance against the real model — run it after any schema or prompt change, with a real `GEMINI_API_KEY` (see "Manual integration check" below).
-- `extractedCaseSchema` also rejects a case whose `title`, once trimmed, equals its `automationKey`: a model that falls back to echoing the reporter's runtime name as the human-facing title produces a case that `assessCaseDocumentation` (`packages/types/src/documentation-completeness.ts`) already treats as an undocumented title, so extraction now refuses to persist that shape in the first place instead of writing a "documented" case that the completeness rule would immediately flag as incomplete. `extractedCaseObjectSchema` (the same fields, without that cross-field check) is what `chat.contracts.ts`'s `suggestedCaseSchema` derives from via `.omit({ automationKey: true, sourceExcerpt: true })`, since a chat suggestion that carries no `automationKey` has nothing to compare the title against.
+- `extractedCaseSchema` also rejects a case whose `title`, once trimmed, equals its `automationKey`: a model that falls back to echoing the reporter's runtime name as the human-facing title produces a case that `assessCaseDocumentation` (`packages/types/src/documentation-completeness.ts`) already treats as an undocumented title, so extraction now refuses to persist that shape in the first place instead of writing a "documented" case that the completeness rule would immediately flag as incomplete. `extractedCaseObjectSchema` (the same fields, without that cross-field check) is what `chat.contracts.ts`'s `suggestedCaseSchema` derives from via `.omit({ automationKey: true, sourceExcerpt: true })`, since a chat suggestion that carries no `automationKey` has nothing to compare the title against. `extractedCaseObjectSchema` stays strict: it applies the same limits but repairs nothing, so chat suggestions keep their previous behavior.
+
+### Fields over the limit: repaired, not dropped
+
+A case whose free text exceeds its limit is kept and shortened. A case is dropped only when required content is missing or its shape is wrong, and every drop logs which field failed and with which Zod code.
+
+**Why.** In production, the Railway logs showed `dropped 3 invalid case(s)` for `ai-entitlement.service.spec.ts` and `dropped 2 invalid case(s)` for `use-inbox-counts.test.tsx`. Because neither of the two extraction attempts returned a valid case, `extractWithDeclarationRetry` ended in `no-tests-found` and the user saw "Aeris detectó declaraciones de prueba en este archivo pero no logró documentarlas". The prompt asks for a short, literal quote in `sourceExcerpt` but sets no number for the case fields; the literal quote of a long test easily exceeds 600 characters, and that used to be enough to lose the whole case. The log at the time only counted drops, so it was not possible to confirm which field failed in those two files. The new log exists to answer that question next time.
+
+#### What is repaired
+
+| Field | Limit | If exceeded |
+|---|---|---|
+| `title` | 120 | Shortened, and a digest is appended (see "Title" below). |
+| `objective`, `expectedResult` | 500 | Cut at a word boundary and ends with "…". |
+| `sourceExcerpt` | 600 | Same as above. |
+| Each item of `steps` and `preconditions` | 300 | Same as above, after removing the leading ordinal. |
+| Each item of `observations` | 200 | Same as above. |
+| `steps` | 1 to 20 items | The first 20 are kept. |
+| `preconditions` | up to 10 items | The first 10 are kept. |
+| `observations` | up to 5 items | The first 5 are kept. |
+| `automationKey` | 372 | Unchanged: cut by code points with `truncateTo`. |
+
+Shortening happens before the length is validated: first `trim()` and `min(1)`, then the transformation that shortens, and finally `max()` as a guard. This is the same pattern `automationKey` and the `listItem` ordinal already used.
+
+`truncateOnWordBoundary` (`apps/api/src/common/text/truncate-on-word-boundary.ts`) shortens text with these rules:
+
+1. It measures in UTF-16 units, the same unit Zod's `.max()` uses. Cutting by code points, as `truncateTo` does, could leave text containing emoji above the limit, and the case would be dropped anyway.
+2. It reserves one character for "…", so the result never exceeds the limit.
+3. It cuts at the last whitespace character (space, tab or line break) if that falls within the last 20% of the available space. If there is none, for example in a very long identifier or URL, it makes a hard cut.
+4. It never splits a surrogate pair: if the cut falls between the two halves of an emoji, it steps back one unit.
+5. It removes trailing whitespace before appending "…".
+
+The trailing "…" tells the reviewer that the text was shortened. For `sourceExcerpt`, this means the quote is no longer complete, but it remains literal up to the cut.
+
+#### Lists longer than the cap
+
+When `steps` exceeds 20 items, `preconditions` exceeds 10 or `observations` exceeds 5, the first items are kept in their order and the excess is discarded before each item is validated. An invalid item that falls beyond the cap, for example a step `"21."` that is only an ordinal, is discarded with the excess and does not invalidate the case.
+
+Keeping the prefix was chosen because every proposal goes through human review before publication. A case with its first 20 steps is visible in the review inbox, can be compared against `sourceExcerpt` and can be rejected. A dropped case, by contrast, never reaches the inbox and leaves no trace for the user. The cost is that the tail of the steps is lost, which usually holds the last assertions; `expectedResult` is a separate field and is not affected.
+
+#### Title
+
+The title becomes the official name of the case on approval, and `TestCase` has `@@unique([suiteId, name])` (`apps/api/prisma/schema.prisma`). The review inbox does not allow editing the title before approving: `POST /review/proposals/:id/approve` accepts only a comment. So a name collision on approval currently ends in a 409 with no way out for the reviewer.
+
+| Option | Cases lost | Risk to identity |
+|---|---|---|
+| Drop the case (previous behavior) | Every case with a title over 120 | None |
+| Shorten with nothing else | None | Two titles sharing their first 120 characters, typical of `it.each` rows, end up with the same name and the second collides on approval |
+| **Shorten and append a digest (chosen)** | None | None in practice |
+
+`fitCaseTitle` (`apps/api/src/modules/ai/fit-case-title.ts`) cuts the title at a word boundary, appends "…" and ends with ` (xxxxxx)`, where `xxxxxx` are the first 6 hexadecimal characters of the SHA-256 of the full title. The result never exceeds 120 characters. A title of 120 characters or fewer does not change.
+
+- **Deterministic.** The same test produces the same name on every new extraction, so documenting a file again does not invent new names.
+- **Distinguishes what the cut would hide.** Two different titles that differ only after the cut end with different digests. The probability that two different long titles share a digest is 1 in 16.7 million.
+- **Adds no new collisions.** Two identical titles produce the same digest, but that collision already existed without the cut.
+- **Cost.** The official name carries a hard-to-read suffix. It only appears on titles that already violated the limit and were previously lost.
+
+The check "the title must differ from the `automationKey`" is evaluated on the original title, before shortening, and cut to the same 372 characters as the `automationKey`. That way, a model that returns a long `automationKey` as the title is still dropped, instead of passing the check thanks to the digest.
+
+#### What is still dropped
+
+- Required text that is empty after `trim()`: `title`, `objective`, `expectedResult`, `sourceExcerpt`, or a step or precondition that contains only an ordinal.
+- A required field that is missing or of another type, for example `steps` as text instead of a list.
+- Empty `steps`.
+- `priority` outside `critical`, `high`, `medium` or `low`.
+- A `title` equal to the `automationKey` according to `normalizeTitleForComparison`.
+
+#### How to read the log line
+
+```
+Gemini response for src/modules/ai/ai-entitlement.service.spec.ts dropped 3 invalid case(s): objective too_small x2, steps[] too_small x1
+```
+
+- The prefix `Gemini response for <file> dropped <n> invalid case(s)` did not change, so existing log searches keep working.
+- Each item after the colon has the form `<field> <Zod code> x<cases>`, ordered from most to least frequent. The number counts cases, not errors: a case with two empty steps adds one to `steps[] too_small`.
+- `[]` marks a list item. `case` means the model returned something that is not an object.
+- Usual codes: `too_small` (empty text or empty list), `invalid_type` (missing field or a field of another type), `invalid_value` (`priority` outside the enum) and `custom` on `title` (the title repeats the `automationKey`).
+- A `too_big` on a repaired field should never appear. If it does, the shortening has a bug.
+- The line never includes case content or source code. `summarizeDroppedCases` (`apps/api/src/modules/ai/dropped-case-summary.ts`) reads only the path and the code of each issue, never `message` or `input`.
+
+#### Scope
+
+- The repair lives only in `extractedCaseSchema`, which `GeminiExtractor.toOutcome` and `extractionOutputSchema` use. Chat suggestions use `extractedCaseObjectSchema`, which stays strict; they have the same silent drop and remain as a follow-up.
+- The prompt did not change and stays at `extraction-v11`: it still gives no number for `sourceExcerpt`. Declaring the limits in the prompt would reduce the number of cuts, but it requires validating again against the real model.
+- `RESPONSE_JSON_SCHEMA` and `TARGETED_RESPONSE_JSON_SCHEMA` did not change and still carry no bounds, for the reason explained in the "Limits" list that precedes this section.
+
+#### Verified Zod behavior
+
+The implementation depends on these Zod 4 behaviors. They were verified against the documentation (context7, `/websites/zod_dev`) and by running them against the version installed in `apps/api` (4.4.3):
+
+- `.transform()` and `z.preprocess()` return a `ZodPipe`. If the left side of a pipe fails, for example `min(1)`, the transformation does not run, so empty text is dropped instead of shortened.
+- `z.preprocess(fn, schema).default([])` returns `[]` when the field is missing, and a non-list input reaches the list schema and produces `invalid_type`.
+- `z.string().max(n)` counts UTF-16 units: two emoji measure 4.
+- `safeParse` exposes `error.issues`, and each issue carries `code` and `path`, with list indices as numbers.
 
 ## Cost estimate per file
 

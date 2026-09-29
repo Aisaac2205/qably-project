@@ -308,6 +308,73 @@ describe('GeminiExtractor', () => {
     }
   });
 
+  it('names the failing fields and zod codes when it drops cases, without logging case content', async () => {
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          cases: [
+            validRawCase(),
+            validRawCase({
+              automationKey: 'Cart > removes an item',
+              title: 'Quita un producto del carrito privado',
+              objective: '',
+            }),
+            validRawCase({
+              automationKey: 'Cart > empties the cart',
+              title: 'Vacía el carrito confidencial',
+              objective: '',
+              priority: 'urgent',
+            }),
+          ],
+        }),
+      }),
+    );
+    const extractor = new GeminiExtractor(client, env());
+    const warnSpy = jest.spyOn(extractor['logger'], 'warn');
+
+    const outcome = await extractor.extract(input());
+
+    expect(outcome.kind).toBe('extracted');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Gemini response for src/cart.spec.ts dropped 2 invalid case(s): objective too_small x2, priority invalid_value x1',
+    );
+    const logged = warnSpy.mock.calls.flat().join(' ');
+    expect(logged).not.toContain('privado');
+    expect(logged).not.toContain('confidencial');
+  });
+
+  it('returns a case whose over-long literal sourceExcerpt was repaired instead of dropping it', async () => {
+    const longExcerpt = [
+      "it('adds an item', async () => {",
+      ...Array.from(
+        { length: 20 },
+        (_, index) =>
+          `  await cart.add({ sku: 'SKU-${index}', quantity: ${index + 1} });`,
+      ),
+      '  expect(cart.total()).toBe(210);',
+      '});',
+    ].join('\n');
+    const client = fakeClient(() =>
+      Promise.resolve({
+        text: JSON.stringify({
+          cases: [validRawCase({ sourceExcerpt: longExcerpt })],
+        }),
+      }),
+    );
+    const extractor = new GeminiExtractor(client, env());
+    const warnSpy = jest.spyOn(extractor['logger'], 'warn');
+
+    const outcome = await extractor.extract(input());
+
+    expect(longExcerpt.length).toBeGreaterThan(600);
+    expect(outcome.kind).toBe('extracted');
+    if (outcome.kind !== 'extracted') return;
+    expect(outcome.cases).toHaveLength(1);
+    expect(outcome.cases[0].sourceExcerpt.length).toBeLessThanOrEqual(600);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
   it(`keeps only the first ${MAX_EXTRACTED_CASES} valid cases when the model returns more, and warns about the cap`, async () => {
     const rawCases = Array.from({ length: 25 }, (_, index) =>
       validRawCase({

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { InjectEnv } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { GEMINI_CLIENT } from './ai.tokens';
+import { summarizeDroppedCases, type CaseIssue } from './dropped-case-summary';
 import {
   buildFileContentTurn,
   buildSystemInstruction,
@@ -322,20 +323,20 @@ export class GeminiExtractor implements TestCaseExtractor {
     }
 
     const validCases: ExtractedCase[] = [];
-    let dropped = 0;
+    const droppedCases: CaseIssue[][] = [];
 
     for (const raw of envelope.data.cases) {
       const result = extractedCaseSchema.safeParse(raw);
       if (result.success) {
         validCases.push(result.data);
       } else {
-        dropped += 1;
+        droppedCases.push(result.error.issues);
       }
     }
 
-    if (dropped > 0) {
+    if (droppedCases.length > 0) {
       this.logger.warn(
-        `Gemini response for ${filePath} dropped ${dropped} invalid case(s)`,
+        `Gemini response for ${filePath} dropped ${droppedCases.length} invalid case(s): ${summarizeDroppedCases(droppedCases)}`,
       );
     }
 
