@@ -15,6 +15,20 @@ export interface CaseDocumentationActionProps {
   onEdit: (testCase: TestCase) => void
 }
 
+function CaseInReviewLink({ proposalId }: { proposalId: string }) {
+  const { t } = useTranslation()
+
+  return (
+    <Link
+      href={`/review-inbox?proposal=${proposalId}`}
+      className="inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40"
+    >
+      <Clock size={13} weight="bold" aria-hidden="true" />
+      {t('suites.caseInReview')}
+    </Link>
+  )
+}
+
 export function CaseDocumentationAction({
   testCase,
   stepsOpen,
@@ -25,29 +39,27 @@ export function CaseDocumentationAction({
   const { t } = useTranslation()
   const documentCase = useDocumentCase()
 
+  const reviewLink =
+    documentationBadge === null && testCase.pendingProposalId ? (
+      <CaseInReviewLink proposalId={testCase.pendingProposalId} />
+    ) : null
+
   if (testCase.steps.length > 0) {
     return (
-      <CaseDisclosureToggle
-        label={t('suites.stepsCount', { count: testCase.steps.length })}
-        isOpen={stepsOpen}
-        onToggle={onToggleSteps}
-      />
+      <>
+        <CaseDisclosureToggle
+          label={t('suites.stepsCount', { count: testCase.steps.length })}
+          isOpen={stepsOpen}
+          onToggle={onToggleSteps}
+        />
+        {reviewLink}
+      </>
     )
   }
 
-  if (testCase.executionMode === 'automated') {
-    if (documentationBadge === null && testCase.pendingProposalId) {
-      return (
-        <Link
-          href={`/review-inbox?proposal=${testCase.pendingProposalId}`}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40"
-        >
-          <Clock size={13} weight="bold" aria-hidden="true" />
-          {t('suites.caseInReview')}
-        </Link>
-      )
-    }
+  if (reviewLink !== null) return reviewLink
 
+  if (testCase.executionMode === 'automated') {
     if (testCase.documentation?.outcome === 'failed') {
       const reasonCode = testCase.documentation.skipReason
       const reasonKey = reasonCode === null ? null : extractionFailureReasonKey(reasonCode)

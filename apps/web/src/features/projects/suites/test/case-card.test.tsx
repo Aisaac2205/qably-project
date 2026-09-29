@@ -470,6 +470,108 @@ describe('CaseCard', () => {
       expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
       expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
     })
+
+    describe('on a case that already has steps', () => {
+      const documentedCase: TestCase = {
+        ...automatedCase,
+        steps: ['Open the login page', 'Submit valid credentials'],
+        expectedResult: 'The dashboard opens',
+        state: 'active',
+        healthSignals: [],
+      }
+
+      it('keeps the review state visible next to the steps toggle', async () => {
+        await act(async () => {
+          renderWithQuery(
+            <CaseCard
+              testCase={{ ...documentedCase, pendingProposalId: 'proposal-7' }}
+              projectId="proj-1"
+              onEdit={noop}
+              onDelete={noop}
+            />,
+          )
+        })
+
+        const toggle = screen.getByRole('button', { name: /2 steps/i })
+        const link = screen.getByRole('link', { name: /in review/i })
+
+        expect(link).toHaveAttribute('href', '/review-inbox?proposal=proposal-7')
+        expect(link.parentElement).toBe(toggle.parentElement)
+        expect(
+          toggle.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy()
+      })
+
+      it('adds no chip to the meta cluster and leaves the execution result untouched', async () => {
+        await act(async () => {
+          renderWithQuery(
+            <CaseCard
+              testCase={{
+                ...documentedCase,
+                pendingProposalId: 'proposal-7',
+                lastResult: {
+                  status: 'fail',
+                  runId: 'run-1',
+                  commitSha: null as unknown as undefined,
+                  recordedAt: '2026-03-01T00:00:00Z',
+                },
+              }}
+              projectId="proj-1"
+              onEdit={noop}
+              onDelete={noop}
+            />,
+          )
+        })
+
+        expect(screen.getAllByText(/in review/i)).toHaveLength(1)
+        expect(screen.getByRole('link', { name: /in review/i })).toBeInTheDocument()
+        expect(screen.getByText('Fail').closest('span')).toHaveAttribute('data-status', 'fail')
+        expect(screen.queryByText(/^unconfirmed$/i)).not.toBeInTheDocument()
+      })
+
+      it('shows no review link when nothing is pending', async () => {
+        await act(async () => {
+          renderWithQuery(
+            <CaseCard
+              testCase={{ ...documentedCase, pendingProposalId: null }}
+              projectId="proj-1"
+              onEdit={noop}
+              onDelete={noop}
+            />,
+          )
+        })
+
+        expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+      })
+
+      it('lets the Aeris documenting badge win over the review link', async () => {
+        await act(async () => {
+          renderWithQuery(
+            <CaseCard
+              testCase={{
+                ...documentedCase,
+                pendingProposalId: 'proposal-7',
+                documentation: {
+                  outcome: null,
+                  missing: [],
+                  skipReason: null,
+                  queuedAt: '2026-03-01T00:00:00Z',
+                  outcomeAt: null,
+                },
+              }}
+              projectId="proj-1"
+              onEdit={noop}
+              onDelete={noop}
+            />,
+          )
+        })
+
+        expect(screen.getByText('Documenting')).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+      })
+    })
   })
 
   describe('documented locale', () => {

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import type { TestCase } from '@qably/types'
 import { CaseDocumentationAction } from '@/features/projects/suites/components/case-documentation-action'
+import type { CaseDocumentationBadge } from '@/features/projects/suites/lib/case-documentation-state'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import * as suitesApi from '@/test/suites-api-stub'
 
@@ -28,13 +29,24 @@ const automatedCase: TestCase = {
   automationFilePath: 'src/features/runs/hooks/use-create-run.test.ts',
 }
 
-function renderAction(overrides: Partial<TestCase> = {}) {
+const documentedAutomatedCase: TestCase = {
+  ...automatedCase,
+  steps: ['Open the login page', 'Submit valid credentials'],
+  expectedResult: 'The dashboard opens',
+  state: 'active',
+  healthSignals: [],
+}
+
+function renderAction(
+  overrides: Partial<TestCase> = {},
+  documentationBadge: CaseDocumentationBadge | null = null,
+) {
   return renderWithQuery(
     <CaseDocumentationAction
       testCase={{ ...automatedCase, ...overrides }}
       stepsOpen={false}
       onToggleSteps={noop}
-      documentationBadge={null}
+      documentationBadge={documentationBadge}
       onEdit={noop}
     />,
   )
@@ -137,5 +149,145 @@ describe('CaseDocumentationAction', () => {
     })
 
     expect(screen.getByRole('button', { name: /document this case/i })).toBeInTheDocument()
+  })
+
+  describe('in-review link', () => {
+    it('links to the pending proposal for an automated case with zero steps', async () => {
+      await act(async () => {
+        renderAction({ pendingProposalId: 'proposal-1' })
+      })
+
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-1',
+      )
+    })
+
+    it('shows the link next to the steps toggle when the case already has steps', async () => {
+      await act(async () => {
+        renderAction({ ...documentedAutomatedCase, pendingProposalId: 'proposal-2' })
+      })
+
+      expect(screen.getByRole('button', { name: /2 steps/i })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      )
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-2',
+      )
+    })
+
+    it('keeps the steps toggle first and the link second in keyboard order', async () => {
+      await act(async () => {
+        renderAction({ ...documentedAutomatedCase, pendingProposalId: 'proposal-2' })
+      })
+
+      const toggle = screen.getByRole('button', { name: /2 steps/i })
+      const link = screen.getByRole('link', { name: /in review/i })
+
+      expect(toggle.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('keeps the toggle and the link in the same inline group, not in a second container', async () => {
+      await act(async () => {
+        renderAction({ ...documentedAutomatedCase, pendingProposalId: 'proposal-2' })
+      })
+
+      const toggle = screen.getByRole('button', { name: /2 steps/i })
+      const link = screen.getByRole('link', { name: /in review/i })
+
+      expect(link.parentElement).toBe(toggle.parentElement)
+    })
+
+    it('draws a visible ring on keyboard focus, since the global rule removes the outline', async () => {
+      await act(async () => {
+        renderAction({ pendingProposalId: 'proposal-1' })
+      })
+
+      const link = screen.getByRole('link', { name: /in review/i })
+
+      expect(link.className).toContain('focus-visible:ring-2')
+      expect(link.className).toContain('focus-visible:ring-primary')
+    })
+
+    it('shows only the steps toggle when a case with steps has no pending proposal', async () => {
+      await act(async () => {
+        renderAction({ ...documentedAutomatedCase, pendingProposalId: null })
+      })
+
+      expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
+
+    it('shows only the steps toggle when the pending id is absent from the payload', async () => {
+      await act(async () => {
+        renderAction(documentedAutomatedCase)
+      })
+
+      expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
+
+    it('lets an active Aeris documentation badge take precedence over the link, with steps', async () => {
+      await act(async () => {
+        renderAction(
+          { ...documentedAutomatedCase, pendingProposalId: 'proposal-2' },
+          { kind: 'documenting' },
+        )
+      })
+
+      expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
+
+    it('lets an active Aeris documentation badge take precedence over the link, without steps', async () => {
+      await act(async () => {
+        renderAction({ pendingProposalId: 'proposal-1' }, { kind: 'documenting' })
+      })
+
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
+
+    it('shows the link for a manual case with steps, next to its steps toggle', async () => {
+      await act(async () => {
+        renderAction({
+          ...documentedAutomatedCase,
+          executionMode: 'manual',
+          automationKey: undefined,
+          automationFilePath: undefined,
+          pendingProposalId: 'proposal-3',
+        })
+      })
+
+      expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-3',
+      )
+    })
+
+    it('shows the link instead of the manual Documentar CTA when a proposal is already pending', async () => {
+      await act(async () => {
+        renderAction({ executionMode: 'manual', pendingProposalId: 'proposal-3' })
+      })
+
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-3',
+      )
+      expect(
+        screen.queryByRole('button', { name: /document this case/i }),
+      ).not.toBeInTheDocument()
+    })
+
+    it('keeps the manual Documentar CTA when no proposal is pending', async () => {
+      await act(async () => {
+        renderAction({ executionMode: 'manual', pendingProposalId: null })
+      })
+
+      expect(screen.getByRole('button', { name: /document this case/i })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+    })
   })
 })
