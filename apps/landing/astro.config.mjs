@@ -33,7 +33,6 @@ export default defineConfig({
         'd3-array',
         '@number-flow/react',
         '@base-ui/react',
-        '@central-icons-react/all',
         'class-variance-authority',
         'clsx',
         'tailwind-merge',

@@ -1,6 +1,6 @@
 "use client";
 
-import { CentralIcon } from "@central-icons-react/all";
+import { ArrowDown, ArrowUp } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -22,15 +22,11 @@ export function TrendBadge({
       )}
       variant={positive ? "outline" : "fail"}
     >
-      <CentralIcon
-        className="size-3"
-        data-icon="inline-start"
-        fill="outlined"
-        join="round"
-        name={positive ? "IconArrowUp" : "IconArrowDown"}
-        radius="0"
-        stroke="1.5"
-      />
+      {positive ? (
+        <ArrowUp className="size-3" data-icon="inline-start" />
+      ) : (
+        <ArrowDown className="size-3" data-icon="inline-start" />
+      )}
       {positive ? "+" : ""}
       {value.toFixed(1)}%
     </Badge>

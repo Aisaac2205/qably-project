@@ -17,7 +17,6 @@
   "dependencies": {
     "@astrojs/react": "^6.0.5",
     "@base-ui/react": "^1.6.0",
-    "@central-icons-react/all": "^1.2.1",
     "@number-flow/react": "^0.6.2",
     "@phosphor-icons/react": "^2.1.10",
     "@qably/types": "workspace:*",
