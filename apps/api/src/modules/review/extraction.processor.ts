@@ -36,10 +36,10 @@ import {
 import { detectLanguage } from './lib/detect-language';
 import {
   isSameDocumentation,
-  publishTestCaseVersion,
   type DocumentationStateWrite,
   type PublishTestCaseVersionFields,
 } from './lib/publish-test-case-version';
+import { publishWithNameFallback } from './lib/publish-with-name-fallback';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { testCaseUniqueConstraint } from './lib/test-case-unique-constraint';
 import {
@@ -1036,6 +1036,7 @@ export class ExtractionProcessor extends WorkerHost {
       select: {
         id: true,
         suiteId: true,
+        name: true,
         documentationSource: true,
         currentVersion: {
           select: {
@@ -1121,13 +1122,24 @@ export class ExtractionProcessor extends WorkerHost {
           documentationSkipReason: null,
         };
 
-        await publishTestCaseVersion(tx, target.testCaseId, nextFields, {
-          documentationSource: AERIS_DOCUMENTATION_SOURCE,
-          ...documentedState,
-          ...(testCase.observations === undefined
-            ? {}
-            : { observations: testCase.observations }),
-        });
+        await publishWithNameFallback(
+          tx,
+          {
+            testCaseId: target.testCaseId,
+            suiteId: info.suiteId,
+            automationKey: target.automationKey,
+            currentName: info.name,
+            fields: nextFields,
+            overrides: {
+              documentationSource: AERIS_DOCUMENTATION_SOURCE,
+              ...documentedState,
+              ...(testCase.observations === undefined
+                ? {}
+                : { observations: testCase.observations }),
+            },
+          },
+          this.logger,
+        );
 
         await tx.extractedProposal.deleteMany({
           where: {
