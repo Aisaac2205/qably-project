@@ -1,6 +1,7 @@
 import {
   API_KEY_PREFIX,
   generateApiKeyToken,
+  hasApiKeyTokenShape,
   hashApiKeySecret,
   parseApiKeyToken,
   secretMatches,
@@ -101,5 +102,58 @@ describe('secretMatches', () => {
     const generated = generateApiKeyToken();
 
     expect(secretMatches(generated.secret, 'not-a-hash')).toBe(false);
+  });
+});
+
+describe('hasApiKeyTokenShape', () => {
+  it('accepts every token the generator produces', () => {
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      expect(hasApiKeyTokenShape(generateApiKeyToken().token)).toBe(true);
+    }
+  });
+
+  it('rejects a token that does not carry the platform prefix', () => {
+    const generated = generateApiKeyToken();
+
+    expect(
+      hasApiKeyTokenShape(`sk_${generated.lookupId}_${generated.secret}`),
+    ).toBe(false);
+  });
+
+  it('rejects a lookup id of the wrong length', () => {
+    const generated = generateApiKeyToken();
+
+    expect(
+      hasApiKeyTokenShape(
+        `${API_KEY_PREFIX}_${generated.lookupId.slice(2)}_${generated.secret}`,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects a secret of the wrong length', () => {
+    const generated = generateApiKeyToken();
+
+    expect(
+      hasApiKeyTokenShape(
+        `${API_KEY_PREFIX}_${generated.lookupId}_${generated.secret}00`,
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects characters outside lowercase hexadecimal', () => {
+    const generated = generateApiKeyToken();
+    const tampered = generated.token.replace(generated.secret.slice(0, 1), 'Z');
+
+    expect(hasApiKeyTokenShape(tampered)).toBe(false);
+  });
+
+  it('rejects trailing text after the secret', () => {
+    expect(hasApiKeyTokenShape(`${generateApiKeyToken().token} extra`)).toBe(
+      false,
+    );
+  });
+
+  it('rejects an empty token', () => {
+    expect(hasApiKeyTokenShape('')).toBe(false);
   });
 });

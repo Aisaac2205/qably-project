@@ -6,6 +6,11 @@ const LOOKUP_BYTES = 6;
 const SECRET_BYTES = 32;
 const HASH_LENGTH = 64;
 const TOKEN_PARTS = 3;
+const HEX_CHARS_PER_BYTE = 2;
+
+const API_KEY_TOKEN_SHAPE = new RegExp(
+  `^${API_KEY_PREFIX}_[0-9a-f]{${LOOKUP_BYTES * HEX_CHARS_PER_BYTE}}_[0-9a-f]{${SECRET_BYTES * HEX_CHARS_PER_BYTE}}$`,
+);
 
 export interface GeneratedApiKey {
   token: string;
@@ -38,6 +43,10 @@ export function parseApiKeyToken(token: string): ParsedApiKey | null {
   if (lookupId === '' || secret === '') return null;
 
   return { lookupId, secret };
+}
+
+export function hasApiKeyTokenShape(token: string): boolean {
+  return API_KEY_TOKEN_SHAPE.test(token);
 }
 
 export function hashApiKeySecret(secret: string): string {

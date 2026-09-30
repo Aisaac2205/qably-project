@@ -227,6 +227,12 @@ testcases or 500 distinct suites — `apps/api/src/modules/runs/lib/parse-junit-
 workflow with, say, three report files (unit, e2e, web) spends three requests against the budget
 no matter how many suites are inside them, unless one of those files is oversized enough to split.
 
+Independently of that, every request also counts against a ceiling of **600 requests per minute per
+client address across all routes**, whatever credential it carries. It is sized far above the
+per-credential budgets because CI runners often share one egress address. Only a bearer value shaped
+like a real API key gets its own per-credential bucket; anything else (a malformed key, another scheme,
+no header) is counted against the address.
+
 When the API answers `429` or a `5xx`, or the request itself fails at the network level, the
 reporter retries with exponential backoff instead of dropping the file, up to 4 attempts total. A
 `429` honours the `Retry-After` header the throttler sends (in seconds) when present. A file is

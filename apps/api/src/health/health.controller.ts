@@ -4,7 +4,7 @@ import { Public } from '../modules/auth/decorators/public.decorator';
 import type { HealthReport } from './health.contracts';
 import { HealthService } from './health.service';
 
-@SkipThrottle()
+@SkipThrottle({ default: true, ip: true })
 @Controller('health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}

@@ -1,3 +1,4 @@
+import { generateApiKeyToken } from '../../modules/api-keys/lib/token';
 import { CredentialThrottlerGuard } from './credential-throttler.guard';
 
 class ExposedGuard extends CredentialThrottlerGuard {
@@ -8,48 +9,103 @@ class ExposedGuard extends CredentialThrottlerGuard {
 
 const guard = new ExposedGuard({} as never, {} as never, {} as never);
 
+function bearer(token: string): string {
+  return `Bearer ${token}`;
+}
+
 describe('CredentialThrottlerGuard', () => {
-  it('buckets by credential when one is presented', async () => {
+  it('buckets by credential when a well formed key is presented', async () => {
     const tracker = await guard.track({
-      headers: { authorization: 'Bearer qbly_live_abc' },
+      headers: { authorization: bearer(generateApiKeyToken().token) },
       ip: '10.0.0.1',
     });
 
     expect(tracker.startsWith('credential:')).toBe(true);
   });
 
-  it('never puts the raw credential in the tracker', async () => {
+  it('never puts the raw key in the tracker', async () => {
+    const { token, secret } = generateApiKeyToken();
+
     const tracker = await guard.track({
-      headers: { authorization: 'Bearer qbly_live_abc' },
+      headers: { authorization: bearer(token) },
     });
 
-    expect(tracker).not.toContain('qbly_live_abc');
+    expect(tracker).not.toContain(secret);
+    expect(tracker).not.toContain(token);
   });
 
-  it('gives two credentials two buckets', async () => {
+  it('gives two keys two buckets', async () => {
     const first = await guard.track({
-      headers: { authorization: 'Bearer one' },
+      headers: { authorization: bearer(generateApiKeyToken().token) },
       ip: '10.0.0.1',
     });
     const second = await guard.track({
-      headers: { authorization: 'Bearer two' },
+      headers: { authorization: bearer(generateApiKeyToken().token) },
       ip: '10.0.0.1',
     });
 
     expect(first).not.toBe(second);
   });
 
-  it('gives one credential one bucket across addresses', async () => {
+  it('gives one key one bucket across addresses', async () => {
+    const { token } = generateApiKeyToken();
+
     const first = await guard.track({
-      headers: { authorization: 'Bearer same' },
+      headers: { authorization: bearer(token) },
       ip: '10.0.0.1',
     });
     const second = await guard.track({
-      headers: { authorization: 'Bearer same' },
+      headers: { authorization: bearer(token) },
       ip: '10.0.0.2',
     });
 
     expect(first).toBe(second);
+  });
+
+  it('does not open a new bucket when text is appended to a key', async () => {
+    const { token } = generateApiKeyToken();
+
+    const plain = await guard.track({
+      headers: { authorization: bearer(token) },
+      ip: '10.0.0.1',
+    });
+    const padded = await guard.track({
+      headers: { authorization: `${bearer(token)} padding` },
+      ip: '10.0.0.1',
+    });
+
+    expect(padded).toBe(plain);
+  });
+
+  it('falls back to the address when the credential is not shaped like a key', async () => {
+    const tracker = await guard.track({
+      headers: { authorization: 'Bearer qbly_live_abc' },
+      ip: '10.0.0.1',
+    });
+
+    expect(tracker).toBe('ip:10.0.0.1');
+  });
+
+  it('gives rotating garbage the same bucket', async () => {
+    const first = await guard.track({
+      headers: { authorization: 'Bearer garbage-one' },
+      ip: '10.0.0.1',
+    });
+    const second = await guard.track({
+      headers: { authorization: 'Bearer garbage-two' },
+      ip: '10.0.0.1',
+    });
+
+    expect(first).toBe(second);
+  });
+
+  it('falls back to the address for another scheme', async () => {
+    const tracker = await guard.track({
+      headers: { authorization: `Basic ${generateApiKeyToken().token}` },
+      ip: '10.0.0.1',
+    });
+
+    expect(tracker).toBe('ip:10.0.0.1');
   });
 
   it('falls back to the address for anonymous callers', async () => {

@@ -1,7 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { CredentialThrottlerGuard } from './common/throttler/credential-throttler.guard';
+import { ThrottlingModule } from './common/throttler/throttling.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule } from './config/config.module';
@@ -23,9 +21,7 @@ import { SuitesModule } from './modules/suites/suites.module';
 
 @Module({
   imports: [
-    ThrottlerModule.forRoot({
-      throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],
-    }),
+    ThrottlingModule,
     ConfigModule,
     PrismaModule,
     AuthModule,
@@ -45,6 +41,5 @@ import { SuitesModule } from './modules/suites/suites.module';
     DashboardModule,
     ReporterModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: CredentialThrottlerGuard }],
 })
 export class AppModule {}
