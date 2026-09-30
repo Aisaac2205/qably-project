@@ -30,10 +30,10 @@ import {
 
 const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
 const OVERLOAD_STATUS_CODES = [408, 500, 502, 503, 504];
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 120_000;
 const RETRY_ATTEMPTS = 3;
 const TEMPERATURE = 0.2;
-const MAX_OUTPUT_TOKENS = 8192;
+const MAX_OUTPUT_TOKENS = 16384;
 
 export const RESPONSE_JSON_SCHEMA = {
   type: 'object',

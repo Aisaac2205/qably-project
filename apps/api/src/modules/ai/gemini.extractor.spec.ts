@@ -92,10 +92,10 @@ describe('GeminiExtractor', () => {
     const config = received.config as Record<string, unknown>;
     expect(config.responseMimeType).toBe('application/json');
     expect(config.temperature).toBe(0.2);
-    expect(config.maxOutputTokens).toBe(8192);
+    expect(config.maxOutputTokens).toBe(16384);
     expect(config.systemInstruction).toBe(buildSystemInstruction('es'));
     expect(config.httpOptions).toEqual({
-      timeout: 60_000,
+      timeout: 120_000,
       retryOptions: {
         attempts: 3,
         httpStatusCodes: [408, 429, 500, 502, 503, 504],

@@ -14,13 +14,13 @@ const truncatedResponse = {
   candidates: [{ finishReason: 'MAX_TOKENS' }],
   usageMetadata: {
     promptTokenCount: 34841,
-    candidatesTokenCount: 8177,
-    totalTokenCount: 43018,
+    candidatesTokenCount: 16377,
+    totalTokenCount: 51218,
   },
 };
 
 const DIAGNOSTICS =
-  'finishReason=MAX_TOKENS, output tokens 8177 of 8192, prompt tokens 34841';
+  'finishReason=MAX_TOKENS, output tokens 16377 of 16384, prompt tokens 34841';
 
 function env(): Env {
   return { GEMINI_MODEL: 'gemini-2.5-flash-lite' } as Env;
@@ -99,7 +99,7 @@ describe('GeminiExtractor.extract — unusable response diagnostics', () => {
     });
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
-      `Gemini response for ${FILE_PATH} had no text (finishReason=SAFETY, output tokens 0 of 8192, prompt tokens 120)`,
+      `Gemini response for ${FILE_PATH} had no text (finishReason=SAFETY, output tokens 0 of 16384, prompt tokens 120)`,
     );
   });
 
@@ -109,7 +109,7 @@ describe('GeminiExtractor.extract — unusable response diagnostics', () => {
     await extractor.extract(extractionInput());
 
     expect(warnSpy).toHaveBeenCalledWith(
-      `Gemini response for ${FILE_PATH} had no text (finishReason=unknown, output tokens unknown of 8192, prompt tokens unknown)`,
+      `Gemini response for ${FILE_PATH} had no text (finishReason=unknown, output tokens unknown of 16384, prompt tokens unknown)`,
     );
   });
 
@@ -129,7 +129,7 @@ describe('GeminiExtractor.extract — unusable response diagnostics', () => {
     });
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
-      `Gemini response for ${FILE_PATH} had no cases array (finishReason=STOP, output tokens 15 of 8192, prompt tokens 900)`,
+      `Gemini response for ${FILE_PATH} had no cases array (finishReason=STOP, output tokens 15 of 16384, prompt tokens 900)`,
     );
   });
 
@@ -175,7 +175,7 @@ describe('GeminiExtractor.summarizeSuite — unusable response diagnostics', () 
       retryable: false,
     });
     expect(warnSpy).toHaveBeenCalledWith(
-      `Gemini suite summary response for ${SUITE_NAME} had no text (finishReason=SAFETY, output tokens unknown of 8192, prompt tokens unknown)`,
+      `Gemini suite summary response for ${SUITE_NAME} had no text (finishReason=SAFETY, output tokens unknown of 16384, prompt tokens unknown)`,
     );
   });
 
@@ -195,7 +195,7 @@ describe('GeminiExtractor.summarizeSuite — unusable response diagnostics', () 
     });
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy).toHaveBeenCalledWith(
-      `Gemini suite summary response for ${SUITE_NAME} failed schema validation (finishReason=STOP, output tokens 10 of 8192, prompt tokens 300)`,
+      `Gemini suite summary response for ${SUITE_NAME} failed schema validation (finishReason=STOP, output tokens 10 of 16384, prompt tokens 300)`,
     );
   });
 });
