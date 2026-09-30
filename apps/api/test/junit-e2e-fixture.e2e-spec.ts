@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { INestApplication } from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import { Test } from '@nestjs/testing';
-import express from 'express';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 import {
@@ -13,6 +12,7 @@ import {
 import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { configureHttpPipeline } from '../src/common/http/configure-http-pipeline';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import { ApiKeysModule } from '../src/modules/api-keys/api-keys.module';
@@ -648,9 +648,7 @@ describe('JUnit e2e fixture ingestion (e2e)', () => {
       .compile();
 
     app = moduleFixture.createNestApplication({ bodyParser: false });
-    app.use(
-      express.text({ type: ['application/xml', 'text/xml'], limit: '10mb' }),
-    );
+    configureHttpPipeline(app, testEnv);
     app.useGlobalFilters(new AllExceptionsFilter(false));
     await app.init();
 

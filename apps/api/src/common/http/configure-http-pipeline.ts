@@ -6,6 +6,8 @@ import type { Env } from '../../config/env';
 import { jsonWithRawBody } from './raw-body';
 
 const AUTH_PATH_PREFIX = '/api/auth';
+const JUNIT_INGEST_PATH = '/runs/ingest/junit';
+const XML_BODY_LIMIT = '10mb';
 
 export function configureHttpPipeline(
   app: INestApplication,
@@ -16,9 +18,19 @@ export function configureHttpPipeline(
 
   const xmlParser = express.text({
     type: ['application/xml', 'text/xml'],
-    limit: '10mb',
+    limit: XML_BODY_LIMIT,
   });
-  app.use(xmlParser);
+  app.use(
+    JUNIT_INGEST_PATH,
+    (
+      request: express.Request,
+      response: express.Response,
+      next: express.NextFunction,
+    ) => {
+      if (request.method !== 'POST') return next();
+      return xmlParser(request, response, next);
+    },
+  );
 
   const jsonParser = jsonWithRawBody();
   app.use(
