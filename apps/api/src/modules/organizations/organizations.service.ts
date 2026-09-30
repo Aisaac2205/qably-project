@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  PLAN_LIMITS,
   creditsUsedAt,
   nextMonthStartUtc,
+  publicPlanLimits,
   type OrganizationUsageRecord,
 } from '@qably/types';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
@@ -125,7 +125,7 @@ export class OrganizationsService {
 
     return {
       plan: organization.plan,
-      limits: PLAN_LIMITS[organization.plan],
+      limits: publicPlanLimits(organization.plan),
       members,
       pendingInvites,
       projects,

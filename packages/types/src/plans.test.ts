@@ -1,38 +1,55 @@
 import { describe, it, expect } from 'vitest';
 import {
   PLAN_LIMITS,
+  publicPlanLimits,
   monthStartUtc,
   nextMonthStartUtc,
   creditsUsedAt,
 } from './plans';
 
 describe('PLAN_LIMITS', () => {
-  it('gratuito allows 3 members, 1 project and 25 monthly Aeris credits, no notification integrations', () => {
+  it('gratuito allows 3 members, 1 project, 25 monthly Aeris credits and 60,000 source characters, no notification integrations', () => {
     expect(PLAN_LIMITS.gratuito).toEqual({
       members: 3,
       projects: 1,
       monthlyAiCredits: 25,
       notificationIntegrations: false,
+      maxSourceCharacters: 60_000,
     });
   });
 
-  it('equipo allows 10 members, 5 projects, 300 monthly Aeris credits and notification integrations', () => {
+  it('equipo allows 10 members, 5 projects, 300 monthly Aeris credits, 60,000 source characters and notification integrations', () => {
     expect(PLAN_LIMITS.equipo).toEqual({
       members: 10,
       projects: 5,
       monthlyAiCredits: 300,
       notificationIntegrations: true,
+      maxSourceCharacters: 60_000,
     });
   });
 
-  it('empresa allows 25 members, unlimited projects, 1000 monthly Aeris credits and notification integrations', () => {
+  it('empresa allows 25 members, unlimited projects, 1000 monthly Aeris credits, 1,000,000 source characters and notification integrations', () => {
     expect(PLAN_LIMITS.empresa).toEqual({
       members: 25,
       projects: null,
       monthlyAiCredits: 1000,
       notificationIntegrations: true,
+      maxSourceCharacters: 1_000_000,
     });
   });
+});
+
+describe('publicPlanLimits', () => {
+  it.each(['gratuito', 'equipo', 'empresa'] as const)(
+    'exposes every limit of %s except the internal source size',
+    (plan) => {
+      const { maxSourceCharacters, ...expected } = PLAN_LIMITS[plan];
+
+      expect(maxSourceCharacters).toBeGreaterThan(0);
+      expect(publicPlanLimits(plan)).toEqual(expected);
+      expect(publicPlanLimits(plan)).not.toHaveProperty('maxSourceCharacters');
+    },
+  );
 });
 
 describe('monthStartUtc', () => {

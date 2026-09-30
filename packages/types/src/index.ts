@@ -1,6 +1,6 @@
 import type { CaseDocumentationState, SuiteDocumentationState } from './documentation-completeness'
 import type { DashboardPeriod } from './dashboard-period'
-import type { PlanLimits } from './plans'
+import type { PublicPlanLimits } from './plans'
 
 // ─── Status types ────────────────────────────────────────────────────────────
 
@@ -165,7 +165,7 @@ export interface InvitePreviewRecord {
 
 export interface OrganizationUsageRecord {
   plan: Plan
-  limits: PlanLimits
+  limits: PublicPlanLimits
   members: number
   pendingInvites: number
   projects: number
