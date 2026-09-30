@@ -166,7 +166,9 @@ GitHub does not lower the ceiling for authenticated reads. `SourceReader` asks t
 
 When a `document-file` job read a source that was cut at the plan's limit and some targets are still unmatched after the retry round, those targets are recorded with the reason `source-truncated` instead of `automation-key-not-found`. The flow itself is unchanged, including the retry round; only the recorded reason differs, because a cut source explains the miss and "no case matched the key" does not. The reviewer sees: "The file exceeds the maximum size your plan allows and Aeris could only read part of it. Split it into smaller files or document this case manually." (`manualReviewReasonSourceTruncated`, in both catalogs.)
 
-When the source was not cut, an unmatched target still ends in `automation-key-not-found`. Document-case and code-change jobs read with the plan's limit as well, but their fallback reasons are unchanged.
+A `document-case` job applies the same rule. It reads with the plan's limit too, and when the source was cut and the model returned no case for the target's `automationKey`, the case is recorded with `source-truncated` instead of `automation-key-not-found`. The code-change path shares the decision (`unmatchedReasonFor` in `ExtractionProcessor`) but only reaches it if the extractor returns an extraction with no cases: `GeminiExtractor` answers `no-tests-found` in that situation, and a code-change job has no target case to mark, so the recorder only logs the reason.
+
+When the source was not cut, an unmatched target still ends in `automation-key-not-found`. A cut source in which the model found no test declarations at all keeps `no-tests-found`: the reason describes what the model reported, and `source-truncated` is only chosen when the model did return cases and the target was not among them.
 
 ### Output budget and request timeout
 
@@ -432,13 +434,14 @@ When every step — the three in `resolveAutomationFilePath` and the tree locato
 | Credit decrement failed after a successful model call (race with another job) | code-change and document-case | `ai-not-enabled` |
 | Model reports no test declarations, and the source genuinely has none (`countTestDeclarations` agrees) | **document-case only** | `no-tests-found` |
 | Model reports no test declarations, but `countTestDeclarations` found some in the source — even after one retry with the count named in the prompt | **document-case only** | `extraction-incomplete` |
-| Model returns cases, but none match the target case's `automationKey` | **document-case only** | `automation-key-not-found` |
+| Model returns cases, but none match the target case's `automationKey`, and the whole file was read | **document-case only** | `automation-key-not-found` |
+| Model returns cases, but none match the target case's `automationKey`, and the source was cut at the plan's limit | **document-case only** | `source-truncated` |
 | Some targets of a `document-file` job are still unmatched after the retry round, and the source was cut at the plan's limit | **document-file only** | `source-truncated` |
 | Model call fails (invalid credentials, timeout, schema violation, empty response) | code-change and document-case | the provider's reason (e.g. `invalid-credentials`) |
 | An uncaught error is thrown anywhere in the extraction path | code-change and document-case | `extraction-failed` |
 | The platform's daily Aeris budget is spent | all three job kinds | `quota-exhausted` |
 
-For a **code-change** job, "no test declarations found" and "no case for a specific key" do not apply — a code-change extraction persists whatever cases the model found, with no single case to match against. A document-case job always targets exactly one existing automated case, so any outcome that doesn't produce that case ends in the fallback instead of silently doing nothing.
+For a **code-change** job, "no test declarations found" and "no case for a specific key" do not apply — a code-change extraction persists whatever cases the model found, with no single case to match against. The one branch it shares with document-case (an extraction that yields no cases) picks `source-truncated` or `automation-key-not-found` by the same rule, and only logs it because no case is marked. A document-case job always targets exactly one existing automated case, so any outcome that doesn't produce that case ends in the fallback instead of silently doing nothing.
 
 ### Trusting the source over the model when it reports zero
 

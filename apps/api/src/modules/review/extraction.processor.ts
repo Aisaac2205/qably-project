@@ -87,6 +87,10 @@ const SUITE_SUMMARY_MAX_CASES = 60;
 const SUITE_TAG_CAP = SUITE_LIMITS.tags;
 const SUITE_STATES_FOR_SUMMARY = ['active', 'draft'] as const;
 
+function unmatchedReasonFor(sourceTruncated: boolean): string {
+  return sourceTruncated ? SOURCE_TRUNCATED_REASON : NO_MATCHING_CASE_REASON;
+}
+
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
 
@@ -874,9 +878,7 @@ export class ExtractionProcessor extends WorkerHost {
       );
     }
 
-    const unmatchedReason = source.truncated
-      ? SOURCE_TRUNCATED_REASON
-      : NO_MATCHING_CASE_REASON;
+    const unmatchedReason = unmatchedReasonFor(source.truncated);
 
     if (matched.length === 0) {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
@@ -1362,7 +1364,7 @@ export class ExtractionProcessor extends WorkerHost {
 
       await this.failureRecorder.recordExtractionFailure(
         ctx,
-        NO_MATCHING_CASE_REASON,
+        unmatchedReasonFor(source.truncated),
       );
       return;
     }
