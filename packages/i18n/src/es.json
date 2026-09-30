@@ -162,6 +162,7 @@
     "manualReviewReasonExtractionFailed": "No fue posible contactar al proveedor de IA, o su respuesta fue rechazada por el esquema.",
     "manualReviewReasonNoTestsFound": "No se encontraron declaraciones de prueba en este archivo.",
     "manualReviewReasonExtractionIncomplete": "Aeris detectó declaraciones de prueba en este archivo pero no logró documentarlas. Vuelve a intentarlo o documéntalo a mano.",
+    "manualReviewReasonSourceTruncated": "El archivo supera el tamaño máximo que permite tu plan y Aeris solo pudo leer una parte. Divídelo en archivos más pequeños o documenta este caso manualmente.",
     "manualReviewReasonAiNotEnabled": "La extracción por IA no está habilitada para esta organización.",
     "manualReviewReasonAutomationKeyNotFound": "Ningún caso oficial coincide con la clave de automatización que reporta este archivo.",
     "manualReviewReasonNotConfigured": "Aeris todavía no está configurado en este servidor. Contactá a soporte.",

@@ -6,6 +6,7 @@ const REAL_FAILURE_REASONS = [
   'extraction-failed',
   'no-tests-found',
   'extraction-incomplete',
+  'source-truncated',
   'automation-key-not-found',
   'not-configured',
   'invalid-credentials',

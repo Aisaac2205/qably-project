@@ -20,6 +20,7 @@ describe('isSourceUnavailableReason', () => {
     'quota-exhausted',
     'no-tests-found',
     'extraction-incomplete',
+    'source-truncated',
     'extraction-failed',
     'automation-key-not-found',
     'invalid-credentials',

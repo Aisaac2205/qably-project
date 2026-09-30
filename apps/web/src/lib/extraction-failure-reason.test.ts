@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { en, es } from '@qably/i18n'
 import { extractionFailureReasonKey } from './extraction-failure-reason'
 
 describe('extractionFailureReasonKey', () => {
@@ -58,6 +59,14 @@ describe('extractionFailureReasonKey', () => {
     expect(extractionFailureReasonKey('fetch-failed')).toBe(
       'manualReviewReasonFetchFailed',
     )
+  })
+
+  it('maps the truncated-source reason to a key both catalogs define', () => {
+    const key = 'manualReviewReasonSourceTruncated'
+
+    expect(extractionFailureReasonKey('source-truncated')).toBe(key)
+    expect(Object.keys(en.reviewInbox)).toContain(key)
+    expect(Object.keys(es.reviewInbox)).toContain(key)
   })
 
   it('maps a 401 or 403 http status to the permission-denied key', () => {

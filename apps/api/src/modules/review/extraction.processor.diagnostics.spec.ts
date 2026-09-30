@@ -117,6 +117,7 @@ function build(
   const entitlement = {
     isEntitled: jest.fn().mockResolvedValue(true),
     spendCredit: jest.fn().mockResolvedValue(true),
+    maxSourceCharacters: jest.fn().mockResolvedValue(60_000),
   } as unknown as AiEntitlementService;
   const processor = new ExtractionProcessor(
     prisma as never,

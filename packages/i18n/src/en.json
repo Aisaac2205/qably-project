@@ -162,6 +162,7 @@
     "manualReviewReasonExtractionFailed": "The AI provider could not be reached, or returned a response the schema rejected.",
     "manualReviewReasonNoTestsFound": "No test declarations were found in this file.",
     "manualReviewReasonExtractionIncomplete": "Aeris detected test declarations in this file but could not document them. Try again, or document it by hand.",
+    "manualReviewReasonSourceTruncated": "The file exceeds the maximum size your plan allows and Aeris could only read part of it. Split it into smaller files or document this case manually.",
     "manualReviewReasonAiNotEnabled": "AI extraction is not enabled for this organization.",
     "manualReviewReasonAutomationKeyNotFound": "No official case matched the automation key this file reports.",
     "manualReviewReasonNotConfigured": "Aeris isn't configured on this server yet. Contact support.",

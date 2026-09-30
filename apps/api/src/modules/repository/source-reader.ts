@@ -2,7 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import type { RepoConnectionProvider } from '@qably/types';
 
 const TIMEOUT_MS = 15_000;
-const MAX_CONTENT_LENGTH = 60_000;
+const DEFAULT_MAX_CONTENT_LENGTH = 60_000;
 
 export interface SourceReadInput {
   provider: RepoConnectionProvider;
@@ -11,6 +11,7 @@ export interface SourceReadInput {
   ref: string;
   path: string;
   accessToken?: string;
+  maxContentLength?: number;
 }
 
 export type SourceReadResult =
@@ -125,12 +126,14 @@ export class SourceReader {
         return { kind: 'unavailable', reason: `http-${response.status}` };
       }
 
+      const maxContentLength =
+        input.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
       const body = await response.text();
-      const truncated = body.length > MAX_CONTENT_LENGTH;
+      const truncated = body.length > maxContentLength;
 
       return {
         kind: 'content',
-        content: truncated ? body.slice(0, MAX_CONTENT_LENGTH) : body,
+        content: truncated ? body.slice(0, maxContentLength) : body,
         truncated,
       };
     } catch (error) {

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PLAN_LIMITS, creditsUsedAt, monthStartUtc } from '@qably/types';
 import { PrismaService } from '../../prisma/prisma.service';
 
+const FALLBACK_PLAN = 'gratuito';
+
 export interface CreditSpendClient {
   organization: {
     findUnique: PrismaService['organization']['findUnique'];
@@ -30,6 +32,15 @@ export class AiEntitlementService {
     const allotment = PLAN_LIMITS[organization.plan].monthlyAiCredits;
 
     return used < allotment;
+  }
+
+  async maxSourceCharacters(organizationId: string): Promise<number> {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      select: { plan: true },
+    });
+
+    return PLAN_LIMITS[organization?.plan ?? FALLBACK_PLAN].maxSourceCharacters;
   }
 
   async spendCredit(

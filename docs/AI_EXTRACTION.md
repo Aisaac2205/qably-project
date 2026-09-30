@@ -30,14 +30,14 @@ Set `GEMINI_MODEL` to any model id Gemini's `models.list()` reports as available
 
 - `systemInstruction`: the extraction prompt, versioned as `EXTRACTION_PROMPT_VERSION` (`apps/api/src/modules/ai/extraction-prompt.ts`) and stored on every proposal (`ExtractedProposal.promptVersion`) for audit. It declares that block untrusted data; see `AI_PROMPT_SAFETY.md`.
 - `responseMimeType: 'application/json'` and `responseJsonSchema`: forces a structured `{ cases: [...] }` reply.
-- `temperature: 0.2`, `maxOutputTokens: 8192`.
-- `httpOptions.timeout: 60000` and `httpOptions.retryOptions` (3 attempts, retrying `408/429/500/502/503/504`).
+- `temperature: 0.2`, `maxOutputTokens: 16384`.
+- `httpOptions.timeout: 120000` and `httpOptions.retryOptions` (3 attempts, retrying `408/429/500/502/503/504`).
 
 A `401`/`403` from the API (invalid key) is never retried and immediately resolves to `provider-unavailable: 'invalid-credentials'`.
 
 ## Limits
 
-- Source content is capped at **60,000 characters** per file (`SourceReader`, `apps/api/src/modules/repository/source-reader.ts`); anything longer is truncated before it reaches the model.
+- Source content is capped per file (`SourceReader`, `apps/api/src/modules/repository/source-reader.ts`) at a size that depends on the organization's plan: **60,000 characters** on `gratuito` and `equipo`, **1,000,000** on `empresa`. Anything longer is truncated before it reaches the model. See "Source size is a plan limit" below.
 - `SourceReader` percent-encodes owner, repo, ref and each path segment when it builds the fetch URL, and `buildBlobUrl` does the same for the human-facing `Evidence.uri` shown to reviewers — a file path or branch name containing a space, `#` or other reserved character never breaks either link.
 - The model may return at most **20 cases** per file (`MAX_EXTRACTED_CASES`, `apps/api/src/modules/ai/extraction.contracts.ts`). The cap is enforced in code, not in the schema: `GeminiExtractor.toOutcome` keeps only the first `MAX_EXTRACTED_CASES` schema-valid cases and drops the rest with a `this.logger.warn` naming the file path and the number dropped — a warning distinct from the one it already logs for individually invalid cases. The Zod `extractionOutputSchema` (`z.array(extractedCaseSchema).max(MAX_EXTRACTED_CASES)`) carries the same bound, but it runs only in the integration and contract specs, never inside `toOutcome`; the live cap is the slice.
 - Each case field is length-bounded (title ≤120, objective/expectedResult ≤500, steps 1–20 × ≤300, preconditions ≤10 × ≤300, sourceExcerpt ≤600, observations ≤5 × ≤200) and validated with Zod (`extractedCaseSchema`) before it is persisted. Over-long free text and over-long lists are repaired instead of dropped; see "Fields over the limit: repaired, not dropped" below. A case that still violates the schema is dropped, and the warning names the failing fields; it never fails the rest of the batch.
@@ -136,6 +136,46 @@ The implementation depends on these Zod 4 behaviors. They were verified against 
 - `z.preprocess(fn, schema).default([])` returns `[]` when the field is missing, and a non-list input reaches the list schema and produces `invalid_type`.
 - `z.string().max(n)` counts UTF-16 units: two emoji measure 4.
 - `safeParse` exposes `error.issues`, and each issue carries `code` and `path`, with list indices as numbers.
+
+## Source size is a plan limit
+
+The number of characters of a file that reach the model is a plan limit, not one fixed cut for everybody. It is `maxSourceCharacters` in `PLAN_LIMITS` (`@qably/types`), and the extraction processor resolves it from the organization's plan before every read (`AiEntitlementService.maxSourceCharacters`, a plain read of `Organization.plan` that takes no lock and writes nothing):
+
+| Plan | Source characters per file |
+|---|---|
+| `gratuito` | 60,000 |
+| `equipo` | 60,000 |
+| `empresa` | 1,000,000 |
+
+The limit is internal. It is not on the pricing page, not in the organization usage response (`publicPlanLimits` returns every limit except this one) and not in the web UI. Callers that pass no limit to `SourceReader.read` keep the 60,000-character default.
+
+### The numbers behind it
+
+- Gemini documents an input window of 1,048,576 tokens and an output limit of 65,536 tokens.
+- A 113-test file of 120,482 characters measured **34,933 prompt tokens** with the system instruction included, about 0.29 tokens per character.
+- At that ratio the old 60,000-character cap is about 17,400 tokens, under 2% of the input window, and the 1,000,000-character ceiling is about 290,000 tokens, under 28% of it. Even the ceiling leaves most of the window free.
+- Before the limit became per plan, documenting that 113-test file failed for about half of its cases. The cut fell inside the file, and in production 18 of the 20 targets of each job were unmatched, all of them located after the cut. Retrying resends the same cut text, so it can never succeed.
+
+GitHub does not lower the ceiling for authenticated reads. `SourceReader` asks the contents API for the raw media type, and GitHub serves files between 1 MB and 100 MB in that form (above 1 MB it supports only the raw and object media types). A file longer than the limit is still cut, and the cut is reported as described below.
+
+### Why the boosted ceiling is safe
+
+`Organization.plan` is only read by the API. No endpoint writes it and the column defaults to `gratuito`, so `empresa`, and with it the 1,000,000-character ceiling, can only be assigned by editing the row in the database. No account can raise its own ceiling. This is the safeguard for as long as it holds: the day something in the API can change a plan, for example payments, the boosted ceiling has to be reviewed at the same time.
+
+### The `source-truncated` reason
+
+When a `document-file` job read a source that was cut at the plan's limit and some targets are still unmatched after the retry round, those targets are recorded with the reason `source-truncated` instead of `automation-key-not-found`. The flow itself is unchanged, including the retry round; only the recorded reason differs, because a cut source explains the miss and "no case matched the key" does not. The reviewer sees: "The file exceeds the maximum size your plan allows and Aeris could only read part of it. Split it into smaller files or document this case manually." (`manualReviewReasonSourceTruncated`, in both catalogs.)
+
+When the source was not cut, an unmatched target still ends in `automation-key-not-found`. Document-case and code-change jobs read with the plan's limit as well, but their fallback reasons are unchanged.
+
+### Output budget and request timeout
+
+Extraction calls now allow **16,384 output tokens** (`maxOutputTokens`, previously 8,192) and a **120-second** request timeout (`httpOptions.timeout`, previously 60 seconds).
+
+- Real calls with 20 targets per job returned 3,884, 7,816 and 8,177 output tokens. The third ended with `finishReason=MAX_TOKENS` at the 8,192 ceiling, the JSON was cut and the whole 20-case job was lost.
+- Those calls took 23 to 26 seconds for about 8,000 output tokens. At that rate a response that fills 16,384 tokens takes roughly 45 to 52 seconds, too close to the old 60-second timeout, so the timeout doubled with the budget.
+- 16,384 tokens is a quarter of the provider's documented output limit.
+- The extraction queue does not cut a job short before the request timeout: its worker lock lasts 120 seconds and is renewed automatically while the job runs, and there is no job-level timeout. The SDK's own retry (3 attempts) and BullMQ's job retry (`attempts: 3` with exponential backoff) are separate layers.
 
 ## Priority rubric (extraction-v12)
 
@@ -331,7 +371,7 @@ The documentation lists `minItems` and `maxItems` as supported array keywords. T
 
 ## Cost estimate per file
 
-A typical test file (a few hundred lines) runs 1,000–3,000 prompt tokens once the system instruction and the 60,000-character cap are counted, plus a few hundred output tokens per extracted case. `TokenUsage` (`promptTokens`, `candidatesTokens`, `totalTokens`) comes back on every successful extraction from `usageMetadata` and is available to wire into cost dashboards later; it is not yet persisted anywhere.
+A typical test file (a few hundred lines) runs 1,000–3,000 prompt tokens once the system instruction is counted (the plan's source cap, 60,000 characters on `gratuito` and `equipo`, bounds the worst case), plus a few hundred output tokens per extracted case. `TokenUsage` (`promptTokens`, `candidatesTokens`, `totalTokens`) comes back on every successful extraction from `usageMetadata` and is available to wire into cost dashboards later; it is not yet persisted anywhere.
 
 **Use a paid Gemini tier for anything beyond local experimentation.** The free tier trains on submitted content — every source file sent through it would become Google training data. A paid tier keeps the source code private to the request.
 
@@ -352,7 +392,7 @@ The fallback exists to tell a reviewer that a file could not be documented autom
 
 That makes it unpublishable by definition, and the API enforces it: `ReviewDecisionService.approve` returns `incomplete-proposal` (HTTP 422) for any proposal whose `steps` are empty, before any transaction opens. Without that guard, approving a fallback published an `active` official case with zero steps — documented intent with no content — which is exactly what human review is supposed to prevent. The invariant is stated on the content, not on the flag: nothing publishes an official case with no steps, whatever produced it.
 
-`needsManualReview` is what the reviewer sees. It travels on `ExtractedProposal` through to the web client, where `review-proposal-inspector.tsx` replaces the Steps and Expected result sections with the reason the extraction gave and disables Approve, leaving Reject available. The reason arrives in `objective` as one of the processor's own codes (`extraction-failed`, `no-tests-found`, `ai-not-enabled`, `automation-key-not-found`); `manual-review-reason.ts` maps those to translated copy and falls back to showing the raw provider message when the reason is something else.
+`needsManualReview` is what the reviewer sees. It travels on `ExtractedProposal` through to the web client, where `review-proposal-inspector.tsx` replaces the Steps and Expected result sections with the reason the extraction gave and disables Approve, leaving Reject available. The reason arrives in `objective` as one of the processor's own codes (`extraction-failed`, `no-tests-found`, `ai-not-enabled`, `automation-key-not-found`, `source-truncated`); `manual-review-reason.ts` maps those to translated copy and falls back to showing the raw provider message when the reason is something else.
 
 ## Where a document-case job gets its file
 
@@ -393,6 +433,7 @@ When every step — the three in `resolveAutomationFilePath` and the tree locato
 | Model reports no test declarations, and the source genuinely has none (`countTestDeclarations` agrees) | **document-case only** | `no-tests-found` |
 | Model reports no test declarations, but `countTestDeclarations` found some in the source — even after one retry with the count named in the prompt | **document-case only** | `extraction-incomplete` |
 | Model returns cases, but none match the target case's `automationKey` | **document-case only** | `automation-key-not-found` |
+| Some targets of a `document-file` job are still unmatched after the retry round, and the source was cut at the plan's limit | **document-file only** | `source-truncated` |
 | Model call fails (invalid credentials, timeout, schema violation, empty response) | code-change and document-case | the provider's reason (e.g. `invalid-credentials`) |
 | An uncaught error is thrown anywhere in the extraction path | code-change and document-case | `extraction-failed` |
 | The platform's daily Aeris budget is spent | all three job kinds | `quota-exhausted` |
@@ -431,7 +472,7 @@ Writing the proposals takes a row lock (`SELECT ... FOR UPDATE`, ordered by id) 
 
 `MAX_EXTRACTED_CASES` bounds one model response, enforced in code (`GeminiExtractor.toOutcome`) rather than in the provider schema — see "Limits" above. Raising it to cover a large file would widen the blast radius of a single call against the existing output-token ceiling, for a problem chunking already solves. A file with more target cases than the cap becomes several `document-file` jobs over the same file, each carrying its own slice of the target keys and each a separate model call.
 
-The 60,000-character source cap is unchanged and interacts with this: a declaration past the truncation point can never match, on any retry, because the cutoff is deterministic. That is a carried-over limitation of every job kind, recorded here so it is not mistaken for a chunking bug.
+The plan's source cap (see "Source size is a plan limit") interacts with this: a declaration past the truncation point can never match, on any retry, because the cutoff is deterministic. That is a limitation of every job kind, recorded here so it is not mistaken for a chunking bug. A job that hits it now reports `source-truncated` instead of `automation-key-not-found`.
 
 ### Credits and the daily budget
 
@@ -586,7 +627,7 @@ A full run makes 28 provider calls: five extraction checks, seven design fixture
 - Run the four known-gap fixtures alone with `-t "known gap"` (4 calls).
 - A single fixture can be rerun alone: `-t "stock reservation"` rates only that fixture, in one call.
 - Model output is nondeterministic, so go by the majority of reruns before changing the prompt.
-- Every real-key test allows 120 seconds. A 30-second jest limit sat below the SDK's own 60-second request timeout and failed the tiny-fixture test on a slow provider response. The third-pass full run finished in 177 seconds overall with no timeout.
+- Every real-key test allows 120 seconds, the same as the SDK's request timeout (60 seconds before it was raised). A 30-second jest limit sat below that timeout and failed the tiny-fixture test on a slow provider response. The third-pass full run finished in 177 seconds overall with no timeout.
 
 Jest does not load `.env` on its own, but preloading `dotenv` for one command does the same as exporting the key, without printing it: `NODE_OPTIONS="-r dotenv/config" npx jest --maxWorkers=2 gemini.extractor.integration`, from `apps/api`.
 

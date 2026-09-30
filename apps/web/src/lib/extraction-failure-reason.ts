@@ -5,6 +5,7 @@ const REASON_KEYS: Record<string, string> = {
   'automation-key-not-found': 'manualReviewReasonAutomationKeyNotFound',
   'quota-exhausted': 'manualReviewReasonQuotaExhausted',
   'extraction-incomplete': 'manualReviewReasonExtractionIncomplete',
+  'source-truncated': 'manualReviewReasonSourceTruncated',
   'not-configured': 'manualReviewReasonNotConfigured',
   'invalid-credentials': 'manualReviewReasonInvalidCredentials',
   'rate-limited': 'manualReviewReasonRateLimited',

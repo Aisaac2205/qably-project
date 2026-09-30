@@ -144,7 +144,11 @@ function fakeEntitlement(
   isEntitled: jest.Mock = jest.fn().mockResolvedValue(true),
   spendCredit: jest.Mock = jest.fn().mockResolvedValue(true),
 ): AiEntitlementService {
-  return { isEntitled, spendCredit } as unknown as AiEntitlementService;
+  return {
+    isEntitled,
+    spendCredit,
+    maxSourceCharacters: jest.fn().mockResolvedValue(60_000),
+  } as unknown as AiEntitlementService;
 }
 
 function fakeDailyBudget(

@@ -72,6 +72,7 @@ const NOT_ENTITLED_REASON = 'ai-not-enabled';
 const NO_MATCHING_CASE_REASON = 'automation-key-not-found';
 const NO_TESTS_FOUND_REASON = 'no-tests-found';
 const EXTRACTION_INCOMPLETE_REASON = 'extraction-incomplete';
+const SOURCE_TRUNCATED_REASON = 'source-truncated';
 const EXTRACTION_FAILED_REASON = 'extraction-failed';
 const QUOTA_EXHAUSTED_REASON = 'quota-exhausted';
 const NOT_BYOK = { isByok: false };
@@ -710,6 +711,9 @@ export class ExtractionProcessor extends WorkerHost {
       ref: ctx.ref,
       path: normalizeAutomationFilePath(ctx.filePath, repo),
       accessToken,
+      maxContentLength: await this.entitlement.maxSourceCharacters(
+        ctx.organizationId,
+      ),
     });
 
     if (source.kind === 'unavailable') {
@@ -870,6 +874,10 @@ export class ExtractionProcessor extends WorkerHost {
       );
     }
 
+    const unmatchedReason = source.truncated
+      ? SOURCE_TRUNCATED_REASON
+      : NO_MATCHING_CASE_REASON;
+
     if (matched.length === 0) {
       if (!(await this.spendCreditOrFallbackForTargets(ctx, ctx.targets))) {
         return;
@@ -877,7 +885,7 @@ export class ExtractionProcessor extends WorkerHost {
       await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         unmatched,
-        NO_MATCHING_CASE_REASON,
+        unmatchedReason,
       );
       return;
     }
@@ -906,7 +914,7 @@ export class ExtractionProcessor extends WorkerHost {
       await this.failureRecorder.recordExtractionFailureForTargets(
         ctx,
         unmatched,
-        NO_MATCHING_CASE_REASON,
+        unmatchedReason,
       );
     }
   }
@@ -1260,6 +1268,9 @@ export class ExtractionProcessor extends WorkerHost {
       ref: ctx.ref,
       path: normalizeAutomationFilePath(ctx.filePath, repo),
       accessToken,
+      maxContentLength: await this.entitlement.maxSourceCharacters(
+        ctx.organizationId,
+      ),
     });
 
     if (source.kind === 'unavailable') {
