@@ -791,7 +791,7 @@ function describePrioritySet(
 
       if (knownGapFixtures.length > 0) {
         it.each(knownGapFixtures)(
-          'gets rated cases from the provider for the $name fixture (known gap)',
+          'the $name fixture gets rated cases from the provider (known gap)',
           async (fixture) => {
             const result = await ratingOf(fixture);
 
