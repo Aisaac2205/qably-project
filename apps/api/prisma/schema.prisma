@@ -138,6 +138,7 @@ model Organization {
   notificationWebhooks    NotificationWebhook[]
   chatThreads             ChatThread[]
   invites                 OrgInvite[]
+  ciRuns                  CiRun[]
 
   @@unique([slug])
   @@map("organization")
@@ -199,6 +200,7 @@ model Project {
   traceabilityLinks TraceabilityLink[]
   chatThreads       ChatThread[]
   caseIdentityCollisions CaseIdentityCollision[]
+  ciRuns            CiRun[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -607,6 +609,9 @@ model Run {
   commitSha        String?
   commitMessage    String?
   commitAuthor     String?
+  ciRunId          String?
+  ciRun            CiRun?       @relation(fields: [ciRunId], references: [id], onDelete: SetNull)
+  ciJobKey         String?
   cases            RunCase[]
   identityCollisions CaseIdentityCollision[]
 
@@ -617,7 +622,37 @@ model Run {
   @@index([commitSha])
   @@index([projectId, source, reportExternalId])
   @@index([suiteId, startedAt])
+  @@index([ciRunId])
   @@map("run")
+}
+
+model CiRun {
+  id             String       @id @default(cuid())
+  projectId      String
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source         RunSource
+  externalId     String
+  workflowName   String?
+  runNumber      Int?
+  runAttempt     Int?
+  branch         String?
+  headRef        String?
+  actor          String?
+  eventName      String?
+  serverUrl      String?
+  repository     String?
+  commitSha      String?
+  commitMessage  String?
+  commitAuthor   String?
+  startedAt      DateTime     @default(now())
+  lastReportedAt DateTime     @default(now())
+  runs           Run[]
+
+  @@unique([projectId, source, externalId])
+  @@index([projectId, startedAt])
+  @@map("ci_run")
 }
 
 model RunCase {
