@@ -502,6 +502,29 @@ describe('buildIngestUrl', () => {
     expect(url.searchParams.has('commitSha')).toBe(false);
     expect(url.searchParams.has('commitMessage')).toBe(false);
   });
+
+  it('carries the ci fields that have a value and drops the ones that do not', () => {
+    const [href] = callPure<[string]>([
+      {
+        fn: 'buildIngestUrl',
+        args: [
+          'https://api.qably.dev',
+          {
+            externalId: 'ext-1',
+            ciRunExternalId: '900',
+            ciJobKey: 'test (node 20)',
+            ciHeadRef: undefined,
+            ciBranch: '',
+          },
+        ],
+      },
+    ]);
+    const url = new URL(href);
+    expect(url.searchParams.get('ciRunExternalId')).toBe('900');
+    expect(url.searchParams.get('ciJobKey')).toBe('test (node 20)');
+    expect(url.searchParams.has('ciHeadRef')).toBe(false);
+    expect(url.searchParams.has('ciBranch')).toBe(false);
+  });
 });
 
 interface JobIdentity {
@@ -622,6 +645,188 @@ describe('buildFileExternalId with a job identity', () => {
     expect(simple).toBe('gha-900-api-junit-unit-xml-3425dd6f');
     expect(upper).toBe('gha-900-Build-API-junit-unit-xml-3425dd6f');
     expect(dotted).toBe('gha-901-test.unit-junit-unit-xml-3425dd6f');
+  });
+});
+
+describe('REPORT_VERSION', () => {
+  it('is 10.1.0 now that the reporter sends CI metadata', () => {
+    const result = runNodeEval(`
+      const mod = await import(${JSON.stringify(REPORTER_MODULE_URL)});
+      process.stdout.write(mod.REPORT_VERSION);
+    `);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('10.1.0');
+  });
+});
+
+type CiFields = Record<string, string>;
+
+interface ContextShape {
+  idSegment: string;
+  runId: string;
+  ci: CiFields;
+}
+
+describe('buildContext CI metadata', () => {
+  it('reads every ci field from the real environment', () => {
+    const [context] = callPure<ContextShape[]>([
+      {
+        fn: 'buildContext',
+        args: [
+          {
+            GITHUB_RUN_ID: '900',
+            GITHUB_JOB: 'api',
+            GITHUB_WORKFLOW: 'CI',
+            GITHUB_RUN_NUMBER: '42',
+            GITHUB_RUN_ATTEMPT: '1',
+            GITHUB_REF_NAME: 'main',
+            GITHUB_HEAD_REF: '',
+            GITHUB_ACTOR: 'ana',
+            GITHUB_EVENT_NAME: 'push',
+            GITHUB_SERVER_URL: 'https://github.com',
+            GITHUB_REPOSITORY: 'acme/shop',
+          },
+        ],
+      },
+    ]);
+
+    expect(context.ci).toEqual({
+      ciRunExternalId: '900',
+      ciJobKey: 'api',
+      ciWorkflowName: 'CI',
+      ciRunNumber: '42',
+      ciRunAttempt: '1',
+      ciBranch: 'main',
+      ciActor: 'ana',
+      ciEventName: 'push',
+      ciServerUrl: 'https://github.com',
+      ciRepository: 'acme/shop',
+    });
+  });
+
+  it('sends only the variables that exist, with no empty values', () => {
+    const [partial, jobOnly] = callPure<ContextShape[]>([
+      {
+        fn: 'buildContext',
+        args: [{ GITHUB_RUN_ID: '900', GITHUB_JOB: 'api' }],
+      },
+      { fn: 'buildContext', args: [{ GITHUB_ACTOR: 'ana' }] },
+    ]);
+
+    expect(partial.ci).toEqual({ ciRunExternalId: '900', ciJobKey: 'api' });
+    expect(jobOnly.ci).toEqual({ ciActor: 'ana' });
+  });
+
+  it('derives no ci field from the defaulted context of a local run', () => {
+    const [local] = callPure<ContextShape[]>([
+      { fn: 'buildContext', args: [{}] },
+    ]);
+
+    expect(local.runId).toBe('local');
+    expect(local.idSegment).toBe('job');
+    expect(local.ci).toEqual({});
+  });
+
+  it('uses QABLY_JOB_KEY, raw, as ciJobKey', () => {
+    const [context] = callPure<ContextShape[]>([
+      {
+        fn: 'buildContext',
+        args: [
+          {
+            GITHUB_RUN_ID: '900',
+            GITHUB_JOB: 'test',
+            QABLY_JOB_KEY: 'test (node 20)',
+          },
+        ],
+      },
+    ]);
+
+    expect(context.ci).toEqual({
+      ciRunExternalId: '900',
+      ciJobKey: 'test (node 20)',
+    });
+  });
+
+  it('omits blank values and counters that are not positive integers', () => {
+    const invalidNumbers = ['abc', '0', '-1', '1.5', '', '99999999999'];
+    const results = callPure<ContextShape[]>([
+      { fn: 'buildContext', args: [{ GITHUB_JOB: '  ', GITHUB_RUN_ID: '  ' }] },
+      ...invalidNumbers.map((value) => ({
+        fn: 'buildContext',
+        args: [{ GITHUB_RUN_NUMBER: value, GITHUB_RUN_ATTEMPT: value }],
+      })),
+      {
+        fn: 'buildContext',
+        args: [{ GITHUB_RUN_NUMBER: ' 7 ', GITHUB_RUN_ATTEMPT: '2' }],
+      },
+    ]);
+
+    expect(results).toHaveLength(invalidNumbers.length + 2);
+    expect(results[0].ci).toEqual({});
+    for (const context of results.slice(1, -1)) {
+      expect(context.ci).toEqual({});
+    }
+    expect(results[results.length - 1].ci).toEqual({
+      ciRunNumber: '7',
+      ciRunAttempt: '2',
+    });
+  });
+
+  it('truncates a string field to 255 characters', () => {
+    const [context] = callPure<ContextShape[]>([
+      {
+        fn: 'buildContext',
+        args: [{ GITHUB_REF_NAME: 'b'.repeat(300) }],
+      },
+    ]);
+
+    expect(context.ci.ciBranch).toBe('b'.repeat(255));
+  });
+
+  it('keeps the pull request merge ref and the head ref apart', () => {
+    const [context] = callPure<ContextShape[]>([
+      {
+        fn: 'buildContext',
+        args: [{ GITHUB_REF_NAME: '12/merge', GITHUB_HEAD_REF: 'feature/x' }],
+      },
+    ]);
+
+    expect(context.ci).toEqual({
+      ciBranch: '12/merge',
+      ciHeadRef: 'feature/x',
+    });
+  });
+
+  it('omits a server url the API would reject, instead of losing the whole report to a 400', () => {
+    const rejected = [
+      'javascript:alert(1)',
+      'ftp://x',
+      'github.com',
+      `https://${'h'.repeat(260)}.example`,
+    ];
+    const results = callPure<ContextShape[]>([
+      ...rejected.map((value) => ({
+        fn: 'buildContext',
+        args: [{ GITHUB_SERVER_URL: value }],
+      })),
+      {
+        fn: 'buildContext',
+        args: [{ GITHUB_SERVER_URL: 'https://ghe.example.com' }],
+      },
+      { fn: 'buildContext', args: [{ GITHUB_SERVER_URL: 'http://ghe.local' }] },
+    ]);
+
+    expect(results).toHaveLength(rejected.length + 2);
+    for (const context of results.slice(0, rejected.length)) {
+      expect(context.ci).toEqual({});
+    }
+    expect(results[rejected.length].ci).toEqual({
+      ciServerUrl: 'https://ghe.example.com',
+    });
+    expect(results[rejected.length + 1].ci).toEqual({
+      ciServerUrl: 'http://ghe.local',
+    });
   });
 });
 
@@ -780,6 +985,36 @@ function writeReport(dir: string, name: string, xml: string): string {
   const filePath = join(dir, name);
   writeFileSync(filePath, xml);
   return filePath;
+}
+
+async function ingestQueriesFor(
+  dir: string,
+  env: Record<string, string>,
+): Promise<{ queries: URLSearchParams[]; exitCode: number | null }> {
+  const queries: URLSearchParams[] = [];
+  const { server, url } = await createScriptedServer((_, req) => {
+    queries.push(new URL(req.url ?? '', 'http://localhost').searchParams);
+    return { status: 202, body: { accepted: 1, runs: [] } };
+  });
+
+  try {
+    const filePath = writeReport(dir, 'report.xml', smallReport);
+    const result = await runCli([filePath], {
+      QABLY_API_KEY: 'key',
+      QABLY_API_BASE_URL: url,
+      ...env,
+    });
+
+    return { queries, exitCode: result.exitCode };
+  } finally {
+    server.close();
+  }
+}
+
+function ciParamsOf(query: URLSearchParams): Record<string, string> {
+  return Object.fromEntries(
+    [...query.entries()].filter(([key]) => key.startsWith('ci')),
+  );
 }
 
 describe('CLI end-to-end against a fake ingest server', () => {
@@ -1293,5 +1528,82 @@ describe('CLI end-to-end against a fake ingest server', () => {
     } finally {
       server.close();
     }
+  }, 15_000);
+
+  it('sends every ci field of a real GitHub Actions environment on the ingest request', async () => {
+    const { queries, exitCode } = await ingestQueriesFor(dir, {
+      GITHUB_ACTIONS: 'true',
+      GITHUB_RUN_ID: '900',
+      GITHUB_JOB: 'api',
+      GITHUB_WORKFLOW: 'CI',
+      GITHUB_RUN_NUMBER: '42',
+      GITHUB_RUN_ATTEMPT: '1',
+      GITHUB_REF_NAME: 'main',
+      GITHUB_ACTOR: 'ana',
+      GITHUB_EVENT_NAME: 'push',
+      GITHUB_SERVER_URL: 'https://github.com',
+      GITHUB_REPOSITORY: 'acme/shop',
+    });
+
+    expect(exitCode).toBe(0);
+    expect(queries).toHaveLength(1);
+    expect(ciParamsOf(queries[0])).toEqual({
+      ciRunExternalId: '900',
+      ciJobKey: 'api',
+      ciWorkflowName: 'CI',
+      ciRunNumber: '42',
+      ciRunAttempt: '1',
+      ciBranch: 'main',
+      ciActor: 'ana',
+      ciEventName: 'push',
+      ciServerUrl: 'https://github.com',
+      ciRepository: 'acme/shop',
+    });
+    expect(queries[0].get('source')).toBe('github_actions');
+  }, 15_000);
+
+  it('sends only the ci fields whose variables exist, with no empty parameter', async () => {
+    const { queries, exitCode } = await ingestQueriesFor(dir, {
+      GITHUB_RUN_ID: '900',
+      GITHUB_JOB: 'api',
+    });
+
+    expect(exitCode).toBe(0);
+    expect(queries).toHaveLength(1);
+    expect(ciParamsOf(queries[0])).toEqual({
+      ciRunExternalId: '900',
+      ciJobKey: 'api',
+    });
+  }, 15_000);
+
+  it('sends the request without any ci field for a local run, instead of inventing a run called local', async () => {
+    const { queries, exitCode } = await ingestQueriesFor(dir, {});
+
+    expect(exitCode).toBe(0);
+    expect(queries).toHaveLength(1);
+    expect(ciParamsOf(queries[0])).toEqual({});
+    expect(queries[0].get('externalId')).toMatch(
+      /^gha-local-job-report-xml-\w{8}$/,
+    );
+    expect(queries[0].get('source')).toBe('api');
+  }, 15_000);
+
+  it('sends both the merge ref and the head ref on a pull request', async () => {
+    const { queries, exitCode } = await ingestQueriesFor(dir, {
+      GITHUB_ACTIONS: 'true',
+      GITHUB_RUN_ID: '901',
+      GITHUB_REF_NAME: '12/merge',
+      GITHUB_HEAD_REF: 'feature/x',
+      GITHUB_EVENT_NAME: 'pull_request',
+    });
+
+    expect(exitCode).toBe(0);
+    expect(queries).toHaveLength(1);
+    expect(ciParamsOf(queries[0])).toEqual({
+      ciRunExternalId: '901',
+      ciBranch: '12/merge',
+      ciHeadRef: 'feature/x',
+      ciEventName: 'pull_request',
+    });
   }, 15_000);
 });

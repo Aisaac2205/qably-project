@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const REPORT_VERSION = '10.0.0';
+export const REPORT_VERSION = '10.1.0';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 const MAX_TESTCASES_PER_REQUEST = 10_000;
@@ -16,6 +16,8 @@ const RETRY_JITTER_MS = 100;
 const DEFAULT_THROTTLE_WAIT_SECONDS = 3;
 const MAX_DIRECTORY_DEPTH = 5;
 const DEFAULT_FETCH_TIMEOUT_MS = 60_000;
+const MAX_CI_TEXT_LENGTH = 255;
+const MAX_CI_INTEGER = 2_147_483_647;
 
 function resolveFetchTimeoutMs(env) {
   const raw = env.QABLY_REPORT_TIMEOUT_MS;
@@ -529,15 +531,56 @@ function readCommitMetadata(env) {
   };
 }
 
+function ciText(value) {
+  const trimmed = nonBlank(value);
+  return trimmed === undefined ? undefined : trimmed.slice(0, MAX_CI_TEXT_LENGTH);
+}
+
+function ciPositiveInteger(value) {
+  const trimmed = nonBlank(value);
+  if (trimmed === undefined || !/^\d+$/.test(trimmed)) return undefined;
+
+  const parsed = Number(trimmed);
+  return parsed >= 1 && parsed <= MAX_CI_INTEGER ? String(parsed) : undefined;
+}
+
+function ciHttpUrl(value) {
+  const trimmed = nonBlank(value);
+  if (trimmed === undefined || trimmed.length > MAX_CI_TEXT_LENGTH) return undefined;
+
+  try {
+    const { protocol } = new URL(trimmed);
+    return protocol === 'http:' || protocol === 'https:' ? trimmed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildCiFields(env, jobKey) {
+  return {
+    ciRunExternalId: ciText(env.GITHUB_RUN_ID),
+    ciJobKey: ciText(jobKey),
+    ciWorkflowName: ciText(env.GITHUB_WORKFLOW),
+    ciRunNumber: ciPositiveInteger(env.GITHUB_RUN_NUMBER),
+    ciRunAttempt: ciPositiveInteger(env.GITHUB_RUN_ATTEMPT),
+    ciBranch: ciText(env.GITHUB_REF_NAME),
+    ciHeadRef: ciText(env.GITHUB_HEAD_REF),
+    ciActor: ciText(env.GITHUB_ACTOR),
+    ciEventName: ciText(env.GITHUB_EVENT_NAME),
+    ciServerUrl: ciHttpUrl(env.GITHUB_SERVER_URL),
+    ciRepository: ciText(env.GITHUB_REPOSITORY),
+  };
+}
+
 export function buildContext(env = process.env) {
   const { jobKey, idSegment } = resolveJobIdentity(env);
 
   return {
-    jobKey,
     idSegment,
     runId: env.GITHUB_RUN_ID ?? 'local',
     source: env.GITHUB_ACTIONS === 'true' ? 'github_actions' : 'api',
     commit: readCommitMetadata(env),
+    ci: buildCiFields(env, jobKey),
   };
 }
 
@@ -782,6 +825,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         commitMessage: context.commit.commitMessage,
         commitAuthor: context.commit.commitAuthor,
         reportSize: String(totalGroups),
+        ...context.ci,
       });
 
       const outcome = await postJunitChunk({
