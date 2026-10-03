@@ -481,8 +481,25 @@ export async function resolveInputPaths(args, cwd = process.cwd()) {
   return { files: [...new Set(files)], emptyArgs };
 }
 
+function nonBlank(value) {
+  if (value === undefined) return undefined;
+
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+export function resolveJobIdentity(env) {
+  const override = nonBlank(env.QABLY_JOB_KEY);
+
+  if (override !== undefined) {
+    return { jobKey: override, idSegment: slugify(override) };
+  }
+
+  return { jobKey: nonBlank(env.GITHUB_JOB), idSegment: env.GITHUB_JOB ?? 'job' };
+}
+
 export function buildFileExternalId(filePath, context) {
-  return `gha-${context.runId}-${context.jobId}-${slugify(basename(filePath))}-${shortHash(filePath)}`;
+  return `gha-${context.runId}-${context.idSegment}-${slugify(basename(filePath))}-${shortHash(filePath)}`;
 }
 
 function readCommitMetadata(env) {
@@ -513,8 +530,11 @@ function readCommitMetadata(env) {
 }
 
 export function buildContext(env = process.env) {
+  const { jobKey, idSegment } = resolveJobIdentity(env);
+
   return {
-    jobId: env.GITHUB_JOB ?? 'job',
+    jobKey,
+    idSegment,
     runId: env.GITHUB_RUN_ID ?? 'local',
     source: env.GITHUB_ACTIONS === 'true' ? 'github_actions' : 'api',
     commit: readCommitMetadata(env),

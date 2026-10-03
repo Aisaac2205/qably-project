@@ -53,7 +53,9 @@ export function callPure<T>(calls: Array<{ fn: string; args: unknown[] }>): T {
   return JSON.parse(result.stdout) as T;
 }
 
-const CI_DETECTION_ENV_KEYS = ['GITHUB_ACTIONS'];
+function isAmbientCiKey(key: string): boolean {
+  return key.startsWith('GITHUB_') || key === 'QABLY_JOB_KEY';
+}
 
 export function runCli(
   args: string[],
@@ -64,8 +66,8 @@ export function runCli(
     ...(process.env as Record<string, string>),
   };
 
-  for (const key of CI_DETECTION_ENV_KEYS) {
-    delete merged[key];
+  for (const key of Object.keys(merged)) {
+    if (isAmbientCiKey(key)) delete merged[key];
   }
 
   for (const [key, value] of Object.entries(env)) {

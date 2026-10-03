@@ -7,7 +7,12 @@ import {
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { callPure, runCli } from './test-support';
+import {
+  callPure,
+  runCli,
+  runNodeEval,
+  REPORTER_MODULE_URL,
+} from './test-support';
 import { parseJunitXml } from '../modules/runs/lib/parse-junit-xml';
 import { groupJunitReportBySuite } from '../modules/runs/lib/group-junit-report';
 
@@ -496,6 +501,127 @@ describe('buildIngestUrl', () => {
     expect(url.searchParams.get('source')).toBe('github_actions');
     expect(url.searchParams.has('commitSha')).toBe(false);
     expect(url.searchParams.has('commitMessage')).toBe(false);
+  });
+});
+
+interface JobIdentity {
+  jobKey?: string;
+  idSegment: string;
+}
+
+function externalIdsFor(
+  filePath: string,
+  envs: Array<Record<string, string>>,
+): string[] {
+  const script = `
+    const mod = await import(${JSON.stringify(REPORTER_MODULE_URL)});
+    const envs = ${JSON.stringify(envs)};
+    const ids = envs.map((env) => mod.buildFileExternalId(${JSON.stringify(filePath)}, mod.buildContext(env)));
+    process.stdout.write(JSON.stringify(ids));
+  `;
+  const result = runNodeEval(script);
+
+  if (result.exitCode !== 0) {
+    throw new Error(`harness script failed: ${result.stderr}`);
+  }
+
+  return JSON.parse(result.stdout) as string[];
+}
+
+describe('resolveJobIdentity', () => {
+  it('shows QABLY_JOB_KEY untouched and slugs it for the external id', () => {
+    const [matrix20, matrix22] = callPure<JobIdentity[]>([
+      {
+        fn: 'resolveJobIdentity',
+        args: [{ QABLY_JOB_KEY: 'test (node 20)', GITHUB_JOB: 'test' }],
+      },
+      {
+        fn: 'resolveJobIdentity',
+        args: [{ QABLY_JOB_KEY: '  test (node 22)  ', GITHUB_JOB: 'test' }],
+      },
+    ]);
+
+    expect(matrix20).toEqual({
+      jobKey: 'test (node 20)',
+      idSegment: 'test-node-20',
+    });
+    expect(matrix22).toEqual({
+      jobKey: 'test (node 22)',
+      idSegment: 'test-node-22',
+    });
+  });
+
+  it('keeps GITHUB_JOB untransformed in the id segment while QABLY_JOB_KEY is absent', () => {
+    const [upper, dotted] = callPure<JobIdentity[]>([
+      { fn: 'resolveJobIdentity', args: [{ GITHUB_JOB: 'Build-API' }] },
+      { fn: 'resolveJobIdentity', args: [{ GITHUB_JOB: 'test.unit' }] },
+    ]);
+
+    expect(upper).toEqual({ jobKey: 'Build-API', idSegment: 'Build-API' });
+    expect(dotted).toEqual({ jobKey: 'test.unit', idSegment: 'test.unit' });
+  });
+
+  it('ignores a blank QABLY_JOB_KEY and falls back to GITHUB_JOB', () => {
+    const [spaces, empty] = callPure<JobIdentity[]>([
+      {
+        fn: 'resolveJobIdentity',
+        args: [{ QABLY_JOB_KEY: '  ', GITHUB_JOB: 'api' }],
+      },
+      {
+        fn: 'resolveJobIdentity',
+        args: [{ QABLY_JOB_KEY: '', GITHUB_JOB: 'api' }],
+      },
+    ]);
+
+    expect(spaces).toEqual({ jobKey: 'api', idSegment: 'api' });
+    expect(empty).toEqual({ jobKey: 'api', idSegment: 'api' });
+  });
+
+  it('has no job key and the legacy id segment when neither variable exists', () => {
+    const [none] = callPure<JobIdentity[]>([
+      { fn: 'resolveJobIdentity', args: [{}] },
+    ]);
+
+    expect(none.jobKey).toBeUndefined();
+    expect(none.idSegment).toBe('job');
+  });
+});
+
+describe('buildFileExternalId with a job identity', () => {
+  const filePath = 'reports/junit-unit.xml';
+
+  it('gives matrix variants of the same file different external ids', () => {
+    const [node20, node22, withoutKey] = externalIdsFor(filePath, [
+      {
+        GITHUB_RUN_ID: '900',
+        GITHUB_JOB: 'test',
+        QABLY_JOB_KEY: 'test (node 20)',
+      },
+      {
+        GITHUB_RUN_ID: '900',
+        GITHUB_JOB: 'test',
+        QABLY_JOB_KEY: 'test (node 22)',
+      },
+      { GITHUB_RUN_ID: '900', GITHUB_JOB: 'test' },
+    ]);
+
+    expect(node20).toBe('gha-900-test-node-20-junit-unit-xml-3425dd6f');
+    expect(node22).toBe('gha-900-test-node-22-junit-unit-xml-3425dd6f');
+    expect(withoutKey).toBe('gha-900-test-junit-unit-xml-3425dd6f');
+  });
+
+  it('regenerates the 10.0.0 external id byte for byte while QABLY_JOB_KEY is absent', () => {
+    const [local, simple, upper, dotted] = externalIdsFor(filePath, [
+      {},
+      { GITHUB_RUN_ID: '900', GITHUB_JOB: 'api' },
+      { GITHUB_RUN_ID: '900', GITHUB_JOB: 'Build-API' },
+      { GITHUB_RUN_ID: '901', GITHUB_JOB: 'test.unit' },
+    ]);
+
+    expect(local).toBe('gha-local-job-junit-unit-xml-3425dd6f');
+    expect(simple).toBe('gha-900-api-junit-unit-xml-3425dd6f');
+    expect(upper).toBe('gha-900-Build-API-junit-unit-xml-3425dd6f');
+    expect(dotted).toBe('gha-901-test.unit-junit-unit-xml-3425dd6f');
   });
 });
 
@@ -1135,6 +1261,35 @@ describe('CLI end-to-end against a fake ingest server', () => {
       expect(calls()).toBe(2);
       expect(reportSizes).toEqual(['501', '501']);
       expect(result.exitCode).toBe(0);
+    } finally {
+      server.close();
+    }
+  }, 15_000);
+
+  it('puts the QABLY_JOB_KEY slug in the sent externalId, so matrix variants of one file stop overwriting each other', async () => {
+    const externalIds: string[] = [];
+    const { server, url } = await createScriptedServer((_, req) => {
+      const requestUrl = new URL(req.url ?? '', 'http://localhost');
+      externalIds.push(requestUrl.searchParams.get('externalId') ?? '');
+      return { status: 202, body: { accepted: 1, runs: [] } };
+    });
+
+    try {
+      const filePath = writeReport(dir, 'report.xml', smallReport);
+      const base = {
+        QABLY_API_KEY: 'key',
+        QABLY_API_BASE_URL: url,
+        GITHUB_RUN_ID: '900',
+        GITHUB_JOB: 'test',
+      };
+      await runCli([filePath], { ...base, QABLY_JOB_KEY: 'test (node 20)' });
+      await runCli([filePath], { ...base, QABLY_JOB_KEY: 'test (node 22)' });
+      await runCli([filePath], base);
+
+      expect(externalIds).toHaveLength(3);
+      expect(externalIds[0]).toMatch(/^gha-900-test-node-20-report-xml-\w{8}$/);
+      expect(externalIds[1]).toMatch(/^gha-900-test-node-22-report-xml-\w{8}$/);
+      expect(externalIds[2]).toMatch(/^gha-900-test-report-xml-\w{8}$/);
     } finally {
       server.close();
     }
