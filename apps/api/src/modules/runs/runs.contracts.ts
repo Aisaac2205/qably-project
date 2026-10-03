@@ -1,4 +1,5 @@
 import type {
+  CiRunsPageRecord,
   JunitIngestRecord,
   PushPassRateRecord,
   RegressionsRecord,
@@ -19,6 +20,7 @@ export type RunView = RunRecord;
 export type RunCaseView = RunCaseRecord;
 export type RunSummaryView = RunSummaryRecord;
 export type RunsPageView = RunsPageRecord;
+export type CiRunsPageView = CiRunsPageRecord;
 export type SuiteMetricsView = SuiteMetricsRecord;
 export type RegressionsView = RegressionsRecord;
 export type PushPassRateOhlcView = PushPassRateRecord;
