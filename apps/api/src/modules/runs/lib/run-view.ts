@@ -17,6 +17,7 @@ export const RUN_SELECT = {
   commitSha: true,
   commitMessage: true,
   commitAuthor: true,
+  ciRunId: true,
 } as const;
 
 export const RUN_LIST_SELECT = {
@@ -72,6 +73,7 @@ export interface RunRow {
   commitSha: string | null;
   commitMessage: string | null;
   commitAuthor: string | null;
+  ciRunId: string | null;
 }
 
 export interface RunListRow extends RunRow {
@@ -127,6 +129,7 @@ export function toRunView(
     ...(run.commitSha === null ? {} : { commitSha: run.commitSha }),
     ...(run.commitMessage === null ? {} : { commitMessage: run.commitMessage }),
     ...(run.commitAuthor === null ? {} : { commitAuthor: run.commitAuthor }),
+    ...(run.ciRunId === null ? {} : { ciRunId: run.ciRunId }),
     cases: cases
       .slice()
       .sort((a, b) => a.position - b.position)
