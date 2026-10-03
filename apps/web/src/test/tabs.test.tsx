@@ -46,4 +46,24 @@ describe('Tabs', () => {
       screen.getByRole('tab', { name: 'Second' }),
     )
   })
+
+  it('gives every tab a 44px target below md and 40px from md up', () => {
+    renderTabs()
+
+    const tabs = screen.getAllByRole('tab')
+
+    expect(tabs).toHaveLength(2)
+    for (const tab of tabs) {
+      expect(tab).toHaveClass('min-h-11', 'md:min-h-10')
+    }
+  })
+
+  it('leaves the row height to the tabs so the two cannot drift apart', () => {
+    renderTabs()
+
+    const list = screen.getByRole('tablist')
+
+    expect(list).not.toHaveClass('h-10')
+    expect(list).toHaveClass('items-end', 'border-b')
+  })
 })
