@@ -155,13 +155,14 @@ export class RunQueriesService {
   ) {}
 
   async list(org: OrgContext, query: ListRunsQuery): Promise<RunsPageView> {
-    const { projectId, source, limit, cursor, days } = query;
+    const { projectId, source, limit, cursor, days, ungrouped } = query;
 
     const rows = (await this.prisma.run.findMany({
       where: {
         organizationId: org.organizationId,
         ...(projectId === undefined ? {} : { projectId }),
         ...(source === undefined ? {} : { source }),
+        ...(ungrouped === true ? { ciRunId: null } : {}),
         ...(days === undefined
           ? {}
           : { startedAt: { gte: resolveSinceDate(new Date(), days) } }),

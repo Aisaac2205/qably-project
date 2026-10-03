@@ -590,3 +590,45 @@ describe('ingestRunSchema ci fields', () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe('listRunsQuerySchema ungrouped', () => {
+  it('reads the string true as the boolean true', () => {
+    const result = listRunsQuerySchema.safeParse({ ungrouped: 'true' });
+
+    expect(result.success && result.data.ungrouped).toBe(true);
+  });
+
+  it('reads the string false as the boolean false, never as true', () => {
+    const result = listRunsQuerySchema.safeParse({ ungrouped: 'false' });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.ungrouped).toBe(false);
+  });
+
+  it('leaves ungrouped undefined when the query omits it', () => {
+    const result = listRunsQuerySchema.safeParse({ projectId: 'project-1' });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.ungrouped).toBeUndefined();
+  });
+
+  it.each(['maybe', '1', 'TRUE', ''])('rejects ungrouped=%j', (value) => {
+    expect(listRunsQuerySchema.safeParse({ ungrouped: value }).success).toBe(
+      false,
+    );
+  });
+
+  it('combines with projectId and source', () => {
+    const result = listRunsQuerySchema.safeParse({
+      projectId: 'project-1',
+      source: 'api',
+      ungrouped: 'true',
+    });
+
+    expect(result.success && result.data).toEqual({
+      projectId: 'project-1',
+      source: 'api',
+      ungrouped: true,
+    });
+  });
+});
