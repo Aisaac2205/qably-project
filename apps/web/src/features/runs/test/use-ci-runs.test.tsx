@@ -2,17 +2,19 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import type { CiRunSummaryRecord } from '@qably/types'
-import { useCiRunsPage } from '@/features/runs/hooks/use-ci-runs'
+import type { CiRunDetailRecord, CiRunSummaryRecord } from '@qably/types'
+import { useCiRun, useCiRunsPage } from '@/features/runs/hooks/use-ci-runs'
 import { ciRunKeys } from '@/features/runs/lib/query-keys'
-import { listCiRuns } from '@/features/runs/api/ci-runs.api'
+import { getCiRun, listCiRuns } from '@/features/runs/api/ci-runs.api'
 import { ApiError } from '@/lib/api-client'
 
 vi.mock('@/features/runs/api/ci-runs.api', () => ({
   listCiRuns: vi.fn(),
+  getCiRun: vi.fn(),
 }))
 
 const list = vi.mocked(listCiRuns)
+const detail = vi.mocked(getCiRun)
 
 function ciRun(id: string, overrides: Partial<CiRunSummaryRecord> = {}): CiRunSummaryRecord {
   return {
@@ -24,6 +26,24 @@ function ciRun(id: string, overrides: Partial<CiRunSummaryRecord> = {}): CiRunSu
     startedAt: '2026-10-03T10:00:00.000Z',
     lastReportedAt: '2026-10-03T10:05:00.000Z',
     ...overrides,
+  }
+}
+
+function ciRunDetail(id: string): CiRunDetailRecord {
+  return {
+    ...ciRun(id),
+    runs: [
+      {
+        id: 'run-1',
+        suiteId: 'suite-1',
+        suiteName: 'Authentication',
+        name: 'Authentication',
+        status: 'pass',
+        startedAt: '2026-10-03T10:00:00.000Z',
+        ciJobKey: 'api',
+        reportExternalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+      },
+    ],
   }
 }
 
@@ -262,5 +282,152 @@ describe('useCiRunsPage', () => {
     })
 
     expect(list).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useCiRun', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('loads the CI run under its detail key', async () => {
+    detail.mockResolvedValue(ciRunDetail('c1'))
+    const client = createClient()
+
+    const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(client) })
+
+    expect(result.current.isLoading).toBe(true)
+    await waitFor(() => expect(result.current.ciRun?.id).toBe('c1'))
+    expect(result.current.ciRun?.runs).toHaveLength(1)
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.isError).toBe(false)
+    expect(detail).toHaveBeenCalledTimes(1)
+    expect(detail.mock.calls[0][0]).toBe('c1')
+    expect(cacheHas(client, ciRunKeys.detail('c1'))).toBe(true)
+  })
+
+  it('makes no request while the id is undefined', async () => {
+    detail.mockResolvedValue(ciRunDetail('c1'))
+    const client = createClient()
+
+    const { result } = renderHook(() => useCiRun(undefined), { wrapper: wrapperFor(client) })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(detail).not.toHaveBeenCalled()
+    expect(result.current.ciRun).toBeUndefined()
+    expect(result.current.isLoading).toBe(false)
+    expect(result.current.isError).toBe(false)
+
+    const queries = client.getQueryCache().getAll()
+    expect(queries).toHaveLength(1)
+    for (const query of queries) {
+      expect(query.queryKey.every((part) => typeof part === 'string' && part !== 'undefined')).toBe(
+        true,
+      )
+    }
+  })
+
+  it('makes no request for an empty id either', async () => {
+    detail.mockResolvedValue(ciRunDetail('c1'))
+
+    const { result } = renderHook(() => useCiRun(''), { wrapper: wrapperFor(createClient()) })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(detail).not.toHaveBeenCalled()
+    expect(result.current.isLoading).toBe(false)
+  })
+
+  it('starts requesting once the id arrives', async () => {
+    detail.mockResolvedValue(ciRunDetail('c1'))
+    const client = createClient()
+
+    const { result, rerender } = renderHook(({ id }) => useCiRun(id), {
+      wrapper: wrapperFor(client),
+      initialProps: { id: undefined as string | undefined },
+    })
+    expect(detail).not.toHaveBeenCalled()
+
+    rerender({ id: 'c1' })
+
+    await waitFor(() => expect(result.current.ciRun?.id).toBe('c1'))
+    expect(detail).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps two ids in separate cache entries', async () => {
+    detail.mockImplementation((id) => Promise.resolve(ciRunDetail(id)))
+    const client = createClient()
+    const wrapper = wrapperFor(client)
+
+    const first = renderHook(() => useCiRun('c1'), { wrapper })
+    const second = renderHook(() => useCiRun('c2'), { wrapper })
+
+    await waitFor(() => expect(first.result.current.ciRun?.id).toBe('c1'))
+    await waitFor(() => expect(second.result.current.ciRun?.id).toBe('c2'))
+    expect(cacheHas(client, ciRunKeys.detail('c1'))).toBe(true)
+    expect(cacheHas(client, ciRunKeys.detail('c2'))).toBe(true)
+  })
+
+  it('exposes a 404 so the caller can tell not found from a failure', async () => {
+    detail.mockRejectedValue(new ApiError(404, 'CI run not found', 'not-found'))
+
+    const { result } = renderHook(() => useCiRun('missing'), {
+      wrapper: wrapperFor(createClient()),
+    })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.ciRun).toBeUndefined()
+    expect(result.current.error).toBeInstanceOf(ApiError)
+    expect((result.current.error as ApiError).status).toBe(404)
+    expect((result.current.error as ApiError).code).toBe('not-found')
+  })
+
+  it('exposes a server failure with its own status', async () => {
+    detail.mockRejectedValue(new ApiError(500, 'Internal error'))
+
+    const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(createClient()) })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect((result.current.error as ApiError).status).toBe(500)
+  })
+
+  it('serves a CI run seeded under the detail key without asking the server', () => {
+    const client = createSeededClient()
+    client.setQueryData(ciRunKeys.detail('c1'), ciRunDetail('c1'))
+    detail.mockResolvedValue({ ...ciRunDetail('c1'), id: 'from-server' })
+
+    const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(client) })
+
+    expect(result.current.ciRun?.id).toBe('c1')
+    expect(result.current.isLoading).toBe(false)
+    expect(detail).not.toHaveBeenCalled()
+  })
+
+  it('does not refetch the detail on a timer', async () => {
+    vi.useFakeTimers()
+    detail.mockReset()
+    detail.mockResolvedValue(ciRunDetail('c1'))
+
+    const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(createClient()) })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50)
+    })
+    expect(result.current.ciRun?.id).toBe('c1')
+    expect(detail).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10 * 60_000)
+    })
+
+    expect(detail).toHaveBeenCalledTimes(1)
   })
 })

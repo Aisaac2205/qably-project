@@ -1,7 +1,7 @@
 'use client'
 
-import { useInfiniteQuery } from '@tanstack/react-query'
-import { listCiRuns } from '../api/ci-runs.api'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { getCiRun, listCiRuns } from '../api/ci-runs.api'
 import { ciRunKeys } from '../lib/query-keys'
 
 export const CI_RUNS_PAGE_SIZE = 25
@@ -22,5 +22,22 @@ export function useCiRunsPage(projectId: string) {
     fetchNextPage: query.fetchNextPage,
     isLoading: query.isLoading,
     isError: query.isError,
+  }
+}
+
+export function useCiRun(id: string | undefined) {
+  const resolvedId = id ?? ''
+
+  const query = useQuery({
+    queryKey: ciRunKeys.detail(resolvedId),
+    queryFn: ({ signal }) => getCiRun(resolvedId, signal),
+    enabled: resolvedId !== '',
+  })
+
+  return {
+    ciRun: query.data,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
   }
 }
