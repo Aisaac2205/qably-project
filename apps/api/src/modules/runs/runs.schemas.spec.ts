@@ -2,6 +2,7 @@ import {
   createManualRunSchema,
   ingestJunitQuerySchema,
   ingestRunSchema,
+  listCiRunsQuerySchema,
   listRunsQuerySchema,
   updateRunCaseStatusSchema,
 } from './runs.schemas';
@@ -630,5 +631,63 @@ describe('listRunsQuerySchema ungrouped', () => {
       source: 'api',
       ungrouped: true,
     });
+  });
+});
+
+describe('listCiRunsQuerySchema', () => {
+  it('requires a projectId', () => {
+    expect(listCiRunsQuerySchema.safeParse({}).success).toBe(false);
+    expect(listCiRunsQuerySchema.safeParse({ projectId: '' }).success).toBe(
+      false,
+    );
+  });
+
+  it('defaults the limit to 25', () => {
+    const result = listCiRunsQuerySchema.safeParse({ projectId: 'project-1' });
+
+    expect(result.success && result.data).toEqual({
+      projectId: 'project-1',
+      limit: 25,
+    });
+  });
+
+  it('coerces a numeric limit from the query string', () => {
+    const result = listCiRunsQuerySchema.safeParse({
+      projectId: 'project-1',
+      limit: '10',
+    });
+
+    expect(result.success && result.data.limit).toBe(10);
+  });
+
+  it.each(['1', '100'])('accepts the boundary limit %s', (limit) => {
+    const result = listCiRunsQuerySchema.safeParse({
+      projectId: 'project-1',
+      limit,
+    });
+
+    expect(result.success && result.data.limit).toBe(Number(limit));
+  });
+
+  it.each(['0', '101', '-1', '1.5', 'abc'])('rejects limit=%s', (limit) => {
+    const result = listCiRunsQuerySchema.safeParse({
+      projectId: 'project-1',
+      limit,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('carries an opaque cursor through and rejects an empty one', () => {
+    const accepted = listCiRunsQuerySchema.safeParse({
+      projectId: 'project-1',
+      cursor: 'ci-run-9',
+    });
+
+    expect(accepted.success && accepted.data.cursor).toBe('ci-run-9');
+    expect(
+      listCiRunsQuerySchema.safeParse({ projectId: 'project-1', cursor: '' })
+        .success,
+    ).toBe(false);
   });
 });

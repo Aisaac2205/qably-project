@@ -113,6 +113,14 @@ export const listRunsQuerySchema = z.object({
     .optional(),
 });
 
+export const listCiRunsQuerySchema = z.object({
+  projectId: z.string().min(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  cursor: z.string().min(1).optional(),
+});
+
+export type ListCiRunsQuery = z.infer<typeof listCiRunsQuerySchema>;
+
 export const pushPassRateQuerySchema = z.object({
   projectId: z.string().min(1),
   days: z.coerce.number().int().min(1).max(365).default(30),
