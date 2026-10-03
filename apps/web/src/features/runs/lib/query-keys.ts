@@ -13,3 +13,9 @@ export const runKeys = {
   pushPassRate: (projectId: string, days: number) =>
     ['runs', 'push-pass-rate', projectId, days] as const,
 }
+
+export const ciRunKeys = {
+  all: ['ci-runs'] as const,
+  page: (projectId: string) => ['ci-runs', 'page', projectId] as const,
+  detail: (id: string) => ['ci-runs', 'detail', id] as const,
+}
