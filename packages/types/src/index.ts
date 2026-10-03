@@ -295,6 +295,7 @@ export interface RunRecord {
   commitSha?: string
   commitMessage?: string
   commitAuthor?: string
+  ciRunId?: string
   cases: RunCaseRecord[]
   delta: RunDeltaDetail | null
 }
@@ -360,6 +361,50 @@ export interface RunSummaryRecord {
 export interface RunsPageRecord {
   items: RunSummaryRecord[]
   nextCursor?: string
+}
+
+export type CiRunStatus = 'failing' | 'passing'
+
+export interface CiRunSummaryRecord {
+  id: string
+  projectId: string
+  source: RunSource
+  externalId: string
+  status: CiRunStatus
+  startedAt: string
+  lastReportedAt: string
+  workflowName?: string
+  runNumber?: number
+  runAttempt?: number
+  branch?: string
+  headRef?: string
+  actor?: string
+  eventName?: string
+  serverUrl?: string
+  repository?: string
+  commitSha?: string
+  commitMessage?: string
+  commitAuthor?: string
+}
+
+export interface CiRunsPageRecord {
+  items: CiRunSummaryRecord[]
+  nextCursor?: string
+}
+
+export interface CiRunJobRunRecord {
+  id: string
+  suiteId: string
+  suiteName: string
+  name: string
+  status: RunStatus
+  startedAt: string
+  ciJobKey?: string
+  reportExternalId?: string
+}
+
+export interface CiRunDetailRecord extends CiRunSummaryRecord {
+  runs: CiRunJobRunRecord[]
 }
 
 /**
