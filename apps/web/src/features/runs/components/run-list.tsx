@@ -105,10 +105,19 @@ function RunRow({
   )
 }
 
-export function RunList({ projectId, source }: { projectId: string; source?: RunSource }) {
+export function RunList({
+  projectId,
+  source,
+  ungrouped,
+}: {
+  projectId: string
+  source?: RunSource
+  ungrouped?: boolean
+}) {
   const { runs, hasNextPage, isFetchingNextPage, fetchNextPage } = useRunsPage(
     projectId,
     source,
+    { ungrouped },
   )
   const { t, locale } = useTranslation()
 

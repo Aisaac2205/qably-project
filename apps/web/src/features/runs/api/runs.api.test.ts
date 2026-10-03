@@ -115,4 +115,38 @@ describe('runs.api', () => {
 
     expect(lastCall()[0]).toContain('/runs/regressions?projectId=proj-1&limit=5')
   })
+
+  it('asks only for the runs without a CI run when ungrouped is true', async () => {
+    await listRuns({ projectId: 'proj-1', ungrouped: true })
+
+    expect(lastCall()[0]).toContain('/runs?projectId=proj-1&ungrouped=true')
+  })
+
+  it('keeps every other filter next to ungrouped', async () => {
+    await listRuns({
+      projectId: 'proj-1',
+      source: 'api',
+      limit: 25,
+      cursor: 'run-9',
+      ungrouped: true,
+    })
+
+    const { searchParams } = new URL(lastCall()[0])
+    expect(searchParams.get('projectId')).toBe('proj-1')
+    expect(searchParams.get('source')).toBe('api')
+    expect(searchParams.get('limit')).toBe('25')
+    expect(searchParams.get('cursor')).toBe('run-9')
+    expect(searchParams.get('ungrouped')).toBe('true')
+  })
+
+  it.each([[false], [undefined]])(
+    'leaves the url exactly as it was when ungrouped is %s',
+    async (ungrouped) => {
+      await listRuns({ projectId: 'proj-1', source: 'api', limit: 25, cursor: 'run-9', ungrouped })
+
+      const [url] = lastCall()
+      expect(url).toMatch(/\/runs\?projectId=proj-1&source=api&limit=25&cursor=run-9$/)
+      expect(url).not.toContain('ungrouped')
+    },
+  )
 })
