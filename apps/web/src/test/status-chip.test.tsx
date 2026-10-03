@@ -1,5 +1,5 @@
 import { render, screen, act } from '@testing-library/react'
-import { beforeEach, describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect, expectTypeOf } from 'vitest'
 import { StatusChip, type StatusChipProps } from '@/components/ui/status-chip'
 import { useI18nStore } from '@/lib/i18n'
 
@@ -102,3 +102,71 @@ describe('StatusChip (global)', () => {
 // @ts-expect-error StatusChip only accepts the explicit registry vocabulary.
 const invalidStatusChipProps: StatusChipProps = { status: 'unknown' }
 void invalidStatusChipProps
+
+const FORBIDDEN_CI_RUN_COPY = /aprobada|completada|terminada|finalizada|passed|completed|finished/i
+
+describe('StatusChip (ci-run scope)', () => {
+  it.each([
+    ['failing', 'Has failures', 'fail'],
+    ['passing', 'No failures', 'pass'],
+  ] as const)('shows a %s CI run as "%s" with the %s tone', async (status, label, tone) => {
+    await act(async () => {
+      render(<StatusChip status={status} scope="ci-run" />)
+    })
+
+    const chip = screen.getByText(label).closest('span')
+    expect(chip).toHaveAccessibleName(label)
+    expect(chip).toHaveAttribute('data-status', status)
+    expect(chip).toHaveAttribute('data-tone', tone)
+    expect(chip?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it.each([
+    ['failing', 'Con fallos'],
+    ['passing', 'Sin fallos'],
+  ] as const)('shows a %s CI run as "%s" in Spanish', async (status, label) => {
+    useI18nStore.setState({ locale: 'es' })
+    await act(async () => {
+      render(<StatusChip status={status} scope="ci-run" />)
+    })
+
+    const chip = screen.getByText(label).closest('span')
+    expect(chip).toHaveAccessibleName(label)
+    expect(chip?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it.each([
+    ['en', 'failing', 'Has failures'],
+    ['en', 'passing', 'No failures'],
+    ['es', 'failing', 'Con fallos'],
+    ['es', 'passing', 'Sin fallos'],
+  ] as const)('never calls a CI run finished or passed in %s (%s)', async (locale, status, label) => {
+    useI18nStore.setState({ locale })
+    await act(async () => {
+      render(<StatusChip status={status} scope="ci-run" />)
+    })
+
+    const chip = screen.getByText(label).closest('span')
+    expect(chip).toHaveTextContent(label)
+    expect(chip?.textContent).not.toMatch(FORBIDDEN_CI_RUN_COPY)
+  })
+
+  it('keeps the explanation out of the chip so a list row adds no tab stop', async () => {
+    await act(async () => {
+      render(<StatusChip status="failing" scope="ci-run" />)
+    })
+
+    const chip = screen.getByText('Has failures').closest('span')
+    expect(chip).not.toHaveAttribute('tabindex')
+    expect(chip).not.toHaveAttribute('aria-describedby')
+    expect(chip?.querySelector('button, a, [tabindex]')).toBeNull()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+
+  it('accepts only the CI run vocabulary under the ci-run scope', () => {
+    expectTypeOf<{ status: 'failing'; scope: 'ci-run' }>().toExtend<StatusChipProps>()
+    expectTypeOf<{ status: 'passing'; scope: 'ci-run' }>().toExtend<StatusChipProps>()
+    expectTypeOf<{ status: 'pass'; scope: 'ci-run' }>().not.toExtend<StatusChipProps>()
+    expectTypeOf<{ status: 'failing' }>().not.toExtend<StatusChipProps>()
+  })
+})

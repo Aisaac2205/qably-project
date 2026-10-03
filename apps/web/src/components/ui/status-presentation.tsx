@@ -10,7 +10,14 @@ import {
   XCircle,
   type Icon,
 } from '@phosphor-icons/react'
-import type { CaseState, CaseStatus, ReviewStatus, RunStatus, SuiteRunStatus } from '@qably/types'
+import type {
+  CaseState,
+  CaseStatus,
+  CiRunStatus,
+  ReviewStatus,
+  RunStatus,
+  SuiteRunStatus,
+} from '@qably/types'
 
 export type ExecutionStatus = CaseStatus | RunStatus | SuiteRunStatus
 export type LegacyStatus = ExecutionStatus | 'cancelled' | CaseState
@@ -60,6 +67,11 @@ const caseLifecyclePresentations = {
   deprecated: { status: 'deprecated', labelKey: 'status.lifecycle.deprecated', tone: 'muted', Icon: MinusCircle },
 } satisfies StatusPresentationRegistry<CaseState>
 
+const ciRunStatusPresentations = {
+  passing: { status: 'passing', labelKey: 'status.ciRun.passing', tone: 'pass', Icon: CheckCircle },
+  failing: { status: 'failing', labelKey: 'status.ciRun.failing', tone: 'fail', Icon: XCircle },
+} satisfies StatusPresentationRegistry<CiRunStatus>
+
 // Preserve the original unscoped API while making every accepted value explicit.
 const legacyStatusPresentations = {
   pass: executionStatusPresentations.pass,
@@ -91,6 +103,10 @@ export function getReviewStatusPresentation(status: ReviewStatus): StatusPresent
 
 export function getCaseLifecyclePresentation(status: CaseState): StatusPresentation {
   return caseLifecyclePresentations[status]
+}
+
+export function getCiRunStatusPresentation(status: CiRunStatus): StatusPresentation {
+  return ciRunStatusPresentations[status]
 }
 
 export function getLegacyStatusPresentation(status: LegacyStatus): StatusPresentation {

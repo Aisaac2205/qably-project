@@ -1,9 +1,10 @@
 'use client'
 
 import { useTranslation } from '@/lib/i18n'
-import type { CaseState, ReviewStatus } from '@qably/types'
+import type { CaseState, CiRunStatus, ReviewStatus } from '@qably/types'
 import {
   getCaseLifecyclePresentation,
+  getCiRunStatusPresentation,
   getLegacyStatusPresentation,
   getReviewStatusPresentation,
   statusToneClassNames,
@@ -15,10 +16,12 @@ export type StatusChipProps =
   | { status: LegacyStatus; scope?: undefined }
   | { status: ReviewStatus; scope: 'review' }
   | { status: CaseState; scope: 'lifecycle' }
+  | { status: CiRunStatus; scope: 'ci-run' }
 
 function getStatusPresentation(props: StatusChipProps): StatusPresentation {
   if (props.scope === 'review') return getReviewStatusPresentation(props.status)
   if (props.scope === 'lifecycle') return getCaseLifecyclePresentation(props.status)
+  if (props.scope === 'ci-run') return getCiRunStatusPresentation(props.status)
   return getLegacyStatusPresentation(props.status)
 }
 

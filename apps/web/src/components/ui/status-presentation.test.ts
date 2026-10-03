@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import {
   getCaseLifecyclePresentation,
+  getCiRunStatusPresentation,
   getExecutionStatusPresentation,
   getLegacyStatusPresentation,
   getReviewStatusPresentation,
 } from './status-presentation'
-import { MinusCircle, ProhibitInset, WarningCircle } from '@phosphor-icons/react'
+import {
+  CheckCircle,
+  MinusCircle,
+  ProhibitInset,
+  WarningCircle,
+  XCircle,
+} from '@phosphor-icons/react'
 
 describe('status presentation registry', () => {
   it('maps execution statuses to explicit visual and accessible intent', () => {
@@ -48,6 +55,24 @@ describe('status presentation registry', () => {
       labelKey: 'status.lifecycle.deprecated',
       tone: 'muted',
       Icon: MinusCircle,
+    })
+  })
+
+  it('maps a failing CI run to the fail tone with a cross icon', () => {
+    expect(getCiRunStatusPresentation('failing')).toMatchObject({
+      status: 'failing',
+      labelKey: 'status.ciRun.failing',
+      tone: 'fail',
+      Icon: XCircle,
+    })
+  })
+
+  it('maps a passing CI run to the pass tone with a check icon', () => {
+    expect(getCiRunStatusPresentation('passing')).toMatchObject({
+      status: 'passing',
+      labelKey: 'status.ciRun.passing',
+      tone: 'pass',
+      Icon: CheckCircle,
     })
   })
 })
