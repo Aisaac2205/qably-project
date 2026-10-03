@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { buildJobId } from '../../common/queue/job-id';
 import { RunsController } from './runs.controller';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
@@ -144,6 +145,77 @@ describe('RunsController.ingestJunit', () => {
 
     const [job] = jobBodies(runIngestQueue);
     expect(job.data.body.commitSha).toBe('a41f9c2');
+  });
+
+  it('enqueues every suite of a report with the ci fields from the query', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({
+        ciRunExternalId: '900',
+        ciJobKey: 'api',
+        ciRunNumber: '42',
+        ciServerUrl: 'https://github.com',
+      }),
+      multiSuiteReport,
+    );
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs).toHaveLength(3);
+    for (const job of jobs) {
+      expect(job.data.body.ciRunExternalId).toBe('900');
+      expect(job.data.body.ciJobKey).toBe('api');
+      expect(job.data.body.ciRunNumber).toBe(42);
+      expect(job.data.body.ciServerUrl).toBe('https://github.com');
+    }
+  });
+
+  it('keeps the ci fields on the job body when the caller pins a suiteId', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(
+      apiKey,
+      query({ suiteId: 'suite-9', ciRunExternalId: '900' }),
+      report,
+    );
+
+    const [job] = jobBodies(runIngestQueue);
+    expect(job.data.body.ciRunExternalId).toBe('900');
+  });
+
+  it('puts no ci key on the job body when the query sends none', async () => {
+    const { controller, runIngestQueue } = build();
+
+    await controller.ingestJunit(apiKey, query(), multiSuiteReport);
+
+    for (const job of jobBodies(runIngestQueue)) {
+      expect(
+        Object.keys(job.data.body).filter((key) => key.startsWith('ci')),
+      ).toEqual([]);
+    }
+  });
+
+  it.each([
+    ['empty', ''],
+    ['256 character', 'x'.repeat(256)],
+  ])('answers 400 for an %s ciJobKey', (_label, value) => {
+    const pipe = new ZodValidationPipe(ingestJunitQuerySchema);
+
+    expect(() =>
+      pipe.transform({ externalId: 'ci-42', ciJobKey: value }),
+    ).toThrow(BadRequestException);
+  });
+
+  it('answers 400 for a ciRunNumber above the 32-bit integer range', () => {
+    const pipe = new ZodValidationPipe(ingestJunitQuerySchema);
+
+    expect(() =>
+      pipe.transform({ externalId: 'ci-42', ciRunNumber: '2147483648' }),
+    ).toThrow(BadRequestException);
+    expect(
+      pipe.transform({ externalId: 'ci-42', ciRunNumber: '2147483647' }),
+    ).toEqual(expect.objectContaining({ ciRunNumber: 2147483647 }));
   });
 
   it('rejects a body that is not a string', async () => {

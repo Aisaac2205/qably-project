@@ -26,6 +26,23 @@ const failureType = z.string().trim().min(1).max(250);
 const failureMessage = z.string().trim().min(1).max(1000);
 const failureDetails = z.string().trim().min(1).max(4000);
 const skipReason = z.string().trim().min(1).max(500);
+const ciString = z.string().trim().min(1).max(255);
+const ciPositiveInt = z.coerce.number().int().min(1).max(2_147_483_647);
+const ciServerUrl = z.url({ protocol: /^https?$/ }).max(255);
+
+const ciFields = {
+  ciRunExternalId: ciString.optional(),
+  ciJobKey: ciString.optional(),
+  ciWorkflowName: ciString.optional(),
+  ciRunNumber: ciPositiveInt.optional(),
+  ciRunAttempt: ciPositiveInt.optional(),
+  ciBranch: ciString.optional(),
+  ciHeadRef: ciString.optional(),
+  ciActor: ciString.optional(),
+  ciEventName: ciString.optional(),
+  ciServerUrl: ciServerUrl.optional(),
+  ciRepository: ciString.optional(),
+};
 
 const ingestCaseSchema = z.object({
   name: caseName,
@@ -56,6 +73,7 @@ export const ingestRunSchema = z
     commitSha: commitSha.optional(),
     commitMessage: commitMessage.optional(),
     commitAuthor: commitAuthor.optional(),
+    ...ciFields,
     cases: z.array(ingestCaseSchema).min(1),
   })
   .refine(
@@ -128,6 +146,7 @@ export const ingestJunitQuerySchema = z.object({
   commitMessage: commitMessage.optional(),
   commitAuthor: commitAuthor.optional(),
   reportSize: z.coerce.number().int().positive().optional(),
+  ...ciFields,
 });
 
 export type IngestJunitQuery = z.infer<typeof ingestJunitQuerySchema>;

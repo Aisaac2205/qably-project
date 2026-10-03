@@ -367,3 +367,226 @@ describe('ingestJunitQuerySchema', () => {
     ).toBe(false);
   });
 });
+
+const ciStringFields = [
+  'ciRunExternalId',
+  'ciJobKey',
+  'ciWorkflowName',
+  'ciBranch',
+  'ciHeadRef',
+  'ciActor',
+  'ciEventName',
+  'ciRepository',
+] as const;
+
+const ciIntFields = ['ciRunNumber', 'ciRunAttempt'] as const;
+
+const fullCiQuery = {
+  ciRunExternalId: '900',
+  ciJobKey: 'test (node 20)',
+  ciWorkflowName: 'CI',
+  ciRunNumber: '42',
+  ciRunAttempt: '2',
+  ciBranch: '12/merge',
+  ciHeadRef: 'feature/x',
+  ciActor: 'ana',
+  ciEventName: 'pull_request',
+  ciServerUrl: 'https://github.com',
+  ciRepository: 'acme/shop',
+};
+
+const fullCiBody = {
+  ...fullCiQuery,
+  ciRunNumber: 42,
+  ciRunAttempt: 2,
+};
+
+const ciKeysOf = (value: object) =>
+  Object.keys(value).filter((key) => key.startsWith('ci'));
+
+describe('ingestJunitQuerySchema ci fields', () => {
+  const parse = (extra: Record<string, unknown>) =>
+    ingestJunitQuerySchema.safeParse({ externalId: 'ci-42', ...extra });
+
+  it('yields no ci keys when none are sent', () => {
+    const result = parse({});
+
+    expect(result.success).toBe(true);
+    expect(result.success && ciKeysOf(result.data)).toEqual([]);
+  });
+
+  it('carries all eleven ci fields through, coercing the counters', () => {
+    const result = parse(fullCiQuery);
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data).toEqual(
+      expect.objectContaining(fullCiBody),
+    );
+    expect(result.success && ciKeysOf(result.data).sort()).toEqual(
+      Object.keys(fullCiBody).sort(),
+    );
+  });
+
+  it('keeps only the ci fields that were sent', () => {
+    const result = parse({ ciRunExternalId: '900', ciJobKey: 'api' });
+
+    expect(result.success && ciKeysOf(result.data).sort()).toEqual([
+      'ciJobKey',
+      'ciRunExternalId',
+    ]);
+  });
+
+  it.each(ciStringFields)('trims %s', (field) => {
+    const result = parse({ [field]: '  value  ' });
+
+    expect(
+      result.success && (result.data as Record<string, unknown>)[field],
+    ).toBe('value');
+  });
+
+  it.each(ciStringFields)('rejects an empty or blank %s', (field) => {
+    expect(parse({ [field]: '' }).success).toBe(false);
+    expect(parse({ [field]: '   ' }).success).toBe(false);
+  });
+
+  it.each(ciStringFields)(
+    'accepts %s at 255 characters and rejects 256',
+    (field) => {
+      expect(parse({ [field]: 'a'.repeat(255) }).success).toBe(true);
+      expect(parse({ [field]: 'a'.repeat(256) }).success).toBe(false);
+    },
+  );
+
+  it.each(ciIntFields)('coerces a numeric %s query string', (field) => {
+    const result = parse({ [field]: '12' });
+
+    expect(
+      result.success && (result.data as Record<string, unknown>)[field],
+    ).toBe(12);
+  });
+
+  it.each(ciIntFields)(
+    'rejects %s when it is not a positive integer',
+    (field) => {
+      for (const value of ['0', '-1', '1.5', 'abc']) {
+        expect(parse({ [field]: value }).success).toBe(false);
+      }
+    },
+  );
+
+  it.each(ciIntFields)('bounds %s to the 32-bit integer range', (field) => {
+    expect(parse({ [field]: '2147483647' }).success).toBe(true);
+    expect(parse({ [field]: '2147483648' }).success).toBe(false);
+    expect(parse({ [field]: '99999999999' }).success).toBe(false);
+  });
+
+  it('accepts an http or https ciServerUrl', () => {
+    expect(parse({ ciServerUrl: 'https://github.com' }).success).toBe(true);
+    expect(parse({ ciServerUrl: 'http://ghe.internal' }).success).toBe(true);
+  });
+
+  it.each(['javascript:alert(1)', 'ftp://x', 'github.com'])(
+    'rejects the ciServerUrl %s',
+    (value) => {
+      expect(parse({ ciServerUrl: value }).success).toBe(false);
+    },
+  );
+
+  it('accepts a ciServerUrl of 255 characters and rejects 256', () => {
+    const prefix = 'https://github.com/';
+    const atLimit = `${prefix}${'a'.repeat(255 - prefix.length)}`;
+    const overLimit = `${atLimit}a`;
+
+    expect(atLimit).toHaveLength(255);
+    expect(overLimit).toHaveLength(256);
+    expect(parse({ ciServerUrl: atLimit }).success).toBe(true);
+    expect(parse({ ciServerUrl: overLimit }).success).toBe(false);
+  });
+});
+
+describe('ingestRunSchema ci fields', () => {
+  const parse = (extra: Record<string, unknown>) =>
+    ingestRunSchema.safeParse({ ...baseInput, ...extra });
+
+  it('yields no ci keys when none are sent', () => {
+    const result = parse({});
+
+    expect(result.success).toBe(true);
+    expect(result.success && ciKeysOf(result.data)).toEqual([]);
+  });
+
+  it('carries all eleven ci fields through instead of stripping them', () => {
+    const result = parse(fullCiBody);
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data).toEqual(
+      expect.objectContaining(fullCiBody),
+    );
+  });
+
+  it('accepts the ci fields when the suite is resolved by name', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInputWithoutSuiteId,
+      suiteName: 'Checkout',
+      ...fullCiBody,
+    });
+
+    expect(result.success && result.data.ciRunExternalId).toBe('900');
+  });
+
+  it.each(ciStringFields)(
+    'rejects an empty %s and one over 255 characters',
+    (field) => {
+      expect(parse({ [field]: '' }).success).toBe(false);
+      expect(parse({ [field]: 'a'.repeat(255) }).success).toBe(true);
+      expect(parse({ [field]: 'a'.repeat(256) }).success).toBe(false);
+    },
+  );
+
+  it.each(ciIntFields)(
+    'accepts a positive integer %s from a JSON body',
+    (field) => {
+      const result = parse({ [field]: 7 });
+
+      expect(
+        result.success && (result.data as Record<string, unknown>)[field],
+      ).toBe(7);
+    },
+  );
+
+  it.each(ciIntFields)(
+    'rejects %s when it is not a positive integer',
+    (field) => {
+      for (const value of [0, -1, 1.5, 'abc']) {
+        expect(parse({ [field]: value }).success).toBe(false);
+      }
+    },
+  );
+
+  it.each(ciIntFields)('bounds %s to the 32-bit integer range', (field) => {
+    expect(parse({ [field]: 2_147_483_647 }).success).toBe(true);
+    expect(parse({ [field]: 2_147_483_648 }).success).toBe(false);
+    expect(parse({ [field]: 99_999_999_999 }).success).toBe(false);
+  });
+
+  it('accepts an http or https ciServerUrl', () => {
+    expect(parse({ ciServerUrl: 'https://github.com' }).success).toBe(true);
+    expect(parse({ ciServerUrl: 'http://ghe.internal' }).success).toBe(true);
+  });
+
+  it.each(['javascript:alert(1)', 'ftp://x', 'github.com'])(
+    'rejects the ciServerUrl %s',
+    (value) => {
+      expect(parse({ ciServerUrl: value }).success).toBe(false);
+    },
+  );
+
+  it('still enforces the suiteId or suiteName rule when ci fields are present', () => {
+    const result = ingestRunSchema.safeParse({
+      ...baseInputWithoutSuiteId,
+      ...fullCiBody,
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
