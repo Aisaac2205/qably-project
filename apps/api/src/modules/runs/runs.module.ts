@@ -13,6 +13,8 @@ import {
   RECORD_SUITE_RESULT_SCRIPT,
 } from './lib/report-batch.lua';
 import { CiRunLinker } from './ci-run-linker';
+import { CiRunsController } from './ci-runs.controller';
+import { CiRunsService } from './ci-runs.service';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import { ReportBatchService } from './report-batch.service';
 import { REPORT_BATCH_REDIS } from './report-batch.tokens';
@@ -45,7 +47,7 @@ import { RunsService } from './runs.service';
       },
     }),
   ],
-  controllers: [RunsController, RunQueriesController],
+  controllers: [RunsController, RunQueriesController, CiRunsController],
   providers: [
     RunsService,
     RunQueriesService,
@@ -53,6 +55,7 @@ import { RunsService } from './runs.service';
     ReportBatchService,
     OfficialCaseReconciler,
     CiRunLinker,
+    CiRunsService,
     {
       provide: REPORT_BATCH_REDIS,
       inject: [ENV],
