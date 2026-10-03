@@ -380,6 +380,10 @@
     },
     "legacy": {
       "cancelled": "Cancelled"
+    },
+    "ciRun": {
+      "passing": "No failures",
+      "failing": "Has failures"
     }
   },
   "dashboard": {
@@ -866,7 +870,52 @@
     "duration": "Duration",
     "skipReason": "Skip reason",
     "coveredByCi": "Covered by CI",
-    "loading": "Loading runs…"
+    "loading": "Loading runs…",
+    "ci": {
+      "tabsAria": "Run source",
+      "tabActions": "Actions",
+      "tabManual": "Manual",
+      "listAria": "CI runs",
+      "loading": "Loading runs…",
+      "loadMore": "Load more",
+      "loadingMore": "Loading…",
+      "emptyTitle": "No runs yet",
+      "emptyDescription": "Runs appear here once the results reporter is wired into the CI workflow.",
+      "emptyDocsLink": "How to report results from CI",
+      "errorTitle": "Could not load the runs",
+      "errorDescription": "Try again in a few seconds.",
+      "ciNumber": "CI #{{number}}",
+      "durationApprox": "~{{value}}",
+      "durationSeconds_one": "{{count}} s",
+      "durationSeconds_other": "{{count}} s",
+      "durationMinutes_one": "{{count}} min",
+      "durationMinutes_other": "{{count}} min",
+      "durationHours_one": "{{count}} h",
+      "durationHours_other": "{{count}} h",
+      "durationTooltip": "Approximate: between the first and the last report",
+      "freshnessSeconds_one": "Last report {{count}} s ago",
+      "freshnessSeconds_other": "Last report {{count}} s ago",
+      "freshnessMinutes_one": "Last report {{count}} min ago",
+      "freshnessMinutes_other": "Last report {{count}} min ago",
+      "freshnessHours_one": "Last report {{count}} h ago",
+      "freshnessHours_other": "Last report {{count}} h ago",
+      "freshnessDays_one": "Last report {{count}} d ago",
+      "freshnessDays_other": "Last report {{count}} d ago",
+      "statusTooltip": "Based on the reports received so far. Jobs that do not upload a test report are not shown.",
+      "suitesShow_one": "Show {{count}} suite without failures",
+      "suitesShow_other": "Show {{count}} suites without failures",
+      "suitesHide_one": "Hide {{count}} suite without failures",
+      "suitesHide_other": "Hide {{count}} suites without failures",
+      "suitesAria": "Suites in the run",
+      "groupSuitesAria": "{{name}} suites",
+      "githubLinkAria": "Open the {{repository}} run on {{host}} (opens in a new tab)",
+      "detailLoading": "Loading the run…",
+      "detailErrorTitle": "Could not load the run",
+      "detailErrorDescription": "Try again in a few seconds.",
+      "notFoundTitle": "Run not found",
+      "notFoundDescription": "It may have been deleted or belong to another project.",
+      "backToList": "Back to runs"
+    }
   },
   "suites": {
     "versionBadge": "v{{version}}",

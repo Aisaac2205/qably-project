@@ -380,6 +380,10 @@
     },
     "legacy": {
       "cancelled": "Cancelado"
+    },
+    "ciRun": {
+      "passing": "Sin fallos",
+      "failing": "Con fallos"
     }
   },
   "dashboard": {
@@ -866,7 +870,52 @@
     "duration": "Duración",
     "skipReason": "Motivo de omisión",
     "coveredByCi": "Cubiertos por CI",
-    "loading": "Cargando corridas…"
+    "loading": "Cargando corridas…",
+    "ci": {
+      "tabsAria": "Origen de las ejecuciones",
+      "tabActions": "Acciones",
+      "tabManual": "Manual",
+      "listAria": "Ejecuciones de CI",
+      "loading": "Cargando ejecuciones…",
+      "loadMore": "Cargar más",
+      "loadingMore": "Cargando…",
+      "emptyTitle": "Sin ejecuciones aún",
+      "emptyDescription": "Las ejecuciones aparecen aquí cuando el reporte de resultados está conectado al flujo de CI.",
+      "emptyDocsLink": "Cómo reportar resultados desde CI",
+      "errorTitle": "No se pudieron cargar las ejecuciones",
+      "errorDescription": "Intenta de nuevo en unos segundos.",
+      "ciNumber": "CI #{{number}}",
+      "durationApprox": "~{{value}}",
+      "durationSeconds_one": "{{count}} s",
+      "durationSeconds_other": "{{count}} s",
+      "durationMinutes_one": "{{count}} min",
+      "durationMinutes_other": "{{count}} min",
+      "durationHours_one": "{{count}} h",
+      "durationHours_other": "{{count}} h",
+      "durationTooltip": "Aproximado: entre el primer y el último reporte",
+      "freshnessSeconds_one": "Último reporte hace {{count}} s",
+      "freshnessSeconds_other": "Último reporte hace {{count}} s",
+      "freshnessMinutes_one": "Último reporte hace {{count}} min",
+      "freshnessMinutes_other": "Último reporte hace {{count}} min",
+      "freshnessHours_one": "Último reporte hace {{count}} h",
+      "freshnessHours_other": "Último reporte hace {{count}} h",
+      "freshnessDays_one": "Último reporte hace {{count}} d",
+      "freshnessDays_other": "Último reporte hace {{count}} d",
+      "statusTooltip": "Según los reportes recibidos hasta ahora. Los trabajos que no suben un reporte de pruebas no aparecen.",
+      "suitesShow_one": "Ver {{count}} suite sin fallos",
+      "suitesShow_other": "Ver {{count}} suites sin fallos",
+      "suitesHide_one": "Ocultar {{count}} suite sin fallos",
+      "suitesHide_other": "Ocultar {{count}} suites sin fallos",
+      "suitesAria": "Suites de la ejecución",
+      "groupSuitesAria": "Suites de {{name}}",
+      "githubLinkAria": "Abrir la ejecución de {{repository}} en {{host}} (se abre en una pestaña nueva)",
+      "detailLoading": "Cargando la ejecución…",
+      "detailErrorTitle": "No se pudo cargar la ejecución",
+      "detailErrorDescription": "Intenta de nuevo en unos segundos.",
+      "notFoundTitle": "Ejecución no encontrada",
+      "notFoundDescription": "Puede que se haya eliminado o que pertenezca a otro proyecto.",
+      "backToList": "Volver a las ejecuciones"
+    }
   },
   "suites": {
     "versionBadge": "v{{version}}",
