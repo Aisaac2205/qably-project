@@ -6,6 +6,7 @@ import { NotificationsPublisher } from '../notifications/notifications.publisher
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
+import { CiRunLinker } from './ci-run-linker';
 import {
   OfficialCaseReconciler,
   type AdoptionTx,
@@ -50,6 +51,7 @@ export class RunsService {
     private readonly reportBatch: ReportBatchService,
     private readonly officialCaseReconciler: OfficialCaseReconciler,
     private readonly reclassifier: ProposalReclassifier,
+    private readonly ciRunLinker: CiRunLinker,
   ) {}
 
   async ingest(
@@ -78,6 +80,17 @@ export class RunsService {
     const finishedAt =
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
     const reportExternalId = input.reportExternalId ?? input.externalId;
+
+    const ciRunId = await this.ciRunLinker.resolve(apiKey, input);
+    const ciLink =
+      ciRunId === undefined
+        ? {}
+        : {
+            ciRunId,
+            ...(input.ciJobKey === undefined
+              ? {}
+              : { ciJobKey: input.ciJobKey }),
+          };
 
     let createdCaseIds: string[] = [];
 
@@ -131,12 +144,14 @@ export class RunsService {
           ...(input.commitAuthor === undefined
             ? {}
             : { commitAuthor: input.commitAuthor }),
+          ...ciLink,
         },
         update: {
           suiteId: suite.id,
           name: input.name,
           status,
           reportExternalId,
+          ...ciLink,
           ...(input.startedAt === undefined ? {} : { startedAt }),
           ...(finishedAt === undefined ? {} : { finishedAt }),
           ...(input.commitSha === undefined

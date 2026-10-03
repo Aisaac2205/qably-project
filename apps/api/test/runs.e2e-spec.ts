@@ -1,3 +1,4 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -9,6 +10,7 @@ import {
 import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { configureHttpPipeline } from '../src/common/http/configure-http-pipeline';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import { ApiKeysModule } from '../src/modules/api-keys/api-keys.module';
@@ -19,6 +21,7 @@ import {
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RUN_INGEST_QUEUE } from '../src/modules/runs/runs.contracts';
 import { RunsModule } from '../src/modules/runs/runs.module';
 import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
@@ -81,6 +84,7 @@ const runRow = {
   commitSha: null,
   commitMessage: null,
   commitAuthor: null,
+  ciRunId: null,
 };
 
 function runCaseRow(overrides: Record<string, unknown> = {}) {
@@ -121,6 +125,7 @@ describe('Runs ingestion (e2e)', () => {
       update: jest.fn(),
     },
     run: { upsert: jest.fn() },
+    ciRun: { upsert: jest.fn() },
     runCase: {
       deleteMany: jest.fn(),
       createManyAndReturn: jest.fn(),
@@ -159,6 +164,7 @@ describe('Runs ingestion (e2e)', () => {
     prisma.testCase.createMany.mockResolvedValue({ count: 0 });
     prisma.testCase.update.mockResolvedValue(officialCases[0]);
     prisma.run.upsert.mockResolvedValue(runRow);
+    prisma.ciRun.upsert.mockResolvedValue({ id: 'ci-1' });
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
     prisma.runCase.findMany.mockResolvedValue([runCaseRow()]);
@@ -187,7 +193,8 @@ describe('Runs ingestion (e2e)', () => {
       .useValue(testEnv)
       .compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleFixture.createNestApplication({ bodyParser: false });
+    configureHttpPipeline(app, testEnv);
     app.useGlobalFilters(new AllExceptionsFilter(false));
     await app.init();
   });
@@ -336,5 +343,132 @@ describe('Runs ingestion (e2e)', () => {
       .expect(404);
 
     expect(prisma.suite.create).not.toHaveBeenCalled();
+  });
+
+  describe('ci run linking', () => {
+    const reportExternalId = 'gha-900-api-junit-unit-xml-ab12cd34';
+    const ciFields = { ciRunExternalId: '900', ciJobKey: 'api' };
+    const junitXml =
+      '<testsuite name="Checkout"><testcase name="Adds to cart"/></testsuite>';
+
+    const postJunit = (query: string) =>
+      request(app.getHttpServer())
+        .post(`/runs/ingest/junit?${query}`)
+        .set('Authorization', `Bearer ${generated.token}`)
+        .set('Content-Type', 'application/xml')
+        .send(junitXml);
+
+    const enqueuedBodies = () => {
+      const queue = app.get<{ addBulk: jest.Mock }>(
+        getQueueToken(RUN_INGEST_QUEUE),
+      );
+      const [jobs] = queue.addBulk.mock.calls[0] as [
+        { data: { body: Record<string, unknown> } }[],
+      ];
+      return jobs.map((job) => job.data.body);
+    };
+
+    it('answers a request without ci fields as before and never resolves a ci run', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/runs/ingest')
+        .set('Authorization', `Bearer ${generated.token}`)
+        .send(validBody)
+        .expect(200);
+
+      expect(response.body).toEqual(
+        expect.objectContaining({ id: 'run-1', status: 'pass' }),
+      );
+      expect(response.body).not.toHaveProperty('ciRunId');
+      expect(prisma.ciRun.upsert).not.toHaveBeenCalled();
+    });
+
+    it('links the run to its ci run and returns the link', async () => {
+      prisma.run.upsert.mockResolvedValue({ ...runRow, ciRunId: 'ci-1' });
+
+      const response = await request(app.getHttpServer())
+        .post('/runs/ingest')
+        .set('Authorization', `Bearer ${generated.token}`)
+        .send({ ...validBody, source: 'github_actions', ...ciFields })
+        .expect(200);
+
+      expect(prisma.ciRun.upsert).toHaveBeenCalledTimes(1);
+      expect(prisma.ciRun.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            projectId_source_externalId: {
+              projectId: 'project-1',
+              source: 'github_actions',
+              externalId: '900',
+            },
+          },
+        }),
+      );
+      const [call] = prisma.run.upsert.mock.calls[0] as [
+        { create: object; update: object },
+      ];
+      const link = { ciRunId: 'ci-1', ciJobKey: 'api' };
+      expect(call.create).toEqual(expect.objectContaining(link));
+      expect(call.update).toEqual(expect.objectContaining(link));
+      expect(response.body).toHaveProperty('ciRunId', 'ci-1');
+    });
+
+    it.each([
+      ['a counter above the 32-bit range', { ciRunNumber: 99_999_999_999 }],
+      ['a non-http ciServerUrl', { ciServerUrl: 'javascript:alert(1)' }],
+      ['an empty job key', { ciJobKey: '' }],
+    ])('rejects %s with a 400 before any write', async (_label, extra) => {
+      await request(app.getHttpServer())
+        .post('/runs/ingest')
+        .set('Authorization', `Bearer ${generated.token}`)
+        .send({ ...validBody, ...ciFields, ...extra })
+        .expect(400);
+
+      expect(prisma.ciRun.upsert).not.toHaveBeenCalled();
+      expect(prisma.run.upsert).not.toHaveBeenCalled();
+    });
+
+    it('accepts a junit report without ci fields with a 202 and the same shape as before', async () => {
+      const response = await postJunit(`externalId=${reportExternalId}`).expect(
+        202,
+      );
+
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          accepted: 1,
+          runs: [
+            expect.objectContaining({
+              externalId: reportExternalId,
+              suiteName: 'Checkout',
+            }) as unknown,
+          ],
+          rejected: [],
+        }),
+      );
+      const [body] = enqueuedBodies();
+      expect(Object.keys(body).filter((key) => key.startsWith('ci'))).toEqual(
+        [],
+      );
+    });
+
+    it('carries the ci query parameters into the enqueued job body', async () => {
+      await postJunit(
+        `externalId=${reportExternalId}&source=github_actions&ciRunExternalId=900&ciJobKey=api&ciRunNumber=42`,
+      ).expect(202);
+
+      expect(enqueuedBodies()).toEqual([
+        expect.objectContaining({
+          ciRunExternalId: '900',
+          ciJobKey: 'api',
+          ciRunNumber: 42,
+        }) as unknown,
+      ]);
+    });
+
+    it.each([
+      ['a 256 character job key', `ciJobKey=${'a'.repeat(256)}`],
+      ['a counter above the 32-bit range', 'ciRunNumber=2147483648'],
+    ])('answers 400 on the junit route for %s', async (_label, query) => {
+      await postJunit(`externalId=${reportExternalId}&${query}`).expect(400);
+    });
   });
 });

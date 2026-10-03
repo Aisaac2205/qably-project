@@ -1,5 +1,6 @@
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
+import { CiRunLinker } from './ci-run-linker';
 import { deriveRunStatus } from './lib/derive-run-status';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import type { IngestRunInput } from './runs.schemas';
@@ -32,6 +33,7 @@ const runRow = {
   commitSha: null,
   commitMessage: null,
   commitAuthor: null,
+  ciRunId: null,
 };
 
 function caseRow(overrides: Record<string, unknown>) {
@@ -142,11 +144,16 @@ function fakeReclassifier(
   return { enqueue } as unknown as ProposalReclassifier;
 }
 
+function createCiRunLinker(ciRunId?: string) {
+  return { resolve: jest.fn().mockResolvedValue(ciRunId) };
+}
+
 function build(
   prisma: FakePrisma,
   notifications: { publish: jest.Mock } = createNotifications(),
   reportBatch: { recordAndMaybePublish: jest.Mock } = createReportBatch(),
   reclassifier: ProposalReclassifier = fakeReclassifier(),
+  ciRunLinker: { resolve: jest.Mock } = createCiRunLinker(),
 ) {
   return new RunsService(
     prisma as never,
@@ -154,6 +161,7 @@ function build(
     reportBatch as never,
     new OfficialCaseReconciler(),
     reclassifier,
+    ciRunLinker as never,
   );
 }
 
@@ -1731,5 +1739,221 @@ describe('RunsService.ingest case identity collisions', () => {
     await build(prisma).ingest(apiKey, baseInput);
 
     expect(prisma.caseIdentityCollision.upsert).not.toHaveBeenCalled();
+  });
+});
+
+const ciInput: IngestRunInput = {
+  ...baseInputBySuiteName,
+  source: 'github_actions',
+  externalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+  reportExternalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+  ciRunExternalId: '900',
+  ciJobKey: 'api',
+};
+
+interface RunUpsertArgs {
+  where: unknown;
+  create: Record<string, unknown>;
+  update: Record<string, unknown>;
+}
+
+function runUpsertArgs(prisma: FakePrisma, index = 0): RunUpsertArgs {
+  const [args] = prisma.run.upsert.mock.calls[index] as [RunUpsertArgs];
+  return args;
+}
+
+function buildWithLinker(prisma: FakePrisma, linker: { resolve: jest.Mock }) {
+  return build(
+    prisma,
+    createNotifications(),
+    createReportBatch(),
+    fakeReclassifier(),
+    linker,
+  );
+}
+
+describe('RunsService.ingest ci run linking', () => {
+  it('resolves the ci run once with the api key and the input, before the transaction opens', async () => {
+    const prisma = createPrisma();
+    const linker = createCiRunLinker('ci-1');
+
+    await buildWithLinker(prisma, linker).ingest(apiKey, ciInput);
+
+    expect(linker.resolve).toHaveBeenCalledTimes(1);
+    expect(linker.resolve).toHaveBeenCalledWith(apiKey, ciInput);
+    expect(linker.resolve.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.$transaction.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('writes the ci run id and job key on both the create and the update, which links a stored run late', async () => {
+    const prisma = createPrisma();
+
+    await buildWithLinker(prisma, createCiRunLinker('ci-1')).ingest(
+      apiKey,
+      ciInput,
+    );
+
+    expect(runUpsertArgs(prisma).create).toEqual(
+      expect.objectContaining({ ciRunId: 'ci-1', ciJobKey: 'api' }),
+    );
+    expect(runUpsertArgs(prisma).update).toEqual(
+      expect.objectContaining({ ciRunId: 'ci-1', ciJobKey: 'api' }),
+    );
+  });
+
+  it('writes the ci run id without a job key when the report carries none', async () => {
+    const prisma = createPrisma();
+
+    await buildWithLinker(prisma, createCiRunLinker('ci-1')).ingest(apiKey, {
+      ...ciInput,
+      ciJobKey: undefined,
+    });
+
+    for (const write of [
+      runUpsertArgs(prisma).create,
+      runUpsertArgs(prisma).update,
+    ]) {
+      expect(write.ciRunId).toBe('ci-1');
+      expect(Object.keys(write)).not.toContain('ciJobKey');
+    }
+  });
+
+  it('leaves both link keys out of both writes for a report without ci fields, so a stored link never regresses', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    for (const write of [
+      runUpsertArgs(prisma).create,
+      runUpsertArgs(prisma).update,
+    ]) {
+      expect(Object.keys(write)).not.toContain('ciRunId');
+      expect(Object.keys(write)).not.toContain('ciJobKey');
+    }
+  });
+
+  it('keeps the job key out of the run when no ci run was resolved, and still succeeds', async () => {
+    const prisma = createPrisma();
+
+    const result = await build(prisma).ingest(apiKey, {
+      ...ciInput,
+      ciRunExternalId: undefined,
+    });
+
+    expect(result.ok).toBe(true);
+    for (const write of [
+      runUpsertArgs(prisma).create,
+      runUpsertArgs(prisma).update,
+    ]) {
+      expect(Object.keys(write)).not.toContain('ciRunId');
+      expect(Object.keys(write)).not.toContain('ciJobKey');
+    }
+  });
+
+  it('never resolves a ci run for a request that fails before writing', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+    const linker = createCiRunLinker('ci-1');
+    const service = buildWithLinker(prisma, linker);
+
+    const missingSuite = await service.ingest(apiKey, {
+      ...ciInput,
+      suiteName: undefined,
+      suiteId: 'suite-missing',
+    });
+    const forbiddenSource = await service.ingest(apiKey, {
+      ...ciInput,
+      source: 'manual' as never,
+    });
+
+    expect(missingSuite).toEqual({ ok: false, error: 'suite-not-found' });
+    expect(forbiddenSource).toEqual({ ok: false, error: 'source-not-allowed' });
+    expect(linker.resolve).not.toHaveBeenCalled();
+  });
+
+  it('fails the ingest before the transaction when the ci run cannot be resolved, so the queue retries it', async () => {
+    const prisma = createPrisma();
+    const linker = { resolve: jest.fn().mockRejectedValue(new Error('down')) };
+
+    await expect(
+      buildWithLinker(prisma, linker).ingest(apiKey, ciInput),
+    ).rejects.toThrow('down');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('links the same report ingested twice to the same ci run through the real linker', async () => {
+    const prisma = createPrisma();
+    const ciRun = {
+      upsert: jest.fn().mockResolvedValue({ id: 'ci-1' }),
+      update: jest.fn(),
+    };
+    const linker = new CiRunLinker({ ciRun } as never);
+    const service = buildWithLinker(prisma, linker as never);
+
+    await service.ingest(apiKey, ciInput);
+    await service.ingest(apiKey, ciInput);
+
+    expect(ciRun.upsert).toHaveBeenCalledTimes(2);
+    const [[first], [second]] = ciRun.upsert.mock.calls as [
+      [{ where: unknown }],
+      [{ where: unknown }],
+    ];
+    expect(first.where).toEqual({
+      projectId_source_externalId: {
+        projectId: 'project-1',
+        source: 'github_actions',
+        externalId: '900',
+      },
+    });
+    expect(second.where).toEqual(first.where);
+    expect(runUpsertArgs(prisma, 0).create.ciRunId).toBe('ci-1');
+    expect(runUpsertArgs(prisma, 1).create.ciRunId).toBe('ci-1');
+    expect(runUpsertArgs(prisma, 0).where).toEqual(
+      runUpsertArgs(prisma, 1).where,
+    );
+  });
+
+  it('keeps each report of the same job under its own reportExternalId while sharing one ci run', async () => {
+    const prisma = createPrisma();
+    const service = buildWithLinker(prisma, createCiRunLinker('ci-1'));
+
+    await service.ingest(apiKey, ciInput);
+    await service.ingest(apiKey, {
+      ...ciInput,
+      externalId: 'gha-900-api-junit-e2e-xml-ef56ab78',
+      reportExternalId: 'gha-900-api-junit-e2e-xml-ef56ab78',
+    });
+
+    expect(runUpsertArgs(prisma, 0).create).toEqual(
+      expect.objectContaining({
+        ciRunId: 'ci-1',
+        ciJobKey: 'api',
+        reportExternalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+      }),
+    );
+    expect(runUpsertArgs(prisma, 1).create).toEqual(
+      expect.objectContaining({
+        ciRunId: 'ci-1',
+        ciJobKey: 'api',
+        reportExternalId: 'gha-900-api-junit-e2e-xml-ef56ab78',
+      }),
+    );
+  });
+
+  it('returns the ci run id in the view only when the stored run is linked', async () => {
+    const linked = createPrisma();
+    linked.run.upsert.mockResolvedValue({ ...runRow, ciRunId: 'ci-1' });
+
+    const linkedResult = await build(linked).ingest(apiKey, ciInput);
+    const unlinkedResult = await build(createPrisma()).ingest(
+      apiKey,
+      baseInput,
+    );
+
+    expect(linkedResult.ok && linkedResult.value.ciRunId).toBe('ci-1');
+    expect(unlinkedResult.ok && unlinkedResult.value).not.toHaveProperty(
+      'ciRunId',
+    );
   });
 });
