@@ -1,14 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import type { RunStatus } from '@qably/types';
+import { err, ok, type Result } from '../../common/result';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import {
+  CI_RUN_JOB_RUN_SELECT,
   CI_RUN_SELECT,
+  toCiRunJobRun,
   toCiRunSummary,
+  type CiRunJobRunRow,
   type CiRunRow,
 } from './lib/ci-run-view';
 import { deriveCiRunStatus } from './lib/derive-ci-run-status';
-import type { CiRunsPageView } from './runs.contracts';
+import type {
+  CiRunDetailView,
+  CiRunQueryError,
+  CiRunsPageView,
+} from './runs.contracts';
 import type { ListCiRunsQuery } from './runs.schemas';
 
 interface CiRunStatusGroup {
@@ -66,5 +74,30 @@ export class CiRunsService {
     return hasMore
       ? { items, nextCursor: page[page.length - 1].id }
       : { items };
+  }
+
+  async get(
+    org: OrgContext,
+    id: string,
+  ): Promise<Result<CiRunDetailView, CiRunQueryError>> {
+    const row = await this.prisma.ciRun.findFirst({
+      where: { id, organizationId: org.organizationId },
+      select: CI_RUN_SELECT,
+    });
+
+    if (row === null) return err('not-found');
+
+    const runs = (await this.prisma.run.findMany({
+      where: { organizationId: org.organizationId, ciRunId: id },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      select: CI_RUN_JOB_RUN_SELECT,
+    })) as CiRunJobRunRow[];
+
+    const status = deriveCiRunStatus(runs.map((run) => run.status));
+
+    return ok({
+      ...toCiRunSummary(row, status),
+      runs: runs.map(toCiRunJobRun),
+    });
   }
 }

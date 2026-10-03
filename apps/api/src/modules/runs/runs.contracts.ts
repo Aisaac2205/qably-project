@@ -1,4 +1,5 @@
 import type {
+  CiRunDetailRecord,
   CiRunsPageRecord,
   JunitIngestRecord,
   PushPassRateRecord,
@@ -21,6 +22,7 @@ export type RunCaseView = RunCaseRecord;
 export type RunSummaryView = RunSummaryRecord;
 export type RunsPageView = RunsPageRecord;
 export type CiRunsPageView = CiRunsPageRecord;
+export type CiRunDetailView = CiRunDetailRecord;
 export type SuiteMetricsView = SuiteMetricsRecord;
 export type RegressionsView = RegressionsRecord;
 export type PushPassRateOhlcView = PushPassRateRecord;
@@ -47,3 +49,5 @@ export type RunQueryError =
   | 'no-manual-cases'
   | 'case-not-found'
   | 'source-not-editable';
+
+export type CiRunQueryError = 'not-found';

@@ -1,4 +1,10 @@
-import type { CiRunStatus, CiRunSummaryRecord, RunSource } from '@qably/types';
+import type {
+  CiRunJobRunRecord,
+  CiRunStatus,
+  CiRunSummaryRecord,
+  RunSource,
+  RunStatus,
+} from '@qably/types';
 
 export const CI_RUN_SELECT = {
   id: true,
@@ -21,6 +27,17 @@ export const CI_RUN_SELECT = {
   lastReportedAt: true,
 } as const;
 
+export const CI_RUN_JOB_RUN_SELECT = {
+  id: true,
+  suiteId: true,
+  name: true,
+  status: true,
+  startedAt: true,
+  ciJobKey: true,
+  reportExternalId: true,
+  suite: { select: { name: true } },
+} as const;
+
 export interface CiRunRow {
   id: string;
   projectId: string;
@@ -40,6 +57,17 @@ export interface CiRunRow {
   commitAuthor: string | null;
   startedAt: Date;
   lastReportedAt: Date;
+}
+
+export interface CiRunJobRunRow {
+  id: string;
+  suiteId: string;
+  name: string;
+  status: RunStatus;
+  startedAt: Date;
+  ciJobKey: string | null;
+  reportExternalId: string | null;
+  suite: { name: string };
 }
 
 export function toCiRunSummary(
@@ -66,5 +94,20 @@ export function toCiRunSummary(
     ...(row.commitSha === null ? {} : { commitSha: row.commitSha }),
     ...(row.commitMessage === null ? {} : { commitMessage: row.commitMessage }),
     ...(row.commitAuthor === null ? {} : { commitAuthor: row.commitAuthor }),
+  };
+}
+
+export function toCiRunJobRun(row: CiRunJobRunRow): CiRunJobRunRecord {
+  return {
+    id: row.id,
+    suiteId: row.suiteId,
+    suiteName: row.suite.name,
+    name: row.name,
+    status: row.status,
+    startedAt: row.startedAt.toISOString(),
+    ...(row.ciJobKey === null ? {} : { ciJobKey: row.ciJobKey }),
+    ...(row.reportExternalId === null
+      ? {}
+      : { reportExternalId: row.reportExternalId }),
   };
 }

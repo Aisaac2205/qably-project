@@ -1,4 +1,11 @@
-import { CI_RUN_SELECT, toCiRunSummary, type CiRunRow } from './ci-run-view';
+import {
+  CI_RUN_JOB_RUN_SELECT,
+  CI_RUN_SELECT,
+  toCiRunJobRun,
+  toCiRunSummary,
+  type CiRunJobRunRow,
+  type CiRunRow,
+} from './ci-run-view';
 
 const startedAt = new Date('2026-10-03T14:00:00.000Z');
 const lastReportedAt = new Date('2026-10-03T14:12:20.000Z');
@@ -103,5 +110,68 @@ describe('CI_RUN_SELECT', () => {
 
   it('never selects the organization', () => {
     expect(CI_RUN_SELECT).not.toHaveProperty('organizationId');
+  });
+});
+
+const linkedJobRun: CiRunJobRunRow = {
+  id: 'run-1',
+  suiteId: 'suite-1',
+  name: 'Checkout regression',
+  status: 'fail',
+  startedAt,
+  ciJobKey: 'api',
+  reportExternalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+  suite: { name: 'Checkout' },
+};
+
+describe('toCiRunJobRun', () => {
+  it('maps the run, resolving the suite name and serialising the start', () => {
+    expect(toCiRunJobRun(linkedJobRun)).toStrictEqual({
+      id: 'run-1',
+      suiteId: 'suite-1',
+      suiteName: 'Checkout',
+      name: 'Checkout regression',
+      status: 'fail',
+      startedAt: '2026-10-03T14:00:00.000Z',
+      ciJobKey: 'api',
+      reportExternalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+    });
+  });
+
+  it('omits the job key and the report id when they are null', () => {
+    const run = toCiRunJobRun({
+      ...linkedJobRun,
+      status: 'pass',
+      ciJobKey: null,
+      reportExternalId: null,
+    });
+
+    expect(run).toStrictEqual({
+      id: 'run-1',
+      suiteId: 'suite-1',
+      suiteName: 'Checkout',
+      name: 'Checkout regression',
+      status: 'pass',
+      startedAt: '2026-10-03T14:00:00.000Z',
+    });
+  });
+
+  it('keeps the job key when only the report id is null', () => {
+    const run = toCiRunJobRun({ ...linkedJobRun, reportExternalId: null });
+
+    expect(run).toMatchObject({ ciJobKey: 'api' });
+    expect(run).not.toHaveProperty('reportExternalId');
+  });
+});
+
+describe('CI_RUN_JOB_RUN_SELECT', () => {
+  it('selects exactly the columns the row type carries', () => {
+    expect(Object.keys(CI_RUN_JOB_RUN_SELECT).sort()).toEqual(
+      Object.keys(linkedJobRun).sort(),
+    );
+  });
+
+  it('selects only the suite name from the suite relation', () => {
+    expect(CI_RUN_JOB_RUN_SELECT.suite).toEqual({ select: { name: true } });
   });
 });
