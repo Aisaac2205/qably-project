@@ -27,6 +27,20 @@ export interface CiRunKey {
   externalId: string;
 }
 
+export interface ExistingCiRun {
+  id: string;
+  startedAt: Date;
+  lastReportedAt: Date;
+  commitSha: string | null;
+  commitMessage: string | null;
+  commitAuthor: string | null;
+}
+
+export interface CiRunPatch extends CommitFields {
+  startedAt?: Date;
+  lastReportedAt?: Date;
+}
+
 export interface NewCiRun extends CiRunKey, CommitFields {
   organizationId: string;
   startedAt: Date;
@@ -38,7 +52,9 @@ export interface BackfillPort {
     afterId: string | undefined,
     take: number,
   ): Promise<BackfillRunRow[]>;
+  findCiRun(key: CiRunKey): Promise<ExistingCiRun | null>;
   createCiRun(input: NewCiRun): Promise<string>;
+  updateCiRun(id: string, patch: CiRunPatch): Promise<void>;
   linkRuns(ciRunId: string, runIds: readonly string[]): Promise<number>;
 }
 
@@ -46,6 +62,7 @@ export interface BackfillSummary {
   scanned: number;
   unattributable: number;
   ciRunsCreated: number;
+  ciRunsUpdated: number;
   runsLinked: number;
 }
 
@@ -98,20 +115,53 @@ function commitFieldsOf(rows: readonly BackfillRunRow[]): CommitFields {
   return commit;
 }
 
+function patchFor(
+  existing: ExistingCiRun,
+  startedAt: Date,
+  lastReportedAt: Date,
+  commit: CommitFields,
+): CiRunPatch | undefined {
+  const patch: CiRunPatch = {};
+  if (startedAt < existing.startedAt) patch.startedAt = startedAt;
+  if (lastReportedAt > existing.lastReportedAt) {
+    patch.lastReportedAt = lastReportedAt;
+  }
+  for (const field of COMMIT_FIELDS) {
+    const value = commit[field];
+    if (existing[field] === null && value !== undefined) patch[field] = value;
+  }
+  return Object.keys(patch).length === 0 ? undefined : patch;
+}
+
 async function applyGroup(
   port: BackfillPort,
   group: RunGroup,
   summary: BackfillSummary,
 ): Promise<void> {
   const times = group.rows.map((row) => row.startedAt.getTime());
-  const ciRunId = await port.createCiRun({
-    ...group.key,
-    organizationId: group.organizationId,
-    startedAt: new Date(Math.min(...times)),
-    lastReportedAt: new Date(Math.max(...times)),
-    ...commitFieldsOf(group.rows),
-  });
-  summary.ciRunsCreated += 1;
+  const startedAt = new Date(Math.min(...times));
+  const lastReportedAt = new Date(Math.max(...times));
+  const commit = commitFieldsOf(group.rows);
+  const existing = await port.findCiRun(group.key);
+
+  let ciRunId: string;
+  if (existing === null) {
+    ciRunId = await port.createCiRun({
+      ...group.key,
+      organizationId: group.organizationId,
+      startedAt,
+      lastReportedAt,
+      ...commit,
+    });
+    summary.ciRunsCreated += 1;
+  } else {
+    ciRunId = existing.id;
+    const patch = patchFor(existing, startedAt, lastReportedAt, commit);
+    if (patch !== undefined) {
+      await port.updateCiRun(existing.id, patch);
+      summary.ciRunsUpdated += 1;
+    }
+  }
   summary.runsLinked += await port.linkRuns(
     ciRunId,
     group.rows.map((row) => row.id),
@@ -127,6 +177,7 @@ export async function backfillCiRuns(
     scanned: 0,
     unattributable: 0,
     ciRunsCreated: 0,
+    ciRunsUpdated: 0,
     runsLinked: 0,
   };
 
