@@ -274,10 +274,148 @@ upserts on that compound key:
 
 The whole write — suite adoption, the test case lookup and draft creation, the run upsert, the case
 delete, and the case recreate — happens inside a single `prisma.$transaction`, so a replay (or a first
-report that adopts a suite) is never observed half-applied.
+report that adopts a suite) is never observed half-applied. The one step that runs outside it is
+resolving the CI run the report belongs to — see "CI run linking" below.
 
 `executedById` is always `null` for api-key ingests; only the session-authenticated UI can attribute a
 run to a user.
+
+## CI run linking
+
+A `CiRun` is one GitHub Actions workflow run. It is the parent of every `Run` (one per `<testsuite>`)
+that the jobs of that workflow run report, so the UI can show one row per push instead of one per
+suite. A `Run` points to it through `Run.ciRunId`; `Run.ciJobKey` names the job that reported it.
+Reports from before this existed, from a reporter older than 10.1.0 and local runs have no link.
+
+### Parameters
+
+All of these are optional, on the query of `POST /runs/ingest/junit` and in the body of
+`POST /runs/ingest`. Both schemas declare them: the controller spreads the whole query into
+`ingestRunSchema`, which drops any key it does not declare, so a field missing from one schema would be
+lost without an error.
+
+| Parameter | Environment variable (reporter) | Stored in |
+| --- | --- | --- |
+| `ciRunExternalId` | `GITHUB_RUN_ID` | `CiRun.externalId` |
+| `ciJobKey` | `QABLY_JOB_KEY`, otherwise `GITHUB_JOB` | `Run.ciJobKey` |
+| `ciWorkflowName` | `GITHUB_WORKFLOW` | `CiRun.workflowName` |
+| `ciRunNumber` / `ciRunAttempt` | `GITHUB_RUN_NUMBER` / `GITHUB_RUN_ATTEMPT` | `runNumber` / `runAttempt` |
+| `ciBranch` / `ciHeadRef` | `GITHUB_REF_NAME` / `GITHUB_HEAD_REF` | `branch` / `headRef` |
+| `ciActor` / `ciEventName` / `ciRepository` | `GITHUB_ACTOR` / `GITHUB_EVENT_NAME` / `GITHUB_REPOSITORY` | `actor` / `eventName` / `repository` |
+| `ciServerUrl` | `GITHUB_SERVER_URL` | `serverUrl` |
+
+`commitSha`, `commitMessage` and `commitAuthor` already existed and are copied to the `CiRun` as well.
+On a pull request `GITHUB_REF_NAME` is `<number>/merge`, which is why `GITHUB_HEAD_REF` travels as
+`ciHeadRef`.
+
+Validation: strings are trimmed and must be 1 to 255 characters; `ciRunNumber` and `ciRunAttempt` are
+integers from 1 to 2,147,483,647 (the `int32` range of the column); `ciServerUrl` must be an `http` or
+`https` URL of at most 255 characters. A value outside these bounds answers `400` on
+`/runs/ingest/junit`. The reporter applies the same bounds before sending and omits what does not fit
+(see "Reporter behavior").
+
+### Rules
+
+- `(projectId, source, ciRunExternalId)` identifies the `CiRun`, so the same id in two projects, or
+  with `api` and `github_actions` as source, yields two rows.
+- **Without `ciRunExternalId`, every other `ci*` parameter is ignored**, `ciJobKey` included: no
+  `CiRun` is created, `ciRunId` and `ciJobKey` stay `null` and the ingest succeeds. This keeps one
+  invariant: a run with a `ciJobKey` always has a `ciRunId`.
+- A `ci*` or commit parameter that is present overwrites the stored value on the `CiRun`; one that is
+  absent never clears it. `runAttempt` therefore follows the latest report of a GitHub re-run.
+- The run gets `ciRunId` (and `ciJobKey` when sent) on create and on update. A replay of the run by a
+  reporter that sends no `ci*` keeps the link it already had.
+- `CiRun.startedAt` is written once, when the row is created, and ingestion never updates it. Both it
+  and `lastReportedAt` are the clock of the worker that handled the report, not a time taken from the
+  report.
+
+### Where the CI run is resolved, and why
+
+`CiRunLinker.resolve` runs in `RunsService.ingest` after the `source` check and the `suiteId` lookup
+and before `prisma.$transaction`. It issues one `ciRun.upsert` on `projectId_source_externalId`, never
+a read first, and returns the id as a plain value that the transaction then writes on the run.
+
+It is outside the transaction on purpose. A push produces on the order of 350 ingests that all write
+the same `CiRun` row, and the worker runs 4 jobs at a time (`concurrency: 4`). An interactive
+transaction keeps the row lock until it commits, and this one also adopts the suite, reconciles the
+official cases and writes the cases, with Prisma's default 5 second interactive timeout. Inside it, the
+effective concurrency on that row would drop to 1 and the waiting jobs would spend their timeout
+waiting for the lock (`P2028`). Outside, the lock lasts one statement.
+
+The costs of that choice:
+
+- If the transaction fails after the `CiRun` was resolved, the `CiRun` stays with no runs. That is a
+  valid state: the read API returns it with `runs: []` and status `passing`. The BullMQ retry links it
+  again, and it is only visible if every ingest of that workflow run fails permanently.
+- If the linker itself fails, the ingest aborts before the transaction and nothing is written for that
+  attempt. The error is not a business rejection, so BullMQ retries the job (3 attempts, exponential
+  backoff starting at 1 s, as described under "Retries and failure modes").
+- A request that the ingest rejects earlier (`source-not-allowed`, `suite-not-found`) never creates a
+  `CiRun`.
+
+The upsert is wrapped in a single retry: on `P2002` (unique violation) it falls back to an `update`
+by the same key, so concurrent first reports of one workflow run never fail on the constraint. Prisma
+delegates `upsert` to a native `INSERT ... ON CONFLICT DO UPDATE` when `where` names a single unique
+constraint, which `projectId_source_externalId` is; this was checked against the Prisma documentation
+(7.6.0, the installed client is 7.8.0) but the emitted SQL has not been observed against the real
+database. Until it is, the `P2002` fallback is what guarantees the behavior. Status: documented, not
+observed.
+
+### `lastReportedAt`
+
+`lastReportedAt` is written explicitly on every upsert, in the `create` and in the `update`; it has no
+`@updatedAt`, so a write that is not a report (a backfill, a correction) never moves it. It is the
+worker clock at that write. When two ingests of one `CiRun` commit out of order (4 jobs run at a time)
+it can move back by a few milliseconds. It is a freshness value for display, not an ordering key:
+`GET /ci-runs` orders by `startedAt` (see `docs/RUN_QUERIES.md`).
+
+### Job identity and `QABLY_JOB_KEY`
+
+The reporter derives two different values from the environment (`resolveJobIdentity`):
+
+| Value | Rule | Used for |
+| --- | --- | --- |
+| `jobKey` | `QABLY_JOB_KEY` trimmed when not empty; otherwise `GITHUB_JOB` trimmed; otherwise none | the `ciJobKey` parameter and the text shown in the UI |
+| `idSegment` | `slugify(QABLY_JOB_KEY)` when the variable is present; otherwise `GITHUB_JOB ?? 'job'`, untransformed | the job segment of the per-file `externalId` |
+
+In a matrix, variants of one job share `GITHUB_JOB`, so two variants that report the same file used to
+produce the same `externalId` and overwrite each other. Setting `QABLY_JOB_KEY` to a different value
+per variant (for example `test (node 20)` and `test (node 22)`) gives each its own `externalId`, and
+`ciJobKey` keeps the raw value, so the UI shows `test (node 20)` as written.
+
+While `QABLY_JOB_KEY` is unset, `idSegment` is exactly the previous expression, so every `externalId`
+already ingested is generated byte for byte as before. Adopting the variable in an existing workflow
+changes the `externalId` of that job once: the suites already ingested stay as history and the next
+ingest creates new rows. To adopt it without creating duplicates the value must satisfy
+`slugify(value) === GITHUB_JOB`, where `slugify` lowercases, collapses every run of characters outside
+`[a-z0-9]` into `-` and trims `-`. A job key with uppercase letters or dots (`Build-API`, `test.unit`)
+cannot meet that, so adopting the variable there always re-keys.
+
+A `QABLY_JOB_KEY` without any letter or digit (for example `()`) slugifies to the fallback `report`;
+the `externalId` then carries `report` as its job segment while `ciJobKey` keeps the raw value.
+
+### Reporter behavior
+
+The reporter reads the real `GITHUB_*` variables and never fills a `ci*` parameter from the defaults
+it uses to build an `externalId` (`local`, `job`). A run outside GitHub Actions sends no `ci*` at all
+and keeps the `gha-local-job-...` externalId. It omits a value rather than sending an invalid one:
+
+- text values are trimmed, dropped when empty and cut at 255 characters;
+- `ciRunNumber` and `ciRunAttempt` are sent only when the variable is a plain positive integer up to
+  2,147,483,647;
+- `ciServerUrl` is dropped, not cut, when it is not an `http` or `https` URL or is longer than 255
+  characters.
+
+### `ciServerUrl` policy
+
+The API accepts `http` and `https` only, up to 255 characters, so `javascript:` and `ftp:` URLs and
+values without a scheme are rejected with `400`. That check looks at the scheme and nothing else, and
+this is the current behavior: a value with credentials (`https://user:pw@host`) or with a query string
+or fragment (`https://github.com/?token=abc#frag`) passes, is stored as sent and is returned verbatim
+as `serverUrl` by `GET /ci-runs` and `GET /ci-runs/:id`. The web link to the workflow run is built
+from `new URL(serverUrl).origin`, so the link in the UI never carries credentials, path, query or
+fragment; the API response does. Whether the schema should also reject username, password, query and
+fragment is an open decision.
 
 ## Response
 
@@ -332,6 +470,9 @@ any name with no match is drafted and linked. `testCaseId` is therefore never `n
 successful `POST /runs/ingest` — the field stays nullable in the type only because `RunCase` also backs
 manually-driven runs, and a failed ingest never gets this far.
 
+The run carries `ciRunId` only when it is linked to a CI run; an unlinked run omits the key instead of
+returning `null`. `ciJobKey` is not part of this view: it is exposed per run by `GET /ci-runs/:id`.
+
 ## JUnit ingestion — `POST /runs/ingest/junit`
 
 The body is the **raw JUnit XML report**, sent as-is — no JSON envelope. Everything that would be a
@@ -358,6 +499,7 @@ Content-Type: application/xml
 | `suiteId` / `suiteName` | no | Pins the report to one existing (or adopted) suite and turns off the per-suite split — see below. Passing `suiteId` skips suite-name derivation from the XML entirely. |
 | `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
 | `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
+| `ci*`             | no       | Optional CI run metadata, validated and stored as described in "CI run linking" below. Without `ciRunExternalId` every other `ci*` parameter is ignored. |
 | `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own accepted-plus-rejected groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: raised to at least this request's own group count (accepted plus rejected) if still under that, and capped at 100,000 if absurdly large. It is never trusted blindly, and it is never reduced for a rejected group — see "Rejected groups still count toward the batch" below. |
 
 ### Response — `202 Accepted`, asynchronous
@@ -609,9 +751,10 @@ the common case, one file becomes one `POST /runs/ingest/junit` call,
 which in turn becomes one enqueued job per `<testsuite>` in that file. `suiteName` is left unset so
 the server derives and splits by it; the reporter only supplies `externalId` (built from the job,
 the run and the file path — see `docs/CI.md`; the server then re-derives a per-suite `externalId`
-from this base when the file holds more than one suite), `source`, and the commit metadata already
-read from `$GITHUB_SHA` and `git log` — there is no `name` parameter, the server derives each run's
-name from the suite it actually parsed. On success the reporter reads `accepted` and the `runs`
+from this base when the file holds more than one suite), `source`, the commit metadata already
+read from `$GITHUB_SHA` and `git log`, and, since 10.1.0, the `ci*` parameters read from the real
+`GITHUB_*` environment (see "CI run linking") — there is no `name` parameter, the server derives each
+run's name from the suite it actually parsed. On success the reporter reads `accepted` and the `runs`
 array's `externalId`s from the `202` JSON response to log how many jobs were queued and for which
 runs — it does not (and cannot) know whether ingestion itself has finished by the time it logs. The
 `429`/`5xx`/network retry-with-backoff and `::warning`/`::notice` annotation behavior is unchanged

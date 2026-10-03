@@ -9,7 +9,9 @@ from the session and the optional `x-organization-id` header, exactly like the s
 They live in the same `RunsModule`, in a second controller (`RunQueriesController`) mounted on the
 same `runs` path as the api-key `RunsController`. The two controllers never collide: the api-key
 controller only owns `POST /runs/ingest`, marked `@Public()` to bypass the global session guard; this
-controller owns every other verb and path under `/runs`, none of which is `ingest`.
+controller owns every other verb and path under `/runs`, none of which is `ingest`. The CI run routes
+(`GET /ci-runs` and `GET /ci-runs/:id`) live in a third controller of the same module,
+`CiRunsController`, on their own `ci-runs` path.
 
 ## Organization scoping
 
@@ -23,6 +25,14 @@ from "exists in an organization you cannot see".
 Lists runs in the caller's organization, newest first (`startedAt` descending). `projectId` is
 optional; omitting it returns every run across every project in the organization, which is what an
 organization-wide dashboard needs.
+
+`ungrouped=true` restricts the list to runs that are not linked to a CI run (`ciRunId IS NULL`) and
+combines with `projectId` and `source`. The criterion is the link, never `source`: an `api` run with no
+link and a `github_actions` run with no link both appear, and no linked run does. `ungrouped=false` and
+an absent parameter apply no filter on the link, and `"false"` is never read as true; any other value
+(`maybe`) answers `400`. The Manual tab of the runs page uses it, so the runs that no CI run adopted
+(an older reporter, local runs, manual runs) stay reachable. The shape of an item does not change:
+`RunSummaryRecord` carries no `ciRunId`.
 
 The list response does **not** embed each run's cases. Sending every case of every run back for a list
 view is wasteful — the list only needs to render a status pill and a pass rate. Instead each item
@@ -70,7 +80,8 @@ classified `new` and counted in none of the three buckets.
 ## `GET /runs/:id`
 
 Returns the full run, including every case ordered by `position`. This is the detail view, where
-sending the whole case list is the point.
+sending the whole case list is the point. It carries `ciRunId` when the run is linked to a CI run and
+omits the key otherwise.
 
 The detail carries `delta` too, but as names rather than counts: `{ regressions: CaseDeltaEntry[],
 fixes: CaseDeltaEntry[] }` with `{ testCaseId, caseName }` per entry, or `null` for a suite's first
@@ -87,6 +98,103 @@ the previous finished run of its suite and fails in the scanned one, with the ru
 and the id of the run it is compared against, plus `runsScanned`. It shipped before this document
 mentioned it. It uses the same window query and the same classifier as the list delta above, filtered
 to the `regression` answer; the quality page reads it to show what recently broke.
+
+## `GET /ci-runs?projectId=<id>`
+
+Lists the CI runs of a project, most recent first, for the Actions tab of the runs page. A CI run is
+one GitHub Actions workflow run, and its suites are the runs linked to it (see "CI run linking" in
+`docs/RUN_INGESTION.md`). The route lives in `CiRunsController`, mounted on `ci-runs`, behind
+`SessionGuard` and `OrgScopeGuard` like the routes above.
+
+| Query parameter | Required | Notes |
+| --- | --- | --- |
+| `projectId` | yes | A project of another organization answers `200` with an empty page, not `403`. |
+| `limit` | no | 1 to 100, default 25. |
+| `cursor` | no | The `nextCursor` of the previous page. |
+
+A missing `projectId`, or a `limit` of 0 or 101, answers `400` and reads nothing.
+
+```json
+{
+  "items": [
+    {
+      "id": "cirun_abc123",
+      "projectId": "project_123",
+      "source": "github_actions",
+      "externalId": "900",
+      "status": "failing",
+      "startedAt": "2026-09-01T10:00:02.000Z",
+      "lastReportedAt": "2026-09-01T10:04:12.000Z",
+      "workflowName": "CI",
+      "runNumber": 42,
+      "runAttempt": 1,
+      "branch": "main",
+      "actor": "ana",
+      "eventName": "push",
+      "serverUrl": "https://github.com",
+      "repository": "acme/shop",
+      "commitSha": "a41f9c2d5e6b7a8c9d0e1f2a3b4c5d6e7f8a9b0c",
+      "commitMessage": "fix: retry the checkout call",
+      "commitAuthor": "ana"
+    }
+  ],
+  "nextCursor": "cirun_abc123"
+}
+```
+
+Columns that are `null` are omitted from the item. An item carries no list of runs and no counts of
+suites or jobs; those belong to the detail.
+
+**Status is derived on every read and never stored.** It is `failing` when any run linked to the CI
+run has status `fail`, and `passing` otherwise. That includes a CI run with no linked runs and runs
+that are still `running` or `pending`. It reflects the reports received so far: a job that uploads no
+test report is not represented.
+
+**Order is `startedAt` descending, then `id` descending.** Pagination uses `cursor: { id }, skip: 1`,
+the same mechanism as `GET /runs`, and that mechanism requires a sort key that does not change.
+`lastReportedAt` changes with every report: a CI run just below the end of page 1 that received a
+report would move above that boundary and appear on no page, with no error. `startedAt` is written once
+when the row is created, so the order is total and stable while reports keep arriving. It is also the
+order a reader expects, and `lastReportedAt` would lift a late retry of an old workflow run above
+newer pushes. `lastReportedAt` is still returned, as a freshness value that can move back by a few
+milliseconds (see "`lastReportedAt`" in `docs/RUN_INGESTION.md`). A CI run created by the backfill has
+`startedAt` set to its earliest suite, so it lands at its real chronological position.
+
+`nextCursor` is the id of the last item of the page and is present only when another row exists. A
+`cursor` that matches no row answers `200` with an empty `items` and no `nextCursor`, never `500`.
+
+A page costs two reads, not one per row: a `ciRun.findMany` that takes `limit + 1` rows, and a single
+`run.groupBy` by `(ciRunId, status)` over the ids of the page, scoped by organization. The existence of
+a `(ciRunId, 'fail')` group is enough to derive the status. An empty page skips the second read.
+
+## `GET /ci-runs/:id`
+
+Returns the item above plus `runs`, the suites linked to the CI run, as a flat list:
+
+```json
+{
+  "id": "run_abc123",
+  "suiteId": "suite_123",
+  "suiteName": "src/features/checkout/checkout.test.ts",
+  "name": "src/features/checkout/checkout.test.ts",
+  "status": "fail",
+  "startedAt": "2026-09-01T10:00:02.000Z",
+  "ciJobKey": "api",
+  "reportExternalId": "gha-900-api-junit-unit-xml-ab12cd34"
+}
+```
+
+`ciJobKey` and `reportExternalId` are omitted when `null`. The list is not grouped by job: grouping is
+done by the client, so changing how suites are grouped never changes this contract. It is ordered by
+`name` ascending and `id` ascending, and it is not capped: every linked run is returned, and one push
+can link several hundred. `status` is derived from all of them. A CI run with no runs answers
+`runs: []` and `passing`.
+
+A CI run that does not exist and one that belongs to another organization answer the same `404`,
+`{ "code": "not-found", "message": "CI run not found" }`, so the caller cannot tell them apart. The
+route takes only the id; the project is not part of it, so a client that shows the CI run under a
+project must compare `projectId` itself. The detail costs two reads: `ciRun.findFirst` scoped by
+organization, and `run.findMany` scoped by organization and `ciRunId`.
 
 ## `POST /runs` — starting a manual run
 
@@ -160,3 +268,18 @@ On a successful patch:
 
 The response is the full updated run with its cases, the same shape `GET /runs/:id` returns, so the UI
 can re-render immediately after a single keystroke without a second round trip.
+
+## Known limitation: the cursor row is not scoped to the caller
+
+`GET /runs` and `GET /ci-runs` paginate with `cursor: { id }, skip: 1`. Prisma resolves the cursor row
+by its primary key and applies the `where` to the other rows only, so the cursor id is never checked
+against the caller's organization or project. A `cursor` set to another organization's id (a cuid,
+which cannot be enumerated) has two effects:
+
+- The response is a one-bit existence check. An id that does not exist gives an empty page; an id that
+  exists gives the caller's rows positioned after it, which is empty when the caller has no older rows.
+- The `startedAt` of that foreign row decides where the page starts, and `skip: 1` drops one of the
+  caller's own rows.
+
+No data of the other organization is returned. The limitation is known and not fixed: closing it needs
+either a read of the cursor row under the same scope before paginating, or a composite cursor.
