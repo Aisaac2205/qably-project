@@ -25,6 +25,12 @@ import {
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { useTranslation } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
+
+const FIELD_FOCUS =
+  'focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+
+const FIELD_TEXT = 'text-base md:text-sm'
 
 function translateCreateRunError(error: unknown, t: (key: string) => string): string {
   if (error instanceof ApiError && error.status === 400) {
@@ -105,7 +111,9 @@ function NewRunFormBody({
 
       {hasNoSuites ? (
         <DialogFooter>
-          <DialogClose className={buttonVariants({ variant: 'outline' })}>
+          <DialogClose
+            className={cn(buttonVariants({ variant: 'outline' }), FIELD_FOCUS)}
+          >
             {t('common.cancel')}
           </DialogClose>
         </DialogFooter>
@@ -122,13 +130,23 @@ function NewRunFormBody({
                 id={suiteFieldId}
                 aria-invalid={validationError ? true : undefined}
                 aria-describedby={message ? messageId : undefined}
+                className={cn(
+                  'h-auto min-h-11 py-2 text-left md:h-auto md:min-h-10',
+                  '[&>span]:line-clamp-none [&>span]:wrap-anywhere',
+                  FIELD_TEXT,
+                  FIELD_FOCUS,
+                )}
               >
-                <SelectValue placeholder={t('runs.selectSuite')} />
+                <SelectValue placeholder={t('runs.selectSuite')} className={FIELD_TEXT} />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
                   {suites.map((suite) => (
-                    <SelectItem key={suite.id} value={suite.id}>
+                    <SelectItem
+                      key={suite.id}
+                      value={suite.id}
+                      className={cn('min-h-11 wrap-anywhere md:min-h-0', FIELD_TEXT)}
+                    >
                       {suite.name}
                     </SelectItem>
                   ))}
@@ -149,14 +167,23 @@ function NewRunFormBody({
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t('runs.runNamePlaceholder')}
+              className={cn('h-11 md:h-10', FIELD_TEXT, FIELD_FOCUS)}
             />
           </Field>
 
           <DialogFooter>
-            <DialogClose disabled={pending} className={buttonVariants({ variant: 'outline' })}>
+            <DialogClose
+              disabled={pending}
+              className={cn(buttonVariants({ variant: 'outline' }), FIELD_FOCUS)}
+            >
               {t('common.cancel')}
             </DialogClose>
-            <Button type="submit" disabled={pending || isLoading} focusableWhenDisabled>
+            <Button
+              type="submit"
+              disabled={pending || isLoading}
+              focusableWhenDisabled
+              className={FIELD_FOCUS}
+            >
               {pending && <Spinner size="sm" />}
               {pending ? t('runs.starting') : t('runs.startRun')}
             </Button>

@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { RunRecord } from '@qably/types'
 import { Dialog } from '@/components/ui/dialog'
 import { NewRunForm } from '@/features/runs/components/new-run-form'
+import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import { ApiError } from '@/lib/api-client'
 
@@ -163,6 +164,22 @@ describe('NewRunForm', () => {
       await waitFor(() => {
         expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveFocus()
       })
+    })
+
+    it('keeps focus inside the dialog while tabbing past its last control', async () => {
+      const user = userEvent.setup()
+      await openForm()
+      const dialog = screen.getByRole('dialog', { name: 'New run' })
+      await waitFor(() => {
+        expect(dialog).toContainElement(document.activeElement as HTMLElement)
+      })
+
+      for (let press = 0; press < 8; press += 1) {
+        await user.tab()
+        await waitFor(() => {
+          expect(dialog).toContainElement(document.activeElement as HTMLElement)
+        })
+      }
     })
 
     it('focuses the suite select even while the suites are still loading', async () => {
@@ -385,6 +402,59 @@ describe('NewRunForm', () => {
         expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/run-created')
       })
       expect(create).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('touch targets, text size and focus', () => {
+    it('sizes every control 44px below md and 40px from md with 16px text on mobile', async () => {
+      await openForm()
+
+      const select = screen.getByRole('combobox', { name: 'Suite' })
+      const input = screen.getByRole('textbox', { name: /run name/i })
+      expect(input).toHaveClass('h-11', 'md:h-10')
+      expect(input).not.toHaveClass('h-10')
+      expect(select).toHaveClass('min-h-11', 'md:min-h-10')
+      const selected = select.querySelector('[data-slot="select-value"]')
+      for (const control of [select, input, selected]) {
+        expect(control).toHaveClass('text-base', 'md:text-sm')
+        expect(control).not.toHaveClass('text-xs', 'text-sm')
+      }
+      for (const name of ['Cancel', 'Start run']) {
+        expect(screen.getByRole('button', { name })).toHaveClass('h-11', 'md:h-10')
+      }
+    })
+
+    it('lets a long suite name wrap inside the select and inside its options', async () => {
+      const user = userEvent.setup()
+      await openForm()
+
+      const select = screen.getByRole('combobox', { name: 'Suite' })
+      expect(select).toHaveClass(
+        'h-auto',
+        'md:h-auto',
+        '[&>span]:line-clamp-none',
+        '[&>span]:wrap-anywhere',
+      )
+      expect(select).not.toHaveClass('h-11', 'md:h-10', '[&>span]:line-clamp-1')
+
+      await user.click(select)
+      const option = await screen.findByRole('option', { name: 'Authentication' })
+      expect(option).toHaveClass('min-h-11', 'md:min-h-0', 'wrap-anywhere', 'text-base', 'md:text-sm')
+    })
+
+    it('carries the focus ring recipe on the select, the name input and both buttons', async () => {
+      await openForm()
+
+      expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveClass(
+        'focus-visible:outline-hidden!',
+        'focus-visible:ring-2',
+        'focus-visible:ring-primary',
+        'focus-visible:ring-offset-2',
+        'focus-visible:ring-offset-background',
+      )
+      expectFocusRing(screen.getByRole('textbox', { name: /run name/i }))
+      expectFocusRing(screen.getByRole('button', { name: 'Cancel' }))
+      expectFocusRing(screen.getByRole('button', { name: 'Start run' }))
     })
   })
 })

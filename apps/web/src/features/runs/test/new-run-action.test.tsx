@@ -3,6 +3,7 @@ import { screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NewRunAction } from '@/features/runs/components/new-run-action'
+import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
@@ -56,6 +57,13 @@ describe('NewRunAction', () => {
 
       expect(await screen.findByRole('dialog', { name: 'New run' })).toBeInTheDocument()
       expect(trigger()).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('keeps the default button height and the focus ring recipe', async () => {
+      await renderAction()
+
+      expect(trigger()).toHaveClass('h-11', 'md:h-10')
+      expectFocusRing(trigger())
     })
 
     it.each(CLOSERS)(
