@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useRun } from '@/features/runs/hooks/use-runs'
+import { useCiRun } from '@/features/runs/hooks/use-ci-runs'
+import { useCiRunLabel } from '@/features/runs/hooks/use-ci-run-label'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { ArrowLeft } from '@phosphor-icons/react'
@@ -20,6 +22,8 @@ export function RunDetailPageClient({
   const { t } = useTranslation()
   const { run, isLoading } = useRun(runId)
   const { project } = useProject(projectId)
+  const { ciRun } = useCiRun(run?.ciRunId)
+  const ciRunLabel = useCiRunLabel(ciRun)
 
   if (isLoading) {
     return (
@@ -61,6 +65,9 @@ export function RunDetailPageClient({
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
           ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
           { label: t('runs.title'), href: `/projects/${projectId}/runs` },
+          ...(ciRunLabel !== undefined
+            ? [{ label: ciRunLabel, href: `/projects/${projectId}/runs/ci/${run.ciRunId}` }]
+            : []),
           { label: run.name },
         ]}
       />
