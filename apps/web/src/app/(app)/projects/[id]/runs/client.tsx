@@ -1,19 +1,30 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
+import { CiRunList } from '@/features/runs/components/ci-run-list'
 import { RunList } from '@/features/runs/components/run-list'
+import { DEFAULT_RUNS_TAB, parseRunsTab, type RunsTab } from '@/features/runs/lib/runs-tab'
 import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { cn } from '@/lib/utils'
 import { projectRootPath } from '@/features/projects/lib/routes'
 
-export function RunListPageClient({ projectId }: { projectId: string }) {
+export function RunListPageClient({
+  projectId,
+  initialTab = DEFAULT_RUNS_TAB,
+}: {
+  projectId: string
+  initialTab?: RunsTab
+}) {
   const { t } = useTranslation()
   const { project } = useProject(projectId)
   const hasNoManualCases = project?.hasManualCases === false
+  const [tab, setTab] = useState(initialTab)
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
@@ -57,9 +68,22 @@ export function RunListPageClient({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      <div className="space-y-6">
-        <RunList projectId={projectId} />
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(parseRunsTab(value))}
+        className="gap-4"
+      >
+        <TabsList aria-label={t('runs.ci.tabsAria')}>
+          <TabsTab value="actions">{t('runs.ci.tabActions')}</TabsTab>
+          <TabsTab value="manual">{t('runs.ci.tabManual')}</TabsTab>
+        </TabsList>
+        <TabsPanel value="actions" tabIndex={-1}>
+          <CiRunList projectId={projectId} />
+        </TabsPanel>
+        <TabsPanel value="manual" tabIndex={-1}>
+          <RunList projectId={projectId} ungrouped />
+        </TabsPanel>
+      </Tabs>
     </div>
   )
 }
