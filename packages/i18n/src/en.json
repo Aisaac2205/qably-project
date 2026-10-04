@@ -908,6 +908,8 @@
       "suitesHide_other": "Hide {{count}} suites without failures",
       "suitesAria": "Suites in the run",
       "groupSuitesAria": "{{name}} suites",
+      "suitesWithoutFailuresAria": "Suites without failures in the run",
+      "groupSuitesWithoutFailuresAria": "{{name}} suites without failures",
       "githubLinkAria": "Open the {{repository}} run on {{host}} (opens in a new tab)",
       "detailLoading": "Loading the run…",
       "detailErrorTitle": "Could not load the run",

@@ -129,6 +129,36 @@ describe('runs.ci and status.ciRun copy', () => {
     })
   })
 
+  describe('suite list names', () => {
+    it.each(Object.keys(LOCALES) as (keyof typeof LOCALES)[])(
+      'names the list of suites without failures apart from the list of failing suites (%s)',
+      (locale) => {
+        const flat = flatten(LOCALES[locale])
+        const unnamed = flat['runs.ci.suitesWithoutFailuresAria']
+        const named = flat['runs.ci.groupSuitesWithoutFailuresAria']
+
+        expect(unnamed).toBeTruthy()
+        expect(named).toContain('{{name}}')
+        expect(unnamed).not.toBe(flat['runs.ci.suitesAria'])
+        expect(named).not.toBe(flat['runs.ci.groupSuitesAria'])
+      },
+    )
+
+    it('words the list names in Spanish with the sin fallos language', () => {
+      const flat = flatten(LOCALES.es)
+
+      expect(flat['runs.ci.suitesWithoutFailuresAria']).toBe('Suites sin fallos de la ejecución')
+      expect(flat['runs.ci.groupSuitesWithoutFailuresAria']).toBe('Suites sin fallos de {{name}}')
+    })
+
+    it('words the list names in English', () => {
+      const flat = flatten(LOCALES.en)
+
+      expect(flat['runs.ci.suitesWithoutFailuresAria']).toBe('Suites without failures in the run')
+      expect(flat['runs.ci.groupSuitesWithoutFailuresAria']).toBe('{{name}} suites without failures')
+    })
+  })
+
   describe('closed vocabulary', () => {
     it('keeps english words out of the Spanish copy', () => {
       const entries = familyEntries(LOCALES.es)

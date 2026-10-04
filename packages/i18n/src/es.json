@@ -908,6 +908,8 @@
       "suitesHide_other": "Ocultar {{count}} suites sin fallos",
       "suitesAria": "Suites de la ejecución",
       "groupSuitesAria": "Suites de {{name}}",
+      "suitesWithoutFailuresAria": "Suites sin fallos de la ejecución",
+      "groupSuitesWithoutFailuresAria": "Suites sin fallos de {{name}}",
       "githubLinkAria": "Abrir la ejecución de {{repository}} en {{host}} (se abre en una pestaña nueva)",
       "detailLoading": "Cargando la ejecución…",
       "detailErrorTitle": "No se pudo cargar la ejecución",
