@@ -175,7 +175,7 @@ describe('the suite breadcrumb when there is no CI run to show', () => {
     expect(crumbLinks()).toStrictEqual([
       ['Projects', '/projects'],
       ['Ecommerce App', '/projects/proj-1/repository'],
-      ['Runs', '/projects/proj-1/runs'],
+      ['Runs', '/projects/proj-1/runs?tab=manual'],
     ])
     expect(within(breadcrumb()).getByText('Run #12')).toHaveAttribute('aria-current', 'page')
   })
@@ -227,5 +227,74 @@ describe('the suite breadcrumb when there is no CI run to show', () => {
     expect(crumbLinks().map(([label]) => label)).toStrictEqual(['Projects', 'Ecommerce App', 'Runs'])
     expect(within(breadcrumb()).getByText('Run #12')).toHaveAttribute('aria-current', 'page')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+})
+
+describe('the way back to the runs list', () => {
+  const ACTIONS_LIST = '/projects/proj-1/runs'
+  const MANUAL_LIST = '/projects/proj-1/runs?tab=manual'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  function runsCrumbHref(): string | null {
+    return within(breadcrumb()).getByRole('link', { name: 'Runs' }).getAttribute('href')
+  }
+
+  it('sends a run without a CI run to the Manual tab, where the runs without a CI run are listed', async () => {
+    run.mockResolvedValue(runRecord())
+
+    renderPage()
+    await screen.findByRole('heading', { level: 3, name: 'Run #12' })
+
+    expect(runsCrumbHref()).toBe(MANUAL_LIST)
+  })
+
+  it('keeps the default tab for a run that belongs to a CI run and leaves the CI level alone', async () => {
+    run.mockResolvedValue(runRecord({ ciRunId: 'c1' }))
+    ciRun.mockResolvedValue(ciRunDetail([], { id: 'c1', runNumber: 42 }))
+
+    renderPage()
+    const ciLink = await screen.findByRole('link', { name: 'CI #42' })
+
+    expect(runsCrumbHref()).toBe(ACTIONS_LIST)
+    expect(ciLink).toHaveAttribute('href', '/projects/proj-1/runs/ci/c1')
+  })
+
+  it('keeps the default tab for a linked run while its CI run is still loading', async () => {
+    run.mockResolvedValue(runRecord({ ciRunId: 'c1' }))
+    ciRun.mockReturnValue(new Promise(() => undefined))
+
+    renderPage()
+    await screen.findByRole('heading', { level: 3, name: 'Run #12' })
+    await waitFor(() => expect(ciRun).toHaveBeenCalledTimes(1))
+
+    expect(runsCrumbHref()).toBe(ACTIONS_LIST)
+  })
+
+  it('keeps the default tab for a linked run whose CI run cannot be shown', async () => {
+    run.mockResolvedValue(runRecord({ ciRunId: 'c1' }))
+    ciRun.mockRejectedValue(new ApiError(404, 'CI run not found', 'not-found'))
+
+    renderPage()
+    await screen.findByRole('heading', { level: 3, name: 'Run #12' })
+    await waitFor(() => expect(ciRun).toHaveBeenCalledTimes(1))
+    await settle()
+
+    expect(runsCrumbHref()).toBe(ACTIONS_LIST)
+  })
+
+  it('sends the not found page to the Manual tab too, in the breadcrumb and in the link back', async () => {
+    run.mockRejectedValue(new ApiError(404, 'Run not found', 'not-found'))
+
+    renderPage()
+    await screen.findByText('Not found', { selector: 'p' })
+
+    const links = screen.getAllByRole('link', { name: 'Runs' })
+    expect(links).toHaveLength(2)
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', MANUAL_LIST)
+    }
   })
 })

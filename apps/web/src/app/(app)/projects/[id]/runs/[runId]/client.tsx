@@ -24,6 +24,9 @@ export function RunDetailPageClient({
   const { project } = useProject(projectId)
   const { ciRun } = useCiRun(run?.ciRunId)
   const ciRunLabel = useCiRunLabel(ciRun)
+  const runsHref = run?.ciRunId
+    ? `/projects/${projectId}/runs`
+    : `/projects/${projectId}/runs?tab=manual`
 
   if (isLoading) {
     return (
@@ -40,14 +43,14 @@ export function RunDetailPageClient({
           items={[
             { label: t('suites.breadcrumbProjects'), href: '/projects' },
             ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-            { label: t('runs.title'), href: `/projects/${projectId}/runs` },
+            { label: t('runs.title'), href: runsHref },
             { label: t('common.notFound') },
           ]}
         />
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <p className="text-sm text-muted">{t('common.notFound')}</p>
           <Link
-            href={`/projects/${projectId}/runs`}
+            href={runsHref}
             className="text-sm text-primary font-semibold hover:underline focus-visible:outline-2 focus-visible:outline-primary inline-flex items-center gap-1"
           >
             <ArrowLeft size={14} weight="bold" aria-hidden="true" />
@@ -64,7 +67,7 @@ export function RunDetailPageClient({
         items={[
           { label: t('suites.breadcrumbProjects'), href: '/projects' },
           ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-          { label: t('runs.title'), href: `/projects/${projectId}/runs` },
+          { label: t('runs.title'), href: runsHref },
           ...(ciRunLabel !== undefined
             ? [{ label: ciRunLabel, href: `/projects/${projectId}/runs/ci/${run.ciRunId}` }]
             : []),
