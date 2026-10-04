@@ -190,7 +190,7 @@ export function RunList({
           <Button
             type="button"
             variant="outline"
-            className="h-10 w-full sm:w-auto px-4 text-sm focus-visible:outline-hidden! focus-visible:ring-primary"
+            className="w-full sm:w-auto px-4 text-sm focus-visible:outline-hidden! focus-visible:ring-primary"
             onClick={() => void fetchNextPage()}
             disabled={isFetchingNextPage}
           >

@@ -138,3 +138,18 @@ describe('RunList focus', () => {
     expectEveryFocusableToCarryARing(container, 1)
   })
 })
+
+describe('RunList touch targets', () => {
+  beforeEach(() => {
+    listRuns.mockReset()
+  })
+
+  it('gives the load more button the 44px target below md and 40px from md up, like the CI list', async () => {
+    await renderPage()
+
+    const button = screen.getByRole('button', { name: /load more/i })
+
+    expect(button).toHaveClass('h-11', 'md:h-10')
+    expect(button).not.toHaveClass('h-10')
+  })
+})
