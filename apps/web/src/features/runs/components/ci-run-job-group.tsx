@@ -74,24 +74,27 @@ export function CiRunJobGroup({
   const failing = runs.filter((run) => run.status === 'fail')
   const passing = runs.filter((run) => run.status !== 'fail')
   const reportLabels = reportLabelsByRun(runs, ciRunExternalId)
-  const listLabel =
-    jobKey === undefined
-      ? t('runs.ci.suitesAria')
-      : t('runs.ci.groupSuitesAria', { name: humanizeJobKey(jobKey) })
+  const name = jobKey === undefined ? undefined : humanizeJobKey(jobKey)
+  const failingLabel =
+    name === undefined ? t('runs.ci.suitesAria') : t('runs.ci.groupSuitesAria', { name })
+  const passingLabel =
+    name === undefined
+      ? t('runs.ci.suitesWithoutFailuresAria')
+      : t('runs.ci.groupSuitesWithoutFailuresAria', { name })
 
   if (runs.length === 0) return null
 
   return (
     <div className="space-y-2">
-      {jobKey !== undefined && (
-        <h3 className="wrap-anywhere text-sm font-semibold text-default">{humanizeJobKey(jobKey)}</h3>
+      {name !== undefined && (
+        <h3 className="wrap-anywhere text-sm font-semibold text-default">{name}</h3>
       )}
       <div className="rule-bleed !px-0 border-y border-border">
         {failing.length > 0 && (
           <SuiteList
             projectId={projectId}
             runs={failing}
-            label={listLabel}
+            label={failingLabel}
             reportLabels={reportLabels}
           />
         )}
@@ -120,7 +123,7 @@ export function CiRunJobGroup({
                 <SuiteList
                   projectId={projectId}
                   runs={passing}
-                  label={listLabel}
+                  label={passingLabel}
                   reportLabels={reportLabels}
                   className="border-t border-border"
                 />

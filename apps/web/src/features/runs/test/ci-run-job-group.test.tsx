@@ -244,7 +244,53 @@ describe('CiRunJobGroup suites without failures', () => {
 
     await user.click(screen.getByRole('button'))
 
-    expect(within(screen.getByRole('list', { name: 'api suites' })).getAllByRole('link')).toHaveLength(4)
+    expect(
+      within(screen.getByRole('list', { name: 'api suites without failures' })).getAllByRole('link'),
+    ).toHaveLength(4)
+  })
+
+  it('names the expanded list apart from the list of failing suites', async () => {
+    const user = userEvent.setup()
+    renderGroup([...failing(1), ...passing(2)], 'api')
+
+    await user.click(screen.getByRole('button'))
+
+    expect(within(screen.getByRole('list', { name: 'api suites' })).getAllByRole('link')).toHaveLength(1)
+    expect(
+      within(screen.getByRole('list', { name: 'api suites without failures' })).getAllByRole('link'),
+    ).toHaveLength(2)
+  })
+
+  it('names the two lists of the section without a job apart as well', async () => {
+    const user = userEvent.setup()
+    renderGroup([...failing(1), ...passing(2)])
+
+    await user.click(screen.getByRole('button'))
+
+    expect(screen.getByRole('list', { name: 'Suites in the run' })).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Suites without failures in the run' })).toBeInTheDocument()
+  })
+
+  it('never gives two lists of one section the same accessible name', async () => {
+    const user = userEvent.setup()
+    renderGroup([...failing(2), ...passing(2)], 'api')
+
+    await user.click(screen.getByRole('button'))
+
+    const names = screen.getAllByRole('list').map((list) => list.getAttribute('aria-label'))
+    expect(names).toHaveLength(2)
+    expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('names the expanded list in the active locale', async () => {
+    const user = userEvent.setup()
+    useI18nStore.setState({ locale: 'es' })
+    renderGroup([...failing(1), ...passing(2)], 'api')
+
+    await user.click(screen.getByRole('button'))
+
+    expect(screen.getByRole('list', { name: 'Suites de api' })).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Suites sin fallos de api' })).toBeInTheDocument()
   })
 
   it('counts running and pending suites as without failures', () => {
