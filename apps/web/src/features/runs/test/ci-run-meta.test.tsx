@@ -79,4 +79,11 @@ describe('CiRunMeta', () => {
     expect(screen.getByText('main')).not.toHaveClass('font-mono')
     expect(screen.getByText('ana')).not.toHaveClass('font-mono')
   })
+
+  it('lets the ref and the author, which the reporter supplies, break anywhere', () => {
+    renderMeta(FULL)
+
+    expect(screen.getByText('main')).toHaveClass('wrap-anywhere')
+    expect(screen.getByText('ana')).toHaveClass('wrap-anywhere')
+  })
 })

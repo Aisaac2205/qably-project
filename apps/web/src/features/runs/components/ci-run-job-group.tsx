@@ -26,8 +26,8 @@ function SuiteRow({
     >
       <StatusChip status={run.status} />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-default">{run.suiteName || run.name}</p>
-        {label !== undefined && <p className="mt-0.5 truncate font-mono text-xs text-muted">{label}</p>}
+        <p className="wrap-anywhere text-sm text-default">{run.suiteName || run.name}</p>
+        {label !== undefined && <p className="mt-0.5 wrap-anywhere font-mono text-xs text-muted">{label}</p>}
       </div>
     </Link>
   )
@@ -84,7 +84,7 @@ export function CiRunJobGroup({
   return (
     <div className="space-y-2">
       {jobKey !== undefined && (
-        <h3 className="text-sm font-semibold text-default">{humanizeJobKey(jobKey)}</h3>
+        <h3 className="wrap-anywhere text-sm font-semibold text-default">{humanizeJobKey(jobKey)}</h3>
       )}
       <div className="rule-bleed !px-0 border-y border-border">
         {failing.length > 0 && (

@@ -136,6 +136,31 @@ function statusTrigger(): HTMLElement {
   return screen.getByText('Has failures').closest('[tabindex="0"]') as HTMLElement
 }
 
+describe('CiRunHeader long reporter text', () => {
+  it('wraps the title, which the reporter supplies', () => {
+    renderHeader()
+
+    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('wrap-anywhere')
+  })
+
+  it('wraps the workflow name, which the reporter supplies', () => {
+    renderHeader({ workflowName: 'Release' })
+
+    expect(screen.getByText('Release')).toHaveClass('wrap-anywhere')
+  })
+
+  it('lets the repository in the GitHub link shrink and break, with its icons kept whole', () => {
+    renderHeader()
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveClass('min-w-0')
+    expect(screen.getByText('acme/shop')).toHaveClass('min-w-0', 'wrap-anywhere')
+    const icons = link.querySelectorAll('svg')
+    expect(icons).toHaveLength(2)
+    for (const icon of icons) expect(icon).toHaveClass('shrink-0')
+  })
+})
+
 describe('CiRunHeader tooltip text for assistive technology', () => {
   it('describes the status without anyone opening the tooltip', () => {
     renderHeader()

@@ -165,6 +165,14 @@ describe('CiRunRow', () => {
     expect(screen.getByText('Último reporte hace 5 min')).toBeInTheDocument()
   })
 
+  it('wraps a long title instead of cutting it off, because the title is all the row says about the run', () => {
+    renderRows([ciRunSummary('ci-1')])
+
+    const title = screen.getByText('Fix flaky checkout')
+    expect(title).toHaveClass('wrap-anywhere')
+    expect(title).not.toHaveClass('truncate')
+  })
+
   it('is at least 44px tall', () => {
     renderRows([ciRunSummary('ci-1')])
 

@@ -24,7 +24,7 @@ export function CiRunRow({
       <StatusChip status={ciRun.status} scope="ci-run" />
       <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0 space-y-0.5">
-          <p className="truncate text-sm font-semibold text-default">{ciRunTitle(ciRun)}</p>
+          <p className="wrap-anywhere text-sm font-semibold text-default">{ciRunTitle(ciRun)}</p>
           <CiRunMeta ciRun={ciRun} />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted sm:flex-col sm:items-end">

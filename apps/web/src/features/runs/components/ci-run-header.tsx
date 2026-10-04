@@ -25,11 +25,11 @@ function GitHubRunLink({ ciRun }: { ciRun: CiRunSummaryRecord }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t('runs.ci.githubLinkAria', { repository, host: new URL(href).host })}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-default hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:min-h-8"
+      className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded text-sm font-medium text-default hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:min-h-8"
     >
-      <GithubLogo size={16} weight="fill" aria-hidden="true" />
-      {repository}
-      <ArrowUpRight size={12} weight="bold" aria-hidden="true" />
+      <GithubLogo size={16} weight="fill" aria-hidden="true" className="shrink-0" />
+      <span className="min-w-0 wrap-anywhere">{repository}</span>
+      <ArrowUpRight size={12} weight="bold" aria-hidden="true" className="shrink-0" />
     </a>
   )
 }
@@ -74,7 +74,9 @@ export function CiRunHeader({ ciRun }: { ciRun: CiRunSummaryRecord }) {
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-          {workflow !== undefined && workflow !== title && <span>{workflow}</span>}
+          {workflow !== undefined && workflow !== title && (
+            <span className="wrap-anywhere">{workflow}</span>
+          )}
           <CiRunDuration
             startedAt={ciRun.startedAt}
             lastReportedAt={ciRun.lastReportedAt}

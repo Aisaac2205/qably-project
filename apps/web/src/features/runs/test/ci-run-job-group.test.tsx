@@ -59,6 +59,44 @@ describe('CiRunJobGroup heading', () => {
   })
 })
 
+describe('CiRunJobGroup long reporter text', () => {
+  it('wraps the job heading, which the reporter supplies', () => {
+    renderGroup(failing(1), 'api')
+
+    expect(screen.getByRole('heading', { level: 3 })).toHaveClass('wrap-anywhere')
+  })
+
+  it('wraps the suite title instead of cutting off the end that tells suites apart', () => {
+    renderGroup(failing(1), 'api')
+
+    const title = screen.getByText('Failing 0')
+    expect(title).toHaveClass('wrap-anywhere')
+    expect(title).not.toHaveClass('truncate')
+  })
+
+  it('wraps the report label instead of cutting it off', () => {
+    renderGroup(
+      [
+        ciRunJobRun('a', {
+          status: 'fail',
+          ciJobKey: 'api',
+          reportExternalId: 'gha-900-api-junit-unit-xml-ab12cd34',
+        }),
+        ciRunJobRun('b', {
+          status: 'fail',
+          ciJobKey: 'api',
+          reportExternalId: 'gha-900-api-junit-e2e-xml-ef56ab78',
+        }),
+      ],
+      'api',
+    )
+
+    const label = screen.getByText('junit-unit-xml')
+    expect(label).toHaveClass('font-mono', 'wrap-anywhere')
+    expect(label).not.toHaveClass('truncate')
+  })
+})
+
 describe('CiRunJobGroup without suites', () => {
   it.each([
     ['a job', 'api'],
