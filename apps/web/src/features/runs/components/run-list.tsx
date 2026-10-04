@@ -47,7 +47,7 @@ function RunRow({
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
-      className="flex items-center justify-between px-5 py-3 sm:px-7 lg:px-9 sm:py-3.5 hover:bg-surface-hover/60 transition-colors"
+      className="flex items-center justify-between px-5 py-3 sm:px-7 lg:px-9 sm:py-3.5 hover:bg-surface-hover/60 transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
     >
       <div className="min-w-0 flex-1 flex items-center gap-3.5">
         <StatusChip status={run.status} />
@@ -73,7 +73,7 @@ function RunRow({
           <Tooltip>
             <TooltipTrigger
               render={<span tabIndex={0} aria-label={t('runs.sourceCi')} />}
-              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-brand-github-actions focus-visible:outline-2 focus-visible:outline-primary"
+              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-brand-github-actions focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <GithubActionsIcon className="size-5" aria-hidden="true" />
             </TooltipTrigger>
@@ -83,7 +83,7 @@ function RunRow({
           <Tooltip>
             <TooltipTrigger
               render={<span tabIndex={0} aria-label={t('runs.sourceManual')} />}
-              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-primary focus-visible:outline-2 focus-visible:outline-primary"
+              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-primary focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <QablyMarkIcon className="size-5" aria-hidden="true" />
             </TooltipTrigger>
@@ -131,13 +131,13 @@ export function RunList({
           <div className="flex flex-col items-center gap-2">
             <a
               href={docsUrl(REPORT_CI_ANCHOR, locale)}
-              className="text-sm font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
+              className="rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {t('runs.emptyDocsLink')}
             </a>
             <Link
               href={`/projects/${projectId}/runs/new`}
-              className="text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-2 focus-visible:outline-primary"
+              className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               {t('runs.startARun')}
             </Link>
@@ -164,7 +164,7 @@ export function RunList({
           <Button
             type="button"
             variant="outline"
-            className="h-10 w-full sm:w-auto px-4 text-sm"
+            className="h-10 w-full sm:w-auto px-4 text-sm focus-visible:outline-hidden! focus-visible:ring-primary"
             onClick={() => void fetchNextPage()}
             disabled={isFetchingNextPage}
           >
