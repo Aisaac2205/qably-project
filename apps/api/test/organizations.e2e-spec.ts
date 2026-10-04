@@ -50,6 +50,11 @@ const adminRow = {
   user: { name: 'Grace Hopper', email: 'grace@acme.test', image: null },
 };
 
+function startOfCurrentUtcMonth(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+}
+
 describe('Organizations (e2e)', () => {
   let app: INestApplication<App>;
   const read = jest.fn();
@@ -85,7 +90,7 @@ describe('Organizations (e2e)', () => {
       plan: 'equipo',
       aiEnabled: true,
       aiCreditsUsed: 12,
-      aiCreditsPeriodStart: new Date('2026-09-01T00:00:00.000Z'),
+      aiCreditsPeriodStart: startOfCurrentUtcMonth(),
     });
     prisma.$queryRaw.mockResolvedValue([{ plan: 'equipo' }]);
 
