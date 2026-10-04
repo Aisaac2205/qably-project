@@ -325,9 +325,12 @@ sending and omits what does not fit (see "Reporter behavior").
   absent never clears it. `runAttempt` therefore follows the latest report of a GitHub re-run.
 - The run gets `ciRunId` (and `ciJobKey` when sent) on create and on update. A replay of the run by a
   reporter that sends no `ci*` keeps the link it already had.
-- `CiRun.startedAt` is written once, when the row is created, and ingestion never updates it. Both it
-  and `lastReportedAt` are the clock of the worker that handled the report, not a time taken from the
-  report.
+- `CiRun.startedAt` is written once, when the row is created, and ingestion never updates it. The only
+  other writer is the owner-run backfill, which can lower it on a `CiRun` that live ingestion created
+  when it merges older runs into it (`docs/OPS_BACKFILL_CI_RUNS.md`). Both `startedAt` and
+  `lastReportedAt` come from the clock of the process that handled the report, not from a time taken
+  from the report: the BullMQ worker for `POST /runs/ingest/junit`, and the API process itself for
+  `POST /runs/ingest`, which ingests synchronously.
 
 ### Where the CI run is resolved, and why
 
@@ -364,10 +367,12 @@ observed.
 ### `lastReportedAt`
 
 `lastReportedAt` is written explicitly on every upsert, in the `create` and in the `update`; it has no
-`@updatedAt`, so a write that is not a report (a backfill, a correction) never moves it. It is the
-worker clock at that write. When two ingests of one `CiRun` commit out of order (4 jobs run at a time)
-it can move back by a few milliseconds. It is a freshness value for display, not an ordering key:
-`GET /ci-runs` orders by `startedAt` (see `docs/RUN_QUERIES.md`).
+`@updatedAt`, so a write to the row never moves it implicitly. Ingestion sets it to the clock of the
+process that handled the report. The backfill also sets it, explicitly: on a `CiRun` that already
+exists it raises `lastReportedAt` to the latest `Run.startedAt` of the runs it links when that is later
+than the stored value (`docs/OPS_BACKFILL_CI_RUNS.md`). When two ingests of one `CiRun` commit out of
+order (4 jobs run at a time) it can move back by a few milliseconds. It is a freshness value for
+display, not an ordering key: `GET /ci-runs` orders by `startedAt` (see `docs/RUN_QUERIES.md`).
 
 ### Job identity and `QABLY_JOB_KEY`
 
@@ -375,8 +380,10 @@ The reporter derives two different values from the environment (`resolveJobIdent
 
 | Value | Rule | Used for |
 | --- | --- | --- |
-| `jobKey` | `QABLY_JOB_KEY` trimmed when not empty; otherwise `GITHUB_JOB` trimmed; otherwise none | the `ciJobKey` parameter and the text shown in the UI |
-| `idSegment` | `slugify(QABLY_JOB_KEY)` when the variable is present; otherwise `GITHUB_JOB ?? 'job'`, untransformed | the job segment of the per-file `externalId` |
+| `jobKey` | `QABLY_JOB_KEY` trimmed when not blank; otherwise `GITHUB_JOB` trimmed; otherwise none | the `ciJobKey` parameter and the text shown in the UI |
+| `idSegment` | `slugify(QABLY_JOB_KEY)` when the variable is not blank; otherwise `GITHUB_JOB ?? 'job'`, untransformed | the job segment of the per-file `externalId` |
+
+An empty or whitespace-only `QABLY_JOB_KEY` counts as absent for both values.
 
 In a matrix, variants of one job share `GITHUB_JOB`, so two variants that report the same file used to
 produce the same `externalId` and overwrite each other. Setting `QABLY_JOB_KEY` to a different value

@@ -53,7 +53,7 @@ value; it is never actually dialed, since the build never makes a real request. 
 already sets its own `NEXT_PUBLIC_API_URL` for the test environment, so the two do not conflict.
 
 `NEXT_PUBLIC_DOCS_URL` is optional and names the origin of the public documentation site, so the app
-can link a QA from an empty runs page to the CI reporting guide. Unset, the link is a same-origin path
+can link a QA from the empty Actions tab of the runs page to the CI reporting guide. Unset, the link is a same-origin path
 (`/docs#...`, `/en/docs#...`), which is right for local development where the two apps are proxied
 together. Production should set the real docs origin; no value is guessed here because domains are
 the owner's call.
@@ -294,6 +294,37 @@ instead a query parameter the reporter builds from the environment:
 | `externalId` | `gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>` — see below |
 | `commitSha` | `$GITHUB_SHA` |
 | `commitMessage` / `commitAuthor` | `git log -1 --pretty=%s` / `%an` (best-effort, read locally — cheaper than parsing the event payload) |
+| `ciRunExternalId` | `$GITHUB_RUN_ID` |
+| `ciJobKey` | `$QABLY_JOB_KEY`, otherwise `$GITHUB_JOB` |
+| `ciWorkflowName` | `$GITHUB_WORKFLOW` |
+| `ciRunNumber` / `ciRunAttempt` | `$GITHUB_RUN_NUMBER` / `$GITHUB_RUN_ATTEMPT` |
+| `ciBranch` / `ciHeadRef` | `$GITHUB_REF_NAME` / `$GITHUB_HEAD_REF` |
+| `ciActor` / `ciEventName` / `ciRepository` | `$GITHUB_ACTOR` / `$GITHUB_EVENT_NAME` / `$GITHUB_REPOSITORY` |
+| `ciServerUrl` | `$GITHUB_SERVER_URL` |
+
+The `ci*` parameters let the server group the per-file reports of one workflow run under one CI run,
+which the Actions tab of the runs page lists as one row per push. They are all optional, and
+`docs/RUN_INGESTION.md` ("CI run linking") is the reference for them. The facts that matter when
+writing a workflow:
+
+- **Limits.** Text values are trimmed and must be 1 to 255 characters; the reporter cuts longer ones at
+  255. `ciRunNumber` and `ciRunAttempt` are integers from 1 to 2,147,483,647 (the `int32` range of the
+  column); the reporter sends them only when the variable is a plain integer in that range.
+  `ciServerUrl` must be an `http` or `https` URL of at most 255 characters; the reporter drops it, and
+  does not cut it, when it is not.
+- **`ciServerUrl` is normalized.** The server stores only the origin of the URL and discards
+  credentials, path, query and fragment, so `https://user:pw@github.com/x?token=abc#frag` is stored as
+  `https://github.com`. `GITHUB_SERVER_URL` is already an origin, so the reporter's payload is
+  unchanged.
+- **When they are ignored.** The reporter omits a parameter whose variable is unset, blank or invalid,
+  and never fills one from a default, so a run outside GitHub Actions sends no `ci*` at all. The server
+  ignores every `ci*` parameter, `ciJobKey` included, when `ciRunExternalId` is absent. A run reported
+  without them is not linked to a CI run and appears under the Manual tab.
+- **`QABLY_JOB_KEY`** is an optional environment variable that replaces `GITHUB_JOB` as `ciJobKey` and,
+  in slug form, as the job segment of `externalId`. Set it to a different value for each variant of a
+  matrix job so that variants reporting the same file do not overwrite each other. An empty or
+  whitespace-only value counts as unset. Adopting it in a workflow that already reports changes the
+  `externalId` of that job once; see "Job identity and `QABLY_JOB_KEY`" in `docs/RUN_INGESTION.md`.
 
 There is no `name` query parameter: the reporter leaves the run's display name for the server to
 derive from the actual `<testsuite>` it parsed (`resolveRunName` in `runs.controller.ts`), which is
@@ -327,7 +358,8 @@ fallback.
   instead of creating duplicates — which is exactly the idempotency behavior described in
   `docs/RUN_INGESTION.md`. A genuinely new workflow run (new push, new PR sync) gets a new run ID.
 - **`GITHUB_JOB`** — disambiguates report files with the same name reported from different jobs in
-  the same run (`api` vs `web`).
+  the same run (`api` vs `web`). When `QABLY_JOB_KEY` is set and not blank, its slug takes this place
+  in the `externalId`.
 - **`slug(basename(filePath))`** — the file's own name lowercased and reduced to `[a-z0-9-]`, kept
   for readability in logs and dashboards.
 - **`sha256(filePath)[0:8]`** — an 8-hex-character digest of the full (unslugged) file path, appended

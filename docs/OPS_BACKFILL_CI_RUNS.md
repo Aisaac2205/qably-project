@@ -28,8 +28,8 @@ GitHub run.
   the runs (the first non-null value of each field).
 - Links the runs with `updateMany` restricted to `ciRunId IS NULL` and writing only `ciRunId`. A run
   that live ingestion linked after the batch was read is left as it is. `ciJobKey` is never written,
-  so adopted runs have no job; the web app lists them directly under the CI run header, without a group
-  heading.
+  so adopted runs have no job; the web app lists their failing suites directly under the CI run header,
+  without a group heading, and puts the others behind a "Show N suites without failures" button.
 - Reuses a `CiRun` that already exists for the same `(projectId, source, run id)`, which happens when
   the same GitHub run was also reported by a 10.1.0 reporter, or when a `CiRun` spans two batches. The
   existing row is widened (`startedAt` to the earlier value, `lastReportedAt` to the later one) and
@@ -42,10 +42,12 @@ GitHub run.
   is therefore never replaced by an older one.
 
 `startedAt` and `lastReportedAt` mean different things depending on the origin of the row. For a row
-created by live ingestion they are the worker clock at the first and the latest report. For a
-backfilled row they are the earliest and the latest `Run.startedAt`. The list is ordered by
-`startedAt`, so a backfilled CI run sits at its true chronological position, and the duration shown in
-the UI for it is the spread of its suites' start times, not the duration of the workflow.
+created by live ingestion they are the clock of the process that handled the first and the latest
+report. For a backfilled row they are the earliest and the latest `Run.startedAt`. When the script
+merges older runs into a row that live ingestion created, it lowers that row's `startedAt` to the
+earliest of them, which moves the row down the list. The list is ordered by `startedAt`, so a
+backfilled CI run sits at its true chronological position, and the duration shown in the UI for it is
+the spread of its suites' start times, not the duration of the workflow.
 
 ## Idempotency and failure behavior
 
@@ -154,8 +156,9 @@ SELECT count(*) FROM "run" WHERE "ciRunId" IS NOT NULL AND "ciJobKey" IS NULL;
 -- expect the Runs linked figure from the output, plus live-linked runs that reported no job
 ```
 
-In the web app, open the detail of an adopted CI run. Its suites appear directly under the header,
-with no group heading of any kind, and no group is named after an unidentified job.
+In the web app, open the detail of an adopted CI run. Its failing suites, if any, appear directly under
+the header and the suites without failures sit behind a "Show N suites without failures" button. There
+is no group heading of any kind, and no group is named after an unidentified job.
 
 ## Rollback
 

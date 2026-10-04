@@ -155,15 +155,20 @@ test report is not represented.
 **Order is `startedAt` descending, then `id` descending.** Pagination uses `cursor: { id }, skip: 1`,
 the same mechanism as `GET /runs`, and that mechanism requires a sort key that does not change.
 `lastReportedAt` changes with every report: a CI run just below the end of page 1 that received a
-report would move above that boundary and appear on no page, with no error. `startedAt` is written once
-when the row is created, so the order is total and stable while reports keep arriving. It is also the
-order a reader expects, and `lastReportedAt` would lift a late retry of an old workflow run above
-newer pushes. `lastReportedAt` is still returned, as a freshness value that can move back by a few
+report would move above that boundary and appear on no page, with no error. Ingestion writes
+`startedAt` once, when the row is created, and never updates it, so the order is total and stable while
+reports keep arriving. The one exception is the owner-run backfill: when it merges older runs into a
+`CiRun` that live ingestion created, it lowers that row's `startedAt` and the row moves down the list
+(see `docs/OPS_BACKFILL_CI_RUNS.md`). That is a one-off operation, and a client that is paginating at
+that moment can see a row skipped or repeated. `startedAt` is also the order a reader expects, and
+`lastReportedAt` would lift a late retry of an old workflow run above newer pushes. `lastReportedAt` is still returned, as a freshness value that can move back by a few
 milliseconds (see "`lastReportedAt`" in `docs/RUN_INGESTION.md`). A CI run created by the backfill has
 `startedAt` set to its earliest suite, so it lands at its real chronological position.
 
 `nextCursor` is the id of the last item of the page and is present only when another row exists. A
-`cursor` that matches no row answers `200` with an empty `items` and no `nextCursor`, never `500`.
+`cursor` that matches no row is expected to answer `200` with an empty `items` and no `nextCursor`
+rather than `500`. This is verified against a mocked client and the generated SQL, where the cursor
+subselects return `NULL` so no row matches; it has not been confirmed on the real Postgres database.
 
 A page costs two reads, not one per row: a `ciRun.findMany` that takes `limit + 1` rows, and a single
 `run.groupBy` by `(ciRunId, status)` over the ids of the page, scoped by organization. The existence of
@@ -171,7 +176,8 @@ a `(ciRunId, 'fail')` group is enough to derive the status. An empty page skips 
 
 ## `GET /ci-runs/:id`
 
-Returns the item above plus `runs`, the suites linked to the CI run, as a flat list:
+Returns the item above plus `runs`, the suites linked to the CI run, as a flat list with one element
+per linked run. Each element of `runs` has this shape:
 
 ```json
 {
@@ -278,8 +284,9 @@ by its primary key and applies the `where` to the other rows only, so the cursor
 against the caller's organization or project. A `cursor` set to another organization's id (a cuid,
 which cannot be enumerated) has two effects:
 
-- The response is a one-bit existence check. An id that does not exist gives an empty page; an id that
-  exists gives the caller's rows positioned after it, which is empty when the caller has no older rows.
+- The response is a one-bit existence check. An id that does not exist is expected to give an empty page
+  (verified as described under `nextCursor`, not on the real database); an id that exists gives the
+  caller's rows positioned after it, which is empty when the caller has no older rows.
 - The `startedAt` of that foreign row decides where the page starts, and `skip: 1` drops one of the
   caller's own rows.
 
