@@ -33,6 +33,11 @@ async function openForm(props: Partial<ComponentProps<typeof NewRunForm>> = {}) 
   })
 }
 
+async function chooseSuite(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('combobox', { name: 'Suite' }))
+  await user.click(await screen.findByRole('option', { name }))
+}
+
 describe('NewRunForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -70,8 +75,7 @@ describe('NewRunForm', () => {
     )
 
     await openForm()
-    await user.click(screen.getByRole('combobox'))
-    await user.click(await screen.findByText('Authentication'))
+    await chooseSuite(user, 'Authentication')
     await user.click(screen.getByRole('button', { name: 'Start run' }))
 
     await waitFor(() => {
@@ -96,8 +100,7 @@ describe('NewRunForm', () => {
     )
 
     await openForm()
-    await user.click(screen.getByRole('combobox'))
-    await user.click(await screen.findByText('Authentication'))
+    await chooseSuite(user, 'Authentication')
     await user.click(screen.getByRole('button', { name: 'Start run' }))
 
     await waitFor(() => {
@@ -115,8 +118,7 @@ describe('NewRunForm', () => {
     vi.spyOn(api, 'createRun').mockRejectedValueOnce(new ApiError(500, 'boom'))
 
     await openForm()
-    await user.click(screen.getByRole('combobox'))
-    await user.click(await screen.findByText('Authentication'))
+    await chooseSuite(user, 'Authentication')
     await user.click(screen.getByRole('button', { name: 'Start run' }))
 
     await waitFor(() => {
@@ -218,8 +220,7 @@ describe('NewRunForm', () => {
         .mockResolvedValueOnce({ id: 'run-created' } as RunRecord)
 
       await openForm()
-      await user.click(screen.getByRole('combobox'))
-      await user.click(await screen.findByText('Checkout'))
+      await chooseSuite(user, 'Checkout')
       await user.type(screen.getByPlaceholderText('e.g. Smoke Test'), 'Smoke')
       await user.click(screen.getByRole('button', { name: 'Start run' }))
 
@@ -315,8 +316,7 @@ describe('NewRunForm', () => {
       await user.click(screen.getByRole('button', { name: 'Start run' }))
       expect(screen.getByRole('alert')).toBeInTheDocument()
 
-      await user.click(screen.getByRole('combobox'))
-      await user.click(await screen.findByText('Authentication'))
+      await chooseSuite(user, 'Authentication')
 
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
       expect(screen.getByRole('combobox', { name: 'Suite' })).not.toHaveAttribute(
