@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { X } from "@phosphor-icons/react"
+import { useTranslation } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
@@ -36,6 +37,8 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
 }
 
 function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.Props) {
+  const { t } = useTranslation()
+
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -54,13 +57,13 @@ function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.
           {children}
           <DialogPrimitive.Close
             className={cn(
-              "absolute right-3 top-3 flex size-6 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+              "absolute right-0.5 top-0.5 flex size-11 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 md:right-3 md:top-3 md:size-6",
+              "focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               "disabled:pointer-events-none",
             )}
           >
             <X className="size-4" weight="bold" />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{t("common.close")}</span>
           </DialogPrimitive.Close>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Viewport>
