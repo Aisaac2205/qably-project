@@ -41,6 +41,7 @@ async function chooseSuite(user: ReturnType<typeof userEvent.setup>, name: strin
 describe('NewRunForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.restoreAllMocks()
   })
 
   it('renders suite select', async () => {
