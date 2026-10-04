@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react'
-import { screen, act, waitFor, within } from '@testing-library/react'
+import { screen, act, waitFor, within, createEvent, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { RunRecord } from '@qably/types'
@@ -162,6 +162,13 @@ describe('NewRunForm', () => {
         expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveFocus()
       })
     })
+
+    it('labels the suite select and the optional name', async () => {
+      await openForm()
+
+      expect(screen.getByRole('combobox', { name: 'Suite' })).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Run name (optional)' })).toBeInTheDocument()
+    })
   })
 
   describe('creating a run', () => {
@@ -187,6 +194,116 @@ describe('NewRunForm', () => {
         suiteId: 'suite-2',
         name: 'Smoke',
       })
+    })
+
+    it('sends no name when the optional field is blank', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      const create = vi
+        .spyOn(api, 'createRun')
+        .mockResolvedValueOnce({ id: 'run-created' } as RunRecord)
+
+      await openForm({ initialSuiteId: 'suite-1' })
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+      await waitFor(() => {
+        expect(create).toHaveBeenCalledWith({
+          projectId: 'proj-1',
+          suiteId: 'suite-1',
+          name: undefined,
+        })
+      })
+    })
+
+    it('submits from the keyboard with Enter in the name field', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      const create = vi
+        .spyOn(api, 'createRun')
+        .mockResolvedValueOnce({ id: 'run-created' } as RunRecord)
+
+      await openForm({ initialSuiteId: 'suite-1' })
+      await user.type(screen.getByRole('textbox', { name: /run name/i }), 'Nightly{Enter}')
+
+      await waitFor(() => {
+        expect(create).toHaveBeenCalledWith({
+          projectId: 'proj-1',
+          suiteId: 'suite-1',
+          name: 'Nightly',
+        })
+      })
+    })
+
+    it('keeps the browser from reloading the page when the form is submitted', async () => {
+      await openForm({ initialSuiteId: 'suite-1' })
+      const form = screen.getByRole('textbox', { name: /run name/i }).closest('form') as HTMLFormElement
+      const submit = createEvent.submit(form)
+
+      fireEvent(form, submit)
+
+      expect(submit.defaultPrevented).toBe(true)
+    })
+
+    it('does not start a run without a suite, even from the keyboard', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      const create = vi.spyOn(api, 'createRun')
+
+      await openForm()
+      await user.type(screen.getByRole('textbox', { name: /run name/i }), 'Nightly{Enter}')
+
+      expect(create).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert')).toHaveTextContent('Please select a suite')
+    })
+  })
+
+  describe('errors and fields', () => {
+    it('announces the missing suite and ties it to the select', async () => {
+      const user = userEvent.setup()
+      await openForm()
+
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+      const alert = screen.getByRole('alert')
+      expect(alert).toHaveTextContent('Please select a suite')
+      const select = screen.getByRole('combobox', { name: 'Suite' })
+      expect(select).toHaveAttribute('aria-invalid', 'true')
+      expect(select).toHaveAccessibleDescription('Please select a suite')
+    })
+
+    it('clears the error once a suite is chosen', async () => {
+      const user = userEvent.setup()
+      await openForm()
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+      expect(screen.getByRole('alert')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('combobox'))
+      await user.click(await screen.findByText('Authentication'))
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Suite' })).not.toHaveAttribute(
+        'aria-invalid',
+        'true',
+      )
+    })
+
+    it('preselects a known suite', async () => {
+      await openForm({ initialSuiteId: 'suite-2' })
+
+      expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveTextContent('Checkout')
+    })
+
+    it('ignores a preselected suite that does not exist in the project', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      const create = vi.spyOn(api, 'createRun')
+
+      await openForm({ initialSuiteId: 'suite-missing' })
+
+      expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveTextContent('Select a suite')
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+      expect(create).not.toHaveBeenCalled()
+      expect(screen.getByRole('alert')).toHaveTextContent('Please select a suite')
     })
   })
 })

@@ -1,17 +1,9 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useCallback, useId, useState, type FormEvent } from 'react'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { useCreateRun } from '@/features/runs/hooks/use-create-run'
 import { ApiError } from '@/lib/api-client'
-import {
-  Select,
-  SelectGroup,
-  SelectValue,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-} from '@/components/ui/select'
 import { Button, buttonVariants } from '@/components/ui/button'
 import {
   DialogClose,
@@ -21,6 +13,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Field, FieldError, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select'
 import { useTranslation } from '@/lib/i18n'
 
 function translateCreateRunError(error: unknown, t: (key: string) => string): string {
@@ -57,108 +59,102 @@ function NewRunFormBody({
   const { suites } = useSuites(projectId)
   const { start: createRun, error: createError } = useCreateRun(projectId)
   const { t } = useTranslation()
-  const [suiteId, setSuiteId] = useState(initialSuiteId ?? '')
+  const suiteFieldId = useId()
+  const nameFieldId = useId()
+  const messageId = useId()
+  const [chosenSuiteId, setChosenSuiteId] = useState(initialSuiteId ?? '')
   const [name, setName] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [validationError, setValidationError] = useState('')
+
+  const suiteId = suites.some((suite) => suite.id === chosenSuiteId) ? chosenSuiteId : ''
+  const message = validationError || (createError ? translateCreateRunError(createError, t) : '')
+  const hasNoSuites = suites.length === 0
 
   const handleSuiteChange = useCallback((value: unknown) => {
-    const v = String(value ?? '')
-    setSuiteId(v)
-    if (v) setError('')
+    const next = String(value ?? '')
+    setChosenSuiteId(next)
+    if (next) setValidationError('')
   }, [])
 
-  const handleSubmit = useCallback(async () => {
-    if (!suiteId) {
-      setError(t('runs.pleaseSelectSuite'))
-      return
-    }
-    setSubmitting(true)
-    try {
+  const handleSubmit = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault()
+      if (!suiteId) {
+        setValidationError(t('runs.pleaseSelectSuite'))
+        return
+      }
+      setValidationError('')
       createRun(suiteId, name || undefined)
-    } finally {
-      setSubmitting(false)
-    }
-  }, [suiteId, name, createRun, t])
-
-  const header = (
-    <DialogHeader>
-      <DialogTitle>{t('runs.newRun')}</DialogTitle>
-      <DialogDescription>
-        {suites.length === 0 ? t('runs.noSuitesAvailable') : t('runs.newRunDescription')}
-      </DialogDescription>
-    </DialogHeader>
+    },
+    [suiteId, name, createRun, t],
   )
-  const cancel = (
-    <DialogClose className={buttonVariants({ variant: 'outline' })}>
-      {t('common.cancel')}
-    </DialogClose>
-  )
-
-  if (suites.length === 0) {
-    return (
-      <>
-        {header}
-        <DialogFooter>{cancel}</DialogFooter>
-      </>
-    )
-  }
 
   return (
     <>
-      {header}
+      <DialogHeader>
+        <DialogTitle>{t('runs.newRun')}</DialogTitle>
+        <DialogDescription>
+          {hasNoSuites ? t('runs.noSuitesAvailable') : t('runs.newRunDescription')}
+        </DialogDescription>
+      </DialogHeader>
 
-      <div className="space-y-1.5">
-        <label htmlFor="suite-select" className="text-xs font-medium text-default">
-          {t('runs.suiteLabel')}
-        </label>
-        <Select
-          value={suiteId}
-          items={suites.map((s) => ({ value: s.id, label: s.name }))}
-          onValueChange={handleSuiteChange}
-        >
-          <SelectTrigger id="suite-select">
-            <SelectValue placeholder={t('runs.selectSuite')} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {suites.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        {(error || createError) && (
-          <span className="text-xs text-fail" role="alert">
-            {error || translateCreateRunError(createError, t)}
-          </span>
-        )}
-      </div>
+      {hasNoSuites ? (
+        <DialogFooter>
+          <DialogClose className={buttonVariants({ variant: 'outline' })}>
+            {t('common.cancel')}
+          </DialogClose>
+        </DialogFooter>
+      ) : (
+        <form onSubmit={handleSubmit} noValidate className="grid gap-4">
+          <Field data-invalid={validationError ? true : undefined}>
+            <FieldLabel htmlFor={suiteFieldId}>{t('runs.suiteLabel')}</FieldLabel>
+            <Select
+              value={suiteId}
+              items={suites.map((suite) => ({ value: suite.id, label: suite.name }))}
+              onValueChange={handleSuiteChange}
+            >
+              <SelectTrigger
+                id={suiteFieldId}
+                aria-invalid={validationError ? true : undefined}
+                aria-describedby={message ? messageId : undefined}
+              >
+                <SelectValue placeholder={t('runs.selectSuite')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {suites.map((suite) => (
+                    <SelectItem key={suite.id} value={suite.id}>
+                      {suite.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            {message && <FieldError id={messageId}>{message}</FieldError>}
+          </Field>
 
-      <div className="space-y-1.5">
-        <label htmlFor="run-name" className="text-xs font-medium text-default">
-          {t('runs.runNameLabel')}{' '}
-          <span className="text-muted font-normal">({t('common.optional')})</span>
-        </label>
-        <input
-          id="run-name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t('runs.runNamePlaceholder')}
-          className="w-full h-8 px-2.5 text-xs rounded border border-border bg-surface text-default
-            placeholder:text-muted focus-visible:outline-2 focus-visible:outline-primary"
-        />
-      </div>
+          <Field>
+            <FieldLabel htmlFor={nameFieldId}>
+              {t('runs.runNameLabel')}{' '}
+              <span className="font-normal text-muted">({t('common.optional')})</span>
+            </FieldLabel>
+            <Input
+              id={nameFieldId}
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={t('runs.runNamePlaceholder')}
+            />
+          </Field>
 
-      <DialogFooter>
-        {cancel}
-        <Button onClick={handleSubmit} disabled={submitting}>
-          {submitting ? t('runs.starting') : t('runs.startRun')}
-        </Button>
-      </DialogFooter>
+          <DialogFooter>
+            <DialogClose className={buttonVariants({ variant: 'outline' })}>
+              {t('common.cancel')}
+            </DialogClose>
+            <Button type="submit">{t('runs.startRun')}</Button>
+          </DialogFooter>
+        </form>
+      )}
     </>
   )
 }
