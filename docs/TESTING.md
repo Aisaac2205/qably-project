@@ -38,6 +38,23 @@ After the fix, the full run reports `import 95.6s, tests 70.3s, environment 211.
 - **Run pure-logic files under `environment: 'node'`.** This needs `test.projects`; `environmentMatchGlobs` was removed in Vitest 4. It is not free: a file's environment cannot be inferred from its extension (`use-auth.test.ts` renders hooks, `store.test.ts` persists to `localStorage`), so the node project needs an explicit include list, and `src/test/setup.ts` calls `localStorage.clear()`, so it needs its own setup file. About 22 of the 159 files are provably pure today, which caps the saving at roughly 15s of wall time.
 - **Replace jsdom with happy-dom for every file.** happy-dom constructs much faster, so this attacks all 159 files rather than 14% of them, and the config change is one line. It is a new devDependency and a different DOM implementation, so the 1088 tests are the acceptance test for it. This is the larger lever and it has not been tried.
 
+## Opening a Base UI Select in a test
+
+Base UI mounts a Select's options before the popup opens. As soon as the trigger takes focus, the portal renders the items inside a positioner that is `hidden` and carries `pointer-events: none`, and the popup opens a few frames later. `findByText('Authentication')` matches that hidden copy immediately, and user-event refuses to click it with `Unable to perform pointer interaction as the element has pointer-events: none`.
+
+Wait for the option by role instead:
+
+```
+await user.click(screen.getByRole('combobox', { name: 'Suite' }))
+await user.click(await screen.findByRole('option', { name: 'Authentication' }))
+```
+
+A role query skips the hidden copy and resolves only once the popup is open and interactive. `new-run-form.test.tsx` wraps the two lines in `chooseSuite`. Menus and dialogs do not pre-mount their items, so text queries are fine there.
+
+A green run on Windows does not prove a test like this is safe. `setTimeout(0)` fires after about 15 ms on a Windows machine at the default timer resolution and after about 1 ms on Linux. user-event and Testing Library wait on that timer between steps, so on Windows the popup has time to open and the race is usually won; on the Linux CI runner it is lost every time. The new run form tests failed 5 of 5 Select tests in CI while passing locally.
+
+The same file showed a second trap. `vi.clearAllMocks()` keeps the values queued by `mockResolvedValueOnce`, `mockRejectedValueOnce` and `mockReturnValueOnce`, so a test that fails before consuming its value hands it to the next test. Pair it with `vi.restoreAllMocks()` in `beforeEach` when a file queues one-shot values on a shared spy, or one real failure is reported as several.
+
 ## The skipped suite
 
 `apps/api/src/modules/ai/gemini.extractor.integration.spec.ts` reports as skipped on every run. That is deliberate: it is gated behind `describe.skip` unless `GEMINI_API_KEY` is set, because it calls the real Gemini API. Nothing is broken and it should stay skipped by default.
