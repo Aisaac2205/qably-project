@@ -45,8 +45,19 @@ export function createPrismaBackfillPort(prisma: PrismaClient): BackfillPort {
       return row.id;
     },
 
-    updateCiRun: async (id, patch) => {
-      await prisma.ciRun.update({ where: { id }, data: patch });
+    updateCiRunIfUnchanged: async (expected, patch) => {
+      const result = await prisma.ciRun.updateMany({
+        where: {
+          id: expected.id,
+          startedAt: expected.startedAt,
+          lastReportedAt: expected.lastReportedAt,
+          commitSha: expected.commitSha,
+          commitMessage: expected.commitMessage,
+          commitAuthor: expected.commitAuthor,
+        },
+        data: patch,
+      });
+      return result.count === 1;
     },
 
     linkRuns: async (ciRunId, runIds) => {

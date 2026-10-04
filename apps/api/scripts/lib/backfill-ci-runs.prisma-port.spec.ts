@@ -15,7 +15,7 @@ function build() {
     ciRun: {
       findUnique: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: 'ci-1' }),
-      update: jest.fn().mockResolvedValue({ id: 'ci-1' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   };
 
@@ -99,14 +99,48 @@ describe('createPrismaBackfillPort', () => {
     });
   });
 
-  it('updates a CiRun by id with exactly the patch', async () => {
-    const { port, prisma } = build();
-    const patch = { commitSha: 'a41f9c2' };
+  describe('updateCiRunIfUnchanged', () => {
+    const readValues = {
+      id: 'ci-1',
+      startedAt: new Date('2026-09-01T10:30:00.000Z'),
+      lastReportedAt: new Date('2026-09-01T10:31:00.000Z'),
+      commitSha: null,
+      commitMessage: 'fix: retry the checkout call',
+      commitAuthor: null,
+    };
+    const patch = {
+      startedAt: new Date('2026-09-01T10:05:00.000Z'),
+      commitSha: 'a41f9c2',
+    };
 
-    await expect(port.updateCiRun('ci-1', patch)).resolves.toBeUndefined();
-    expect(prisma.ciRun.update).toHaveBeenCalledWith({
-      where: { id: 'ci-1' },
-      data: patch,
+    it('writes the patch only to the row that still holds every value that was read', async () => {
+      const { port, prisma } = build();
+      prisma.ciRun.updateMany.mockResolvedValueOnce({ count: 1 });
+
+      await expect(
+        port.updateCiRunIfUnchanged(readValues, patch),
+      ).resolves.toBe(true);
+      expect(prisma.ciRun.updateMany).toHaveBeenCalledTimes(1);
+      expect(prisma.ciRun.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'ci-1',
+          startedAt: readValues.startedAt,
+          lastReportedAt: readValues.lastReportedAt,
+          commitSha: null,
+          commitMessage: 'fix: retry the checkout call',
+          commitAuthor: null,
+        },
+        data: patch,
+      });
+    });
+
+    it('reports a lost race when no row matched the values that were read', async () => {
+      const { port, prisma } = build();
+      prisma.ciRun.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        port.updateCiRunIfUnchanged(readValues, patch),
+      ).resolves.toBe(false);
     });
   });
 

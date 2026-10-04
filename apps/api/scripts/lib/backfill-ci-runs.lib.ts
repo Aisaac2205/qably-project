@@ -1,6 +1,8 @@
 import type { RunSource } from '../../generated/prisma/client';
+import { isUniqueViolation } from '../../src/prisma/is-unique-violation';
 
 export const DEFAULT_BATCH_SIZE = 500;
+export const MAX_MERGE_ATTEMPTS = 5;
 
 const GITHUB_RUN_ID_PREFIX = /^gha-(\d+)-/;
 const COMMIT_FIELDS = ['commitSha', 'commitMessage', 'commitAuthor'] as const;
@@ -54,7 +56,10 @@ export interface BackfillPort {
   ): Promise<BackfillRunRow[]>;
   findCiRun(key: CiRunKey): Promise<ExistingCiRun | null>;
   createCiRun(input: NewCiRun): Promise<string>;
-  updateCiRun(id: string, patch: CiRunPatch): Promise<void>;
+  updateCiRunIfUnchanged(
+    expected: ExistingCiRun,
+    patch: CiRunPatch,
+  ): Promise<boolean>;
   linkRuns(ciRunId: string, runIds: readonly string[]): Promise<number>;
 }
 
@@ -133,35 +138,69 @@ function patchFor(
   return Object.keys(patch).length === 0 ? undefined : patch;
 }
 
+async function createUnlessTaken(
+  port: BackfillPort,
+  input: NewCiRun,
+): Promise<string | undefined> {
+  try {
+    return await port.createCiRun(input);
+  } catch (error) {
+    if (isUniqueViolation(error)) return undefined;
+    throw error;
+  }
+}
+
+async function resolveCiRun(
+  port: BackfillPort,
+  group: RunGroup,
+  summary: BackfillSummary,
+): Promise<string> {
+  const times = group.rows.map((row) => row.startedAt.getTime());
+  const startedAt = new Date(Math.min(...times));
+  const lastReportedAt = new Date(Math.max(...times));
+  const commit = commitFieldsOf(group.rows);
+
+  for (let attempt = 1; attempt <= MAX_MERGE_ATTEMPTS; attempt += 1) {
+    const existing = await port.findCiRun(group.key);
+
+    if (existing === null) {
+      const createdId = await createUnlessTaken(port, {
+        ...group.key,
+        organizationId: group.organizationId,
+        startedAt,
+        lastReportedAt,
+        ...commit,
+      });
+      if (createdId !== undefined) {
+        summary.ciRunsCreated += 1;
+        return createdId;
+      }
+      continue;
+    }
+
+    const patch = patchFor(existing, startedAt, lastReportedAt, commit);
+    if (patch === undefined) return existing.id;
+
+    if (await port.updateCiRunIfUnchanged(existing, patch)) {
+      summary.ciRunsUpdated += 1;
+      return existing.id;
+    }
+  }
+
+  const { projectId, source, externalId } = group.key;
+  throw new Error(
+    `Gave up on the ${source} CiRun ${externalId} of project ${projectId} after ` +
+      `${MAX_MERGE_ATTEMPTS} attempts because concurrent ingestion kept ` +
+      'changing it. None of its runs were linked; run the script again.',
+  );
+}
+
 async function applyGroup(
   port: BackfillPort,
   group: RunGroup,
   summary: BackfillSummary,
 ): Promise<void> {
-  const times = group.rows.map((row) => row.startedAt.getTime());
-  const startedAt = new Date(Math.min(...times));
-  const lastReportedAt = new Date(Math.max(...times));
-  const commit = commitFieldsOf(group.rows);
-  const existing = await port.findCiRun(group.key);
-
-  let ciRunId: string;
-  if (existing === null) {
-    ciRunId = await port.createCiRun({
-      ...group.key,
-      organizationId: group.organizationId,
-      startedAt,
-      lastReportedAt,
-      ...commit,
-    });
-    summary.ciRunsCreated += 1;
-  } else {
-    ciRunId = existing.id;
-    const patch = patchFor(existing, startedAt, lastReportedAt, commit);
-    if (patch !== undefined) {
-      await port.updateCiRun(existing.id, patch);
-      summary.ciRunsUpdated += 1;
-    }
-  }
+  const ciRunId = await resolveCiRun(port, group, summary);
   summary.runsLinked += await port.linkRuns(
     ciRunId,
     group.rows.map((row) => row.id),

@@ -22,7 +22,7 @@ function build(overrides: Partial<BackfillCliDeps> = {}) {
     ),
     findCiRun: jest.fn(() => Promise.resolve(null)),
     createCiRun: jest.fn(() => Promise.resolve('ci-1')),
-    updateCiRun: jest.fn(() => Promise.resolve()),
+    updateCiRunIfUnchanged: jest.fn(() => Promise.resolve(true)),
     linkRuns: jest.fn(() => Promise.resolve(1)),
   };
   const close = jest.fn(() => Promise.resolve());
@@ -50,7 +50,7 @@ describe('runBackfillCli', () => {
     expect((t.errors[0] as Error).message).toMatch(/--confirm/);
     expect(t.deps.openPort).not.toHaveBeenCalled();
     expect(t.port.createCiRun).not.toHaveBeenCalled();
-    expect(t.port.updateCiRun).not.toHaveBeenCalled();
+    expect(t.port.updateCiRunIfUnchanged).not.toHaveBeenCalled();
     expect(t.port.linkRuns).not.toHaveBeenCalled();
     expect(t.lines).toEqual([]);
   });

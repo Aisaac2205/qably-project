@@ -35,6 +35,11 @@ GitHub run.
   existing row is widened (`startedAt` to the earlier value, `lastReportedAt` to the later one) and
   commit fields are filled only when they are `NULL`. An existing value is never overwritten. When
   nothing would change, no update is issued.
+- Applies that update only if the row still holds the values the script read: the write is an
+  `updateMany` filtered on `id`, `startedAt`, `lastReportedAt` and the three commit fields. If live
+  ingestion changed the row in between, no row matches, the script reads it again, recomputes the merge
+  from the fresh values and retries, up to 5 attempts. A value written by live ingestion after the read
+  is therefore never replaced by an older one.
 
 `startedAt` and `lastReportedAt` mean different things depending on the origin of the row. For a row
 created by live ingestion they are the worker clock at the first and the latest report. For a
@@ -50,8 +55,11 @@ same unattributable count as the first pass.
 The script does not use a transaction across groups. Each group is a lookup, a create or an update,
 and a link. If the process stops between the create and the link, a `CiRun` without runs remains; the
 next pass finds it by its unique key, reuses it and links the runs. If live ingestion creates the same
-`CiRun` between the lookup and the create, the create fails on the unique constraint and the script
-exits with a non-zero code; running it again resolves it.
+`CiRun` between the lookup and the create, the create fails on the unique constraint (`P2002`); the
+script catches that, reads the row again and merges into it as into any existing `CiRun`. Any other
+error on the create aborts the run. A group that is still not resolved after 5 attempts, because live
+ingestion keeps changing its `CiRun`, aborts the run with a non-zero code and an error that names the
+`CiRun`; none of its runs are linked, and running the script again resolves it.
 
 ## Pre-checks
 

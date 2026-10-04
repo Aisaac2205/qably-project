@@ -1,4 +1,5 @@
 import {
+  MAX_MERGE_ATTEMPTS,
   backfillCiRuns,
   parseCiRunExternalId,
   type BackfillPort,
@@ -48,10 +49,31 @@ function liveCiRun(extra: Partial<StoredCiRun> = {}): StoredCiRun {
   };
 }
 
-function fakeDb(runs: StoredRun[], ciRuns: StoredCiRun[] = []) {
+const sameKey = (
+  row: Pick<StoredCiRun, 'projectId' | 'source' | 'externalId'>,
+  key: Pick<StoredCiRun, 'projectId' | 'source' | 'externalId'>,
+) =>
+  row.projectId === key.projectId &&
+  row.source === key.source &&
+  row.externalId === key.externalId;
+
+interface FakeHooks {
+  afterFind?: (row: StoredCiRun, finds: number) => void;
+  beforeCreate?: (input: NewCiRun, ciRuns: StoredCiRun[]) => void;
+}
+
+const uniqueViolation = () =>
+  Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+
+function fakeDb(
+  runs: StoredRun[],
+  ciRuns: StoredCiRun[] = [],
+  hooks: FakeHooks = {},
+) {
   const reads: number[] = [];
   const linkSizes: number[] = [];
   const writes = { create: 0, update: 0, link: 0 };
+  const counters = { finds: 0 };
 
   const port: BackfillPort = {
     readUnlinkedRuns: (afterId, take) => {
@@ -66,35 +88,45 @@ function fakeDb(runs: StoredRun[], ciRuns: StoredCiRun[] = []) {
       return Promise.resolve(page);
     },
     findCiRun: (key) => {
-      const row = ciRuns.find(
-        (candidate) =>
-          candidate.projectId === key.projectId &&
-          candidate.source === key.source &&
-          candidate.externalId === key.externalId,
-      );
-      return Promise.resolve(
-        row === undefined
-          ? null
-          : {
-              id: row.id,
-              startedAt: row.startedAt,
-              lastReportedAt: row.lastReportedAt,
-              commitSha: row.commitSha ?? null,
-              commitMessage: row.commitMessage ?? null,
-              commitAuthor: row.commitAuthor ?? null,
-            },
-      );
+      counters.finds += 1;
+      const row = ciRuns.find((candidate) => sameKey(candidate, key));
+      if (row === undefined) return Promise.resolve(null);
+
+      const snapshot = {
+        id: row.id,
+        startedAt: row.startedAt,
+        lastReportedAt: row.lastReportedAt,
+        commitSha: row.commitSha ?? null,
+        commitMessage: row.commitMessage ?? null,
+        commitAuthor: row.commitAuthor ?? null,
+      };
+      hooks.afterFind?.(row, counters.finds);
+      return Promise.resolve(snapshot);
     },
     createCiRun: (input) => {
+      hooks.beforeCreate?.(input, ciRuns);
+      if (ciRuns.some((candidate) => sameKey(candidate, input))) {
+        return Promise.reject(uniqueViolation());
+      }
       const id = `ci-${ciRuns.length + 1}`;
       ciRuns.push({ ...input, id });
       writes.create += 1;
       return Promise.resolve(id);
     },
-    updateCiRun: (id, patch) => {
-      Object.assign(ciRuns.find((row) => row.id === id) ?? {}, patch);
+    updateCiRunIfUnchanged: (expected, patch) => {
+      const row = ciRuns.find((candidate) => candidate.id === expected.id);
+      const unchanged =
+        row !== undefined &&
+        row.startedAt.getTime() === expected.startedAt.getTime() &&
+        row.lastReportedAt.getTime() === expected.lastReportedAt.getTime() &&
+        (row.commitSha ?? null) === expected.commitSha &&
+        (row.commitMessage ?? null) === expected.commitMessage &&
+        (row.commitAuthor ?? null) === expected.commitAuthor;
+      if (!unchanged) return Promise.resolve(false);
+
+      Object.assign(row, patch);
       writes.update += 1;
-      return Promise.resolve();
+      return Promise.resolve(true);
     },
     linkRuns: (ciRunId, runIds) => {
       linkSizes.push(runIds.length);
@@ -110,7 +142,7 @@ function fakeDb(runs: StoredRun[], ciRuns: StoredCiRun[] = []) {
     },
   };
 
-  return { port, runs, ciRuns, reads, linkSizes, writes };
+  return { port, runs, ciRuns, reads, linkSizes, writes, counters };
 }
 
 describe('parseCiRunExternalId', () => {
@@ -344,6 +376,144 @@ describe('backfillCiRuns against an existing CiRun', () => {
 
     expect(db.writes).toEqual({ create: 0, update: 0, link: 1 });
     expect(summary).toMatchObject({ ciRunsUpdated: 0, runsLinked: 1 });
+  });
+});
+
+describe('backfillCiRuns against concurrent live ingestion', () => {
+  it('never overwrites a lastReportedAt that a live ingest advanced after the read', async () => {
+    const db = fakeDb(
+      [stored('r1', 'gha-900-api-junit-xml-ab12cd34', 45)],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          if (finds === 1) row.lastReportedAt = at(50);
+        },
+      },
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.ciRuns[0].lastReportedAt).toEqual(at(50));
+    expect(db.runs[0].ciRunId).toBe('ci-live');
+    expect(summary).toMatchObject({ ciRunsUpdated: 0, runsLinked: 1 });
+  });
+
+  it('never overwrites a commit field that a live ingest filled after the read', async () => {
+    const db = fakeDb(
+      [
+        stored('r1', 'gha-900-api-junit-xml-ab12cd34', 30, {
+          commitSha: 'backfill-sha',
+        }),
+      ],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          if (finds === 1) row.commitSha = 'live-sha';
+        },
+      },
+    );
+
+    await backfillCiRuns(db.port);
+
+    expect(db.ciRuns[0].commitSha).toBe('live-sha');
+    expect(db.runs[0].ciRunId).toBe('ci-live');
+  });
+
+  it('merges into the CiRun that a live ingest created between the read and the create', async () => {
+    const db = fakeDb([stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)], [], {
+      beforeCreate: (_input, ciRuns) => {
+        if (ciRuns.length === 0) ciRuns.push(liveCiRun());
+      },
+    });
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.ciRuns).toHaveLength(1);
+    expect(db.ciRuns[0]).toMatchObject({ id: 'ci-live', startedAt: at(5) });
+    expect(db.ciRuns[0].lastReportedAt).toEqual(at(31));
+    expect(db.runs[0].ciRunId).toBe('ci-live');
+    expect(summary).toEqual({
+      scanned: 1,
+      unattributable: 0,
+      ciRunsCreated: 0,
+      ciRunsUpdated: 1,
+      runsLinked: 1,
+    });
+  });
+
+  it('recomputes the merge from a fresh read when the row changed and applies it', async () => {
+    const db = fakeDb(
+      [stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          if (finds === 1) row.lastReportedAt = at(50);
+        },
+      },
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.counters.finds).toBe(2);
+    expect(db.ciRuns[0].startedAt).toEqual(at(5));
+    expect(db.ciRuns[0].lastReportedAt).toEqual(at(50));
+    expect(db.runs[0].ciRunId).toBe('ci-live');
+    expect(summary).toMatchObject({ ciRunsUpdated: 1, runsLinked: 1 });
+    expect(db.writes.update).toBe(1);
+  });
+
+  it('gives up loudly after a bounded number of attempts and links nothing', async () => {
+    const db = fakeDb(
+      [stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          row.lastReportedAt = at(40 + finds);
+        },
+      },
+    );
+
+    await expect(backfillCiRuns(db.port)).rejects.toThrow(
+      `after ${MAX_MERGE_ATTEMPTS} attempts`,
+    );
+
+    expect(db.counters.finds).toBe(MAX_MERGE_ATTEMPTS);
+    expect(db.writes).toEqual({ create: 0, update: 0, link: 0 });
+    expect(db.runs[0].ciRunId).toBeNull();
+  });
+
+  it('gives up loudly when the create keeps hitting a unique violation', async () => {
+    const db = fakeDb([stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)], [], {
+      beforeCreate: () => {
+        throw uniqueViolation();
+      },
+    });
+
+    await expect(backfillCiRuns(db.port)).rejects.toThrow(
+      `after ${MAX_MERGE_ATTEMPTS} attempts`,
+    );
+
+    expect(db.counters.finds).toBe(MAX_MERGE_ATTEMPTS);
+    expect(db.runs[0].ciRunId).toBeNull();
+  });
+
+  it.each([
+    ['a connection error', new Error('connection lost')],
+    [
+      'a foreign key violation',
+      Object.assign(new Error('Foreign key constraint failed'), {
+        code: 'P2003',
+      }),
+    ],
+  ])('lets %s on create abort the run', async (_label, error) => {
+    const db = fakeDb([stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)], [], {
+      beforeCreate: () => {
+        throw error;
+      },
+    });
+
+    await expect(backfillCiRuns(db.port)).rejects.toBe(error);
+    expect(db.runs[0].ciRunId).toBeNull();
   });
 });
 
