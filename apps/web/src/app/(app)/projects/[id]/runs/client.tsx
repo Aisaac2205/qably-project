@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Plus } from '@phosphor-icons/react'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -22,9 +23,16 @@ export function RunListPageClient({
   initialTab?: RunsTab
 }) {
   const { t } = useTranslation()
+  const router = useRouter()
   const { project } = useProject(projectId)
   const hasNoManualCases = project?.hasManualCases === false
   const [tab, setTab] = useState(initialTab)
+  const [urlTab, setUrlTab] = useState(initialTab)
+
+  if (urlTab !== initialTab) {
+    setUrlTab(initialTab)
+    setTab(initialTab)
+  }
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
@@ -70,7 +78,13 @@ export function RunListPageClient({
 
       <Tabs
         value={tab}
-        onValueChange={(value) => setTab(parseRunsTab(value))}
+        onValueChange={(value, eventDetails) => {
+          if (eventDetails.reason !== 'none') return
+
+          const next = parseRunsTab(value)
+          setTab(next)
+          router.replace(`/projects/${projectId}/runs?tab=${next}`, { scroll: false })
+        }}
         className="gap-4"
       >
         <TabsList aria-label={t('runs.ci.tabsAria')}>
