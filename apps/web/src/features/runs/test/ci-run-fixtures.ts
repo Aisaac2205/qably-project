@@ -1,4 +1,4 @@
-import type { CiRunJobRunRecord, CiRunSummaryRecord } from '@qably/types'
+import type { CiRunDetailRecord, CiRunJobRunRecord, CiRunSummaryRecord } from '@qably/types'
 
 export const PROJECT = 'proj-1'
 
@@ -38,4 +38,11 @@ export function ciRunJobRun(
     startedAt: '2026-10-03T11:50:00.000Z',
     ...overrides,
   }
+}
+
+export function ciRunDetail(
+  runs: CiRunJobRunRecord[],
+  overrides: Partial<CiRunSummaryRecord> = {},
+): CiRunDetailRecord {
+  return { ...ciRunSummary('ci-1', overrides), runs }
 }

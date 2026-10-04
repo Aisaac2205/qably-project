@@ -58,6 +58,17 @@ describe('CiRunJobGroup heading', () => {
   })
 })
 
+describe('CiRunJobGroup without suites', () => {
+  it.each([
+    ['a job', 'api'],
+    ['the section without a job', undefined],
+  ])('renders nothing for %s that has no suites', (_label, jobKey) => {
+    const { container } = renderGroup([], jobKey)
+
+    expect(container).toBeEmptyDOMElement()
+  })
+})
+
 describe('CiRunJobGroup suites', () => {
   it('lists the failing suites as links to the suite run with their status', () => {
     renderGroup(failing(2), 'api')

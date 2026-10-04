@@ -79,6 +79,8 @@ export function CiRunJobGroup({
       ? t('runs.ci.suitesAria')
       : t('runs.ci.groupSuitesAria', { name: humanizeJobKey(jobKey) })
 
+  if (runs.length === 0) return null
+
   return (
     <div className="space-y-2">
       {jobKey !== undefined && (
