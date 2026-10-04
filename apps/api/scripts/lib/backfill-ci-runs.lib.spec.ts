@@ -220,6 +220,52 @@ describe('backfillCiRuns grouping', () => {
     expect(db.ciRuns[0].lastReportedAt).toEqual(at(20));
   });
 
+  it('takes each commit field from the first Run, in ascending id order, that carries it', async () => {
+    const db = fakeDb([
+      stored('r1', 'gha-900-api-junit-xml-ab12cd34', 20, {
+        commitSha: 'sha-first',
+        commitAuthor: 'ana',
+      }),
+      stored('r2', 'gha-900-web-junit-xml-cd34ef56', 10, {
+        commitSha: 'sha-second',
+        commitMessage: 'message-second',
+        commitAuthor: 'bob',
+      }),
+      stored('r3', 'gha-900-landing-junit-xml-ef56ab78', 15, {
+        commitSha: 'sha-third',
+        commitMessage: 'message-third',
+      }),
+    ]);
+
+    await backfillCiRuns(db.port);
+
+    expect(db.ciRuns[0]).toMatchObject({
+      commitSha: 'sha-first',
+      commitMessage: 'message-second',
+      commitAuthor: 'ana',
+    });
+  });
+
+  it('keeps the commit fields written by an earlier batch and fills only the ones it left empty', async () => {
+    const db = fakeDb([
+      stored('r1', 'gha-900-api-junit-xml-ab12cd34', 10, {
+        commitSha: 'sha-batch-1',
+      }),
+      stored('r2', 'gha-900-web-junit-xml-cd34ef56', 11),
+      stored('r3', 'gha-900-landing-junit-xml-ef56ab78', 12, {
+        commitSha: 'sha-batch-2',
+        commitMessage: 'message-batch-2',
+      }),
+    ]);
+
+    await backfillCiRuns(db.port, { batchSize: 2 });
+
+    expect(db.ciRuns[0]).toMatchObject({
+      commitSha: 'sha-batch-1',
+      commitMessage: 'message-batch-2',
+    });
+  });
+
   it('keeps the same external id in other projects and sources as separate CiRuns', async () => {
     const db = fakeDb([
       stored('r1', 'gha-900-api-junit-xml-ab12cd34', 10),
@@ -381,6 +427,36 @@ describe('backfillCiRuns against an existing CiRun', () => {
 
     expect(db.writes).toEqual({ create: 0, update: 0, link: 1 });
     expect(summary).toMatchObject({ ciRunsUpdated: 0, runsLinked: 1 });
+  });
+});
+
+describe('backfillCiRuns against a CiRun that already holds the same times', () => {
+  it('does not write when the group ends exactly at the stored lastReportedAt', async () => {
+    const db = fakeDb(
+      [stored('r1', 'gha-900-api-junit-xml-ab12cd34', 31)],
+      [liveCiRun()],
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.writes).toEqual({ create: 0, update: 0, link: 1 });
+    expect(summary).toMatchObject({ ciRunsUpdated: 0, runsLinked: 1 });
+    expect(db.ciRuns[0].lastReportedAt).toEqual(at(31));
+  });
+
+  it('does not write when the group spans exactly the stored startedAt and lastReportedAt', async () => {
+    const db = fakeDb(
+      [
+        stored('r1', 'gha-900-api-junit-xml-ab12cd34', 30),
+        stored('r2', 'gha-900-web-junit-xml-cd34ef56', 31),
+      ],
+      [liveCiRun()],
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.writes).toEqual({ create: 0, update: 0, link: 2 });
+    expect(summary).toMatchObject({ ciRunsUpdated: 0, runsLinked: 2 });
   });
 });
 
