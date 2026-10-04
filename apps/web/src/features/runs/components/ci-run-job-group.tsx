@@ -22,7 +22,7 @@ function SuiteRow({
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
-      className="flex min-h-11 items-center gap-3.5 px-5 py-2.5 transition-colors hover:bg-surface-hover/60 focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:px-7 lg:px-9"
+      className="flex min-h-11 items-center gap-3.5 px-5 py-2.5 transition-colors hover:bg-surface-hover/60 focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2! sm:px-7 lg:px-9"
     >
       <StatusChip status={run.status} />
       <div className="min-w-0 flex-1">
@@ -106,7 +106,7 @@ export function CiRunJobGroup({
               aria-controls={panelId}
               onClick={() => setExpanded((open) => !open)}
               className={cn(
-                'flex min-h-11 w-full items-center gap-2 px-5 text-left text-sm font-medium text-muted transition-colors hover:bg-surface-hover/60 hover:text-default focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary sm:px-7 lg:px-9',
+                'flex min-h-11 w-full items-center gap-2 px-5 text-left text-sm font-medium text-muted transition-colors hover:bg-surface-hover/60 hover:text-default focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2! sm:px-7 lg:px-9',
                 failing.length > 0 && 'border-t border-border',
               )}
             >
