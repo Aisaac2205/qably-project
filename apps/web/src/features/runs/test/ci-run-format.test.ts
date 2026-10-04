@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { CiRunSummaryRecord } from '@qably/types'
 import {
   approxDuration,
+  ciRunLabel,
   ciRunMetaParts,
   ciRunTitle,
   freshness,
@@ -168,6 +169,30 @@ describe('ciRunMetaParts', () => {
 
   it('returns no parts when the CI run carries no metadata', () => {
     expect(ciRunMetaParts(ciRun())).toStrictEqual([])
+  })
+})
+
+describe('ciRunLabel', () => {
+  it('is the run number when the CI run has one', () => {
+    expect(ciRunLabel(ciRun({ runNumber: 42, commitSha: 'abcdef1234567890' }))).toStrictEqual({
+      kind: 'number',
+      number: 42,
+    })
+  })
+
+  it('falls back to the short SHA when there is no run number', () => {
+    expect(ciRunLabel(ciRun({ commitSha: 'a1b2c3d4e5f60718' }))).toStrictEqual({
+      kind: 'text',
+      value: 'a1b2c3d',
+    })
+  })
+
+  it('falls back to the external id when there is neither a run number nor a SHA', () => {
+    expect(ciRunLabel(ciRun({ externalId: '900' }))).toStrictEqual({ kind: 'text', value: '900' })
+    expect(ciRunLabel(ciRun({ externalId: '901', commitSha: '   ' }))).toStrictEqual({
+      kind: 'text',
+      value: '901',
+    })
   })
 })
 

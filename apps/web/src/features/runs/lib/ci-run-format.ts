@@ -12,10 +12,14 @@ type CiRunTitleSource = Pick<
   'externalId' | 'commitMessage' | 'workflowName' | 'commitSha'
 >
 
+type CiRunLabelSource = Pick<CiRunSummaryRecord, 'runNumber' | 'commitSha' | 'externalId'>
+
 type CiRunMetaSource = Pick<
   CiRunSummaryRecord,
   'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor'
 >
+
+export type CiRunLabel = { kind: 'number'; number: number } | { kind: 'text'; value: string }
 
 export type CiRunMetaPart =
   | { kind: 'number'; number: number }
@@ -67,6 +71,12 @@ export function ciRunTitle(ciRun: CiRunTitleSource): string {
     shortSha(ciRun.commitSha) ??
     ciRun.externalId
   )
+}
+
+export function ciRunLabel(ciRun: CiRunLabelSource): CiRunLabel {
+  if (ciRun.runNumber !== undefined) return { kind: 'number', number: ciRun.runNumber }
+
+  return { kind: 'text', value: shortSha(ciRun.commitSha) ?? ciRun.externalId }
 }
 
 export function ciRunMetaParts(ciRun: CiRunMetaSource): CiRunMetaPart[] {
