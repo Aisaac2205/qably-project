@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { Suite } from '@qably/types'
 import {
   confirmDocumentation,
@@ -24,17 +24,56 @@ import { ApiError } from '@/lib/api-client'
 import { notify } from '@/lib/notify'
 import { useTranslation } from '@/lib/i18n'
 
-function useSuiteInvalidation() {
-  const queryClient = useQueryClient()
+function patchSuiteList(queryClient: QueryClient, fresh: Suite) {
+  queryClient.setQueryData<Suite[]>(suiteKeys.list(fresh.projectId), (cached) => {
+    if (cached === undefined) return undefined
 
-  return async (suite?: Suite) => {
-    await queryClient.invalidateQueries({ queryKey: suiteKeys.all })
-    if (suite !== undefined) {
-      await queryClient.invalidateQueries({
-        queryKey: suiteKeys.detail(suite.id),
-      })
-    }
+    const known = cached.some((entry) => entry.id === fresh.id)
+    const merged = known
+      ? cached.map((entry) => (entry.id === fresh.id ? fresh : entry))
+      : [fresh, ...cached]
+
+    if (!fresh.isDefault) return merged
+
+    return merged.map((entry) =>
+      entry.id !== fresh.id && entry.isDefault ? { ...entry, isDefault: false } : entry,
+    )
+  })
+}
+
+function refetchSuiteList(queryClient: QueryClient, projectId: string) {
+  return queryClient.invalidateQueries({
+    queryKey: suiteKeys.list(projectId),
+    refetchType: 'all',
+  })
+}
+
+function adoptSuite(queryClient: QueryClient, suite: Suite) {
+  queryClient.setQueryData(suiteKeys.detail(suite.id), suite)
+  patchSuiteList(queryClient, suite)
+  void queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suite.id) })
+  void refetchSuiteList(queryClient, suite.projectId)
+}
+
+function evictSuiteDetail(queryClient: QueryClient, suiteId: string) {
+  const cache = queryClient.getQueryCache()
+  const filters = { queryKey: suiteKeys.detail(suiteId), exact: true }
+  const query = cache.find(filters)
+
+  if (query === undefined) return
+
+  if (query.getObserversCount() === 0) {
+    queryClient.removeQueries(filters)
+    return
   }
+
+  const unsubscribe = cache.subscribe((event) => {
+    if (event.type !== 'observerRemoved' || event.query !== query) return
+    if (query.getObserversCount() > 0) return
+
+    unsubscribe()
+    queryClient.removeQueries(filters)
+  })
 }
 
 export function useRefreshSuiteLists() {
@@ -44,63 +83,60 @@ export function useRefreshSuiteLists() {
     async (projectId: string, suiteId: string) => {
       const fresh = queryClient.getQueryData<Suite>(suiteKeys.detail(suiteId))
 
-      if (fresh !== undefined) {
-        queryClient.setQueryData<Suite[]>(suiteKeys.list(projectId), (cached) =>
-          cached?.map((entry) => (entry.id === fresh.id ? fresh : entry)),
-        )
-      }
+      if (fresh !== undefined) patchSuiteList(queryClient, fresh)
 
-      await queryClient.invalidateQueries({
-        queryKey: suiteKeys.list(projectId),
-        refetchType: 'all',
-      })
+      await refetchSuiteList(queryClient, projectId)
     },
     [queryClient],
   )
 }
 
-function useCaseInvalidation() {
-  const invalidateSuites = useSuiteInvalidation()
+function useCaseSync() {
   const queryClient = useQueryClient()
 
-  return async (suite: Suite) => {
-    await invalidateSuites(suite)
-    await queryClient.invalidateQueries({
-      queryKey: projectKeys.detail(suite.projectId),
-    })
+  return (suite: Suite) => {
+    adoptSuite(queryClient, suite)
+    void queryClient.invalidateQueries({ queryKey: projectKeys.detail(suite.projectId) })
   }
 }
 
 export function useCreateSuite() {
-  const invalidate = useSuiteInvalidation()
+  const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (payload: CreateSuitePayload) => createSuite(payload),
-    onSuccess: invalidate,
+    onSuccess: (suite) => adoptSuite(queryClient, suite),
   })
 }
 
 export function useUpdateSuite() {
-  const invalidate = useSuiteInvalidation()
+  const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateSuitePayload }) =>
       updateSuite(id, patch),
-    onSuccess: invalidate,
+    onSuccess: (suite) => adoptSuite(queryClient, suite),
   })
 }
 
 export function useDeleteSuite() {
-  const invalidate = useSuiteInvalidation()
+  const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: string) => deleteSuite(id),
-    onSuccess: () => invalidate(),
+    mutationFn: ({ id }: { id: string; projectId: string }) => deleteSuite(id),
+    onSuccess: (_result, { id, projectId }) => {
+      queryClient.setQueryData<Suite[]>(suiteKeys.list(projectId), (cached) =>
+        cached?.filter((entry) => entry.id !== id),
+      )
+      evictSuiteDetail(queryClient, id)
+      void refetchSuiteList(queryClient, projectId)
+      void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
+    },
   })
 }
 
 export function useCreateCase() {
-  const invalidate = useCaseInvalidation()
+  const syncCase = useCaseSync()
 
   return useMutation({
     mutationFn: ({
@@ -110,12 +146,12 @@ export function useCreateCase() {
       suiteId: string
       payload: CreateCasePayload
     }) => createCase(suiteId, payload),
-    onSuccess: invalidate,
+    onSuccess: syncCase,
   })
 }
 
 export function useUpdateCase() {
-  const invalidate = useCaseInvalidation()
+  const syncCase = useCaseSync()
 
   return useMutation({
     mutationFn: ({
@@ -127,32 +163,43 @@ export function useUpdateCase() {
       caseId: string
       patch: UpdateCasePayload
     }) => updateCase(suiteId, caseId, patch),
-    onSuccess: invalidate,
+    onSuccess: syncCase,
   })
 }
 
 export function useDeleteCase() {
-  const invalidate = useCaseInvalidation()
+  const syncCase = useCaseSync()
 
   return useMutation({
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
       deleteCase(suiteId, caseId),
-    onSuccess: invalidate,
+    onSuccess: syncCase,
   })
 }
 
 export function useDocumentSuite() {
-  const invalidateSuites = useSuiteInvalidation()
+  const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ suiteId, mode }: { suiteId: string; mode: DocumentFilesMode }) =>
-      documentSuite(suiteId, mode),
-    onSuccess: () => invalidateSuites(),
+    mutationFn: ({
+      suiteId,
+      mode,
+    }: {
+      suiteId: string
+      projectId: string
+      mode: DocumentFilesMode
+    }) => documentSuite(suiteId, mode),
+    onSuccess: async (_result, { suiteId, projectId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: suiteKeys.list(projectId),
+        refetchType: 'none',
+      })
+      await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
+    },
   })
 }
 
 export function useConfirmDocumentation() {
-  const invalidateSuites = useSuiteInvalidation()
   const refreshSuiteLists = useRefreshSuiteLists()
   const queryClient = useQueryClient()
 
@@ -166,10 +213,9 @@ export function useConfirmDocumentation() {
       caseIds?: string[]
     }) => confirmDocumentation(suiteId, caseIds),
     onSuccess: async (_result, { suiteId, projectId }) => {
-      await invalidateSuites()
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       void refreshSuiteLists(projectId, suiteId)
-      await queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
+      void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
     },
   })
 }
@@ -182,7 +228,6 @@ export function useDocumentCase() {
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
       documentCase(suiteId, caseId),
     onSuccess: async (_result, { suiteId }) => {
-      await queryClient.invalidateQueries({ queryKey: suiteKeys.all })
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       notify.success(t('suites.documentCaseQueued'))
     },

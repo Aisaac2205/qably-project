@@ -85,7 +85,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const documentSuite = useDocumentSuite()
   const documentation = useDocumentFiles(async (mode) => {
     const baseline = watchedCount(suite, mode) ?? 0
-    const result = await documentSuite.mutateAsync({ suiteId: suiteId, mode })
+    const result = await documentSuite.mutateAsync({ suiteId, projectId, mode })
 
     if (result.casesTargeted > 0) {
       setWatchedMode(mode)
@@ -400,7 +400,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           count: suite.cases.length,
         })}
         onConfirm={() => {
-          removeSuite.mutate(suite.id, {
+          removeSuite.mutate({ id: suite.id, projectId }, {
             onSuccess: () => router.push(projectSuitesPath(projectId)),
           })
         }}

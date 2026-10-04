@@ -577,6 +577,21 @@ describe('SuiteDetail (redesigned)', () => {
     })
   })
 
+  it('keeps the suite on screen while leaving after a delete, instead of flashing a loading state', async () => {
+    const user = userEvent.setup()
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    await user.click(screen.getByRole('button', { name: /suite actions/i }))
+    await user.click(await screen.findByText('Delete suite'))
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }))
+
+    await vi.waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites')
+    })
+    expect(screen.getByRole('heading', { level: 1, name: 'Authentication' })).toBeInTheDocument()
+    expect(screen.queryByText('Loading suites…')).not.toBeInTheDocument()
+  })
+
   it('navigates to the suite edit page instead of opening a modal', async () => {
     const user = userEvent.setup()
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
