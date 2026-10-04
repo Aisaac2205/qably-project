@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { en, es } from './index'
 
@@ -9,6 +10,8 @@ const LOCALES = { en: en as unknown as Tree, es: es as unknown as Tree }
 const SCOPES = ['runs.ci', 'status.ciRun'] as const
 const PLURAL_SUFFIX = /_(one|other)$/
 const RETIRED_KEY = ['runs', 'subtitle'].join('.')
+const UNICODE_ESCAPE = new RegExp(String.fromCharCode(92, 92) + 'u[0-9a-fA-F]{4}')
+const MANUAL_EMPTY_KEYS = ['runs.ci.manualEmptyTitle', 'runs.ci.manualEmptyDescription'] as const
 
 const EXPECTED_PLURAL_BASES = [
   'runs.ci.freshnessSeconds',
@@ -255,6 +258,62 @@ describe('runs.ci and status.ciRun copy', () => {
       expect(enFlat['runs.ci.statusTooltip']).toBe(
         'Based on the reports received so far. Jobs that do not upload a test report are not shown.',
       )
+    })
+  })
+
+  describe('manual runs empty state', () => {
+    it.each(Object.keys(LOCALES) as (keyof typeof LOCALES)[])(
+      'ships its own title and description instead of reusing the Actions copy (%s)',
+      (locale) => {
+        const flat = flatten(LOCALES[locale])
+
+        for (const key of MANUAL_EMPTY_KEYS) {
+          expect(flat[key]).toBeTypeOf('string')
+          expect(flat[key]?.trim()).not.toBe('')
+        }
+        expect(flat['runs.ci.manualEmptyTitle']).not.toBe(flat['runs.ci.emptyTitle'])
+        expect(flat['runs.ci.manualEmptyTitle']).not.toBe(flat['runs.noRuns'])
+        expect(flat['runs.ci.manualEmptyDescription']).not.toBe(flat['runs.ci.emptyDescription'])
+        expect(flat['runs.ci.manualEmptyDescription']).not.toBe(flat['runs.emptyDescription'])
+      },
+    )
+
+    it.each(Object.keys(LOCALES) as (keyof typeof LOCALES)[])(
+      'carries no placeholder, no plural form and no mention of the CI guide (%s)',
+      (locale) => {
+        const flat = flatten(LOCALES[locale])
+
+        for (const key of MANUAL_EMPTY_KEYS) {
+          expect(flat[key]).not.toContain('{{')
+          expect(flat[`${key}_one`]).toBeUndefined()
+          expect(flat[`${key}_other`]).toBeUndefined()
+          expect(flat[key]).not.toMatch(/CI/)
+        }
+      },
+    )
+
+    it('words the empty state in English around what a manual run is', () => {
+      const flat = flatten(LOCALES.en)
+
+      expect(flat['runs.ci.manualEmptyTitle']).toBe('Run your manual cases')
+      expect(flat['runs.ci.manualEmptyDescription']).toBe(
+        'Manual runs are the ones you start from this page. Each one records a result for every manual case of a suite.',
+      )
+    })
+
+    it('words the empty state in neutral Spanish without voseo', () => {
+      const flat = flatten(LOCALES.es)
+
+      expect(flat['runs.ci.manualEmptyTitle']).toBe('Ejecuta tus casos manuales')
+      expect(flat['runs.ci.manualEmptyDescription']).toBe(
+        'Las ejecuciones manuales son las que inicias desde esta página. Cada una registra el resultado de cada caso manual de una suite.',
+      )
+    })
+
+    it.each(['en.json', 'es.json'])('writes %s with real characters, never escape sequences', (file) => {
+      const text = readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
+
+      expect(text).not.toMatch(UNICODE_ESCAPE)
     })
   })
 

@@ -881,6 +881,8 @@
       "emptyTitle": "No runs yet",
       "emptyDescription": "Runs appear here once the results reporter is wired into the CI workflow.",
       "emptyDocsLink": "How to report results from CI",
+      "manualEmptyTitle": "Run your manual cases",
+      "manualEmptyDescription": "Manual runs are the ones you start from this page. Each one records a result for every manual case of a suite.",
       "errorTitle": "Could not load the runs",
       "errorDescription": "Try again in a few seconds.",
       "ciNumber": "CI #{{number}}",

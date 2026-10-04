@@ -881,6 +881,8 @@
       "emptyTitle": "Sin ejecuciones aún",
       "emptyDescription": "Las ejecuciones aparecen aquí cuando el reporte de resultados está conectado al flujo de CI.",
       "emptyDocsLink": "Cómo reportar resultados desde CI",
+      "manualEmptyTitle": "Ejecuta tus casos manuales",
+      "manualEmptyDescription": "Las ejecuciones manuales son las que inicias desde esta página. Cada una registra el resultado de cada caso manual de una suite.",
       "errorTitle": "No se pudieron cargar las ejecuciones",
       "errorDescription": "Intenta de nuevo en unos segundos.",
       "ciNumber": "CI #{{number}}",
