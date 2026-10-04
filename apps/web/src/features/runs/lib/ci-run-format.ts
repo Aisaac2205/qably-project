@@ -1,4 +1,4 @@
-import type { CiRunSummaryRecord } from '@qably/types'
+import type { CiRunJobRunRecord, CiRunSummaryRecord } from '@qably/types'
 
 const SHORT_SHA_LENGTH = 7
 const MS_PER_SECOND = 1000
@@ -6,6 +6,7 @@ const SECONDS_PER_MINUTE = 60
 const MINUTES_PER_HOUR = 60
 const SECONDS_PER_HOUR = MINUTES_PER_HOUR * SECONDS_PER_MINUTE
 const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR
+const jobKeyCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' })
 
 type CiRunTitleSource = Pick<
   CiRunSummaryRecord,
@@ -18,6 +19,16 @@ type CiRunMetaSource = Pick<
 >
 
 type CiRunUrlSource = Pick<CiRunSummaryRecord, 'source' | 'serverUrl' | 'repository' | 'externalId'>
+
+export interface CiRunJobGroup {
+  key: string
+  runs: CiRunJobRunRecord[]
+}
+
+export interface CiRunJobGroups {
+  unnamed: CiRunJobRunRecord[]
+  groups: CiRunJobGroup[]
+}
 
 export type CiRunMetaPart =
   | { kind: 'number'; number: number }
@@ -152,4 +163,32 @@ export function buildCiRunUrl(ciRun: CiRunUrlSource): string | undefined {
   const path = repository.split('/').map(encodeURIComponent).join('/')
 
   return `${origin}/${path}/actions/runs/${encodeURIComponent(externalId)}`
+}
+
+export function groupRunsByJob(runs: readonly CiRunJobRunRecord[]): CiRunJobGroups {
+  const unnamed: CiRunJobRunRecord[] = []
+  const runsByKey = new Map<string, CiRunJobRunRecord[]>()
+
+  for (const item of runs) {
+    const key = present(item.ciJobKey)
+
+    if (key === undefined) {
+      unnamed.push(item)
+    } else {
+      runsByKey.set(key, [...(runsByKey.get(key) ?? []), item])
+    }
+  }
+
+  const failingKeys = new Set(
+    [...runsByKey].filter(([, keyRuns]) => keyRuns.some((item) => item.status === 'fail')).map(([key]) => key),
+  )
+  const groups = [...runsByKey].map(([key, keyRuns]) => ({ key, runs: keyRuns }))
+
+  groups.sort(
+    (a, b) =>
+      Number(failingKeys.has(b.key)) - Number(failingKeys.has(a.key)) ||
+      jobKeyCollator.compare(a.key, b.key),
+  )
+
+  return { unnamed, groups }
 }
