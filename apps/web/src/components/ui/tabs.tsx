@@ -35,6 +35,7 @@ function TabsTab({ className, ...props }: TabsPrimitive.Tab.Props) {
         "text-muted-foreground hover:text-default",
         "focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "data-active:border-primary! data-active:text-default",
+        "forced-colors:border-b-0 forced-colors:data-active:border-b-2",
         className,
       )}
       {...props}

@@ -88,6 +88,14 @@ describe('Tabs', () => {
     }
   })
 
+  it('drops the resting underline in forced colors so only the selected tab keeps one', () => {
+    renderTabs()
+
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab).toHaveClass('forced-colors:border-b-0', 'forced-colors:data-active:border-b-2')
+    }
+  })
+
   it('carries the focus ring on every tab and on the open panel', () => {
     renderTabs()
 
