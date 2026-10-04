@@ -31,10 +31,10 @@ function TabsTab({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-tab"
       className={cn(
-        "inline-flex min-h-11 items-center justify-center whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium outline-none select-none transition-colors md:min-h-10",
+        "inline-flex min-h-11 items-center justify-center whitespace-nowrap border-b-2 border-transparent! px-3 py-2 text-sm font-medium outline-none select-none transition-colors md:min-h-10",
         "text-muted-foreground hover:text-default",
-        "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        "data-[selected]:border-primary data-[selected]:text-default",
+        "focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "data-active:border-primary! data-active:text-default",
         className,
       )}
       {...props}
@@ -47,7 +47,7 @@ function TabsPanel({ className, ...props }: TabsPrimitive.Panel.Props) {
     <TabsPrimitive.Panel
       data-slot="tabs-panel"
       className={cn(
-        "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,
       )}
       {...props}
