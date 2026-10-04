@@ -128,7 +128,7 @@ describe('NewRunForm', () => {
   it('shows empty state when no suites', async () => {
     await openForm({ projectId: 'proj-4' })
     // proj-4 has 0 suites in mock data
-    expect(screen.getByText(/No suites available/)).toBeInTheDocument()
+    expect(await screen.findByText(/No suites available/)).toBeInTheDocument()
   })
 
   it('shows heading', async () => {
@@ -150,7 +150,9 @@ describe('NewRunForm', () => {
       await openForm({ projectId: 'proj-4' })
 
       const dialog = screen.getByRole('dialog', { name: 'New run' })
-      expect(dialog).toHaveAccessibleDescription('No suites available. Create a suite first.')
+      await waitFor(() => {
+        expect(dialog).toHaveAccessibleDescription('No suites available. Create a suite first.')
+      })
       expect(within(dialog).queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument()
       expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     })
@@ -161,6 +163,24 @@ describe('NewRunForm', () => {
       await waitFor(() => {
         expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveFocus()
       })
+    })
+
+    it('focuses the suite select even while the suites are still loading', async () => {
+      const suitesApi = await import('@/features/projects/suites/api/suites.api')
+      vi.spyOn(suitesApi, 'listSuites').mockReturnValueOnce(new Promise(() => undefined))
+
+      await openForm({ projectId: 'proj-unseeded' })
+
+      const select = screen.getByRole('combobox', { name: 'Suite' })
+      expect(select).not.toBeDisabled()
+      await waitFor(() => {
+        expect(select).toHaveFocus()
+      })
+      expect(screen.getByRole('button', { name: 'Start run' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
+      expect(screen.queryByText(/No suites available/)).not.toBeInTheDocument()
     })
 
     it('labels the suite select and the optional name', async () => {
@@ -304,6 +324,67 @@ describe('NewRunForm', () => {
       await user.click(screen.getByRole('button', { name: 'Start run' }))
       expect(create).not.toHaveBeenCalled()
       expect(screen.getByRole('alert')).toHaveTextContent('Please select a suite')
+    })
+  })
+
+  describe('while the run is starting', () => {
+    it('disables the submit button, shows the spinner and starts only one run', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      const create = vi
+        .spyOn(api, 'createRun')
+        .mockReturnValueOnce(new Promise<RunRecord>(() => undefined))
+
+      await openForm({ initialSuiteId: 'suite-1' })
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+      const submit = await screen.findByRole('button', { name: 'Starting…' })
+      expect(submit).toHaveAttribute('aria-disabled', 'true')
+      expect(submit.querySelector('.spinner')).not.toBeNull()
+      expect(screen.queryByRole('button', { name: 'Start run' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+
+      await user.click(submit)
+      const form = screen.getByRole('textbox', { name: /run name/i }).closest('form') as HTMLFormElement
+      await act(async () => {
+        fireEvent.submit(form)
+      })
+      expect(create).toHaveBeenCalledTimes(1)
+    })
+
+    it('enables the submit button again and announces the error when the request fails', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      vi.spyOn(api, 'createRun').mockRejectedValueOnce(new ApiError(500, 'boom'))
+
+      await openForm({ initialSuiteId: 'suite-1' })
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Could not start the run. Please try again.')
+      const submit = screen.getByRole('button', { name: 'Start run' })
+      expect(submit).not.toHaveAttribute('aria-disabled', 'true')
+      expect(submit.querySelector('.spinner')).toBeNull()
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled()
+    })
+
+    it('lets the user retry after a failure', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      const create = vi
+        .spyOn(api, 'createRun')
+        .mockRejectedValueOnce(new ApiError(500, 'boom'))
+        .mockResolvedValueOnce({ id: 'run-created' } as RunRecord)
+
+      await openForm({ initialSuiteId: 'suite-1' })
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+      await screen.findByRole('alert')
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/run-created')
+      })
+      expect(create).toHaveBeenCalledTimes(2)
     })
   })
 })

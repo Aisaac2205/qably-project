@@ -23,6 +23,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
 import { useTranslation } from '@/lib/i18n'
 
 function translateCreateRunError(error: unknown, t: (key: string) => string): string {
@@ -56,7 +57,7 @@ function NewRunFormBody({
   projectId: string
   initialSuiteId?: string
 }) {
-  const { suites } = useSuites(projectId)
+  const { suites, isLoading } = useSuites(projectId)
   const { start: createRun, error: createError } = useCreateRun(projectId)
   const { t } = useTranslation()
   const suiteFieldId = useId()
@@ -65,10 +66,12 @@ function NewRunFormBody({
   const [chosenSuiteId, setChosenSuiteId] = useState(initialSuiteId ?? '')
   const [name, setName] = useState('')
   const [validationError, setValidationError] = useState('')
+  const [submitted, setSubmitted] = useState(false)
 
   const suiteId = suites.some((suite) => suite.id === chosenSuiteId) ? chosenSuiteId : ''
+  const pending = submitted && createError == null
   const message = validationError || (createError ? translateCreateRunError(createError, t) : '')
-  const hasNoSuites = suites.length === 0
+  const hasNoSuites = !isLoading && suites.length === 0
 
   const handleSuiteChange = useCallback((value: unknown) => {
     const next = String(value ?? '')
@@ -79,14 +82,16 @@ function NewRunFormBody({
   const handleSubmit = useCallback(
     (event: FormEvent) => {
       event.preventDefault()
+      if (pending) return
       if (!suiteId) {
         setValidationError(t('runs.pleaseSelectSuite'))
         return
       }
       setValidationError('')
+      setSubmitted(true)
       createRun(suiteId, name || undefined)
     },
-    [suiteId, name, createRun, t],
+    [pending, suiteId, name, createRun, t],
   )
 
   return (
@@ -148,10 +153,13 @@ function NewRunFormBody({
           </Field>
 
           <DialogFooter>
-            <DialogClose className={buttonVariants({ variant: 'outline' })}>
+            <DialogClose disabled={pending} className={buttonVariants({ variant: 'outline' })}>
               {t('common.cancel')}
             </DialogClose>
-            <Button type="submit">{t('runs.startRun')}</Button>
+            <Button type="submit" disabled={pending || isLoading} focusableWhenDisabled>
+              {pending && <Spinner size="sm" />}
+              {pending ? t('runs.starting') : t('runs.startRun')}
+            </Button>
           </DialogFooter>
         </form>
       )}
