@@ -8,6 +8,7 @@ interface Tree {
 const LOCALES = { en: en as unknown as Tree, es: es as unknown as Tree }
 const SCOPES = ['runs.ci', 'status.ciRun'] as const
 const PLURAL_SUFFIX = /_(one|other)$/
+const RETIRED_KEY = ['runs', 'subtitle'].join('.')
 
 const EXPECTED_PLURAL_BASES = [
   'runs.ci.freshnessSeconds',
@@ -255,6 +256,20 @@ describe('runs.ci and status.ciRun copy', () => {
         'Based on the reports received so far. Jobs that do not upload a test report are not shown.',
       )
     })
+  })
+
+  describe('retired copy', () => {
+    it.each(Object.keys(LOCALES) as (keyof typeof LOCALES)[])(
+      'no longer carries the retired runs subtitle key in %s',
+      (locale) => {
+        const flat = flatten(LOCALES[locale])
+
+        expect(flat['runs.title']).toBeTypeOf('string')
+        expect(flat['runs.noManualCasesInProject']).toBeTypeOf('string')
+        expect(Object.keys(flat).filter((key) => key.endsWith('.subtitle')).length).toBeGreaterThan(0)
+        expect(Object.keys(flat)).not.toContain(RETIRED_KEY)
+      },
+    )
   })
 
   describe('navigation and detail copy', () => {

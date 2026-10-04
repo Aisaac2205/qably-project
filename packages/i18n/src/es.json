@@ -797,7 +797,6 @@
   },
   "runs": {
     "title": "Ejecuciones",
-    "subtitle": "Cada ejecución es evidencia de lo que pasó una vez, ligada al cambio de código que la produjo. Aquí se ve qué empezó a fallar y qué se arregló entre una y otra.",
     "emptyDescription": "CI llena esta página automáticamente cuando el reporte de resultados está conectado al flujo de trabajo. Las ejecuciones manuales cubren lo que todavía no está automatizado.",
     "emptyDocsLink": "Cómo reportar resultados desde CI",
     "commitLabel": "Commit",

@@ -797,7 +797,6 @@
   },
   "runs": {
     "title": "Runs",
-    "subtitle": "Each run is evidence of what happened once, tied to the code change that produced it. This is where you see what started failing and what got fixed between one run and the next.",
     "emptyDescription": "CI fills this page automatically once the results reporter is wired into the workflow. Manual runs cover what is not automated yet.",
     "emptyDocsLink": "How to report results from CI",
     "commitLabel": "Commit",
