@@ -101,5 +101,15 @@ describe('Dialog', () => {
       )
       expect(close.className).not.toMatch(/(^|\s)focus:outline-none/)
     })
+
+    it('draws the focus indicator inside its own box so the popup edge cannot clip it', () => {
+      renderOpen()
+
+      const close = screen.getByRole('button', { name: 'Close' })
+      expect(close).toHaveClass(
+        'focus-visible:ring-inset',
+        'forced-colors:focus-visible:-outline-offset-2!',
+      )
+    })
   })
 })
