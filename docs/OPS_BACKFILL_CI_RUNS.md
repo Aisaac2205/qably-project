@@ -111,6 +111,11 @@ COMMIT;
 The tables live in their own schema, outside the `public` schema that Prisma manages. Keep them until
 the result of the run is accepted, then remove them with `DROP SCHEMA backfill_snapshot CASCADE;`.
 
+`CREATE SCHEMA` needs the `CREATE` privilege on the database. If the role you connect with does not
+have it, the statement fails with a permission error and the transaction creates nothing: run the
+snapshot with a role that has the privilege. The script itself creates no schema and needs no such
+privilege.
+
 ## How to run
 
 ```sh
@@ -140,7 +145,14 @@ appearing under the Manual tab.
 
 1. Run it against a disposable database with realistic data and the migration applied, and read the
    unattributable count. A count far above the number of manual and local runs means the id format
-   differs from what the pattern expects.
+   differs from what the pattern expects. The database must also contain at least one `CiRun` that
+   already exists and that the script has to widen or fill: its `startedAt` later than the earliest
+   unlinked run of the same GitHub run, its `lastReportedAt` earlier than the latest one, or a `NULL`
+   commit field that one of those runs carries. Create it with a 10.1.0 reporter or by hand. That is the
+   only way the compare-and-set update runs before the shared database: when every group creates its
+   `CiRun`, no update is issued and `CiRuns updated` stays 0. The equality on the values it read has not
+   run against a real Postgres, so expect `CiRuns updated` to be above 0 on this pass and check the
+   widened row by hand.
 2. Run it a second time on the same database and confirm `CiRuns created`, `CiRuns updated` and
    `Runs linked` are all 0 and the unattributable count is unchanged.
 3. Only then take the pre-run snapshot and run it against the shared database. Practice the rollback
@@ -169,7 +181,16 @@ Run every block below inside a transaction, check the reported row counts, then 
 
 ### Rollback with the snapshot
 
-This reverses exactly what the script changed, using the tables from "Pre-run snapshot":
+This reverses exactly what the script changed, using the tables from "Pre-run snapshot".
+
+Pause ingestion first, or run it in a quiet window in which no workflow reports. Live ingestion resolves
+the `CiRun` before it writes the run, in two separate steps: the row is created, and the run that
+points at it is inserted afterwards in a transaction. The second statement below deletes every `CiRun`
+that is not in the snapshot and has no run. A `CiRun` that live ingestion created a moment before its
+run was inserted matches that condition, so the delete removes it and the run insert then fails its
+foreign key check on `ciRunId`. A queued report is retried by the queue (3 attempts, exponential backoff
+starting at 1 s), which creates the `CiRun` again; a request to `POST /runs/ingest` fails and the client
+has to send it again.
 
 ```sql
 BEGIN;
@@ -229,11 +250,24 @@ reverted at all:
   not recorded, so a widened `startedAt`, a raised `lastReportedAt` and filled commit fields cannot be
   restored.
 
-Two statements remain, and both are approximations.
+Two statements remain, and both are approximations. Before running either, dump `ci_run` and the `id`,
+`ciRunId` and `ciJobKey` columns of `run`, and keep the files until the result is accepted:
+
+```
+\copy (SELECT * FROM "ci_run") TO 'ci_run.csv' CSV HEADER
+\copy (SELECT "id", "ciRunId", "ciJobKey" FROM "run" WHERE "ciRunId" IS NOT NULL OR "ciJobKey" IS NOT NULL) TO 'run_ci_links.csv' CSV HEADER
+```
 
 Remove every `CiRun`, including those created by live ingestion, and clear every job key, including
 those written by live ingestion, so that no run is left with a job and no CI run. The next report of a
-workflow run creates its `CiRun` again and links only the suites it reports:
+workflow run creates its `CiRun` again and links only the suites it reports.
+
+This variant erases data that exists only in the database, and it cannot be undone from the reporters.
+The `CiRun` metadata that live ingestion stored (`workflowName`, `runNumber`, `branch`, `actor` and
+the other `ci*` columns) is deleted with its row, and every `ciJobKey` is cleared. Reports that were
+already ingested are never sent again, so none of it returns for historical runs; only a workflow run
+that reports from now on gets a `CiRun` and job keys again. Every run that was linked is left
+unlinked and appears under the Manual tab. Do not run it without the dump above.
 
 ```sql
 BEGIN;
@@ -264,4 +298,5 @@ against a mocked client. The script has not been executed against a real databas
 change that introduced it, so the first run on a disposable database (see "Recommended order") is also
 its first real execution. The concurrent-write guard (the conditional update and the retry after a
 unique violation) is proven against an in-memory port and a mocked client, not against concurrent
-writers on a real database. The snapshot and rollback SQL have not been executed either.
+writers on a real database. The snapshot, the dump and the rollback statements have not been
+executed either.

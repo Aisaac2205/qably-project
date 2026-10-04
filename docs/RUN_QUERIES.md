@@ -161,9 +161,10 @@ reports keep arriving. The one exception is the owner-run backfill: when it merg
 `CiRun` that live ingestion created, it lowers that row's `startedAt` and the row moves down the list
 (see `docs/OPS_BACKFILL_CI_RUNS.md`). That is a one-off operation, and a client that is paginating at
 that moment can see a row skipped or repeated. `startedAt` is also the order a reader expects, and
-`lastReportedAt` would lift a late retry of an old workflow run above newer pushes. `lastReportedAt` is still returned, as a freshness value that can move back by a few
-milliseconds (see "`lastReportedAt`" in `docs/RUN_INGESTION.md`). A CI run created by the backfill has
-`startedAt` set to its earliest suite, so it lands at its real chronological position.
+`lastReportedAt` would lift a late retry of an old workflow run above newer pushes. `lastReportedAt`
+is still returned, as a freshness value that can move back by a few milliseconds (see
+"`lastReportedAt`" in `docs/RUN_INGESTION.md`). A CI run created by the backfill has `startedAt` set
+to its earliest suite, so it lands at its real chronological position.
 
 `nextCursor` is the id of the last item of the page and is present only when another row exists. A
 `cursor` that matches no row is expected to answer `200` with an empty `items` and no `nextCursor`

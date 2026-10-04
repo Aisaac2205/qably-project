@@ -53,10 +53,10 @@ value; it is never actually dialed, since the build never makes a real request. 
 already sets its own `NEXT_PUBLIC_API_URL` for the test environment, so the two do not conflict.
 
 `NEXT_PUBLIC_DOCS_URL` is optional and names the origin of the public documentation site, so the app
-can link a QA from the empty Actions tab of the runs page to the CI reporting guide. Unset, the link is a same-origin path
-(`/docs#...`, `/en/docs#...`), which is right for local development where the two apps are proxied
-together. Production should set the real docs origin; no value is guessed here because domains are
-the owner's call.
+can link a QA from the empty Actions tab of the runs page to the CI reporting guide. Unset, the
+link is a same-origin path (`/docs#...`, `/en/docs#...`), which is right for local development
+where the two apps are proxied together. Production should set the real docs origin; no value is
+guessed here because domains are the owner's call.
 
 ### `type-check`
 
@@ -317,9 +317,11 @@ writing a workflow:
   `https://github.com`. `GITHUB_SERVER_URL` is already an origin, so the reporter's payload is
   unchanged.
 - **When they are ignored.** The reporter omits a parameter whose variable is unset, blank or invalid,
-  and never fills one from a default, so a run outside GitHub Actions sends no `ci*` at all. The server
-  ignores every `ci*` parameter, `ciJobKey` included, when `ciRunExternalId` is absent. A run reported
-  without them is not linked to a CI run and appears under the Manual tab.
+  and never fills one from a default, so a run with none of these variables set, such as a local run,
+  sends no `ci*` at all. A variable that is set sends its own parameter even outside GitHub Actions:
+  with only `QABLY_JOB_KEY` or `GITHUB_JOB` set, the reporter sends `ciJobKey`. The server ignores every
+  `ci*` parameter, `ciJobKey` included, when `ciRunExternalId` is absent. A run reported without them
+  is not linked to a CI run and appears under the Manual tab.
 - **`QABLY_JOB_KEY`** is an optional environment variable that replaces `GITHUB_JOB` as `ciJobKey` and,
   in slug form, as the job segment of `externalId`. Set it to a different value for each variant of a
   matrix job so that variants reporting the same file do not overwrite each other. An empty or

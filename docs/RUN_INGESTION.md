@@ -328,9 +328,11 @@ sending and omits what does not fit (see "Reporter behavior").
 - `CiRun.startedAt` is written once, when the row is created, and ingestion never updates it. The only
   other writer is the owner-run backfill, which can lower it on a `CiRun` that live ingestion created
   when it merges older runs into it (`docs/OPS_BACKFILL_CI_RUNS.md`). Both `startedAt` and
-  `lastReportedAt` come from the clock of the process that handled the report, not from a time taken
-  from the report: the BullMQ worker for `POST /runs/ingest/junit`, and the API process itself for
-  `POST /runs/ingest`, which ingests synchronously.
+  `lastReportedAt` come from the clock of the API application at the moment it handles the report, not
+  from a time taken from the report. That moment differs by endpoint: for `POST /runs/ingest/junit` it
+  is when `RunIngestProcessor` takes the queued job, after the queue delay, and for `POST /runs/ingest`
+  it is the request itself, which ingests synchronously. `RunIngestProcessor` is a provider of the same
+  Nest application, not a separate process.
 
 ### Where the CI run is resolved, and why
 
@@ -404,8 +406,11 @@ the `externalId` then carries `report` as its job segment while `ciJobKey` keeps
 ### Reporter behavior
 
 The reporter reads the real `GITHUB_*` variables and never fills a `ci*` parameter from the defaults
-it uses to build an `externalId` (`local`, `job`). A run outside GitHub Actions sends no `ci*` at all
-and keeps the `gha-local-job-...` externalId. It omits a value rather than sending an invalid one:
+it uses to build an `externalId` (`local`, `job`). A run with none of those variables set, such as a
+local run, sends no `ci*` at all and keeps the `gha-local-job-...` externalId. A variable that is set
+sends its own parameter even outside GitHub Actions: with only `QABLY_JOB_KEY` set, the reporter sends
+`ciJobKey`, which the server ignores without `ciRunExternalId`. It omits a value rather than sending an
+invalid one:
 
 - text values are trimmed, dropped when empty and cut at 255 characters;
 - `ciRunNumber` and `ciRunAttempt` are sent only when the variable is a plain positive integer up to
@@ -429,7 +434,11 @@ the scheme and host are lowercased and a default port is dropped.
 
 The value is normalized rather than rejected so that a pipeline that puts a credential in this
 variable still has its report ingested, with only the origin kept. The length limit applies to the
-value as sent, before normalization. Both ingestion schemas share the rule, so the normalized value is
+value as sent, before normalization: a long URL that carries a token in its query is rejected with
+`400` even though its origin is short, and the reporter drops such a URL itself instead of sending it.
+It does not bound the stored origin either: an internationalized host name is stored in its punycode
+form, which can be longer than the input, so a stored `serverUrl` can exceed 255 characters (the
+column is `TEXT`). Both ingestion schemas share the rule, so the normalized value is
 the one the queued job carries, the one `CiRunLinker` writes to `serverUrl` and the one `GET /ci-runs`
 and `GET /ci-runs/:id` return. The reporter sends `GITHUB_SERVER_URL`, which is already an origin, so
 its payload is unchanged. The backfill never writes this column. The web link to the workflow run is
