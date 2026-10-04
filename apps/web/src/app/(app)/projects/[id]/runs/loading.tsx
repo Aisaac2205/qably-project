@@ -1,5 +1,5 @@
-import { RouteSkeleton } from '@/components/ui/route-skeleton'
+import { RunsPageSkeleton } from '@/features/runs/components/runs-page-skeleton'
 
 export default function RunsLoading() {
-  return <RouteSkeleton variant="list" labelKey="runs.loading" />
+  return <RunsPageSkeleton />
 }
