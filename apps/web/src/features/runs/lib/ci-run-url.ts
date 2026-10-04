@@ -1,12 +1,33 @@
 import type { CiRunSummaryRecord } from '@qably/types'
 import { present } from './ci-run-format'
 
+const REPOSITORY_SEGMENT_COUNT = 2
+const DOT_SEGMENT = /^\.{1,2}$/
+
 type CiRunUrlSource = Pick<CiRunSummaryRecord, 'source' | 'serverUrl' | 'repository' | 'externalId'>
 
 function httpOrigin(serverUrl: string): string | undefined {
   try {
     const url = new URL(serverUrl)
     return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function isPathSegment(segment: string): boolean {
+  return segment !== '' && !DOT_SEGMENT.test(segment)
+}
+
+function runPagePath(repository: string, externalId: string): string | undefined {
+  const segments = repository.split('/')
+
+  if (segments.length !== REPOSITORY_SEGMENT_COUNT) return undefined
+  if (![...segments, externalId].every(isPathSegment)) return undefined
+
+  try {
+    const [owner, name] = segments.map(encodeURIComponent)
+    return `/${owner}/${name}/actions/runs/${encodeURIComponent(externalId)}`
   } catch {
     return undefined
   }
@@ -23,9 +44,8 @@ export function buildCiRunUrl(ciRun: CiRunUrlSource): string | undefined {
   }
 
   const origin = httpOrigin(serverUrl)
-  if (origin === undefined) return undefined
+  const path = runPagePath(repository, externalId)
+  if (origin === undefined || path === undefined) return undefined
 
-  const path = repository.split('/').map(encodeURIComponent).join('/')
-
-  return `${origin}/${path}/actions/runs/${encodeURIComponent(externalId)}`
+  return `${origin}${path}`
 }
