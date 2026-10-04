@@ -109,10 +109,12 @@ export function RunList({
   projectId,
   source,
   ungrouped,
+  hasManualCases,
 }: {
   projectId: string
   source?: RunSource
   ungrouped?: boolean
+  hasManualCases?: boolean
 }) {
   const { runs, hasNextPage, isFetchingNextPage, fetchNextPage } = useRunsPage(
     projectId,
@@ -135,12 +137,14 @@ export function RunList({
             >
               {t('runs.emptyDocsLink')}
             </a>
-            <Link
-              href={`/projects/${projectId}/runs/new`}
-              className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {t('runs.startARun')}
-            </Link>
+            {hasManualCases !== false && (
+              <Link
+                href={`/projects/${projectId}/runs/new`}
+                className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                {t('runs.startARun')}
+              </Link>
+            )}
           </div>
         }
       />

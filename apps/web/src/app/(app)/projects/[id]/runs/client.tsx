@@ -106,7 +106,7 @@ export function RunListPageClient({
         </TabsPanel>
         <TabsPanel value="manual" tabIndex={-1} className="space-y-4">
           <NewRunAction projectId={projectId} disabled={hasNoManualCases} />
-          <RunList projectId={projectId} ungrouped />
+          <RunList projectId={projectId} ungrouped hasManualCases={project?.hasManualCases} />
         </TabsPanel>
       </Tabs>
     </div>

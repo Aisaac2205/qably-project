@@ -163,6 +163,39 @@ describe('RunListPageClient', () => {
     })
   })
 
+  describe('the empty list of the Manual tab', () => {
+    function startLinks(): HTMLElement[] {
+      return screen.queryAllByRole('link', { name: 'Start a run' })
+    }
+
+    it('offers no second way to start a run next to the disabled New run button', async () => {
+      stubProjectWith(false)
+
+      renderWithQuery(<RunListPageClient projectId="proj-empty" initialTab="manual" />)
+
+      expect(await screen.findByText('No runs yet')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /new run/i })).toHaveAttribute('aria-disabled', 'true')
+      expect(startLinks()).toHaveLength(0)
+      expect(
+        screen.queryAllByRole('link').filter((link) => link.getAttribute('href')?.endsWith('/runs/new')),
+      ).toHaveLength(0)
+    })
+
+    it.each<[string, boolean | undefined]>([
+      ['has manual cases', true],
+      ['has not reported whether it has manual cases', undefined],
+    ])('keeps the start link next to the New run link when the project %s', async (_label, hasManualCases) => {
+      stubProjectWith(hasManualCases)
+
+      renderWithQuery(<RunListPageClient projectId="proj-empty" initialTab="manual" />)
+
+      expect(await screen.findByText('No runs yet')).toBeInTheDocument()
+      expect(startLinks()).toHaveLength(1)
+      expect(startLinks()[0]).toHaveAttribute('href', '/projects/proj-empty/runs/new')
+      expect(screen.getByRole('link', { name: /new run/i })).toBeInTheDocument()
+    })
+  })
+
   describe('the page chrome', () => {
     it('does not render the retired subtitle in either tab', () => {
       stubProjectWith(true)
