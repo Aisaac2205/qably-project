@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Plus } from '@phosphor-icons/react'
@@ -14,6 +14,46 @@ import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { cn } from '@/lib/utils'
 import { projectRootPath } from '@/features/projects/lib/routes'
+
+const ACTION_FOCUS =
+  'focus-visible:outline-hidden! focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+
+function NewRunAction({ projectId, disabled }: { projectId: string; disabled: boolean }) {
+  const { t } = useTranslation()
+  const hintId = useId()
+
+  if (disabled) {
+    return (
+      <div className="flex flex-col gap-1 md:items-end">
+        <Button
+          type="button"
+          disabled
+          focusableWhenDisabled
+          aria-describedby={hintId}
+          className={cn('w-full md:w-auto', ACTION_FOCUS)}
+        >
+          <Plus size={16} weight="bold" aria-hidden="true" />
+          {t('runs.newRun')}
+        </Button>
+        <p id={hintId} className="text-xs text-muted md:max-w-64 md:text-right">
+          {t('runs.noManualCasesInProject')}
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex md:justify-end">
+      <Link
+        href={`/projects/${projectId}/runs/new`}
+        className={cn(buttonVariants(), 'w-full md:w-auto', ACTION_FOCUS)}
+      >
+        <Plus size={16} weight="bold" aria-hidden="true" />
+        {t('runs.newRun')}
+      </Link>
+    </div>
+  )
+}
 
 export function RunListPageClient({
   projectId,
@@ -44,37 +84,7 @@ export function RunListPageClient({
         ]}
       />
 
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0">
-          <h1 className="sr-only">{t('runs.title')}</h1>
-          <p className="text-sm text-muted">{t('runs.subtitle')}</p>
-        </div>
-        {hasNoManualCases ? (
-          <div className="flex flex-col md:items-end gap-1 w-full md:w-auto">
-            <Button
-              type="button"
-              disabled
-              focusableWhenDisabled
-              aria-describedby="new-run-no-manual-hint"
-              className="w-full md:w-auto"
-            >
-              <Plus size={16} weight="bold" aria-hidden="true" />
-              {t('runs.newRun')}
-            </Button>
-            <p id="new-run-no-manual-hint" className="text-xs text-muted max-w-[260px] text-left md:text-right">
-              {t('runs.noManualCasesInProject')}
-            </p>
-          </div>
-        ) : (
-          <Link
-            href={`/projects/${projectId}/runs/new`}
-            className={cn(buttonVariants(), 'w-full md:w-auto')}
-          >
-            <Plus size={16} weight="bold" aria-hidden="true" />
-            {t('runs.newRun')}
-          </Link>
-        )}
-      </div>
+      <h1 className="sr-only">{t('runs.title')}</h1>
 
       <Tabs
         value={tab}
@@ -94,7 +104,8 @@ export function RunListPageClient({
         <TabsPanel value="actions" tabIndex={-1}>
           <CiRunList projectId={projectId} />
         </TabsPanel>
-        <TabsPanel value="manual" tabIndex={-1}>
+        <TabsPanel value="manual" tabIndex={-1} className="space-y-4">
+          <NewRunAction projectId={projectId} disabled={hasNoManualCases} />
           <RunList projectId={projectId} ungrouped />
         </TabsPanel>
       </Tabs>
