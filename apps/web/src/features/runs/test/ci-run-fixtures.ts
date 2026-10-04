@@ -1,4 +1,4 @@
-import type { CiRunSummaryRecord } from '@qably/types'
+import type { CiRunJobRunRecord, CiRunSummaryRecord } from '@qably/types'
 
 export const PROJECT = 'proj-1'
 
@@ -21,6 +21,21 @@ export function ciRunSummary(
     branch: 'main',
     commitSha: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678',
     commitAuthor: 'ana',
+    ...overrides,
+  }
+}
+
+export function ciRunJobRun(
+  id: string,
+  overrides: Partial<CiRunJobRunRecord> = {},
+): CiRunJobRunRecord {
+  return {
+    id,
+    suiteId: `suite-${id}`,
+    suiteName: `Suite ${id}`,
+    name: `Suite ${id}`,
+    status: 'pass',
+    startedAt: '2026-10-03T11:50:00.000Z',
     ...overrides,
   }
 }
