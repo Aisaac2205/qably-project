@@ -54,13 +54,14 @@ describe('RunListPageClient', () => {
     vi.restoreAllMocks()
   })
 
-  it('shows an enabled New run link when the project has manual cases', () => {
+  it('shows an enabled New run button when the project has manual cases', () => {
     stubProject({ project: { id: 'proj-1', name: 'Ecommerce App', organizationId: 'org-1', technologies: [], createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', hasManualCases: true } })
 
     renderWithQuery(<RunListPageClient projectId="proj-1" initialTab="manual" />)
 
-    const link = screen.getByRole('link', { name: /new run/i })
-    expect(link).toHaveAttribute('href', '/projects/proj-1/runs/new')
+    const button = screen.getByRole('button', { name: /new run/i })
+    expect(button).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(screen.queryByRole('link', { name: /new run/i })).not.toBeInTheDocument()
   })
 
   it('disables New run and shows a hint when the project has no manual cases', () => {
@@ -96,15 +97,16 @@ describe('RunListPageClient', () => {
     it.each<[string, boolean | undefined]>([
       ['has manual cases', true],
       ['has not reported whether it has manual cases', undefined],
-    ])('is a link with the default button height when the project %s', (_label, hasManualCases) => {
+    ])('is a dialog trigger with the default button height when the project %s', (_label, hasManualCases) => {
       stubProjectWith(hasManualCases)
 
       renderWithQuery(<RunListPageClient projectId="proj-1" initialTab="manual" />)
 
-      const link = screen.getByRole('link', { name: /new run/i })
-      expect(link).toHaveAttribute('href', '/projects/proj-1/runs/new')
-      expect(link).toHaveClass('h-11', 'md:h-10')
-      expect(screen.queryByRole('button', { name: /new run/i })).not.toBeInTheDocument()
+      const button = screen.getByRole('button', { name: /new run/i })
+      expect(button).toHaveAttribute('aria-haspopup', 'dialog')
+      expect(button).not.toHaveAttribute('aria-disabled')
+      expect(button).toHaveClass('h-11', 'md:h-10')
+      expect(screen.queryByRole('link', { name: /new run/i })).not.toBeInTheDocument()
     })
 
     it('is a disabled button that still takes focus and is described by the hint when there are no manual cases', async () => {
@@ -131,13 +133,13 @@ describe('RunListPageClient', () => {
       const user = userEvent.setup()
       stubProjectWith(true)
       renderWithQuery(<RunListPageClient projectId="proj-1" />)
-      expect(screen.queryByRole('link', { name: /new run/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /new run/i })).not.toBeInTheDocument()
 
       await user.click(screen.getByRole('tab', { name: 'Manual' }))
-      expect(screen.getByRole('link', { name: /new run/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /new run/i })).toBeInTheDocument()
 
       await user.click(screen.getByRole('tab', { name: 'Actions' }))
-      expect(screen.queryByRole('link', { name: /new run/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /new run/i })).not.toBeInTheDocument()
     })
 
     it('is the first stop after the tabs when the Manual tab is open', async () => {
@@ -148,14 +150,14 @@ describe('RunListPageClient', () => {
 
       await user.tab()
 
-      expect(screen.getByRole('link', { name: /new run/i })).toHaveFocus()
+      expect(screen.getByRole('button', { name: /new run/i })).toHaveFocus()
     })
 
-    it('carries a visible focus ring as a link and as a disabled button', () => {
+    it('carries a visible focus ring as a dialog trigger and as a disabled button', () => {
       stubProjectWith(true)
-      const asLink = renderWithQuery(<RunListPageClient projectId="proj-1" initialTab="manual" />)
-      expectFocusRing(screen.getByRole('link', { name: /new run/i }))
-      asLink.unmount()
+      const asTrigger = renderWithQuery(<RunListPageClient projectId="proj-1" initialTab="manual" />)
+      expectFocusRing(screen.getByRole('button', { name: /new run/i }))
+      asTrigger.unmount()
 
       stubProjectWith(false)
       renderWithQuery(<RunListPageClient projectId="proj-1" initialTab="manual" />)
@@ -184,7 +186,7 @@ describe('RunListPageClient', () => {
     it.each<[string, boolean | undefined]>([
       ['has manual cases', true],
       ['has not reported whether it has manual cases', undefined],
-    ])('keeps the start link next to the New run link when the project %s', async (_label, hasManualCases) => {
+    ])('keeps the start link next to the New run button when the project %s', async (_label, hasManualCases) => {
       stubProjectWith(hasManualCases)
 
       renderWithQuery(<RunListPageClient projectId="proj-empty" initialTab="manual" />)
@@ -192,7 +194,7 @@ describe('RunListPageClient', () => {
       expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(startLinks()).toHaveLength(1)
       expect(startLinks()[0]).toHaveAttribute('href', '/projects/proj-empty/runs/new')
-      expect(screen.getByRole('link', { name: /new run/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /new run/i })).toBeInTheDocument()
     })
   })
 

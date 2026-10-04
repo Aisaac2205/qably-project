@@ -1,6 +1,6 @@
 'use client'
 
-import { NewRunForm } from '@/features/runs/components/new-run-form'
+import { NewRunAction } from '@/features/runs/components/new-run-action'
 
 export function NewRunPageClient({
   projectId,
@@ -9,5 +9,14 @@ export function NewRunPageClient({
   projectId: string
   initialSuiteId?: string
 }) {
-  return <NewRunForm projectId={projectId} initialSuiteId={initialSuiteId} />
+  return (
+    <div className="w-full px-5 py-6 sm:px-7 lg:px-9">
+      <NewRunAction
+        projectId={projectId}
+        disabled={false}
+        defaultOpen
+        initialSuiteId={initialSuiteId}
+      />
+    </div>
+  )
 }

@@ -12,7 +12,15 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { useTranslation } from '@/lib/i18n'
 
 function translateCreateRunError(error: unknown, t: (key: string) => string): string {
@@ -26,6 +34,20 @@ function translateCreateRunError(error: unknown, t: (key: string) => string): st
 }
 
 export function NewRunForm({
+  projectId,
+  initialSuiteId,
+}: {
+  projectId: string
+  initialSuiteId?: string
+}) {
+  return (
+    <DialogContent className="max-w-md">
+      <NewRunFormBody projectId={projectId} initialSuiteId={initialSuiteId} />
+    </DialogContent>
+  )
+}
+
+function NewRunFormBody({
   projectId,
   initialSuiteId,
 }: {
@@ -59,17 +81,32 @@ export function NewRunForm({
     }
   }, [suiteId, name, createRun, t])
 
+  const header = (
+    <DialogHeader>
+      <DialogTitle>{t('runs.newRun')}</DialogTitle>
+      <DialogDescription>
+        {suites.length === 0 ? t('runs.noSuitesAvailable') : t('runs.newRunDescription')}
+      </DialogDescription>
+    </DialogHeader>
+  )
+  const cancel = (
+    <DialogClose className={buttonVariants({ variant: 'outline' })}>
+      {t('common.cancel')}
+    </DialogClose>
+  )
+
   if (suites.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted">
-        {t('runs.noSuitesAvailable')}
-      </div>
+      <>
+        {header}
+        <DialogFooter>{cancel}</DialogFooter>
+      </>
     )
   }
 
   return (
-    <div className="max-w-md mx-auto p-4 space-y-4">
-      <h1 className="text-lg font-semibold text-default">{t('runs.newRun')}</h1>
+    <>
+      {header}
 
       <div className="space-y-1.5">
         <label htmlFor="suite-select" className="text-xs font-medium text-default">
@@ -116,13 +153,12 @@ export function NewRunForm({
         />
       </div>
 
-      <Button
-        onClick={handleSubmit}
-        disabled={submitting}
-        className="w-full"
-      >
-        {submitting ? t('runs.starting') : t('runs.startRun')}
-      </Button>
-    </div>
+      <DialogFooter>
+        {cancel}
+        <Button onClick={handleSubmit} disabled={submitting}>
+          {submitting ? t('runs.starting') : t('runs.startRun')}
+        </Button>
+      </DialogFooter>
+    </>
   )
 }
