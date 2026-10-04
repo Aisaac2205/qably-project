@@ -15,7 +15,9 @@ vi.mock('next/link', () => ({
 }))
 
 function renderGroup(runs: CiRunJobRunRecord[], jobKey?: string) {
-  return render(<CiRunJobGroup projectId={PROJECT} jobKey={jobKey} runs={runs} />)
+  return render(
+    <CiRunJobGroup projectId={PROJECT} ciRunExternalId="900" jobKey={jobKey} runs={runs} />,
+  )
 }
 
 function passing(count: number): CiRunJobRunRecord[] {
@@ -217,5 +219,108 @@ describe('CiRunJobGroup suites without failures', () => {
 
     expect(screen.getByRole('button', { name: 'Ver 3 suites sin fallos' })).toBeInTheDocument()
     expect(screen.getByRole('list', { name: 'Suites de api' })).toBeInTheDocument()
+  })
+})
+
+const UNIT_REPORT = 'gha-900-api-junit-unit-xml-ab12cd34'
+const E2E_REPORT = 'gha-900-api-junit-e2e-xml-ef56ab78'
+
+function reported(id: string, reportExternalId: string | undefined, overrides: Partial<CiRunJobRunRecord> = {}) {
+  return ciRunJobRun(id, { ciJobKey: 'api', reportExternalId, ...overrides })
+}
+
+describe('CiRunJobGroup report labels', () => {
+  it('tells the suites of two reports apart by the file each one came from', () => {
+    renderGroup(
+      [
+        reported('a', UNIT_REPORT, { status: 'fail', suiteName: 'Alpha' }),
+        reported('b', E2E_REPORT, { status: 'fail', suiteName: 'Beta' }),
+      ],
+      'api',
+    )
+
+    expect(within(screen.getByRole('link', { name: /Alpha/ })).getByText('junit-unit-xml')).toBeInTheDocument()
+    expect(within(screen.getByRole('link', { name: /Beta/ })).getByText('junit-e2e-xml')).toBeInTheDocument()
+  })
+
+  it('shows no label when every suite came from the same report', () => {
+    renderGroup(
+      [
+        reported('a', UNIT_REPORT, { status: 'fail', suiteName: 'Alpha' }),
+        reported('b', UNIT_REPORT, { status: 'fail', suiteName: 'Beta' }),
+      ],
+      'api',
+    )
+
+    expect(screen.queryByText('junit-unit-xml')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Alpha/ })).toHaveTextContent(/^FailAlpha$/)
+  })
+
+  it('counts a report split in parts as one report', () => {
+    renderGroup(
+      [
+        reported('a', `${UNIT_REPORT}-p1`, { status: 'fail', suiteName: 'Alpha' }),
+        reported('b', `${UNIT_REPORT}-p2`, { status: 'fail', suiteName: 'Beta' }),
+      ],
+      'api',
+    )
+
+    expect(screen.queryByText('junit-unit-xml')).not.toBeInTheDocument()
+  })
+
+  it('decides from every suite of the section, including the ones still collapsed', async () => {
+    const user = userEvent.setup()
+    renderGroup(
+      [
+        reported('a', UNIT_REPORT, { status: 'fail', suiteName: 'Alpha' }),
+        reported('b', E2E_REPORT, { suiteName: 'Beta' }),
+      ],
+      'api',
+    )
+
+    expect(within(screen.getByRole('link', { name: /Alpha/ })).getByText('junit-unit-xml')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show 1 suite without failures' }))
+
+    expect(within(screen.getByRole('link', { name: /Beta/ })).getByText('junit-e2e-xml')).toBeInTheDocument()
+  })
+
+  it('shows no label for suites that carry no report id', () => {
+    renderGroup(
+      [
+        reported('a', UNIT_REPORT, { status: 'fail', suiteName: 'Alpha' }),
+        reported('b', undefined, { status: 'fail', suiteName: 'Beta' }),
+      ],
+      'api',
+    )
+
+    expect(screen.queryByText('junit-unit-xml')).not.toBeInTheDocument()
+  })
+
+  it('keeps the job in the label of suites that belong to no job', () => {
+    renderGroup([
+      ciRunJobRun('a', { status: 'fail', suiteName: 'Alpha', reportExternalId: UNIT_REPORT }),
+      ciRunJobRun('b', {
+        status: 'fail',
+        suiteName: 'Beta',
+        reportExternalId: 'gha-900-web-junit-xml-cd34ef56',
+      }),
+    ])
+
+    expect(within(screen.getByRole('link', { name: /Alpha/ })).getByText('api-junit-unit-xml')).toBeInTheDocument()
+    expect(within(screen.getByRole('link', { name: /Beta/ })).getByText('web-junit-xml')).toBeInTheDocument()
+  })
+
+  it('shows an id that does not follow the report format as it is', () => {
+    renderGroup(
+      [
+        reported('a', 'custom-report-1', { status: 'fail', suiteName: 'Alpha' }),
+        reported('b', 'custom-report-2', { status: 'fail', suiteName: 'Beta' }),
+      ],
+      'api',
+    )
+
+    expect(within(screen.getByRole('link', { name: /Alpha/ })).getByText('custom-report-1')).toBeInTheDocument()
+    expect(within(screen.getByRole('link', { name: /Beta/ })).getByText('custom-report-2')).toBeInTheDocument()
   })
 })

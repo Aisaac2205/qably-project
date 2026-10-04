@@ -7,17 +7,28 @@ import type { CiRunJobRunRecord } from '@qably/types'
 import { EntityList } from '@/components/ui/entity-list'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { humanizeJobKey } from '../lib/ci-run-groups'
+import { humanizeJobKey, reportLabelsByRun } from '../lib/ci-run-groups'
 import { StatusChip } from './status-chip'
 
-function SuiteRow({ projectId, run }: { projectId: string; run: CiRunJobRunRecord }) {
+function SuiteRow({
+  projectId,
+  run,
+  label,
+}: {
+  projectId: string
+  run: CiRunJobRunRecord
+  label?: string
+}) {
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
       className="flex min-h-11 items-center gap-3.5 px-5 py-2.5 transition-colors hover:bg-surface-hover/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:px-7 lg:px-9"
     >
       <StatusChip status={run.status} />
-      <p className="min-w-0 flex-1 truncate text-sm text-default">{run.suiteName || run.name}</p>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-default">{run.suiteName || run.name}</p>
+        {label !== undefined && <p className="mt-0.5 truncate font-mono text-xs text-muted">{label}</p>}
+      </div>
     </Link>
   )
 }
@@ -26,18 +37,20 @@ function SuiteList({
   projectId,
   runs,
   label,
+  reportLabels,
   className,
 }: {
   projectId: string
   runs: CiRunJobRunRecord[]
   label: string
+  reportLabels: Map<string, string>
   className?: string
 }) {
   return (
     <EntityList aria-label={label} className={className}>
       {runs.map((run) => (
         <li key={run.id}>
-          <SuiteRow projectId={projectId} run={run} />
+          <SuiteRow projectId={projectId} run={run} label={reportLabels.get(run.id)} />
         </li>
       ))}
     </EntityList>
@@ -46,10 +59,12 @@ function SuiteList({
 
 export function CiRunJobGroup({
   projectId,
+  ciRunExternalId,
   jobKey,
   runs,
 }: {
   projectId: string
+  ciRunExternalId: string
   jobKey?: string
   runs: readonly CiRunJobRunRecord[]
 }) {
@@ -58,6 +73,7 @@ export function CiRunJobGroup({
   const panelId = useId()
   const failing = runs.filter((run) => run.status === 'fail')
   const passing = runs.filter((run) => run.status !== 'fail')
+  const reportLabels = reportLabelsByRun(runs, ciRunExternalId)
   const listLabel =
     jobKey === undefined
       ? t('runs.ci.suitesAria')
@@ -69,7 +85,14 @@ export function CiRunJobGroup({
         <h3 className="text-sm font-semibold text-default">{humanizeJobKey(jobKey)}</h3>
       )}
       <div className="rule-bleed !px-0 border-y border-border">
-        {failing.length > 0 && <SuiteList projectId={projectId} runs={failing} label={listLabel} />}
+        {failing.length > 0 && (
+          <SuiteList
+            projectId={projectId}
+            runs={failing}
+            label={listLabel}
+            reportLabels={reportLabels}
+          />
+        )}
         {passing.length > 0 && (
           <>
             <button
@@ -96,6 +119,7 @@ export function CiRunJobGroup({
                   projectId={projectId}
                   runs={passing}
                   label={listLabel}
+                  reportLabels={reportLabels}
                   className="border-t border-border"
                 />
               )}
