@@ -202,6 +202,9 @@ function NewRunFormBody({
               {pending ? t('runs.starting') : t('runs.startRun')}
             </Button>
           </DialogFooter>
+          <span role="status" aria-live="polite" className="sr-only">
+            {pending ? t('runs.starting') : null}
+          </span>
         </form>
       )}
     </>

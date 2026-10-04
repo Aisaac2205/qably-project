@@ -8,6 +8,7 @@ import { NewRunForm } from '@/features/runs/components/new-run-form'
 import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import { ApiError } from '@/lib/api-client'
+import { useI18nStore } from '@/lib/i18n'
 
 const mockPush = vi.hoisted(() => vi.fn())
 
@@ -402,6 +403,61 @@ describe('NewRunForm', () => {
         expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/run-created')
       })
       expect(create).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('announcing the starting state', () => {
+    async function startHeldRun() {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      vi.spyOn(api, 'createRun').mockReturnValueOnce(new Promise<RunRecord>(() => undefined))
+      await openForm({ initialSuiteId: 'suite-1' })
+      await user.click(screen.getByRole('button', { name: /^(Start run|Iniciar ejecución)$/ }))
+    }
+
+    it('has a polite status region that is hidden from sight and empty before a run starts', async () => {
+      await openForm({ initialSuiteId: 'suite-1' })
+
+      const status = screen.getByRole('status')
+      expect(status).toHaveAttribute('aria-live', 'polite')
+      expect(status).toHaveClass('sr-only')
+      expect(status).toBeEmptyDOMElement()
+    })
+
+    it('mirrors the starting label in the status region while the request is pending', async () => {
+      await startHeldRun()
+
+      await screen.findByRole('button', { name: 'Starting…' })
+      expect(screen.getByRole('status')).toHaveTextContent(/^Starting…$/)
+    })
+
+    it('says it in the language of the interface', async () => {
+      useI18nStore.setState({ locale: 'es' })
+
+      await startHeldRun()
+
+      expect(await screen.findByRole('status')).toHaveTextContent(/^Iniciando…$/)
+    })
+
+    it('empties the status region again when the request fails', async () => {
+      const user = userEvent.setup()
+      const api = await import('@/features/runs/api/runs.api')
+      vi.spyOn(api, 'createRun').mockRejectedValueOnce(new ApiError(500, 'boom'))
+      await openForm({ initialSuiteId: 'suite-1' })
+
+      await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+      await screen.findByRole('alert')
+      expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    })
+
+    it('keeps the visible label on the button and adds no visible text of its own', async () => {
+      await startHeldRun()
+
+      const button = await screen.findByRole('button', { name: 'Starting…' })
+      expect(button).toHaveTextContent(/^Starting…$/)
+      expect(button).not.toContainElement(screen.getByRole('status'))
+      expect(screen.getByRole('status')).toHaveClass('sr-only')
     })
   })
 
