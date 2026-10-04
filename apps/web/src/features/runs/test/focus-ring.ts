@@ -18,6 +18,9 @@ export function expectFocusRing(element: HTMLElement, { inset = false } = {}) {
   if (inset || element.classList.contains('focus-visible:ring-inset')) {
     expect(element).toHaveClass(INSET_FORCED_COLORS_OUTLINE)
   }
+  if (element.classList.contains('focus-visible:ring-offset-2')) {
+    expect(element).toHaveClass('focus-visible:ring-offset-background')
+  }
   expect(element.className).not.toMatch(OUTLINE_UTILITY)
 }
 

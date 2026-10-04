@@ -102,7 +102,7 @@ export function CiRunList({ projectId }: { projectId: string }) {
       action={
         <a
           href={docsUrl(REPORT_CI_ANCHOR, locale)}
-          className="inline-flex min-h-11 items-center rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:min-h-8"
+          className="inline-flex min-h-11 items-center rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-8"
         >
           {t('runs.ci.emptyDocsLink')}
         </a>
