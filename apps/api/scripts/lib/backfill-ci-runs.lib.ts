@@ -49,11 +49,13 @@ export interface NewCiRun extends CiRunKey, CommitFields {
   lastReportedAt: Date;
 }
 
+export type RunsAscendingById = BackfillRunRow[];
+
 export interface BackfillPort {
   readUnlinkedRuns(
     afterId: string | undefined,
     take: number,
-  ): Promise<BackfillRunRow[]>;
+  ): Promise<RunsAscendingById>;
   findCiRun(key: CiRunKey): Promise<ExistingCiRun | null>;
   createCiRun(input: NewCiRun): Promise<string>;
   updateCiRunIfUnchanged(

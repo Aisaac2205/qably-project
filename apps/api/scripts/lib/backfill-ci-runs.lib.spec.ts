@@ -74,6 +74,7 @@ function fakeDb(
   const linkSizes: number[] = [];
   const writes = { create: 0, update: 0, link: 0 };
   const counters = { finds: 0 };
+  const events: string[] = [];
 
   const port: BackfillPort = {
     readUnlinkedRuns: (afterId, take) => {
@@ -85,6 +86,7 @@ function fakeDb(
         .sort((a, b) => (a.id < b.id ? -1 : 1))
         .slice(0, take);
       reads.push(page.length);
+      events.push(`read:${page.length}`);
       return Promise.resolve(page);
     },
     findCiRun: (key) => {
@@ -111,6 +113,7 @@ function fakeDb(
       const id = `ci-${ciRuns.length + 1}`;
       ciRuns.push({ ...input, id });
       writes.create += 1;
+      events.push('create');
       return Promise.resolve(id);
     },
     updateCiRunIfUnchanged: (expected, patch) => {
@@ -126,10 +129,12 @@ function fakeDb(
 
       Object.assign(row, patch);
       writes.update += 1;
+      events.push('update');
       return Promise.resolve(true);
     },
     linkRuns: (ciRunId, runIds) => {
       linkSizes.push(runIds.length);
+      events.push(`link:${runIds.length}`);
       let linked = 0;
       for (const run of runs) {
         if (runIds.includes(run.id) && run.ciRunId === null) {
@@ -142,7 +147,7 @@ function fakeDb(
     },
   };
 
-  return { port, runs, ciRuns, reads, linkSizes, writes, counters };
+  return { port, runs, ciRuns, reads, linkSizes, writes, counters, events };
 }
 
 describe('parseCiRunExternalId', () => {
@@ -534,11 +539,51 @@ describe('backfillCiRuns batching', () => {
 
     expect(db.reads).toEqual([4, 4, 2, 0]);
     expect(db.linkSizes).toEqual([4, 4, 2]);
+    expect(db.events).toEqual([
+      'read:4',
+      'create',
+      'link:4',
+      'read:4',
+      'create',
+      'link:4',
+      'read:2',
+      'create',
+      'link:2',
+      'read:0',
+    ]);
     expect(summary).toMatchObject({
       scanned: 10,
       ciRunsCreated: 3,
       runsLinked: 10,
     });
+  });
+
+  it('writes every group of a batch before it reads the next batch', async () => {
+    const db = fakeDb([
+      stored('r00', 'gha-900-api-junit-xml-ab12cd34', 10),
+      stored('r01', 'gha-900-web-junit-xml-cd34ef56', 11),
+      stored('r02', 'gha-901-api-junit-xml-ab12cd34', 6),
+      stored('r03', 'gha-901-web-junit-xml-cd34ef56', 7),
+      stored('r10', 'gha-901-landing-junit-xml-ef56ab78', 3),
+      stored('r11', 'gha-local-job-junit-xml-ab12cd34', 4),
+      stored('r12', 'gha-902-api-junit-xml-ab12cd34', 20),
+    ]);
+
+    await backfillCiRuns(db.port, { batchSize: 4 });
+
+    expect(db.events).toEqual([
+      'read:4',
+      'create',
+      'link:2',
+      'create',
+      'link:2',
+      'read:3',
+      'update',
+      'link:1',
+      'create',
+      'link:1',
+      'read:0',
+    ]);
   });
 
   it('merges the time range of a CiRun that spans batches', async () => {
