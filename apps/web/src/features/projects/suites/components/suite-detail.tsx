@@ -12,6 +12,7 @@ import {
   useDeleteCase,
   useDeleteSuite,
   useDocumentSuite,
+  useRefreshSuiteLists,
 } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { BackButton } from '@/components/ui/back-button'
@@ -120,6 +121,13 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   const documentedCount = watch.documentedCountSince(currentWatchedCount)
 
   useDocumentationFeedback({ documentation, watchStatus, documentedCount })
+
+  const refreshSuiteLists = useRefreshSuiteLists()
+
+  useEffect(() => {
+    if (watchStatus !== 'settled') return
+    void refreshSuiteLists(projectId, suiteId)
+  }, [watchStatus, projectId, suiteId, refreshSuiteLists])
 
   if (isLoading) {
     return (

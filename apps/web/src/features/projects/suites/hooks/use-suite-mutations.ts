@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Suite } from '@qably/types'
 import {
@@ -34,6 +35,28 @@ function useSuiteInvalidation() {
       })
     }
   }
+}
+
+export function useRefreshSuiteLists() {
+  const queryClient = useQueryClient()
+
+  return useCallback(
+    async (projectId: string, suiteId: string) => {
+      const fresh = queryClient.getQueryData<Suite>(suiteKeys.detail(suiteId))
+
+      if (fresh !== undefined) {
+        queryClient.setQueryData<Suite[]>(suiteKeys.list(projectId), (cached) =>
+          cached?.map((entry) => (entry.id === fresh.id ? fresh : entry)),
+        )
+      }
+
+      await queryClient.invalidateQueries({
+        queryKey: suiteKeys.list(projectId),
+        refetchType: 'all',
+      })
+    },
+    [queryClient],
+  )
 }
 
 function useCaseInvalidation() {
@@ -130,6 +153,7 @@ export function useDocumentSuite() {
 
 export function useConfirmDocumentation() {
   const invalidateSuites = useSuiteInvalidation()
+  const refreshSuiteLists = useRefreshSuiteLists()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -144,6 +168,7 @@ export function useConfirmDocumentation() {
     onSuccess: async (_result, { suiteId, projectId }) => {
       await invalidateSuites()
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
+      void refreshSuiteLists(projectId, suiteId)
       await queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
     },
   })

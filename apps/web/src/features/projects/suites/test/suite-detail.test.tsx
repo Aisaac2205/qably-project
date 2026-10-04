@@ -1,8 +1,10 @@
-import { render, screen, act, within, waitFor } from '@testing-library/react'
+import { render, renderHook, screen, act, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { Suite, TestCase } from '@qably/types'
 import { SuiteDetail } from '@/features/projects/suites/components/suite-detail'
+import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
@@ -804,6 +806,107 @@ describe('SuiteDetail (redesigned)', () => {
       const infoOrder = vi.mocked(notify.info).mock.invocationCallOrder[0]
       const successOrder = vi.mocked(notify.success).mock.invocationCallOrder[0]
       expect(infoOrder).toBeLessThan(successOrder)
+    })
+
+    it('refreshes the project suite list in the background once the watch settles, so returning to it shows the documented suite', async () => {
+      const user = userEvent.setup()
+
+      function draftCase(documentation?: TestCase['documentation']) {
+        return createMockTestCase({
+          id: 'tc-watch-1',
+          executionMode: 'automated',
+          state: 'draft',
+          documentation,
+        })
+      }
+
+      function watchedSuite(overrides: Partial<Suite>) {
+        return createMockSuite({
+          id: watchSuiteId,
+          projectId: 'proj-1',
+          name: 'Watched',
+          manualCases: 0,
+          automatedCases: 1,
+          undocumentedCount: 1,
+          cases: [draftCase()],
+          ...overrides,
+        })
+      }
+
+      const initialSuite = watchedSuite({})
+      const busySuite = watchedSuite({
+        cases: [
+          draftCase({
+            outcome: null,
+            missing: [],
+            skipReason: null,
+            queuedAt: '2026-06-01T00:00:00Z',
+            outcomeAt: null,
+          }),
+        ],
+      })
+      const documentedSuite = watchedSuite({ name: 'Watched by Aeris', undocumentedCount: 0 })
+
+      const client = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, staleTime: Infinity, refetchOnMount: false },
+          mutations: { retry: false },
+        },
+      })
+      client.setQueryData(suiteKeys.detail(watchSuiteId), initialSuite)
+
+      const listSpy = vi
+        .spyOn(suitesApiStub, 'listSuites')
+        .mockResolvedValueOnce([initialSuite])
+        .mockResolvedValue([documentedSuite])
+      const observedList = renderHook(() => useSuites('proj-1'), {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      })
+      await waitFor(() => {
+        expect(observedList.result.current.suites.map((entry) => entry.name)).toEqual(['Watched'])
+      })
+      observedList.unmount()
+
+      vi.spyOn(suitesApiStub, 'getSuite')
+        .mockResolvedValueOnce(initialSuite)
+        .mockResolvedValueOnce(busySuite)
+        .mockResolvedValue(documentedSuite)
+      vi.spyOn(suitesApiStub, 'documentSuite').mockResolvedValue({
+        filesEnqueued: 1,
+        casesTargeted: 1,
+        casesSkipped: [],
+      })
+
+      await act(async () => {
+        render(
+          <QueryClientProvider client={client}>
+            <SuiteDetail projectId="proj-1" suiteId={watchSuiteId} />
+          </QueryClientProvider>,
+        )
+      })
+
+      await user.click(screen.getByRole('button', { name: /document \(1\)/i }))
+      await waitFor(() => {
+        expect(notify.info).toHaveBeenCalled()
+      })
+
+      await act(async () => {
+        await client.refetchQueries({ queryKey: suiteKeys.detail(watchSuiteId) })
+      })
+      expect(listSpy).toHaveBeenCalledTimes(1)
+
+      await act(async () => {
+        await client.refetchQueries({ queryKey: suiteKeys.detail(watchSuiteId) })
+      })
+
+      await waitFor(() => {
+        expect(
+          client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))?.map((entry) => entry.name),
+        ).toEqual(['Watched by Aeris'])
+      })
+      expect(listSpy).toHaveBeenCalledTimes(2)
     })
   })
 })
