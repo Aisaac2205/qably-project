@@ -1,6 +1,11 @@
 import type { CiRunSummaryRecord } from '@qably/types'
 
 const SHORT_SHA_LENGTH = 7
+const MS_PER_SECOND = 1000
+const SECONDS_PER_MINUTE = 60
+const MINUTES_PER_HOUR = 60
+const SECONDS_PER_HOUR = MINUTES_PER_HOUR * SECONDS_PER_MINUTE
+const SECONDS_PER_DAY = 24 * SECONDS_PER_HOUR
 
 type CiRunTitleSource = Pick<
   CiRunSummaryRecord,
@@ -17,6 +22,27 @@ export type CiRunMetaPart =
   | { kind: 'ref'; value: string }
   | { kind: 'sha'; value: string }
   | { kind: 'author'; value: string }
+
+export type DurationUnitKey =
+  | 'runs.ci.durationSeconds'
+  | 'runs.ci.durationMinutes'
+  | 'runs.ci.durationHours'
+
+export interface DurationPart {
+  key: DurationUnitKey
+  count: number
+}
+
+export type FreshnessKey =
+  | 'runs.ci.freshnessSeconds'
+  | 'runs.ci.freshnessMinutes'
+  | 'runs.ci.freshnessHours'
+  | 'runs.ci.freshnessDays'
+
+export interface FreshnessPart {
+  key: FreshnessKey
+  count: number
+}
 
 function present(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
@@ -55,4 +81,46 @@ export function ciRunMetaParts(ciRun: CiRunMetaSource): CiRunMetaPart[] {
   if (author !== undefined) parts.push({ kind: 'author', value: author })
 
   return parts
+}
+
+export function approxDuration(
+  startedAt: string,
+  lastReportedAt: string,
+): DurationPart[] | undefined {
+  const totalSeconds = Math.floor((Date.parse(lastReportedAt) - Date.parse(startedAt)) / MS_PER_SECOND)
+
+  if (!(totalSeconds >= 1)) return undefined
+
+  if (totalSeconds < SECONDS_PER_MINUTE) {
+    return [{ key: 'runs.ci.durationSeconds', count: totalSeconds }]
+  }
+
+  const totalMinutes = Math.floor(totalSeconds / SECONDS_PER_MINUTE)
+  const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR)
+  const minutes = totalMinutes % MINUTES_PER_HOUR
+
+  const parts: DurationPart[] = []
+
+  if (hours > 0) parts.push({ key: 'runs.ci.durationHours', count: hours })
+  if (minutes > 0) parts.push({ key: 'runs.ci.durationMinutes', count: minutes })
+
+  return parts
+}
+
+export function freshness(lastReportedAt: string, now: number): FreshnessPart {
+  const elapsed = now - Date.parse(lastReportedAt)
+  const seconds = elapsed > 0 ? Math.floor(elapsed / MS_PER_SECOND) : 0
+
+  if (seconds < SECONDS_PER_MINUTE) return { key: 'runs.ci.freshnessSeconds', count: seconds }
+  if (seconds < SECONDS_PER_HOUR) {
+    return { key: 'runs.ci.freshnessMinutes', count: Math.floor(seconds / SECONDS_PER_MINUTE) }
+  }
+  if (seconds < SECONDS_PER_DAY) {
+    return { key: 'runs.ci.freshnessHours', count: Math.floor(seconds / SECONDS_PER_HOUR) }
+  }
+  return { key: 'runs.ci.freshnessDays', count: Math.floor(seconds / SECONDS_PER_DAY) }
+}
+
+export function humanizeJobKey(ciJobKey: string): string {
+  return ciJobKey.replace(/[-_]/g, ' ')
 }
