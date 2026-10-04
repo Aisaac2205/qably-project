@@ -20,7 +20,7 @@ export interface CiRunJobGroups {
 }
 
 export function humanizeJobKey(ciJobKey: string): string {
-  return ciJobKey.replace(/[-_]/g, ' ')
+  return ciJobKey.replace(/[-_]+/g, ' ')
 }
 
 export function groupRunsByJob(runs: readonly CiRunJobRunRecord[]): CiRunJobGroups {

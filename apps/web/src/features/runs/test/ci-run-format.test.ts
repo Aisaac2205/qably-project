@@ -272,6 +272,15 @@ describe('humanizeJobKey', () => {
     expect(humanizeJobKey(key)).toBe(expected)
   })
 
+  it.each<[string, string]>([
+    ['my--job', 'my job'],
+    ['my__job', 'my job'],
+    ['my-_-job', 'my job'],
+    ['build---and___test', 'build and test'],
+  ])('collapses a run of separators in %s into a single space', (key, expected) => {
+    expect(humanizeJobKey(key)).toBe(expected)
+  })
+
   it.each<[string]>([['test (node 20)'], ['test.unit'], ['lint: web']])(
     'leaves %s intact because it has no - or _',
     (key) => {
