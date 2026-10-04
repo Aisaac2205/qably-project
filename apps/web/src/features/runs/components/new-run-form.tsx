@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useId, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
 import { useSuites } from '@/features/projects/suites/hooks/use-suites'
 import { useCreateRun } from '@/features/runs/hooks/use-create-run'
 import { ApiError } from '@/lib/api-client'
@@ -45,13 +45,21 @@ function translateCreateRunError(error: unknown, t: (key: string) => string): st
 export function NewRunForm({
   projectId,
   initialSuiteId,
+  pending = false,
+  onPendingChange,
 }: {
   projectId: string
   initialSuiteId?: string
+  pending?: boolean
+  onPendingChange?: (pending: boolean) => void
 }) {
   return (
-    <DialogContent className="max-w-md">
-      <NewRunFormBody projectId={projectId} initialSuiteId={initialSuiteId} />
+    <DialogContent className="max-w-md" closeDisabled={pending}>
+      <NewRunFormBody
+        projectId={projectId}
+        initialSuiteId={initialSuiteId}
+        onPendingChange={onPendingChange}
+      />
     </DialogContent>
   )
 }
@@ -59,9 +67,11 @@ export function NewRunForm({
 function NewRunFormBody({
   projectId,
   initialSuiteId,
+  onPendingChange,
 }: {
   projectId: string
   initialSuiteId?: string
+  onPendingChange?: (pending: boolean) => void
 }) {
   const { suites, isLoading } = useSuites(projectId)
   const { start: createRun, error: createError } = useCreateRun(projectId)
@@ -78,6 +88,10 @@ function NewRunFormBody({
   const pending = submitted && createError == null
   const message = validationError || (createError ? translateCreateRunError(createError, t) : '')
   const hasNoSuites = !isLoading && suites.length === 0
+
+  useEffect(() => {
+    onPendingChange?.(pending)
+  }, [pending, onPendingChange])
 
   const handleSuiteChange = useCallback((value: unknown) => {
     const next = String(value ?? '')

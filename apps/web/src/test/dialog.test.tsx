@@ -102,6 +102,27 @@ describe('Dialog', () => {
       expect(close.className).not.toMatch(/(^|\s)focus:outline-none/)
     })
 
+    it('is enabled by default and disabled when the content asks for it', () => {
+      const { rerender } = render(
+        <Dialog open>
+          <DialogContent>
+            <DialogTitle>Dialog Title</DialogTitle>
+          </DialogContent>
+        </Dialog>,
+      )
+      expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
+
+      rerender(
+        <Dialog open>
+          <DialogContent closeDisabled>
+            <DialogTitle>Dialog Title</DialogTitle>
+          </DialogContent>
+        </Dialog>,
+      )
+
+      expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled()
+    })
+
     it('draws the focus indicator inside its own box so the popup edge cannot clip it', () => {
       renderOpen()
 

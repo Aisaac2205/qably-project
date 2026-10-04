@@ -26,6 +26,7 @@ export function NewRunAction({
   const hintId = useId()
   const [open, setOpen] = useState(defaultOpen)
   const [preselectedSuiteId, setPreselectedSuiteId] = useState(initialSuiteId)
+  const [pending, setPending] = useState(false)
 
   if (disabled) {
     return (
@@ -51,7 +52,11 @@ export function NewRunAction({
     <div className="flex md:justify-end">
       <Dialog
         open={open}
-        onOpenChange={(next) => {
+        onOpenChange={(next, eventDetails) => {
+          if (!next && pending) {
+            eventDetails.cancel()
+            return
+          }
           setOpen(next)
           if (!next) setPreselectedSuiteId(undefined)
         }}
@@ -60,7 +65,12 @@ export function NewRunAction({
           <Plus size={16} weight="bold" aria-hidden="true" />
           {t('runs.newRun')}
         </DialogTrigger>
-        <NewRunForm projectId={projectId} initialSuiteId={preselectedSuiteId} />
+        <NewRunForm
+          projectId={projectId}
+          initialSuiteId={preselectedSuiteId}
+          pending={pending}
+          onPendingChange={setPending}
+        />
       </Dialog>
     </div>
   )

@@ -36,7 +36,12 @@ function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) 
   )
 }
 
-function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.Props) {
+function DialogContent({
+  className,
+  children,
+  closeDisabled = false,
+  ...props
+}: DialogPrimitive.Popup.Props & { closeDisabled?: boolean }) {
   const { t } = useTranslation()
 
   return (
@@ -56,10 +61,11 @@ function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.
         >
           {children}
           <DialogPrimitive.Close
+            disabled={closeDisabled}
             className={cn(
               "absolute right-0.5 top-0.5 flex size-11 items-center justify-center rounded-sm opacity-70 transition-opacity hover:opacity-100 md:right-3 md:top-3 md:size-6",
               "focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background forced-colors:focus-visible:-outline-offset-2!",
-              "disabled:pointer-events-none",
+              "disabled:pointer-events-none disabled:opacity-50",
             )}
           >
             <X className="size-4" weight="bold" />
