@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { CiRunSummaryRecord } from '@qably/types'
 import { useCiRunLabel } from '@/features/runs/hooks/use-ci-run-label'
 import { ciRunSummary } from './ci-run-fixtures'
@@ -27,6 +27,13 @@ describe('useCiRunLabel', () => {
     const { result } = labelOf({ runNumber: undefined, commitSha: undefined, externalId: '900' })
 
     expect(result.current).toBe('900')
+  })
+
+  it('is never a maybe for a CI run that exists', () => {
+    const { result } = renderHook(() => useCiRunLabel(ciRunSummary('c1', { runNumber: 3 })))
+
+    expectTypeOf(result.current).toEqualTypeOf<string>()
+    expect(result.current).toBe('CI #3')
   })
 
   it('has no label while there is no CI run', () => {

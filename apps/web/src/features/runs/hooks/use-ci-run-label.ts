@@ -6,6 +6,8 @@ import { ciRunLabel } from '../lib/ci-run-format'
 
 type CiRunLabelSource = Pick<CiRunSummaryRecord, 'runNumber' | 'commitSha' | 'externalId'>
 
+export function useCiRunLabel(ciRun: CiRunLabelSource): string
+export function useCiRunLabel(ciRun: CiRunLabelSource | undefined): string | undefined
 export function useCiRunLabel(ciRun: CiRunLabelSource | undefined): string | undefined {
   const { t } = useTranslation()
 
