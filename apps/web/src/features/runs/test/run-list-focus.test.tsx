@@ -19,12 +19,12 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-async function renderList() {
+async function renderList({ ungrouped = true } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
 
   const view = render(
     <QueryClientProvider client={client}>
-      <RunList projectId="proj-1" ungrouped />
+      <RunList projectId="proj-1" ungrouped={ungrouped} />
     </QueryClientProvider>,
   )
   await waitFor(() => expect(listRuns).toHaveBeenCalledTimes(1))
@@ -112,9 +112,9 @@ describe('RunList focus', () => {
     expectEveryFocusableToCarryARing(container, 6)
   })
 
-  it('carries a ring on both links of the empty state, away from any clipped edge', async () => {
+  it('carries a ring on both links of the default empty state, away from any clipped edge', async () => {
     listRuns.mockResolvedValue({ items: [] })
-    const { container } = await renderList()
+    const { container } = await renderList({ ungrouped: false })
 
     const links = screen.getAllByRole('link')
 
@@ -124,5 +124,17 @@ describe('RunList focus', () => {
       expect(link).not.toHaveClass('focus-visible:ring-inset')
     }
     expectEveryFocusableToCarryARing(container, 2)
+  })
+
+  it('carries a ring on the start link of the Manual empty state, away from any clipped edge', async () => {
+    listRuns.mockResolvedValue({ items: [] })
+    const { container } = await renderList()
+
+    const links = screen.getAllByRole('link')
+
+    expect(links).toHaveLength(1)
+    expect(links[0]).toHaveClass('focus-visible:ring-offset-2')
+    expect(links[0]).not.toHaveClass('focus-visible:ring-inset')
+    expectEveryFocusableToCarryARing(container, 1)
   })
 })

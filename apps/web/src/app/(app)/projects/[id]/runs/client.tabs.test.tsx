@@ -124,9 +124,7 @@ describe('the runs page tabs', () => {
     it('mounts only the Manual panel for tab=manual, ungrouped, and never asks for the CI runs', async () => {
       await renderPage({ tab: 'manual' })
 
-      expect(
-        await screen.findByText(/CI fills this page automatically once the results reporter is wired/),
-      ).toBeInTheDocument()
+      expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(manualRuns).toHaveBeenCalledWith(
         { projectId: 'proj-1', source: undefined, limit: 25, cursor: undefined, ungrouped: true },
         expect.any(AbortSignal),
@@ -144,9 +142,7 @@ describe('the runs page tabs', () => {
 
       await user.click(screen.getByRole('tab', { name: 'Manual' }))
 
-      expect(
-        await screen.findByText(/CI fills this page automatically once the results reporter is wired/),
-      ).toBeInTheDocument()
+      expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(manualRuns).toHaveBeenCalledTimes(1)
       expect(manualRuns).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: 'proj-1', ungrouped: true }),

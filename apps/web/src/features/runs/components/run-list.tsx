@@ -105,6 +105,46 @@ function RunRow({
   )
 }
 
+function EmptyRunList({
+  projectId,
+  ungrouped,
+  hasManualCases,
+}: {
+  projectId: string
+  ungrouped: boolean
+  hasManualCases: boolean | undefined
+}) {
+  const { t, locale } = useTranslation()
+
+  return (
+    <StateView
+      kind="empty"
+      title={t(ungrouped ? 'runs.ci.manualEmptyTitle' : 'runs.noRuns')}
+      description={t(ungrouped ? 'runs.ci.manualEmptyDescription' : 'runs.emptyDescription')}
+      action={
+        <div className="flex flex-col items-center gap-2">
+          {!ungrouped && (
+            <a
+              href={docsUrl(REPORT_CI_ANCHOR, locale)}
+              className="rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              {t('runs.emptyDocsLink')}
+            </a>
+          )}
+          {hasManualCases !== false && (
+            <Link
+              href={`/projects/${projectId}/runs/new`}
+              className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              {t('runs.startARun')}
+            </Link>
+          )}
+        </div>
+      }
+    />
+  )
+}
+
 export function RunList({
   projectId,
   source,
@@ -121,32 +161,14 @@ export function RunList({
     source,
     { ungrouped },
   )
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
 
   if (runs.length === 0) {
     return (
-      <StateView
-        kind="empty"
-        title={t('runs.noRuns')}
-        description={t('runs.emptyDescription')}
-        action={
-          <div className="flex flex-col items-center gap-2">
-            <a
-              href={docsUrl(REPORT_CI_ANCHOR, locale)}
-              className="rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {t('runs.emptyDocsLink')}
-            </a>
-            {hasManualCases !== false && (
-              <Link
-                href={`/projects/${projectId}/runs/new`}
-                className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                {t('runs.startARun')}
-              </Link>
-            )}
-          </div>
-        }
+      <EmptyRunList
+        projectId={projectId}
+        ungrouped={ungrouped === true}
+        hasManualCases={hasManualCases}
       />
     )
   }

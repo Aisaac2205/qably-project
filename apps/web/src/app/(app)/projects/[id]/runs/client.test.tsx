@@ -173,7 +173,7 @@ describe('RunListPageClient', () => {
 
       renderWithQuery(<RunListPageClient projectId="proj-empty" initialTab="manual" />)
 
-      expect(await screen.findByText('No runs yet')).toBeInTheDocument()
+      expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /new run/i })).toHaveAttribute('aria-disabled', 'true')
       expect(startLinks()).toHaveLength(0)
       expect(
@@ -189,7 +189,7 @@ describe('RunListPageClient', () => {
 
       renderWithQuery(<RunListPageClient projectId="proj-empty" initialTab="manual" />)
 
-      expect(await screen.findByText('No runs yet')).toBeInTheDocument()
+      expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(startLinks()).toHaveLength(1)
       expect(startLinks()[0]).toHaveAttribute('href', '/projects/proj-empty/runs/new')
       expect(screen.getByRole('link', { name: /new run/i })).toBeInTheDocument()
