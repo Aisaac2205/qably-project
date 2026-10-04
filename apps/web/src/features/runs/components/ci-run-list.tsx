@@ -1,6 +1,7 @@
 'use client'
 
 import type { CiRunSummaryRecord } from '@qably/types'
+import { Button } from '@/components/ui/button'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { docsUrl } from '@/lib/docs-url'
@@ -28,11 +29,58 @@ function CiRunRows({ ciRuns, projectId }: { ciRuns: CiRunSummaryRecord[]; projec
   )
 }
 
+function LoadMore({
+  isFetching,
+  hasFailed,
+  onLoad,
+}: {
+  isFetching: boolean
+  hasFailed: boolean
+  onLoad: () => void
+}) {
+  const { t } = useTranslation()
+  const showFailure = hasFailed && !isFetching
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      {showFailure && (
+        <p role="alert" className="text-sm text-fail">
+          {t('runs.ci.errorTitle')}
+        </p>
+      )}
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full focus-visible:ring-primary sm:w-auto"
+        onClick={onLoad}
+        disabled={isFetching}
+        focusableWhenDisabled
+      >
+        {isFetching ? t('runs.ci.loadingMore') : showFailure ? t('common.retry') : t('runs.ci.loadMore')}
+      </Button>
+    </div>
+  )
+}
+
 export function CiRunList({ projectId }: { projectId: string }) {
   const { t, locale } = useTranslation()
-  const { ciRuns, isLoading, isError } = useCiRunsPage(projectId)
+  const { ciRuns, hasNextPage, isFetchingNextPage, fetchNextPage, isLoading, isError } =
+    useCiRunsPage(projectId)
 
-  if (ciRuns.length > 0) return <CiRunRows ciRuns={ciRuns} projectId={projectId} />
+  if (ciRuns.length > 0) {
+    return (
+      <div className="space-y-4">
+        <CiRunRows ciRuns={ciRuns} projectId={projectId} />
+        {hasNextPage && (
+          <LoadMore
+            isFetching={isFetchingNextPage}
+            hasFailed={isError}
+            onLoad={() => void fetchNextPage()}
+          />
+        )}
+      </div>
+    )
+  }
 
   if (isLoading) return <StateView kind="loading" title={t('runs.ci.loading')} />
 
