@@ -1,6 +1,6 @@
 'use client'
 
-import { NewRunAction } from '@/features/runs/components/new-run-action'
+import { RunListPageClient } from '../client'
 
 export function NewRunPageClient({
   projectId,
@@ -10,13 +10,11 @@ export function NewRunPageClient({
   initialSuiteId?: string
 }) {
   return (
-    <div className="w-full px-5 py-6 sm:px-7 lg:px-9">
-      <NewRunAction
-        projectId={projectId}
-        disabled={false}
-        defaultOpen
-        initialSuiteId={initialSuiteId}
-      />
-    </div>
+    <RunListPageClient
+      projectId={projectId}
+      initialTab="manual"
+      openNewRun
+      initialSuiteId={initialSuiteId}
+    />
   )
 }

@@ -15,9 +15,13 @@ import { projectRootPath } from '@/features/projects/lib/routes'
 export function RunListPageClient({
   projectId,
   initialTab = DEFAULT_RUNS_TAB,
+  openNewRun = false,
+  initialSuiteId,
 }: {
   projectId: string
   initialTab?: RunsTab
+  openNewRun?: boolean
+  initialSuiteId?: string
 }) {
   const { t } = useTranslation()
   const router = useRouter()
@@ -62,7 +66,12 @@ export function RunListPageClient({
           <CiRunList projectId={projectId} />
         </TabsPanel>
         <TabsPanel value="manual" tabIndex={-1} className="space-y-4">
-          <NewRunAction projectId={projectId} disabled={hasNoManualCases} />
+          <NewRunAction
+            projectId={projectId}
+            disabled={hasNoManualCases}
+            defaultOpen={openNewRun}
+            initialSuiteId={initialSuiteId}
+          />
           <RunList projectId={projectId} ungrouped hasManualCases={project?.hasManualCases} />
         </TabsPanel>
       </Tabs>
