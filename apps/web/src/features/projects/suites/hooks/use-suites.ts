@@ -27,6 +27,7 @@ export function useSuites(projectId?: string, refetchInterval: SuitesRefetchInte
 
   return {
     suites: query.data ?? [],
+    hasData: query.data !== undefined,
     isLoading: query.isLoading,
     isError: query.isError,
   }

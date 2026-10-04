@@ -20,7 +20,12 @@ export function useSuiteMetrics(
   projectId: string,
   refetchInterval: SuitesRefetchInterval = false,
 ): UseSuiteMetricsResult {
-  const { suites, isLoading: suitesLoading, isError: suitesError } = useSuites(projectId, refetchInterval)
+  const {
+    suites,
+    hasData: hasSuites,
+    isLoading: suitesLoading,
+    isError: suitesError,
+  } = useSuites(projectId, refetchInterval)
 
   const metricsQuery = useQuery({
     queryKey: runKeys.suiteMetrics(projectId),
@@ -44,6 +49,7 @@ export function useSuiteMetrics(
   return {
     perSuite,
     isLoading: suitesLoading || metricsQuery.isLoading,
-    isError: suitesError || metricsQuery.isError,
+    isError:
+      (suitesError && !hasSuites) || (metricsQuery.isError && metricsQuery.data === undefined),
   }
 }

@@ -1,10 +1,13 @@
-import { screen, act } from '@testing-library/react'
+import { render, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SuiteList } from '@/features/projects/suites/components/suite-list'
 import { __resetStore } from '@/lib/mock-store'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { createTestQueryClient, renderWithQuery } from '@/lib/query-test-utils'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
+import * as suitesApiStub from '@/test/suites-api-stub'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -30,6 +33,10 @@ function SuiteListForTest() {
 describe('SuiteList', () => {
   beforeEach(() => {
     __resetStore()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it('renders the filter bar and the 3 seeded suites', async () => {
@@ -152,6 +159,25 @@ describe('SuiteList', () => {
     })
     expect(screen.getByRole('alert')).toBeInTheDocument()
     expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
+  })
+
+  it('keeps the cached suites on screen, not the error view, when a background refetch fails', async () => {
+    vi.spyOn(suitesApiStub, 'listSuites').mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+
+    await act(async () => {
+      render(
+        <QueryClientProvider client={client}>
+          <SuiteListForTest />
+        </QueryClientProvider>,
+      )
+    })
+    await waitFor(() => {
+      expect(client.getQueryState(suiteKeys.list('proj-1'))?.status).toBe('error')
+    })
+
+    expect(screen.getByText('Authentication')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('shows the empty state only once loading has finished with zero suites', async () => {

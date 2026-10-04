@@ -1,9 +1,12 @@
-import { act, renderHook } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { act, renderHook, waitFor } from '@testing-library/react'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
 import { createTestQueryClient, withQueryClient } from '@/lib/query-test-utils'
 import { runKeys } from '@/features/runs/lib/query-keys'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
+import * as suitesApiStub from '@/test/suites-api-stub'
+import * as runsApiStub from '@/test/runs-api-stub'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -124,5 +127,82 @@ describe('useSuiteMetrics', () => {
     expect(m1!.suite.isDefault).toBe(true)
     expect(m1!.suite.description.length).toBeGreaterThan(0)
     expect(m1!.suite.tags.length).toBeGreaterThan(0)
+  })
+})
+
+describe('useSuiteMetrics when a request fails', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('keeps the cached suites on screen when a background refetch of the list fails', async () => {
+    vi.spyOn(suitesApiStub, 'listSuites').mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+    const { result } = renderHook(() => useSuiteMetrics('proj-1'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    await waitFor(() => {
+      expect(client.getQueryState(suiteKeys.list('proj-1'))?.status).toBe('error')
+    })
+
+    expect(result.current.isError).toBe(false)
+    expect(result.current.perSuite.map((m) => m.suite.id)).toEqual([
+      'suite-1',
+      'suite-2',
+      'suite-3',
+      'suite-4',
+    ])
+  })
+
+  it('reports an error when the list fails and nothing is cached for the project', async () => {
+    vi.spyOn(suitesApiStub, 'listSuites').mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+    const { result } = renderHook(() => useSuiteMetrics('proj-unseen'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+    expect(result.current.perSuite).toEqual([])
+  })
+
+  it('keeps the cached run metrics when a background refetch of them fails', async () => {
+    vi.spyOn(runsApiStub, 'getSuiteMetrics').mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+    const { result } = renderHook(() => useSuiteMetrics('proj-1'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    await waitFor(() => {
+      expect(client.getQueryState(runKeys.suiteMetrics('proj-1'))?.status).toBe('error')
+    })
+
+    expect(result.current.isError).toBe(false)
+    expect(result.current.perSuite.find((m) => m.suite.id === 'suite-1')?.lastRun?.id).toBe(
+      'run-12',
+    )
+  })
+
+  it('reports an error when the run metrics fail and none are cached, instead of showing every suite as never run', async () => {
+    vi.spyOn(runsApiStub, 'getSuiteMetrics').mockRejectedValue(new Error('network down'))
+    const client = createTestQueryClient()
+    client.removeQueries({ queryKey: runKeys.suiteMetrics('proj-1') })
+    const { result } = renderHook(() => useSuiteMetrics('proj-1'), {
+      wrapper: ({ children }) => (
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      ),
+    })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
   })
 })

@@ -823,7 +823,7 @@ describe('SuiteDetail (redesigned)', () => {
       expect(infoOrder).toBeLessThan(successOrder)
     })
 
-    it('refreshes the project suite list in the background once the watch settles, so returning to it shows the documented suite', async () => {
+    it('patches the cached project suite list once the watch settles and leaves it stale for the next visit, without fetching it while it is off screen', async () => {
       const user = userEvent.setup()
 
       function draftCase(documentation?: TestCase['documentation']) {
@@ -921,7 +921,8 @@ describe('SuiteDetail (redesigned)', () => {
           client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))?.map((entry) => entry.name),
         ).toEqual(['Watched by Aeris'])
       })
-      expect(listSpy).toHaveBeenCalledTimes(2)
+      expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
+      expect(listSpy).toHaveBeenCalledTimes(1)
     })
   })
 })

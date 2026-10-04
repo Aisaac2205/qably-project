@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider, type UseMutationResult } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Suite } from '@qably/types'
+import type { Suite, TestCase } from '@qably/types'
 import {
   useConfirmDocumentation,
   useCreateCase,
@@ -31,6 +31,7 @@ import {
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 import { notify } from '@/lib/notify'
+import { createMockTestCase } from '@/lib/test-utils'
 
 vi.mock('../api/suites.api', () => ({
   createCase: vi.fn(),
@@ -68,30 +69,97 @@ const updateSuiteApi = vi.mocked(updateSuite)
 const deleteSuiteApi = vi.mocked(deleteSuite)
 const documentSuiteApi = vi.mocked(documentSuite)
 
-const suite: Suite = {
-  id: 'suite-1',
-  projectId: 'proj-1',
-  organizationId: 'org-1',
-  name: 'Checkout',
-  cases: [],
-  manualCases: 1,
-  automatedCases: 0,
-  undocumentedCount: 0,
-  staleLocaleCount: 0,
-  incompleteCount: 0,
-  createdAt: '2026-01-01T00:00:00.000Z',
-  description: '',
-  tags: [],
-  isDefault: false,
-  updatedAt: '2026-01-01T00:00:00.000Z',
+const emptyDocumentation = {
+  outcome: null,
+  missing: [],
+  skipReason: null,
+  queuedAt: null,
+  outcomeAt: null,
 }
 
-const otherSuite: Suite = { ...suite, id: 'suite-2', name: 'Login' }
-const updatedSuite: Suite = { ...suite, name: 'Checkout v2', manualCases: 2 }
+function producedCase(
+  id: string,
+  suiteId: string,
+  name: string,
+  overrides: Partial<TestCase> = {},
+): TestCase {
+  return {
+    ...createMockTestCase({
+      id,
+      suiteId,
+      name,
+      objective: 'Pay for an order',
+      steps: ['Open the cart', 'Pay'],
+      expectedResult: 'The order is created',
+      documentation: emptyDocumentation,
+      documentedLocale: null,
+      localeStale: false,
+      healthSignals: [],
+      ...overrides,
+    }),
+    pendingProposalId: null,
+  }
+}
+
+function producedSuite(
+  id: string,
+  name: string,
+  cases: TestCase[],
+  overrides: Partial<Suite> = {},
+): Suite {
+  const automatedCases = cases.filter((entry) => entry.executionMode === 'automated').length
+
+  return {
+    id,
+    projectId: 'proj-1',
+    organizationId: 'org-1',
+    name,
+    description: '',
+    tags: [],
+    isDefault: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    manualCases: cases.length - automatedCases,
+    automatedCases,
+    undocumentedCount: 0,
+    staleLocaleCount: 0,
+    incompleteCount: 0,
+    documentation: emptyDocumentation,
+    healthSummary: {},
+    openCollisions: 0,
+    cases,
+    ...overrides,
+  }
+}
+
+const caseOne = producedCase('case-1', 'suite-1', 'Pays by card')
+const caseTwo = producedCase('case-2', 'suite-1', 'Pays by voucher')
+
+const suite = producedSuite('suite-1', 'Checkout', [caseOne])
+const otherSuite = producedSuite('suite-2', 'Login', [
+  producedCase('case-3', 'suite-2', 'Logs in with a password'),
+])
+const thirdSuite = producedSuite('suite-3', 'Profile', [
+  producedCase('case-4', 'suite-3', 'Edits the avatar'),
+])
+
+const renamedSuite = producedSuite('suite-1', 'Checkout v2', [caseOne])
+const suiteWithNewCase = producedSuite('suite-1', 'Checkout', [caseOne, caseTwo])
+const suiteWithEditedCase = producedSuite('suite-1', 'Checkout', [
+  {
+    ...caseOne,
+    steps: ['Open the cart', 'Enter the card', 'Pay'],
+    expectedResult: 'The order is paid',
+  },
+])
+const suiteWithoutCases = producedSuite('suite-1', 'Checkout', [])
 
 function setup() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false, staleTime: 60_000 },
+      mutations: { retry: false },
+    },
   })
   const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
   return { client, invalidateSpy }
@@ -152,19 +220,20 @@ async function prepareResponseScenario(
 ) {
   const { client, invalidateSpy } = setup()
   await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
-  list.mockReturnValue(new Promise(() => {}))
   apiMock.mockResolvedValue(response)
   return { client, invalidateSpy }
 }
 
-function expectCachesSyncedFrom(
+function expectSuiteAdopted(
   response: Suite,
   client: QueryClient,
   invalidateSpy: { mock: { calls: unknown[][] } },
 ) {
   expect(client.getQueryData(suiteKeys.detail(response.id))).toEqual(response)
+  expect(client.getQueryState(suiteKeys.detail(response.id))?.isInvalidated).toBe(true)
   expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([response, otherSuite])
-  expect(list).toHaveBeenCalledTimes(2)
+  expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
+  expect(list).toHaveBeenCalledTimes(1)
   expect(invalidateSpy.mock.calls).not.toContainEqual([{ queryKey: suiteKeys.all }])
 }
 
@@ -195,9 +264,7 @@ describe('useConfirmDocumentation', () => {
   it('refreshes the suite in place so the confirmed cases stop reading as drafts', async () => {
     const { client, invalidateSpy } = setup()
     const { result } = renderHook(() => useConfirmDocumentation(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1' })
@@ -214,29 +281,10 @@ describe('useConfirmDocumentation', () => {
     expect(confirm).toHaveBeenCalledWith('suite-1', undefined)
   })
 
-  it('refetches the project suite list even when no screen is observing it', async () => {
+  it('patches the cached list from the confirmed suite and leaves it stale for the next visit instead of fetching it', async () => {
     const { client } = setup()
     await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
-    list.mockResolvedValue([{ ...suite, name: 'Checkout flow' }, otherSuite])
-    const { result } = renderHook(() => useConfirmDocumentation(), {
-      wrapper: wrapperFor(client),
-    })
-
-    result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1' })
-
-    await waitFor(() => {
-      expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))?.[0].name).toBe(
-        'Checkout flow',
-      )
-    })
-    expect(list).toHaveBeenCalledTimes(2)
-  })
-
-  it('shows the confirmed suite in the cached list before the list refetch lands', async () => {
-    const { client } = setup()
-    await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
-    list.mockReturnValue(new Promise(() => {}))
-    client.setQueryData(suiteKeys.detail('suite-1'), { ...suite, name: 'Checkout flow' })
+    client.setQueryData(suiteKeys.detail('suite-1'), renamedSuite)
     const { result } = renderHook(() => useConfirmDocumentation(), {
       wrapper: wrapperFor(client),
     })
@@ -246,17 +294,19 @@ describe('useConfirmDocumentation', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expect(
-      client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))?.map((entry) => entry.name),
-    ).toEqual(['Checkout flow', 'Login'])
-    expect(list).toHaveBeenCalledTimes(2)
+    expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([
+      renamedSuite,
+      otherSuite,
+    ])
+    expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
+    expect(list).toHaveBeenCalledTimes(1)
   })
 
-  it('leaves the suite list of another project untouched', async () => {
+  it('adopts the detail it just refetched when the suite page is open', async () => {
     const { client } = setup()
-    await cacheInactiveList(client, 'proj-1', [suite])
-    await cacheInactiveList(client, 'proj-2', [{ ...otherSuite, projectId: 'proj-2' }])
-    list.mockResolvedValue([suite])
+    await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
+    await cacheLiveDetail(client)
+    getSuiteApi.mockResolvedValueOnce(renamedSuite)
     const { result } = renderHook(() => useConfirmDocumentation(), {
       wrapper: wrapperFor(client),
     })
@@ -264,17 +314,37 @@ describe('useConfirmDocumentation', () => {
     result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1' })
 
     await waitFor(() => {
-      expect(list).toHaveBeenCalledTimes(3)
+      expect(result.current.isSuccess).toBe(true)
     })
-    expect(list.mock.calls.filter(([projectId]) => projectId === 'proj-2')).toHaveLength(1)
+    expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([
+      renamedSuite,
+      otherSuite,
+    ])
+    expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
+  })
+
+  it('leaves the suite list of another project untouched', async () => {
+    const { client } = setup()
+    await cacheInactiveList(client, 'proj-1', [suite])
+    await cacheInactiveList(client, 'proj-2', [{ ...otherSuite, projectId: 'proj-2' }])
+    const { result } = renderHook(() => useConfirmDocumentation(), {
+      wrapper: wrapperFor(client),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(suiteKeys.list('proj-2'))?.isInvalidated).toBe(false)
+    expect(list).toHaveBeenCalledTimes(2)
   })
 
   it('forwards the selected case ids to the API call', async () => {
     const { client } = setup()
     const { result } = renderHook(() => useConfirmDocumentation(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({
@@ -293,9 +363,7 @@ describe('useCreateCase', () => {
   it('invalidates the project detail so hasManualCases reflects the new case', async () => {
     const { client, invalidateSpy } = setup()
     const { result } = renderHook(() => useCreateCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', payload: { name: 'New case' } })
@@ -311,18 +379,18 @@ describe('useCreateCase', () => {
     })
   })
 
-  it('seeds the detail and patches the cached list from the returned suite without waiting on the list refetch', async () => {
-    const { client, invalidateSpy } = await prepareResponseScenario(create, updatedSuite)
+  it('adopts the returned suite into the detail and list, replacing the old cases, and leaves the list stale without fetching it', async () => {
+    const { client, invalidateSpy } = await prepareResponseScenario(create, suiteWithNewCase)
 
     const result = runMutation(client, useCreateCase, {
       suiteId: 'suite-1',
-      payload: { name: 'New case' },
+      payload: { name: 'Pays by voucher' },
     })
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expectCachesSyncedFrom(updatedSuite, client, invalidateSpy)
+    expectSuiteAdopted(suiteWithNewCase, client, invalidateSpy)
   })
 })
 
@@ -330,9 +398,7 @@ describe('useUpdateCase', () => {
   it('invalidates the project detail so hasManualCases reflects an executionMode change', async () => {
     const { client, invalidateSpy } = setup()
     const { result } = renderHook(() => useUpdateCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({
@@ -348,19 +414,19 @@ describe('useUpdateCase', () => {
     })
   })
 
-  it('seeds the detail and patches the cached list from the returned suite without waiting on the list refetch', async () => {
-    const { client, invalidateSpy } = await prepareResponseScenario(update, updatedSuite)
+  it('adopts the returned suite into the detail and list, replacing the old cases, and leaves the list stale without fetching it', async () => {
+    const { client, invalidateSpy } = await prepareResponseScenario(update, suiteWithEditedCase)
 
     const result = runMutation(client, useUpdateCase, {
       suiteId: 'suite-1',
       caseId: 'case-1',
-      patch: { state: 'active' },
+      patch: { steps: ['Open the cart', 'Enter the card', 'Pay'] },
     })
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expectCachesSyncedFrom(updatedSuite, client, invalidateSpy)
+    expectSuiteAdopted(suiteWithEditedCase, client, invalidateSpy)
   })
 })
 
@@ -377,13 +443,10 @@ describe('useDocumentCase', () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
   })
 
-
   it('queues the case and notifies success', async () => {
     const { client } = setup()
     const { result } = renderHook(() => useDocumentCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
@@ -400,9 +463,7 @@ describe('useDocumentCase', () => {
     document_.mockRejectedValueOnce(new ApiError(409, 'nope', 'no-source-file'))
     const { client } = setup()
     const { result } = renderHook(() => useDocumentCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
@@ -418,9 +479,7 @@ describe('useDocumentCase', () => {
     document_.mockRejectedValueOnce(new ApiError(403, 'nope', 'ai-not-enabled'))
     const { client } = setup()
     const { result } = renderHook(() => useDocumentCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
@@ -436,9 +495,7 @@ describe('useDocumentCase', () => {
     document_.mockRejectedValueOnce(new Error('boom'))
     const { client } = setup()
     const { result } = renderHook(() => useDocumentCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
@@ -453,9 +510,7 @@ describe('useDeleteCase', () => {
   it('invalidates the project detail so hasManualCases reflects the removed case', async () => {
     const { client, invalidateSpy } = setup()
     const { result } = renderHook(() => useDeleteCase(), {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={client}>{children}</QueryClientProvider>
-      ),
+      wrapper: wrapperFor(client),
     })
 
     result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
@@ -467,21 +522,21 @@ describe('useDeleteCase', () => {
     })
   })
 
-  it('seeds the detail and patches the cached list from the returned suite without waiting on the list refetch', async () => {
-    const { client, invalidateSpy } = await prepareResponseScenario(remove, updatedSuite)
+  it('adopts the returned suite into the detail and list, dropping the removed case, and leaves the list stale without fetching it', async () => {
+    const { client, invalidateSpy } = await prepareResponseScenario(remove, suiteWithoutCases)
 
     const result = runMutation(client, useDeleteCase, { suiteId: 'suite-1', caseId: 'case-1' })
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expectCachesSyncedFrom(updatedSuite, client, invalidateSpy)
+    expectSuiteAdopted(suiteWithoutCases, client, invalidateSpy)
   })
 })
 
 describe('useUpdateSuite', () => {
-  it('seeds the detail and patches the cached list from the returned suite without waiting on the list refetch', async () => {
-    const { client, invalidateSpy } = await prepareResponseScenario(updateSuiteApi, updatedSuite)
+  it('adopts the returned suite into the detail and list and leaves the list stale without fetching it', async () => {
+    const { client, invalidateSpy } = await prepareResponseScenario(updateSuiteApi, renamedSuite)
 
     const result = runMutation(client, useUpdateSuite, {
       id: 'suite-1',
@@ -491,15 +546,41 @@ describe('useUpdateSuite', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expectCachesSyncedFrom(updatedSuite, client, invalidateSpy)
+    expectSuiteAdopted(renamedSuite, client, invalidateSpy)
   })
 
-  it('clears the default flag of the other cached suites when this one becomes the default', async () => {
+  it('refetches the list when it is on screen, so the visible rows reconcile with the server', async () => {
+    const { client } = setup()
+    list.mockResolvedValueOnce([suite, otherSuite])
+    const onScreen = renderHook(() => useSuites('proj-1'), { wrapper: wrapperFor(client) })
+    await waitFor(() => {
+      expect(onScreen.result.current.suites).toHaveLength(2)
+    })
+    const fromServer: Suite = { ...renamedSuite, description: 'Normalised by the server' }
+    list.mockResolvedValueOnce([fromServer, otherSuite])
+    updateSuiteApi.mockResolvedValue(renamedSuite)
+
+    const result = runMutation(client, useUpdateSuite, {
+      id: 'suite-1',
+      patch: { name: 'Checkout v2' },
+    })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    await waitFor(() => {
+      expect(onScreen.result.current.suites[0]).toEqual(fromServer)
+    })
+    expect(list).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears the default flag of the other cached suites, and stales their cached details, when this one becomes the default', async () => {
     const { client } = setup()
     const previousDefault: Suite = { ...otherSuite, isDefault: true }
     const nowDefault: Suite = { ...suite, isDefault: true }
-    await cacheInactiveList(client, 'proj-1', [suite, previousDefault])
-    list.mockReturnValue(new Promise(() => {}))
+    await cacheInactiveList(client, 'proj-1', [suite, previousDefault, thirdSuite])
+    client.setQueryData(suiteKeys.detail('suite-2'), previousDefault)
+    client.setQueryData(suiteKeys.detail('suite-3'), thirdSuite)
     updateSuiteApi.mockResolvedValue(nowDefault)
 
     const result = runMutation(client, useUpdateSuite, {
@@ -513,17 +594,19 @@ describe('useUpdateSuite', () => {
     expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([
       nowDefault,
       { ...otherSuite, isDefault: false },
+      thirdSuite,
     ])
+    expect(client.getQueryState(suiteKeys.detail('suite-2'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(suiteKeys.detail('suite-3'))?.isInvalidated).toBe(false)
   })
 })
 
 describe('useCreateSuite', () => {
-  const created: Suite = { ...suite, id: 'suite-3', name: 'Payments' }
+  const created = producedSuite('suite-4', 'Payments', [])
 
-  it('seeds the new detail and puts the suite at the top of the cached project list', async () => {
+  it('seeds the new detail and puts the suite at the top of the cached project list, leaving the list stale without fetching it', async () => {
     const { client, invalidateSpy } = setup()
     await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
-    list.mockReturnValue(new Promise(() => {}))
     createSuiteApi.mockResolvedValue(created)
 
     const result = runMutation(client, useCreateSuite, { projectId: 'proj-1', name: 'Payments' })
@@ -531,13 +614,15 @@ describe('useCreateSuite', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expect(client.getQueryData(suiteKeys.detail('suite-3'))).toEqual(created)
+    expect(client.getQueryData(suiteKeys.detail('suite-4'))).toEqual(created)
+    expect(client.getQueryState(suiteKeys.detail('suite-4'))?.isInvalidated).toBe(true)
     expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([
       created,
       suite,
       otherSuite,
     ])
-    expect(list).toHaveBeenCalledTimes(2)
+    expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
+    expect(list).toHaveBeenCalledTimes(1)
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
   })
 
@@ -550,17 +635,18 @@ describe('useCreateSuite', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expect(client.getQueryData(suiteKeys.detail('suite-3'))).toEqual(created)
+    expect(client.getQueryData(suiteKeys.detail('suite-4'))).toEqual(created)
     expect(client.getQueryData(suiteKeys.list('proj-1'))).toBeUndefined()
     expect(list).not.toHaveBeenCalled()
   })
 
-  it('clears the default flag of the other cached suites when the new one is the default', async () => {
+  it('clears the default flag of the other cached suites, and stales their cached details, when the new one is the default', async () => {
     const { client } = setup()
     const previousDefault: Suite = { ...suite, isDefault: true }
     const createdDefault: Suite = { ...created, isDefault: true }
     await cacheInactiveList(client, 'proj-1', [previousDefault, otherSuite])
-    list.mockReturnValue(new Promise(() => {}))
+    client.setQueryData(suiteKeys.detail('suite-1'), previousDefault)
+    client.setQueryData(suiteKeys.detail('suite-2'), otherSuite)
     createSuiteApi.mockResolvedValue(createdDefault)
 
     const result = runMutation(client, useCreateSuite, {
@@ -577,15 +663,16 @@ describe('useCreateSuite', () => {
       { ...suite, isDefault: false },
       otherSuite,
     ])
+    expect(client.getQueryState(suiteKeys.detail('suite-1'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(suiteKeys.detail('suite-2'))?.isInvalidated).toBe(false)
   })
 })
 
 describe('useDeleteSuite', () => {
-  it('drops the suite from the cached list and detail at once, then refetches the list in the background', async () => {
+  it('drops the suite from the cached list and detail at once and leaves the list stale without fetching it', async () => {
     const { client, invalidateSpy } = setup()
     await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
     client.setQueryData(suiteKeys.detail('suite-1'), suite)
-    list.mockReturnValue(new Promise(() => {}))
 
     const result = runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
 
@@ -593,9 +680,21 @@ describe('useDeleteSuite', () => {
       expect(result.current.isSuccess).toBe(true)
     })
     expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([otherSuite])
+    expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
     expect(client.getQueryState(suiteKeys.detail('suite-1'))).toBeUndefined()
-    expect(list).toHaveBeenCalledTimes(2)
+    expect(list).toHaveBeenCalledTimes(1)
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
+  })
+
+  it('invalidates the project detail so hasManualCases reflects the removed suite', async () => {
+    const { client, invalidateSpy } = setup()
+
+    const result = runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.detail('proj-1') })
   })
 
   it('keeps the detail while its page is still mounted, then evicts it once the page leaves', async () => {

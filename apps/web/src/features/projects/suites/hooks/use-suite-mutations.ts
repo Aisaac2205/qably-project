@@ -25,34 +25,42 @@ import { notify } from '@/lib/notify'
 import { useTranslation } from '@/lib/i18n'
 
 function patchSuiteList(queryClient: QueryClient, fresh: Suite) {
-  queryClient.setQueryData<Suite[]>(suiteKeys.list(fresh.projectId), (cached) => {
-    if (cached === undefined) return undefined
+  const listKey = suiteKeys.list(fresh.projectId)
+  const cached = queryClient.getQueryData<Suite[]>(listKey)
 
-    const known = cached.some((entry) => entry.id === fresh.id)
-    const merged = known
-      ? cached.map((entry) => (entry.id === fresh.id ? fresh : entry))
-      : [fresh, ...cached]
+  if (cached === undefined) return
 
-    if (!fresh.isDefault) return merged
+  const known = cached.some((entry) => entry.id === fresh.id)
+  const merged = known
+    ? cached.map((entry) => (entry.id === fresh.id ? fresh : entry))
+    : [fresh, ...cached]
+  const demotedIds = new Set(
+    fresh.isDefault
+      ? merged.filter((entry) => entry.id !== fresh.id && entry.isDefault).map((entry) => entry.id)
+      : [],
+  )
 
-    return merged.map((entry) =>
-      entry.id !== fresh.id && entry.isDefault ? { ...entry, isDefault: false } : entry,
-    )
-  })
+  queryClient.setQueryData<Suite[]>(
+    listKey,
+    demotedIds.size === 0
+      ? merged
+      : merged.map((entry) => (demotedIds.has(entry.id) ? { ...entry, isDefault: false } : entry)),
+  )
+
+  for (const id of demotedIds) {
+    void queryClient.invalidateQueries({ queryKey: suiteKeys.detail(id), refetchType: 'none' })
+  }
 }
 
-function refetchSuiteList(queryClient: QueryClient, projectId: string) {
-  return queryClient.invalidateQueries({
-    queryKey: suiteKeys.list(projectId),
-    refetchType: 'all',
-  })
+function invalidateSuiteList(queryClient: QueryClient, projectId: string) {
+  return queryClient.invalidateQueries({ queryKey: suiteKeys.list(projectId) })
 }
 
 function adoptSuite(queryClient: QueryClient, suite: Suite) {
   queryClient.setQueryData(suiteKeys.detail(suite.id), suite)
   patchSuiteList(queryClient, suite)
   void queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suite.id) })
-  void refetchSuiteList(queryClient, suite.projectId)
+  void invalidateSuiteList(queryClient, suite.projectId)
 }
 
 function evictSuiteDetail(queryClient: QueryClient, suiteId: string) {
@@ -85,7 +93,7 @@ export function useRefreshSuiteLists() {
 
       if (fresh !== undefined) patchSuiteList(queryClient, fresh)
 
-      await refetchSuiteList(queryClient, projectId)
+      await invalidateSuiteList(queryClient, projectId)
     },
     [queryClient],
   )
@@ -129,7 +137,7 @@ export function useDeleteSuite() {
         cached?.filter((entry) => entry.id !== id),
       )
       evictSuiteDetail(queryClient, id)
-      void refetchSuiteList(queryClient, projectId)
+      void invalidateSuiteList(queryClient, projectId)
       void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
     },
   })
