@@ -1,59 +1,16 @@
 'use client'
 
-import { useId, useState } from 'react'
-import Link from 'next/link'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus } from '@phosphor-icons/react'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
-import { Button, buttonVariants } from '@/components/ui/button'
 import { Tabs, TabsList, TabsPanel, TabsTab } from '@/components/ui/tabs'
 import { CiRunList } from '@/features/runs/components/ci-run-list'
+import { NewRunAction } from '@/features/runs/components/new-run-action'
 import { RunList } from '@/features/runs/components/run-list'
 import { DEFAULT_RUNS_TAB, parseRunsTab, type RunsTab } from '@/features/runs/lib/runs-tab'
 import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { cn } from '@/lib/utils'
 import { projectRootPath } from '@/features/projects/lib/routes'
-
-const ACTION_FOCUS =
-  'focus-visible:outline-hidden! focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background'
-
-function NewRunAction({ projectId, disabled }: { projectId: string; disabled: boolean }) {
-  const { t } = useTranslation()
-  const hintId = useId()
-
-  if (disabled) {
-    return (
-      <div className="flex flex-col gap-1 md:items-end">
-        <Button
-          type="button"
-          disabled
-          focusableWhenDisabled
-          aria-describedby={hintId}
-          className={cn('w-full md:w-auto', ACTION_FOCUS)}
-        >
-          <Plus size={16} weight="bold" aria-hidden="true" />
-          {t('runs.newRun')}
-        </Button>
-        <p id={hintId} className="text-xs text-muted md:max-w-64 md:text-right">
-          {t('runs.noManualCasesInProject')}
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex md:justify-end">
-      <Link
-        href={`/projects/${projectId}/runs/new`}
-        className={cn(buttonVariants(), 'w-full md:w-auto', ACTION_FOCUS)}
-      >
-        <Plus size={16} weight="bold" aria-hidden="true" />
-        {t('runs.newRun')}
-      </Link>
-    </div>
-  )
-}
 
 export function RunListPageClient({
   projectId,
