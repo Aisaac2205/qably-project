@@ -184,6 +184,14 @@ describe('approxDuration', () => {
     expect(approxDuration(iso(START), iso(START - 5 * MINUTE))).toBeUndefined()
   })
 
+  it.each<[string, string, string]>([
+    ['the start is not a date', 'not a date', iso(START + 5 * MINUTE)],
+    ['the end is not a date', iso(START), 'not a date'],
+    ['both are empty', '', ''],
+  ])('omits the duration when %s instead of returning no parts', (_label, startedAt, lastReportedAt) => {
+    expect(approxDuration(startedAt, lastReportedAt)).toBeUndefined()
+  })
+
   it.each<[string, number, DurationPart[]]>([
     ['1 s', SECOND, [{ key: 'runs.ci.durationSeconds', count: 1 }]],
     ['1.9 s', 1_900, [{ key: 'runs.ci.durationSeconds', count: 1 }]],

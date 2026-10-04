@@ -98,6 +98,26 @@ describe('useCiRunsPage', () => {
     expect(cacheHas(client, ciRunKeys.page('proj-1'))).toBe(true)
   })
 
+  it('hands the abort signal of the query to every page request', async () => {
+    list
+      .mockResolvedValueOnce({ items: [ciRun('a')], nextCursor: 'after-a' })
+      .mockResolvedValueOnce({ items: [ciRun('b')] })
+
+    const { result } = renderHook(() => useCiRunsPage('proj-1'), {
+      wrapper: wrapperFor(createClient()),
+    })
+    await waitFor(() => expect(ids(result.current.ciRuns)).toEqual(['a']))
+
+    await act(async () => {
+      await result.current.fetchNextPage()
+    })
+    await waitFor(() => expect(ids(result.current.ciRuns)).toEqual(['a', 'b']))
+
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(list).toHaveBeenNthCalledWith(1, expect.anything(), expect.any(AbortSignal))
+    expect(list).toHaveBeenNthCalledWith(2, expect.anything(), expect.any(AbortSignal))
+  })
+
   it('reports loading until the first page arrives', async () => {
     let resolvePage: (page: { items: CiRunSummaryRecord[] }) => void = () => undefined
     list.mockReturnValue(
@@ -134,8 +154,8 @@ describe('useCiRunsPage', () => {
 
   it('accumulates pages and hands each cursor back unchanged', async () => {
     list
-      .mockResolvedValueOnce({ items: [ciRun('a'), ciRun('b')], nextCursor: 'b' })
-      .mockResolvedValueOnce({ items: [ciRun('c'), ciRun('d')], nextCursor: 'd' })
+      .mockResolvedValueOnce({ items: [ciRun('a'), ciRun('b')], nextCursor: 'after-b' })
+      .mockResolvedValueOnce({ items: [ciRun('c'), ciRun('d')], nextCursor: 'after-d' })
       .mockResolvedValueOnce({ items: [ciRun('e')] })
 
     const { result } = renderHook(() => useCiRunsPage('proj-1'), {
@@ -156,7 +176,7 @@ describe('useCiRunsPage', () => {
     })
     await waitFor(() => expect(ids(result.current.ciRuns)).toEqual(['a', 'b', 'c', 'd', 'e']))
     expect(result.current.hasNextPage).toBe(false)
-    expect(list.mock.calls.map(([params]) => params.cursor)).toEqual([undefined, 'b', 'd'])
+    expect(list.mock.calls.map(([params]) => params.cursor)).toEqual([undefined, 'after-b', 'after-d'])
     expect(list.mock.calls.every(([params]) => params.limit === 25)).toBe(true)
   })
 
@@ -189,7 +209,7 @@ describe('useCiRunsPage', () => {
 
   it('keeps the loaded rows and the way to retry when the next page fails', async () => {
     list
-      .mockResolvedValueOnce({ items: [ciRun('a'), ciRun('b')], nextCursor: 'b' })
+      .mockResolvedValueOnce({ items: [ciRun('a'), ciRun('b')], nextCursor: 'after-b' })
       .mockRejectedValueOnce(new ApiError(500, 'Internal error'))
       .mockResolvedValueOnce({ items: [ciRun('c')] })
 
@@ -211,7 +231,11 @@ describe('useCiRunsPage', () => {
     })
     await waitFor(() => expect(ids(result.current.ciRuns)).toEqual(['a', 'b', 'c']))
     expect(result.current.isError).toBe(false)
-    expect(list.mock.calls.map(([params]) => params.cursor)).toEqual([undefined, 'b', 'b'])
+    expect(list.mock.calls.map(([params]) => params.cursor)).toEqual([
+      undefined,
+      'after-b',
+      'after-b',
+    ])
   })
 
   it('reports an error with no rows when the first page fails', async () => {
@@ -308,6 +332,16 @@ describe('useCiRun', () => {
     expect(detail).toHaveBeenCalledTimes(1)
     expect(detail.mock.calls[0][0]).toBe('c1')
     expect(cacheHas(client, ciRunKeys.detail('c1'))).toBe(true)
+  })
+
+  it('hands the abort signal of the query to the request', async () => {
+    detail.mockResolvedValue(ciRunDetail('c1'))
+
+    const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(createClient()) })
+    await waitFor(() => expect(result.current.ciRun?.id).toBe('c1'))
+
+    expect(detail).toHaveBeenCalledTimes(1)
+    expect(detail).toHaveBeenCalledWith('c1', expect.any(AbortSignal))
   })
 
   it('makes no request while the id is undefined', async () => {

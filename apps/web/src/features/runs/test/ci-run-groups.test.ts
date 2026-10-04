@@ -103,6 +103,24 @@ describe('groupRunsByJob', () => {
     expect(keys(result.groups)).toStrictEqual(['alpha', 'node 9', 'node 20', 'Zeta'])
   })
 
+  it('keeps keys that differ only by case as separate groups in the order they first appear', () => {
+    const lowerFirst = groupRunsByJob([inJob('r1', 'api'), inJob('r2', 'API')])
+    const upperFirst = groupRunsByJob([inJob('r1', 'API'), inJob('r2', 'api')])
+
+    expect(keys(lowerFirst.groups)).toStrictEqual(['api', 'API'])
+    expect(ids(lowerFirst.groups[0].runs)).toStrictEqual(['r1'])
+    expect(ids(lowerFirst.groups[1].runs)).toStrictEqual(['r2'])
+    expect(keys(upperFirst.groups)).toStrictEqual(['API', 'api'])
+    expect(ids(upperFirst.groups[0].runs)).toStrictEqual(['r1'])
+    expect(ids(upperFirst.groups[1].runs)).toStrictEqual(['r2'])
+  })
+
+  it('does not let a key that differs only by case jump ahead of its neighbours', () => {
+    const result = groupRunsByJob([inJob('r1', 'Node'), inJob('r2', 'alpha'), inJob('r3', 'node')])
+
+    expect(keys(result.groups)).toStrictEqual(['alpha', 'Node', 'node'])
+  })
+
   it('lists the runs without a job key as the unnamed section, in their original order', () => {
     const result = groupRunsByJob([
       inJob('u1', undefined),
@@ -273,7 +291,11 @@ describe('reportLabel', () => {
     ['a local run id', 'gha-local-job-junit-xml-ab12cd34'],
     ['an id without the 8-character hash', 'gha-900-api-junit-xml'],
     ['an id with a short hash', 'gha-900-api-junit-xml-ab12cd3'],
+    ['an id with a long hash', 'gha-900-api-junit-xml-ab12cd345'],
+    ['an id with a long hash and a part suffix', 'gha-900-api-junit-xml-ab12cd345-p1'],
+    ['an id with a 16-character hash', 'gha-900-api-junit-xml-ab12cd34ef56ab78'],
     ['an id whose hash is not hexadecimal', 'gha-900-api-junit-xml-ab12cdzz'],
+    ['an id whose hash is in upper case', 'gha-900-api-junit-xml-AB12CD34'],
   ])('returns the full id for %s', (_label, reportExternalId) => {
     expect(reportLabel(reportExternalId, { ciRunExternalId: '900', ciJobKey: 'api' })).toBe(
       reportExternalId,
