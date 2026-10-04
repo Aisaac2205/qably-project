@@ -24,7 +24,7 @@ function GitHubRunLink({ ciRun }: { ciRun: CiRunSummaryRecord }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t('runs.ci.githubLinkAria', { repository, host: new URL(href).host })}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-default hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary md:min-h-8"
+      className="inline-flex min-h-11 items-center gap-1.5 rounded text-sm font-medium text-default hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:min-h-8"
     >
       <GithubLogo size={16} weight="fill" aria-hidden="true" />
       {repository}
@@ -51,7 +51,7 @@ export function CiRunHeader({ ciRun }: { ciRun: CiRunSummaryRecord }) {
         <Tooltip>
           <TooltipTrigger
             render={<span tabIndex={0} />}
-            className="inline-flex min-h-6 shrink-0 items-center self-start rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            className="inline-flex min-h-6 shrink-0 items-center self-start rounded focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <StatusChip status={ciRun.status} scope="ci-run" />
           </TooltipTrigger>

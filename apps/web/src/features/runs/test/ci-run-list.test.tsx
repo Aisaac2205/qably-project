@@ -7,6 +7,7 @@ import { ciRunKeys } from '@/features/runs/lib/query-keys'
 import { listCiRuns } from '@/features/runs/api/ci-runs.api'
 import { useI18nStore } from '@/lib/i18n/store'
 import { NOW, PROJECT, ciRunSummary } from './ci-run-fixtures'
+import { expectEveryFocusableToCarryARing } from './focus-ring'
 
 vi.mock('@/features/runs/api/ci-runs.api', () => ({
   listCiRuns: vi.fn(),
@@ -173,6 +174,15 @@ describe('CiRunList states', () => {
     )
     expect(screen.getAllByRole('link')).toHaveLength(1)
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('gives the docs link of the empty state a focus ring', async () => {
+    list.mockResolvedValue({ items: [] })
+
+    const { container } = renderList()
+
+    await screen.findByText('No runs yet')
+    expectEveryFocusableToCarryARing(container, 1)
   })
 
   it('renders the rows once the first page arrives', async () => {

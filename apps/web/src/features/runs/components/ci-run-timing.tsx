@@ -28,7 +28,7 @@ export function CiRunDuration({
         className={cn(
           'tabular-nums',
           focusable &&
-            'rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+            'rounded focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2',
         )}
       >
         {t('runs.ci.durationApprox', { value })}

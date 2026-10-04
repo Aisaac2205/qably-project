@@ -51,7 +51,7 @@ function LoadMore({
       <Button
         type="button"
         variant="outline"
-        className="w-full focus-visible:ring-primary sm:w-auto"
+        className="w-full focus-visible:outline-hidden! focus-visible:ring-primary sm:w-auto"
         onClick={onLoad}
         disabled={isFetching}
         focusableWhenDisabled
@@ -102,7 +102,7 @@ export function CiRunList({ projectId }: { projectId: string }) {
       action={
         <a
           href={docsUrl(REPORT_CI_ANCHOR, locale)}
-          className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary md:min-h-8"
+          className="inline-flex min-h-11 items-center rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:min-h-8"
         >
           {t('runs.ci.emptyDocsLink')}
         </a>

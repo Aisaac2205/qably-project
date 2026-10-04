@@ -5,6 +5,7 @@ import type { CiRunSummaryRecord } from '@qably/types'
 import { CiRunRow } from '@/features/runs/components/ci-run-row'
 import { useI18nStore } from '@/lib/i18n/store'
 import { NOW, PROJECT, ciRunSummary } from './ci-run-fixtures'
+import { expectEveryFocusableToCarryARing, expectFocusRing } from './focus-ring'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) => (
@@ -156,9 +157,21 @@ describe('CiRunRow', () => {
     expect(screen.getByText('Último reporte hace 5 min')).toBeInTheDocument()
   })
 
-  it('is at least 44px tall and keeps a visible focus ring', () => {
+  it('is at least 44px tall', () => {
     renderRows([ciRunSummary('ci-1')])
 
-    expect(rows()[0]).toHaveClass('min-h-11', 'focus-visible:outline-2')
+    expect(rows()[0]).toHaveClass('min-h-11')
+  })
+
+  it('draws its focus ring inside the row so the scroll container cannot clip it', () => {
+    renderRows([ciRunSummary('ci-1')])
+
+    expectFocusRing(rows()[0], { inset: true })
+  })
+
+  it('leaves no focusable element without a ring', () => {
+    const { container } = renderRows([ciRunSummary('ci-1'), ciRunSummary('ci-2')])
+
+    expectEveryFocusableToCarryARing(container, 2)
   })
 })

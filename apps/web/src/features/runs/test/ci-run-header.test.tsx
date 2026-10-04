@@ -5,6 +5,7 @@ import type { CiRunSummaryRecord } from '@qably/types'
 import { CiRunHeader } from '@/features/runs/components/ci-run-header'
 import { useI18nStore } from '@/lib/i18n/store'
 import { NOW, ciRunSummary } from './ci-run-fixtures'
+import { expectEveryFocusableToCarryARing, expectFocusRing } from './focus-ring'
 
 const GITHUB: Partial<CiRunSummaryRecord> = {
   workflowName: 'CI',
@@ -220,9 +221,23 @@ describe('CiRunHeader GitHub link', () => {
     ).toBeInTheDocument()
   })
 
-  it('is at least 44px tall below md and keeps a focus ring', () => {
+  it('is at least 44px tall below md', () => {
     renderHeader()
 
-    expect(screen.getByRole('link')).toHaveClass('min-h-11', 'focus-visible:outline-2')
+    expect(screen.getByRole('link')).toHaveClass('min-h-11')
+  })
+
+  it('shows a focus ring that does not depend on an outline utility', () => {
+    renderHeader()
+
+    expectFocusRing(screen.getByRole('link'))
+  })
+})
+
+describe('CiRunHeader focus', () => {
+  it('leaves no focusable element without a ring', () => {
+    const { container } = renderHeader()
+
+    expectEveryFocusableToCarryARing(container, 3)
   })
 })

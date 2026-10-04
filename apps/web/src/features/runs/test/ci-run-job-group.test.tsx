@@ -5,6 +5,7 @@ import type { CiRunJobRunRecord } from '@qably/types'
 import { CiRunJobGroup } from '@/features/runs/components/ci-run-job-group'
 import { useI18nStore } from '@/lib/i18n/store'
 import { PROJECT, ciRunJobRun } from './ci-run-fixtures'
+import { expectEveryFocusableToCarryARing, expectFocusRing } from './focus-ring'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) => (
@@ -94,10 +95,16 @@ describe('CiRunJobGroup suites', () => {
     expect(screen.queryByText('checkout-report')).not.toBeInTheDocument()
   })
 
-  it('keeps every suite row at least 44px tall with a focus ring', () => {
+  it('keeps every suite row at least 44px tall', () => {
     renderGroup(failing(1), 'api')
 
-    expect(screen.getByRole('link')).toHaveClass('min-h-11', 'focus-visible:outline-2')
+    expect(screen.getByRole('link')).toHaveClass('min-h-11')
+  })
+
+  it('draws the focus ring of a suite row inside the row so the scroll container cannot clip it', () => {
+    renderGroup(failing(1), 'api')
+
+    expectFocusRing(screen.getByRole('link'), { inset: true })
   })
 })
 
@@ -217,10 +224,25 @@ describe('CiRunJobGroup suites without failures', () => {
     expect(screen.getByRole('button', { name: 'Show 3 suites without failures' })).toBeInTheDocument()
   })
 
-  it('makes the disclosure at least 44px tall with a focus ring', () => {
+  it('makes the disclosure at least 44px tall', () => {
     renderGroup([...failing(1), ...passing(1)], 'api')
 
-    expect(screen.getByRole('button')).toHaveClass('min-h-11', 'focus-visible:outline-2')
+    expect(screen.getByRole('button')).toHaveClass('min-h-11')
+  })
+
+  it('shows a visible focus ring on the disclosure button', () => {
+    renderGroup([...failing(1), ...passing(1)], 'api')
+
+    expectFocusRing(screen.getByRole('button'), { inset: true })
+  })
+
+  it('leaves no focusable element of the open group without a ring', async () => {
+    const user = userEvent.setup()
+    const { container } = renderGroup([...failing(2), ...passing(2)], 'api')
+
+    await user.click(screen.getByRole('button'))
+
+    expectEveryFocusableToCarryARing(container, 5)
   })
 
   it('translates the disclosure with the active locale', () => {

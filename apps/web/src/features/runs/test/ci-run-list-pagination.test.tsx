@@ -6,6 +6,7 @@ import type { CiRunsPageRecord } from '@qably/types'
 import { CiRunList } from '@/features/runs/components/ci-run-list'
 import { listCiRuns } from '@/features/runs/api/ci-runs.api'
 import { PROJECT, ciRunSummary } from './ci-run-fixtures'
+import { expectEveryFocusableToCarryARing } from './focus-ring'
 
 vi.mock('@/features/runs/api/ci-runs.api', () => ({
   listCiRuns: vi.fn(),
@@ -175,5 +176,16 @@ describe('CiRunList pagination', () => {
     renderList()
 
     expect(await screen.findByRole('button', { name: 'Load more' })).toHaveClass('h-11')
+  })
+
+  it('overrides the faint ring of the button primitive with the primary ring on load more', async () => {
+    list.mockResolvedValue(page(['one'], 'after-one'))
+
+    const { container } = renderList()
+
+    expect(await screen.findByRole('button', { name: 'Load more' })).toHaveClass(
+      'focus-visible:ring-primary',
+    )
+    expectEveryFocusableToCarryARing(container, 2)
   })
 })
