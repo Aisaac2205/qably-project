@@ -310,9 +310,9 @@ On a pull request `GITHUB_REF_NAME` is `<number>/merge`, which is why `GITHUB_HE
 
 Validation: strings are trimmed and must be 1 to 255 characters; `ciRunNumber` and `ciRunAttempt` are
 integers from 1 to 2,147,483,647 (the `int32` range of the column); `ciServerUrl` must be an `http` or
-`https` URL of at most 255 characters. A value outside these bounds answers `400` on
-`/runs/ingest/junit`. The reporter applies the same bounds before sending and omits what does not fit
-(see "Reporter behavior").
+`https` URL of at most 255 characters and is stored as its origin (see "`ciServerUrl` policy"). A value
+outside these bounds answers `400` on `/runs/ingest/junit`. The reporter applies the same bounds before
+sending and omits what does not fit (see "Reporter behavior").
 
 ### Rules
 
@@ -409,13 +409,24 @@ and keeps the `gha-local-job-...` externalId. It omits a value rather than sendi
 ### `ciServerUrl` policy
 
 The API accepts `http` and `https` only, up to 255 characters, so `javascript:` and `ftp:` URLs and
-values without a scheme are rejected with `400`. That check looks at the scheme and nothing else, and
-this is the current behavior: a value with credentials (`https://user:pw@host`) or with a query string
-or fragment (`https://github.com/?token=abc#frag`) passes, is stored as sent and is returned verbatim
-as `serverUrl` by `GET /ci-runs` and `GET /ci-runs/:id`. The web link to the workflow run is built
-from `new URL(serverUrl).origin`, so the link in the UI never carries credentials, path, query or
-fragment; the API response does. Whether the schema should also reject username, password, query and
-fragment is an open decision.
+values without a scheme are rejected with `400`. A value that passes is normalized to its origin
+(`new URL(value).origin`) before anything uses it: userinfo, path, query and fragment are discarded,
+the scheme and host are lowercased and a default port is dropped.
+
+| Sent | Stored |
+| --- | --- |
+| `https://user:pw@github.com/x?token=abc#frag` | `https://github.com` |
+| `https://github.com/` | `https://github.com` |
+| `HTTPS://GitHub.com` | `https://github.com` |
+| `https://ghe.example.com:8443/path` | `https://ghe.example.com:8443` |
+
+The value is normalized rather than rejected so that a pipeline that puts a credential in this
+variable still has its report ingested, with only the origin kept. The length limit applies to the
+value as sent, before normalization. Both ingestion schemas share the rule, so the normalized value is
+the one the queued job carries, the one `CiRunLinker` writes to `serverUrl` and the one `GET /ci-runs`
+and `GET /ci-runs/:id` return. The reporter sends `GITHUB_SERVER_URL`, which is already an origin, so
+its payload is unchanged. The backfill never writes this column. The web link to the workflow run is
+built from `new URL(serverUrl).origin` as well.
 
 ## Response
 

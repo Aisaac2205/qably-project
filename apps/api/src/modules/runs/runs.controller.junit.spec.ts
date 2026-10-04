@@ -171,6 +171,29 @@ describe('RunsController.ingestJunit', () => {
     }
   });
 
+  it('enqueues only the origin of a ciServerUrl that carries credentials, query and fragment', async () => {
+    const { controller, runIngestQueue } = build();
+    const pipe = new ZodValidationPipe(ingestJunitQuerySchema);
+
+    await controller.ingestJunit(
+      apiKey,
+      pipe.transform({
+        externalId: 'ci-42',
+        ciRunExternalId: '900',
+        ciServerUrl: 'https://user:pw@github.com/x?token=abc#frag',
+      }),
+      multiSuiteReport,
+    );
+
+    const jobs = jobBodies(runIngestQueue);
+    expect(jobs).toHaveLength(3);
+    for (const job of jobs) {
+      expect(job.data.body.ciServerUrl).toBe('https://github.com');
+    }
+    expect(JSON.stringify(jobs)).not.toContain('token=abc');
+    expect(JSON.stringify(jobs)).not.toContain('user:pw');
+  });
+
   it('keeps the ci fields on the job body when the caller pins a suiteId', async () => {
     const { controller, runIngestQueue } = build();
 

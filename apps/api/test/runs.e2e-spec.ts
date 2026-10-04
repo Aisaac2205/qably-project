@@ -23,6 +23,8 @@ import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RUN_INGEST_QUEUE } from '../src/modules/runs/runs.contracts';
 import { RunsModule } from '../src/modules/runs/runs.module';
+import type { IngestRunInput } from '../src/modules/runs/runs.schemas';
+import { RunsService } from '../src/modules/runs/runs.service';
 import { stubQueues } from './support/stub-queues';
 import { testEnv } from './support/test-env';
 
@@ -425,6 +427,62 @@ describe('Runs ingestion (e2e)', () => {
 
       expect(prisma.ciRun.upsert).not.toHaveBeenCalled();
       expect(prisma.run.upsert).not.toHaveBeenCalled();
+    });
+
+    describe('ciServerUrl normalization', () => {
+      const dirtyUrl = 'https://user:pw@github.com/x?token=abc#frag';
+      const origin = 'https://github.com';
+
+      const upsertedServerUrls = () => {
+        const [call] = prisma.ciRun.upsert.mock.calls[0] as [
+          { create: { serverUrl?: string }; update: { serverUrl?: string } },
+        ];
+        return [call.create.serverUrl, call.update.serverUrl];
+      };
+
+      it('stores only the origin of a ciServerUrl sent to the json route', async () => {
+        await request(app.getHttpServer())
+          .post('/runs/ingest')
+          .set('Authorization', `Bearer ${generated.token}`)
+          .send({
+            ...validBody,
+            source: 'github_actions',
+            ...ciFields,
+            ciServerUrl: dirtyUrl,
+          })
+          .expect(200);
+
+        expect(upsertedServerUrls()).toEqual([origin, origin]);
+      });
+
+      it('enqueues and then stores only the origin of a ciServerUrl sent to the junit route', async () => {
+        await postJunit(
+          `externalId=${reportExternalId}&source=github_actions&ciRunExternalId=900&ciServerUrl=${encodeURIComponent(dirtyUrl)}`,
+        ).expect(202);
+
+        const [body] = enqueuedBodies();
+        expect(body.ciServerUrl).toBe(origin);
+        expect(JSON.stringify(body)).not.toContain('token=abc');
+
+        await app.get(RunsService).ingest(
+          {
+            apiKeyId: 'key-1',
+            projectId: 'project-1',
+            organizationId: 'org-1',
+          },
+          body as unknown as IngestRunInput,
+        );
+
+        expect(upsertedServerUrls()).toEqual([origin, origin]);
+      });
+
+      it('keeps the payload of the reporter unchanged when it sends an origin', async () => {
+        await postJunit(
+          `externalId=${reportExternalId}&source=github_actions&ciRunExternalId=900&ciServerUrl=${encodeURIComponent(origin)}`,
+        ).expect(202);
+
+        expect(enqueuedBodies()[0].ciServerUrl).toBe(origin);
+      });
     });
 
     it('accepts a junit report without ci fields with a 202 and the same shape as before', async () => {

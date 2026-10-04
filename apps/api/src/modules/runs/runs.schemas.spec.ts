@@ -405,6 +405,39 @@ const fullCiBody = {
 const ciKeysOf = (value: object) =>
   Object.keys(value).filter((key) => key.startsWith('ci'));
 
+const ciServerUrlOrigins = [
+  [
+    'credentials, path, query and fragment',
+    'https://user:pw@github.com/x?token=abc#frag',
+    'https://github.com',
+  ],
+  ['a username only', 'https://token@github.com', 'https://github.com'],
+  ['a trailing slash', 'https://github.com/', 'https://github.com'],
+  [
+    'a query without a path',
+    'https://github.com?token=abc',
+    'https://github.com',
+  ],
+  [
+    'a fragment without a path',
+    'https://github.com#frag',
+    'https://github.com',
+  ],
+  ['an upper case scheme and host', 'HTTPS://GitHub.com', 'https://github.com'],
+  [
+    'a custom port and a path',
+    'https://ghe.example.com:8443/path',
+    'https://ghe.example.com:8443',
+  ],
+  ['the default port', 'https://github.com:443', 'https://github.com'],
+  [
+    'plain http with a path',
+    'http://ghe.internal/a?b=c',
+    'http://ghe.internal',
+  ],
+  ['an origin', 'https://github.com', 'https://github.com'],
+] as const;
+
 describe('ingestJunitQuerySchema ci fields', () => {
   const parse = (extra: Record<string, unknown>) =>
     ingestJunitQuerySchema.safeParse({ externalId: 'ci-42', ...extra });
@@ -503,6 +536,32 @@ describe('ingestJunitQuerySchema ci fields', () => {
     expect(parse({ ciServerUrl: atLimit }).success).toBe(true);
     expect(parse({ ciServerUrl: overLimit }).success).toBe(false);
   });
+
+  it.each(ciServerUrlOrigins)(
+    'normalizes a ciServerUrl with %s to its origin',
+    (_label, value, origin) => {
+      const result = parse({ ciServerUrl: value });
+
+      expect(result.success && result.data.ciServerUrl).toBe(origin);
+    },
+  );
+
+  it('keeps the normalized ciServerUrl stable when it is parsed again', () => {
+    const first = parse({ ciServerUrl: 'https://u:p@ghe.example.com:8443/x' });
+    const again = parse({
+      ciServerUrl: first.success ? first.data.ciServerUrl : undefined,
+    });
+
+    expect(again.success && again.data.ciServerUrl).toBe(
+      'https://ghe.example.com:8443',
+    );
+  });
+
+  it('leaves ciServerUrl out of the result when it is not sent', () => {
+    const result = parse({});
+
+    expect(result.success && 'ciServerUrl' in result.data).toBe(false);
+  });
 });
 
 describe('ingestRunSchema ci fields', () => {
@@ -581,6 +640,29 @@ describe('ingestRunSchema ci fields', () => {
       expect(parse({ ciServerUrl: value }).success).toBe(false);
     },
   );
+
+  it('rejects a ciServerUrl over 255 characters before normalizing it', () => {
+    const prefix = 'https://github.com/';
+    const overLimit = `${prefix}${'a'.repeat(256 - prefix.length)}`;
+
+    expect(overLimit).toHaveLength(256);
+    expect(parse({ ciServerUrl: overLimit }).success).toBe(false);
+  });
+
+  it.each(ciServerUrlOrigins)(
+    'normalizes a ciServerUrl with %s to its origin',
+    (_label, value, origin) => {
+      const result = parse({ ciServerUrl: value });
+
+      expect(result.success && result.data.ciServerUrl).toBe(origin);
+    },
+  );
+
+  it('leaves ciServerUrl out of the result when it is not sent', () => {
+    const result = parse({});
+
+    expect(result.success && 'ciServerUrl' in result.data).toBe(false);
+  });
 
   it('still enforces the suiteId or suiteName rule when ci fields are present', () => {
     const result = ingestRunSchema.safeParse({

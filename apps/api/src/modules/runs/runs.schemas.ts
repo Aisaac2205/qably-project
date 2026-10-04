@@ -28,7 +28,10 @@ const failureDetails = z.string().trim().min(1).max(4000);
 const skipReason = z.string().trim().min(1).max(500);
 const ciString = z.string().trim().min(1).max(255);
 const ciPositiveInt = z.coerce.number().int().min(1).max(2_147_483_647);
-const ciServerUrl = z.url({ protocol: /^https?$/ }).max(255);
+const ciServerUrl = z
+  .url({ protocol: /^https?$/ })
+  .max(255)
+  .transform((value) => new URL(value).origin);
 
 const ciFields = {
   ciRunExternalId: ciString.optional(),

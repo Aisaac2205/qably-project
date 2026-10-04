@@ -142,8 +142,10 @@ A missing `projectId`, or a `limit` of 0 or 101, answers `400` and reads nothing
 }
 ```
 
-Columns that are `null` are omitted from the item. An item carries no list of runs and no counts of
-suites or jobs; those belong to the detail.
+Columns that are `null` are omitted from the item. `serverUrl` is the origin of the CI
+server (`scheme://host[:port]`): ingestion discards credentials, path, query and fragment (see
+`docs/RUN_INGESTION.md`). An item carries no list of runs and no counts of suites or jobs; those belong
+to the detail.
 
 **Status is derived on every read and never stored.** It is `failing` when any run linked to the CI
 run has status `fail`, and `passing` otherwise. That includes a CI run with no linked runs and runs
