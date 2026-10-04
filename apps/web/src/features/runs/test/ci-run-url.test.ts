@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CiRunSummaryRecord, RunSource } from '@qably/types'
-import { buildCiRunUrl } from '@/features/runs/lib/ci-run-format'
+import { buildCiRunUrl } from '@/features/runs/lib/ci-run-url'
 
 function ciRun(overrides: Partial<CiRunSummaryRecord> = {}): CiRunSummaryRecord {
   return {

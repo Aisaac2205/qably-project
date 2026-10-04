@@ -4,7 +4,7 @@ import {
   groupRunsByJob,
   reportLabel,
   reportLabelsByRun,
-} from '@/features/runs/lib/ci-run-format'
+} from '@/features/runs/lib/ci-run-groups'
 
 function run(id: string, overrides: Partial<CiRunJobRunRecord> = {}): CiRunJobRunRecord {
   return {

@@ -5,10 +5,10 @@ import {
   ciRunMetaParts,
   ciRunTitle,
   freshness,
-  humanizeJobKey,
   type DurationPart,
   type FreshnessPart,
 } from '@/features/runs/lib/ci-run-format'
+import { humanizeJobKey } from '@/features/runs/lib/ci-run-groups'
 import { useI18nStore } from '@/lib/i18n/store'
 
 const SECOND = 1000
