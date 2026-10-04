@@ -1,10 +1,12 @@
 'use client'
 
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { ApiError } from '@/lib/api-client'
 import { getCiRun, listCiRuns } from '../api/ci-runs.api'
 import { ciRunKeys } from '../lib/query-keys'
 
 export const CI_RUNS_PAGE_SIZE = 25
+const CI_RUN_RETRIES = 1
 
 export function useCiRunsPage(projectId: string) {
   const query = useInfiniteQuery({
@@ -25,6 +27,11 @@ export function useCiRunsPage(projectId: string) {
   }
 }
 
+function retryUnlessNotFound(failureCount: number, error: Error): boolean {
+  if (error instanceof ApiError && error.status === 404) return false
+  return failureCount < CI_RUN_RETRIES
+}
+
 export function useCiRun(id: string | undefined) {
   const resolvedId = id ?? ''
 
@@ -32,6 +39,7 @@ export function useCiRun(id: string | undefined) {
     queryKey: ciRunKeys.detail(resolvedId),
     queryFn: ({ signal }) => getCiRun(resolvedId, signal),
     enabled: resolvedId !== '',
+    retry: retryUnlessNotFound,
   })
 
   return {

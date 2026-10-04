@@ -426,12 +426,66 @@ describe('useCiRun', () => {
   })
 
   it('exposes a server failure with its own status', async () => {
+    vi.useFakeTimers()
     detail.mockRejectedValue(new ApiError(500, 'Internal error'))
 
     const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(createClient()) })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
 
-    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.isError).toBe(true)
     expect((result.current.error as ApiError).status).toBe(500)
+  })
+
+  it('does not retry a request that came back 404', async () => {
+    vi.useFakeTimers()
+    detail.mockRejectedValue(new ApiError(404, 'CI run not found', 'not-found'))
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 1 } } })
+
+    const { result } = renderHook(() => useCiRun('missing'), { wrapper: wrapperFor(client) })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10)
+    })
+
+    expect(result.current.isError).toBe(true)
+    expect(detail).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+
+    expect(detail).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['a server failure', new ApiError(500, 'Internal error')],
+    ['a forbidden response', new ApiError(403, 'Forbidden', 'forbidden')],
+    ['a network failure', new TypeError('Failed to fetch')],
+  ])('retries %s once before reporting it', async (_label, failure) => {
+    vi.useFakeTimers()
+    detail.mockRejectedValue(failure)
+
+    const { result } = renderHook(() => useCiRun('c1'), { wrapper: wrapperFor(createClient()) })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10)
+    })
+
+    expect(detail).toHaveBeenCalledTimes(1)
+    expect(result.current.isError).toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+
+    expect(detail).toHaveBeenCalledTimes(2)
+    expect(result.current.isError).toBe(true)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000)
+    })
+
+    expect(detail).toHaveBeenCalledTimes(2)
   })
 
   it('serves a CI run seeded under the detail key without asking the server', () => {
