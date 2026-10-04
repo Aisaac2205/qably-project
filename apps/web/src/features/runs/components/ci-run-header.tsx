@@ -1,5 +1,6 @@
 'use client'
 
+import { useId } from 'react'
 import { ArrowUpRight, GithubLogo } from '@phosphor-icons/react'
 import type { CiRunSummaryRecord } from '@qably/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -33,8 +34,29 @@ function GitHubRunLink({ ciRun }: { ciRun: CiRunSummaryRecord }) {
   )
 }
 
-export function CiRunHeader({ ciRun }: { ciRun: CiRunSummaryRecord }) {
+function CiRunStatus({ status }: { status: CiRunSummaryRecord['status'] }) {
   const { t } = useTranslation()
+  const descriptionId = useId()
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger
+          render={<span tabIndex={0} aria-describedby={descriptionId} />}
+          className="inline-flex min-h-6 shrink-0 items-center self-start rounded focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <StatusChip status={status} scope="ci-run" />
+        </TooltipTrigger>
+        <TooltipContent>{t('runs.ci.statusTooltip')}</TooltipContent>
+      </Tooltip>
+      <span id={descriptionId} className="sr-only">
+        {t('runs.ci.statusTooltip')}
+      </span>
+    </>
+  )
+}
+
+export function CiRunHeader({ ciRun }: { ciRun: CiRunSummaryRecord }) {
   const now = useNow(FRESHNESS_TICK_MS)
   const title = ciRunTitle(ciRun)
   const workflow = present(ciRun.workflowName)
@@ -48,15 +70,7 @@ export function CiRunHeader({ ciRun }: { ciRun: CiRunSummaryRecord }) {
           </h2>
           <CiRunMeta ciRun={ciRun} />
         </div>
-        <Tooltip>
-          <TooltipTrigger
-            render={<span tabIndex={0} />}
-            className="inline-flex min-h-6 shrink-0 items-center self-start rounded focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            <StatusChip status={ciRun.status} scope="ci-run" />
-          </TooltipTrigger>
-          <TooltipContent>{t('runs.ci.statusTooltip')}</TooltipContent>
-        </Tooltip>
+        <CiRunStatus status={ciRun.status} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">

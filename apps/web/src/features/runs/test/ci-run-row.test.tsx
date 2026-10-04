@@ -148,6 +148,14 @@ describe('CiRunRow', () => {
     expect(rows()[1]).toHaveFocus()
   })
 
+  it('keeps the tooltip sentence out of the link, which is the whole accessible name of the row', () => {
+    renderRows([ciRunSummary('ci-1')])
+
+    expect(screen.getByText('~5 min')).not.toHaveAttribute('aria-describedby')
+    expect(rows()[0]).not.toHaveTextContent('Approximate')
+    expect(rows()[0]).toHaveAccessibleDescription('')
+  })
+
   it('translates the copy with the active locale', () => {
     useI18nStore.setState({ locale: 'es' })
 

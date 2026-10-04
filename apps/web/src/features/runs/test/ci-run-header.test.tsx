@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CiRunSummaryRecord } from '@qably/types'
@@ -116,26 +116,95 @@ describe('CiRunHeader summary', () => {
   })
 })
 
+const STATUS_TIP =
+  'Based on the reports received so far. Jobs that do not upload a test report are not shown.'
+const DURATION_TIP = 'Approximate: between the first and the last report'
+
+function openTooltip(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[data-slot="tooltip-content"]')
+}
+
+async function findOpenTooltip(): Promise<HTMLElement> {
+  return waitFor(() => {
+    const tooltip = openTooltip()
+    if (tooltip === null) throw new Error('no tooltip is open')
+    return tooltip
+  })
+}
+
+function statusTrigger(): HTMLElement {
+  return screen.getByText('Has failures').closest('[tabindex="0"]') as HTMLElement
+}
+
+describe('CiRunHeader tooltip text for assistive technology', () => {
+  it('describes the status without anyone opening the tooltip', () => {
+    renderHeader()
+
+    expect(statusTrigger()).toHaveAccessibleDescription(STATUS_TIP)
+    expect(openTooltip()).toBeNull()
+  })
+
+  it('describes the duration without anyone opening the tooltip', () => {
+    renderHeader()
+
+    expect(screen.getByText('~5 min')).toHaveAccessibleDescription(DURATION_TIP)
+    expect(openTooltip()).toBeNull()
+  })
+
+  it('keeps the description out of the text of the triggers', () => {
+    renderHeader()
+
+    expect(statusTrigger()).toHaveTextContent(/^Has failures$/)
+    expect(screen.getByText('~5 min')).toHaveTextContent(/^~5 min$/)
+  })
+
+  it('gives each trigger its own description element', () => {
+    renderHeader()
+
+    const ids = [statusTrigger(), screen.getByText('~5 min')].map((trigger) =>
+      trigger.getAttribute('aria-describedby'),
+    )
+    expect(ids[0]).toBeTruthy()
+    expect(ids[1]).toBeTruthy()
+    expect(ids[0]).not.toBe(ids[1])
+  })
+
+  it('has no duration description when the run has no duration', () => {
+    renderHeader({ startedAt: '2026-10-03T11:55:00.200Z' })
+
+    expect(screen.queryByText(DURATION_TIP)).not.toBeInTheDocument()
+  })
+
+  it('describes both triggers in the active locale', () => {
+    useI18nStore.setState({ locale: 'es' })
+
+    renderHeader()
+
+    const status = screen.getByText('Con fallos').closest('[tabindex="0"]')
+    expect(status).toHaveAccessibleDescription(
+      'Según los reportes recibidos hasta ahora. Los trabajos que no suben un reporte de pruebas no aparecen.',
+    )
+    expect(screen.getByText('~5 min')).toHaveAccessibleDescription(
+      'Aproximado: entre el primer y el último reporte',
+    )
+  })
+})
+
 describe('CiRunHeader tooltips', () => {
   it('explains the status in a tooltip that keyboard users reach and that hides on Escape', async () => {
     const user = userEvent.setup()
     renderHeader()
 
-    expect(screen.queryByText(/Based on the reports received so far/)).not.toBeInTheDocument()
+    expect(openTooltip()).toBeNull()
 
     await user.tab()
 
-    const trigger = screen.getByText('Has failures').closest('[tabindex="0"]')
-    expect(trigger).toHaveFocus()
-    expect(
-      await screen.findByText(
-        'Based on the reports received so far. Jobs that do not upload a test report are not shown.',
-      ),
-    ).toBeInTheDocument()
+    expect(statusTrigger()).toHaveFocus()
+    expect(await findOpenTooltip()).toHaveTextContent(STATUS_TIP)
 
     await user.keyboard('{Escape}')
 
-    expect(screen.queryByText(/Based on the reports received so far/)).not.toBeInTheDocument()
+    expect(openTooltip()).toBeNull()
   })
 
   it('explains the status on hover as well', async () => {
@@ -144,7 +213,7 @@ describe('CiRunHeader tooltips', () => {
 
     await user.hover(screen.getByText('No failures'))
 
-    expect(await screen.findByText(/Based on the reports received so far/)).toBeInTheDocument()
+    expect(await findOpenTooltip()).toHaveTextContent(STATUS_TIP)
   })
 
   it('explains what the duration measures to keyboard users too', async () => {
@@ -155,9 +224,7 @@ describe('CiRunHeader tooltips', () => {
     await user.tab()
 
     expect(screen.getByText('~5 min')).toHaveFocus()
-    expect(
-      await screen.findByText('Approximate: between the first and the last report'),
-    ).toBeInTheDocument()
+    expect(await findOpenTooltip()).toHaveTextContent(DURATION_TIP)
   })
 })
 
