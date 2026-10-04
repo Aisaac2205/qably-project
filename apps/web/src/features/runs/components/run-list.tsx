@@ -47,7 +47,7 @@ function RunRow({
   return (
     <Link
       href={`/projects/${projectId}/runs/${run.id}`}
-      className="flex items-center justify-between px-5 py-3 sm:px-7 lg:px-9 sm:py-3.5 hover:bg-surface-hover/60 transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2!"
+      className="flex items-center justify-between px-5 py-3 sm:px-7 lg:px-9 sm:py-3.5 hover:bg-runs-hover/60 transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2!"
     >
       <div className="min-w-0 flex-1 flex items-center gap-3.5">
         <StatusChip status={run.status} />
@@ -190,7 +190,7 @@ export function RunList({
           <Button
             type="button"
             variant="outline"
-            className="w-full sm:w-auto px-4 text-sm focus-visible:outline-hidden! focus-visible:ring-primary"
+            className="w-full sm:w-auto px-4 text-sm hover:bg-runs-hover focus-visible:outline-hidden! focus-visible:ring-primary"
             onClick={() => void fetchNextPage()}
             disabled={isFetchingNextPage}
           >

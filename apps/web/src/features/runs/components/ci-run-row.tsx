@@ -19,7 +19,7 @@ export function CiRunRow({
   return (
     <Link
       href={`/projects/${projectId}/runs/ci/${ciRun.id}`}
-      className="flex min-h-11 items-start gap-3.5 px-5 py-3 transition-colors hover:bg-surface-hover/60 focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2! sm:px-7 sm:py-3.5 lg:px-9"
+      className="flex min-h-11 items-start gap-3.5 px-5 py-3 transition-colors hover:bg-runs-hover/60 focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2! sm:px-7 sm:py-3.5 lg:px-9"
     >
       <StatusChip status={ciRun.status} scope="ci-run" />
       <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">

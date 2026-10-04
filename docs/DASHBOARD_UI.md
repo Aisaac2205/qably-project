@@ -103,6 +103,21 @@ hero and by `Sparkline`'s `muted` tone. It is a package contract var like the ot
 web-local token — `apps/landing` will bind its own value when the landing preview change lands,
 never copy `apps/web`'s.
 
+### Runs hover token
+
+The runs screens (the CI run rows, the suite rows and passing-suites bar of a CI run, the Manual
+rows and their Load more button) hover on `--runs-hover`, `oklch(0.935 0 0)`, exposed as
+`bg-runs-hover`. It has no chroma because `--surface-hover` is `oklch(0.935 0.008 260)`, a blue-tinted
+grey the runs screens do not want.
+
+`--surface-hover`, `--bg`, `--bg-sidebar-hover`, `--bg-sidebar-active` and `--heatmap-l0` belong to the
+Dashboard, and so does every alias that reads them (`--chart-segment-background` and the `--color-*`
+and `--color-qb-*` bindings), so none of them can change to suit the runs screens. Runs read their own
+token instead. `apps/web/src/test/tokens.test.ts` pins the five values and the full alias list.
+
+Rows apply the token at 60% (`hover:bg-runs-hover/60`), the same weight they had on `--surface-hover`,
+so the page background `--bg` shows through at 40% and the rendered row keeps a trace of its tint.
+
 ## Accessibility contract
 
 Every chart component satisfies the same three rules, independent of which one it is:

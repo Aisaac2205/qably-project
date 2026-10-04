@@ -51,7 +51,7 @@ function LoadMore({
       <Button
         type="button"
         variant="outline"
-        className="w-full focus-visible:outline-hidden! focus-visible:ring-primary sm:w-auto"
+        className="w-full hover:bg-runs-hover focus-visible:outline-hidden! focus-visible:ring-primary sm:w-auto"
         onClick={onLoad}
         disabled={isFetching}
         focusableWhenDisabled

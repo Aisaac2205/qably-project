@@ -59,6 +59,7 @@
   /* Hover surface — for ghost/outline interactive states. Distinct from
      --fg-muted: that token is a TEXT color, this one is a BACKGROUND. */
   --surface-hover:     oklch(0.935 0.008 260);
+  --runs-hover:        oklch(0.935 0.000 0);
 
   /* Traceability heatmap — encodes event VOLUME, not quality. Shares hue 145
      with --status-pass; see docs/DASHBOARD_UI.md. */
@@ -192,6 +193,7 @@
   --color-fail-bg:            var(--status-fail-bg);
   --color-destructive:        var(--status-fail);
   --color-surface-hover:      var(--surface-hover);
+  --color-runs-hover:         var(--runs-hover);
 
   --color-heatmap-l0:         var(--heatmap-l0);
   --color-heatmap-l1:         var(--heatmap-l1);
