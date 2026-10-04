@@ -816,6 +816,7 @@
     "pleaseSelectSuite": "Please select a suite",
     "noSuitesAvailable": "No suites available. Create a suite first.",
     "newRun": "New run",
+    "newRunDescription": "Select a suite to record a result for each of its manual cases.",
     "suiteLabel": "Suite",
     "selectSuite": "Select a suite",
     "runNameLabel": "Run name",
