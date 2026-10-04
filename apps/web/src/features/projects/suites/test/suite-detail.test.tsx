@@ -64,6 +64,17 @@ describe('SuiteDetail (redesigned)', () => {
     expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/suites')
   })
 
+  it('keeps the back button visible next to the breadcrumbs on desktop', async () => {
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    const back = screen.getByRole('button', { name: 'Back' })
+    expect(back).not.toHaveClass('md:hidden')
+    expect(back).not.toHaveClass('hidden')
+    expect(back.parentElement).toContainElement(
+      screen.getByRole('navigation', { name: /breadcrumb/i }),
+    )
+  })
+
   it('pushes to the Aeris chat with the case attached when Improve with Aeris is chosen', async () => {
     const user = userEvent.setup()
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })

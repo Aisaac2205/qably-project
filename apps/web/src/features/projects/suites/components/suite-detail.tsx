@@ -172,7 +172,6 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
       <div className="flex min-w-0 items-center gap-1.5">
         <BackButton
-          className="md:hidden"
           onClick={() => {
             if (window.history.length > 1) {
               router.back()
