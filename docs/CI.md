@@ -321,7 +321,9 @@ writing a workflow:
   sends no `ci*` at all. A variable that is set sends its own parameter even outside GitHub Actions:
   with only `QABLY_JOB_KEY` or `GITHUB_JOB` set, the reporter sends `ciJobKey`. The server ignores every
   `ci*` parameter, `ciJobKey` included, when `ciRunExternalId` is absent. A run reported without them
-  is not linked to a CI run and appears under the Manual tab.
+  is not linked to a CI run, so no job of the Actions tab lists it. It does not appear under the Manual tab
+  either, which lists only the runs a person started; it stays reachable by its direct link and from the
+  suites.
 - **`QABLY_JOB_KEY`** is an optional environment variable that replaces `GITHUB_JOB` as `ciJobKey` and,
   in slug form, as the job segment of `externalId`. Set it to a different value for each variant of a
   matrix job so that variants reporting the same file do not overwrite each other. An empty or

@@ -26,13 +26,19 @@ Lists runs in the caller's organization, newest first (`startedAt` descending). 
 optional; omitting it returns every run across every project in the organization, which is what an
 organization-wide dashboard needs.
 
-`ungrouped=true` restricts the list to runs that are not linked to a CI run (`ciRunId IS NULL`) and
-combines with `projectId` and `source`. The criterion is the link, never `source`: an `api` run with no
-link and a `github_actions` run with no link both appear, and no linked run does. `ungrouped=false` and
-an absent parameter apply no filter on the link, and `"false"` is never read as true; any other value
-(`maybe`) answers `400`. The Manual tab of the runs page uses it, so the runs that no CI run adopted
-(an older reporter, local runs, manual runs) stay reachable. The shape of an item does not change:
-`RunSummaryRecord` carries no `ciRunId`.
+`source` (`manual`, `api` or `github_actions`) restricts the list to the runs of that source and combines
+with `projectId`. The Manual tab of the runs page asks for `source=manual`, so it lists only the runs a
+person started. An automated run is never listed there. One that a CI run adopted is reachable from its
+job in the Actions tab; one that no CI run adopted (an older reporter, a run posted with `curl`) is
+reachable only by its direct link and from the suites. The tab filters by source and not by the absence of
+a CI run link because the link is a property of automated runs: filtering on it listed every unlinked
+automated run next to the runs a person started.
+
+`(projectId, source, startedAt)` is the index behind that filter. Each push adds about 350 automated runs
+(one per JUnit test suite), so without it the Manual tab would walk the whole `(projectId, startedAt)`
+index to find the few runs a person started, and the cost would grow with every push. A query parameter
+the endpoint does not declare, the retired `ungrouped` included, is ignored like any other one, so a
+client that still sends it gets the list unfiltered, not an error.
 
 The list response does **not** embed each run's cases. Sending every case of every run back for a list
 view is wasteful — the list only needs to render a status pill and a pass rate. Instead each item

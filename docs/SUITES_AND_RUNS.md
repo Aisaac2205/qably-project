@@ -35,8 +35,17 @@ disagree about what "started failing" means.
 
 The page copy used to describe itself as "historial ... y simulación de CI", a phrase left over from the
 mock era. Nothing here is simulated: every run is a real CI report or a real manual execution, and the
-subtitle now says so. The empty state explains that CI fills the page and links to the public reporting
-guide, because a blank list otherwise reads as a bug.
+subtitle now says so. The empty state of the Actions tab explains that CI fills it and links to the public
+reporting guide, because a blank list otherwise reads as a bug.
+
+The runs page splits its runs into two tabs by origin, never by what is missing. Actions lists the CI runs,
+one row per push, and each of their jobs holds the automated suites it ran. Manual lists only the runs with
+`source = manual`, the ones a person started, and its empty state teaches what a manual run is. An
+automated run that no CI run adopted appears in neither tab; it is reachable by its direct link and from
+the suites. The way back from a run detail follows the same rule: the `Runs` crumb and the back button
+fall back to the Manual tab only for a manual run, and to the Actions tab, or to its CI run, for any other.
+The Manual tab used to list every run without a CI run link, which mixed the automated runs that no CI run
+adopted with the runs a person started.
 
 ## Why `run_case` duplicates the case content
 

@@ -383,7 +383,7 @@ gha-{GITHUB_RUN_ID}-{job}-{slug(file)}-{sha256(filePath)[0..8]}
 
 with `-p{n}` appended when a file was split into several requests, and a suite suffix appended by the
 server when the report holds several `<testsuite>`. A reporter older than 10.1.0 sends the id but no
-`ci*` parameter, so before this rule its runs stayed unlinked and showed only under the Manual tab.
+`ci*` parameter, so before this rule its runs stayed unlinked and out of the Actions tab.
 
 When a request has no `ciRunExternalId`, `CiRunLinker` reads the run id from `externalId` with
 `parseCiRunExternalId` (`^gha-(\d{1,20})-`, a run id of 1 to 20 digits) and links the run exactly as if

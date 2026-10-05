@@ -6,8 +6,9 @@ Owner-run only. Never executed automatically by this codebase or by CI.
 
 Links runs that were ingested before the `ci_run` table existed, or by a reporter older than 10.1.0,
 to a `CiRun` row, and gives the runs it can the `ciJobKey` of the job that reported them. Those runs
-have `run.ciRunId = NULL`, so they appear only under the Manual tab of the runs page and never under a
-CI run in the Actions tab.
+have `run.ciRunId = NULL`, so they never appear under a CI run in the Actions tab. The Manual tab lists only
+the runs a person started, so they are not there either: they stay reachable by their direct link and from
+the suites.
 
 The reporter has always embedded the GitHub run id and the job in `Run.externalId`, in the form
 `gha-{GITHUB_RUN_ID}-{job}-{file}-{hash}` (with a trailing `-p{n}` when a file was split). The script
@@ -101,7 +102,7 @@ A later pass is not always a no-op. A reporter older than 10.1.0 (a vendored or 
 until ingestion started linking them from the id; every pass links the ones that arrived before that.
 Runs posted with `curl`, as in the public CI documentation, carry the bare GitHub run id as
 `externalId`, which does not match `^gha-(\d{1,20})-`: they are unattributable, stay unlinked on every pass
-and keep appearing under the Manual tab.
+and stay out of both tabs, reachable by their direct link and from the suites.
 
 The script does not use a transaction across groups. Each group is a lookup, a create or an update,
 and a link. If the process stops between the create and the link, a `CiRun` without runs remains; the
@@ -247,8 +248,8 @@ Linked runs left without a job key: 20
 Skipped groups: 0
 ```
 
-`Scanned` is every run read with `ciRunId IS NULL`. The unattributable runs stay unlinked and keep
-appearing under the Manual tab. `Job keys set` counts every run that received a `ciJobKey`, linked in
+`Scanned` is every run read with `ciRunId IS NULL`. The unattributable runs stay unlinked and stay out of
+both tabs, reachable by their direct link and from the suites. `Job keys set` counts every run that received a `ciJobKey`, linked in
 this pass or earlier. `Linked runs left without a job key` counts the linked runs with an `externalId`
 that starts with `gha-` that no known job key matched; it is not an error.
 
@@ -434,7 +435,8 @@ The `CiRun` metadata that live ingestion stored (`workflowName`, `runNumber`, `b
 the other `ci*` columns) is deleted with its row, and every `ciJobKey` is cleared. Reports that were
 already ingested are never sent again, so none of it returns for historical runs; only a workflow run
 that reports from now on gets a `CiRun` and job keys again. Every run that was linked is left
-unlinked and appears under the Manual tab. Do not run it without the dump above.
+unlinked, so it leaves the Actions tab and is reachable only by its direct link and from the suites. Do not
+run it without the dump above.
 
 ```sql
 BEGIN;
