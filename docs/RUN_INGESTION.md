@@ -418,17 +418,41 @@ project already uses instead:
    `build_api` both slug to `build-api`) the result is nothing rather than a guess.
 
 If no known key matches, the run is linked without a job key, which the UI already renders as a CI run
-with no job level. The key matched is always one that already exists in the project, so the rule cannot
-create a new job name: the first report of a job that has never been seen with a key is linked without
-one, and a later backfill pass (`docs/OPS_BACKFILL_CI_RUNS.md`) can recover it once the key is known.
+with no job level. The key matched is always one that already exists in the project, so the rule never
+creates a job name. The first report of a job that has never been seen with a key, and whose id does not
+start with a known key, is linked without one, and a later backfill pass
+(`docs/OPS_BACKFILL_CI_RUNS.md`) can recover it once the key is known.
 
 The shorter-prefix ambiguity above is real and the longest match resolves it in favour of the longer
 job name: a project with the jobs `build` and `build-web` whose job `build` reports a file named
 `web-junit.xml` gets that run attributed to `build-web`. The data to tell them apart does not exist in
 the id.
 
-The lookup is the only cost of the fallback and runs only for a request without `ciRunExternalId` and
-without `ciJobKey`, whose `externalId` parses. Two things limit it:
+#### A new job whose key extends a known key
+
+The same missing data has a second consequence that no ordering of the candidates removes. When a job is
+new to the project and its key extends a key the project already knows, the fallback attributes it to the
+shorter key. With `web` known, the first report of a new job `web-e2e` has the id
+`gha-900-web-e2e-junit-xml-3425dd6f`. That id starts with `gha-900-web-`, `web` is the only known key
+that matches, and the run is linked with `ciJobKey = web`. The backfill does the same. Nothing in the id
+says that `web-e2e` is a job of its own, and the fallback has no other source for the job.
+
+What limits the damage:
+
+- A key resolved from the id is only ever filled in. When the stored run already has a `ciJobKey`, a later
+  report of the same run (same `externalId`) leaves it as it is. When the stored key is `NULL`, or the
+  run is not stored yet, the resolved key is written. `CiRunLinker` decides it with one `run.findUnique`
+  by the unique key, before the transaction and only when a key was resolved, so the transaction gets no
+  extra query.
+- A `ciJobKey` that the reporter sends (10.1.0 or later) is the job itself and is written on every
+  report, so a later report of the same run from such a reporter replaces a wrong key.
+
+The backfill does not correct a wrong key: it only fills runs whose `ciJobKey IS NULL`
+(`docs/OPS_BACKFILL_CI_RUNS.md`). Until a reporter at 10.1.0 or later reports that run again, the wrong
+attribution stays.
+
+The known-key lookup is the main cost of the fallback and runs only for a request without
+`ciRunExternalId` and without `ciJobKey`, whose `externalId` parses. Two things limit it:
 
 - The 30 day window keeps it from grouping the whole history of the project, which produces on the order
   of 350 runs per push.
@@ -439,7 +463,7 @@ without `ciJobKey`, whose `externalId` parses. Two things limit it:
 
 A cold read is still a grouping over the runs of the project inside the window. The cache also means
 that a job key that appears for the first time is unknown to the fallback for up to 60 seconds. The
-lookup is outside the interactive transaction, like the upsert.
+lookups are outside the interactive transaction, like the upsert.
 
 ### `lastReportedAt`
 

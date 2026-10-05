@@ -62,6 +62,11 @@ function build() {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
+    run: {
+      findUnique: jest
+        .fn()
+        .mockResolvedValue(null as { ciJobKey: string | null } | null),
+    },
   };
   const knownJobKeys = {
     forProject: jest.fn().mockResolvedValue([] as string[]),
@@ -506,6 +511,117 @@ describe('CiRunLinker.resolve', () => {
 
       await expect(t.linker.resolve(apiKey, stale())).rejects.toBe(failure);
       expect(ciRunCalls(t.prisma)).toEqual([0, 0, 0, 0]);
+    });
+  });
+
+  describe('a job key resolved from the external id', () => {
+    const realId = 'gha-900-web-e2e-junit-xml-3425dd6f';
+    const stale = (extra: Record<string, unknown> = {}) =>
+      body({ externalId: realId, reportExternalId: realId, ...extra });
+    const knowingWeb = () => {
+      const t = build();
+      knownKeys(t, 'web');
+      return t;
+    };
+
+    it('is returned when the run is not stored yet', async () => {
+      const t = knowingWeb();
+
+      const result = await t.linker.resolve(apiKey, stale());
+
+      expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'web' });
+    });
+
+    it('is returned when the stored run has no job key, which fills it', async () => {
+      const t = knowingWeb();
+      t.prisma.run.findUnique.mockResolvedValue({ ciJobKey: null });
+
+      const result = await t.linker.resolve(apiKey, stale());
+
+      expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'web' });
+    });
+
+    it('is left out when the stored run already has a job key, so a re-ingest never overwrites it', async () => {
+      const t = knowingWeb();
+      t.prisma.run.findUnique.mockResolvedValue({ ciJobKey: 'web-e2e' });
+
+      const result = await t.linker.resolve(apiKey, stale());
+
+      expect(result).toEqual({ ciRunId: 'ci-1' });
+    });
+
+    it('looks the stored run up by the unique key of the request, selecting only the job key', async () => {
+      const t = knowingWeb();
+
+      await t.linker.resolve({ ...apiKey, projectId: 'proj-2' }, stale());
+
+      expect(t.prisma.run.findUnique).toHaveBeenCalledTimes(1);
+      expect(t.prisma.run.findUnique).toHaveBeenCalledWith({
+        where: uniqueKey('proj-2', 'github_actions', realId),
+        select: { ciJobKey: true },
+      });
+    });
+
+    it('keeps the source of the request in the lookup', async () => {
+      const t = knowingWeb();
+
+      await t.linker.resolve(apiKey, stale({ source: 'api' }));
+
+      expect(t.prisma.run.findUnique).toHaveBeenCalledWith({
+        where: uniqueKey('proj-1', 'api', realId),
+        select: { ciJobKey: true },
+      });
+    });
+
+    it('is not looked up against the stored run when no known key matches the id', async () => {
+      const t = build();
+      knownKeys(t, 'landing');
+
+      const result = await t.linker.resolve(apiKey, stale());
+
+      expect(result).toEqual({ ciRunId: 'ci-1' });
+      expect(t.prisma.run.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('fails before writing the ci run when the stored run cannot be read', async () => {
+      const t = knowingWeb();
+      const failure = new Error('connection lost');
+      t.prisma.run.findUnique.mockRejectedValueOnce(failure);
+
+      await expect(t.linker.resolve(apiKey, stale())).rejects.toBe(failure);
+      expect(ciRunCalls(t.prisma)).toEqual([0, 0, 0, 0]);
+    });
+  });
+
+  describe('a job key the request carries', () => {
+    const realId = 'gha-900-web-e2e-junit-xml-3425dd6f';
+
+    it('is returned over a stored one without reading the stored run, so the reporter keeps overwriting', async () => {
+      const t = build();
+      knownKeys(t, 'web');
+      t.prisma.run.findUnique.mockResolvedValue({ ciJobKey: 'web' });
+
+      const result = await t.linker.resolve(
+        apiKey,
+        body({
+          externalId: realId,
+          reportExternalId: realId,
+          ciJobKey: 'web-e2e',
+        }),
+      );
+
+      expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'web-e2e' });
+      expect(t.prisma.run.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('is returned over a stored one when the request also carries the ciRunExternalId', async () => {
+      const t = build();
+      t.prisma.run.findUnique.mockResolvedValue({ ciJobKey: 'web' });
+
+      const result = await t.linker.resolve(apiKey, body(fullCi));
+
+      expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'api' });
+      expect(t.prisma.run.findUnique).not.toHaveBeenCalled();
     });
   });
 });

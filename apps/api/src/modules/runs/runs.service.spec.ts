@@ -1920,34 +1920,85 @@ describe('RunsService.ingest ci run linking', () => {
     );
   });
 
-  it('links a report from a reporter that sends no ci fields through the run id and the job key in its external id', async () => {
-    const prisma = createPrisma();
-    const ciRun = { upsert: jest.fn().mockResolvedValue({ id: 'ci-1' }) };
-    const run = {
-      groupBy: jest.fn().mockResolvedValue([{ ciJobKey: 'api' }]),
-    };
-    const service = buildWithLinker(
-      prisma,
-      new CiRunLinker(
-        { ciRun, run } as never,
-        new KnownCiJobKeys({ run } as never),
-      ) as never,
-    );
-
-    await service.ingest(apiKey, {
+  describe('from a reporter that sends no ci fields, through the real linker', () => {
+    const legacyInput: IngestRunInput = {
       ...ciInput,
       ciRunExternalId: undefined,
       ciJobKey: undefined,
+    };
+
+    function buildWithRealLinker(
+      prisma: FakePrisma,
+      storedRun: { ciJobKey: string | null } | null,
+    ) {
+      const ciRun = { upsert: jest.fn().mockResolvedValue({ id: 'ci-1' }) };
+      const run = {
+        groupBy: jest.fn().mockResolvedValue([{ ciJobKey: 'api' }]),
+        findUnique: jest.fn().mockResolvedValue(storedRun),
+      };
+      const service = buildWithLinker(
+        prisma,
+        new CiRunLinker(
+          { ciRun, run } as never,
+          new KnownCiJobKeys({ run } as never),
+        ) as never,
+      );
+
+      return { service, ciRun, run };
+    }
+
+    it('links the report through the run id and the job key in its external id', async () => {
+      const prisma = createPrisma();
+      const { service, ciRun } = buildWithRealLinker(prisma, null);
+
+      await service.ingest(apiKey, legacyInput);
+
+      expect(ciRun.upsert).toHaveBeenCalledTimes(1);
+      for (const write of [
+        runUpsertArgs(prisma).create,
+        runUpsertArgs(prisma).update,
+      ]) {
+        expect(write.ciRunId).toBe('ci-1');
+        expect(write.ciJobKey).toBe('api');
+      }
     });
 
-    expect(ciRun.upsert).toHaveBeenCalledTimes(1);
-    for (const write of [
-      runUpsertArgs(prisma).create,
-      runUpsertArgs(prisma).update,
-    ]) {
-      expect(write.ciRunId).toBe('ci-1');
-      expect(write.ciJobKey).toBe('api');
-    }
+    it('fills the job key of a stored run that has none', async () => {
+      const prisma = createPrisma();
+      const { service } = buildWithRealLinker(prisma, { ciJobKey: null });
+
+      await service.ingest(apiKey, legacyInput);
+
+      expect(runUpsertArgs(prisma).update.ciRunId).toBe('ci-1');
+      expect(runUpsertArgs(prisma).update.ciJobKey).toBe('api');
+    });
+
+    it('never overwrites the job key of a stored run, and still links it', async () => {
+      const prisma = createPrisma();
+      const { service } = buildWithRealLinker(prisma, { ciJobKey: 'web' });
+
+      await service.ingest(apiKey, legacyInput);
+
+      for (const write of [
+        runUpsertArgs(prisma).create,
+        runUpsertArgs(prisma).update,
+      ]) {
+        expect(write.ciRunId).toBe('ci-1');
+        expect(Object.keys(write)).not.toContain('ciJobKey');
+      }
+    });
+
+    it('still overwrites the job key of a stored run with the one the reporter sends', async () => {
+      const prisma = createPrisma();
+      const { service, run } = buildWithRealLinker(prisma, {
+        ciJobKey: 'web',
+      });
+
+      await service.ingest(apiKey, { ...legacyInput, ciJobKey: 'api' });
+
+      expect(runUpsertArgs(prisma).update.ciJobKey).toBe('api');
+      expect(run.findUnique).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps each report of the same job under its own reportExternalId while sharing one ci run', async () => {

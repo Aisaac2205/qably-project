@@ -126,7 +126,7 @@ describe('Runs ingestion (e2e)', () => {
       createMany: jest.fn(),
       update: jest.fn(),
     },
-    run: { upsert: jest.fn(), groupBy: jest.fn() },
+    run: { upsert: jest.fn(), groupBy: jest.fn(), findUnique: jest.fn() },
     ciRun: { upsert: jest.fn() },
     runCase: {
       deleteMany: jest.fn(),
@@ -167,6 +167,7 @@ describe('Runs ingestion (e2e)', () => {
     prisma.testCase.update.mockResolvedValue(officialCases[0]);
     prisma.run.upsert.mockResolvedValue(runRow);
     prisma.run.groupBy.mockResolvedValue([]);
+    prisma.run.findUnique.mockResolvedValue(null);
     prisma.ciRun.upsert.mockResolvedValue({ id: 'ci-1' });
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
@@ -455,6 +456,25 @@ describe('Runs ingestion (e2e)', () => {
 
         expectLinkedToApiJob();
         expect(response.body).toHaveProperty('ciRunId', 'ci-1');
+      });
+
+      it('keeps the job key a stored run already has instead of overwriting it with the one known from the project', async () => {
+        prisma.run.groupBy.mockResolvedValue([{ ciJobKey: 'api' }]);
+        prisma.run.findUnique.mockResolvedValue({ ciJobKey: 'api-e2e' });
+
+        await request(app.getHttpServer())
+          .post('/runs/ingest')
+          .set('Authorization', `Bearer ${generated.token}`)
+          .send(staleBody)
+          .expect(200);
+
+        const [call] = prisma.run.upsert.mock.calls[0] as [
+          { create: object; update: object },
+        ];
+        expect(call.update).toEqual(
+          expect.objectContaining({ ciRunId: 'ci-1' }),
+        );
+        expect(call.update).not.toHaveProperty('ciJobKey');
       });
 
       it('links a queued junit report once the worker ingests it', async () => {

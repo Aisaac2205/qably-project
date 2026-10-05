@@ -67,6 +67,13 @@ arrived before that.
   runs left without a job key". The web app lists such a run's failing suites directly under the CI run
   header, without a group heading, and puts the others behind a "Show N suites without failures"
   button.
+- Attributes a job whose key extends a known key to the shorter key. With `web` known and runs of a job
+  `web-e2e` that has never been reported with a key, the ids `gha-900-web-e2e-junit-xml-...` start with
+  `gha-900-web-` and the script gives those runs `ciJobKey = web`, exactly as ingestion does for a first
+  report of a legacy reporter (`docs/RUN_INGESTION.md`, "A new job whose key extends a known key"). The
+  id cannot tell the two jobs apart. The script only fills runs whose `ciJobKey IS NULL`, so it never
+  corrects a key it set, or one that ingestion set; run the pre-check "Job keys that extend one
+  another" before the script.
 
 The keys come from the project's own data, so the script can set none for a project that has no run
 with a `ciJobKey` yet, which is the case until a reporter at 10.1.0 or later has reported once. Run the
@@ -132,6 +139,47 @@ SELECT "projectId", "ciJobKey", count(*) FROM "run"
 A project missing from this list gets no job key from the script. When one key is a prefix of another
 (`build` and `build-web`), the longest match wins, so a run of the job `build` that reports a file named
 `web-junit.xml` is attributed to `build-web`: the id carries nothing that tells the two apart.
+
+4. Job keys that extend one another. Run this read-only query before the script. It lists, per project,
+   every pair of distinct known keys where the longer one starts with the shorter one followed by `-`,
+   comparing the keys as written and through the slug the reporter puts in the id:
+
+```sql
+WITH keys AS (
+  SELECT "projectId", "ciJobKey" AS key,
+         COALESCE(
+           NULLIF(trim(both '-' from regexp_replace(lower(btrim("ciJobKey")), '[^a-z0-9]+', '-', 'g')), ''),
+           'report'
+         ) AS slug,
+         count(*) AS runs
+    FROM "run"
+   WHERE "ciJobKey" IS NOT NULL
+   GROUP BY "projectId", "ciJobKey"
+)
+SELECT shorter."projectId",
+       shorter.key AS shorter_key, shorter.runs AS shorter_runs,
+       longer.key AS longer_key, longer.runs AS longer_runs
+  FROM keys shorter
+  JOIN keys longer
+    ON longer."projectId" = shorter."projectId"
+   AND longer.key <> shorter.key
+   AND (
+        starts_with(longer.key, shorter.key || '-')
+     OR starts_with(longer.key, shorter.slug || '-')
+     OR starts_with(longer.slug, shorter.key || '-')
+     OR starts_with(longer.slug, shorter.slug || '-')
+   )
+ ORDER BY shorter."projectId", shorter.key, longer.key;
+```
+
+An empty result means that no two known keys of a project can be mistaken for each other. A row is a
+pair the script resolves by the longest match, so a run of the shorter job whose file name begins with
+the rest of the longer key goes to the longer key. This query cannot show the other case: a job whose key
+extends a known key and that has no run with a key yet. Its runs are given the shorter key, and the
+script cannot correct them afterwards. Look for it by hand: list the names of the jobs in the workflows
+of the project and compare them with the keys of the "Job keys" query above. If a job extends a known
+key and has never reported a key, run the workflow once with a reporter at 10.1.0 or later before the
+script, so that the key is known.
 
 ## Pre-run snapshot
 
@@ -429,4 +477,4 @@ database (see "Recommended order") is also its first real execution. The concurr
 conditional update and the retry after a unique violation) is proven against an in-memory port and a
 mocked client, not against concurrent writers on a real database. The snapshot, the dump and the
 rollback statements, including the restore of `ciJobKey` from `run_link`, have not been executed
-either.
+either, and neither has the pre-check query for job keys that extend one another.

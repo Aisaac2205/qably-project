@@ -64,19 +64,38 @@ export class CiRunLinker {
 
     const ciJobKey =
       input.ciJobKey ??
-      (await this.resolveJobKey(apiKey, input.externalId, ciRunExternalId));
+      (await this.resolveJobKeyToFill(apiKey, input, ciRunExternalId));
 
     return this.link(apiKey, input, ciRunExternalId, ciJobKey);
   }
 
-  private async resolveJobKey(
+  private async resolveJobKeyToFill(
     apiKey: ApiKeyIdentity,
-    externalId: string,
+    input: IngestRunInput,
     ciRunExternalId: string,
   ): Promise<string | undefined> {
     const knownJobKeys = await this.knownJobKeys.forProject(apiKey.projectId);
+    const resolved = resolveCiJobKey(
+      input.externalId,
+      ciRunExternalId,
+      knownJobKeys,
+    );
+    if (resolved === undefined) return undefined;
 
-    return resolveCiJobKey(externalId, ciRunExternalId, knownJobKeys);
+    const stored = await this.prisma.run.findUnique({
+      where: {
+        projectId_source_externalId: {
+          projectId: apiKey.projectId,
+          source: input.source,
+          externalId: input.externalId,
+        },
+      },
+      select: { ciJobKey: true },
+    });
+
+    const alreadyKeyed = stored !== null && stored.ciJobKey !== null;
+
+    return alreadyKeyed ? undefined : resolved;
   }
 
   private async link(
