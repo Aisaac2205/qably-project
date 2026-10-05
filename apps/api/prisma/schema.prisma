@@ -617,6 +617,7 @@ model Run {
 
   @@unique([projectId, source, externalId])
   @@index([projectId, startedAt])
+  @@index([projectId, source, startedAt])
   @@index([organizationId])
   @@index([organizationId, startedAt])
   @@index([commitSha])
