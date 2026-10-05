@@ -31,7 +31,7 @@ import {
 } from '../api/suites.api'
 import { getProject } from '../../api/projects.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
-import { runKeys } from '@/features/runs/lib/query-keys'
+import { ciRunKeys, runKeys } from '@/features/runs/lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 import { notify } from '@/lib/notify'
 import { createMockTestCase } from '@/lib/test-utils'
@@ -1027,4 +1027,45 @@ describe('run details', () => {
       label === 'deleting a suite',
     )
   })
+
+  it('marks the CI run detail and the CI run list of the project stale after deleting a suite, without fetching them', async () => {
+    const { client, invalidateSpy } = setup()
+    client.setQueryData(ciRunKeys.detail('ci-1'), { id: 'ci-1', runs: [] })
+    client.setQueryData(ciRunKeys.page('proj-1'), { pages: [], pageParams: [] })
+    client.setQueryData(ciRunKeys.page('proj-2'), { pages: [], pageParams: [] })
+
+    runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(client.getQueryState(ciRunKeys.detail('ci-1'))?.isInvalidated).toBe(true)
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ciRunKeys.details,
+      refetchType: 'none',
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ciRunKeys.page('proj-1'),
+      refetchType: 'none',
+    })
+    expect(client.getQueryState(ciRunKeys.page('proj-1'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(ciRunKeys.page('proj-2'))?.isInvalidated).toBe(false)
+  })
+
+  it.each(triggers.filter(([label]) => label !== 'deleting a suite'))(
+    'leaves the CI runs alone after %s, since no run is deleted',
+    async (_label, trigger) => {
+      const { client } = setup()
+      client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
+      client.setQueryData(ciRunKeys.detail('ci-1'), { id: 'ci-1', runs: [] })
+      client.setQueryData(ciRunKeys.page('proj-1'), { pages: [], pageParams: [] })
+
+      trigger(client)
+
+      await waitFor(() => {
+        expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(true)
+      })
+      expect(client.getQueryState(ciRunKeys.detail('ci-1'))?.isInvalidated).toBe(false)
+      expect(client.getQueryState(ciRunKeys.page('proj-1'))?.isInvalidated).toBe(false)
+    },
+  )
 })

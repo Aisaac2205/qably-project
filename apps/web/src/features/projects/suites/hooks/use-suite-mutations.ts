@@ -21,6 +21,7 @@ import {
 } from '../api/suites.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
 import { ApiError } from '@/lib/api-client'
+import { markCiRunsStale } from '@/features/runs/lib/mark-ci-runs-stale'
 import { markRunDetailsStale } from '@/features/runs/lib/mark-run-details-stale'
 import { markRunPagesStale } from '@/features/runs/lib/mark-run-pages-stale'
 import { notify } from '@/lib/notify'
@@ -171,6 +172,7 @@ export function useDeleteSuite() {
       markProjectStale(queryClient, projectId)
       markRunDetailsStale(queryClient)
       markRunPagesStale(queryClient, projectId)
+      markCiRunsStale(queryClient, projectId)
     },
   })
 }

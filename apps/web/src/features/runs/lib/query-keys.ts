@@ -17,5 +17,6 @@ export const runKeys = {
 export const ciRunKeys = {
   all: ['ci-runs'] as const,
   page: (projectId: string) => ['ci-runs', 'page', projectId] as const,
+  details: ['ci-runs', 'detail'] as const,
   detail: (id: string) => ['ci-runs', 'detail', id] as const,
 }

@@ -226,6 +226,14 @@ are not on screen while a suite is deleted, and an infinite query would refetch 
 the other, so the next visit to the list refetches it instead. The key prefix is
 `['runs', 'page', projectId]`, which covers every source of that project and no other project.
 
+The same cascade reaches the CI runs. A CI run detail lists the job runs of its suites and the CI run status
+is derived from them, so after a suite deletion a cached detail would keep listing the deleted runs, and
+opening one of them would end in a 404, until the 60 second stale time ran out. `useDeleteSuite` therefore
+also marks every cached CI run detail and the CI run list of its project stale through `markCiRunsStale`
+(`apps/web/src/features/runs/lib/mark-ci-runs-stale.ts`), again with `refetchType: 'none'`. The detail prefix
+is `['ci-runs', 'detail']` and the list key is `['ci-runs', 'page', projectId]`, so no other project is
+touched. No other library mutation deletes runs, so none of them marks the CI runs.
+
 The Aeris action is gated for the same reason as the empty state. The single-case documentation endpoint
 (`ExtractionService.enqueueDocumentCase`) rejects a case that is not automated, has a pending proposal or has no
 automation key, but not one that is already documented, and the extraction job spends an AI credit. Offering
