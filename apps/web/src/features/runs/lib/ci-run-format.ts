@@ -16,7 +16,7 @@ type CiRunLabelSource = Pick<CiRunSummaryRecord, 'runNumber' | 'commitSha' | 'ex
 
 type CiRunMetaSource = Pick<
   CiRunSummaryRecord,
-  'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor'
+  'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor' | 'actor'
 >
 
 export type CiRunLabel = { kind: 'number'; number: number } | { kind: 'text'; value: string }
@@ -82,7 +82,7 @@ export function ciRunLabel(ciRun: CiRunLabelSource): CiRunLabel {
 export function ciRunMetaParts(ciRun: CiRunMetaSource): CiRunMetaPart[] {
   const ref = present(ciRun.headRef) ?? present(ciRun.branch)
   const sha = shortSha(ciRun.commitSha)
-  const author = present(ciRun.commitAuthor)
+  const author = present(ciRun.commitAuthor) ?? present(ciRun.actor)
   const parts: CiRunMetaPart[] = []
 
   if (ciRun.runNumber !== undefined) parts.push({ kind: 'number', number: ciRun.runNumber })

@@ -8,7 +8,7 @@ import { ciRunMetaParts, type CiRunMetaPart } from '../lib/ci-run-format'
 
 type CiRunMetaSource = Pick<
   CiRunSummaryRecord,
-  'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor'
+  'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor' | 'actor'
 >
 
 function MetaPart({ part }: { part: CiRunMetaPart }) {

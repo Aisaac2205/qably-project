@@ -158,9 +158,30 @@ describe('ciRunMetaParts', () => {
     ])
   })
 
+  it('falls back to the GitHub actor when the CI run has no commit author', () => {
+    expect(ciRunMetaParts(ciRun({ runNumber: 7, actor: 'octocat' }))).toStrictEqual([
+      { kind: 'number', number: 7 },
+      { kind: 'author', value: 'octocat' },
+    ])
+  })
+
+  it('prefers the commit author over the actor', () => {
+    expect(ciRunMetaParts(ciRun({ commitAuthor: 'Ana', actor: 'octocat' }))).toStrictEqual([
+      { kind: 'author', value: 'Ana' },
+    ])
+  })
+
+  it('falls back to the actor when the commit author is blank', () => {
+    expect(ciRunMetaParts(ciRun({ commitAuthor: '  ', actor: 'octocat' }))).toStrictEqual([
+      { kind: 'author', value: 'octocat' },
+    ])
+  })
+
   it('omits blank strings instead of rendering an empty part', () => {
     expect(
-      ciRunMetaParts(ciRun({ branch: '', headRef: '   ', commitSha: '', commitAuthor: ' ' })),
+      ciRunMetaParts(
+        ciRun({ branch: '', headRef: '   ', commitSha: '', commitAuthor: ' ', actor: '' }),
+      ),
     ).toStrictEqual([])
     expect(ciRunMetaParts(ciRun({ headRef: '  ', branch: 'main' }))).toStrictEqual([
       { kind: 'ref', value: 'main' },

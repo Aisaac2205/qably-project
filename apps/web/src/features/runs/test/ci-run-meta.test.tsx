@@ -5,7 +5,7 @@ import { CiRunMeta } from '@/features/runs/components/ci-run-meta'
 
 type MetaSource = Pick<
   CiRunSummaryRecord,
-  'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor'
+  'runNumber' | 'branch' | 'headRef' | 'commitSha' | 'commitAuthor' | 'actor'
 >
 
 const FULL: MetaSource = {
@@ -56,6 +56,19 @@ describe('CiRunMeta', () => {
       expect(line?.textContent).not.toMatch(/-|null|undefined|^·|·$|··/)
     },
   )
+
+  it('shows the GitHub actor when the CI run has no commit author', () => {
+    const { line } = renderMeta({ runNumber: 7, branch: 'main', actor: 'octocat' })
+
+    expect(line).toHaveTextContent('CI #7·main·octocat')
+  })
+
+  it('shows the commit author and not the actor when both are present', () => {
+    renderMeta({ ...FULL, actor: 'octocat' })
+
+    expect(screen.getByText('ana')).toBeInTheDocument()
+    expect(screen.queryByText('octocat')).not.toBeInTheDocument()
+  })
 
   it('renders nothing when the CI run carries none of the parts', () => {
     const { container } = renderMeta({})

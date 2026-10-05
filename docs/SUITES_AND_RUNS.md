@@ -47,6 +47,14 @@ fall back to the Manual tab only for a manual run, and to the Actions tab, or to
 The Manual tab used to list every run without a CI run link, which mixed the automated runs that no CI run
 adopted with the runs a person started.
 
+The line under the title of a CI run row and of the CI run header lists, in this order and omitting what
+is absent, the run number, the ref, the short commit SHA and an author. The author is the commit author
+when the reporter or the backfill sent one, and otherwise the GitHub actor, the `ciActor` the reporter
+fills from `GITHUB_ACTOR`, which GitHub sets on every workflow run. The commit fields are optional metadata
+and often missing, so the actor keeps the line from going without an author. A blank value counts as
+missing, so the author falls through to the actor and, with neither, the part is left out instead of
+rendering an empty slot.
+
 ## Why `run_case` duplicates the case content
 
 `run_case` carries its own `steps` and `expected_result`, copied from `test_case` when the run is created
