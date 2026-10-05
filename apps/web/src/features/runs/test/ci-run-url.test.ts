@@ -260,7 +260,6 @@ describe('buildCiRunUrl', () => {
         'https://github.com/acme/shop%3Fx%3D1%23y/actions/runs/900',
       )
     })
-
   })
 
   describe('links only a run id made of digits', () => {
