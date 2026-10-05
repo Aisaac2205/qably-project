@@ -81,16 +81,7 @@ export class RunsService {
       input.finishedAt === undefined ? undefined : new Date(input.finishedAt);
     const reportExternalId = input.reportExternalId ?? input.externalId;
 
-    const ciRunId = await this.ciRunLinker.resolve(apiKey, input);
-    const ciLink =
-      ciRunId === undefined
-        ? {}
-        : {
-            ciRunId,
-            ...(input.ciJobKey === undefined
-              ? {}
-              : { ciJobKey: input.ciJobKey }),
-          };
+    const ciLink = (await this.ciRunLinker.resolve(apiKey, input)) ?? {};
 
     let createdCaseIds: string[] = [];
 

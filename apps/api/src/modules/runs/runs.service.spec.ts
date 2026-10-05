@@ -1,6 +1,6 @@
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
-import { CiRunLinker } from './ci-run-linker';
+import { CiRunLinker, type CiRunLink } from './ci-run-linker';
 import { deriveRunStatus } from './lib/derive-run-status';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import type { IngestRunInput } from './runs.schemas';
@@ -144,8 +144,8 @@ function fakeReclassifier(
   return { enqueue } as unknown as ProposalReclassifier;
 }
 
-function createCiRunLinker(ciRunId?: string) {
-  return { resolve: jest.fn().mockResolvedValue(ciRunId) };
+function createCiRunLinker(link?: CiRunLink) {
+  return { resolve: jest.fn().mockResolvedValue(link) };
 }
 
 function build(
@@ -1751,6 +1751,8 @@ const ciInput: IngestRunInput = {
   ciJobKey: 'api',
 };
 
+const linkedToApi: CiRunLink = { ciRunId: 'ci-1', ciJobKey: 'api' };
+
 interface RunUpsertArgs {
   where: unknown;
   create: Record<string, unknown>;
@@ -1775,7 +1777,7 @@ function buildWithLinker(prisma: FakePrisma, linker: { resolve: jest.Mock }) {
 describe('RunsService.ingest ci run linking', () => {
   it('resolves the ci run once with the api key and the input, before the transaction opens', async () => {
     const prisma = createPrisma();
-    const linker = createCiRunLinker('ci-1');
+    const linker = createCiRunLinker(linkedToApi);
 
     await buildWithLinker(prisma, linker).ingest(apiKey, ciInput);
 
@@ -1789,7 +1791,7 @@ describe('RunsService.ingest ci run linking', () => {
   it('writes the ci run id and job key on both the create and the update, which links a stored run late', async () => {
     const prisma = createPrisma();
 
-    await buildWithLinker(prisma, createCiRunLinker('ci-1')).ingest(
+    await buildWithLinker(prisma, createCiRunLinker(linkedToApi)).ingest(
       apiKey,
       ciInput,
     );
@@ -1802,13 +1804,13 @@ describe('RunsService.ingest ci run linking', () => {
     );
   });
 
-  it('writes the ci run id without a job key when the report carries none', async () => {
+  it('writes the ci run id without a job key when the link carries none', async () => {
     const prisma = createPrisma();
 
-    await buildWithLinker(prisma, createCiRunLinker('ci-1')).ingest(apiKey, {
-      ...ciInput,
-      ciJobKey: undefined,
-    });
+    await buildWithLinker(
+      prisma,
+      createCiRunLinker({ ciRunId: 'ci-1' }),
+    ).ingest(apiKey, ciInput);
 
     for (const write of [
       runUpsertArgs(prisma).create,
@@ -1854,7 +1856,7 @@ describe('RunsService.ingest ci run linking', () => {
   it('never resolves a ci run for a request that fails before writing', async () => {
     const prisma = createPrisma();
     prisma.suite.findFirst.mockResolvedValue(null);
-    const linker = createCiRunLinker('ci-1');
+    const linker = createCiRunLinker(linkedToApi);
     const service = buildWithLinker(prisma, linker);
 
     const missingSuite = await service.ingest(apiKey, {
@@ -1914,9 +1916,36 @@ describe('RunsService.ingest ci run linking', () => {
     );
   });
 
+  it('links a report from a reporter that sends no ci fields through the run id and the job key in its external id', async () => {
+    const prisma = createPrisma();
+    const ciRun = { upsert: jest.fn().mockResolvedValue({ id: 'ci-1' }) };
+    const run = {
+      groupBy: jest.fn().mockResolvedValue([{ ciJobKey: 'api' }]),
+    };
+    const service = buildWithLinker(
+      prisma,
+      new CiRunLinker({ ciRun, run } as never) as never,
+    );
+
+    await service.ingest(apiKey, {
+      ...ciInput,
+      ciRunExternalId: undefined,
+      ciJobKey: undefined,
+    });
+
+    expect(ciRun.upsert).toHaveBeenCalledTimes(1);
+    for (const write of [
+      runUpsertArgs(prisma).create,
+      runUpsertArgs(prisma).update,
+    ]) {
+      expect(write.ciRunId).toBe('ci-1');
+      expect(write.ciJobKey).toBe('api');
+    }
+  });
+
   it('keeps each report of the same job under its own reportExternalId while sharing one ci run', async () => {
     const prisma = createPrisma();
-    const service = buildWithLinker(prisma, createCiRunLinker('ci-1'));
+    const service = buildWithLinker(prisma, createCiRunLinker(linkedToApi));
 
     await service.ingest(apiKey, ciInput);
     await service.ingest(apiKey, {
