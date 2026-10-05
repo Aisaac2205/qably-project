@@ -856,7 +856,7 @@
     "started": "Iniciado",
     "finished": "Finalizado",
     "byAuthor": "por ",
-    "versionSnapshot": "Versión {{version}}",
+    "caseVersion": "Versión {{version}}",
     "viewInLibrary": "Ver en biblioteca de pruebas",
     "readOnlyRun": "Registrado por {{source}}",
     "readOnlyRunHint": "Los estados de una ejecución automatizada provienen de la herramienta que los reportó y no pueden editarse aquí.",

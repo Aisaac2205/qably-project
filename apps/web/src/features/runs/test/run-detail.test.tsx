@@ -7,6 +7,13 @@ import { runFixtures } from '@/test/runs-api-stub'
 import { ApiError } from '@/lib/api-client'
 import type { RunRecord } from '@qably/types'
 import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
+import {
+  CI_RAW_NAME,
+  automatedOfficialCase,
+  manualOfficialCase,
+  reportedRunCase,
+  snapshotRunCase,
+} from './run-case-fixtures'
 
 vi.mock('@/features/runs/api/runs.api', async () =>
   await import('@/test/runs-api-stub'),
@@ -343,24 +350,15 @@ describe('RunDetail metadata rows', () => {
     expect(chip.className).toMatch(/min-w-6/)
   })
 
-  it('offers to document the selected case with Aeris when it has no documentation yet', async () => {
-    const run = getFreshRun()
+  it('offers to document the selected case of a CI run when its library entry has no documentation yet', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
     run.cases = run.cases.map((c, i) =>
       i === 0
-        ? {
-            ...c,
-            steps: [],
-            expectedResult: '',
-            officialCase: {
-              id: 'tc-1',
-              suiteId: 'suite-1',
-              version: 1,
-              name: 'Valid login redirects to dashboard',
-              steps: [],
-              expectedResult: '',
-              executionMode: 'manual',
-            },
-          }
+        ? reportedRunCase({
+            id: c.id,
+            testCaseId: 'tc-1',
+            officialCase: automatedOfficialCase({ id: 'tc-1', suiteId: 'suite-1' }),
+          })
         : c,
     )
     const user = userEvent.setup()
@@ -373,6 +371,68 @@ describe('RunDetail metadata rows', () => {
 
     await user.click(screen.getByRole('button', { name: /document with aeris/i }))
     expect(documentSpy).toHaveBeenCalledWith('suite-1', 'tc-1')
+  })
+
+  it('never offers Aeris in a manual run, whatever the library entry holds', async () => {
+    const run = getFreshRun()
+    run.cases = run.cases.map((c, i) =>
+      i === 0
+        ? {
+            ...c,
+            steps: [],
+            expectedResult: '',
+            officialCase: automatedOfficialCase({ id: 'tc-1', suiteId: 'suite-1' }),
+          }
+        : c,
+    )
+
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
+  })
+
+  it('shows the approved library title in the list and the detail of a CI run, with the reporter name kept as evidence', async () => {
+    const run = { ...getFreshRun(), source: 'github_actions' as const }
+    run.cases = [
+      reportedRunCase({
+        id: 'rc-1',
+        officialCase: automatedOfficialCase({
+          version: 2,
+          steps: ['Abrir el formulario de acceso'],
+          expectedResult: 'Se redirige al panel',
+        }),
+      }),
+    ]
+
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    expect(screen.getAllByText('Redirige al panel con credenciales válidas')).toHaveLength(2)
+    expect(screen.getAllByText(CI_RAW_NAME)).toHaveLength(2)
+    expect(screen.getByText('Abrir el formulario de acceso')).toBeInTheDocument()
+    expect(screen.getByText('Version 2')).toBeInTheDocument()
+  })
+
+  it('keeps the run snapshot in the list and the detail of a manual run', async () => {
+    const run = getFreshRun()
+    run.cases = [
+      snapshotRunCase({
+        id: 'rc-1',
+        officialCase: manualOfficialCase({ name: 'Título renombrado', steps: ['Paso nuevo'] }),
+      }),
+    ]
+
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    expect(screen.getAllByText('Valid login redirects to dashboard')).toHaveLength(2)
+    expect(screen.queryByText('Título renombrado')).not.toBeInTheDocument()
+    expect(screen.queryByText('Paso nuevo')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Version /)).not.toBeInTheDocument()
   })
 })
 

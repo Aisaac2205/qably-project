@@ -856,7 +856,7 @@
     "started": "Started",
     "finished": "Finished",
     "byAuthor": "by ",
-    "versionSnapshot": "Version {{version}}",
+    "caseVersion": "Version {{version}}",
     "viewInLibrary": "View in Test Library",
     "readOnlyRun": "Recorded by {{source}}",
     "readOnlyRunHint": "Statuses in an automated run come from the reporting tool and cannot be edited here.",

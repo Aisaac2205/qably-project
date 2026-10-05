@@ -1,12 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import type { RunCaseRecord } from '@qably/types'
+import type { RunCaseRecord, RunSource } from '@qably/types'
 import { ArrowSquareOut, Sparkle } from '@phosphor-icons/react'
 import { StatusChip } from './status-chip'
 import { Button } from '@/components/ui/button'
 import { useTranslation } from '@/lib/i18n'
-import { describeCase } from '@/features/projects/suites/lib/case-title'
+import { resolveRunCase } from '../lib/resolve-run-case'
 import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 
 function formatDuration(ms: number, locale: string): string {
@@ -19,25 +19,25 @@ function formatDuration(ms: number, locale: string): string {
 
 export function CaseDetail({
   c,
+  source,
   projectId,
 }: {
   c: RunCaseRecord
+  source: RunSource
   projectId?: string
 }) {
   const { t, locale } = useTranslation()
   const officialCase = c.officialCase
-  const described = describeCase(c)
-  const showRawName = described.raw !== described.title
+  const resolved = resolveRunCase(c, source)
   const documentCase = useDocumentCase()
 
   return (
     <div className="space-y-5 p-5 sm:p-6">
-      {/* Header with name, version snapshot, and status */}
       <div className="space-y-2 pb-4 border-b border-border">
         <div className="flex items-center gap-2 flex-wrap">
-          {officialCase && officialCase.version !== null && (
+          {resolved.version !== undefined && (
             <span className="rounded bg-canvas border border-border px-2 py-0.5 font-mono text-xs font-semibold text-muted">
-              {t('runs.versionSnapshot', { version: officialCase.version })}
+              {t('runs.caseVersion', { version: resolved.version })}
             </span>
           )}
           {projectId && officialCase && (
@@ -53,9 +53,9 @@ export function CaseDetail({
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <h3 className="text-base sm:text-lg font-semibold text-default">{described.title}</h3>
-            {showRawName && (
-              <p className="mt-0.5 font-mono text-xs text-muted truncate">{described.raw}</p>
+            <h3 className="text-base sm:text-lg font-semibold text-default">{resolved.title}</h3>
+            {resolved.rawName !== undefined && (
+              <p className="mt-0.5 font-mono text-xs text-muted truncate">{resolved.rawName}</p>
             )}
           </div>
           <StatusChip status={c.status} />
@@ -92,13 +92,13 @@ export function CaseDetail({
         </div>
       )}
 
-      {c.steps.length > 0 && (
+      {resolved.steps.length > 0 && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted">
             {t('runs.steps')}
           </h4>
           <ol className="space-y-1.5 list-decimal list-inside text-xs sm:text-sm text-default leading-relaxed bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4">
-            {c.steps.map((step, i) => (
+            {resolved.steps.map((step, i) => (
               <li key={i} className="pl-1">
                 {step}
               </li>
@@ -107,18 +107,18 @@ export function CaseDetail({
         </div>
       )}
 
-      {c.expectedResult !== '' && (
+      {resolved.expectedResult !== '' && (
         <div className="space-y-2">
           <h4 className="text-xs font-semibold text-muted">
             {t('runs.expectedResult')}
           </h4>
           <p className="text-xs sm:text-sm text-default bg-canvas/40 border border-border/60 rounded-lg p-3 sm:p-4 leading-relaxed">
-            {c.expectedResult}
+            {resolved.expectedResult}
           </p>
         </div>
       )}
 
-      {c.steps.length === 0 && c.expectedResult === '' && (
+      {resolved.steps.length === 0 && resolved.expectedResult === '' && (
         <div className="flex flex-wrap items-center justify-between gap-3 py-1">
           <div className="space-y-1 min-w-0">
             <p className="text-xs font-semibold text-default">
@@ -128,7 +128,7 @@ export function CaseDetail({
               {t('runs.undocumentedCaseHint')}
             </p>
           </div>
-          {officialCase && (
+          {resolved.showAerisAction && officialCase && (
             <Button
               type="button"
               variant="outline"
