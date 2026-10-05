@@ -45,9 +45,11 @@ arrived before that.
   from the fresh values and retries, up to 5 attempts. A value written by live ingestion after the read
   is therefore never replaced by an older one.
 - Skips a group that is still not resolved after those 5 attempts, because live ingestion keeps changing
-  its `CiRun`. None of the runs of that group are linked, the script logs the skip as it happens,
-  carries on with the next group and lists the skipped `CiRun` ids in the summary. It exits with code 2
-  so that a skip cannot be mistaken for a clean run. Running the script again resolves them.
+  its `CiRun`. A group is the runs of one GitHub run read in one batch, so a GitHub run whose runs
+  straddle two batches can be skipped in one and linked in the next. The runs of the group in the batch
+  that skipped it are not linked, the script logs the skip as it happens, carries on with the next group
+  and lists the GitHub run external ids (with the project id) in the summary. It exits with code 2 so
+  that a skip cannot be mistaken for a clean run. Running the script again links the runs that were left.
 - Recovers the job key in a second phase, after every batch of unlinked runs was processed. It reads the
   runs with `ciRunId IS NOT NULL`, `ciJobKey IS NULL` and `externalId LIKE 'gha-%'` in `id` order, 500
   per batch with a keyset cursor, and resolves each one with `resolveCiJobKey` against the job keys of
@@ -100,9 +102,9 @@ next pass finds it by its unique key, reuses it and links the runs. If live inge
 `CiRun` between the lookup and the create, the create fails on the unique constraint (`P2002`); the
 script catches that, reads the row again and merges into it as into any existing `CiRun`. Any other
 error on the create aborts the run with exit code 1. A group that is still not resolved after 5
-attempts, because live ingestion keeps changing its `CiRun`, does not abort it: it is skipped, none of
-its runs are linked, the run ends with exit code 2 and the summary names the `CiRun`. Running the
-script again resolves it.
+attempts, because live ingestion keeps changing its `CiRun`, does not abort it: it is skipped, its runs
+in that batch are not linked, the run ends with exit code 2 and the summary names the GitHub run
+external id and the project. Running the script again links the runs that were left.
 
 ## Pre-checks
 
@@ -207,15 +209,17 @@ error, 2 when it completed but skipped at least one group. A skip is logged when
 at the end:
 
 ```
-Skipped github_actions CiRun 9120334455 of project cmg1abc: concurrent ingestion changed it in 5 consecutive attempts and none of its runs were linked.
+Skipped github_actions GitHub run 9120334455 of project cmg1abc: concurrent ingestion changed its CiRun in 5 consecutive attempts, so the runs of that group in that batch were not linked.
 ...
 Skipped groups: 1
   github_actions 9120334455 (project cmg1abc)
-Run the script again to link the skipped groups.
+The runs of these groups in the batch that skipped them were not linked. Run the script again to link them.
 ```
 
-A skipped group leaves every one of its runs unlinked and without a job key. Run the script again, in a
-quieter moment if the same group is skipped twice.
+The identifier printed is the GitHub run external id of the group, not the id of a `CiRun` row. A skip
+is per batch: it leaves the runs of that group in that batch unlinked and without a job key, while the
+runs of the same GitHub run that were read in another batch can already be linked. Run the script again,
+in a quieter moment if the same group is skipped twice.
 
 ## Recommended order
 

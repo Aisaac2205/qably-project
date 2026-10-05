@@ -130,7 +130,7 @@ describe('runBackfillCli', () => {
     expect(t.port.linkRuns).not.toHaveBeenCalled();
     expect(t.lines).toEqual([
       'Target database host: db.example.internal',
-      'Skipped github_actions CiRun 900 of project proj-1: concurrent ingestion changed it in 5 consecutive attempts and none of its runs were linked.',
+      'Skipped github_actions GitHub run 900 of project proj-1: concurrent ingestion changed its CiRun in 5 consecutive attempts, so the runs of that group in that batch were not linked.',
       'Scanned: 1',
       'Unattributable (left untouched): 0',
       'CiRuns created: 0',
@@ -140,7 +140,7 @@ describe('runBackfillCli', () => {
       'Linked runs left without a job key: 0',
       'Skipped groups: 1',
       '  github_actions 900 (project proj-1)',
-      'Run the script again to link the skipped groups.',
+      'The runs of these groups in the batch that skipped them were not linked. Run the script again to link them.',
     ]);
     expect(t.close).toHaveBeenCalledTimes(1);
   });

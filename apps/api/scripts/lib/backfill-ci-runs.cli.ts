@@ -22,9 +22,9 @@ const EXIT_SKIPPED_GROUPS = 2;
 
 function skippedLine(key: CiRunKey): string {
   return (
-    `Skipped ${key.source} CiRun ${key.externalId} of project ${key.projectId}: ` +
-    `concurrent ingestion changed it in ${MAX_MERGE_ATTEMPTS} consecutive ` +
-    'attempts and none of its runs were linked.'
+    `Skipped ${key.source} GitHub run ${key.externalId} of project ${key.projectId}: ` +
+    `concurrent ingestion changed its CiRun in ${MAX_MERGE_ATTEMPTS} consecutive ` +
+    'attempts, so the runs of that group in that batch were not linked.'
   );
 }
 
@@ -36,7 +36,7 @@ function skippedSummaryLines(summary: BackfillSummary): string[] {
     ...summary.skippedGroups.map(
       (key) => `  ${key.source} ${key.externalId} (project ${key.projectId})`,
     ),
-    'Run the script again to link the skipped groups.',
+    'The runs of these groups in the batch that skipped them were not linked. Run the script again to link them.',
   ];
 }
 
