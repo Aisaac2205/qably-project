@@ -493,10 +493,12 @@ describe('useCreateCase', () => {
       })
     })
 
+    expect(client.getQueryData(suiteKeys.detail('suite-1'))).toEqual(suiteWithThreeCases)
+    await waitFor(() => {
+      expect(editPage.result.current.detail.suite).toEqual(suiteWithThreeCases)
+    })
     expect(getSuiteApi).toHaveBeenCalledTimes(1)
     expect(getProjectApi).toHaveBeenCalledTimes(1)
-    expect(client.getQueryData(suiteKeys.detail('suite-1'))).toEqual(suiteWithThreeCases)
-    expect(editPage.result.current.detail.suite).toEqual(suiteWithThreeCases)
     expect(client.getQueryState(projectKeys.detail('proj-1'))?.isInvalidated).toBe(true)
   })
 
