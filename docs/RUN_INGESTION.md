@@ -285,7 +285,9 @@ run to a user.
 A `CiRun` is one GitHub Actions workflow run. It is the parent of every `Run` (one per `<testsuite>`)
 that the jobs of that workflow run report, so the UI can show one row per push instead of one per
 suite. A `Run` points to it through `Run.ciRunId`; `Run.ciJobKey` names the job that reported it.
-Reports from before this existed, from a reporter older than 10.1.0 and local runs have no link.
+Reports from before this existed and local runs have no link of their own. A report from a reporter
+older than 10.1.0 is still linked when its `externalId` carries the GitHub run id (see "Linking from
+the external id").
 
 ### Parameters
 
@@ -318,9 +320,10 @@ sending and omits what does not fit (see "Reporter behavior").
 
 - `(projectId, source, ciRunExternalId)` identifies the `CiRun`, so the same id in two projects, or
   with `api` and `github_actions` as source, yields two rows.
-- **Without `ciRunExternalId`, every other `ci*` parameter is ignored**, `ciJobKey` included: no
-  `CiRun` is created, `ciRunId` and `ciJobKey` stay `null` and the ingest succeeds. This keeps one
-  invariant: a run with a `ciJobKey` always has a `ciRunId`.
+- **Without a CI run id, every other `ci*` parameter is ignored**, `ciJobKey` included: no `CiRun` is
+  created, `ciRunId` and `ciJobKey` stay `null` and the ingest succeeds. The CI run id is
+  `ciRunExternalId` when it is sent, otherwise the one in the run's `externalId` (see "Linking from the
+  external id"). This keeps one invariant: a run with a `ciJobKey` always has a `ciRunId`.
 - A `ci*` or commit parameter that is present overwrites the stored value on the `CiRun`; one that is
   absent never clears it. `runAttempt` therefore follows the latest report of a GitHub re-run.
 - The run gets `ciRunId` (and `ciJobKey` when sent) on create and on update. A replay of the run by a
@@ -338,7 +341,10 @@ sending and omits what does not fit (see "Reporter behavior").
 
 `CiRunLinker.resolve` runs in `RunsService.ingest` after the `source` check and the `suiteId` lookup
 and before `prisma.$transaction`. It issues one `ciRun.upsert` on `projectId_source_externalId`, never
-a read first, and returns the id as a plain value that the transaction then writes on the run.
+a read first, and returns the link (`ciRunId`, plus `ciJobKey` when there is one) as a plain value that
+the transaction then writes on the run. When the request has no `ciRunExternalId` it takes the CI run
+id from the run's `externalId` instead, with one extra read described under "Linking from the external
+id"; a request that sends `ciRunExternalId` never pays for it.
 
 It is outside the transaction on purpose. A push produces on the order of 350 ingests that all write
 the same `CiRun` row, and the worker runs 4 jobs at a time (`concurrency: 4`). An interactive
@@ -365,6 +371,64 @@ constraint, which `projectId_source_externalId` is; this was checked against the
 (7.6.0, the installed client is 7.8.0) but the emitted SQL has not been observed against the real
 database. Until it is, the `P2002` fallback is what guarantees the behavior. Status: documented, not
 observed.
+
+### Linking from the external id
+
+Every report that Qably's own reporter has sent, from its first version on, carries the GitHub run id
+and the job in `Run.externalId`:
+
+```
+gha-{GITHUB_RUN_ID}-{job}-{slug(file)}-{sha256(filePath)[0..8]}
+```
+
+with `-p{n}` appended when a file was split into several requests, and a suite suffix appended by the
+server when the report holds several `<testsuite>`. A reporter older than 10.1.0 sends the id but no
+`ci*` parameter, so before this rule its runs stayed unlinked and showed only under the Manual tab.
+
+When a request has no `ciRunExternalId`, `CiRunLinker` reads the run id from `externalId` with
+`parseCiRunExternalId` (`^gha-(\d+)-`) and links the run exactly as if that id had been sent: the same
+`ciRun.upsert`, with the `source` of the request and the other `ci*` and commit fields it carries.
+Nothing is linked when the id does not match: `gha-local-job-...` (a local reporter run), `curl`
+examples that use the bare run id, ids from other tools and manual runs keep `ciRunId = null`.
+
+The id that is read is `externalId`, the one stored in `Run.externalId`, not `reportExternalId`. They
+share the same prefix, but `externalId` is the field the run is stored under, it is always present, and
+it is the field the owner-run backfill reads (`docs/OPS_BACKFILL_CI_RUNS.md`), so both paths attribute a
+run to the same CI run.
+
+#### Job key
+
+When `ciJobKey` is not sent either, the linker looks for it in the id. The job segment of the id is
+`GITHUB_JOB` as it came, or the slug of `QABLY_JOB_KEY`, and both can contain hyphens, as can the file
+slug that follows. `gha-900-build-web-junit-xml-3425dd6f` is the job `build-web` with the file
+`junit.xml`, or the job `build` with the file `web-junit.xml`, and nothing in the id tells them apart.
+Splitting on hyphens would therefore invent a job key. The linker does not split. It tests keys the
+project already uses instead:
+
+1. It reads the distinct, non-null `Run.ciJobKey` values of the project whose run started in the last 30
+   days (`run.groupBy`, scoped by `projectId`, one query).
+2. `resolveCiJobKey(externalId, ciRunExternalId, knownJobKeys)` keeps the known keys `K` for which the id
+   starts with `gha-{ciRunExternalId}-{K}-`, trying `K` as written (a `GITHUB_JOB`) and the slug of `K`
+   (a `QABLY_JOB_KEY`; the slug lowercases, collapses every run of characters outside `[a-z0-9]` into
+   `-`, trims `-` and becomes `report` when nothing is left, which is what the reporter does).
+3. The longest match wins, so `build-web` beats `build`. At equal length a key that matches as written
+   beats one that matches through its slug. If two different keys still tie (`Build API` and
+   `build_api` both slug to `build-api`) the result is nothing rather than a guess.
+
+If no known key matches, the run is linked without a job key, which the UI already renders as a CI run
+with no job level. The key matched is always one that already exists in the project, so the rule cannot
+create a new job name: the first report of a job that has never been seen with a key is linked without
+one, and a later backfill pass (`docs/OPS_BACKFILL_CI_RUNS.md`) can recover it once the key is known.
+
+The shorter-prefix ambiguity above is real and the longest match resolves it in favour of the longer
+job name: a project with the jobs `build` and `build-web` whose job `build` reports a file named
+`web-junit.xml` gets that run attributed to `build-web`. The data to tell them apart does not exist in
+the id.
+
+The lookup is the only cost of the fallback and runs only for a request without `ciRunExternalId` and
+without `ciJobKey`, whose `externalId` parses. It is bounded by the 30 day window for the same reason
+other queries are: a project produces on the order of 350 runs per push, and an unbounded scan of its
+history on every ingest does not scale. It is outside the interactive transaction, like the upsert.
 
 ### `lastReportedAt`
 
@@ -526,7 +590,7 @@ Content-Type: application/xml
 | `suiteId` / `suiteName` | no | Pins the report to one existing (or adopted) suite and turns off the per-suite split — see below. Passing `suiteId` skips suite-name derivation from the XML entirely. |
 | `name`            | no       | Defaults to the run's suite name when omitted (see below for what that is per run). |
 | `startedAt` / `finishedAt` / `commitSha` / `commitMessage` / `commitAuthor` | no | Same as `POST /runs/ingest`, applied identically to every run this request creates. |
-| `ci*`             | no       | Optional CI run metadata, validated and stored as described in "CI run linking" below. Without `ciRunExternalId` every other `ci*` parameter is ignored. |
+| `ci*`             | no       | Optional CI run metadata, validated and stored as described in "CI run linking" below. Without a CI run id, sent as `ciRunExternalId` or carried in the `externalId`, every other `ci*` parameter is ignored. |
 | `reportSize`      | no       | A positive integer stating how many suite groups the **whole original report** contains, across every chunk of a client-side split (see "One run per `<testsuite>`" below). Omitted (the default) means "this request's own accepted-plus-rejected groups are the whole report" — unchanged behavior for the common, unsplit case. When present it is validated server-side: raised to at least this request's own group count (accepted plus rejected) if still under that, and capped at 100,000 if absurdly large. It is never trusted blindly, and it is never reduced for a rejected group — see "Rejected groups still count toward the batch" below. |
 
 ### Response — `202 Accepted`, asynchronous
