@@ -136,6 +136,17 @@ describe('CaseDetail with an official case in an automated run', () => {
     expect(screen.getByText(CI_RAW_NAME).className).toContain('font-mono')
   })
 
+  it('wraps a long reporter name instead of cutting it, since it is the only full tool name in the pane', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseDetail c={reportedRunCase({ officialCase: documented })} source="github_actions" projectId="proj-1" />,
+      )
+    })
+    const raw = screen.getByText(CI_RAW_NAME)
+    expect(raw).toHaveClass('wrap-anywhere')
+    expect(raw).not.toHaveClass('truncate')
+  })
+
   it('shows the version of the library case', async () => {
     await act(async () => {
       renderWithQuery(

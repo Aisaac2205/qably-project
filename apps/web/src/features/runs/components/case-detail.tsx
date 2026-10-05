@@ -55,7 +55,7 @@ export function CaseDetail({
           <div className="min-w-0">
             <h3 className="text-base sm:text-lg font-semibold text-default">{resolved.title}</h3>
             {resolved.rawName !== undefined && (
-              <p className="mt-0.5 font-mono text-xs text-muted truncate">{resolved.rawName}</p>
+              <p className="mt-0.5 font-mono text-xs text-muted wrap-anywhere">{resolved.rawName}</p>
             )}
           </div>
           <StatusChip status={c.status} />
