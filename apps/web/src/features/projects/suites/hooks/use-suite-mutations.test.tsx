@@ -598,6 +598,19 @@ describe('useDocumentCase', () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
   })
 
+  it('leaves cached run details alone, since nothing in the library changes until the proposal is approved', async () => {
+    const { client, invalidateSpy } = setup()
+    client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
+
+    const result = runMutation(client, useDocumentCase, { suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(false)
+    expect(invalidateSpy).not.toHaveBeenCalledWith(expect.objectContaining({ queryKey: runKeys.details }))
+  })
+
   it('queues the case and notifies success', async () => {
     const { client } = setup()
     const { result } = renderHook(() => useDocumentCase(), {
@@ -972,12 +985,6 @@ describe('run details', () => {
       'deleting a case',
       (client) => {
         runMutation(client, useDeleteCase, { suiteId: 'suite-1', caseId: 'case-1' })
-      },
-    ],
-    [
-      'documenting a case',
-      (client) => {
-        runMutation(client, useDocumentCase, { suiteId: 'suite-1', caseId: 'case-1' })
       },
     ],
     [

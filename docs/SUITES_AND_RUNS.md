@@ -206,8 +206,10 @@ Because the run detail reads the library when it is displayed, a cached detail m
 change, and the detail query keeps the default 60 second stale time. Every mutation that can change what
 `officialCase` carries marks all cached run details stale through `markRunDetailsStale`
 (`apps/web/src/features/runs/lib/mark-run-details-stale.ts`): an inbox approval, a case create, edit or
-delete, a suite edit or delete, a single-case documentation request and a documentation confirmation. A
-rejection does not, because it never writes `test_case`. The call uses `refetchType: 'none'`, like the
+delete, a suite edit or delete and a documentation confirmation. A rejection does not, because it never
+writes `test_case`, and neither does a single-case documentation request: it only enqueues an extraction,
+the proposal waits in the inbox and nothing in the library changes until a person approves it, which is the
+mutation that marks the details stale. The call uses `refetchType: 'none'`, like the
 project detail after a suite mutation: the run is almost never on screen when the library changes, so a
 refetch would cost one request per mutation for a page nobody is looking at, and an invalidated query is
 stale whatever its age, so the next visit to the run refetches it. Run details live under their own key

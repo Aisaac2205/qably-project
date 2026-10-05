@@ -269,7 +269,6 @@ export function useDocumentCase() {
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
       documentCase(suiteId, caseId),
     onSuccess: async (_result, { suiteId }) => {
-      markRunDetailsStale(queryClient)
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       notify.success(t('suites.documentCaseQueued'))
     },
