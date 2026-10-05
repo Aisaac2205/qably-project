@@ -213,6 +213,15 @@ refetch would cost one request per mutation for a page nobody is looking at, and
 stale whatever its age, so the next visit to the run refetches it. Run details live under their own key
 prefix (`['runs', 'detail', id]`) so this never touches the run list pages or the suite metrics.
 
+Deleting a suite is the one library mutation that also changes the run lists. `Run.suite` is
+`onDelete: Cascade`, so the runs of the suite are deleted with it, and a Manual tab cached before the
+deletion would keep listing them until the 60 second stale time ran out. `useDeleteSuite` therefore also
+marks the run list pages of its project stale through `markRunPagesStale`
+(`apps/web/src/features/runs/lib/mark-run-pages-stale.ts`), with the same `refetchType: 'none'`: the lists
+are not on screen while a suite is deleted, and an infinite query would refetch every loaded page one after
+the other, so the next visit to the list refetches it instead. The key prefix is
+`['runs', 'page', projectId]`, which covers every source of that project and no other project.
+
 The Aeris action is gated for the same reason as the empty state. The single-case documentation endpoint
 (`ExtractionService.enqueueDocumentCase`) rejects a case that is not automated, has a pending proposal or has no
 automation key, but not one that is already documented, and the extraction job spends an AI credit. Offering

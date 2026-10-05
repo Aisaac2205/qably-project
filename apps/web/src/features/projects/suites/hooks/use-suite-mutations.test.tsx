@@ -856,6 +856,26 @@ describe('useDeleteSuite', () => {
     })
   })
 
+  it('marks the run list pages of its project stale without fetching them, since the runs of the suite go with it', async () => {
+    const { client, invalidateSpy } = setup()
+    client.setQueryData(runKeys.page('proj-1', 'manual'), { pages: [], pageParams: [] })
+    client.setQueryData(runKeys.page('proj-1', 'all'), { pages: [], pageParams: [] })
+    client.setQueryData(runKeys.page('proj-2', 'manual'), { pages: [], pageParams: [] })
+
+    const result = runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: runKeys.pages('proj-1'),
+      refetchType: 'none',
+    })
+    expect(client.getQueryState(runKeys.page('proj-1', 'manual'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(runKeys.page('proj-1', 'all'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(runKeys.page('proj-2', 'manual'))?.isInvalidated).toBe(false)
+  })
+
   it('keeps the detail while its page is still mounted, then evicts it once the page leaves', async () => {
     const { client } = setup()
     const page = await mountDetailPageWithDelete(client)
@@ -980,10 +1000,11 @@ describe('run details', () => {
     ],
   ]
 
-  it.each(triggers)('marks cached run details stale after %s, without fetching them', async (_label, trigger) => {
+  it.each(triggers)('marks cached run details stale after %s, without fetching them', async (label, trigger) => {
     const { client, invalidateSpy } = setup()
     client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
     client.setQueryData(runKeys.list('proj-1'), { items: [] })
+    client.setQueryData(runKeys.page('proj-1', 'manual'), { pages: [], pageParams: [] })
 
     trigger(client)
 
@@ -995,5 +1016,8 @@ describe('run details', () => {
       refetchType: 'none',
     })
     expect(client.getQueryState(runKeys.list('proj-1'))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(runKeys.page('proj-1', 'manual'))?.isInvalidated).toBe(
+      label === 'deleting a suite',
+    )
   })
 })

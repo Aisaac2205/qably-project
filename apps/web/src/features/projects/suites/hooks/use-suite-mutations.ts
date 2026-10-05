@@ -22,6 +22,7 @@ import {
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 import { markRunDetailsStale } from '@/features/runs/lib/mark-run-details-stale'
+import { markRunPagesStale } from '@/features/runs/lib/mark-run-pages-stale'
 import { notify } from '@/lib/notify'
 import { useTranslation } from '@/lib/i18n'
 
@@ -169,6 +170,7 @@ export function useDeleteSuite() {
       void invalidateSuiteList(queryClient, projectId)
       markProjectStale(queryClient, projectId)
       markRunDetailsStale(queryClient)
+      markRunPagesStale(queryClient, projectId)
     },
   })
 }

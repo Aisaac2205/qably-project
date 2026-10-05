@@ -1,6 +1,7 @@
 export const runKeys = {
   all: ['runs'] as const,
   list: (projectId: string) => ['runs', 'list', projectId] as const,
+  pages: (projectId: string) => ['runs', 'page', projectId] as const,
   page: (projectId: string, source: string) =>
     ['runs', 'page', projectId, source] as const,
   details: ['runs', 'detail'] as const,
