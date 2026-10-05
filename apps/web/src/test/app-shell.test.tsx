@@ -87,6 +87,43 @@ describe('AppShell', () => {
     expect(wrapper).not.toHaveClass('min-h-dvh')
   })
 
+  it('restores the scroll position of main when history traverses back to an entry', async () => {
+    window.history.replaceState({}, '', '/dashboard?range=week')
+    await act(async () => {
+      render(
+        <AppShell>
+          <div>Content</div>
+        </AppShell>,
+      )
+    })
+    const main = screen.getByRole('main')
+    let top = 0
+    Object.defineProperty(main, 'clientHeight', { configurable: true, get: () => 600 })
+    Object.defineProperty(main, 'scrollHeight', { configurable: true, get: () => 3000 })
+    Object.defineProperty(main, 'scrollTop', {
+      configurable: true,
+      get: () => top,
+      set: (value: number) => {
+        top = value
+      },
+    })
+    main.scrollTo = vi.fn((options?: ScrollToOptions | number) => {
+      if (typeof options === 'object' && options.top !== undefined) top = options.top
+    }) as unknown as typeof main.scrollTo
+
+    top = 700
+    main.dispatchEvent(new Event('scroll'))
+    window.history.pushState({}, '', '/dashboard?range=month')
+    top = 0
+    window.history.replaceState({}, '', '/dashboard?range=week')
+    await act(async () => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+
+    expect(main.scrollTo).toHaveBeenCalledWith({ top: 700, behavior: 'instant' })
+    window.history.replaceState({}, '', '/')
+  })
+
   it('renders children', async () => {
     await act(async () => {
       render(
