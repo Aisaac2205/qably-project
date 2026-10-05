@@ -1401,9 +1401,14 @@ describe('RunsService.ingest official case linkage', () => {
         testCase: {
           id: 'case-1',
           suiteId: 'suite-1',
+          name: 'Agrega al carrito',
           steps: ['open', 'add'],
           expectedResult: 'cart has one item',
           currentVersion: null,
+          executionMode: 'automated',
+          automationKey: 'Adds to cart',
+          automationClassName: 'tests.checkout.test_checkout',
+          automationFilePath: null,
         },
       }),
     ]);
@@ -1415,6 +1420,32 @@ describe('RunsService.ingest official case linkage', () => {
     expect(result.value.cases[0].officialCase).not.toBeNull();
     expect(result.value.cases[0].officialCase?.id).toBe('case-1');
     expect(result.value.cases[0].officialCase?.version).toBeNull();
+    expect(result.value.cases[0].officialCase).toMatchObject({
+      name: 'Agrega al carrito',
+      executionMode: 'automated',
+      automationKey: 'Adds to cart',
+      automationClassName: 'tests.checkout.test_checkout',
+    });
+    expect(result.value.cases[0].officialCase).not.toHaveProperty(
+      'automationFilePath',
+    );
+  });
+
+  it('selects the official case title and automation fields when reloading the ingested cases', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    const [call] = prisma.txRunCaseFindMany.mock.calls as [
+      [{ select: { testCase: { select: Record<string, unknown> } } }],
+    ];
+    expect(call[0].select.testCase.select).toMatchObject({
+      name: true,
+      executionMode: true,
+      automationKey: true,
+      automationClassName: true,
+      automationFilePath: true,
+    });
   });
 });
 

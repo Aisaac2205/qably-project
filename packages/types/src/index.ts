@@ -240,8 +240,13 @@ export interface RunCaseOfficialCase {
   id: string
   suiteId: string
   version: number | null
+  name: string
   steps: string[]
   expectedResult: string
+  executionMode: ExecutionMode
+  automationKey?: string
+  automationClassName?: string
+  automationFilePath?: string
 }
 
 export interface RunCaseRecord {

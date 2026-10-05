@@ -121,8 +121,10 @@ describe('CaseDetail', () => {
               id: 'case-9',
               suiteId: 'suite-1',
               version: 4,
+              name: 'Valid login redirects to dashboard',
               steps: [],
               expectedResult: '',
+              executionMode: 'manual',
             },
           }}
           projectId="proj-1"
@@ -147,8 +149,10 @@ describe('CaseDetail', () => {
               id: 'case-9',
               suiteId: 'suite-1',
               version: null,
+              name: 'Valid login redirects to dashboard',
               steps: [],
               expectedResult: '',
+              executionMode: 'manual',
             },
           }}
           projectId="proj-1"

@@ -351,7 +351,15 @@ describe('RunDetail metadata rows', () => {
             ...c,
             steps: [],
             expectedResult: '',
-            officialCase: { id: 'tc-1', suiteId: 'suite-1', version: 1, steps: [], expectedResult: '' },
+            officialCase: {
+              id: 'tc-1',
+              suiteId: 'suite-1',
+              version: 1,
+              name: 'Valid login redirects to dashboard',
+              steps: [],
+              expectedResult: '',
+              executionMode: 'manual',
+            },
           }
         : c,
     )

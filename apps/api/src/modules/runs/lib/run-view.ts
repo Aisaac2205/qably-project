@@ -1,4 +1,9 @@
-import type { CaseStatus, RunSource, RunStatus } from '@qably/types';
+import type {
+  CaseStatus,
+  ExecutionMode,
+  RunSource,
+  RunStatus,
+} from '@qably/types';
 import type { RunView } from '../runs.contracts';
 
 export const RUN_SELECT = {
@@ -50,8 +55,13 @@ export const CASE_READ_SELECT = {
     select: {
       id: true,
       suiteId: true,
+      name: true,
       steps: true,
       expectedResult: true,
+      executionMode: true,
+      automationKey: true,
+      automationClassName: true,
+      automationFilePath: true,
       currentVersion: { select: { version: true } },
     },
   },
@@ -100,8 +110,13 @@ export interface RunCaseRow {
   testCase?: {
     id: string;
     suiteId: string;
+    name: string;
     steps: string[];
     expectedResult: string;
+    executionMode: ExecutionMode;
+    automationKey: string | null;
+    automationClassName: string | null;
+    automationFilePath: string | null;
     currentVersion: { version: number } | null;
   } | null;
 }
@@ -143,8 +158,19 @@ export function toRunView(
                 id: row.testCase.id,
                 suiteId: row.testCase.suiteId,
                 version: row.testCase.currentVersion?.version ?? null,
+                name: row.testCase.name,
                 steps: row.testCase.steps,
                 expectedResult: row.testCase.expectedResult,
+                executionMode: row.testCase.executionMode,
+                ...(row.testCase.automationKey === null
+                  ? {}
+                  : { automationKey: row.testCase.automationKey }),
+                ...(row.testCase.automationClassName === null
+                  ? {}
+                  : { automationClassName: row.testCase.automationClassName }),
+                ...(row.testCase.automationFilePath === null
+                  ? {}
+                  : { automationFilePath: row.testCase.automationFilePath }),
               },
         name: row.name,
         suiteName: row.suiteName,

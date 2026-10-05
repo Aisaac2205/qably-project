@@ -50,6 +50,22 @@ function runCaseRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function officialCaseRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'case-1',
+    suiteId: 'suite-1',
+    name: 'Adds to cart',
+    steps: [],
+    expectedResult: '',
+    currentVersion: null,
+    executionMode: 'manual' as const,
+    automationKey: null,
+    automationClassName: null,
+    automationFilePath: null,
+    ...overrides,
+  };
+}
+
 const suiteWithCases = {
   id: 'suite-1',
   name: 'Checkout',
@@ -744,13 +760,17 @@ describe('RunQueriesService.findOne', () => {
     prisma.runCase.findMany.mockResolvedValue([
       runCaseRow({
         testCaseId: 'case-9',
-        testCase: {
+        testCase: officialCaseRow({
           id: 'case-9',
-          suiteId: 'suite-1',
+          name: 'Vacía el carrito',
           steps: ['Open the cart'],
           expectedResult: 'The cart is empty',
           currentVersion: { version: 3 },
-        },
+          executionMode: 'automated',
+          automationKey: 'test_empty_cart',
+          automationClassName: 'tests.cart.CartTest',
+          automationFilePath: 'tests/cart_test.py',
+        }),
       }),
     ]);
 
@@ -762,8 +782,60 @@ describe('RunQueriesService.findOne', () => {
       id: 'case-9',
       suiteId: 'suite-1',
       version: 3,
+      name: 'Vacía el carrito',
       steps: ['Open the cart'],
       expectedResult: 'The cart is empty',
+      executionMode: 'automated',
+      automationKey: 'test_empty_cart',
+      automationClassName: 'tests.cart.CartTest',
+      automationFilePath: 'tests/cart_test.py',
+    });
+  });
+
+  it('omits the automation fields the official case does not carry', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({
+        testCaseId: 'case-9',
+        testCase: officialCaseRow({
+          id: 'case-9',
+          name: 'Adds to cart',
+          executionMode: 'manual',
+          automationKey: null,
+          automationClassName: null,
+          automationFilePath: null,
+        }),
+      }),
+    ]);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const official = result.value.cases[0].officialCase;
+    expect(official).toMatchObject({
+      name: 'Adds to cart',
+      executionMode: 'manual',
+    });
+    expect(official).not.toHaveProperty('automationKey');
+    expect(official).not.toHaveProperty('automationClassName');
+    expect(official).not.toHaveProperty('automationFilePath');
+  });
+
+  it('selects the official case title and automation fields from the library', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).findOne(org, 'run-1');
+
+    const [call] = prisma.runCase.findMany.mock.calls as [
+      [{ select: { testCase: { select: Record<string, unknown> } } }],
+    ];
+    expect(call[0].select.testCase.select).toMatchObject({
+      name: true,
+      executionMode: true,
+      automationKey: true,
+      automationClassName: true,
+      automationFilePath: true,
     });
   });
 
@@ -772,13 +844,12 @@ describe('RunQueriesService.findOne', () => {
     prisma.runCase.findMany.mockResolvedValue([
       runCaseRow({
         testCaseId: 'case-9',
-        testCase: {
+        testCase: officialCaseRow({
           id: 'case-9',
-          suiteId: 'suite-1',
           steps: [],
           expectedResult: '',
           currentVersion: null,
-        },
+        }),
       }),
     ]);
 
@@ -964,13 +1035,11 @@ describe('RunQueriesService.createManual', () => {
     prisma.txRunCaseFindMany.mockResolvedValue([
       runCaseRow({
         testCaseId: 'case-1',
-        testCase: {
+        testCase: officialCaseRow({
           id: 'case-1',
-          suiteId: 'suite-1',
           steps: ['open', 'add'],
           expectedResult: 'cart has one item',
-          currentVersion: null,
-        },
+        }),
       }),
     ]);
 
