@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider, type UseMutationResult } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Suite, TestCase } from '@qably/types'
+import type { Project, Suite, TestCase } from '@qably/types'
 import {
   useConfirmDocumentation,
   useCreateCase,
@@ -15,6 +15,7 @@ import {
   useUpdateSuite,
 } from './use-suite-mutations'
 import { useSuite, useSuites } from './use-suites'
+import { useProject } from '../../hooks/use-project'
 import {
   confirmDocumentation,
   createCase,
@@ -28,6 +29,7 @@ import {
   updateCase,
   updateSuite,
 } from '../api/suites.api'
+import { getProject } from '../../api/projects.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 import { notify } from '@/lib/notify'
@@ -45,6 +47,10 @@ vi.mock('../api/suites.api', () => ({
   updateSuite: vi.fn(),
   deleteSuite: vi.fn(),
   documentSuite: vi.fn(),
+}))
+
+vi.mock('../../api/projects.api', () => ({
+  getProject: vi.fn(),
 }))
 
 vi.mock('@/lib/notify', () => ({
@@ -68,6 +74,7 @@ const createSuiteApi = vi.mocked(createSuite)
 const updateSuiteApi = vi.mocked(updateSuite)
 const deleteSuiteApi = vi.mocked(deleteSuite)
 const documentSuiteApi = vi.mocked(documentSuite)
+const getProjectApi = vi.mocked(getProject)
 
 const emptyDocumentation = {
   outcome: null,
@@ -153,6 +160,21 @@ const suiteWithEditedCase = producedSuite('suite-1', 'Checkout', [
   },
 ])
 const suiteWithoutCases = producedSuite('suite-1', 'Checkout', [])
+const suiteWithThreeCases = producedSuite('suite-1', 'Checkout', [
+  caseOne,
+  caseTwo,
+  producedCase('case-5', 'suite-1', 'Pays by transfer'),
+])
+
+const project: Project = {
+  id: 'proj-1',
+  name: 'Shop',
+  organizationId: 'org-1',
+  technologies: [],
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  hasManualCases: true,
+}
 
 function setup() {
   const client = new QueryClient({
@@ -230,17 +252,21 @@ function expectSuiteAdopted(
   invalidateSpy: { mock: { calls: unknown[][] } },
 ) {
   expect(client.getQueryData(suiteKeys.detail(response.id))).toEqual(response)
-  expect(client.getQueryState(suiteKeys.detail(response.id))?.isInvalidated).toBe(true)
+  expect(client.getQueryState(suiteKeys.detail(response.id))?.isInvalidated).toBe(false)
   expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([response, otherSuite])
   expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
   expect(list).toHaveBeenCalledTimes(1)
   expect(invalidateSpy.mock.calls).not.toContainEqual([{ queryKey: suiteKeys.all }])
+  expect(invalidateSpy.mock.calls).not.toContainEqual([
+    { queryKey: suiteKeys.detail(response.id) },
+  ])
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   list.mockReset()
   getSuiteApi.mockReset()
+  getProjectApi.mockReset()
   createSuiteApi.mockResolvedValue(suite)
   updateSuiteApi.mockResolvedValue(suite)
   deleteSuiteApi.mockResolvedValue(undefined)
@@ -276,6 +302,7 @@ describe('useConfirmDocumentation', () => {
     })
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: projectKeys.detail('proj-1'),
+      refetchType: 'none',
     })
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
     expect(confirm).toHaveBeenCalledWith('suite-1', undefined)
@@ -360,8 +387,9 @@ describe('useConfirmDocumentation', () => {
 })
 
 describe('useCreateCase', () => {
-  it('invalidates the project detail so hasManualCases reflects the new case', async () => {
+  it('marks the project detail stale so hasManualCases reflects the new case on the next visit', async () => {
     const { client, invalidateSpy } = setup()
+    client.setQueryData(projectKeys.detail('proj-1'), project)
     const { result } = renderHook(() => useCreateCase(), {
       wrapper: wrapperFor(client),
     })
@@ -371,12 +399,79 @@ describe('useCreateCase', () => {
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: projectKeys.detail('proj-1'),
+        refetchType: 'none',
       })
     })
+    expect(client.getQueryState(projectKeys.detail('proj-1'))?.isInvalidated).toBe(true)
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: suiteKeys.detail('suite-1'),
+  })
+
+  it('adopts every saved case without refetching the observed detail or project', async () => {
+    const { client } = setup()
+    getSuiteApi.mockResolvedValue(suite)
+    getProjectApi.mockResolvedValue(project)
+    const editPage = renderHook(
+      () => ({
+        detail: useSuite('suite-1'),
+        project: useProject('proj-1'),
+        saving: useCreateCase(),
+      }),
+      { wrapper: wrapperFor(client) },
+    )
+    await waitFor(() => {
+      expect(editPage.result.current.detail.suite).toEqual(suite)
+      expect(editPage.result.current.project.project).toEqual(project)
     })
+    create.mockResolvedValueOnce(suiteWithNewCase).mockResolvedValueOnce(suiteWithThreeCases)
+
+    await act(async () => {
+      await editPage.result.current.saving.mutateAsync({
+        suiteId: 'suite-1',
+        payload: { name: 'Pays by voucher' },
+      })
+    })
+    await act(async () => {
+      await editPage.result.current.saving.mutateAsync({
+        suiteId: 'suite-1',
+        payload: { name: 'Pays by transfer' },
+      })
+    })
+
+    expect(getSuiteApi).toHaveBeenCalledTimes(1)
+    expect(getProjectApi).toHaveBeenCalledTimes(1)
+    expect(client.getQueryData(suiteKeys.detail('suite-1'))).toEqual(suiteWithThreeCases)
+    expect(editPage.result.current.detail.suite).toEqual(suiteWithThreeCases)
+    expect(client.getQueryState(projectKeys.detail('proj-1'))?.isInvalidated).toBe(true)
+  })
+
+  it('keeps the response when a detail fetch that started before it settles afterwards', async () => {
+    const { client } = setup()
+    await cacheLiveDetail(client)
+    let settleOldFetch: (value: Suite) => void = () => undefined
+    getSuiteApi.mockReturnValueOnce(
+      new Promise<Suite>((resolve) => {
+        settleOldFetch = resolve
+      }),
+    )
+    void client.refetchQueries({ queryKey: suiteKeys.detail('suite-1') })
+    await waitFor(() => {
+      expect(getSuiteApi).toHaveBeenCalledTimes(2)
+    })
+    create.mockResolvedValue(suiteWithNewCase)
+
+    const result = runMutation(client, useCreateCase, {
+      suiteId: 'suite-1',
+      payload: { name: 'Pays by voucher' },
+    })
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    settleOldFetch(suite)
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(client.getQueryData(suiteKeys.detail('suite-1'))).toEqual(suiteWithNewCase)
   })
 
   it('adopts the returned suite into the detail and list, replacing the old cases, and leaves the list stale without fetching it', async () => {
@@ -395,7 +490,7 @@ describe('useCreateCase', () => {
 })
 
 describe('useUpdateCase', () => {
-  it('invalidates the project detail so hasManualCases reflects an executionMode change', async () => {
+  it('marks the project detail stale so hasManualCases reflects an executionMode change on the next visit', async () => {
     const { client, invalidateSpy } = setup()
     const { result } = renderHook(() => useUpdateCase(), {
       wrapper: wrapperFor(client),
@@ -410,6 +505,7 @@ describe('useUpdateCase', () => {
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: projectKeys.detail('proj-1'),
+        refetchType: 'none',
       })
     })
   })
@@ -507,7 +603,7 @@ describe('useDocumentCase', () => {
 })
 
 describe('useDeleteCase', () => {
-  it('invalidates the project detail so hasManualCases reflects the removed case', async () => {
+  it('marks the project detail stale so hasManualCases reflects the removed case on the next visit', async () => {
     const { client, invalidateSpy } = setup()
     const { result } = renderHook(() => useDeleteCase(), {
       wrapper: wrapperFor(client),
@@ -518,6 +614,7 @@ describe('useDeleteCase', () => {
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: projectKeys.detail('proj-1'),
+        refetchType: 'none',
       })
     })
   })
@@ -615,7 +712,7 @@ describe('useCreateSuite', () => {
       expect(result.current.isSuccess).toBe(true)
     })
     expect(client.getQueryData(suiteKeys.detail('suite-4'))).toEqual(created)
-    expect(client.getQueryState(suiteKeys.detail('suite-4'))?.isInvalidated).toBe(true)
+    expect(client.getQueryState(suiteKeys.detail('suite-4'))?.isInvalidated).toBe(false)
     expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([
       created,
       suite,
@@ -686,7 +783,7 @@ describe('useDeleteSuite', () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
   })
 
-  it('invalidates the project detail so hasManualCases reflects the removed suite', async () => {
+  it('marks the project detail stale so hasManualCases reflects the removed suite on the next visit', async () => {
     const { client, invalidateSpy } = setup()
 
     const result = runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
@@ -694,7 +791,10 @@ describe('useDeleteSuite', () => {
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true)
     })
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.detail('proj-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: projectKeys.detail('proj-1'),
+      refetchType: 'none',
+    })
   })
 
   it('keeps the detail while its page is still mounted, then evicts it once the page leaves', async () => {

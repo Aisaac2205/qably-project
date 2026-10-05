@@ -56,10 +56,19 @@ function invalidateSuiteList(queryClient: QueryClient, projectId: string) {
   return queryClient.invalidateQueries({ queryKey: suiteKeys.list(projectId) })
 }
 
-function adoptSuite(queryClient: QueryClient, suite: Suite) {
-  queryClient.setQueryData(suiteKeys.detail(suite.id), suite)
+function markProjectStale(queryClient: QueryClient, projectId: string) {
+  void queryClient.invalidateQueries({
+    queryKey: projectKeys.detail(projectId),
+    refetchType: 'none',
+  })
+}
+
+async function adoptSuite(queryClient: QueryClient, suite: Suite) {
+  const detailKey = suiteKeys.detail(suite.id)
+
+  await queryClient.cancelQueries({ queryKey: detailKey, exact: true })
+  queryClient.setQueryData(detailKey, suite)
   patchSuiteList(queryClient, suite)
-  void queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suite.id) })
   void invalidateSuiteList(queryClient, suite.projectId)
 }
 
@@ -102,9 +111,9 @@ export function useRefreshSuiteLists() {
 function useCaseSync() {
   const queryClient = useQueryClient()
 
-  return (suite: Suite) => {
-    adoptSuite(queryClient, suite)
-    void queryClient.invalidateQueries({ queryKey: projectKeys.detail(suite.projectId) })
+  return async (suite: Suite) => {
+    await adoptSuite(queryClient, suite)
+    markProjectStale(queryClient, suite.projectId)
   }
 }
 
@@ -138,7 +147,7 @@ export function useDeleteSuite() {
       )
       evictSuiteDetail(queryClient, id)
       void invalidateSuiteList(queryClient, projectId)
-      void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
+      markProjectStale(queryClient, projectId)
     },
   })
 }
@@ -223,7 +232,7 @@ export function useConfirmDocumentation() {
     onSuccess: async (_result, { suiteId, projectId }) => {
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       void refreshSuiteLists(projectId, suiteId)
-      void queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) })
+      markProjectStale(queryClient, projectId)
     },
   })
 }
