@@ -193,6 +193,7 @@ export function RunDetail({
         <div className="flex flex-col overflow-y-auto">
           <CaseList
             cases={sortedCases}
+            source={run.source}
             selectedId={activeCaseId}
             onSelect={selectCase}
           />
