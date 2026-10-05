@@ -1,8 +1,18 @@
 import { screen, act } from '@testing-library/react'
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import EditSuitePage from './page'
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { createMockSuite } from '@/lib/test-utils'
 import { useSuite } from '@/features/projects/suites/hooks/use-suites'
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}))
+
+vi.mock('@/hooks/use-mobile', () => ({
+  useIsMobile: () => false,
+}))
 
 vi.mock('@/features/projects/suites/hooks/use-suites', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/features/projects/suites/hooks/use-suites')>()
@@ -18,6 +28,24 @@ function paramsFor(id: string, suiteId: string) {
 }
 
 describe('EditSuitePage', () => {
+  afterEach(() => {
+    vi.mocked(useSuite).mockReset()
+  })
+
+  it('keeps the form on screen when a background refetch fails while the suite is loaded', async () => {
+    vi.mocked(useSuite).mockReturnValue({
+      suite: createMockSuite({ id: 'suite-1', projectId: 'proj-1', name: 'Checkout flow' }),
+      isLoading: false,
+      isError: true,
+      dataUpdatedAt: 1,
+    })
+    await act(async () => {
+      renderWithQuery(<EditSuitePage params={paramsFor('proj-1', 'suite-1')} />)
+    })
+    expect(screen.getByDisplayValue('Checkout flow')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('shows a distinct error state, not "suite not found", when the suite fails to load', async () => {
     vi.mocked(useSuite).mockReturnValueOnce({
       suite: undefined,

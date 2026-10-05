@@ -21,7 +21,7 @@ export default function EditSuitePage({ params }: { params: Params }) {
     )
   }
 
-  if (isError) {
+  if (isError && suite === undefined) {
     return (
       <div className="w-full px-5 py-6 sm:px-7 lg:py-8">
         <StateView kind="error" title={t('suites.suiteLoadError')} focusOnMount />
