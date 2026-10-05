@@ -19,7 +19,7 @@ vi.mock('@/features/projects/suites/api/suites.api', async () =>
 
 const mockCase: RunCaseRecord = {
   id: 'tc-1',
-  testCaseId: 'tc-1',
+  testCaseId: null,
   officialCase: null,
   name: 'Valid login redirects to dashboard',
   suiteName: 'Authentication',
@@ -31,7 +31,7 @@ const mockCase: RunCaseRecord = {
 
 const automatedCase: RunCaseRecord = {
   id: 'tc-9',
-  testCaseId: 'tc-9',
+  testCaseId: null,
   officialCase: null,
   name: 'useCreateRun > redirects to dashboard on valid login',
   suiteName: 'Auth',

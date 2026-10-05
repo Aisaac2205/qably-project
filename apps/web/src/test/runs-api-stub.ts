@@ -41,10 +41,12 @@ function caseRecord(
   position: number,
   overrides: Partial<RunCaseRecord> = {},
 ): RunCaseRecord {
+  const officialCase = overrides.officialCase ?? null
+
   return {
     id,
-    testCaseId: id,
-    officialCase: null,
+    testCaseId: officialCase?.id ?? null,
+    officialCase,
     name,
     suiteName,
     steps: [],

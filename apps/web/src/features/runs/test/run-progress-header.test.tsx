@@ -21,10 +21,10 @@ const mockRun: RunRecord = {
   finishedAt: '2026-06-16T10:05:00Z',
   delta: null,
   cases: [
-    { id: 'tc-1', testCaseId: 'tc-1', officialCase: null, name: 'a', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pass', position: 0 },
-    { id: 'tc-2', testCaseId: 'tc-2', officialCase: null, name: 'b', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'fail', position: 1 },
-    { id: 'tc-3', testCaseId: 'tc-3', officialCase: null, name: 'c', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'blocked', position: 2 },
-    { id: 'tc-4', testCaseId: 'tc-4', officialCase: null, name: 'd', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pending', position: 3 },
+    { id: 'tc-1', testCaseId: null, officialCase: null, name: 'a', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pass', position: 0 },
+    { id: 'tc-2', testCaseId: null, officialCase: null, name: 'b', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'fail', position: 1 },
+    { id: 'tc-3', testCaseId: null, officialCase: null, name: 'c', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'blocked', position: 2 },
+    { id: 'tc-4', testCaseId: null, officialCase: null, name: 'd', suiteName: 'Authentication', steps: [], expectedResult: '', status: 'pending', position: 3 },
   ],
 }
 
