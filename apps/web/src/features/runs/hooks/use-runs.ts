@@ -26,31 +26,12 @@ export function useRuns(projectId?: string) {
   }
 }
 
-export interface RunsPageOptions {
-  ungrouped?: boolean
-}
-
-export function useRunsPage(
-  projectId: string,
-  source?: RunSource,
-  options: RunsPageOptions = {},
-) {
-  const ungrouped = options.ungrouped === true
-  const sourceKey = source ?? 'all'
-
+export function useRunsPage(projectId: string, source?: RunSource) {
   const query = useInfiniteQuery({
-    queryKey: ungrouped
-      ? runKeys.pageUngrouped(projectId, sourceKey)
-      : runKeys.page(projectId, sourceKey),
+    queryKey: runKeys.page(projectId, source ?? 'all'),
     queryFn: ({ pageParam, signal }) =>
       listRuns(
-        {
-          projectId,
-          source,
-          limit: RUNS_PAGE_SIZE,
-          cursor: pageParam,
-          ...(ungrouped ? { ungrouped } : {}),
-        },
+        { projectId, source, limit: RUNS_PAGE_SIZE, cursor: pageParam },
         signal,
       ),
     initialPageParam: undefined as string | undefined,

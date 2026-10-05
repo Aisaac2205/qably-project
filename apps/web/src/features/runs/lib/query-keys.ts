@@ -3,8 +3,6 @@ export const runKeys = {
   list: (projectId: string) => ['runs', 'list', projectId] as const,
   page: (projectId: string, source: string) =>
     ['runs', 'page', projectId, source] as const,
-  pageUngrouped: (projectId: string, source: string) =>
-    ['runs', 'page', projectId, source, 'ungrouped'] as const,
   details: ['runs', 'detail'] as const,
   detail: (id: string) => ['runs', 'detail', id] as const,
   suiteMetrics: (projectId: string) =>

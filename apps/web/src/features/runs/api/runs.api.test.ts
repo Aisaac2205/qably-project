@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRun, getRegressions, getRun, listRuns, updateRunCase } from './runs.api'
+import {
+  createRun,
+  getRegressions,
+  getRun,
+  listRuns,
+  updateRunCase,
+  type ListRunsParams,
+} from './runs.api'
 
 const fetchMock = vi.fn()
 
@@ -116,37 +123,25 @@ describe('runs.api', () => {
     expect(lastCall()[0]).toContain('/runs/regressions?projectId=proj-1&limit=5')
   })
 
-  it('asks only for the runs without a CI run when ungrouped is true', async () => {
-    await listRuns({ projectId: 'proj-1', ungrouped: true })
+  it('asks only for manual runs when the source is manual', async () => {
+    await listRuns({ projectId: 'proj-1', source: 'manual' })
 
-    expect(lastCall()[0]).toContain('/runs?projectId=proj-1&ungrouped=true')
+    expect(lastCall()[0]).toContain('/runs?projectId=proj-1&source=manual')
   })
 
-  it('keeps every other filter next to ungrouped', async () => {
-    await listRuns({
-      projectId: 'proj-1',
-      source: 'api',
-      limit: 25,
-      cursor: 'run-9',
-      ungrouped: true,
-    })
+  it('keeps pagination next to the manual source', async () => {
+    await listRuns({ projectId: 'proj-1', source: 'manual', limit: 25, cursor: 'run-9' })
 
     const { searchParams } = new URL(lastCall()[0])
     expect(searchParams.get('projectId')).toBe('proj-1')
-    expect(searchParams.get('source')).toBe('api')
+    expect(searchParams.get('source')).toBe('manual')
     expect(searchParams.get('limit')).toBe('25')
     expect(searchParams.get('cursor')).toBe('run-9')
-    expect(searchParams.get('ungrouped')).toBe('true')
   })
 
-  it.each([[false], [undefined]])(
-    'leaves the url exactly as it was when ungrouped is %s',
-    async (ungrouped) => {
-      await listRuns({ projectId: 'proj-1', source: 'api', limit: 25, cursor: 'run-9', ungrouped })
+  it('never sends the retired ungrouped parameter, even when an old caller still passes it', async () => {
+    await listRuns({ projectId: 'proj-1', source: 'manual', ungrouped: true } as ListRunsParams)
 
-      const [url] = lastCall()
-      expect(url).toMatch(/\/runs\?projectId=proj-1&source=api&limit=25&cursor=run-9$/)
-      expect(url).not.toContain('ungrouped')
-    },
-  )
+    expect(lastCall()[0]).not.toContain('ungrouped')
+  })
 })

@@ -25,7 +25,6 @@ export interface ListRunsParams {
   limit?: number
   cursor?: string
   days?: number
-  ungrouped?: boolean
 }
 
 export function listRuns(
@@ -39,7 +38,6 @@ export function listRuns(
   if (params.limit !== undefined) search.set('limit', String(params.limit))
   if (params.cursor !== undefined) search.set('cursor', params.cursor)
   if (params.days !== undefined) search.set('days', String(params.days))
-  if (params.ungrouped === true) search.set('ungrouped', 'true')
 
   const query = search.size === 0 ? '' : `?${search.toString()}`
 
