@@ -5,6 +5,8 @@ import { useRun } from '@/features/runs/hooks/use-runs'
 import { useCiRun } from '@/features/runs/hooks/use-ci-runs'
 import { useCiRunLabel } from '@/features/runs/hooks/use-ci-run-label'
 import { useProject } from '@/features/projects/hooks/use-project'
+import { useSuite } from '@/features/projects/suites/hooks/use-suites'
+import { runTitleParts } from '@/features/runs/lib/format'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
 import { BackButton } from '@/components/ui/back-button'
 import { ArrowLeft } from '@phosphor-icons/react'
@@ -24,6 +26,7 @@ export function RunDetailPageClient({
   const { t } = useTranslation()
   const { run, isLoading } = useRun(runId)
   const { project } = useProject(projectId)
+  const { suite } = useSuite(run?.suiteId ?? '')
   const { ciRun } = useCiRun(run?.ciRunId)
   const ciRunLabel = useCiRunLabel(ciRun)
   const runsHref = run?.ciRunId ? projectRunsPath(projectId) : projectRunsPath(projectId, 'manual')
@@ -77,7 +80,7 @@ export function RunDetailPageClient({
             ...(ciRunLabel !== undefined
               ? [{ label: ciRunLabel, href: `/projects/${projectId}/runs/ci/${run.ciRunId}` }]
               : []),
-            { label: run.name },
+            { label: runTitleParts(run, suite?.name ?? '').title },
           ]}
         />
       </div>

@@ -343,3 +343,49 @@ describe('the back button of a run that belongs to a CI run', () => {
     expect(mockPush).not.toHaveBeenCalled()
   })
 })
+
+describe('the current level of the breadcrumb', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('names a run reported by CI after its official suite, like the page title, not after the raw suite name the tool sent', async () => {
+    run.mockResolvedValue(
+      runRecord({ source: 'github_actions', name: 'truncateTo', ciRunId: 'c1' }),
+    )
+    ciRun.mockResolvedValue(ciRunDetail([], { id: 'c1', runNumber: 42 }))
+
+    renderPage()
+
+    expect(await screen.findByRole('heading', { level: 3, name: 'Authentication' })).toBeInTheDocument()
+    const current = within(breadcrumb()).getByText('Authentication')
+    expect(current).toHaveAttribute('aria-current', 'page')
+    expect(within(breadcrumb()).queryByText('truncateTo')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the run name while the official suite cannot be read', async () => {
+    run.mockResolvedValue(
+      runRecord({ source: 'github_actions', name: 'truncateTo', suiteId: 'suite-missing' }),
+    )
+
+    renderPage()
+    await screen.findByRole('heading', { level: 3, name: 'truncateTo' })
+    await settle()
+
+    expect(within(breadcrumb()).getByText('truncateTo')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('keeps the name a person gave to a manual run, which is also its page title', async () => {
+    run.mockResolvedValue(runRecord({ source: 'manual', name: 'Sprint regression' }))
+
+    renderPage()
+    await screen.findByRole('heading', { level: 3, name: 'Sprint regression' })
+    await settle()
+
+    expect(within(breadcrumb()).getByText('Sprint regression')).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(within(breadcrumb()).queryByText('Authentication')).not.toBeInTheDocument()
+  })
+})
