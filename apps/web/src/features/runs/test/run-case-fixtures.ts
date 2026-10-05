@@ -40,10 +40,12 @@ export function manualOfficialCase(
 export function reportedRunCase(
   overrides: Partial<RunCaseRecord> = {},
 ): RunCaseRecord {
+  const officialCase = overrides.officialCase ?? null
+
   return {
     id: 'run-case-9',
-    testCaseId: 'case-9',
-    officialCase: null,
+    testCaseId: officialCase?.id ?? null,
+    officialCase,
     name: CI_RAW_NAME,
     suiteName: 'Auth',
     steps: [],
@@ -61,10 +63,12 @@ export function reportedRunCase(
 export function snapshotRunCase(
   overrides: Partial<RunCaseRecord> = {},
 ): RunCaseRecord {
+  const officialCase = overrides.officialCase ?? null
+
   return {
     id: 'run-case-1',
-    testCaseId: 'case-1',
-    officialCase: null,
+    testCaseId: officialCase?.id ?? null,
+    officialCase,
     name: 'Valid login redirects to dashboard',
     suiteName: 'Authentication',
     steps: ['Navigate to /login', 'Click Sign in'],
