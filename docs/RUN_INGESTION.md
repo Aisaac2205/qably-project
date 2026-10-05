@@ -386,10 +386,11 @@ server when the report holds several `<testsuite>`. A reporter older than 10.1.0
 `ci*` parameter, so before this rule its runs stayed unlinked and showed only under the Manual tab.
 
 When a request has no `ciRunExternalId`, `CiRunLinker` reads the run id from `externalId` with
-`parseCiRunExternalId` (`^gha-(\d+)-`) and links the run exactly as if that id had been sent: the same
-`ciRun.upsert`, with the `source` of the request and the other `ci*` and commit fields it carries.
-Nothing is linked when the id does not match: `gha-local-job-...` (a local reporter run), `curl`
-examples that use the bare run id, ids from other tools and manual runs keep `ciRunId = null`.
+`parseCiRunExternalId` (`^gha-(\d{1,20})-`, a run id of 1 to 20 digits) and links the run exactly as if
+that id had been sent: the same `ciRun.upsert`, with the `source` of the request and the other `ci*` and
+commit fields it carries. Nothing is linked when the id does not match: `gha-local-job-...` (a local
+reporter run), `curl` examples that use the bare run id, ids from other tools and manual runs keep
+`ciRunId = null`.
 
 The id that is read is `externalId`, the one stored in `Run.externalId`, not `reportExternalId`. They
 share the same prefix, but `externalId` is the field the run is stored under, it is always present, and

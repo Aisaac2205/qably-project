@@ -24,7 +24,7 @@ arrived before that.
 
 - Reads `run` rows with `ciRunId IS NULL` in `id` order, 500 per batch, using a keyset cursor on `id`.
   It never holds more than one batch, and never writes more than one batch of run ids in one statement.
-- Attributes a run when `externalId` matches `^gha-(\d+)-`, using the same `parseCiRunExternalId` as
+- Attributes a run when `externalId` matches `^gha-(\d{1,20})-`, using the same `parseCiRunExternalId` as
   ingestion. Anything else is **unattributable**:
   `gha-local-job-...` (a local reporter run), `gha-abc-...`, a `null` `externalId` (manual runs and runs
   posted by `POST /runs/ingest` with its own ids). Unattributable runs are counted and never modified.
@@ -91,7 +91,7 @@ A later pass is not always a no-op. A reporter older than 10.1.0 (a vendored or 
 `qably-report.mjs`) produced runs whose `externalId` is attributable and whose `ciRunId` is `NULL`
 until ingestion started linking them from the id; every pass links the ones that arrived before that.
 Runs posted with `curl`, as in the public CI documentation, carry the bare GitHub run id as
-`externalId`, which does not match `^gha-(\d+)-`: they are unattributable, stay unlinked on every pass
+`externalId`, which does not match `^gha-(\d{1,20})-`: they are unattributable, stay unlinked on every pass
 and keep appearing under the Manual tab.
 
 The script does not use a transaction across groups. Each group is a lookup, a create or an update,
@@ -113,8 +113,8 @@ script again resolves it.
 3. Take a count of what the script can attribute:
 
 ```sql
-SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND "externalId" ~ '^gha-[0-9]+-';
-SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND ("externalId" IS NULL OR "externalId" !~ '^gha-[0-9]+-');
+SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND "externalId" ~ '^gha-[0-9]{1,20}-';
+SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND ("externalId" IS NULL OR "externalId" !~ '^gha-[0-9]{1,20}-');
 SELECT count(*) FROM "run" WHERE "ciRunId" IS NOT NULL AND "ciJobKey" IS NULL AND "externalId" LIKE 'gha-%';
 ```
 
@@ -158,7 +158,7 @@ COMMIT;
 ```
 
 `run_link` holds every run whose `ciRunId` or `ciJobKey` the script can write, and only those. The
-script links a run only when it has no `ciRunId` and its `externalId` matches `^gha-(\d+)-`, and it
+script links a run only when it has no `ciRunId` and its `externalId` matches `^gha-(\d{1,20})-`, and it
 sets a `ciJobKey` only on a linked run that has none and whose `externalId` starts with `gha-`. Both
 conditions are inside the `WHERE` above, and the values in the table are what the rollback restores.
 It replaces the `linked_run` table of earlier versions of this document, which could not say which
@@ -262,7 +262,7 @@ quieter moment if the same group is skipped twice.
 ## How to verify
 
 ```sql
-SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND "externalId" ~ '^gha-[0-9]+-';
+SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND "externalId" ~ '^gha-[0-9]{1,20}-';
 -- expect 0, or only rows ingested after the run started
 
 SELECT count(*) FROM "run" WHERE "ciRunId" IS NOT NULL AND "ciJobKey" IS NULL AND "externalId" LIKE 'gha-%';

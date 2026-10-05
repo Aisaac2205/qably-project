@@ -1,4 +1,4 @@
-const GITHUB_RUN_ID_PREFIX = /^gha-(\d+)-/;
+const GITHUB_RUN_ID_PREFIX = /^gha-(\d{1,20})-/;
 
 interface JobKeyMatch {
   key: string;

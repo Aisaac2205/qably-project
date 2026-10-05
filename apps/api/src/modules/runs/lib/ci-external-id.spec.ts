@@ -59,6 +59,18 @@ describe('parseCiRunExternalId', () => {
     expect(parseCiRunExternalId(externalId)).toBeUndefined();
   });
 
+  it('accepts a run id of 20 digits and rejects one of 21', () => {
+    const twenty = '9'.repeat(20);
+    const twentyOne = '9'.repeat(21);
+
+    expect(parseCiRunExternalId(`gha-${twenty}-api-junit-xml-ab12cd34`)).toBe(
+      twenty,
+    );
+    expect(
+      parseCiRunExternalId(`gha-${twentyOne}-api-junit-xml-ab12cd34`),
+    ).toBeUndefined();
+  });
+
   it('reads the run id of an id the reporter produced, and nothing for a local one', () => {
     const [ci, local] = reporterExternalIds([
       run('900', { GITHUB_JOB: 'api' }),
