@@ -1,8 +1,9 @@
 import type { ComponentProps } from 'react'
-import { screen, act, waitFor } from '@testing-library/react'
+import { cleanup, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NewRunAction } from '@/features/runs/components/new-run-action'
+import { cancelNewRunFocus, requestNewRunFocus } from '@/features/runs/lib/new-run-focus'
 import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import { renderWithQuery } from '@/lib/query-test-utils'
 
@@ -44,6 +45,50 @@ async function waitForClose() {
 describe('NewRunAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    cancelNewRunFocus()
+  })
+
+  describe('when the new run route was just closed', () => {
+    it('gives focus to its trigger once, and leaves a later visit alone', async () => {
+      requestNewRunFocus('proj-1')
+
+      await renderAction()
+      expect(trigger()).toHaveFocus()
+
+      cleanup()
+      await renderAction()
+      expect(trigger()).not.toHaveFocus()
+    })
+
+    it('falls back to the main content when it is disabled, since the trigger cannot take the action', async () => {
+      requestNewRunFocus('proj-1')
+
+      await act(async () => {
+        renderWithQuery(
+          <main id="main-content" tabIndex={-1}>
+            <NewRunAction projectId="proj-1" disabled />
+          </main>,
+        )
+      })
+
+      expect(screen.getByRole('main')).toHaveFocus()
+    })
+
+    it('ignores a request made for another project', async () => {
+      requestNewRunFocus('proj-2')
+
+      await renderAction()
+
+      expect(trigger()).not.toHaveFocus()
+    })
+
+    it('is not asked for focus by a route-bound instance, which is the one being closed', async () => {
+      requestNewRunFocus('proj-1')
+
+      await renderAction({ routeBound: true })
+
+      expect(trigger()).not.toHaveFocus()
+    })
   })
 
   describe('when the project has manual cases', () => {

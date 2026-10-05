@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus } from '@phosphor-icons/react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'
 import { projectRunsPath } from '@/features/projects/lib/routes'
 import { NewRunForm } from '@/features/runs/components/new-run-form'
+import { consumeNewRunFocus, requestNewRunFocus } from '@/features/runs/lib/new-run-focus'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ export function NewRunAction({
   const { t } = useTranslation()
   const { replace } = useRouter()
   const hintId = useId()
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(routeBound)
   const [preselectedSuiteId, setPreselectedSuiteId] = useState(initialSuiteId)
   const [pending, setPending] = useState(false)
@@ -35,6 +37,13 @@ export function NewRunAction({
   useEffect(() => {
     if (routeBound && disabled) replace(listHref, { scroll: false })
   }, [routeBound, disabled, replace, listHref])
+
+  useEffect(() => {
+    if (routeBound || !consumeNewRunFocus(projectId)) return
+
+    const target = disabled ? document.getElementById('main-content') : triggerRef.current
+    target?.focus({ preventScroll: true })
+  }, [routeBound, disabled, projectId])
 
   if (disabled) {
     return (
@@ -69,10 +78,13 @@ export function NewRunAction({
           if (next) return
 
           setPreselectedSuiteId(undefined)
-          if (routeBound) replace(listHref, { scroll: false })
+          if (!routeBound) return
+
+          requestNewRunFocus(projectId)
+          replace(listHref, { scroll: false })
         }}
       >
-        <DialogTrigger className={cn(buttonVariants(), 'w-full md:w-auto', ACTION_FOCUS)}>
+        <DialogTrigger ref={triggerRef} className={cn(buttonVariants(), 'w-full md:w-auto', ACTION_FOCUS)}>
           <Plus size={16} weight="bold" aria-hidden="true" />
           {t('runs.newRun')}
         </DialogTrigger>

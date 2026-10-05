@@ -1,4 +1,5 @@
 import { act, cleanup, screen, waitFor } from '@testing-library/react'
+import { cancelNewRunFocus } from '@/features/runs/lib/new-run-focus'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RunRecord } from '@qably/types'
@@ -129,6 +130,7 @@ describe('the new run deep link page', () => {
     vi.clearAllMocks()
     navigation.replace.mockReset()
     navigation.push.mockReset()
+    cancelNewRunFocus()
     project.hasManualCases = true
   })
 
@@ -321,6 +323,76 @@ describe('the new run deep link page', () => {
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
+  })
+
+  describe.each(CLOSERS)('when the list replaces the new run route after closing with %s', (_label, close) => {
+    async function closeAndRemountList() {
+      const user = userEvent.setup()
+      await mountRoute('/projects/proj-1/runs/new?suite=suite-2')
+      await screen.findByRole('dialog', { name: 'New run' })
+      await close(user)
+      await waitFor(() => {
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      })
+      cleanup()
+      await mountRoute(LIST_URL)
+    }
+
+    it('puts focus on the New run trigger, once', async () => {
+      await closeAndRemountList()
+
+      expect(screen.getByRole('button', { name: 'New run' })).toHaveFocus()
+
+      cleanup()
+      await mountRoute(LIST_URL)
+      expect(screen.getByRole('button', { name: 'New run' })).not.toHaveFocus()
+    })
+  })
+
+  it('does not steal focus when the list is visited without closing the dialog first', async () => {
+    await mountRoute(LIST_URL)
+
+    expect(screen.getByRole('button', { name: 'New run' })).not.toHaveFocus()
+  })
+
+  it('does not steal focus when the list only appears after the handoff window', async () => {
+    const user = userEvent.setup()
+    await mountRoute('/projects/proj-1/runs/new?suite=suite-2')
+    await screen.findByRole('dialog', { name: 'New run' })
+    await user.keyboard('{Escape}')
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    cleanup()
+    const now = Date.now()
+    vi.spyOn(Date, 'now').mockReturnValue(now + 10_000)
+
+    await mountRoute(LIST_URL)
+
+    expect(screen.getByRole('button', { name: 'New run' })).not.toHaveFocus()
+    vi.restoreAllMocks()
+  })
+
+  it('moves focus to the main content when the list comes back with the action disabled', async () => {
+    const user = userEvent.setup()
+    await mountRoute('/projects/proj-1/runs/new?suite=suite-2')
+    await screen.findByRole('dialog', { name: 'New run' })
+    await user.keyboard('{Escape}')
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    cleanup()
+    project.hasManualCases = false
+
+    await act(async () => {
+      renderWithQuery(
+        <main id="main-content" tabIndex={-1}>
+          <RunListPageClient projectId="proj-1" initialTab="manual" />
+        </main>,
+      )
+    })
+
+    expect(screen.getByRole('main')).toHaveFocus()
   })
 
   it('keeps the previous page one back step away while the dialog is still open', async () => {
