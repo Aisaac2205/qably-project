@@ -21,6 +21,7 @@ import {
 } from '../lib/decision-error'
 import {
   invalidateReviewLists,
+  invalidateRunDetails,
   invalidateSuiteAndProjectLists,
 } from '../lib/invalidate-after-decision'
 import { removeFromPages, reinsertAt, adjustCounts, type RemovedItemPosition } from '../lib/inbox-cache'
@@ -146,6 +147,7 @@ export function useProposalDecision({
     onSettled: (_result, _error, { proposalId }) => {
       release(proposalId)
       settle()
+      invalidateRunDetails(queryClient)
     },
   })
 

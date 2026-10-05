@@ -31,6 +31,7 @@ import {
 } from '../api/suites.api'
 import { getProject } from '../../api/projects.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
+import { runKeys } from '@/features/runs/lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 import { notify } from '@/lib/notify'
 import { createMockTestCase } from '@/lib/test-utils'
@@ -925,5 +926,74 @@ describe('useDocumentSuite', () => {
     expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
     expect(client.getQueryState(suiteKeys.list('proj-2'))?.isInvalidated).toBe(false)
     expect(list).toHaveBeenCalledTimes(2)
+  })
+})
+
+
+describe('run details', () => {
+  const triggers: Array<[string, (client: QueryClient) => void]> = [
+    [
+      'creating a case',
+      (client) => {
+        runMutation(client, useCreateCase, { suiteId: 'suite-1', payload: { name: 'New case' } })
+      },
+    ],
+    [
+      'editing a case',
+      (client) => {
+        runMutation(client, useUpdateCase, {
+          suiteId: 'suite-1',
+          caseId: 'case-1',
+          patch: { name: 'Renamed' },
+        })
+      },
+    ],
+    [
+      'deleting a case',
+      (client) => {
+        runMutation(client, useDeleteCase, { suiteId: 'suite-1', caseId: 'case-1' })
+      },
+    ],
+    [
+      'documenting a case',
+      (client) => {
+        runMutation(client, useDocumentCase, { suiteId: 'suite-1', caseId: 'case-1' })
+      },
+    ],
+    [
+      'confirming documentation',
+      (client) => {
+        runMutation(client, useConfirmDocumentation, { suiteId: 'suite-1', projectId: 'proj-1' })
+      },
+    ],
+    [
+      'editing a suite',
+      (client) => {
+        runMutation(client, useUpdateSuite, { id: 'suite-1', patch: { name: 'Checkout v2' } })
+      },
+    ],
+    [
+      'deleting a suite',
+      (client) => {
+        runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
+      },
+    ],
+  ]
+
+  it.each(triggers)('marks cached run details stale after %s, without fetching them', async (_label, trigger) => {
+    const { client, invalidateSpy } = setup()
+    client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
+    client.setQueryData(runKeys.list('proj-1'), { items: [] })
+
+    trigger(client)
+
+    await waitFor(() => {
+      expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(true)
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: runKeys.details,
+      refetchType: 'none',
+    })
+    expect(client.getQueryState(runKeys.list('proj-1'))?.isInvalidated).toBe(false)
   })
 })

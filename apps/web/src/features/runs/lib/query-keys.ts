@@ -5,7 +5,8 @@ export const runKeys = {
     ['runs', 'page', projectId, source] as const,
   pageUngrouped: (projectId: string, source: string) =>
     ['runs', 'page', projectId, source, 'ungrouped'] as const,
-  detail: (id: string) => ['runs', id] as const,
+  details: ['runs', 'detail'] as const,
+  detail: (id: string) => ['runs', 'detail', id] as const,
   suiteMetrics: (projectId: string) =>
     ['runs', 'suite-metrics', projectId] as const,
   regressions: (projectId: string, limit: number) =>

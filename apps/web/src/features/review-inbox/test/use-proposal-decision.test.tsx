@@ -8,6 +8,7 @@ import * as reviewApi from '@/features/review-inbox/api/review.api'
 import type { ProposalListItem, ReviewInboxPageResult, ReviewInboxCountsResult } from '@/features/review-inbox/api/review.api'
 import { suiteKeys, projectKeys } from '@/features/projects/lib/query-keys'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
+import { runKeys } from '@/features/runs/lib/query-keys'
 import { useProposal } from '@/features/review-inbox/hooks/use-proposals'
 import { approvalConflictError, conflictingCaseFixture } from './approval-conflict-fixture'
 
@@ -230,6 +231,48 @@ describe('useProposalDecision', () => {
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: projectKeys.all }),
     )
+  })
+
+  it('marks cached run details stale after an approval so a run reads the approved documentation on the next visit', async () => {
+    vi.spyOn(reviewApi, 'approveProposal').mockResolvedValue(approvalResult)
+    const client = makeClient()
+    client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
+    client.setQueryData(runKeys.list('p1'), { items: [] })
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      { wrapper: wrapperFor(client) },
+    )
+
+    act(() => {
+      result.current.approve('proposal-1')
+    })
+
+    await waitFor(() =>
+      expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(true),
+    )
+    expect(client.getQueryState(runKeys.list('p1'))?.isInvalidated).toBe(false)
+  })
+
+  it('leaves cached run details alone after a rejection, since nothing in the library changed', async () => {
+    vi.spyOn(reviewApi, 'rejectProposal').mockResolvedValue({ decisionId: 'decision-1' })
+    const client = makeClient()
+    const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+    client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      { wrapper: wrapperFor(client) },
+    )
+
+    act(() => {
+      result.current.reject('proposal-1')
+    })
+
+    await waitFor(() =>
+      expect(invalidateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ queryKey: suiteKeys.all }),
+      ),
+    )
+    expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(false)
   })
 
   it('reports incomplete-proposal instead of a generic error when approving a proposal with no steps', async () => {

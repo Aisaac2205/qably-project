@@ -21,6 +21,7 @@ import {
 } from '../api/suites.api'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
 import { ApiError } from '@/lib/api-client'
+import { markRunDetailsStale } from '@/features/runs/lib/mark-run-details-stale'
 import { notify } from '@/lib/notify'
 import { useTranslation } from '@/lib/i18n'
 
@@ -129,6 +130,7 @@ function useCaseSync() {
   return async (suite: Suite) => {
     await adoptSuite(queryClient, suite)
     markProjectStale(queryClient, suite.projectId)
+    markRunDetailsStale(queryClient)
   }
 }
 
@@ -147,7 +149,10 @@ export function useUpdateSuite() {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: UpdateSuitePayload }) =>
       updateSuite(id, patch),
-    onSuccess: (suite) => adoptSuite(queryClient, suite),
+    onSuccess: async (suite) => {
+      markRunDetailsStale(queryClient)
+      await adoptSuite(queryClient, suite)
+    },
   })
 }
 
@@ -163,6 +168,7 @@ export function useDeleteSuite() {
       evictSuiteDetail(queryClient, id)
       void invalidateSuiteList(queryClient, projectId)
       markProjectStale(queryClient, projectId)
+      markRunDetailsStale(queryClient)
     },
   })
 }
@@ -248,6 +254,7 @@ export function useConfirmDocumentation() {
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       void refreshSuiteLists(projectId, suiteId)
       markProjectStale(queryClient, projectId)
+      markRunDetailsStale(queryClient)
     },
   })
 }
@@ -260,6 +267,7 @@ export function useDocumentCase() {
     mutationFn: ({ suiteId, caseId }: { suiteId: string; caseId: string }) =>
       documentCase(suiteId, caseId),
     onSuccess: async (_result, { suiteId }) => {
+      markRunDetailsStale(queryClient)
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
       notify.success(t('suites.documentCaseQueued'))
     },

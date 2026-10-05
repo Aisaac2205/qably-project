@@ -170,6 +170,17 @@ record of what a person was asked to execute, so it keeps the snapshot (*Why `ru
 case content*) and shows no badge. The badge copy lives under `runs.caseVersion` because it names the
 current library version, not a snapshot.
 
+Because the run detail reads the library when it is displayed, a cached detail must not outlive a library
+change, and the detail query keeps the default 60 second stale time. Every mutation that can change what
+`officialCase` carries marks all cached run details stale through `markRunDetailsStale`
+(`apps/web/src/features/runs/lib/mark-run-details-stale.ts`): an inbox approval, a case create, edit or
+delete, a suite edit or delete, a single-case documentation request and a documentation confirmation. A
+rejection does not, because it never writes `test_case`. The call uses `refetchType: 'none'`, like the
+project detail after a suite mutation: the run is almost never on screen when the library changes, so a
+refetch would cost one request per mutation for a page nobody is looking at, and an invalidated query is
+stale whatever its age, so the next visit to the run refetches it. Run details live under their own key
+prefix (`['runs', 'detail', id]`) so this never touches the run list pages or the suite metrics.
+
 The Aeris action is gated for the same reason as the empty state. The single-case documentation endpoint
 (`ExtractionService.enqueueDocumentCase`) rejects a case that is not automated, has a pending proposal or has no
 automation key, but not one that is already documented, and the extraction job spends an AI credit. Offering
