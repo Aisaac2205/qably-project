@@ -8,6 +8,7 @@ import {
 
 interface StoredRun extends BackfillRunRow {
   ciRunId: string | null;
+  ciJobKey: string | null;
 }
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 8, 1, 10, minutes));
@@ -29,6 +30,7 @@ function stored(
     commitMessage: null,
     commitAuthor: null,
     ciRunId: null,
+    ciJobKey: null,
     ...extra,
   };
 }
@@ -144,6 +146,58 @@ function fakeDb(
       writes.link += linked;
       return Promise.resolve(linked);
     },
+    readKnownJobKeys: (projectId) =>
+      Promise.resolve([
+        ...new Set(
+          runs.flatMap((run) =>
+            run.projectId === projectId && run.ciJobKey !== null
+              ? [run.ciJobKey]
+              : [],
+          ),
+        ),
+      ]),
+    readRunsMissingJobKey: (afterId, take) => {
+      const page = runs
+        .filter(
+          (run) =>
+            run.ciRunId !== null &&
+            run.ciJobKey === null &&
+            run.externalId?.startsWith('gha-') === true &&
+            (afterId === undefined || run.id > afterId),
+        )
+        .sort((a, b) => (a.id < b.id ? -1 : 1))
+        .slice(0, take)
+        .flatMap((run) => {
+          const ciRun = ciRuns.find(
+            (candidate) => candidate.id === run.ciRunId,
+          );
+          return ciRun === undefined
+            ? []
+            : [
+                {
+                  id: run.id,
+                  projectId: run.projectId,
+                  externalId: run.externalId,
+                  ciRunExternalId: ciRun.externalId,
+                },
+              ];
+        });
+      return Promise.resolve(page);
+    },
+    setJobKey: (runIds, ciJobKey) => {
+      let changed = 0;
+      for (const run of runs) {
+        if (
+          runIds.includes(run.id) &&
+          run.ciJobKey === null &&
+          run.ciRunId !== null
+        ) {
+          run.ciJobKey = ciJobKey;
+          changed += 1;
+        }
+      }
+      return Promise.resolve(changed);
+    },
   };
 
   return { port, runs, ciRuns, reads, linkSizes, writes, counters, events };
@@ -182,6 +236,8 @@ describe('backfillCiRuns grouping', () => {
       ciRunsCreated: 1,
       ciRunsUpdated: 0,
       runsLinked: 3,
+      jobKeysSet: 0,
+      jobKeysUnresolved: 3,
     });
   });
 
@@ -291,6 +347,8 @@ describe('backfillCiRuns unattributable runs', () => {
       ciRunsCreated: 1,
       ciRunsUpdated: 0,
       runsLinked: 1,
+      jobKeysSet: 0,
+      jobKeysUnresolved: 1,
     });
     expect(db.runs.map((run) => run.ciRunId)).toEqual([
       db.ciRuns[0].id,
@@ -323,6 +381,8 @@ describe('backfillCiRuns idempotency', () => {
       ciRunsCreated: 0,
       ciRunsUpdated: 0,
       runsLinked: 0,
+      jobKeysSet: 0,
+      jobKeysUnresolved: 2,
     });
     expect(db.writes).toEqual(writesAfterFirst);
   });
@@ -497,6 +557,8 @@ describe('backfillCiRuns against concurrent live ingestion', () => {
       ciRunsCreated: 0,
       ciRunsUpdated: 1,
       runsLinked: 1,
+      jobKeysSet: 0,
+      jobKeysUnresolved: 1,
     });
   });
 
@@ -658,5 +720,113 @@ describe('backfillCiRuns batching', () => {
     expect(db.ciRuns[0].startedAt).toEqual(at(5));
     expect(db.ciRuns[0].lastReportedAt).toEqual(at(21));
     expect(summary).toMatchObject({ ciRunsCreated: 1, ciRunsUpdated: 2 });
+  });
+});
+
+describe('backfillCiRuns job key recovery', () => {
+  const live = (extra: Partial<StoredRun> = {}) =>
+    stored('r-live', 'gha-901-api-junit-xml-ab12cd34', 40, {
+      ciRunId: 'ci-901',
+      ciJobKey: 'api',
+      ...extra,
+    });
+  const ci901 = () => liveCiRun({ id: 'ci-901', externalId: '901' });
+
+  it('sets the job key of the runs it links when the project already uses that key', async () => {
+    const db = fakeDb(
+      [
+        live(),
+        stored('r1', 'gha-900-api-junit-unit-xml-3425dd6f', 10),
+        stored('r2', 'gha-900-landing-junit-xml-ef56ab78', 11),
+      ],
+      [ci901()],
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.runs.map((run) => [run.id, run.ciJobKey])).toEqual([
+      ['r-live', 'api'],
+      ['r1', 'api'],
+      ['r2', null],
+    ]);
+    expect(summary).toMatchObject({
+      runsLinked: 2,
+      jobKeysSet: 1,
+      jobKeysUnresolved: 1,
+    });
+  });
+
+  it('sets the job key of a run that was linked earlier without one, in a CiRun with nothing left to link', async () => {
+    const db = fakeDb(
+      [
+        live(),
+        stored('r-old', 'gha-899-api-junit-xml-ab12cd34', 5, {
+          ciRunId: 'ci-899',
+        }),
+      ],
+      [ci901(), liveCiRun({ id: 'ci-899', externalId: '899' })],
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.runs[1].ciJobKey).toBe('api');
+    expect(summary).toMatchObject({
+      scanned: 0,
+      runsLinked: 0,
+      jobKeysSet: 1,
+      jobKeysUnresolved: 0,
+    });
+  });
+
+  it('never gives a job key to a run that is not linked', async () => {
+    const db = fakeDb([
+      live(),
+      stored('r1', 'gha-900-api-junit-xml-ab12cd34', 10),
+      stored('r2', 'gha-local-job-junit-xml-ab12cd34', 11),
+    ]);
+
+    await backfillCiRuns(db.port);
+
+    expect(db.runs[2].ciRunId).toBeNull();
+    expect(db.runs[2].ciJobKey).toBeNull();
+  });
+
+  it('never overwrites a job key that a run already has', async () => {
+    const db = fakeDb(
+      [
+        live(),
+        stored('r1', 'gha-901-web-junit-xml-cd34ef56', 10, {
+          ciRunId: 'ci-901',
+          ciJobKey: 'api',
+        }),
+      ],
+      [ci901()],
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.runs[1].ciJobKey).toBe('api');
+    expect(summary.jobKeysSet).toBe(0);
+  });
+
+  it('writes nothing on a second pass and reports the same unresolved count', async () => {
+    const db = fakeDb(
+      [
+        live(),
+        stored('r1', 'gha-900-api-junit-xml-ab12cd34', 10),
+        stored('r2', 'gha-900-landing-junit-xml-ef56ab78', 11),
+      ],
+      [ci901()],
+    );
+
+    const first = await backfillCiRuns(db.port);
+    const second = await backfillCiRuns(db.port);
+
+    expect(first).toMatchObject({ jobKeysSet: 1, jobKeysUnresolved: 1 });
+    expect(second).toMatchObject({
+      runsLinked: 0,
+      jobKeysSet: 0,
+      jobKeysUnresolved: 1,
+    });
   });
 });

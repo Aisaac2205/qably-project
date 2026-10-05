@@ -1,6 +1,7 @@
 import type { RunSource } from '../../generated/prisma/client';
 import { parseCiRunExternalId } from '../../src/modules/runs/lib/ci-external-id';
 import { isUniqueViolation } from '../../src/prisma/is-unique-violation';
+import { recoverJobKeys, type JobKeyPort } from './backfill-ci-runs.job-keys';
 
 export const DEFAULT_BATCH_SIZE = 500;
 export const MAX_MERGE_ATTEMPTS = 5;
@@ -51,7 +52,7 @@ export interface NewCiRun extends CiRunKey, CommitFields {
 
 export type RunsAscendingById = BackfillRunRow[];
 
-export interface BackfillPort {
+export interface BackfillPort extends JobKeyPort {
   readUnlinkedRuns(
     afterId: string | undefined,
     take: number,
@@ -71,6 +72,8 @@ export interface BackfillSummary {
   ciRunsCreated: number;
   ciRunsUpdated: number;
   runsLinked: number;
+  jobKeysSet: number;
+  jobKeysUnresolved: number;
 }
 
 interface RunGroup {
@@ -213,6 +216,8 @@ export async function backfillCiRuns(
     ciRunsCreated: 0,
     ciRunsUpdated: 0,
     runsLinked: 0,
+    jobKeysSet: 0,
+    jobKeysUnresolved: 0,
   };
 
   let batch = await port.readUnlinkedRuns(undefined, batchSize);
@@ -227,6 +232,8 @@ export async function backfillCiRuns(
 
     batch = await port.readUnlinkedRuns(batch[batch.length - 1].id, batchSize);
   }
+
+  Object.assign(summary, await recoverJobKeys(port, batchSize));
 
   return summary;
 }

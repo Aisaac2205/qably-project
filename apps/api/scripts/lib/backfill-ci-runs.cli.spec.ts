@@ -24,6 +24,22 @@ function build(overrides: Partial<BackfillCliDeps> = {}) {
     createCiRun: jest.fn(() => Promise.resolve('ci-1')),
     updateCiRunIfUnchanged: jest.fn(() => Promise.resolve(true)),
     linkRuns: jest.fn(() => Promise.resolve(1)),
+    readKnownJobKeys: jest.fn(() => Promise.resolve(['api'])),
+    readRunsMissingJobKey: jest.fn((afterId?: string) =>
+      Promise.resolve(
+        afterId === undefined
+          ? [
+              {
+                id: 'r1',
+                projectId: 'proj-1',
+                externalId: unlinkedRun.externalId,
+                ciRunExternalId: '900',
+              },
+            ]
+          : [],
+      ),
+    ),
+    setJobKey: jest.fn(() => Promise.resolve(1)),
   };
   const close = jest.fn(() => Promise.resolve());
   const lines: string[] = [];
@@ -85,7 +101,10 @@ describe('runBackfillCli', () => {
       'CiRuns created: 1',
       'CiRuns updated: 0',
       'Runs linked: 1',
+      'Job keys set: 1',
+      'Linked runs left without a job key: 0',
     ]);
+    expect(t.port.setJobKey).toHaveBeenCalledWith(['r1'], 'api');
     expect(t.lines.join('\n')).not.toMatch(/s3cret|user/);
     expect(t.close).toHaveBeenCalledTimes(1);
   });

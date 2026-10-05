@@ -11,6 +11,7 @@ function build() {
     run: {
       findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 3 }),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     ciRun: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -153,6 +154,102 @@ describe('createPrismaBackfillPort', () => {
     expect(prisma.run.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['r1', 'r2', 'r3'] }, ciRunId: null },
       data: { ciRunId: 'ci-1' },
+    });
+  });
+
+  describe('job keys', () => {
+    it('reads the distinct job keys a project already uses and drops the null group', async () => {
+      const { port, prisma } = build();
+      prisma.run.groupBy.mockResolvedValueOnce([
+        { ciJobKey: 'api' },
+        { ciJobKey: null },
+        { ciJobKey: 'web' },
+      ]);
+
+      const keys = await port.readKnownJobKeys('proj-1');
+
+      expect(keys).toEqual(['api', 'web']);
+      expect(prisma.run.groupBy).toHaveBeenCalledWith({
+        by: ['ciJobKey'],
+        where: { projectId: 'proj-1', ciJobKey: { not: null } },
+      });
+    });
+
+    it('reads the first page of linked runs without a job key in id order, with the run id of their CiRun', async () => {
+      const { port, prisma } = build();
+      prisma.run.findMany.mockResolvedValueOnce([
+        {
+          id: 'r1',
+          projectId: 'proj-1',
+          externalId: 'gha-900-api-junit-xml-ab12cd34',
+          ciRun: { externalId: '900' },
+        },
+      ]);
+
+      const rows = await port.readRunsMissingJobKey(undefined, 500);
+
+      expect(rows).toEqual([
+        {
+          id: 'r1',
+          projectId: 'proj-1',
+          externalId: 'gha-900-api-junit-xml-ab12cd34',
+          ciRunExternalId: '900',
+        },
+      ]);
+      expect(prisma.run.findMany).toHaveBeenCalledWith({
+        where: {
+          ciRunId: { not: null },
+          ciJobKey: null,
+          externalId: { startsWith: 'gha-' },
+        },
+        orderBy: { id: 'asc' },
+        take: 500,
+        select: {
+          id: true,
+          projectId: true,
+          externalId: true,
+          ciRun: { select: { externalId: true } },
+        },
+      });
+    });
+
+    it('continues after the last id of the previous page and drops a row whose CiRun is gone', async () => {
+      const { port, prisma } = build();
+      prisma.run.findMany.mockResolvedValueOnce([
+        { id: 'r10', projectId: 'proj-1', externalId: 'gha-1-a', ciRun: null },
+      ]);
+
+      const rows = await port.readRunsMissingJobKey('r9', 25);
+
+      expect(rows).toEqual([]);
+      expect(prisma.run.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            ciRunId: { not: null },
+            ciJobKey: null,
+            externalId: { startsWith: 'gha-' },
+            id: { gt: 'r9' },
+          },
+          take: 25,
+        }),
+      );
+    });
+
+    it('writes the key only to runs that are linked and still have none, and returns the count', async () => {
+      const { port, prisma } = build();
+      prisma.run.updateMany.mockResolvedValueOnce({ count: 2 });
+
+      const changed = await port.setJobKey(['r1', 'r2', 'r3'], 'api');
+
+      expect(changed).toBe(2);
+      expect(prisma.run.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: ['r1', 'r2', 'r3'] },
+          ciJobKey: null,
+          ciRunId: { not: null },
+        },
+        data: { ciJobKey: 'api' },
+      });
     });
   });
 });

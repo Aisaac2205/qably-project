@@ -67,5 +67,58 @@ export function createPrismaBackfillPort(prisma: PrismaClient): BackfillPort {
       });
       return result.count;
     },
+
+    readKnownJobKeys: async (projectId) => {
+      const rows = await prisma.run.groupBy({
+        by: ['ciJobKey'],
+        where: { projectId, ciJobKey: { not: null } },
+      });
+      return rows.flatMap((row) =>
+        row.ciJobKey === null ? [] : [row.ciJobKey],
+      );
+    },
+
+    readRunsMissingJobKey: async (afterId, take) => {
+      const rows = await prisma.run.findMany({
+        where: {
+          ciRunId: { not: null },
+          ciJobKey: null,
+          externalId: { startsWith: 'gha-' },
+          ...(afterId === undefined ? {} : { id: { gt: afterId } }),
+        },
+        orderBy: { id: 'asc' },
+        take,
+        select: {
+          id: true,
+          projectId: true,
+          externalId: true,
+          ciRun: { select: { externalId: true } },
+        },
+      });
+      return rows.flatMap((row) =>
+        row.ciRun === null
+          ? []
+          : [
+              {
+                id: row.id,
+                projectId: row.projectId,
+                externalId: row.externalId,
+                ciRunExternalId: row.ciRun.externalId,
+              },
+            ],
+      );
+    },
+
+    setJobKey: async (runIds, ciJobKey) => {
+      const result = await prisma.run.updateMany({
+        where: {
+          id: { in: [...runIds] },
+          ciJobKey: null,
+          ciRunId: { not: null },
+        },
+        data: { ciJobKey },
+      });
+      return result.count;
+    },
   };
 }

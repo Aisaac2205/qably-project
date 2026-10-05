@@ -23,6 +23,8 @@ function summaryLines(summary: BackfillSummary): string[] {
     `CiRuns created: ${summary.ciRunsCreated}`,
     `CiRuns updated: ${summary.ciRunsUpdated}`,
     `Runs linked: ${summary.runsLinked}`,
+    `Job keys set: ${summary.jobKeysSet}`,
+    `Linked runs left without a job key: ${summary.jobKeysUnresolved}`,
   ];
 }
 
