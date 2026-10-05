@@ -31,7 +31,8 @@ const ciPositiveInt = z.coerce.number().int().min(1).max(2_147_483_647);
 const ciServerUrl = z
   .url({ protocol: /^https?$/ })
   .max(255)
-  .transform((value) => new URL(value).origin);
+  .transform((value) => new URL(value).origin)
+  .pipe(z.url({ protocol: /^https?$/ }).max(255));
 
 const ciFields = {
   ciRunExternalId: ciString.optional(),

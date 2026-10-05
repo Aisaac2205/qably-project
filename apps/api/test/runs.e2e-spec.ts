@@ -515,9 +515,17 @@ describe('Runs ingestion (e2e)', () => {
       });
     });
 
+    const wideHostUrl = `https://${Array.from({ length: 120 }, (_, index) =>
+      String.fromCodePoint(0x4e00 + index * 173),
+    ).join('')}.com`;
+
     it.each([
       ['a counter above the 32-bit range', { ciRunNumber: 99_999_999_999 }],
       ['a non-http ciServerUrl', { ciServerUrl: 'javascript:alert(1)' }],
+      [
+        'a ciServerUrl whose origin exceeds 255 characters once normalized',
+        { ciServerUrl: wideHostUrl },
+      ],
       ['an empty job key', { ciJobKey: '' }],
     ])('rejects %s with a 400 before any write', async (_label, extra) => {
       await request(app.getHttpServer())

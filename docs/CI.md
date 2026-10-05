@@ -314,7 +314,9 @@ writing a workflow:
   does not cut it, when it is not.
 - **`ciServerUrl` is normalized.** The server stores only the origin of the URL and discards
   credentials, path, query and fragment, so `https://user:pw@github.com/x?token=abc#frag` is stored as
-  `https://github.com`. `GITHUB_SERVER_URL` is already an origin, so the reporter's payload is
+  `https://github.com`. The origin must still be an `http` or `https` URL of at most 255 characters once
+  normalized, so a host name that grows when it is converted to ASCII can be rejected even when the
+  value as sent fits. `GITHUB_SERVER_URL` is already an origin, so the reporter's payload is
   unchanged.
 - **When they are ignored.** The reporter omits a parameter whose variable is unset, blank or invalid,
   and never fills one from a default, so a run with none of these variables set, such as a local run,

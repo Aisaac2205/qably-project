@@ -522,7 +522,9 @@ invalid one:
 The API accepts `http` and `https` only, up to 255 characters, so `javascript:` and `ftp:` URLs and
 values without a scheme are rejected with `400`. A value that passes is normalized to its origin
 (`new URL(value).origin`) before anything uses it: userinfo, path, query and fragment are discarded,
-the scheme and host are lowercased and a default port is dropped.
+the scheme and host are lowercased and a default port is dropped. The origin is then validated again
+with the same rule, `http` or `https` and at most 255 characters, so what is stored always meets the
+limit the reporter and the web link rely on.
 
 | Sent | Stored |
 | --- | --- |
@@ -535,11 +537,12 @@ The value is normalized rather than rejected so that a pipeline that puts a cred
 variable still has its report ingested, with only the origin kept. The length limit applies to the
 value as sent, before normalization: a long URL that carries a token in its query is rejected with
 `400` even though its origin is short, and the reporter drops such a URL itself instead of sending it.
-It does not bound the stored origin either: an internationalized host name is stored in its punycode
-form, which can be longer than the input, so a stored `serverUrl` can exceed 255 characters (the
-column is `TEXT`). Both ingestion schemas share the rule, so the normalized value is
-the one the queued job carries, the one `CiRunLinker` writes to `serverUrl` and the one `GET /ci-runs`
-and `GET /ci-runs/:id` return. The reporter sends `GITHUB_SERVER_URL`, which is already an origin, so
+The limit applies to the normalized origin as well, because an internationalized host name is stored in
+its punycode form, which can be much longer than the input: a 132-character URL whose host is made of
+120 distinct ideographs normalizes to an origin of 373 characters, and it is rejected with `400`. The
+column is `TEXT`, so the second check is a contract, not a storage limit. Both ingestion schemas share
+the rule, so the normalized value is the one the queued job carries, the one `CiRunLinker` writes to
+`serverUrl` and the one `GET /ci-runs` and `GET /ci-runs/:id` return. The reporter sends `GITHUB_SERVER_URL`, which is already an origin, so
 its payload is unchanged. The backfill never writes this column. The web link to the workflow run is
 built from `new URL(serverUrl).origin` as well.
 

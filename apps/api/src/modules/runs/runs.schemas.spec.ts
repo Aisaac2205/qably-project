@@ -438,6 +438,12 @@ const ciServerUrlOrigins = [
   ['an origin', 'https://github.com', 'https://github.com'],
 ] as const;
 
+const wideHostUrl = `https://${Array.from({ length: 120 }, (_, index) =>
+  String.fromCodePoint(0x4e00 + index * 173),
+).join('')}.com`;
+
+const originAtLimit = `https://${'a'.repeat(255 - 'https://'.length)}`;
+
 describe('ingestJunitQuerySchema ci fields', () => {
   const parse = (extra: Record<string, unknown>) =>
     ingestJunitQuerySchema.safeParse({ externalId: 'ci-42', ...extra });
@@ -535,6 +541,19 @@ describe('ingestJunitQuerySchema ci fields', () => {
     expect(overLimit).toHaveLength(256);
     expect(parse({ ciServerUrl: atLimit }).success).toBe(true);
     expect(parse({ ciServerUrl: overLimit }).success).toBe(false);
+  });
+
+  it('rejects a ciServerUrl whose origin exceeds 255 characters once normalized', () => {
+    expect(wideHostUrl.length).toBeLessThanOrEqual(255);
+    expect(new URL(wideHostUrl).origin.length).toBeGreaterThan(255);
+    expect(parse({ ciServerUrl: wideHostUrl }).success).toBe(false);
+  });
+
+  it('accepts a ciServerUrl whose origin is exactly 255 characters', () => {
+    const result = parse({ ciServerUrl: originAtLimit });
+
+    expect(originAtLimit).toHaveLength(255);
+    expect(result.success && result.data.ciServerUrl).toBe(originAtLimit);
   });
 
   it.each(ciServerUrlOrigins)(
@@ -647,6 +666,19 @@ describe('ingestRunSchema ci fields', () => {
 
     expect(overLimit).toHaveLength(256);
     expect(parse({ ciServerUrl: overLimit }).success).toBe(false);
+  });
+
+  it('rejects a ciServerUrl whose origin exceeds 255 characters once normalized', () => {
+    expect(wideHostUrl.length).toBeLessThanOrEqual(255);
+    expect(new URL(wideHostUrl).origin.length).toBeGreaterThan(255);
+    expect(parse({ ciServerUrl: wideHostUrl }).success).toBe(false);
+  });
+
+  it('accepts a ciServerUrl whose origin is exactly 255 characters', () => {
+    const result = parse({ ciServerUrl: originAtLimit });
+
+    expect(originAtLimit).toHaveLength(255);
+    expect(result.success && result.data.ciServerUrl).toBe(originAtLimit);
   });
 
   it.each(ciServerUrlOrigins)(
