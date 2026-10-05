@@ -798,8 +798,6 @@
   },
   "runs": {
     "title": "Ejecuciones",
-    "emptyDescription": "CI llena esta página automáticamente cuando el reporte de resultados está conectado al flujo de trabajo. Las ejecuciones manuales cubren lo que todavía no está automatizado.",
-    "emptyDocsLink": "Cómo reportar resultados desde CI",
     "commitLabel": "Commit",
     "deltaAria": "Cambios respecto a la ejecución anterior: {{regressions}} regresiones, {{fixes}} arreglos, {{unchanged}} sin cambio",
     "deltaRegressions": "{{count}} regresiones",
@@ -841,7 +839,6 @@
     "shortcuts": "Atajos",
     "noCaseSelected": "Sin caso seleccionado",
     "pickCaseHint": "Selecciona un caso de la lista para ver sus detalles.",
-    "noRuns": "Sin ejecuciones aún",
     "startARun": "Iniciar una ejecución",
     "loadMore": "Cargar más",
     "loadingMore": "Cargando…",

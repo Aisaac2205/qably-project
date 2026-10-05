@@ -272,9 +272,7 @@ describe('runs.ci and status.ciRun copy', () => {
           expect(flat[key]?.trim()).not.toBe('')
         }
         expect(flat['runs.ci.manualEmptyTitle']).not.toBe(flat['runs.ci.emptyTitle'])
-        expect(flat['runs.ci.manualEmptyTitle']).not.toBe(flat['runs.noRuns'])
         expect(flat['runs.ci.manualEmptyDescription']).not.toBe(flat['runs.ci.emptyDescription'])
-        expect(flat['runs.ci.manualEmptyDescription']).not.toBe(flat['runs.emptyDescription'])
       },
     )
 

@@ -798,8 +798,6 @@
   },
   "runs": {
     "title": "Runs",
-    "emptyDescription": "CI fills this page automatically once the results reporter is wired into the workflow. Manual runs cover what is not automated yet.",
-    "emptyDocsLink": "How to report results from CI",
     "commitLabel": "Commit",
     "deltaAria": "Changes since the previous run: {{regressions}} regressions, {{fixes}} fixes, {{unchanged}} unchanged",
     "deltaRegressions": "{{count}} regressions",
@@ -841,7 +839,6 @@
     "shortcuts": "Shortcuts",
     "noCaseSelected": "No case selected",
     "pickCaseHint": "Pick a case from the list to view its details.",
-    "noRuns": "No runs yet",
     "startARun": "Start a run",
     "loadMore": "Load more",
     "loadingMore": "Loading…",
