@@ -45,9 +45,9 @@ automated run that no CI run adopted appears in neither tab; it is reachable by 
 the suites. The way back from a run detail follows the same rule: the `Runs` crumb and the back button
 fall back to the Manual tab only for a manual run, and to the Actions tab, or to its CI run, for any other.
 The Manual tab used to list every run without a CI run link, which mixed the automated runs that no CI run
-adopted with the runs a person started. A row of the Manual tab carries no source mark for the same reason:
-every run listed there is manual, so a mark would repeat the name of the tab and, being focusable, would add
-a second tab stop inside the link of each row.
+adopted with the runs a person started. A row of the Manual tab carries no source mark: every run listed
+there is manual, so a mark would repeat the name of the tab and, being focusable, would add a second tab
+stop inside the link of each row.
 
 The `/projects/{id}/runs/new?suite=S` address is a deep link that renders the Manual tab with the new run
 dialog open and `S` preselected. It opens the dialog only once the project has loaded: until then the
@@ -68,9 +68,9 @@ rendering an empty slot.
 The CI run header links to the workflow run on GitHub only when the stored `externalId` is a GitHub run
 id: one to twenty ASCII digits, the same shape `parseCiRunExternalId` reads from the `gha-<run id>-` prefix
 of a reporter `externalId`. The API stores `ciRunExternalId` as free text up to 255 characters, so a
-custom client can send any word, and a path built from it would point at a page that does not exist or
-at another path of the repository. Such a CI run keeps its row and its detail and has no link. The
-repository segments are still encoded one by one and refused when they are empty or a dot segment.
+custom client can send any word, and a link built from it would point at a page that does not exist. Such
+a CI run keeps its row and its detail and has no link. The repository segments are still encoded one by
+one and refused when they are empty or a dot segment.
 
 ## Why `run_case` duplicates the case content
 
