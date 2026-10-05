@@ -26,9 +26,7 @@ export function RunDetailPageClient({
   const { project } = useProject(projectId)
   const { ciRun } = useCiRun(run?.ciRunId)
   const ciRunLabel = useCiRunLabel(ciRun)
-  const runsHref = run?.ciRunId
-    ? `/projects/${projectId}/runs`
-    : `/projects/${projectId}/runs?tab=manual`
+  const runsHref = run?.ciRunId ? projectRunsPath(projectId) : projectRunsPath(projectId, 'manual')
   const goBack = useGoBack(
     run?.ciRunId ? projectCiRunPath(projectId, run.ciRunId) : projectRunsPath(projectId, 'manual'),
   )

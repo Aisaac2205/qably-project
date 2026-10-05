@@ -1,3 +1,5 @@
+import type { RunsTab } from '@/features/runs/lib/runs-tab'
+
 export const PROJECT_ROOT_SECTION = 'repository'
 
 export function projectRootPath(projectId: string): string {
@@ -24,7 +26,7 @@ export function projectRunPath(projectId: string, runId: string): string {
   return `/projects/${projectId}/runs/${runId}`
 }
 
-export function projectRunsPath(projectId: string, tab?: 'actions' | 'manual'): string {
+export function projectRunsPath(projectId: string, tab?: RunsTab): string {
   const base = `/projects/${projectId}/runs`
 
   return tab === undefined ? base : `${base}?tab=${tab}`

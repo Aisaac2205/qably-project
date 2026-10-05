@@ -10,7 +10,7 @@ import { RunList } from '@/features/runs/components/run-list'
 import { DEFAULT_RUNS_TAB, parseRunsTab, type RunsTab } from '@/features/runs/lib/runs-tab'
 import { useTranslation } from '@/lib/i18n'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { projectRootPath } from '@/features/projects/lib/routes'
+import { projectRootPath, projectRunsPath } from '@/features/projects/lib/routes'
 
 export function RunListPageClient({
   projectId,
@@ -54,7 +54,7 @@ export function RunListPageClient({
 
           const next = parseRunsTab(value)
           setTab(next)
-          router.replace(`/projects/${projectId}/runs?tab=${next}`, { scroll: false })
+          router.replace(projectRunsPath(projectId, next), { scroll: false })
         }}
         className="gap-4"
       >

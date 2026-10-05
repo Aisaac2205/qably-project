@@ -58,7 +58,7 @@ function BackToRuns({ projectId }: { projectId: string }) {
 
   return (
     <Link
-      href={`/projects/${projectId}/runs?tab=actions`}
+      href={projectRunsPath(projectId, 'actions')}
       className={cn(
         buttonVariants({ variant: 'outline' }),
         'focus-visible:outline-hidden! focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background',

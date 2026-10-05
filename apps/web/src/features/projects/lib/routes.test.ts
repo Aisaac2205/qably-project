@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
+import type { RunsTab } from '@/features/runs/lib/runs-tab'
 import {
+  projectCiRunPath,
   projectQualityPath,
   projectRootPath,
   projectRunPath,
+  projectRunsPath,
   projectSuitesPath,
   reviewInboxProposalPath,
   suiteEditCasePath,
@@ -25,6 +28,27 @@ describe('existing project route helpers', () => {
 describe('projectRunPath', () => {
   it('builds the run detail route for a project', () => {
     expect(projectRunPath('proj-1', 'run-1')).toBe('/projects/proj-1/runs/run-1')
+  })
+})
+
+describe('projectRunsPath', () => {
+  it('builds the runs list route without a tab, so the list opens on its default tab', () => {
+    expect(projectRunsPath('proj-1')).toBe('/projects/proj-1/runs')
+  })
+
+  it('builds the runs list route for each tab', () => {
+    expect(projectRunsPath('proj-1', 'actions')).toBe('/projects/proj-1/runs?tab=actions')
+    expect(projectRunsPath('proj-1', 'manual')).toBe('/projects/proj-1/runs?tab=manual')
+  })
+
+  it('accepts exactly the tabs the runs list knows', () => {
+    expectTypeOf(projectRunsPath).parameter(1).toEqualTypeOf<RunsTab | undefined>()
+  })
+})
+
+describe('projectCiRunPath', () => {
+  it('builds the CI run detail route for a project', () => {
+    expect(projectCiRunPath('proj-1', 'ci-1')).toBe('/projects/proj-1/runs/ci/ci-1')
   })
 })
 
