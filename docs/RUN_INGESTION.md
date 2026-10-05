@@ -156,7 +156,7 @@ the endpoint.
 
 ## Test case linking
 
-`RunsService.ensureOfficialCases` loads every `TestCase` row of the resolved suite once (regardless of
+`OfficialCaseReconciler.reconcile` loads every `TestCase` row of the resolved suite once (regardless of
 state or execution mode) and resolves each reported case against it in memory — it no longer filters the
 match in SQL. Two lookups run in parallel, both keyed by `normalizeAutomationKeyForMatch`
 (`apps/api/src/modules/runs/lib/normalize-automation-key.ts`): official `automationKey`, and — only for a
@@ -185,7 +185,7 @@ which can itself change after the run.
 
 ### Case identity — `classname` + `name`
 
-A reported case's identity — the key `ensureOfficialCases` matches and creates against — is not always
+A reported case's identity — the key `OfficialCaseReconciler` matches and creates against — is not always
 its raw `name`. When the report carries a `className` that is not (up to truncation) the same string as
 `name` or a prefix of it, the identity becomes the composite `${className}::${name}`
 (`apps/api/src/modules/runs/lib/case-identity.ts`, `resolveCaseIdentityKey`). This is what lets pytest
@@ -219,7 +219,7 @@ name); a plain identity does not get drafted at all, because drafting under the 
 just silently re-claim whichever row already holds it.
 
 **This is not the same collision set as `caseIdentityCollisions`, and it is not surfaced today.**
-`findLegacyKeyCollisions` runs only inside `RunsService.ensureOfficialCases`, which executes inside
+`findLegacyKeyCollisions` runs only inside `OfficialCaseReconciler.reconcile`, which executes inside
 the ingest transaction on the worker (`RunIngestProcessor`) — after `POST /runs/ingest/junit` has
 already answered `202`. The response's `caseIdentityCollisions` field (see "Response" above) is
 `findCaseIdentityCollisions` output computed synchronously in the controller, before any job is
