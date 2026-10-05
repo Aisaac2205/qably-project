@@ -12,8 +12,10 @@ vi.mock('@/features/projects/suites/api/suites.api', async () =>
 vi.mock('@/features/runs/api/runs.api', async () =>
   await import('@/test/runs-api-stub'),
 )
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: navigation.push, replace: navigation.replace }),
 }))
 
 type User = ReturnType<typeof userEvent.setup>
@@ -98,10 +100,10 @@ describe('NewRunAction', () => {
     })
   })
 
-  describe('when it starts open', () => {
-    it('opens on mount with the requested suite and gives focus back to the trigger on close', async () => {
+  describe('when it is bound to the new run route', () => {
+    it('opens on mount with the requested suite, gives focus back to the trigger on close and moves the entry to the Manual list address', async () => {
       const user = userEvent.setup()
-      await renderAction({ defaultOpen: true, initialSuiteId: 'suite-2' })
+      await renderAction({ routeBound: true, initialSuiteId: 'suite-2' })
 
       expect(await screen.findByRole('dialog', { name: 'New run' })).toBeInTheDocument()
       expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveTextContent('Checkout')
@@ -109,17 +111,47 @@ describe('NewRunAction', () => {
       await user.keyboard('{Escape}')
       await waitForClose()
       expect(trigger()).toHaveFocus()
+      expect(navigation.replace).toHaveBeenCalledTimes(1)
+      expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs?tab=manual', {
+        scroll: false,
+      })
 
       await user.click(trigger())
       expect(await screen.findByRole('combobox', { name: 'Suite' })).toHaveTextContent(
         'Select a suite',
       )
+      expect(navigation.replace).toHaveBeenCalledTimes(1)
     })
 
-    it('stays closed when it is disabled', async () => {
-      await renderAction({ disabled: true, defaultOpen: true, initialSuiteId: 'suite-2' })
+    it('stays closed when it is disabled, and leaves the route for the Manual list address', async () => {
+      await renderAction({ disabled: true, routeBound: true, initialSuiteId: 'suite-2' })
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(navigation.replace).toHaveBeenCalledTimes(1)
+      expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs?tab=manual', {
+        scroll: false,
+      })
+    })
+  })
+
+  describe('when it is opened from the runs list', () => {
+    it.each(CLOSERS)('leaves history alone when closed with %s', async (_label, close) => {
+      const user = userEvent.setup()
+      await renderAction()
+      await user.click(trigger())
+      await screen.findByRole('dialog', { name: 'New run' })
+
+      await close(user)
+      await waitForClose()
+
+      expect(navigation.replace).not.toHaveBeenCalled()
+      expect(navigation.push).not.toHaveBeenCalled()
+    })
+
+    it('never replaces anything while it is disabled', async () => {
+      await renderAction({ disabled: true })
+
+      expect(navigation.replace).not.toHaveBeenCalled()
     })
   })
 

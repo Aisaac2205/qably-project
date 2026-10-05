@@ -69,9 +69,8 @@ export function RunListPageClient({
           <NewRunAction
             projectId={projectId}
             disabled={hasNoManualCases}
-            defaultOpen={openNewRun}
             initialSuiteId={initialSuiteId}
-            replaceOnCreate={openNewRun}
+            routeBound={openNewRun}
           />
           <RunList projectId={projectId} ungrouped hasManualCases={project?.hasManualCases} />
         </TabsPanel>

@@ -50,10 +50,9 @@ async function startPendingRun() {
   const user = userEvent.setup()
   const request = await holdRequest()
   await act(async () => {
-    renderWithQuery(
-      <NewRunAction projectId="proj-1" disabled={false} defaultOpen initialSuiteId="suite-1" />,
-    )
+    renderWithQuery(<NewRunAction projectId="proj-1" disabled={false} initialSuiteId="suite-1" />)
   })
+  await user.click(screen.getByRole('button', { name: 'New run' }))
   await user.click(await screen.findByRole('button', { name: 'Start run' }))
   await screen.findByRole('button', { name: 'Starting…' })
   return { user, ...request }
@@ -168,13 +167,14 @@ describe('NewRunAction while the run is starting', () => {
     const client = createTestQueryClient()
     const action = (disabled: boolean) => (
       <QueryClientProvider client={client}>
-        <NewRunAction projectId="proj-1" disabled={disabled} defaultOpen initialSuiteId="suite-1" />
+        <NewRunAction projectId="proj-1" disabled={disabled} initialSuiteId="suite-1" />
       </QueryClientProvider>
     )
     let view!: ReturnType<typeof render>
     await act(async () => {
       view = render(action(false))
     })
+    await user.click(screen.getByRole('button', { name: 'New run' }))
     await user.click(await screen.findByRole('button', { name: 'Start run' }))
     await screen.findByRole('button', { name: 'Starting…' })
 
@@ -190,8 +190,9 @@ describe('NewRunAction while the run is starting', () => {
   it('does not block dismissing a dialog nothing was submitted from', async () => {
     const user = userEvent.setup()
     await act(async () => {
-      renderWithQuery(<NewRunAction projectId="proj-1" disabled={false} defaultOpen />)
+      renderWithQuery(<NewRunAction projectId="proj-1" disabled={false} />)
     })
+    await user.click(screen.getByRole('button', { name: 'New run' }))
     await screen.findByRole('dialog', { name: 'New run' })
     expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
 

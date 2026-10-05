@@ -1,9 +1,11 @@
 'use client'
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus } from '@phosphor-icons/react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'
+import { projectRunsPath } from '@/features/projects/lib/routes'
 import { NewRunForm } from '@/features/runs/components/new-run-form'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -14,21 +16,25 @@ const ACTION_FOCUS =
 export function NewRunAction({
   projectId,
   disabled,
-  defaultOpen = false,
   initialSuiteId,
-  replaceOnCreate = false,
+  routeBound = false,
 }: {
   projectId: string
   disabled: boolean
-  defaultOpen?: boolean
   initialSuiteId?: string
-  replaceOnCreate?: boolean
+  routeBound?: boolean
 }) {
   const { t } = useTranslation()
+  const { replace } = useRouter()
   const hintId = useId()
-  const [open, setOpen] = useState(defaultOpen)
+  const [open, setOpen] = useState(routeBound)
   const [preselectedSuiteId, setPreselectedSuiteId] = useState(initialSuiteId)
   const [pending, setPending] = useState(false)
+  const listHref = projectRunsPath(projectId, 'manual')
+
+  useEffect(() => {
+    if (routeBound && disabled) replace(listHref, { scroll: false })
+  }, [routeBound, disabled, replace, listHref])
 
   if (disabled) {
     return (
@@ -60,7 +66,10 @@ export function NewRunAction({
             return
           }
           setOpen(next)
-          if (!next) setPreselectedSuiteId(undefined)
+          if (next) return
+
+          setPreselectedSuiteId(undefined)
+          if (routeBound) replace(listHref, { scroll: false })
         }}
       >
         <DialogTrigger className={cn(buttonVariants(), 'w-full md:w-auto', ACTION_FOCUS)}>
@@ -70,7 +79,7 @@ export function NewRunAction({
         <NewRunForm
           projectId={projectId}
           initialSuiteId={preselectedSuiteId}
-          replaceOnCreate={replaceOnCreate}
+          replaceOnCreate={routeBound}
           pending={pending}
           onPendingChange={setPending}
         />
