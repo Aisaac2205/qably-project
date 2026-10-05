@@ -62,19 +62,20 @@ function build() {
       findFirst: jest.fn(),
       findUnique: jest.fn(),
     },
-    run: {
-      groupBy: jest.fn().mockResolvedValue([]),
-    },
+  };
+  const knownJobKeys = {
+    forProject: jest.fn().mockResolvedValue([] as string[]),
   };
 
-  return { linker: new CiRunLinker(prisma as never), prisma };
+  return {
+    linker: new CiRunLinker(prisma as never, knownJobKeys as never),
+    prisma,
+    knownJobKeys,
+  };
 }
 
-function knownJobKeys(
-  prisma: ReturnType<typeof build>['prisma'],
-  ...keys: Array<string | null>
-) {
-  prisma.run.groupBy.mockResolvedValue(keys.map((ciJobKey) => ({ ciJobKey })));
+function knownKeys(t: ReturnType<typeof build>, ...keys: string[]) {
+  t.knownJobKeys.forProject.mockResolvedValue(keys);
 }
 
 const unparsableId = {
@@ -124,18 +125,18 @@ describe('CiRunLinker.resolve', () => {
     ])(
       'returns undefined and never touches Prisma for %s',
       async (_label, ids) => {
-        const { linker, prisma } = build();
+        const { linker, prisma, knownJobKeys } = build();
 
         const result = await linker.resolve(apiKey, body(ids));
 
         expect(result).toBeUndefined();
         expect(ciRunCalls(prisma)).toEqual([0, 0, 0, 0]);
-        expect(prisma.run.groupBy).not.toHaveBeenCalled();
+        expect(knownJobKeys.forProject).not.toHaveBeenCalled();
       },
     );
 
     it('ignores every other ci field and the commit metadata', async () => {
-      const { linker, prisma } = build();
+      const { linker, prisma, knownJobKeys } = build();
 
       const result = await linker.resolve(
         apiKey,
@@ -144,7 +145,7 @@ describe('CiRunLinker.resolve', () => {
 
       expect(result).toBeUndefined();
       expect(ciRunCalls(prisma)).toEqual([0, 0, 0, 0]);
-      expect(prisma.run.groupBy).not.toHaveBeenCalled();
+      expect(knownJobKeys.forProject).not.toHaveBeenCalled();
     });
   });
 
@@ -328,18 +329,18 @@ describe('CiRunLinker.resolve', () => {
 
   describe('the hot path', () => {
     it('never reads the known job keys when ciRunExternalId is sent, with or without a job key', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma, 'api');
+      const t = build();
+      knownKeys(t, 'api');
 
-      const withKey = await linker.resolve(apiKey, body(fullCi));
-      const withoutKey = await linker.resolve(
+      const withKey = await t.linker.resolve(apiKey, body(fullCi));
+      const withoutKey = await t.linker.resolve(
         apiKey,
         body({ ciRunExternalId: '900' }),
       );
 
       expect(withKey).toEqual({ ciRunId: 'ci-1', ciJobKey: 'api' });
       expect(withoutKey).toEqual({ ciRunId: 'ci-1' });
-      expect(prisma.run.groupBy).not.toHaveBeenCalled();
+      expect(t.knownJobKeys.forProject).not.toHaveBeenCalled();
     });
 
     it('trusts the sent ciRunExternalId over the one in the external id', async () => {
@@ -428,69 +429,53 @@ describe('CiRunLinker.resolve', () => {
     });
 
     it('uses the job key the request carries and skips the lookup', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma, 'web');
+      const t = build();
+      knownKeys(t, 'web');
 
-      const result = await linker.resolve(apiKey, stale({ ciJobKey: 'api' }));
-
-      expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'api' });
-      expect(prisma.run.groupBy).not.toHaveBeenCalled();
-    });
-
-    it('resolves the job key from the keys already stored for the project in the last 30 days', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma, 'web', 'api', null);
-
-      const result = await linker.resolve(apiKey, stale());
+      const result = await t.linker.resolve(apiKey, stale({ ciJobKey: 'api' }));
 
       expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'api' });
-      expect(prisma.run.groupBy).toHaveBeenCalledTimes(1);
-      expect(prisma.run.groupBy).toHaveBeenCalledWith({
-        by: ['ciJobKey'],
-        where: {
-          projectId: 'proj-1',
-          ciJobKey: { not: null },
-          startedAt: { gte: new Date('2026-09-03T12:00:00.000Z') },
-        },
-      });
+      expect(t.knownJobKeys.forProject).not.toHaveBeenCalled();
     });
 
-    it('scopes the known keys to the project of the api key', async () => {
-      const { linker, prisma } = build();
+    it('resolves the job key from the known keys of the project of the api key', async () => {
+      const t = build();
+      knownKeys(t, 'web', 'api');
 
-      await linker.resolve({ ...apiKey, projectId: 'proj-2' }, stale());
-
-      expect(prisma.run.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ projectId: 'proj-2' }) as unknown,
-        }),
+      const result = await t.linker.resolve(
+        { ...apiKey, projectId: 'proj-2' },
+        stale(),
       );
+
+      expect(result).toEqual({ ciRunId: 'ci-1', ciJobKey: 'api' });
+      expect(t.knownJobKeys.forProject).toHaveBeenCalledTimes(1);
+      expect(t.knownJobKeys.forProject).toHaveBeenCalledWith('proj-2');
     });
 
     it('links the run without a job key when no known key matches its id', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma, 'web', 'landing');
+      const t = build();
+      knownKeys(t, 'web', 'landing');
 
-      const result = await linker.resolve(apiKey, stale());
+      const result = await t.linker.resolve(apiKey, stale());
 
       expect(result).toEqual({ ciRunId: 'ci-1' });
     });
 
     it('links the run without a job key when the project has no known key', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma);
+      const t = build();
+      knownKeys(t);
 
-      const result = await linker.resolve(apiKey, stale());
+      const result = await t.linker.resolve(apiKey, stale());
 
       expect(result).toEqual({ ciRunId: 'ci-1' });
     });
 
     it('prefers the longest known key over a shorter prefix of it', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma, 'build', 'build-web');
+      const t = build();
+      knownKeys(t, 'build', 'build-web');
       const id = 'gha-900-build-web-junit-unit-xml-3425dd6f';
 
-      const result = await linker.resolve(
+      const result = await t.linker.resolve(
         apiKey,
         body({ externalId: id, reportExternalId: id }),
       );
@@ -499,15 +484,15 @@ describe('CiRunLinker.resolve', () => {
     });
 
     it('falls back to a single update on the first P2002 and returns the resolved link', async () => {
-      const { linker, prisma } = build();
-      knownJobKeys(prisma, 'api');
-      prisma.ciRun.upsert.mockRejectedValueOnce({ code: 'P2002' });
-      prisma.ciRun.update.mockResolvedValueOnce({ id: 'ci-7' });
+      const t = build();
+      knownKeys(t, 'api');
+      t.prisma.ciRun.upsert.mockRejectedValueOnce({ code: 'P2002' });
+      t.prisma.ciRun.update.mockResolvedValueOnce({ id: 'ci-7' });
 
-      const result = await linker.resolve(apiKey, stale());
+      const result = await t.linker.resolve(apiKey, stale());
 
       expect(result).toEqual({ ciRunId: 'ci-7', ciJobKey: 'api' });
-      expect(prisma.ciRun.update).toHaveBeenCalledWith({
+      expect(t.prisma.ciRun.update).toHaveBeenCalledWith({
         where: uniqueKey('proj-1', 'github_actions', '900'),
         data: { lastReportedAt: NOW },
         select: { id: true },
@@ -515,12 +500,12 @@ describe('CiRunLinker.resolve', () => {
     });
 
     it('fails before writing the ci run when the known keys cannot be read', async () => {
-      const { linker, prisma } = build();
+      const t = build();
       const failure = new Error('connection lost');
-      prisma.run.groupBy.mockRejectedValueOnce(failure);
+      t.knownJobKeys.forProject.mockRejectedValueOnce(failure);
 
-      await expect(linker.resolve(apiKey, stale())).rejects.toBe(failure);
-      expect(ciRunCalls(prisma)).toEqual([0, 0, 0, 0]);
+      await expect(t.linker.resolve(apiKey, stale())).rejects.toBe(failure);
+      expect(ciRunCalls(t.prisma)).toEqual([0, 0, 0, 0]);
     });
   });
 });

@@ -1,6 +1,7 @@
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import type { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { CiRunLinker, type CiRunLink } from './ci-run-linker';
+import { KnownCiJobKeys } from './known-ci-job-keys';
 import { deriveRunStatus } from './lib/derive-run-status';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import type { IngestRunInput } from './runs.schemas';
@@ -1890,7 +1891,10 @@ describe('RunsService.ingest ci run linking', () => {
       upsert: jest.fn().mockResolvedValue({ id: 'ci-1' }),
       update: jest.fn(),
     };
-    const linker = new CiRunLinker({ ciRun } as never);
+    const linker = new CiRunLinker(
+      { ciRun } as never,
+      { forProject: jest.fn() } as never,
+    );
     const service = buildWithLinker(prisma, linker as never);
 
     await service.ingest(apiKey, ciInput);
@@ -1924,7 +1928,10 @@ describe('RunsService.ingest ci run linking', () => {
     };
     const service = buildWithLinker(
       prisma,
-      new CiRunLinker({ ciRun, run } as never) as never,
+      new CiRunLinker(
+        { ciRun, run } as never,
+        new KnownCiJobKeys({ run } as never),
+      ) as never,
     );
 
     await service.ingest(apiKey, {

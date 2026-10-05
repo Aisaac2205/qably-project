@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
+import { KnownCiJobKeys } from './known-ci-job-keys';
 import { parseCiRunExternalId, resolveCiJobKey } from './lib/ci-external-id';
 import type { IngestRunInput } from './runs.schemas';
-
-const KNOWN_JOB_KEY_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface CiRunLink {
   ciRunId: string;
@@ -47,7 +46,10 @@ function ciRunFields(input: IngestRunInput) {
 
 @Injectable()
 export class CiRunLinker {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly knownJobKeys: KnownCiJobKeys,
+  ) {}
 
   async resolve(
     apiKey: ApiKeyIdentity,
@@ -72,18 +74,7 @@ export class CiRunLinker {
     externalId: string,
     ciRunExternalId: string,
   ): Promise<string | undefined> {
-    const since = new Date(Date.now() - KNOWN_JOB_KEY_WINDOW_MS);
-    const rows = await this.prisma.run.groupBy({
-      by: ['ciJobKey'],
-      where: {
-        projectId: apiKey.projectId,
-        ciJobKey: { not: null },
-        startedAt: { gte: since },
-      },
-    });
-    const knownJobKeys = rows.flatMap((row) =>
-      row.ciJobKey === null ? [] : [row.ciJobKey],
-    );
+    const knownJobKeys = await this.knownJobKeys.forProject(apiKey.projectId);
 
     return resolveCiJobKey(externalId, ciRunExternalId, knownJobKeys);
   }

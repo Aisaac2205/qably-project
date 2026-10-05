@@ -15,6 +15,7 @@ import {
 import { CiRunLinker } from './ci-run-linker';
 import { CiRunsController } from './ci-runs.controller';
 import { CiRunsService } from './ci-runs.service';
+import { KnownCiJobKeys } from './known-ci-job-keys';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import { ReportBatchService } from './report-batch.service';
 import { REPORT_BATCH_REDIS } from './report-batch.tokens';
@@ -55,6 +56,7 @@ import { RunsService } from './runs.service';
     ReportBatchService,
     OfficialCaseReconciler,
     CiRunLinker,
+    KnownCiJobKeys,
     CiRunsService,
     {
       provide: REPORT_BATCH_REDIS,

@@ -407,7 +407,8 @@ Splitting on hyphens would therefore invent a job key. The linker does not split
 project already uses instead:
 
 1. It reads the distinct, non-null `Run.ciJobKey` values of the project whose run started in the last 30
-   days (`run.groupBy`, scoped by `projectId`, one query).
+   days (`run.groupBy`, scoped by `projectId`, one query). `KnownCiJobKeys` keeps the answer in the
+   memory of the API process for 60 seconds, per project.
 2. `resolveCiJobKey(externalId, ciRunExternalId, knownJobKeys)` keeps the known keys `K` for which the id
    starts with `gha-{ciRunExternalId}-{K}-`, trying `K` as written (a `GITHUB_JOB`) and the slug of `K`
    (a `QABLY_JOB_KEY`; the slug lowercases, collapses every run of characters outside `[a-z0-9]` into
@@ -427,9 +428,18 @@ job name: a project with the jobs `build` and `build-web` whose job `build` repo
 the id.
 
 The lookup is the only cost of the fallback and runs only for a request without `ciRunExternalId` and
-without `ciJobKey`, whose `externalId` parses. It is bounded by the 30 day window for the same reason
-other queries are: a project produces on the order of 350 runs per push, and an unbounded scan of its
-history on every ingest does not scale. It is outside the interactive transaction, like the upsert.
+without `ciJobKey`, whose `externalId` parses. Two things limit it:
+
+- The 30 day window keeps it from grouping the whole history of the project, which produces on the order
+  of 350 runs per push.
+- The 60 second cache keeps it from running on every ingest. A push from a reporter older than 10.1.0
+  ingests about 350 reports, and without the cache each one would issue its own `groupBy`. The cache
+  lives in each API process and is not shared between processes or instances, so every process reads
+  once per project a minute at most. A read that fails is never cached.
+
+A cold read is still a grouping over the runs of the project inside the window. The cache also means
+that a job key that appears for the first time is unknown to the fallback for up to 60 seconds. The
+lookup is outside the interactive transaction, like the upsert.
 
 ### `lastReportedAt`
 
