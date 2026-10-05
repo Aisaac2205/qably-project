@@ -1,11 +1,12 @@
 import type { ComponentProps } from 'react'
-import { cleanup, screen, act, waitFor } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { cleanup, render, screen, act, waitFor, type RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NewRunAction } from '@/features/runs/components/new-run-action'
 import { cancelNewRunFocus, requestNewRunFocus } from '@/features/runs/lib/new-run-focus'
 import { expectFocusRing } from '@/features/runs/test/focus-ring'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { createTestQueryClient, renderWithQuery } from '@/lib/query-test-utils'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -176,6 +177,77 @@ describe('NewRunAction', () => {
       expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs?tab=manual', {
         scroll: false,
       })
+    })
+  })
+
+  describe('when it is bound to the new run route and the project is still loading', () => {
+    function element(client: ReturnType<typeof createTestQueryClient>, props: Partial<ComponentProps<typeof NewRunAction>>) {
+      return (
+        <QueryClientProvider client={client}>
+          <NewRunAction
+            projectId="proj-1"
+            disabled={false}
+            routeBound
+            initialSuiteId="suite-2"
+            {...props}
+          />
+        </QueryClientProvider>
+      )
+    }
+
+    async function mountLoading() {
+      const client = createTestQueryClient()
+      let view!: RenderResult
+
+      await act(async () => {
+        view = render(element(client, { loading: true }))
+      })
+
+      return {
+        settle: (props: Partial<ComponentProps<typeof NewRunAction>> = {}) =>
+          act(async () => {
+            view.rerender(element(client, { loading: false, ...props }))
+          }),
+      }
+    }
+
+    it('stays closed until the project has loaded, then opens with the requested suite', async () => {
+      const loading = await mountLoading()
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(navigation.replace).not.toHaveBeenCalled()
+
+      await loading.settle()
+
+      expect(await screen.findByRole('dialog', { name: 'New run' })).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'Suite' })).toHaveTextContent('Checkout')
+    })
+
+    it('never opens when the project turns out to have no manual cases, and leaves the route', async () => {
+      const loading = await mountLoading()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      await loading.settle({ disabled: true })
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(navigation.replace).toHaveBeenCalledTimes(1)
+      expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs?tab=manual', {
+        scroll: false,
+      })
+    })
+
+    it('opens only once, so a dismissed dialog stays closed on later renders', async () => {
+      const user = userEvent.setup()
+      const loading = await mountLoading()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await loading.settle()
+      await screen.findByRole('dialog', { name: 'New run' })
+
+      await user.keyboard('{Escape}')
+      await waitForClose()
+      await loading.settle()
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
   })
 

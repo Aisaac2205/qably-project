@@ -17,11 +17,13 @@ const ACTION_FOCUS =
 export function NewRunAction({
   projectId,
   disabled,
+  loading = false,
   initialSuiteId,
   routeBound = false,
 }: {
   projectId: string
   disabled: boolean
+  loading?: boolean
   initialSuiteId?: string
   routeBound?: boolean
 }) {
@@ -29,10 +31,16 @@ export function NewRunAction({
   const { replace } = useRouter()
   const hintId = useId()
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const [open, setOpen] = useState(routeBound)
+  const [open, setOpen] = useState(false)
+  const [routeOpened, setRouteOpened] = useState(false)
   const [preselectedSuiteId, setPreselectedSuiteId] = useState(initialSuiteId)
   const [pending, setPending] = useState(false)
   const listHref = projectRunsPath(projectId, 'manual')
+
+  if (routeBound && !loading && !disabled && !routeOpened) {
+    setRouteOpened(true)
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (routeBound && disabled) replace(listHref, { scroll: false })

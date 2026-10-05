@@ -47,6 +47,14 @@ fall back to the Manual tab only for a manual run, and to the Actions tab, or to
 The Manual tab used to list every run without a CI run link, which mixed the automated runs that no CI run
 adopted with the runs a person started.
 
+The `/projects/{id}/runs/new?suite=S` address is a deep link that renders the Manual tab with the new run
+dialog open and `S` preselected. It opens the dialog only once the project has loaded: until then the
+page cannot tell whether the project has manual cases, and a project without any leaves the route for the
+Manual list because there is nothing to run. Opening at the first render showed a dialog that closed again
+a moment later for such a project. A project that fails to load does not hold the dialog back, since a
+missing answer is not a reason to hide the action; the API still answers `409` when a suite has no
+manual case.
+
 The line under the title of a CI run row and of the CI run header lists, in this order and omitting what
 is absent, the run number, the ref, the short commit SHA and an author. The author is the commit author
 when the reporter or the backfill sent one, and otherwise the GitHub actor, the `ciActor` the reporter

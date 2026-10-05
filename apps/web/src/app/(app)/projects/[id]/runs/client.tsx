@@ -25,7 +25,7 @@ export function RunListPageClient({
 }) {
   const { t } = useTranslation()
   const router = useRouter()
-  const { project } = useProject(projectId)
+  const { project, isLoading } = useProject(projectId)
   const hasNoManualCases = project?.hasManualCases === false
   const [tab, setTab] = useState(initialTab)
   const [urlTab, setUrlTab] = useState(initialTab)
@@ -69,6 +69,7 @@ export function RunListPageClient({
           <NewRunAction
             projectId={projectId}
             disabled={hasNoManualCases}
+            loading={isLoading}
             initialSuiteId={initialSuiteId}
             routeBound={openNewRun}
           />

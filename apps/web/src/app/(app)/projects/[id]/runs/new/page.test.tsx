@@ -1,16 +1,19 @@
-import { act, cleanup, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, type RenderResult } from '@testing-library/react'
 import { cancelNewRunFocus } from '@/features/runs/lib/new-run-focus'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RunRecord } from '@qably/types'
 import { ApiError } from '@/lib/api-client'
 import { parseRunsTab } from '@/features/runs/lib/runs-tab'
-import { renderWithQuery } from '@/lib/query-test-utils'
+import { renderWithQuery, withQueryClient } from '@/lib/query-test-utils'
 import { RunListPageClient } from '../client'
 import NewRunPage from './page'
 
 const navigation = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
-const project = vi.hoisted(() => ({ hasManualCases: true as boolean | undefined }))
+const project = vi.hoisted(() => ({
+  hasManualCases: true as boolean | undefined,
+  loading: false,
+}))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: navigation.replace, push: navigation.push }),
@@ -26,8 +29,10 @@ vi.mock('@/features/runs/api/ci-runs.api', () => ({
 }))
 vi.mock('@/features/projects/hooks/use-project', () => ({
   useProject: () => ({
-    project: { id: 'proj-1', name: 'Ecommerce App', hasManualCases: project.hasManualCases },
-    isLoading: false,
+    project: project.loading
+      ? undefined
+      : { id: 'proj-1', name: 'Ecommerce App', hasManualCases: project.hasManualCases },
+    isLoading: project.loading,
     isError: false,
   }),
 }))
@@ -132,6 +137,7 @@ describe('the new run deep link page', () => {
     navigation.push.mockReset()
     cancelNewRunFocus()
     project.hasManualCases = true
+    project.loading = false
   })
 
   it('opens the list on the Manual tab with the new run dialog open and the suite preselected', async () => {
@@ -424,6 +430,46 @@ describe('the new run deep link page', () => {
     expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs?tab=actions', {
       scroll: false,
     })
+  })
+
+  it('keeps the dialog closed while the project loads and opens it with the suite once it has', async () => {
+    project.loading = true
+    const params = { params: Promise.resolve({ id: 'proj-1' }), searchParams: Promise.resolve({ suite: 'suite-2' }) }
+    let view!: RenderResult
+    await act(async () => {
+      view = renderWithQuery(await NewRunPage(params))
+    })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    project.loading = false
+    await act(async () => {
+      view.rerender(withQueryClient(await NewRunPage(params)))
+    })
+
+    expect(await screen.findByRole('dialog', { name: 'New run' })).toBeInTheDocument()
+    expect(suiteSelect()).toHaveTextContent('Checkout')
+  })
+
+  it('never opens the dialog when the project turns out to have no manual cases after loading', async () => {
+    project.loading = true
+    const params = { params: Promise.resolve({ id: 'proj-1' }), searchParams: Promise.resolve({ suite: 'suite-1' }) }
+    let view!: RenderResult
+    await act(async () => {
+      view = renderWithQuery(await NewRunPage(params))
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    project.loading = false
+    project.hasManualCases = false
+    await act(async () => {
+      view.rerender(withQueryClient(await NewRunPage(params)))
+    })
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith(LIST_URL, { scroll: false })
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('does not open the dialog when the project has no manual cases', async () => {
