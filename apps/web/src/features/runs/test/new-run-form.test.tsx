@@ -11,6 +11,7 @@ import { ApiError } from '@/lib/api-client'
 import { useI18nStore } from '@/lib/i18n'
 
 const mockPush = vi.hoisted(() => vi.fn())
+const mockReplace = vi.hoisted(() => vi.fn())
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -20,7 +21,7 @@ vi.mock('@/features/runs/api/runs.api', async () =>
 )
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }))
 
 async function openForm(props: Partial<ComponentProps<typeof NewRunForm>> = {}) {
@@ -228,6 +229,7 @@ describe('NewRunForm', () => {
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/run-created')
       })
+      expect(mockReplace).not.toHaveBeenCalled()
       expect(create).toHaveBeenCalledTimes(1)
       expect(create).toHaveBeenCalledWith({
         projectId: 'proj-1',

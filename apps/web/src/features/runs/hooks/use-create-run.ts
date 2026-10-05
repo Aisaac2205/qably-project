@@ -6,9 +6,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createRun } from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
 
-export function useCreateRun(projectId: string) {
+export function useCreateRun(projectId: string, options: { replaceOnCreate?: boolean } = {}) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { replaceOnCreate = false } = options
 
   const mutation = useMutation({
     mutationFn: ({ suiteId, name }: { suiteId: string; name?: string }) =>
@@ -16,7 +17,14 @@ export function useCreateRun(projectId: string) {
     onSuccess: async (run) => {
       queryClient.setQueryData(runKeys.detail(run.id), run)
       await queryClient.invalidateQueries({ queryKey: runKeys.all })
-      router.push(`/projects/${projectId}/runs/${run.id}`)
+      const href = `/projects/${projectId}/runs/${run.id}`
+
+      if (replaceOnCreate) {
+        router.replace(href)
+        return
+      }
+
+      router.push(href)
     },
   })
   const { mutate } = mutation

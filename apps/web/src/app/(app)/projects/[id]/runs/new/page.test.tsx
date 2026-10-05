@@ -1,6 +1,7 @@
 import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { RunRecord } from '@qably/types'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import NewRunPage from './page'
 
@@ -81,6 +82,43 @@ describe('the new run deep link page', () => {
 
     expect(await screen.findByRole('dialog', { name: 'New run' })).toBeInTheDocument()
     expect(suiteSelect()).toHaveTextContent('Select a suite')
+  })
+
+  it('replaces the new run entry with the run detail once the run is created, so back never reopens the dialog', async () => {
+    const user = userEvent.setup()
+    const api = await import('@/features/runs/api/runs.api')
+    vi.spyOn(api, 'createRun').mockResolvedValueOnce({ id: 'run-created' } as RunRecord)
+    await renderPage({ suite: 'suite-2' })
+    await screen.findByRole('dialog', { name: 'New run' })
+
+    await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs/run-created')
+    })
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it('also replaces the entry when the dialog is closed and opened again on the deep link address', async () => {
+    const user = userEvent.setup()
+    const api = await import('@/features/runs/api/runs.api')
+    vi.spyOn(api, 'createRun').mockResolvedValueOnce({ id: 'run-created' } as RunRecord)
+    await renderPage({ suite: 'suite-2' })
+    await screen.findByRole('dialog', { name: 'New run' })
+    await user.keyboard('{Escape}')
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: 'New run' }))
+    await user.click(await screen.findByRole('combobox', { name: 'Suite' }))
+    await user.click(await screen.findByRole('option', { name: 'Checkout' }))
+    await user.click(screen.getByRole('button', { name: 'Start run' }))
+
+    await waitFor(() => {
+      expect(navigation.replace).toHaveBeenCalledWith('/projects/proj-1/runs/run-created')
+    })
+    expect(navigation.push).not.toHaveBeenCalled()
   })
 
   it('closes with Escape, keeps the list and gives focus back to the New run button', async () => {

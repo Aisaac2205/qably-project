@@ -45,11 +45,13 @@ function translateCreateRunError(error: unknown, t: (key: string) => string): st
 export function NewRunForm({
   projectId,
   initialSuiteId,
+  replaceOnCreate = false,
   pending = false,
   onPendingChange,
 }: {
   projectId: string
   initialSuiteId?: string
+  replaceOnCreate?: boolean
   pending?: boolean
   onPendingChange?: (pending: boolean) => void
 }) {
@@ -58,6 +60,7 @@ export function NewRunForm({
       <NewRunFormBody
         projectId={projectId}
         initialSuiteId={initialSuiteId}
+        replaceOnCreate={replaceOnCreate}
         onPendingChange={onPendingChange}
       />
     </DialogContent>
@@ -67,14 +70,16 @@ export function NewRunForm({
 function NewRunFormBody({
   projectId,
   initialSuiteId,
+  replaceOnCreate,
   onPendingChange,
 }: {
   projectId: string
   initialSuiteId?: string
+  replaceOnCreate: boolean
   onPendingChange?: (pending: boolean) => void
 }) {
   const { suites, isLoading } = useSuites(projectId)
-  const { start: createRun, error: createError } = useCreateRun(projectId)
+  const { start: createRun, error: createError } = useCreateRun(projectId, { replaceOnCreate })
   const { t } = useTranslation()
   const suiteFieldId = useId()
   const nameFieldId = useId()

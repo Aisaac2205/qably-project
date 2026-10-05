@@ -16,11 +16,13 @@ export function NewRunAction({
   disabled,
   defaultOpen = false,
   initialSuiteId,
+  replaceOnCreate = false,
 }: {
   projectId: string
   disabled: boolean
   defaultOpen?: boolean
   initialSuiteId?: string
+  replaceOnCreate?: boolean
 }) {
   const { t } = useTranslation()
   const hintId = useId()
@@ -68,6 +70,7 @@ export function NewRunAction({
         <NewRunForm
           projectId={projectId}
           initialSuiteId={preselectedSuiteId}
+          replaceOnCreate={replaceOnCreate}
           pending={pending}
           onPendingChange={setPending}
         />
