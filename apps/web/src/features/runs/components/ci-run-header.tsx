@@ -1,7 +1,8 @@
 'use client'
 
 import { useId } from 'react'
-import { ArrowUpRight, GithubLogo } from '@phosphor-icons/react'
+import Image from 'next/image'
+import { ArrowUpRight } from '@phosphor-icons/react'
 import type { CiRunSummaryRecord } from '@qably/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useTranslation } from '@/lib/i18n'
@@ -27,7 +28,14 @@ function GitHubRunLink({ ciRun }: { ciRun: CiRunSummaryRecord }) {
       aria-label={t('runs.ci.githubLinkAria', { repository, host: new URL(href).host })}
       className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded text-sm font-medium text-default hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-8"
     >
-      <GithubLogo size={16} weight="fill" aria-hidden="true" className="shrink-0" />
+      <Image
+        src="/logos/github.svg"
+        alt=""
+        width={16}
+        height={16}
+        aria-hidden="true"
+        className="shrink-0"
+      />
       <span className="min-w-0 wrap-anywhere">{repository}</span>
       <ArrowUpRight size={12} weight="bold" aria-hidden="true" className="shrink-0" />
     </a>

@@ -155,9 +155,20 @@ describe('CiRunHeader long reporter text', () => {
     const link = screen.getByRole('link')
     expect(link).toHaveClass('min-w-0')
     expect(screen.getByText('acme/shop')).toHaveClass('min-w-0', 'wrap-anywhere')
-    const icons = link.querySelectorAll('svg')
+    const icons = link.querySelectorAll('svg, img')
     expect(icons).toHaveLength(2)
     for (const icon of icons) expect(icon).toHaveClass('shrink-0')
+  })
+
+  it('shows the GitHub brand mark the rest of the app uses, not a second drawing of it', () => {
+    renderHeader()
+
+    const link = screen.getByRole('link')
+    const mark = link.querySelector('img')
+    expect(mark).toHaveAttribute('src', '/logos/github.svg')
+    expect(mark).toHaveAttribute('alt', '')
+    expect(mark).toHaveAttribute('aria-hidden', 'true')
+    expect(link.querySelectorAll('svg')).toHaveLength(1)
   })
 })
 
@@ -269,7 +280,7 @@ describe('CiRunHeader GitHub link', () => {
   it('hides every icon of the link from assistive technology', () => {
     renderHeader()
 
-    const icons = screen.getByRole('link').querySelectorAll('svg')
+    const icons = screen.getByRole('link').querySelectorAll('svg, img')
     expect(icons.length).toBeGreaterThan(0)
     for (const icon of icons) {
       expect(icon).toHaveAttribute('aria-hidden', 'true')
