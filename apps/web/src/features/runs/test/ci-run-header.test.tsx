@@ -295,6 +295,7 @@ describe('CiRunHeader GitHub link', () => {
     ['the run was reported through the API', { source: 'api' as const }],
     ['the repository holds a dot segment', { repository: 'acme/..' }],
     ['the run id holds a dot segment', { externalId: '..' }],
+    ['the run id is not made of digits', { externalId: 'run-7' }],
   ] as [string, Partial<CiRunSummaryRecord>][])('renders no link when %s', (_label, overrides) => {
     renderHeader(overrides)
 

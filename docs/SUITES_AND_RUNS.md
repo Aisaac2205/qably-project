@@ -55,6 +55,13 @@ and often missing, so the actor keeps the line from going without an author. A b
 missing, so the author falls through to the actor and, with neither, the part is left out instead of
 rendering an empty slot.
 
+The CI run header links to the workflow run on GitHub only when the stored `externalId` is a GitHub run
+id: one to twenty ASCII digits, the same shape `parseCiRunExternalId` reads from the `gha-<run id>-` prefix
+of a reporter `externalId`. The API stores `ciRunExternalId` as free text up to 255 characters, so a
+custom client can send any word, and a path built from it would point at a page that does not exist or
+at another path of the repository. Such a CI run keeps its row and its detail and has no link. The
+repository segments are still encoded one by one and refused when they are empty or a dot segment.
+
 ## Why `run_case` duplicates the case content
 
 `run_case` carries its own `steps` and `expected_result`, copied from `test_case` when the run is created

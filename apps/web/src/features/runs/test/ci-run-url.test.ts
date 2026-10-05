@@ -48,11 +48,25 @@ const REJECTED_REPOSITORIES: [string, string][] = [
   ['three segments', 'a/b/c'],
 ]
 
+const ARABIC_INDIC_THREE = String.fromCodePoint(0x663)
+
 const REJECTED_EXTERNAL_IDS: [string, string][] = [
   ['a parent segment', '..'],
   ['a current segment', '.'],
   ['a parent segment behind whitespace', ' .. '],
   ['a current segment behind whitespace', ' . '],
+  ['three dots', '...'],
+  ['an id that tries to open a segment and a query', '900/../x?y=1'],
+  ['a percent-encoded parent segment', '%2e%2e'],
+  ['a backslash', 'a\b'],
+  ['a word sent by a custom client', 'run-7'],
+  ['a reporter externalId instead of a run id', 'gha-900-test-report-1a2b3c4d'],
+  ['a number with a letter', '900a'],
+  ['a negative number', '-900'],
+  ['a decimal number', '9.5'],
+  ['an exponent', '1e3'],
+  ['digits outside ASCII', ARABIC_INDIC_THREE],
+  ['more than twenty digits', '1'.repeat(21)],
 ]
 
 const SAFE_LINKS: SafeLink[] = [
@@ -109,36 +123,6 @@ const SAFE_LINKS: SafeLink[] = [
     repository: `acme/shop${SURROGATE_PAIR}`,
     externalId: '900',
     pathname: '/acme/shop%F0%9F%98%80/actions/runs/900',
-  },
-  {
-    label: 'an id made of three dots',
-    repository: 'acme/shop',
-    externalId: '...',
-    pathname: '/acme/shop/actions/runs/...',
-  },
-  {
-    label: 'an id that tries to open a segment and a query',
-    repository: 'acme/shop',
-    externalId: '900/../x?y=1',
-    pathname: '/acme/shop/actions/runs/900%2F..%2Fx%3Fy%3D1',
-  },
-  {
-    label: 'a percent-encoded parent segment as the id',
-    repository: 'acme/shop',
-    externalId: '%2e%2e',
-    pathname: '/acme/shop/actions/runs/%252e%252e',
-  },
-  {
-    label: 'a backslash in the id',
-    repository: 'acme/shop',
-    externalId: 'a\\b',
-    pathname: '/acme/shop/actions/runs/a%5Cb',
-  },
-  {
-    label: 'a non-numeric id sent by a custom client',
-    repository: 'acme/shop',
-    externalId: 'run-7',
-    pathname: '/acme/shop/actions/runs/run-7',
   },
 ]
 
@@ -277,9 +261,18 @@ describe('buildCiRunUrl', () => {
       )
     })
 
-    it('does not let an external id open a new path segment or a query', () => {
-      expect(buildCiRunUrl(ciRun({ externalId: '900/../x?y=1' }))).toBe(
-        'https://github.com/acme/shop/actions/runs/900%2F..%2Fx%3Fy%3D1',
+  })
+
+  describe('links only a run id made of digits', () => {
+    it.each(['1', '900', '12345678901', '1'.repeat(20)])('links the id %s', (externalId) => {
+      expect(buildCiRunUrl(ciRun({ externalId }))).toBe(
+        `https://github.com/acme/shop/actions/runs/${externalId}`,
+      )
+    })
+
+    it('links an id with leading zeros as it is stored', () => {
+      expect(buildCiRunUrl(ciRun({ externalId: '0900' }))).toBe(
+        'https://github.com/acme/shop/actions/runs/0900',
       )
     })
   })

@@ -3,6 +3,7 @@ import { present } from './ci-run-format'
 
 const REPOSITORY_SEGMENT_COUNT = 2
 const DOT_SEGMENT = /^\.{1,2}$/
+const GITHUB_RUN_ID = /^\d{1,20}$/
 
 type CiRunUrlSource = Pick<CiRunSummaryRecord, 'source' | 'serverUrl' | 'repository' | 'externalId'>
 
@@ -19,15 +20,15 @@ function isPathSegment(segment: string): boolean {
   return segment !== '' && !DOT_SEGMENT.test(segment)
 }
 
-function runPagePath(repository: string, externalId: string): string | undefined {
+function runPagePath(repository: string, runId: string): string | undefined {
   const segments = repository.split('/')
 
   if (segments.length !== REPOSITORY_SEGMENT_COUNT) return undefined
-  if (![...segments, externalId].every(isPathSegment)) return undefined
+  if (!segments.every(isPathSegment)) return undefined
 
   try {
     const [owner, name] = segments.map(encodeURIComponent)
-    return `/${owner}/${name}/actions/runs/${encodeURIComponent(externalId)}`
+    return `/${owner}/${name}/actions/runs/${runId}`
   } catch {
     return undefined
   }
@@ -42,6 +43,7 @@ export function buildCiRunUrl(ciRun: CiRunUrlSource): string | undefined {
   if (serverUrl === undefined || repository === undefined || externalId === undefined) {
     return undefined
   }
+  if (!GITHUB_RUN_ID.test(externalId)) return undefined
 
   const origin = httpOrigin(serverUrl)
   const path = runPagePath(repository, externalId)
