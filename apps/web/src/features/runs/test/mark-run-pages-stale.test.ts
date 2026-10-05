@@ -12,7 +12,7 @@ function seededClient() {
   client.setQueryData(runKeys.page('proj-2', 'manual'), { pages: [], pageParams: [] })
   client.setQueryData(runKeys.page('proj-10', 'manual'), { pages: [], pageParams: [] })
   client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
-  client.setQueryData(runKeys.list('proj-1'), { items: [] })
+  client.setQueryData(runKeys.regressions('proj-1', 20), { items: [], runsScanned: 0 })
   client.setQueryData(runKeys.suiteMetrics('proj-1'), { items: [] })
   return client
 }
@@ -25,7 +25,7 @@ describe('runKeys.pages', () => {
   })
 
   it('never collides with the other run keys', () => {
-    expect(runKeys.list('proj-1').slice(0, 3)).not.toEqual(runKeys.pages('proj-1'))
+    expect(runKeys.regressions('proj-1', 20).slice(0, 3)).not.toEqual(runKeys.pages('proj-1'))
     expect(runKeys.detail('proj-1').slice(0, 3)).not.toEqual(runKeys.pages('proj-1'))
     expect(runKeys.suiteMetrics('proj-1').slice(0, 3)).not.toEqual(runKeys.pages('proj-1'))
   })
@@ -50,13 +50,13 @@ describe('markRunPagesStale', () => {
     expect(client.getQueryState(runKeys.page('proj-10', 'manual'))?.isInvalidated).toBe(false)
   })
 
-  it('leaves the run details, the list and the metrics alone', () => {
+  it('leaves the run details, the regressions and the metrics alone', () => {
     const client = seededClient()
 
     markRunPagesStale(client, 'proj-1')
 
     expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(false)
-    expect(client.getQueryState(runKeys.list('proj-1'))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(runKeys.regressions('proj-1', 20))?.isInvalidated).toBe(false)
     expect(client.getQueryState(runKeys.suiteMetrics('proj-1'))?.isInvalidated).toBe(false)
   })
 

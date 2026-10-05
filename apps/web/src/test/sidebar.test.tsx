@@ -84,7 +84,6 @@ const mockProject: ProjectSummary = {
 vi.mock('@/lib/use-mock-store', () => ({
   useProject: (id: string) => (id === 'proj-1' ? mockProject : undefined),
   useSuites: () => [],
-  useRuns: () => [],
   useAiCases: () => [],
   useProposals: () => [],
   useMembers: () => [],

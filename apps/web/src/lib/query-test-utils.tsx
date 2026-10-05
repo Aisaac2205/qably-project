@@ -91,12 +91,9 @@ function seedRuns(client: QueryClient): void {
   )
   const summaries = sorted.map(toSummary)
 
-  client.setQueryData(runKeys.list('all'), { items: summaries })
-
   for (const projectId of new Set(runs.map((run) => run.projectId))) {
     const forProject = summaries.filter((run) => run.projectId === projectId)
 
-    client.setQueryData(runKeys.list(projectId), { items: forProject })
     client.setQueryData(runKeys.page(projectId, 'all'), {
       pages: [{ items: forProject }],
       pageParams: [undefined],

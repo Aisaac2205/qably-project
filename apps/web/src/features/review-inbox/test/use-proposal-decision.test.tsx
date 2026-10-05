@@ -237,7 +237,7 @@ describe('useProposalDecision', () => {
     vi.spyOn(reviewApi, 'approveProposal').mockResolvedValue(approvalResult)
     const client = makeClient()
     client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
-    client.setQueryData(runKeys.list('p1'), { items: [] })
+    client.setQueryData(runKeys.page('p1', 'all'), { pages: [], pageParams: [] })
     const { result } = renderHook(
       () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
       { wrapper: wrapperFor(client) },
@@ -250,7 +250,7 @@ describe('useProposalDecision', () => {
     await waitFor(() =>
       expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(true),
     )
-    expect(client.getQueryState(runKeys.list('p1'))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(runKeys.page('p1', 'all'))?.isInvalidated).toBe(false)
   })
 
   it('leaves cached run details alone after a rejection, since nothing in the library changed', async () => {
