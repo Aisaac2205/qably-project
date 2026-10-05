@@ -380,7 +380,7 @@ describe('the current level of the breadcrumb', () => {
 
     renderPage()
     await screen.findByRole('heading', { level: 3, name: 'Sprint regression' })
-    await settle()
+    await screen.findByText('Authentication')
 
     expect(within(breadcrumb()).getByText('Sprint regression')).toHaveAttribute(
       'aria-current',
