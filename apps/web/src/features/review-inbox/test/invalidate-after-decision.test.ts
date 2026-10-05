@@ -4,7 +4,6 @@ import {
   invalidateReviewLists,
   invalidateSuiteAndProjectLists,
   invalidateRunDetails,
-  invalidateAfterDecision,
 } from '@/features/review-inbox/lib/invalidate-after-decision'
 import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
 import { suiteKeys, projectKeys } from '@/features/projects/lib/query-keys'
@@ -44,20 +43,5 @@ describe('invalidateRunDetails', () => {
 
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy).toHaveBeenCalledWith({ queryKey: runKeys.details, refetchType: 'none' })
-  })
-})
-
-describe('invalidateAfterDecision', () => {
-  it('invalidates review, suite, project, and run detail caches, in that order', () => {
-    const client = new QueryClient()
-    const spy = vi.spyOn(client, 'invalidateQueries')
-
-    invalidateAfterDecision(client)
-
-    expect(spy).toHaveBeenCalledTimes(4)
-    expect(spy).toHaveBeenNthCalledWith(1, expect.objectContaining({ queryKey: reviewKeys.all }))
-    expect(spy).toHaveBeenNthCalledWith(2, expect.objectContaining({ queryKey: suiteKeys.all }))
-    expect(spy).toHaveBeenNthCalledWith(3, expect.objectContaining({ queryKey: projectKeys.all }))
-    expect(spy).toHaveBeenNthCalledWith(4, expect.objectContaining({ queryKey: runKeys.details }))
   })
 })

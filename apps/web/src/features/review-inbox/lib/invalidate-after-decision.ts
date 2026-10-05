@@ -15,9 +15,3 @@ export function invalidateSuiteAndProjectLists(queryClient: QueryClient): void {
 export function invalidateRunDetails(queryClient: QueryClient): void {
   markRunDetailsStale(queryClient)
 }
-
-export function invalidateAfterDecision(queryClient: QueryClient): void {
-  invalidateReviewLists(queryClient)
-  invalidateSuiteAndProjectLists(queryClient)
-  invalidateRunDetails(queryClient)
-}
