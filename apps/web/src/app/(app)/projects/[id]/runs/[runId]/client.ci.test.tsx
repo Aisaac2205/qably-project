@@ -249,14 +249,28 @@ describe('the way back to the runs list', () => {
     return within(breadcrumb()).getByRole('link', { name: 'Runs' }).getAttribute('href')
   }
 
-  it('sends a run without a CI run to the Manual tab, where the runs without a CI run are listed', async () => {
-    run.mockResolvedValue(runRecord())
+  it('sends a manual run to the Manual tab, where manual runs are listed', async () => {
+    run.mockResolvedValue(runRecord({ source: 'manual' }))
 
     renderPage()
     await screen.findByRole('heading', { level: 3, name: 'Run #12' })
 
     expect(runsCrumbHref()).toBe(MANUAL_LIST)
   })
+
+  it.each<RunRecord['source']>(['github_actions', 'api'])(
+    'sends a %s run that no CI run adopted to the Actions tab, since the Manual tab lists manual runs only',
+    async (source) => {
+      run.mockResolvedValue(runRecord({ source, name: 'truncateTo' }))
+
+      renderPage()
+      await screen.findByRole('heading', { level: 3, name: 'truncateTo' })
+      await settle()
+
+      expect(ciRun).not.toHaveBeenCalled()
+      expect(runsCrumbHref()).toBe(ACTIONS_LIST)
+    },
+  )
 
   it('keeps the default tab for a run that belongs to a CI run and leaves the CI level alone', async () => {
     run.mockResolvedValue(runRecord({ ciRunId: 'c1' }))
@@ -292,7 +306,7 @@ describe('the way back to the runs list', () => {
     expect(runsCrumbHref()).toBe(ACTIONS_LIST)
   })
 
-  it('sends the not found page to the Manual tab too, in the breadcrumb and in the link back', async () => {
+  it('sends the not found page to the default tab, in the breadcrumb and in the link back, since nothing says where the run was listed', async () => {
     run.mockRejectedValue(new ApiError(404, 'Run not found', 'not-found'))
 
     renderPage()
@@ -301,12 +315,12 @@ describe('the way back to the runs list', () => {
     const links = screen.getAllByRole('link', { name: 'Runs' })
     expect(links).toHaveLength(2)
     for (const link of links) {
-      expect(link).toHaveAttribute('href', MANUAL_LIST)
+      expect(link).toHaveAttribute('href', ACTIONS_LIST)
     }
   })
 })
 
-describe('the back button of a run that belongs to a CI run', () => {
+describe('the back button of a run reported by CI', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -327,6 +341,19 @@ describe('the back button of a run that belongs to a CI run', () => {
 
     expect(mockBack).not.toHaveBeenCalled()
     expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/ci/c1')
+  })
+
+  it('falls back to the Actions tab for an automated run that no CI run adopted, since the Manual tab does not list it', async () => {
+    vi.spyOn(window.history, 'length', 'get').mockReturnValue(1)
+    run.mockResolvedValue(runRecord({ source: 'github_actions', name: 'truncateTo' }))
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByRole('heading', { level: 3, name: 'truncateTo' })
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(mockBack).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs')
   })
 
   it('goes back through history, so the list or the CI run it came from keeps its scroll position', async () => {

@@ -29,10 +29,9 @@ export function RunDetailPageClient({
   const { suite } = useSuite(run?.suiteId ?? '')
   const { ciRun } = useCiRun(run?.ciRunId)
   const ciRunLabel = useCiRunLabel(ciRun)
-  const runsHref = run?.ciRunId ? projectRunsPath(projectId) : projectRunsPath(projectId, 'manual')
-  const goBack = useGoBack(
-    run?.ciRunId ? projectCiRunPath(projectId, run.ciRunId) : projectRunsPath(projectId, 'manual'),
-  )
+  const listedInManual = run?.source === 'manual' && !run.ciRunId
+  const runsHref = projectRunsPath(projectId, listedInManual ? 'manual' : undefined)
+  const goBack = useGoBack(run?.ciRunId ? projectCiRunPath(projectId, run.ciRunId) : runsHref)
 
   if (isLoading) {
     return (
