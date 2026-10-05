@@ -103,9 +103,45 @@ describe('runBackfillCli', () => {
       'Runs linked: 1',
       'Job keys set: 1',
       'Linked runs left without a job key: 0',
+      'Skipped groups: 0',
     ]);
     expect(t.port.setJobKey).toHaveBeenCalledWith(['r1'], 'api');
     expect(t.lines.join('\n')).not.toMatch(/s3cret|user/);
+    expect(t.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs a skipped group as it happens, lists it in the summary and exits with 2 so the skip cannot go unnoticed', async () => {
+    const t = build();
+    t.port.findCiRun.mockResolvedValue({
+      id: 'ci-live',
+      startedAt: new Date('2026-09-01T11:00:00.000Z'),
+      lastReportedAt: new Date('2026-09-01T11:30:00.000Z'),
+      commitSha: null,
+      commitMessage: null,
+      commitAuthor: null,
+    } as never);
+    t.port.updateCiRunIfUnchanged.mockResolvedValue(false);
+    t.port.readRunsMissingJobKey.mockResolvedValue([]);
+
+    const code = await runBackfillCli(t.deps);
+
+    expect(code).toBe(2);
+    expect(t.errors).toEqual([]);
+    expect(t.port.linkRuns).not.toHaveBeenCalled();
+    expect(t.lines).toEqual([
+      'Target database host: db.example.internal',
+      'Skipped github_actions CiRun 900 of project proj-1: concurrent ingestion changed it in 5 consecutive attempts and none of its runs were linked.',
+      'Scanned: 1',
+      'Unattributable (left untouched): 0',
+      'CiRuns created: 0',
+      'CiRuns updated: 0',
+      'Runs linked: 0',
+      'Job keys set: 0',
+      'Linked runs left without a job key: 0',
+      'Skipped groups: 1',
+      '  github_actions 900 (project proj-1)',
+      'Run the script again to link the skipped groups.',
+    ]);
     expect(t.close).toHaveBeenCalledTimes(1);
   });
 

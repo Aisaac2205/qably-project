@@ -238,6 +238,7 @@ describe('backfillCiRuns grouping', () => {
       runsLinked: 3,
       jobKeysSet: 0,
       jobKeysUnresolved: 3,
+      skippedGroups: [],
     });
   });
 
@@ -349,6 +350,7 @@ describe('backfillCiRuns unattributable runs', () => {
       runsLinked: 1,
       jobKeysSet: 0,
       jobKeysUnresolved: 1,
+      skippedGroups: [],
     });
     expect(db.runs.map((run) => run.ciRunId)).toEqual([
       db.ciRuns[0].id,
@@ -383,6 +385,7 @@ describe('backfillCiRuns idempotency', () => {
       runsLinked: 0,
       jobKeysSet: 0,
       jobKeysUnresolved: 2,
+      skippedGroups: [],
     });
     expect(db.writes).toEqual(writesAfterFirst);
   });
@@ -559,6 +562,7 @@ describe('backfillCiRuns against concurrent live ingestion', () => {
       runsLinked: 1,
       jobKeysSet: 0,
       jobKeysUnresolved: 1,
+      skippedGroups: [],
     });
   });
 
@@ -583,7 +587,7 @@ describe('backfillCiRuns against concurrent live ingestion', () => {
     expect(db.writes.update).toBe(1);
   });
 
-  it('gives up loudly after a bounded number of attempts and links nothing', async () => {
+  it('skips a group that is still not resolved after a bounded number of attempts and links none of its runs', async () => {
     const db = fakeDb(
       [stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)],
       [liveCiRun()],
@@ -594,28 +598,135 @@ describe('backfillCiRuns against concurrent live ingestion', () => {
       },
     );
 
-    await expect(backfillCiRuns(db.port)).rejects.toThrow(
-      `after ${MAX_MERGE_ATTEMPTS} attempts`,
-    );
+    const summary = await backfillCiRuns(db.port);
 
     expect(db.counters.finds).toBe(MAX_MERGE_ATTEMPTS);
     expect(db.writes).toEqual({ create: 0, update: 0, link: 0 });
     expect(db.runs[0].ciRunId).toBeNull();
+    expect(summary.skippedGroups).toEqual([
+      { projectId: 'proj-1', source: 'github_actions', externalId: '900' },
+    ]);
+    expect(summary).toMatchObject({
+      scanned: 1,
+      ciRunsUpdated: 0,
+      runsLinked: 0,
+    });
   });
 
-  it('gives up loudly when the create keeps hitting a unique violation', async () => {
+  it('skips a group whose create keeps hitting a unique violation', async () => {
     const db = fakeDb([stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)], [], {
       beforeCreate: () => {
         throw uniqueViolation();
       },
     });
 
-    await expect(backfillCiRuns(db.port)).rejects.toThrow(
-      `after ${MAX_MERGE_ATTEMPTS} attempts`,
-    );
+    const summary = await backfillCiRuns(db.port);
 
     expect(db.counters.finds).toBe(MAX_MERGE_ATTEMPTS);
     expect(db.runs[0].ciRunId).toBeNull();
+    expect(summary.skippedGroups).toHaveLength(1);
+  });
+
+  it('carries on with the next group after a skip and links it', async () => {
+    const db = fakeDb(
+      [
+        stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5),
+        stored('r2', 'gha-901-api-junit-xml-ab12cd34', 6),
+      ],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          if (row.externalId === '900') row.lastReportedAt = at(40 + finds);
+        },
+      },
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(db.runs.map((run) => run.ciRunId)).toEqual([null, 'ci-2']);
+    expect(summary).toMatchObject({
+      ciRunsCreated: 1,
+      runsLinked: 1,
+      skippedGroups: [
+        { projectId: 'proj-1', source: 'github_actions', externalId: '900' },
+      ],
+    });
+  });
+
+  it('reports each skipped group once through the callback, as it happens, and once in the summary', async () => {
+    const skipped: string[] = [];
+    const db = fakeDb(
+      [
+        stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5),
+        stored('r2', 'gha-900-web-junit-xml-cd34ef56', 6),
+        stored('r3', 'gha-900-landing-junit-xml-ef56ab78', 7),
+        stored('r4', 'gha-901-api-junit-xml-ab12cd34', 8),
+      ],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          if (row.externalId === '900') row.lastReportedAt = at(40 + finds);
+        },
+      },
+    );
+
+    const summary = await backfillCiRuns(db.port, {
+      batchSize: 2,
+      onSkippedGroup: (key) =>
+        skipped.push(`${key.projectId}/${key.externalId}`),
+    });
+
+    expect(skipped).toEqual(['proj-1/900']);
+    expect(summary.skippedGroups).toHaveLength(1);
+    expect(db.runs.map((run) => run.ciRunId)).toEqual([
+      null,
+      null,
+      null,
+      'ci-2',
+    ]);
+  });
+
+  it('links a skipped group on the next pass once the contention is over', async () => {
+    const db = fakeDb(
+      [stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5)],
+      [liveCiRun()],
+      {
+        afterFind: (row, finds) => {
+          if (finds <= MAX_MERGE_ATTEMPTS) row.lastReportedAt = at(40 + finds);
+        },
+      },
+    );
+
+    const first = await backfillCiRuns(db.port);
+    const second = await backfillCiRuns(db.port);
+
+    expect(first.skippedGroups).toHaveLength(1);
+    expect(second.skippedGroups).toEqual([]);
+    expect(db.runs[0].ciRunId).toBe('ci-live');
+  });
+
+  it('still recovers the job keys of the runs it did link when another group was skipped', async () => {
+    const db = fakeDb(
+      [
+        stored('r-live', 'gha-902-api-junit-xml-ab12cd34', 1, {
+          ciRunId: 'ci-902',
+          ciJobKey: 'api',
+        }),
+        stored('r1', 'gha-900-api-junit-xml-ab12cd34', 5),
+        stored('r2', 'gha-901-api-junit-xml-ab12cd34', 6),
+      ],
+      [liveCiRun(), liveCiRun({ id: 'ci-902', externalId: '902' })],
+      {
+        afterFind: (row, finds) => {
+          if (row.externalId === '900') row.lastReportedAt = at(40 + finds);
+        },
+      },
+    );
+
+    const summary = await backfillCiRuns(db.port);
+
+    expect(summary.skippedGroups).toHaveLength(1);
+    expect(db.runs[2].ciJobKey).toBe('api');
   });
 
   it.each([

@@ -74,12 +74,22 @@ export interface BackfillSummary {
   runsLinked: number;
   jobKeysSet: number;
   jobKeysUnresolved: number;
+  skippedGroups: CiRunKey[];
+}
+
+export interface BackfillOptions {
+  batchSize?: number;
+  onSkippedGroup?: (key: CiRunKey) => void;
 }
 
 interface RunGroup {
   key: CiRunKey;
   organizationId: string;
   rows: BackfillRunRow[];
+}
+
+function keyOf(key: CiRunKey): string {
+  return JSON.stringify([key.projectId, key.source, key.externalId]);
 }
 
 function groupRuns(batch: readonly BackfillRunRow[]) {
@@ -94,7 +104,7 @@ function groupRuns(batch: readonly BackfillRunRow[]) {
     }
 
     const key = { projectId: row.projectId, source: row.source, externalId };
-    const mapKey = JSON.stringify([key.projectId, key.source, key.externalId]);
+    const mapKey = keyOf(key);
     const group = groups.get(mapKey) ?? {
       key,
       organizationId: row.organizationId,
@@ -152,7 +162,7 @@ async function resolveCiRun(
   port: BackfillPort,
   group: RunGroup,
   summary: BackfillSummary,
-): Promise<string> {
+): Promise<string | undefined> {
   const times = group.rows.map((row) => row.startedAt.getTime());
   const startedAt = new Date(Math.min(...times));
   const lastReportedAt = new Date(Math.max(...times));
@@ -185,20 +195,35 @@ async function resolveCiRun(
     }
   }
 
-  const { projectId, source, externalId } = group.key;
-  throw new Error(
-    `Gave up on the ${source} CiRun ${externalId} of project ${projectId} after ` +
-      `${MAX_MERGE_ATTEMPTS} attempts because concurrent ingestion kept ` +
-      'changing it. None of its runs were linked; run the script again.',
+  return undefined;
+}
+
+function recordSkip(
+  group: RunGroup,
+  summary: BackfillSummary,
+  options: BackfillOptions,
+): void {
+  const alreadySkipped = summary.skippedGroups.some(
+    (skipped) => keyOf(skipped) === keyOf(group.key),
   );
+  if (alreadySkipped) return;
+
+  summary.skippedGroups.push(group.key);
+  options.onSkippedGroup?.(group.key);
 }
 
 async function applyGroup(
   port: BackfillPort,
   group: RunGroup,
   summary: BackfillSummary,
+  options: BackfillOptions,
 ): Promise<void> {
   const ciRunId = await resolveCiRun(port, group, summary);
+  if (ciRunId === undefined) {
+    recordSkip(group, summary, options);
+    return;
+  }
+
   summary.runsLinked += await port.linkRuns(
     ciRunId,
     group.rows.map((row) => row.id),
@@ -207,7 +232,7 @@ async function applyGroup(
 
 export async function backfillCiRuns(
   port: BackfillPort,
-  options: { batchSize?: number } = {},
+  options: BackfillOptions = {},
 ): Promise<BackfillSummary> {
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
   const summary: BackfillSummary = {
@@ -218,6 +243,7 @@ export async function backfillCiRuns(
     runsLinked: 0,
     jobKeysSet: 0,
     jobKeysUnresolved: 0,
+    skippedGroups: [],
   };
 
   let batch = await port.readUnlinkedRuns(undefined, batchSize);
@@ -227,7 +253,7 @@ export async function backfillCiRuns(
     summary.unattributable += unattributable;
 
     for (const group of groups) {
-      await applyGroup(port, group, summary);
+      await applyGroup(port, group, summary, options);
     }
 
     batch = await port.readUnlinkedRuns(batch[batch.length - 1].id, batchSize);

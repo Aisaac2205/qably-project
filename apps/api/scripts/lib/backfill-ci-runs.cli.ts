@@ -1,7 +1,9 @@
 import {
+  MAX_MERGE_ATTEMPTS,
   backfillCiRuns,
   type BackfillPort,
   type BackfillSummary,
+  type CiRunKey,
 } from './backfill-ci-runs.lib';
 import { hasConfirmFlag, hostOf } from './reclassify-pending-proposals.lib';
 
@@ -16,6 +18,28 @@ export interface BackfillCliDeps {
   logError: (error: unknown) => void;
 }
 
+const EXIT_SKIPPED_GROUPS = 2;
+
+function skippedLine(key: CiRunKey): string {
+  return (
+    `Skipped ${key.source} CiRun ${key.externalId} of project ${key.projectId}: ` +
+    `concurrent ingestion changed it in ${MAX_MERGE_ATTEMPTS} consecutive ` +
+    'attempts and none of its runs were linked.'
+  );
+}
+
+function skippedSummaryLines(summary: BackfillSummary): string[] {
+  if (summary.skippedGroups.length === 0) return ['Skipped groups: 0'];
+
+  return [
+    `Skipped groups: ${summary.skippedGroups.length}`,
+    ...summary.skippedGroups.map(
+      (key) => `  ${key.source} ${key.externalId} (project ${key.projectId})`,
+    ),
+    'Run the script again to link the skipped groups.',
+  ];
+}
+
 function summaryLines(summary: BackfillSummary): string[] {
   return [
     `Scanned: ${summary.scanned}`,
@@ -25,6 +49,7 @@ function summaryLines(summary: BackfillSummary): string[] {
     `Runs linked: ${summary.runsLinked}`,
     `Job keys set: ${summary.jobKeysSet}`,
     `Linked runs left without a job key: ${summary.jobKeysUnresolved}`,
+    ...skippedSummaryLines(summary),
   ];
 }
 
@@ -47,13 +72,14 @@ export async function runBackfillCli(deps: BackfillCliDeps): Promise<number> {
 
     const { port, close } = deps.openPort(databaseUrl);
     try {
-      const summary = await backfillCiRuns(port);
+      const summary = await backfillCiRuns(port, {
+        onSkippedGroup: (key) => deps.log(skippedLine(key)),
+      });
       summaryLines(summary).forEach((line) => deps.log(line));
+      return summary.skippedGroups.length === 0 ? 0 : EXIT_SKIPPED_GROUPS;
     } finally {
       await close();
     }
-
-    return 0;
   } catch (error) {
     deps.logError(error);
     return 1;
