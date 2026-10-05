@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BackButton } from '@/components/ui/back-button'
+import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import { useI18nStore } from '@/lib/i18n'
 
 describe('BackButton', () => {
@@ -40,6 +41,14 @@ describe('BackButton', () => {
     const button = screen.getByRole('button', { name: 'Back' })
     expect(button).toHaveClass('size-11', 'md:size-8')
     expect(button).not.toHaveClass('size-8')
+  })
+
+  it('carries the project focus ring, which survives the global button outline reset and forced colors', () => {
+    render(<BackButton onClick={vi.fn()} />)
+
+    const button = screen.getByRole('button', { name: 'Back' })
+    expectFocusRing(button)
+    expect(button).not.toHaveClass('outline-none')
   })
 
   it('keeps the caller class alongside its own', () => {

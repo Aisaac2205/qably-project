@@ -22,7 +22,7 @@ export function BackButton({ onClick, label, className }: BackButtonProps) {
       className={cn(
         'inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border bg-surface md:size-8',
         'text-muted transition-colors hover:bg-surface-hover hover:text-default',
-        'outline-none focus-visible:ring-2 focus-visible:ring-primary',
+        'focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary',
         className,
       )}
     >
