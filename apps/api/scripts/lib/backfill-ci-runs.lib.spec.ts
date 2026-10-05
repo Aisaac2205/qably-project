@@ -1,7 +1,6 @@
 import {
   MAX_MERGE_ATTEMPTS,
   backfillCiRuns,
-  parseCiRunExternalId,
   type BackfillPort,
   type BackfillRunRow,
   type NewCiRun,
@@ -149,27 +148,6 @@ function fakeDb(
 
   return { port, runs, ciRuns, reads, linkSizes, writes, counters, events };
 }
-
-describe('parseCiRunExternalId', () => {
-  it.each([
-    ['gha-900-api-junit-unit-xml-ab12cd34', '900'],
-    ['gha-900-api-junit-xml-ab12cd34-p2', '900'],
-    ['gha-18446744073-web-junit-xml-cd34ef56', '18446744073'],
-  ])('extracts the numeric run id from %s', (externalId, expected) => {
-    expect(parseCiRunExternalId(externalId)).toBe(expected);
-  });
-
-  it.each<string | null>([
-    'gha-local-job-junit-xml-ab12cd34',
-    'gha-abc-api-junit-xml-ab12cd34',
-    'gha-900',
-    'run-900-api',
-    '',
-    null,
-  ])('returns undefined for %s', (externalId) => {
-    expect(parseCiRunExternalId(externalId)).toBeUndefined();
-  });
-});
 
 describe('backfillCiRuns grouping', () => {
   it('groups three reports of one GitHub run into one CiRun and links them all', async () => {

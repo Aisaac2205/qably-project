@@ -1,10 +1,10 @@
 import type { RunSource } from '../../generated/prisma/client';
+import { parseCiRunExternalId } from '../../src/modules/runs/lib/ci-external-id';
 import { isUniqueViolation } from '../../src/prisma/is-unique-violation';
 
 export const DEFAULT_BATCH_SIZE = 500;
 export const MAX_MERGE_ATTEMPTS = 5;
 
-const GITHUB_RUN_ID_PREFIX = /^gha-(\d+)-/;
 const COMMIT_FIELDS = ['commitSha', 'commitMessage', 'commitAuthor'] as const;
 
 export type CommitFields = Partial<
@@ -77,13 +77,6 @@ interface RunGroup {
   key: CiRunKey;
   organizationId: string;
   rows: BackfillRunRow[];
-}
-
-export function parseCiRunExternalId(
-  externalId: string | null,
-): string | undefined {
-  if (externalId === null) return undefined;
-  return GITHUB_RUN_ID_PREFIX.exec(externalId)?.[1];
 }
 
 function groupRuns(batch: readonly BackfillRunRow[]) {
