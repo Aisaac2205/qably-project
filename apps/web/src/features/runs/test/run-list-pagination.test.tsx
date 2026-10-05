@@ -5,14 +5,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { RunsPageRecord, RunSummaryRecord } from '@qably/types'
 import { RunList } from '@/features/runs/components/run-list'
 
-function renderList(source?: 'manual' | 'api' | 'github_actions') {
+function renderList() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   })
 
   return render(
     <QueryClientProvider client={client}>
-      <RunList projectId="proj-1" source={source} />
+      <RunList projectId="proj-1" />
     </QueryClientProvider>,
   )
 }
@@ -64,15 +64,15 @@ describe('RunList pagination', () => {
     )
   })
 
-  it('pushes the source filter into the request instead of filtering a page client-side', async () => {
+  it('pushes the manual source into the request instead of filtering a page client-side', async () => {
     listRuns.mockResolvedValue({ items: [runSummary('a')] })
 
     await act(async () => {
-      renderList('github_actions')
+      renderList()
     })
 
     expect(listRuns).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'github_actions' }),
+      expect.objectContaining({ source: 'manual' }),
       expect.anything(),
     )
   })
@@ -116,6 +116,6 @@ describe('RunList pagination', () => {
 
     await act(async () => { renderList() })
 
-    expect(screen.getByText('No runs yet')).toBeInTheDocument()
+    expect(screen.getByText('Run your manual cases')).toBeInTheDocument()
   })
 })

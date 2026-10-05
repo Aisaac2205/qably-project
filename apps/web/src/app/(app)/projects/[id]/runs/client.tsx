@@ -72,7 +72,7 @@ export function RunListPageClient({
             initialSuiteId={initialSuiteId}
             routeBound={openNewRun}
           />
-          <RunList projectId={projectId} ungrouped hasManualCases={project?.hasManualCases} />
+          <RunList projectId={projectId} hasManualCases={project?.hasManualCases} />
         </TabsPanel>
       </Tabs>
     </div>

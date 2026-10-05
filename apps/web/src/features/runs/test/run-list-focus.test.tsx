@@ -19,12 +19,12 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-async function renderList({ ungrouped = true } = {}) {
+async function renderList() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } })
 
   const view = render(
     <QueryClientProvider client={client}>
-      <RunList projectId="proj-1" ungrouped={ungrouped} />
+      <RunList projectId="proj-1" />
     </QueryClientProvider>,
   )
   await waitFor(() => expect(listRuns).toHaveBeenCalledTimes(1))
@@ -33,7 +33,7 @@ async function renderList({ ungrouped = true } = {}) {
 }
 
 async function renderPage() {
-  listRuns.mockResolvedValue(mixedPage())
+  listRuns.mockResolvedValue(fullPage())
   const view = await renderList()
   await screen.findByText('Run manual-1')
 
@@ -60,14 +60,10 @@ function runSummary(id: string, overrides: Partial<RunSummaryRecord> = {}): RunS
   }
 }
 
-function mixedPage() {
+function fullPage() {
   return {
-    items: [
-      runSummary('manual-1'),
-      runSummary('ci-1', { source: 'github_actions', status: 'fail', commitSha: 'b1e4d90aaaa' }),
-      runSummary('api-1', { source: 'api' }),
-    ],
-    nextCursor: 'api-1',
+    items: [runSummary('manual-1'), runSummary('manual-2', { status: 'fail' })],
+    nextCursor: 'manual-2',
   }
 }
 
@@ -81,7 +77,7 @@ describe('RunList focus', () => {
 
     const rows = screen.getAllByRole('link')
 
-    expect(rows).toHaveLength(3)
+    expect(rows).toHaveLength(2)
     for (const row of rows) {
       expectFocusRing(row, { inset: true })
       expect(row).not.toHaveClass('focus-visible:ring-offset-2')
@@ -91,8 +87,9 @@ describe('RunList focus', () => {
   it('gives the source icons an offset ring, since they sit inside the padding of the row', async () => {
     await renderPage()
 
-    const icons = [screen.getByLabelText('CI'), screen.getByLabelText('Manual')]
+    const icons = screen.getAllByLabelText('Manual')
 
+    expect(icons).toHaveLength(2)
     for (const icon of icons) {
       expectFocusRing(icon)
       expect(icon).toHaveClass('focus-visible:ring-offset-2')
@@ -109,21 +106,7 @@ describe('RunList focus', () => {
   it('carries a ring on every focusable element of a full page', async () => {
     const { container } = await renderPage()
 
-    expectEveryFocusableToCarryARing(container, 6)
-  })
-
-  it('carries a ring on both links of the default empty state, away from any clipped edge', async () => {
-    listRuns.mockResolvedValue({ items: [] })
-    const { container } = await renderList({ ungrouped: false })
-
-    const links = screen.getAllByRole('link')
-
-    expect(links).toHaveLength(2)
-    for (const link of links) {
-      expect(link).toHaveClass('focus-visible:ring-offset-2')
-      expect(link).not.toHaveClass('focus-visible:ring-inset')
-    }
-    expectEveryFocusableToCarryARing(container, 2)
+    expectEveryFocusableToCarryARing(container, 5)
   })
 
   it('carries a ring on the start link of the Manual empty state, away from any clipped edge', async () => {

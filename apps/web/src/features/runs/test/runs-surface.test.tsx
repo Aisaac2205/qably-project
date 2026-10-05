@@ -101,7 +101,7 @@ describe('runs surface hover', () => {
     vi.mocked(listRuns).mockResolvedValue({ items: [runSummary('m1'), runSummary('m2')] })
     render(
       <QueryClientProvider client={createClient()}>
-        <RunList projectId={PROJECT} ungrouped />
+        <RunList projectId={PROJECT} />
       </QueryClientProvider>,
     )
 
@@ -133,7 +133,7 @@ describe('runs surface hover', () => {
     vi.mocked(listRuns).mockResolvedValue({ items: [runSummary('m1')], nextCursor: 'm1' })
     render(
       <QueryClientProvider client={createClient()}>
-        <RunList projectId={PROJECT} ungrouped />
+        <RunList projectId={PROJECT} />
       </QueryClientProvider>,
     )
 

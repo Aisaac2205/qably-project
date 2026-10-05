@@ -121,12 +121,12 @@ describe('the runs page tabs', () => {
       expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
     })
 
-    it('mounts only the Manual panel for tab=manual, ungrouped, and never asks for the CI runs', async () => {
+    it('mounts only the Manual panel for tab=manual, asking for manual runs only, and never asks for the CI runs', async () => {
       await renderPage({ tab: 'manual' })
 
       expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(manualRuns).toHaveBeenCalledWith(
-        { projectId: 'proj-1', source: undefined, limit: 25, cursor: undefined, ungrouped: true },
+        { projectId: 'proj-1', source: 'manual', limit: 25, cursor: undefined },
         expect.any(AbortSignal),
       )
       expect(ciRuns).not.toHaveBeenCalled()
@@ -145,7 +145,7 @@ describe('the runs page tabs', () => {
       expect(await screen.findByText('Run your manual cases')).toBeInTheDocument()
       expect(manualRuns).toHaveBeenCalledTimes(1)
       expect(manualRuns).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: 'proj-1', ungrouped: true }),
+        { projectId: 'proj-1', source: 'manual', limit: 25, cursor: undefined },
         expect.any(AbortSignal),
       )
       expect(screen.queryByRole('link', { name: /Fix flaky checkout/ })).not.toBeInTheDocument()

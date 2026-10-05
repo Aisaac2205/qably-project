@@ -16,15 +16,24 @@ describe('RunList', () => {
     vi.clearAllMocks()
   })
 
-  it('renders runs for a project', async () => {
+  it('renders the manual runs of a project', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
-    // proj-1 has 4 runs: run-12, run-11, run-10 (CI, titled by its commit message), run-9
+
     expect(screen.getByText('Run #12')).toBeInTheDocument()
     expect(screen.getByText('Run #11')).toBeInTheDocument()
-    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
-    expect(screen.getByText('Run #9')).toBeInTheDocument()
+  })
+
+  it('never lists an automated run, reported by CI or sent through the API', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" />)
+    })
+
+    expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
+    expect(screen.queryByText('Run #10')).not.toBeInTheDocument()
+    expect(screen.queryByText(/checkout button not disabling/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Fail')).not.toBeInTheDocument()
   })
 
   it('sorts runs by startedAt descending', async () => {
@@ -32,29 +41,26 @@ describe('RunList', () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
     const runNames = screen.getAllByText(/Run #/)
-    // run-12 has latest startedAt (2026-06-16)
+
     expect(runNames[0]).toHaveTextContent('Run #12')
-    // run-9 has oldest startedAt (2026-06-13)
-    expect(runNames[runNames.length - 1]).toHaveTextContent('Run #9')
+    expect(runNames[runNames.length - 1]).toHaveTextContent('Run #11')
   })
 
   it('renders status chips for each run', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
+
     expect(screen.getByText('Running')).toBeInTheDocument()
-    // Multiple runs with "Pass" status
-    const passChips = screen.getAllByText('Pass')
-    expect(passChips.length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('Fail')).toBeInTheDocument()
+    expect(screen.getByText('Pass')).toBeInTheDocument()
   })
 
   it('renders pass rate in mono font', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
-    // run-11 and run-9 finished with every case passing
     const passRates = screen.getAllByText('100%')
+
     expect(passRates.length).toBeGreaterThan(0)
     expect(passRates[0].className).toContain('font-mono')
   })
@@ -64,59 +70,16 @@ describe('RunList', () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
     const link = screen.getByRole('link', { name: /Run #12/ })
+
     expect(link.getAttribute('href')).toBe('/projects/proj-1/runs/run-12')
   })
 
-  it('shows empty state for project with no runs', async () => {
+  it('shows the manual empty state for a project with no manual runs', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-4" />)
     })
-    expect(screen.getByText('No runs yet')).toBeInTheDocument()
-  })
 
-  it('filters runs by source when source prop provided', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
-    })
-    // Only run-10 has source=github_actions; it's titled by its commit message, not "Run #10"
-    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
-    // run-11, run-9 have different sources — should NOT appear
-    expect(screen.queryByText('Run #12')).not.toBeInTheDocument()
-    expect(screen.queryByText('Run #11')).not.toBeInTheDocument()
-    expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
-  })
-
-  it('shows all runs when source prop omitted', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" />)
-    })
-    // No source filter — all 4 runs visible (run-10 is CI, titled by its commit message)
-    expect(screen.getByText('Run #12')).toBeInTheDocument()
-    expect(screen.getByText('Run #11')).toBeInTheDocument()
-    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
-    expect(screen.getByText('Run #9')).toBeInTheDocument()
-  })
-
-  it('shows empty state when source filter matches no runs', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" source="api" />)
-    })
-    // proj-1 has run-9 with source=api — so should show that
-    expect(screen.getByText('Run #9')).toBeInTheDocument()
-    // non-api runs should not appear
-    expect(screen.queryByText('Run #10')).not.toBeInTheDocument()
-  })
-
-  it('filters correctly for manual source', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" source="manual" />)
-    })
-    // run-12 and run-11 are manual
-    expect(screen.getByText('Run #12')).toBeInTheDocument()
-    expect(screen.getByText('Run #11')).toBeInTheDocument()
-    // github_actions and api runs should not appear
-    expect(screen.queryByText('Run #10')).not.toBeInTheDocument()
-    expect(screen.queryByText('Run #9')).not.toBeInTheDocument()
+    expect(screen.getByText('Run your manual cases')).toBeInTheDocument()
   })
 
   it('reads the suite name off the run, with no suites api mocked at all', async () => {
@@ -125,7 +88,6 @@ describe('RunList', () => {
     })
 
     expect(screen.getAllByText('Authentication').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Checkout').length).toBeGreaterThan(0)
   })
 
   it('hides the load-more control when the api reports no further page', async () => {
@@ -140,53 +102,40 @@ describe('RunList', () => {
 })
 
 describe('RunList evidence', () => {
-  it('shows the commit that produced a CI run', async () => {
+  it('shows the Qably mark instead of a text badge for a manual run', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
-    expect(screen.getByText('b1e4d90')).toBeInTheDocument()
-    expect(screen.getByText(/checkout button not disabling/i)).toBeInTheDocument()
-  })
 
-  it('leads a CI run with its suite name, not the commit message, so rows sharing a commit stay distinguishable', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
-    })
-    const link = screen.getByRole('link', { name: /checkout/i })
-    const title = link.querySelector('.font-semibold')
-    expect(title).toHaveTextContent('Checkout')
-    expect(screen.getByText(/checkout button not disabling/i)).toHaveClass('text-muted')
-  })
-
-  it('shows the GitHub Actions icon instead of a redundant "CI" badge for a CI run', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" source="github_actions" />)
-    })
-    expect(screen.queryByText('github actions')).not.toBeInTheDocument()
-    expect(screen.getByTitle('GitHub Actions')).toBeInTheDocument()
-  })
-
-  it('shows the Qably mark instead of a text badge for a manual run', async () => {
-    await act(async () => {
-      renderWithQuery(<RunList projectId="proj-1" source="manual" />)
-    })
     expect(screen.queryByText('manual')).not.toBeInTheDocument()
     expect(screen.getAllByTitle('Qably').length).toBeGreaterThan(0)
+  })
+
+  it('shows no automation icon or source badge, since an automated run never reaches this list', async () => {
+    await act(async () => {
+      renderWithQuery(<RunList projectId="proj-1" />)
+    })
+
+    expect(screen.queryByTitle('GitHub Actions')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('CI')).not.toBeInTheDocument()
+    expect(screen.queryByText('github actions')).not.toBeInTheDocument()
+    expect(screen.queryByText('api')).not.toBeInTheDocument()
   })
 
   it('omits the delta chip when a run has nothing to compare against', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
+
     expect(screen.queryByRole('group', { name: /changes since the previous run/i })).not.toBeInTheDocument()
   })
 
-  it('explains that CI fills the page and links to the reporting guide when there are no runs', async () => {
+  it('never points to the CI reporting guide, because CI runs do not appear here', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-empty" />)
     })
-    expect(screen.getByText(/ci fills this page automatically/i)).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: /how to report results from ci/i })
-    expect(link).toHaveAttribute('href', expect.stringContaining('#step-4-report-ci'))
+
+    expect(screen.queryByText(/ci fills this page automatically/i)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /how to report results from ci/i })).not.toBeInTheDocument()
   })
 })

@@ -1,23 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import type { RunSource, RunSummaryRecord } from '@qably/types'
+import type { RunSummaryRecord } from '@qably/types'
 import { useRunsPage } from '../hooks/use-runs'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StatusChip } from './status-chip'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
-import { docsUrl } from '@/lib/docs-url'
-import { GitCommit } from '@phosphor-icons/react'
-import { GithubActionsIcon } from '@/components/icons/github-actions-icon'
 import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
-import { formatPassRate, isCiRun, runTitleParts } from '../lib/format'
+import { formatPassRate, runTitleParts } from '../lib/format'
 import { RunDeltaChip } from './run-delta-chip'
-
-const REPORT_CI_ANCHOR = 'step-4-report-ci'
 
 function formatDate(iso: string): string {
   try {
@@ -40,8 +34,6 @@ function RunRow({
   projectId: string
 }) {
   const { t } = useTranslation()
-  const isCi = isCiRun(run)
-  const isManual = run.source === 'manual'
   const { title, subtitle } = runTitleParts(run, run.suiteName)
 
   return (
@@ -54,13 +46,6 @@ function RunRow({
         <div className="min-w-0">
           <div className="text-sm font-semibold text-default truncate">{title}</div>
           {subtitle && <div className="text-xs text-muted truncate mt-0.5">{subtitle}</div>}
-          {run.commitSha && (
-             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted min-w-0">
-               <GitCommit size={12} weight="bold" aria-hidden="true" className="shrink-0" />
-               <span className="font-mono text-default">{run.commitSha.slice(0, 7)}</span>
-               {!isCi && run.commitMessage && <span className="truncate">{run.commitMessage}</span>}
-             </div>
-          )}
         </div>
       </div>
 
@@ -69,31 +54,15 @@ function RunRow({
         <span className="text-sm font-semibold tabular-nums font-mono text-default w-12 text-right">
           {formatPassRate(run.passRate)}
         </span>
-        {isCi ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={<span tabIndex={0} aria-label={t('runs.sourceCi')} />}
-              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-brand-github-actions focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <GithubActionsIcon className="size-5" aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent>{t('runs.sourceCi')}</TooltipContent>
-          </Tooltip>
-        ) : isManual ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={<span tabIndex={0} aria-label={t('runs.sourceManual')} />}
-              className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-primary focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <QablyMarkIcon className="size-5" aria-hidden="true" />
-            </TooltipTrigger>
-            <TooltipContent>{t('runs.sourceManual')}</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Badge variant="outline" className="hidden sm:inline-flex font-normal text-xs">
-            {run.source.replace('_', ' ')}
-          </Badge>
-        )}
+        <Tooltip>
+          <TooltipTrigger
+            render={<span tabIndex={0} aria-label={t('runs.sourceManual')} />}
+            className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-primary focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <QablyMarkIcon className="size-5" aria-hidden="true" />
+          </TooltipTrigger>
+          <TooltipContent>{t('runs.sourceManual')}</TooltipContent>
+        </Tooltip>
         <div className="text-right hidden sm:block">
           <div className="text-xs font-medium text-default">{formatDate(run.startedAt)}</div>
           {run.finishedAt && (
@@ -107,39 +76,27 @@ function RunRow({
 
 function EmptyRunList({
   projectId,
-  ungrouped,
   hasManualCases,
 }: {
   projectId: string
-  ungrouped: boolean
   hasManualCases: boolean | undefined
 }) {
-  const { t, locale } = useTranslation()
+  const { t } = useTranslation()
 
   return (
     <StateView
       kind="empty"
-      title={t(ungrouped ? 'runs.ci.manualEmptyTitle' : 'runs.noRuns')}
-      description={t(ungrouped ? 'runs.ci.manualEmptyDescription' : 'runs.emptyDescription')}
+      title={t('runs.ci.manualEmptyTitle')}
+      description={t('runs.ci.manualEmptyDescription')}
       action={
-        <div className="flex flex-col items-center gap-2">
-          {!ungrouped && (
-            <a
-              href={docsUrl(REPORT_CI_ANCHOR, locale)}
-              className="rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {t('runs.emptyDocsLink')}
-            </a>
-          )}
-          {hasManualCases !== false && (
-            <Link
-              href={`/projects/${projectId}/runs/new`}
-              className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {t('runs.startARun')}
-            </Link>
-          )}
-        </div>
+        hasManualCases !== false ? (
+          <Link
+            href={`/projects/${projectId}/runs/new`}
+            className="rounded text-sm font-medium text-default hover:text-primary transition-colors focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            {t('runs.startARun')}
+          </Link>
+        ) : undefined
       }
     />
   )
@@ -147,30 +104,19 @@ function EmptyRunList({
 
 export function RunList({
   projectId,
-  source,
-  ungrouped,
   hasManualCases,
 }: {
   projectId: string
-  source?: RunSource
-  ungrouped?: boolean
   hasManualCases?: boolean
 }) {
   const { runs, hasNextPage, isFetchingNextPage, fetchNextPage } = useRunsPage(
     projectId,
-    source,
-    { ungrouped },
+    'manual',
   )
   const { t } = useTranslation()
 
   if (runs.length === 0) {
-    return (
-      <EmptyRunList
-        projectId={projectId}
-        ungrouped={ungrouped === true}
-        hasManualCases={hasManualCases}
-      />
-    )
+    return <EmptyRunList projectId={projectId} hasManualCases={hasManualCases} />
   }
 
   return (
