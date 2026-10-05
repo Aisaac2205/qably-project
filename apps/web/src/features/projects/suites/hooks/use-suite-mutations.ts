@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react'
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import type { Suite } from '@qably/types'
+import type { Project, Suite } from '@qably/types'
 import {
   confirmDocumentation,
   createCase,
@@ -63,12 +63,27 @@ function markProjectStale(queryClient: QueryClient, projectId: string) {
   })
 }
 
+function reflectManualCases(queryClient: QueryClient, suite: Suite) {
+  const hasActiveManualCase = suite.cases.some(
+    (entry) => entry.executionMode === 'manual' && entry.state === 'active',
+  )
+
+  if (!hasActiveManualCase) return
+
+  queryClient.setQueryData<Project>(projectKeys.detail(suite.projectId), (cached) =>
+    cached === undefined || cached.hasManualCases === true
+      ? undefined
+      : { ...cached, hasManualCases: true },
+  )
+}
+
 async function adoptSuite(queryClient: QueryClient, suite: Suite) {
   const detailKey = suiteKeys.detail(suite.id)
 
   await queryClient.cancelQueries({ queryKey: detailKey, exact: true })
   queryClient.setQueryData(detailKey, suite)
   patchSuiteList(queryClient, suite)
+  reflectManualCases(queryClient, suite)
   void invalidateSuiteList(queryClient, suite.projectId)
 }
 

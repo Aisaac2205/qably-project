@@ -406,6 +406,62 @@ describe('useCreateCase', () => {
     expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: suiteKeys.all })
   })
 
+  it('shows the first manual case at once by patching the cached project, without a request', async () => {
+    const { client } = setup()
+    client.setQueryData(projectKeys.detail('proj-1'), { ...project, hasManualCases: false })
+    create.mockResolvedValue(suiteWithNewCase)
+
+    const result = runMutation(client, useCreateCase, {
+      suiteId: 'suite-1',
+      payload: { name: 'Pays by voucher' },
+    })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(client.getQueryData<Project>(projectKeys.detail('proj-1'))?.hasManualCases).toBe(true)
+    expect(client.getQueryState(projectKeys.detail('proj-1'))?.isInvalidated).toBe(true)
+    expect(getProjectApi).not.toHaveBeenCalled()
+  })
+
+  it('leaves hasManualCases alone when the saved case is not an active manual case', async () => {
+    const { client } = setup()
+    client.setQueryData(projectKeys.detail('proj-1'), { ...project, hasManualCases: false })
+    create.mockResolvedValue(
+      producedSuite('suite-1', 'Checkout', [
+        producedCase('case-6', 'suite-1', 'Draft by hand', { state: 'draft' }),
+        producedCase('case-7', 'suite-1', 'Runs in CI', {
+          executionMode: 'automated',
+          state: 'active',
+        }),
+      ]),
+    )
+
+    const result = runMutation(client, useCreateCase, {
+      suiteId: 'suite-1',
+      payload: { name: 'Draft by hand' },
+    })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(client.getQueryData<Project>(projectKeys.detail('proj-1'))?.hasManualCases).toBe(false)
+  })
+
+  it('keeps hasManualCases true, only stale, after the last manual case is removed, since only the server knows', async () => {
+    const { client } = setup()
+    client.setQueryData(projectKeys.detail('proj-1'), { ...project, hasManualCases: true })
+    remove.mockResolvedValue(suiteWithoutCases)
+
+    const result = runMutation(client, useDeleteCase, { suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(client.getQueryData<Project>(projectKeys.detail('proj-1'))?.hasManualCases).toBe(true)
+    expect(client.getQueryState(projectKeys.detail('proj-1'))?.isInvalidated).toBe(true)
+  })
+
   it('adopts every saved case without refetching the observed detail or project', async () => {
     const { client } = setup()
     getSuiteApi.mockResolvedValue(suite)
