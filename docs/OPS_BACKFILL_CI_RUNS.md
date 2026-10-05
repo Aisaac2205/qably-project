@@ -5,21 +5,27 @@ Owner-run only. Never executed automatically by this codebase or by CI.
 ## Purpose
 
 Links runs that were ingested before the `ci_run` table existed, or by a reporter older than 10.1.0,
-to a `CiRun` row. Those runs have `run.ciRunId = NULL`, so they appear only under the Manual tab of the
-runs page and never under a CI run in the Actions tab.
+to a `CiRun` row, and gives the runs it can the `ciJobKey` of the job that reported them. Those runs
+have `run.ciRunId = NULL`, so they appear only under the Manual tab of the runs page and never under a
+CI run in the Actions tab.
 
-The reporter has always embedded the GitHub run id in `Run.externalId`, in the form
+The reporter has always embedded the GitHub run id and the job in `Run.externalId`, in the form
 `gha-{GITHUB_RUN_ID}-{job}-{file}-{hash}` (with a trailing `-p{n}` when a file was split). The script
-promotes that id to a `CiRun` row and links the runs that carry it. It derives nothing else from the
-id: `workflowName`, `runNumber`, `branch`, `actor` and the other `ci*` columns were never stored on
-`Run`, so a backfilled `CiRun` has them empty until a reporter at 10.1.0 or later reports the same
-GitHub run.
+promotes that id to a `CiRun` row, links the runs that carry it and recovers the job from the same id
+against the job keys the project already uses. It derives nothing else from the id: `workflowName`,
+`runNumber`, `branch`, `actor` and the other `ci*` columns were never stored on `Run`, so a backfilled
+`CiRun` has them empty until a reporter at 10.1.0 or later reports the same GitHub run.
+
+Runs that a reporter older than 10.1.0 sends from now on are linked by ingestion itself, from the same
+id (`docs/RUN_INGESTION.md`, "Linking from the external id"). The script exists for the history that
+arrived before that.
 
 ## What it does
 
 - Reads `run` rows with `ciRunId IS NULL` in `id` order, 500 per batch, using a keyset cursor on `id`.
   It never holds more than one batch, and never writes more than one batch of run ids in one statement.
-- Attributes a run when `externalId` matches `^gha-(\d+)-`. Anything else is **unattributable**:
+- Attributes a run when `externalId` matches `^gha-(\d+)-`, using the same `parseCiRunExternalId` as
+  ingestion. Anything else is **unattributable**:
   `gha-local-job-...` (a local reporter run), `gha-abc-...`, a `null` `externalId` (manual runs and runs
   posted by `POST /runs/ingest` with its own ids). Unattributable runs are counted and never modified.
 - Groups attributable runs by `(projectId, source, run id)` and creates one `CiRun` per group with the
@@ -27,9 +33,7 @@ GitHub run.
   group and `lastReportedAt` the latest. `commitSha`, `commitMessage` and `commitAuthor` are taken from
   the runs (the first non-null value of each field).
 - Links the runs with `updateMany` restricted to `ciRunId IS NULL` and writing only `ciRunId`. A run
-  that live ingestion linked after the batch was read is left as it is. `ciJobKey` is never written,
-  so adopted runs have no job; the web app lists their failing suites directly under the CI run header,
-  without a group heading, and puts the others behind a "Show N suites without failures" button.
+  that live ingestion linked after the batch was read is left as it is.
 - Reuses a `CiRun` that already exists for the same `(projectId, source, run id)`, which happens when
   the same GitHub run was also reported by a 10.1.0 reporter, or when a `CiRun` spans two batches. The
   existing row is widened (`startedAt` to the earlier value, `lastReportedAt` to the later one) and
@@ -40,6 +44,31 @@ GitHub run.
   ingestion changed the row in between, no row matches, the script reads it again, recomputes the merge
   from the fresh values and retries, up to 5 attempts. A value written by live ingestion after the read
   is therefore never replaced by an older one.
+- Skips a group that is still not resolved after those 5 attempts, because live ingestion keeps changing
+  its `CiRun`. None of the runs of that group are linked, the script logs the skip as it happens,
+  carries on with the next group and lists the skipped `CiRun` ids in the summary. It exits with code 2
+  so that a skip cannot be mistaken for a clean run. Running the script again resolves them.
+- Recovers the job key in a second phase, after every batch of unlinked runs was processed. It reads the
+  runs with `ciRunId IS NOT NULL`, `ciJobKey IS NULL` and `externalId LIKE 'gha-%'` in `id` order, 500
+  per batch with a keyset cursor, and resolves each one with `resolveCiJobKey` against the job keys of
+  its project: every distinct non-null `Run.ciJobKey` of the project, read once per project in an
+  execution. It writes with `updateMany` restricted to `ciJobKey IS NULL AND ciRunId IS NOT NULL`, one
+  statement per job key per batch, so it never overwrites a key and never gives a key to a run that is
+  not linked. This phase covers the runs the script just linked and also the runs linked earlier
+  without a key, such as the ones a previous pass linked before this phase existed, in `CiRun` rows
+  that the first phase no longer touches.
+- Never invents a job. `resolveCiJobKey` accepts a job key only when the project already uses it and
+  the id starts with `gha-{run id}-{key}-`, trying the key as written and its slug, and the longest key
+  wins (`build-web` over `build`). The id is never split on hyphens, because the job and the file slug
+  both contain them and a split would be a guess (`docs/RUN_INGESTION.md`, "Job key"). A run whose id
+  matches no known key, or ties between two keys, keeps `ciJobKey IS NULL` and is counted in "Linked
+  runs left without a job key". The web app lists such a run's failing suites directly under the CI run
+  header, without a group heading, and puts the others behind a "Show N suites without failures"
+  button.
+
+The keys come from the project's own data, so the script can set none for a project that has no run
+with a `ciJobKey` yet, which is the case until a reporter at 10.1.0 or later has reported once. Run the
+workflow once, then the script.
 
 `startedAt` and `lastReportedAt` mean different things depending on the origin of the row. For a row
 created by live ingestion they are the clock of the process that handled the first and the latest
@@ -54,21 +83,26 @@ the spread of its suites' start times, not the duration of the workflow.
 When nothing is ingested between two passes, the second one finds only unattributable runs: it creates
 0 `CiRun` rows, modifies 0 runs and prints the same unattributable count as the first pass.
 
+Job key recovery is idempotent in the same way: a second pass sets 0 job keys and reports the same
+"Linked runs left without a job key", unless a job key that the project did not use before has appeared
+in between.
+
 A later pass is not always a no-op. A reporter older than 10.1.0 (a vendored or pinned copy of
-`qably-report.mjs`) keeps producing runs whose `externalId` is attributable and whose `ciRunId` is
-`NULL`, and every pass links the ones that arrived since the previous one. Runs posted with `curl`, as
-in the public CI documentation, carry the bare GitHub run id as `externalId`, which does not match
-`^gha-(\d+)-`: they are unattributable, stay unlinked on every pass and keep appearing under the Manual
-tab.
+`qably-report.mjs`) produced runs whose `externalId` is attributable and whose `ciRunId` is `NULL`
+until ingestion started linking them from the id; every pass links the ones that arrived before that.
+Runs posted with `curl`, as in the public CI documentation, carry the bare GitHub run id as
+`externalId`, which does not match `^gha-(\d+)-`: they are unattributable, stay unlinked on every pass
+and keep appearing under the Manual tab.
 
 The script does not use a transaction across groups. Each group is a lookup, a create or an update,
 and a link. If the process stops between the create and the link, a `CiRun` without runs remains; the
 next pass finds it by its unique key, reuses it and links the runs. If live ingestion creates the same
 `CiRun` between the lookup and the create, the create fails on the unique constraint (`P2002`); the
 script catches that, reads the row again and merges into it as into any existing `CiRun`. Any other
-error on the create aborts the run. A group that is still not resolved after 5 attempts, because live
-ingestion keeps changing its `CiRun`, aborts the run with a non-zero code and an error that names the
-`CiRun`; none of its runs are linked, and running the script again resolves it.
+error on the create aborts the run with exit code 1. A group that is still not resolved after 5
+attempts, because live ingestion keeps changing its `CiRun`, does not abort it: it is skipped, none of
+its runs are linked, the run ends with exit code 2 and the summary names the `CiRun`. Running the
+script again resolves it.
 
 ## Pre-checks
 
@@ -81,14 +115,28 @@ ingestion keeps changing its `CiRun`, aborts the run with a non-zero code and an
 ```sql
 SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND "externalId" ~ '^gha-[0-9]+-';
 SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND ("externalId" IS NULL OR "externalId" !~ '^gha-[0-9]+-');
+SELECT count(*) FROM "run" WHERE "ciRunId" IS NOT NULL AND "ciJobKey" IS NULL AND "externalId" LIKE 'gha-%';
 ```
+
+The first is the number of runs it can link, the second the unattributable figure it will report, the
+third the number of already linked runs whose job key it will try to recover. Then list the job keys
+the script will resolve against, per project:
+
+```sql
+SELECT "projectId", "ciJobKey", count(*) FROM "run"
+  WHERE "ciJobKey" IS NOT NULL GROUP BY "projectId", "ciJobKey" ORDER BY "projectId", count(*) DESC;
+```
+
+A project missing from this list gets no job key from the script. When one key is a prefix of another
+(`build` and `build-web`), the longest match wins, so a run of the job `build` that reports a file named
+`web-junit.xml` is attributed to `build-web`: the id carries nothing that tells the two apart.
 
 ## Pre-run snapshot
 
 Take it immediately before the run, in the database the script will write to. It is what makes the
 rollback exact: it records which `CiRun` rows existed, their `startedAt`, `lastReportedAt` and commit
-fields, and which runs were already linked. Without it the rollback is approximate (see "Rollback
-without a snapshot").
+fields, and the `ciRunId` and `ciJobKey` of every run the script is able to write. Without it the
+rollback is approximate (see "Rollback without a snapshot").
 
 ```sql
 BEGIN ISOLATION LEVEL REPEATABLE READ;
@@ -99,14 +147,22 @@ CREATE TABLE backfill_snapshot.ci_run AS
   SELECT "id", "startedAt", "lastReportedAt", "commitSha", "commitMessage", "commitAuthor"
   FROM "ci_run";
 
-CREATE TABLE backfill_snapshot.linked_run AS
-  SELECT "id" FROM "run" WHERE "ciRunId" IS NOT NULL;
+CREATE TABLE backfill_snapshot.run_link AS
+  SELECT "id", "ciRunId", "ciJobKey" FROM "run"
+  WHERE "externalId" LIKE 'gha-%' AND ("ciRunId" IS NULL OR "ciJobKey" IS NULL);
 
 SELECT (SELECT count(*) FROM backfill_snapshot.ci_run) AS ci_runs,
-       (SELECT count(*) FROM backfill_snapshot.linked_run) AS linked_runs;
+       (SELECT count(*) FROM backfill_snapshot.run_link) AS candidate_runs;
 
 COMMIT;
 ```
+
+`run_link` holds every run whose `ciRunId` or `ciJobKey` the script can write, and only those. The
+script links a run only when it has no `ciRunId` and its `externalId` matches `^gha-(\d+)-`, and it
+sets a `ciJobKey` only on a linked run that has none and whose `externalId` starts with `gha-`. Both
+conditions are inside the `WHERE` above, and the values in the table are what the rollback restores.
+It replaces the `linked_run` table of earlier versions of this document, which could not say which
+`ciJobKey` values the script had written.
 
 The tables live in their own schema, outside the `public` schema that Prisma manages. Keep them until
 the result of the run is accepted, then remove them with `DROP SCHEMA backfill_snapshot CASCADE;`.
@@ -136,10 +192,30 @@ Unattributable (left untouched): 310
 CiRuns created: 295
 CiRuns updated: 2
 Runs linked: 3810
+Job keys set: 3790
+Linked runs left without a job key: 20
+Skipped groups: 0
 ```
 
 `Scanned` is every run read with `ciRunId IS NULL`. The unattributable runs stay unlinked and keep
-appearing under the Manual tab.
+appearing under the Manual tab. `Job keys set` counts every run that received a `ciJobKey`, linked in
+this pass or earlier. `Linked runs left without a job key` counts the linked runs with an `externalId`
+that starts with `gha-` that no known job key matched; it is not an error.
+
+Exit codes: 0 when the run completed with no skipped group, 1 when it refused to start or aborted on an
+error, 2 when it completed but skipped at least one group. A skip is logged when it happens and listed
+at the end:
+
+```
+Skipped github_actions CiRun 9120334455 of project cmg1abc: concurrent ingestion changed it in 5 consecutive attempts and none of its runs were linked.
+...
+Skipped groups: 1
+  github_actions 9120334455 (project cmg1abc)
+Run the script again to link the skipped groups.
+```
+
+A skipped group leaves every one of its runs unlinked and without a job key. Run the script again, in a
+quieter moment if the same group is skipped twice.
 
 ## Recommended order
 
@@ -152,11 +228,36 @@ appearing under the Manual tab.
    only way the compare-and-set update runs before the shared database: when every group creates its
    `CiRun`, no update is issued and `CiRuns updated` stays 0. The equality on the values it read has not
    run against a real Postgres, so expect `CiRuns updated` to be above 0 on this pass and check the
-   widened row by hand.
-2. Run it a second time on the same database and confirm `CiRuns created`, `CiRuns updated` and
-   `Runs linked` are all 0 and the unattributable count is unchanged.
-3. Only then take the pre-run snapshot and run it against the shared database. Practice the rollback
-   on the disposable database first: its statements have not been executed against a real database.
+   widened row by hand. For the job key, the database needs at least one run with a `ciJobKey` in each
+   project, so that the project has a key to resolve against, and at least one run of a job that has
+   none, so that `Linked runs left without a job key` is above 0 once.
+2. Take the counts from "Pre-checks", then run it:
+
+   ```sh
+   DATABASE_URL="postgresql://...disposable..." \
+     pnpm --filter @qably/api exec ts-node --project tsconfig.json scripts/backfill-ci-runs.ts --confirm
+   echo "exit code: $?"
+   ```
+
+   Compare the output with the counts: `Runs linked` equals the first count, `Unattributable` the
+   second, and `Job keys set` plus `Linked runs left without a job key` equals the third count plus
+   `Runs linked`. Read the exit code: 0 expected, 2 means a group was skipped.
+3. Run it a second time on the same database and confirm `CiRuns created`, `CiRuns updated`,
+   `Runs linked` and `Job keys set` are all 0, the unattributable count and `Linked runs left without a
+   job key` are unchanged and the exit code is 0.
+4. Practice the rollback on the disposable database: its statements have not been executed against a
+   real database. Take the snapshot before step 2 for that, run the rollback after it and confirm the
+   counts of "Pre-checks" are back.
+5. Only then take the pre-run snapshot in the shared database and run the same command against it with
+   its `DATABASE_URL`:
+
+   ```sh
+   DATABASE_URL="postgresql://...shared..." \
+     pnpm --filter @qably/api exec ts-node --project tsconfig.json scripts/backfill-ci-runs.ts --confirm
+   echo "exit code: $?"
+   ```
+
+   Then run the queries of "How to verify".
 
 ## How to verify
 
@@ -164,19 +265,29 @@ appearing under the Manual tab.
 SELECT count(*) FROM "run" WHERE "ciRunId" IS NULL AND "externalId" ~ '^gha-[0-9]+-';
 -- expect 0, or only rows ingested after the run started
 
-SELECT count(*) FROM "run" WHERE "ciRunId" IS NOT NULL AND "ciJobKey" IS NULL;
--- expect the Runs linked figure from the output, plus live-linked runs that reported no job
+SELECT count(*) FROM "run" WHERE "ciRunId" IS NOT NULL AND "ciJobKey" IS NULL AND "externalId" LIKE 'gha-%';
+-- expect the "Linked runs left without a job key" figure from the output, plus live-linked runs that
+-- reported no job
+
+SELECT "projectId", "ciJobKey", count(*) FROM "run"
+  WHERE "ciJobKey" IS NOT NULL GROUP BY "projectId", "ciJobKey" ORDER BY "projectId", count(*) DESC;
+-- expect the same keys as before the run, with higher counts and no key that was not in the list
+
+SELECT count(*) FROM "run" WHERE "ciJobKey" IS NOT NULL AND "ciRunId" IS NULL;
+-- expect 0: a job key never exists without its CiRun
 ```
 
-In the web app, open the detail of an adopted CI run. Its failing suites, if any, appear directly under
-the header and the suites without failures sit behind a "Show N suites without failures" button. There
-is no group heading of any kind, and no group is named after an unidentified job.
+In the web app, open the detail of an adopted CI run. Its suites are grouped under the job that
+reported them, as in a CI run that a 10.1.0 reporter created. A suite that no known key matched appears
+directly under the header when it has failures, or behind the "Show N suites without failures"
+button, with no group heading, and no group is named after an unidentified job.
 
 ## Rollback
 
-The script writes two things: `ci_run` rows (it creates them, and it updates `startedAt`,
-`lastReportedAt` and the commit fields of ones that already exist) and `run.ciRunId`. It never writes
-`run.ciJobKey`. `run.ciRunId` is `ON DELETE SET NULL`, so deleting a `ci_run` row unlinks its runs.
+The script writes three things: `ci_run` rows (it creates them, and it updates `startedAt`,
+`lastReportedAt` and the commit fields of ones that already exist), `run.ciRunId` and `run.ciJobKey`.
+`run.ciRunId` is `ON DELETE SET NULL`, so deleting a `ci_run` row unlinks its runs but leaves their
+`ciJobKey`, which is why the statements below clear the job key in the same statement that unlinks.
 Run every block below inside a transaction, check the reported row counts, then `COMMIT` or `ROLLBACK`.
 
 ### Rollback with the snapshot
@@ -195,11 +306,10 @@ has to send it again.
 ```sql
 BEGIN;
 
-UPDATE "run" r SET "ciRunId" = NULL
-  WHERE r."ciRunId" IS NOT NULL
-    AND r."ciJobKey" IS NULL
-    AND r."externalId" ~ '^gha-[0-9]+-'
-    AND NOT EXISTS (SELECT 1 FROM backfill_snapshot.linked_run s WHERE s.id = r.id);
+UPDATE "run" r SET "ciRunId" = s."ciRunId", "ciJobKey" = s."ciJobKey"
+  FROM backfill_snapshot.run_link s
+  WHERE s.id = r.id
+    AND (r."ciRunId", r."ciJobKey") IS DISTINCT FROM (s."ciRunId", s."ciJobKey");
 
 DELETE FROM "ci_run" c
   WHERE NOT EXISTS (SELECT 1 FROM backfill_snapshot.ci_run s WHERE s.id = c.id)
@@ -218,33 +328,38 @@ UPDATE "ci_run" c SET
       (s."startedAt", s."lastReportedAt", s."commitSha", s."commitMessage", s."commitAuthor");
 ```
 
-1. The first statement unlinks the runs that were not linked in the snapshot. The snapshot is the
-   criterion. `ciJobKey IS NULL` and the `externalId` pattern only narrow it, because the script links
-   nothing else: it never writes a job key and attributes only ids that match the pattern. Neither of
-   them identifies the script's links on its own, since live ingestion also links runs without a job
-   key when a report sends `ciRunExternalId` and no `ciJobKey`.
+1. The first statement puts back the `ciRunId` and the `ciJobKey` that every run in `run_link` had when
+   the snapshot was taken. `run_link` holds the runs the script can write and nothing else, so the
+   statement reverses the links the script made (a `ciRunId` back to `NULL`) and the job keys it set,
+   on runs it linked and on runs that were already linked (a `ciJobKey` back to `NULL`), and leaves
+   every run that is not in the table alone. A run that ingestion created after the snapshot, linked
+   and with its job key, is not in it.
 2. The second statement deletes the `CiRun` rows that are not in the snapshot and have no run left. These
    are the rows the script created. A row that live ingestion created after the snapshot and that still
-   holds runs with a job key is kept.
+   holds runs is kept.
 3. The third statement restores `startedAt`, `lastReportedAt` and the commit fields of the `CiRun` rows
-   that already existed. Row counts to expect: the first statement about the `Runs linked` figure of the
-   script output, the second about `CiRuns created`, the third at most `CiRuns updated`.
+   that already existed. Row counts to expect: the first statement at least the `Runs linked` figure of
+   the script output and at most `Runs linked` plus `Job keys set`, the second about `CiRuns created`,
+   the third at most `CiRuns updated`.
 
-Limits of the rollback with the snapshot. Anything live ingestion wrote after the snapshot is
-indistinguishable from the script's work in the same rows. A run that live ingestion linked after the
-snapshot without a job key is unlinked by the first statement, and the third statement also reverts
-the `lastReportedAt` and commit fields that a live report wrote to a `CiRun` after the snapshot. If
-reports kept arriving between the snapshot and the rollback, drop `lastReportedAt` and the three commit
-fields from the third statement and restore `startedAt` only: ingestion never writes it. When the
-result is accepted, remove the snapshot with `DROP SCHEMA backfill_snapshot CASCADE;`.
+Limits of the rollback with the snapshot. Anything live ingestion wrote after the snapshot to a row
+that the snapshot covers is indistinguishable from the script's work in that row. A run in `run_link`
+that ingestion linked or keyed again after the snapshot, which only happens when a report of that same
+run is sent again, is put back to its snapshot values by the first statement. The third statement also
+reverts the `lastReportedAt` and commit fields that a live report wrote to a `CiRun` after the
+snapshot. If reports kept arriving between the snapshot and the rollback, drop `lastReportedAt` and the
+three commit fields from the third statement and restore `startedAt` only: ingestion never writes it.
+A run that ingestion created between the snapshot and the run of the script is not in the snapshot, so
+the first statement does not unlink it if the script linked it. Take the snapshot immediately before
+the run. When the result is accepted, remove the snapshot with `DROP SCHEMA backfill_snapshot CASCADE;`.
 
 ### Rollback without a snapshot
 
 Without a snapshot the script's changes cannot be separated from live ones, and part of them cannot be
 reverted at all:
 
-- Which runs the script linked is not recorded. `ciJobKey IS NULL` does not identify them: live
-  ingestion also links runs with no job key.
+- Which runs the script linked is not recorded, and neither is which job keys it wrote. A job key on a
+  linked run does not say who wrote it: the reporter and live ingestion write the same values.
 - Which `CiRun` rows the script created is not recorded.
 - The previous `startedAt`, `lastReportedAt` and commit fields of a `CiRun` that already existed are
   not recorded, so a widened `startedAt`, a raised `lastReportedAt` and filled commit fields cannot be
@@ -275,28 +390,39 @@ UPDATE "run" SET "ciJobKey" = NULL WHERE "ciJobKey" IS NOT NULL;
 DELETE FROM "ci_run";
 ```
 
-Remove only the `CiRun` rows that look like the script's: no workflow metadata and no run with a job
-key. A backfilled `CiRun` that a 10.1.0 reporter later updated has metadata and is kept:
+Remove only the `CiRun` rows that look like the script's: no workflow metadata. A backfilled `CiRun`
+that a 10.1.0 reporter later updated has metadata and is kept. The job keys of the runs of the rows
+that are deleted are cleared first, because deleting a row unlinks its runs and leaves their job key:
 
 ```sql
 BEGIN;
+UPDATE "run" r SET "ciJobKey" = NULL
+  WHERE r."ciJobKey" IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM "ci_run" c
+      WHERE c.id = r."ciRunId" AND c."workflowName" IS NULL AND c."runNumber" IS NULL AND c."branch" IS NULL
+    );
 DELETE FROM "ci_run" c
-  WHERE c."workflowName" IS NULL AND c."runNumber" IS NULL AND c."branch" IS NULL
-    AND NOT EXISTS (SELECT 1 FROM "run" r WHERE r."ciRunId" = c.id AND r."ciJobKey" IS NOT NULL);
+  WHERE c."workflowName" IS NULL AND c."runNumber" IS NULL AND c."branch" IS NULL;
 ```
 
-This second statement does not unlink the runs the script linked into a `CiRun` that already existed,
+This second variant does not unlink the runs the script linked into a `CiRun` that already existed,
 does not revert the widened `startedAt`, the raised `lastReportedAt` or the filled commit fields of
-those rows, and can delete a live `CiRun` that has no metadata and no run with a job key, for example
-one created by a report that sent only `ciRunExternalId`.
+those rows, does not clear the job keys the script wrote on runs of a `CiRun` that has metadata, and
+deletes every live `CiRun` that has no metadata, for example one created by a report that sent only
+`ciRunExternalId` or by ingestion linking a run of a reporter older than 10.1.0 from its id, together
+with the link and the job key of its runs.
 
 ## Verification status
 
-The grouping, merge, batching and idempotency rules are covered by unit tests against an in-memory
-port, and the Prisma calls (filters, ordering, the `ciRunId IS NULL` guard on the link) by unit tests
-against a mocked client. The script has not been executed against a real database as part of the
-change that introduced it, so the first run on a disposable database (see "Recommended order") is also
-its first real execution. The concurrent-write guard (the conditional update and the retry after a
-unique violation) is proven against an in-memory port and a mocked client, not against concurrent
-writers on a real database. The snapshot, the dump and the rollback statements have not been
-executed either.
+The grouping, merge, batching, skip and idempotency rules and the job key recovery are covered by unit
+tests against an in-memory port, and the Prisma calls (filters, ordering, the `ciRunId IS NULL` guard
+on the link, the `ciJobKey IS NULL AND ciRunId IS NOT NULL` guard on the job key, the `groupBy` that
+reads the known keys) by unit tests against a mocked client. The resolution of a job key from an
+external id is tested with ids produced by the reporter itself. The script has not been executed
+against a real database as part of the change that introduced it, so the first run on a disposable
+database (see "Recommended order") is also its first real execution. The concurrent-write guard (the
+conditional update and the retry after a unique violation) is proven against an in-memory port and a
+mocked client, not against concurrent writers on a real database. The snapshot, the dump and the
+rollback statements, including the restore of `ciJobKey` from `run_link`, have not been executed
+either.
