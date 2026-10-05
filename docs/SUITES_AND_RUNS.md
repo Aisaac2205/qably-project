@@ -77,11 +77,12 @@ An automated case carries its technical reference alongside the human-facing `na
 raw name the reporter emitted — `describe > it`, `ClassName testMethod`, `test_file.py::test_case`,
 whatever the tool produced), `automation_class_name` and `automation_file_path`. `automation_key` is the
 stable matching key across ingestions; `name` is free for a QA to rewrite into something readable without
-breaking the link back to CI. `ensureOfficialCases` (`runs.service.ts`) matches incoming JUnit cases by
-`automation_key` first, and only falls back to `name` for rows that are already `automated` but were
-created before this column existed — backfilling `automation_key` on that legacy row so the fallback is
-a one-time migration path, not a permanent second matching strategy. A `manual` case is never matched by
-name, so a QA's hand-written case cannot be absorbed into automation because a developer reused its title.
+breaking the link back to CI. `OfficialCaseReconciler` (`apps/api/src/modules/runs/official-case-reconciler.ts`)
+matches incoming JUnit cases by `automation_key` first, and only falls back to `name` for rows that are
+already `automated` but were created before this column existed — backfilling `automation_key` on that
+legacy row so the fallback is a one-time migration path, not a permanent second matching strategy. A
+`manual` case is never matched by name, so a QA's hand-written case cannot be absorbed into automation
+because a developer reused its title.
 
 The mode of pre-existing rows was derived per case, not per suite: a case is `automated` only if it
 appears in `run_case` rows of a non-manual run (migration `20260905195500_fix_execution_mode_backfill`
@@ -95,7 +96,7 @@ intent.
 
 Because `test_case` also has `@@unique([suiteId, name])`, a humanized title can collide with a name
 already taken in the suite — two different raw test names sometimes humanize to the same words. When that
-happens `ensureOfficialCases` keeps the raw `automation_key` as `name` instead of the humanized title
+happens `OfficialCaseReconciler` keeps the raw `automation_key` as `name` instead of the humanized title
 rather than failing the ingestion; the case is still fully linked and still editable, just less pretty
 until a person renames it by hand.
 
@@ -116,7 +117,7 @@ For the same reason `FILLER_PREFIXES` and `BDD_OPENERS` (`packages/test-naming/s
 Spanish and English entries in one set. The humanizer strips test scaffolding in whichever language the
 test was written in; it never picks an output language.
 
-Humanization also runs exactly once, when `ensureOfficialCases` first creates the case, and existing
+Humanization also runs exactly once, when `OfficialCaseReconciler` first creates the case, and existing
 cases are never re-humanized. That is deliberate: a title is editable, and a QA who renamed a case would
 lose that name to the next ingestion. The consequence is worth stating plainly — changing the humanizer
 never rewrites titles that already exist, it only affects cases created afterwards.
@@ -135,6 +136,45 @@ computed once server-side (`Project` has at least one `TestCase` with `execution
 runs form to snapshot either — every suite in it would answer the same `no-manual-cases` 409 the form
 already surfaces per-suite. This is not a second rule; it is the existing suite-level rule evaluated one
 level up, so a QA never has to click into a suite to learn what the project view could already tell them.
+
+### What a run case shows
+
+A `run_case` keeps what the reporter sent: the raw test name, and empty `steps` and `expected_result`,
+because JUnit carries neither. The linked `test_case` can hold more: a title and documentation that Aeris
+wrote and a person approved. `publishTestCaseVersion` overwrites `test_case.name` and bumps the version on
+approval; a proposal that is still `in_review` never touches `test_case`. The run detail reads both, and
+`resolveRunCase` (`apps/web/src/features/runs/lib/resolve-run-case.ts`) decides which one speaks for each
+field, so the case list and the case detail cannot disagree.
+
+| Run | Title, steps, expected result | Version badge | Aeris action |
+| --- | --- | --- | --- |
+| Manual | The `run_case` snapshot, exactly as copied at creation | Never | Never |
+| Automated (`api`, `github_actions`) with a linked case | The library case: its `name` (through `describeCase`, which falls back to the humanized `automation_key` when the name is blank), its `steps` and its `expected_result` | The linked case's current version, only once one is published | Only when the linked case is `automated` and has neither steps nor expected result |
+| Automated without a linked case | The humanized reported name and the `run_case` snapshot | Never | Never |
+
+For an automated run the reporter's raw name stays on a secondary line, in monospace, whenever it differs
+from the title after trimming and ignoring case. Status, duration, failure, skip reason and file path
+always come from the `run_case` row, whatever the library says.
+
+The split follows two rules from the thesis. An automated result is read-only evidence that keeps exactly
+what the tool reported (CONTEXT 4.7.3), so nothing is ever written onto a `run_case` to improve its title:
+the library is read when the run is displayed, through `RunCaseRecord.officialCase`, and the raw name is
+never hidden when it differs, because it is what the tool emitted and what a developer searches for. And
+only human-approved AI content is official (CONTEXT 4.3.4 b), so documentation reaches a run view only
+through `test_case`, which approval alone updates.
+
+The consequence is deliberate. In an automated run the title, the steps and the version badge reflect the
+library today, not the library at execution time. Nothing frozen is contradicted: JUnit recorded no steps,
+and renaming a case relabels a result without changing its verdict. A manual run is different. It is a
+record of what a person was asked to execute, so it keeps the snapshot (*Why `run_case` duplicates the
+case content*) and shows no badge. The badge copy lives under `runs.caseVersion` because it names the
+current library version, not a snapshot.
+
+The Aeris action is gated for the same reason as the empty state. The single-case documentation endpoint
+(`ExtractionService.enqueueDocumentCase`) rejects a case that is not automated, has a pending proposal or has no
+automation key, but not one that is already documented, and the extraction job spends an AI credit. Offering
+the action on a documented case would invite a second charge for content that already exists. On a manual
+run it would also end in a 409 `not-automated`, since only automated cases can be documented.
 
 ### Proactive pending-review state
 
@@ -167,13 +207,15 @@ Aeris proposal can replace a raw ingested name but never one a person chose.
 
 The foreign key is the only link between the two surfaces, and it is what makes traceability possible.
 `CASE_READ_SELECT` in `runs/lib/run-view.ts` projects it as `RunCaseRecord.officialCase`, carrying the
-linked case's id, suite, published version, documented steps and expected result.
+linked case's id, suite, published version, title (`name`), documented steps and expected result, and its
+`executionMode` with the automation key, class name and file path when it has them.
 
 `CASE_SELECT` deliberately does **not** carry that relation: two `createManyAndReturn` calls share it, and
 Prisma cannot select nested relations in that operation. Keep the read and write selects separate.
 
 A `run_case` with a null `test_case_id` is a case the platform saw execute but never adopted into a suite.
-The UI hides the version badge and the library link rather than inventing them.
+The UI hides the version badge and the library link rather than inventing them; *What a run case shows*
+describes which side supplies each field when the link exists.
 
 ## Case content, and the empty case
 
@@ -194,7 +236,7 @@ same way the UI already bounds objective/precondition text.
 
 A case with no steps is a normal, expected state. Three producers create it:
 
-1. `ensureOfficialCases` during CI ingestion, from a name in a JUnit report.
+1. `OfficialCaseReconciler` during CI ingestion, from a name in a JUnit report.
 2. `ExtractionService.seed`, which currently drafts a proposal titled with the changed file path.
 3. A person who created the case before writing it up.
 
