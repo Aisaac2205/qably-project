@@ -108,6 +108,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.useRealTimers()
   window.history.replaceState({}, '', '/')
 })
@@ -276,5 +277,152 @@ describe('useScrollRestoration', () => {
     page.advance(500)
 
     expect(page.main.scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('clamps to the bottom of what is reachable when the window ends and the target is still beyond it', () => {
+    const page = setup('/projects/p1/suites', 3000)
+    page.scrollTo(800)
+    page.push('/projects/p1/suites/s1', 1500)
+
+    page.traverse('/projects/p1/suites', 1000)
+    page.advance(1400)
+    expect(page.main.scrollTop).toBe(0)
+    page.advance(300)
+
+    expect(page.main.scrollTop).toBe(400)
+    expect(page.main.scrollTo).toHaveBeenLastCalledWith({ top: 400, behavior: 'instant' })
+
+    page.layout.contentHeight = 3000
+    page.advance(500)
+
+    expect(page.main.scrollTop).toBe(400)
+  })
+
+  describe.each([
+    ['while the route is still committing', false],
+    ['while the content is still loading', true],
+  ])('a keyboard or pointer interaction %s', (_phase, committed) => {
+    function startRestore() {
+      const page = setup('/projects/p1/suites', 3000)
+      page.scrollTo(800)
+      page.push('/projects/p1/suites/s1', 1500)
+      page.traverse('/projects/p1/suites', 600, committed)
+      page.advance(100)
+      return page
+    }
+
+    function finishRestore(page: ReturnType<typeof startRestore>) {
+      if (!committed) page.commit('/projects/p1/suites')
+      page.layout.contentHeight = 3000
+      page.advance(500)
+    }
+
+    it.each(['Tab', 'ArrowDown', 'ArrowUp', 'PageDown', 'Home', 'End', ' '])(
+      'cancels the restoration on the %j key',
+      (key) => {
+        const page = startRestore()
+
+        window.dispatchEvent(new KeyboardEvent('keydown', { key }))
+        finishRestore(page)
+
+        expect(page.main.scrollTo).not.toHaveBeenCalled()
+        expect(page.main.scrollTop).toBe(0)
+      },
+    )
+
+    it('cancels the restoration on a mouse wheel over the page still on screen', () => {
+      const page = startRestore()
+
+      window.dispatchEvent(new Event('wheel'))
+      finishRestore(page)
+
+      expect(page.main.scrollTo).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['Alt', { key: 'Alt' }],
+      ['Shift', { key: 'Shift' }],
+      ['a repeating arrow key held from the back shortcut', { key: 'ArrowLeft', repeat: true }],
+    ])('keeps restoring through %s, which the back shortcut leaves pressed', (_label, init) => {
+      const page = startRestore()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', init))
+      finishRestore(page)
+
+      expect(page.main.scrollTop).toBe(800)
+    })
+  })
+
+  it('forgets the oldest entry once more than 200 are remembered', () => {
+    const page = setup('/start', 3000)
+    for (let index = 0; index <= 200; index += 1) {
+      window.history.replaceState({}, '', `/entry/${index}`)
+      page.scrollTo(100 + index)
+    }
+
+    page.main.scrollTop = 900
+    page.traverse('/entry/0', 3000)
+    page.advance(100)
+    expect(page.main.scrollTop).toBe(0)
+
+    page.main.scrollTop = 900
+    page.traverse('/entry/1', 3000)
+    page.advance(100)
+    expect(page.main.scrollTop).toBe(101)
+  })
+
+  it('forgets a pending restore whose route never commits, and records positions again', () => {
+    const page = setup('/projects/p1/suites', 3000)
+    page.scrollTo(800)
+    page.push('/projects/p1/suites/s1', 1500)
+    page.traverse('/projects/p1/suites', 3000, false)
+    page.advance(3100)
+
+    page.scrollTo(500)
+    page.commit('/projects/p1/suites')
+    page.advance(200)
+    expect(page.main.scrollTo).not.toHaveBeenCalled()
+
+    page.push('/projects/p1/suites/s1', 1500)
+    page.traverse('/projects/p1/suites', 3000)
+    page.advance(100)
+
+    expect(page.main.scrollTop).toBe(500)
+  })
+
+  it('removes every interaction listener once the restoration has settled', () => {
+    const add = vi.spyOn(window, 'addEventListener')
+    const remove = vi.spyOn(window, 'removeEventListener')
+    const page = setup('/projects/p1/suites', 3000)
+    page.scrollTo(800)
+    page.push('/projects/p1/suites/s1', 1500)
+
+    page.traverse('/projects/p1/suites', 3000)
+    page.advance(500)
+
+    for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+      const added = add.mock.calls.filter(([name]) => name === type).length
+      const removed = remove.mock.calls.filter(([name]) => name === type).length
+      expect(added).toBeGreaterThan(0)
+      expect(removed).toBe(added)
+    }
+  })
+
+  it('removes every interaction listener when an interaction cancels a pending restore', () => {
+    const add = vi.spyOn(window, 'addEventListener')
+    const remove = vi.spyOn(window, 'removeEventListener')
+    const page = setup('/projects/p1/suites', 3000)
+    page.scrollTo(800)
+    page.push('/projects/p1/suites/s1', 1500)
+
+    page.traverse('/projects/p1/suites', 3000, false)
+    window.dispatchEvent(new Event('wheel'))
+
+    for (const type of ['wheel', 'touchstart', 'pointerdown', 'keydown']) {
+      const added = add.mock.calls.filter(([name]) => name === type).length
+      const removed = remove.mock.calls.filter(([name]) => name === type).length
+      expect(added).toBeGreaterThan(0)
+      expect(removed).toBe(added)
+    }
   })
 })

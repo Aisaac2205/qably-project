@@ -4,6 +4,7 @@ const SETTLED_FRAMES = 6
 const SETTLED_TOLERANCE_PX = 1
 const MAX_ENTRIES = 200
 const INTERACTION_EVENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown'] as const
+const MODIFIER_KEYS = new Set(['Alt', 'Control', 'Shift', 'Meta', 'OS', 'AltGraph'])
 
 export interface ScrollRestoration {
   commit: (pathname: string) => void
@@ -17,6 +18,7 @@ interface RestoreSession {
 interface PendingRestore {
   target: number
   timer: number
+  stopWatching: () => void
 }
 
 function locationKey(): string {
@@ -30,6 +32,32 @@ function jumpTo(container: HTMLElement, top: number) {
   }
 
   container.scrollTop = top
+}
+
+function maxScrollTop(container: HTMLElement): number {
+  return Math.max(0, container.scrollHeight - container.clientHeight)
+}
+
+function isDeliberateInteraction(event: Event): boolean {
+  if (!(event instanceof KeyboardEvent)) return true
+
+  return !event.repeat && !MODIFIER_KEYS.has(event.key)
+}
+
+function watchInteraction(onInteract: () => void): () => void {
+  function handle(event: Event) {
+    if (isDeliberateInteraction(event)) onInteract()
+  }
+
+  for (const type of INTERACTION_EVENTS) {
+    window.addEventListener(type, handle, { capture: true, passive: true })
+  }
+
+  return () => {
+    for (const type of INTERACTION_EVENTS) {
+      window.removeEventListener(type, handle, { capture: true })
+    }
+  }
 }
 
 function startRestoreSession(
@@ -47,14 +75,12 @@ function startRestoreSession(
 
     ended = true
     window.cancelAnimationFrame(frame)
-    for (const type of INTERACTION_EVENTS) {
-      window.removeEventListener(type, finish, { capture: true })
-    }
+    stopWatching()
     onEnd()
   }
 
   function step() {
-    const reachable = container.scrollHeight - container.clientHeight >= target
+    const reachable = maxScrollTop(container) >= target
 
     if (!reachable) {
       settledFrames = 0
@@ -65,7 +91,17 @@ function startRestoreSession(
       settledFrames += 1
     }
 
-    if (settledFrames >= SETTLED_FRAMES || performance.now() - startedAt >= RESTORE_WINDOW_MS) {
+    if (settledFrames >= SETTLED_FRAMES) {
+      finish()
+      return
+    }
+
+    if (performance.now() - startedAt >= RESTORE_WINDOW_MS) {
+      const furthest = maxScrollTop(container)
+
+      if (!reachable && Math.abs(container.scrollTop - furthest) > SETTLED_TOLERANCE_PX) {
+        jumpTo(container, furthest)
+      }
       finish()
       return
     }
@@ -73,9 +109,7 @@ function startRestoreSession(
     frame = window.requestAnimationFrame(step)
   }
 
-  for (const type of INTERACTION_EVENTS) {
-    window.addEventListener(type, finish, { capture: true, passive: true })
-  }
+  const stopWatching = watchInteraction(finish)
   step()
 
   return { stop: finish }
@@ -113,6 +147,7 @@ export function createScrollRestoration(
     if (pending === null) return
 
     window.clearTimeout(pending.timer)
+    pending.stopWatching()
     pending = null
   }
 
@@ -138,9 +173,8 @@ export function createScrollRestoration(
 
     pending = {
       target,
-      timer: window.setTimeout(() => {
-        pending = null
-      }, COMMIT_WAIT_MS),
+      timer: window.setTimeout(clearPending, COMMIT_WAIT_MS),
+      stopWatching: watchInteraction(clearPending),
     }
   }
 
