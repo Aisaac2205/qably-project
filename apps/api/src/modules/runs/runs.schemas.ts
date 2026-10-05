@@ -110,10 +110,6 @@ export const listRunsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().min(1).optional(),
   days: z.coerce.number().int().min(1).max(365).optional(),
-  ungrouped: z
-    .enum(['true', 'false'])
-    .transform((value) => value === 'true')
-    .optional(),
 });
 
 export const listCiRunsQuerySchema = z.object({

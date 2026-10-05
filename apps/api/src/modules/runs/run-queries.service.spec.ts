@@ -368,68 +368,33 @@ describe('RunQueriesService.list', () => {
   });
 });
 
-describe('RunQueriesService.list ungrouped', () => {
-  it('filters to runs with no CI run link when ungrouped is true', async () => {
+describe('RunQueriesService.list source filter', () => {
+  it('filters to manual runs and never on the CI run link', async () => {
     const prisma = createPrisma();
 
-    await build(prisma).list(org, { ungrouped: true });
-
-    expect(prisma.run.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: 'org-1', ciRunId: null },
-      }),
-    );
-  });
-
-  it('combines the link filter with the project and source filters', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).list(org, {
-      projectId: 'project-1',
-      source: 'api',
-      ungrouped: true,
-    });
-
-    expect(prisma.run.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          organizationId: 'org-1',
-          projectId: 'project-1',
-          source: 'api',
-          ciRunId: null,
-        },
-      }),
-    );
-  });
-
-  it('filters on the link and never on github_actions as a source', async () => {
-    const prisma = createPrisma();
-
-    await build(prisma).list(org, { ungrouped: true });
+    await build(prisma).list(org, { projectId: 'project-1', source: 'manual' });
 
     const [[args]] = prisma.run.findMany.mock.calls as [
       [{ where: Record<string, unknown> }],
     ];
-    expect(args.where).not.toHaveProperty('source');
+    expect(args.where).toEqual({
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      source: 'manual',
+    });
+    expect(args.where).not.toHaveProperty('ciRunId');
   });
 
-  it.each([
-    ['false', { ungrouped: false }],
-    ['absent', {}],
-  ])(
-    'leaves the link filter out when ungrouped is %s',
-    async (_label, query) => {
-      const prisma = createPrisma();
+  it('leaves the source and the CI run link out when the query names neither', async () => {
+    const prisma = createPrisma();
 
-      await build(prisma).list(org, query);
+    await build(prisma).list(org, {});
 
-      const [[args]] = prisma.run.findMany.mock.calls as [
-        [{ where: Record<string, unknown> }],
-      ];
-      expect(args.where).toEqual({ organizationId: 'org-1' });
-      expect(args.where).not.toHaveProperty('ciRunId');
-    },
-  );
+    const [[args]] = prisma.run.findMany.mock.calls as [
+      [{ where: Record<string, unknown> }],
+    ];
+    expect(args.where).toEqual({ organizationId: 'org-1' });
+  });
 });
 
 describe('RunQueriesService.suiteMetrics', () => {

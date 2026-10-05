@@ -674,44 +674,30 @@ describe('ingestRunSchema ci fields', () => {
   });
 });
 
-describe('listRunsQuerySchema ungrouped', () => {
-  it('reads the string true as the boolean true', () => {
-    const result = listRunsQuerySchema.safeParse({ ungrouped: 'true' });
+describe('listRunsQuerySchema source filter', () => {
+  it.each(['manual', 'api', 'github_actions'])(
+    'accepts source=%s',
+    (source) => {
+      const result = listRunsQuerySchema.safeParse({ source });
 
-    expect(result.success && result.data.ungrouped).toBe(true);
+      expect(result.success && result.data.source).toBe(source);
+    },
+  );
+
+  it('rejects a source that is not a run source', () => {
+    expect(listRunsQuerySchema.safeParse({ source: 'ci' }).success).toBe(false);
   });
 
-  it('reads the string false as the boolean false, never as true', () => {
-    const result = listRunsQuerySchema.safeParse({ ungrouped: 'false' });
-
-    expect(result.success).toBe(true);
-    expect(result.success && result.data.ungrouped).toBe(false);
-  });
-
-  it('leaves ungrouped undefined when the query omits it', () => {
-    const result = listRunsQuerySchema.safeParse({ projectId: 'project-1' });
-
-    expect(result.success).toBe(true);
-    expect(result.success && result.data.ungrouped).toBeUndefined();
-  });
-
-  it.each(['maybe', '1', 'TRUE', ''])('rejects ungrouped=%j', (value) => {
-    expect(listRunsQuerySchema.safeParse({ ungrouped: value }).success).toBe(
-      false,
-    );
-  });
-
-  it('combines with projectId and source', () => {
+  it('ignores the retired ungrouped parameter instead of reading it', () => {
     const result = listRunsQuerySchema.safeParse({
       projectId: 'project-1',
-      source: 'api',
+      source: 'manual',
       ungrouped: 'true',
     });
 
     expect(result.success && result.data).toEqual({
       projectId: 'project-1',
-      source: 'api',
-      ungrouped: true,
+      source: 'manual',
     });
   });
 });

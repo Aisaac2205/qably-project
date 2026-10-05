@@ -204,12 +204,12 @@ describe('Runs queries (e2e)', () => {
     );
   });
 
-  describe('ungrouped filter', () => {
+  describe('source filter', () => {
     const suite = { name: 'Checkout' };
-    const unlinkedActions = {
+    const manual = {
       ...runRow,
-      id: 'run-unlinked-actions',
-      source: 'github_actions' as const,
+      id: 'run-manual',
+      source: 'manual' as const,
       ciRunId: null,
       suite,
     };
@@ -220,18 +220,11 @@ describe('Runs queries (e2e)', () => {
       ciRunId: null,
       suite,
     };
-    const linked = {
+    const linkedActions = {
       ...runRow,
-      id: 'run-linked',
+      id: 'run-linked-actions',
       source: 'github_actions' as const,
       ciRunId: 'ci-run-1',
-      suite,
-    };
-    const linkedApi = {
-      ...runRow,
-      id: 'run-linked-api',
-      source: 'api' as const,
-      ciRunId: 'ci-run-2',
       suite,
     };
 
@@ -240,7 +233,7 @@ describe('Runs queries (e2e)', () => {
     }
 
     beforeEach(() => {
-      const rows = [unlinkedActions, unlinkedApi, linked, linkedApi];
+      const rows = [manual, unlinkedApi, linkedActions];
       prisma.run.findMany.mockImplementation(({ where }: FindManyArgs) =>
         Promise.resolve(
           rows.filter(
@@ -256,45 +249,36 @@ describe('Runs queries (e2e)', () => {
       return (body as { items: { id: string }[] }).items.map((item) => item.id);
     }
 
-    it('lists unlinked runs of any source and never a linked one', async () => {
+    it('lists only manual runs for source=manual, never an automated run without a CI run', async () => {
       const response = await request(app.getHttpServer())
-        .get('/runs?projectId=project-1&ungrouped=true')
+        .get('/runs?projectId=project-1&source=manual')
+        .expect(200);
+
+      expect(idsOf(response.body)).toEqual(['run-manual']);
+    });
+
+    it('lists every run when no source is named', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/runs')
         .expect(200);
 
       expect(idsOf(response.body)).toEqual([
-        'run-unlinked-actions',
+        'run-manual',
         'run-unlinked-api',
+        'run-linked-actions',
       ]);
     });
 
-    it('narrows the unlinked runs by source', async () => {
+    it('no longer reads ungrouped, so the retired parameter filters nothing', async () => {
       const response = await request(app.getHttpServer())
-        .get('/runs?projectId=project-1&source=api&ungrouped=true')
+        .get('/runs?ungrouped=true')
         .expect(200);
 
-      expect(idsOf(response.body)).toEqual(['run-unlinked-api']);
-    });
-
-    it.each(['/runs?ungrouped=false', '/runs'])(
-      'lists every run for %s',
-      async (path) => {
-        const response = await request(app.getHttpServer())
-          .get(path)
-          .expect(200);
-
-        expect(idsOf(response.body)).toEqual([
-          'run-unlinked-actions',
-          'run-unlinked-api',
-          'run-linked',
-          'run-linked-api',
-        ]);
-      },
-    );
-
-    it('answers 400 for a value that is not true or false', async () => {
-      await request(app.getHttpServer())
-        .get('/runs?ungrouped=maybe')
-        .expect(400);
+      expect(idsOf(response.body)).toEqual([
+        'run-manual',
+        'run-unlinked-api',
+        'run-linked-actions',
+      ]);
     });
   });
 
