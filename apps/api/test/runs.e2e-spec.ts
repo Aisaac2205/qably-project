@@ -126,7 +126,7 @@ describe('Runs ingestion (e2e)', () => {
       createMany: jest.fn(),
       update: jest.fn(),
     },
-    run: { upsert: jest.fn() },
+    run: { upsert: jest.fn(), groupBy: jest.fn() },
     ciRun: { upsert: jest.fn() },
     runCase: {
       deleteMany: jest.fn(),
@@ -166,6 +166,7 @@ describe('Runs ingestion (e2e)', () => {
     prisma.testCase.createMany.mockResolvedValue({ count: 0 });
     prisma.testCase.update.mockResolvedValue(officialCases[0]);
     prisma.run.upsert.mockResolvedValue(runRow);
+    prisma.run.groupBy.mockResolvedValue([]);
     prisma.ciRun.upsert.mockResolvedValue({ id: 'ci-1' });
     prisma.runCase.deleteMany.mockResolvedValue({ count: 0 });
     prisma.runCase.createManyAndReturn.mockResolvedValue([runCaseRow()]);
@@ -412,6 +413,86 @@ describe('Runs ingestion (e2e)', () => {
       expect(call.create).toEqual(expect.objectContaining(link));
       expect(call.update).toEqual(expect.objectContaining(link));
       expect(response.body).toHaveProperty('ciRunId', 'ci-1');
+    });
+
+    describe('a report that sends no ci fields but carries the run id in its external id', () => {
+      const staleBody = {
+        ...validBody,
+        externalId: reportExternalId,
+        source: 'github_actions',
+      };
+
+      const expectLinkedToApiJob = () => {
+        expect(prisma.ciRun.upsert).toHaveBeenCalledTimes(1);
+        expect(prisma.ciRun.upsert).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              projectId_source_externalId: {
+                projectId: 'project-1',
+                source: 'github_actions',
+                externalId: '900',
+              },
+            },
+          }),
+        );
+        const [call] = prisma.run.upsert.mock.calls[0] as [
+          { create: object; update: object },
+        ];
+        const link = { ciRunId: 'ci-1', ciJobKey: 'api' };
+        expect(call.create).toEqual(expect.objectContaining(link));
+        expect(call.update).toEqual(expect.objectContaining(link));
+      };
+
+      it('links a run posted to the json route and keeps the job known from the project', async () => {
+        prisma.run.groupBy.mockResolvedValue([{ ciJobKey: 'api' }]);
+        prisma.run.upsert.mockResolvedValue({ ...runRow, ciRunId: 'ci-1' });
+
+        const response = await request(app.getHttpServer())
+          .post('/runs/ingest')
+          .set('Authorization', `Bearer ${generated.token}`)
+          .send(staleBody)
+          .expect(200);
+
+        expectLinkedToApiJob();
+        expect(response.body).toHaveProperty('ciRunId', 'ci-1');
+      });
+
+      it('links a queued junit report once the worker ingests it', async () => {
+        prisma.run.groupBy.mockResolvedValue([{ ciJobKey: 'api' }]);
+
+        await postJunit(
+          `externalId=${reportExternalId}&source=github_actions`,
+        ).expect(202);
+        const [body] = enqueuedBodies();
+        expect(Object.keys(body).filter((key) => key.startsWith('ci'))).toEqual(
+          [],
+        );
+
+        await app.get(RunsService).ingest(
+          {
+            apiKeyId: 'key-1',
+            projectId: 'project-1',
+            organizationId: 'org-1',
+          },
+          body as unknown as IngestRunInput,
+        );
+
+        expectLinkedToApiJob();
+      });
+
+      it('leaves a local reporter run unlinked', async () => {
+        await request(app.getHttpServer())
+          .post('/runs/ingest')
+          .set('Authorization', `Bearer ${generated.token}`)
+          .send({
+            ...staleBody,
+            externalId: 'gha-local-job-junit-unit-xml-3425dd6f',
+          })
+          .expect(200);
+
+        expect(prisma.ciRun.upsert).not.toHaveBeenCalled();
+        expect(prisma.run.groupBy).not.toHaveBeenCalled();
+      });
     });
 
     it.each([
