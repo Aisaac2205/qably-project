@@ -24,6 +24,16 @@ export function projectRunPath(projectId: string, runId: string): string {
   return `/projects/${projectId}/runs/${runId}`
 }
 
+export function projectRunsPath(projectId: string, tab?: 'actions' | 'manual'): string {
+  const base = `/projects/${projectId}/runs`
+
+  return tab === undefined ? base : `${base}?tab=${tab}`
+}
+
+export function projectCiRunPath(projectId: string, ciRunId: string): string {
+  return `/projects/${projectId}/runs/ci/${ciRunId}`
+}
+
 export function suiteNewPath(projectId: string): string {
   return `/projects/${projectId}/suites/new`
 }

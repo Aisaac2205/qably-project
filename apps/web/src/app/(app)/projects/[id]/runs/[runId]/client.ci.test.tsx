@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RunRecord } from '@qably/types'
 import { getCiRun } from '@/features/runs/api/ci-runs.api'
 import { getRun } from '@/features/runs/api/runs.api'
@@ -36,6 +37,12 @@ vi.mock('next/link', () => ({
       {children}
     </a>
   ),
+}))
+
+const mockPush = vi.fn()
+const mockBack = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush, back: mockBack }),
 }))
 
 const run = vi.mocked(getRun)
@@ -296,5 +303,43 @@ describe('the way back to the runs list', () => {
     for (const link of links) {
       expect(link).toHaveAttribute('href', MANUAL_LIST)
     }
+  })
+})
+
+describe('the back button of a run that belongs to a CI run', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('falls back to its CI run, the parent in the breadcrumb, for a deep link', async () => {
+    vi.spyOn(window.history, 'length', 'get').mockReturnValue(1)
+    run.mockResolvedValue(runRecord({ ciRunId: 'c1' }))
+    ciRun.mockResolvedValue(ciRunDetail([], { id: 'c1', runNumber: 42 }))
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByRole('link', { name: 'CI #42' })
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(mockBack).not.toHaveBeenCalled()
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-1/runs/ci/c1')
+  })
+
+  it('goes back through history, so the list or the CI run it came from keeps its scroll position', async () => {
+    vi.spyOn(window.history, 'length', 'get').mockReturnValue(4)
+    run.mockResolvedValue(runRecord({ ciRunId: 'c1' }))
+    ciRun.mockResolvedValue(ciRunDetail([], { id: 'c1', runNumber: 42 }))
+    const user = userEvent.setup()
+
+    renderPage()
+    await screen.findByRole('link', { name: 'CI #42' })
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(mockBack).toHaveBeenCalledTimes(1)
+    expect(mockPush).not.toHaveBeenCalled()
   })
 })

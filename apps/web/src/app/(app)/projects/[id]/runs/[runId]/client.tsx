@@ -6,11 +6,13 @@ import { useCiRun } from '@/features/runs/hooks/use-ci-runs'
 import { useCiRunLabel } from '@/features/runs/hooks/use-ci-run-label'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
+import { BackButton } from '@/components/ui/back-button'
 import { ArrowLeft } from '@phosphor-icons/react'
 import { RunDetail } from '@/features/runs/components/run-detail'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
-import { projectRootPath } from '@/features/projects/lib/routes'
+import { projectCiRunPath, projectRootPath, projectRunsPath } from '@/features/projects/lib/routes'
+import { useGoBack } from '@/hooks/use-go-back'
 
 export function RunDetailPageClient({
   projectId,
@@ -27,6 +29,9 @@ export function RunDetailPageClient({
   const runsHref = run?.ciRunId
     ? `/projects/${projectId}/runs`
     : `/projects/${projectId}/runs?tab=manual`
+  const goBack = useGoBack(
+    run?.ciRunId ? projectCiRunPath(projectId, run.ciRunId) : projectRunsPath(projectId, 'manual'),
+  )
 
   if (isLoading) {
     return (
@@ -63,17 +68,21 @@ export function RunDetailPageClient({
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
-      <Breadcrumbs
-        items={[
-          { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-          { label: t('runs.title'), href: runsHref },
-          ...(ciRunLabel !== undefined
-            ? [{ label: ciRunLabel, href: `/projects/${projectId}/runs/ci/${run.ciRunId}` }]
-            : []),
-          { label: run.name },
-        ]}
-      />
+      <div className="flex min-w-0 items-center gap-1.5">
+        <BackButton onClick={goBack} />
+        <Breadcrumbs
+          className="hidden md:flex"
+          items={[
+            { label: t('suites.breadcrumbProjects'), href: '/projects' },
+            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+            { label: t('runs.title'), href: runsHref },
+            ...(ciRunLabel !== undefined
+              ? [{ label: ciRunLabel, href: `/projects/${projectId}/runs/ci/${run.ciRunId}` }]
+              : []),
+            { label: run.name },
+          ]}
+        />
+      </div>
       <RunDetail projectId={projectId} run={run} />
     </div>
   )

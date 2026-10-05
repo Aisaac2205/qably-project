@@ -49,6 +49,7 @@ import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confir
 import { useDocumentationWatch } from '@/features/projects/suites/hooks/use-documentation-watch'
 import { useDocumentationFeedback } from '@/features/projects/suites/hooks/use-documentation-feedback'
 import { notify } from '@/lib/notify'
+import { useGoBack } from '@/hooks/use-go-back'
 import type { DocumentFilesMode } from './document-with-aeris'
 import { isDocumentationBusy, isOutcomeIncomplete } from '@/features/projects/suites/lib/documentation-state'
 
@@ -68,6 +69,7 @@ function watchedCount(
 
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
+  const goBack = useGoBack(projectSuitesPath(projectId))
   const { t } = useTranslation()
   const [watchedMode, setWatchedMode] = useState<DocumentFilesMode>('undocumented')
   const watch = useDocumentationWatch()
@@ -179,15 +181,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
       <div className="flex min-w-0 items-center gap-1.5">
-        <BackButton
-          onClick={() => {
-            if (window.history.length > 1) {
-              router.back()
-            } else {
-              router.push(projectSuitesPath(projectId))
-            }
-          }}
-        />
+        <BackButton onClick={goBack} />
         <Breadcrumbs
           className="hidden md:flex"
           items={[

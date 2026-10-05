@@ -5,13 +5,15 @@ import Link from 'next/link'
 import { ArrowLeft } from '@phosphor-icons/react'
 import type { CiRunDetailRecord } from '@qably/types'
 import { Breadcrumbs } from '@/components/shell/breadcrumbs'
+import { BackButton } from '@/components/ui/back-button'
 import { buttonVariants } from '@/components/ui/button'
 import { StateView } from '@/components/ui/state-view'
 import { CiRunDetail } from '@/features/runs/components/ci-run-detail'
 import { useCiRunLabel } from '@/features/runs/hooks/use-ci-run-label'
 import { useCiRun } from '@/features/runs/hooks/use-ci-runs'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { projectRootPath } from '@/features/projects/lib/routes'
+import { projectRootPath, projectRunsPath } from '@/features/projects/lib/routes'
+import { useGoBack } from '@/hooks/use-go-back'
 import { ApiError } from '@/lib/api-client'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -29,17 +31,22 @@ function PageFrame({
 }) {
   const { t } = useTranslation()
   const { project } = useProject(projectId)
+  const goBack = useGoBack(projectRunsPath(projectId))
 
   return (
     <div className={PAGE_CLASS}>
-      <Breadcrumbs
-        items={[
-          { label: t('suites.breadcrumbProjects'), href: '/projects' },
-          ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-          { label: t('runs.title'), href: `/projects/${projectId}/runs` },
-          { label: current },
-        ]}
-      />
+      <div className="flex min-w-0 items-center gap-1.5">
+        <BackButton onClick={goBack} />
+        <Breadcrumbs
+          className="hidden md:flex"
+          items={[
+            { label: t('suites.breadcrumbProjects'), href: '/projects' },
+            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+            { label: t('runs.title'), href: projectRunsPath(projectId) },
+            { label: current },
+          ]}
+        />
+      </div>
       <h1 className="sr-only">{current}</h1>
       {children}
     </div>
