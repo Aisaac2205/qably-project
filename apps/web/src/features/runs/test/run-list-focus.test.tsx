@@ -84,16 +84,15 @@ describe('RunList focus', () => {
     }
   })
 
-  it('gives the source icons an offset ring, since they sit inside the padding of the row', async () => {
+  it('makes each row a single tab stop, with nothing focusable inside the link', async () => {
     await renderPage()
 
-    const icons = screen.getAllByLabelText('Manual')
+    const rows = screen.getAllByRole('link')
 
-    expect(icons).toHaveLength(2)
-    for (const icon of icons) {
-      expectFocusRing(icon)
-      expect(icon).toHaveClass('focus-visible:ring-offset-2')
-      expect(icon).not.toHaveClass('focus-visible:ring-inset')
+    expect(rows).toHaveLength(2)
+    for (const row of rows) {
+      expect(row.querySelectorAll('[tabindex]')).toHaveLength(0)
+      expect(row.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0)
     }
   })
 
@@ -106,7 +105,7 @@ describe('RunList focus', () => {
   it('carries a ring on every focusable element of a full page', async () => {
     const { container } = await renderPage()
 
-    expectEveryFocusableToCarryARing(container, 5)
+    expectEveryFocusableToCarryARing(container, 3)
   })
 
   it('carries a ring on the start link of the Manual empty state, away from any clipped edge', async () => {

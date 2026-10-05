@@ -4,12 +4,10 @@ import Link from 'next/link'
 import type { RunSummaryRecord } from '@qably/types'
 import { useRunsPage } from '../hooks/use-runs'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StatusChip } from './status-chip'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
-import { QablyMarkIcon } from '@/components/icons/qably-mark-icon'
 import { formatPassRate, runTitleParts } from '../lib/format'
 import { RunDeltaChip } from './run-delta-chip'
 
@@ -33,7 +31,6 @@ function RunRow({
   run: RunSummaryRecord
   projectId: string
 }) {
-  const { t } = useTranslation()
   const { title, subtitle } = runTitleParts(run, run.suiteName)
 
   return (
@@ -54,15 +51,6 @@ function RunRow({
         <span className="text-sm font-semibold tabular-nums font-mono text-default w-12 text-right">
           {formatPassRate(run.passRate)}
         </span>
-        <Tooltip>
-          <TooltipTrigger
-            render={<span tabIndex={0} aria-label={t('runs.sourceManual')} />}
-            className="hidden sm:inline-flex shrink-0 size-7 items-center justify-center rounded text-primary focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <QablyMarkIcon className="size-5" aria-hidden="true" />
-          </TooltipTrigger>
-          <TooltipContent>{t('runs.sourceManual')}</TooltipContent>
-        </Tooltip>
         <div className="text-right hidden sm:block">
           <div className="text-xs font-medium text-default">{formatDate(run.startedAt)}</div>
           {run.finishedAt && (

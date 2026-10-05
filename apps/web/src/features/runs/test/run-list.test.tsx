@@ -102,13 +102,15 @@ describe('RunList', () => {
 })
 
 describe('RunList evidence', () => {
-  it('shows the Qably mark instead of a text badge for a manual run', async () => {
+  it('marks no row with its source, since every run of the Manual tab is manual', async () => {
     await act(async () => {
       renderWithQuery(<RunList projectId="proj-1" />)
     })
 
+    expect(screen.getAllByRole('link').length).toBeGreaterThan(0)
     expect(screen.queryByText('manual')).not.toBeInTheDocument()
-    expect(screen.getAllByTitle('Qably').length).toBeGreaterThan(0)
+    expect(screen.queryByTitle('Qably')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Manual')).not.toBeInTheDocument()
   })
 
   it('shows no automation icon or source badge, since an automated run never reaches this list', async () => {

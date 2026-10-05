@@ -45,7 +45,9 @@ automated run that no CI run adopted appears in neither tab; it is reachable by 
 the suites. The way back from a run detail follows the same rule: the `Runs` crumb and the back button
 fall back to the Manual tab only for a manual run, and to the Actions tab, or to its CI run, for any other.
 The Manual tab used to list every run without a CI run link, which mixed the automated runs that no CI run
-adopted with the runs a person started.
+adopted with the runs a person started. A row of the Manual tab carries no source mark for the same reason:
+every run listed there is manual, so a mark would repeat the name of the tab and, being focusable, would add
+a second tab stop inside the link of each row.
 
 The `/projects/{id}/runs/new?suite=S` address is a deep link that renders the Manual tab with the new run
 dialog open and `S` preselected. It opens the dialog only once the project has loaded: until then the
