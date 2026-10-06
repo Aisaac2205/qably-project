@@ -33,15 +33,19 @@ interface SuiteListResultsProps {
 interface SuiteRowsProps {
   projectId: string
   suites: SuiteSummary[]
-  listProps: ReturnType<typeof useLoadMoreFocus<HTMLDivElement>>['listProps']
+  listProps: ReturnType<typeof useLoadMoreFocus>['listProps']
 }
 
 function SuiteRows({ projectId, suites, listProps }: SuiteRowsProps) {
   const { t } = useTranslation()
 
   return (
-    <div {...listProps} className="rule-bleed border-y border-border">
-      <EntityList aria-label={t('suites.ariaFilterSuites')} className="divide-y divide-border">
+    <div className="rule-bleed border-y border-border">
+      <EntityList
+        {...listProps}
+        aria-label={t('suites.ariaFilterSuites')}
+        className="divide-y divide-border"
+      >
         {suites.map((suite) => (
           <li key={suite.id}>
             <Link href={`/projects/${projectId}/suites/${suite.id}`} className={ROW_LINK_CLASS}>
@@ -68,7 +72,7 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     pageCount,
     refetch,
   } = useSuiteSummaries(projectId, filters)
-  const { listProps, markActivation } = useLoadMoreFocus<HTMLDivElement>({
+  const { listProps, markActivation } = useLoadMoreFocus({
     rowCount: suites.length,
     pageCount,
   })

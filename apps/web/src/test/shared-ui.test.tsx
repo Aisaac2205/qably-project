@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { createRef } from 'react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { DataTable } from '@/components/ui/data-table'
 import { EntityList } from '@/components/ui/entity-list'
@@ -55,6 +56,16 @@ describe('shared Phase 1 UI components', () => {
 
     expect(screen.getByRole('list', { name: 'Runs' })).toBeInTheDocument()
     expect(screen.getByRole('complementary', { name: 'Details' })).toBeInTheDocument()
+  })
+
+  it('hands its list element to a ref, so a caller can move the focus to it', () => {
+    const ref = createRef<HTMLUListElement>()
+    render(<EntityList ref={ref} aria-label="Runs" tabIndex={-1}><li>Run 12</li></EntityList>)
+
+    const list = screen.getByRole('list', { name: 'Runs' })
+    expect(ref.current).toBe(list)
+    act(() => ref.current?.focus())
+    expect(list).toHaveFocus()
   })
 
   it('announces loading and errors without making non-error states noisy', () => {

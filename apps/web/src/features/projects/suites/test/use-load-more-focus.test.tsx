@@ -10,7 +10,7 @@ interface HarnessProps {
 }
 
 function Harness({ ids, pageCount, showButton = true }: HarnessProps) {
-  const { listProps, markActivation } = useLoadMoreFocus<HTMLDivElement>({
+  const { listProps, markActivation } = useLoadMoreFocus({
     rowCount: ids.length,
     pageCount,
   })
@@ -36,6 +36,25 @@ function Harness({ ids, pageCount, showButton = true }: HarnessProps) {
   )
 }
 
+function ListHarness({ ids, pageCount }: HarnessProps) {
+  const { listProps, markActivation } = useLoadMoreFocus({ rowCount: ids.length, pageCount })
+
+  return (
+    <div>
+      <ul {...listProps} aria-label="Suites">
+        {ids.map((id) => (
+          <li key={id}>
+            <a href={`/suites/${id}`}>{id}</a>
+          </li>
+        ))}
+      </ul>
+      <button type="button" onClick={(event) => markActivation(event.currentTarget)}>
+        Load more
+      </button>
+    </div>
+  )
+}
+
 const FIRST_PAGE = ['s1', 's2', 's3']
 const TWO_PAGES = [...FIRST_PAGE, 's4', 's5', 's6']
 const THREE_PAGES = [...TWO_PAGES, 's7', 's8', 's9']
@@ -45,6 +64,17 @@ describe('useLoadMoreFocus', () => {
     render(<Harness ids={FIRST_PAGE} pageCount={1} />)
 
     expect(screen.getByTestId('list')).toHaveAttribute('tabindex', '-1')
+  })
+
+  it('works on a list element as well as on a plain container', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(<ListHarness ids={FIRST_PAGE} pageCount={1} />)
+    await user.click(screen.getByRole('button', { name: 'Load more' }))
+
+    rerender(<ListHarness ids={TWO_PAGES} pageCount={2} />)
+
+    expect(screen.getByRole('link', { name: 's4' })).toHaveFocus()
+    expect(screen.getByRole('list', { name: 'Suites' })).toHaveAttribute('tabindex', '-1')
   })
 
   describe('when the focus is on the load more button', () => {

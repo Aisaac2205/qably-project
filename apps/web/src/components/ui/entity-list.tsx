@@ -1,7 +1,7 @@
-import type { HTMLAttributes, ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
-interface EntityListProps extends HTMLAttributes<HTMLUListElement> {
+interface EntityListProps extends ComponentProps<'ul'> {
   children: ReactNode
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 const ROW_LINK = 'a[href]'
 
@@ -16,12 +16,12 @@ interface PendingActivation {
   pageCount: number
 }
 
-export function useLoadMoreFocus<T extends HTMLElement>({
-  rowCount,
-  pageCount,
-}: UseLoadMoreFocusOptions) {
-  const listRef = useRef<T | null>(null)
+export function useLoadMoreFocus({ rowCount, pageCount }: UseLoadMoreFocusOptions) {
+  const listRef = useRef<HTMLElement | null>(null)
   const pendingRef = useRef<PendingActivation | null>(null)
+  const setList = useCallback((node: HTMLElement | null) => {
+    listRef.current = node
+  }, [])
 
   function markActivation(activator: HTMLElement) {
     pendingRef.current = {
@@ -60,5 +60,5 @@ export function useLoadMoreFocus<T extends HTMLElement>({
     if (!pending.activator.isConnected) listRef.current?.focus()
   }, [pageCount, rowCount])
 
-  return { listProps: { ref: listRef, tabIndex: -1 }, markActivation }
+  return { listProps: { ref: setList, tabIndex: -1 }, markActivation }
 }
