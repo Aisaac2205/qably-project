@@ -50,3 +50,28 @@ export function patchSuiteSummaries(queryClient: QueryClient, suite: Suite) {
     (data) => rewriteItems(data, (item) => applySuite(item, suite)),
   )
 }
+
+export function removeFromSuiteSummaries(
+  queryClient: QueryClient,
+  projectId: string,
+  suiteId: string,
+) {
+  queryClient.setQueriesData<SuiteSummariesData>(
+    { queryKey: suiteKeys.summaries(projectId) },
+    (data) => rewriteItems(data, (item) => (item.id === suiteId ? null : item)),
+  )
+}
+
+export async function invalidateSuiteSummaries(queryClient: QueryClient, projectId: string) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: suiteKeys.summaries(projectId) }),
+    queryClient.invalidateQueries({ queryKey: suiteKeys.tags(projectId) }),
+  ])
+}
+
+export function markSuiteSummariesStale(queryClient: QueryClient, projectId: string) {
+  void queryClient.invalidateQueries({
+    queryKey: suiteKeys.summaries(projectId),
+    refetchType: 'none',
+  })
+}
