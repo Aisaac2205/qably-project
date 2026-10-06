@@ -13,7 +13,7 @@ export interface SuiteSummariesFilters {
   tag: TagFilter
 }
 
-const SEARCH_MAX_LENGTH = 200
+export const SUITE_SEARCH_MAX_LENGTH = 200
 
 export function toSuiteSummariesQuery({
   sort,
@@ -21,7 +21,7 @@ export function toSuiteSummariesQuery({
   status,
   tag,
 }: SuiteSummariesFilters): SuiteSummariesQuery {
-  const trimmedSearch = search.trim().slice(0, SEARCH_MAX_LENGTH)
+  const trimmedSearch = search.trim().slice(0, SUITE_SEARCH_MAX_LENGTH)
 
   return {
     sort,

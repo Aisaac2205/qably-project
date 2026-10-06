@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { createRef, useState } from 'react'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
@@ -111,5 +111,65 @@ describe('SuiteFilterBar', () => {
     const { container } = render(<ControlledHarness />)
     const group = container.querySelector('[aria-label="Status filter"]')?.closest('div.hidden')
     expect(group?.className).toContain('md:flex')
+  })
+
+  describe('search input', () => {
+    it('hands the input to the ref it receives, so the page can focus it', async () => {
+      const searchRef = createRef<HTMLInputElement>()
+      await act(async () => {
+        render(<SuiteFilterBar {...baseProps} search="" onSearchChange={vi.fn()} searchRef={searchRef} />)
+      })
+
+      expect(searchRef.current).toBe(screen.getByTestId('suite-search'))
+
+      act(() => searchRef.current?.focus())
+
+      expect(screen.getByTestId('suite-search')).toHaveFocus()
+    })
+
+    it('renders the same input when no ref is given', async () => {
+      await act(async () => {
+        render(<SuiteFilterBar {...baseProps} search="" onSearchChange={vi.fn()} />)
+      })
+
+      expect(screen.getByTestId('suite-search')).toBeInTheDocument()
+    })
+
+    it('limits the search to the 200 characters the API accepts', async () => {
+      await act(async () => {
+        render(<ControlledHarness />)
+      })
+
+      expect(screen.getByTestId('suite-search')).toHaveAttribute('maxlength', '200')
+    })
+
+    it('stops taking characters once the search has 200 of them', async () => {
+      const user = userEvent.setup({ delay: null })
+      await act(async () => {
+        render(<ControlledHarness />)
+      })
+      const input = screen.getByTestId('suite-search') as HTMLInputElement
+
+      await user.click(input)
+      await user.paste('a'.repeat(250))
+
+      expect(input.value).toHaveLength(200)
+    })
+
+    it('keeps a search of exactly 200 characters whole', async () => {
+      await act(async () => {
+        render(<ControlledHarness initial={'b'.repeat(200)} />)
+      })
+
+      expect((screen.getByTestId('suite-search') as HTMLInputElement).value).toHaveLength(200)
+    })
+
+    it('is at least 44 px tall below md and the compact height from md up', async () => {
+      await act(async () => {
+        render(<ControlledHarness />)
+      })
+
+      expect(screen.getByTestId('suite-search')).toHaveClass('h-11', 'md:h-10')
+    })
   })
 })

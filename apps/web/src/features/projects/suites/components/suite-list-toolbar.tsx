@@ -18,7 +18,7 @@ interface SuiteListToolbarProps {
 
 export function SuiteListToolbar({ projectId, filters, availableTags }: SuiteListToolbarProps) {
   const { t } = useTranslation()
-  const { search, setSearch, status, setStatus, tag, setTag, sort, setSort } = filters
+  const { search, setSearch, searchRef, status, setStatus, tag, setTag, sort, setSort } = filters
 
   return (
     <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
@@ -26,6 +26,7 @@ export function SuiteListToolbar({ projectId, filters, availableTags }: SuiteLis
         className="md:min-w-0 md:flex-1"
         search={search}
         onSearchChange={setSearch}
+        searchRef={searchRef}
         status={status}
         onStatusChange={setStatus}
         tag={tag}

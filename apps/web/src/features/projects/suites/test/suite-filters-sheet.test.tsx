@@ -21,6 +21,12 @@ describe('SuiteFiltersSheet', () => {
     expect(screen.getByTestId('suite-filters-trigger').textContent).toContain('Filters')
   })
 
+  it('is at least 44 px tall below md and the compact height from md up', async () => {
+    await act(async () => { render(<SuiteFiltersSheet {...baseProps} />) })
+
+    expect(screen.getByTestId('suite-filters-trigger')).toHaveClass('h-11', 'md:h-10')
+  })
+
   it('shows no active-count badge when nothing is filtered', async () => {
     await act(async () => { render(<SuiteFiltersSheet {...baseProps} />) })
 

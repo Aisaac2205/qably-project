@@ -1,5 +1,6 @@
 'use client'
 
+import type { RefObject } from 'react'
 import { MagnifyingGlass } from '@phosphor-icons/react'
 import { Input } from '@/components/ui/input'
 import { FilterBar } from '@/components/ui/filter-bar'
@@ -15,12 +16,14 @@ import {
   type StatusFilter,
   type TagFilter,
 } from '@/features/projects/suites/lib/suite-filter-options'
+import { SUITE_SEARCH_MAX_LENGTH } from '@/features/projects/suites/lib/suite-summaries-query'
 
 export type { SortKey }
 
 export function SuiteFilterBar({
   search,
   onSearchChange,
+  searchRef,
   status,
   onStatusChange,
   tag,
@@ -32,6 +35,7 @@ export function SuiteFilterBar({
 }: {
   search: string
   onSearchChange: (v: string) => void
+  searchRef?: RefObject<HTMLInputElement | null>
   status: StatusFilter
   onStatusChange: (v: StatusFilter) => void
   tag: TagFilter
@@ -60,8 +64,10 @@ export function SuiteFilterBar({
           aria-hidden="true"
         />
         <Input
+          ref={searchRef}
           type="search"
           inputMode="search"
+          maxLength={SUITE_SEARCH_MAX_LENGTH}
           placeholder={t('suites.searchPlaceholder')}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
