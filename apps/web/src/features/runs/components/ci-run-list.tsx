@@ -1,8 +1,8 @@
 'use client'
 
 import type { CiRunSummaryRecord } from '@qably/types'
-import { Button } from '@/components/ui/button'
 import { EntityList } from '@/components/ui/entity-list'
+import { LoadMore } from '@/components/ui/load-more'
 import { StateView } from '@/components/ui/state-view'
 import { docsUrl } from '@/lib/docs-url'
 import { useTranslation } from '@/lib/i18n'
@@ -29,39 +29,6 @@ function CiRunRows({ ciRuns, projectId }: { ciRuns: CiRunSummaryRecord[]; projec
   )
 }
 
-function LoadMore({
-  isFetching,
-  hasFailed,
-  onLoad,
-}: {
-  isFetching: boolean
-  hasFailed: boolean
-  onLoad: () => void
-}) {
-  const { t } = useTranslation()
-  const showFailure = hasFailed && !isFetching
-
-  return (
-    <div className="flex flex-col items-center gap-2">
-      {showFailure && (
-        <p role="alert" className="text-sm text-fail">
-          {t('runs.ci.errorTitle')}
-        </p>
-      )}
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full hover:bg-runs-hover focus-visible:outline-hidden! focus-visible:ring-primary sm:w-auto"
-        onClick={onLoad}
-        disabled={isFetching}
-        focusableWhenDisabled
-      >
-        {isFetching ? t('runs.ci.loadingMore') : showFailure ? t('common.retry') : t('runs.ci.loadMore')}
-      </Button>
-    </div>
-  )
-}
-
 export function CiRunList({ projectId }: { projectId: string }) {
   const { t, locale } = useTranslation()
   const { ciRuns, hasNextPage, isFetchingNextPage, fetchNextPage, isLoading, isError } =
@@ -76,6 +43,13 @@ export function CiRunList({ projectId }: { projectId: string }) {
             isFetching={isFetchingNextPage}
             hasFailed={isError}
             onLoad={() => void fetchNextPage()}
+            labels={{
+              load: t('runs.ci.loadMore'),
+              loading: t('runs.ci.loadingMore'),
+              retry: t('common.retry'),
+              error: t('runs.ci.errorTitle'),
+            }}
+            className="hover:bg-runs-hover"
           />
         )}
       </div>
