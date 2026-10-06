@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -11,7 +12,7 @@ interface LoadMoreLabels {
 interface LoadMoreProps {
   isFetching: boolean
   hasFailed: boolean
-  onLoad: () => void
+  onLoad: (event: MouseEvent<HTMLButtonElement>) => void
   labels: LoadMoreLabels
   className?: string
 }

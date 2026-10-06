@@ -5,13 +5,17 @@ import { Plus } from '@phosphor-icons/react'
 import type { SuiteSummary } from '@qably/types'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { EntityList } from '@/components/ui/entity-list'
+import { LoadMore } from '@/components/ui/load-more'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { suiteNewPath } from '@/features/projects/lib/routes'
+import { useLoadMoreFocus } from '@/features/projects/suites/hooks/use-load-more-focus'
+import { useResultsAnnouncement } from '@/features/projects/suites/hooks/use-results-announcement'
 import { useSuiteSummaries } from '@/features/projects/suites/hooks/use-suite-summaries'
 import {
   hasSummariesFilter,
+  toSuiteSummariesQuery,
   type SuiteSummariesFilters,
 } from '@/features/projects/suites/lib/suite-summaries-query'
 import { SuiteRow } from './suite-row'
@@ -29,13 +33,14 @@ interface SuiteListResultsProps {
 interface SuiteRowsProps {
   projectId: string
   suites: SuiteSummary[]
+  listProps: ReturnType<typeof useLoadMoreFocus>['listProps']
 }
 
-function SuiteRows({ projectId, suites }: SuiteRowsProps) {
+function SuiteRows({ projectId, suites, listProps }: SuiteRowsProps) {
   const { t } = useTranslation()
 
   return (
-    <div className="rule-bleed border-y border-border">
+    <div {...listProps} className="rule-bleed border-y border-border">
       <EntityList aria-label={t('suites.ariaFilterSuites')} className="divide-y divide-border">
         {suites.map((suite) => (
           <li key={suite.id}>
@@ -51,10 +56,27 @@ function SuiteRows({ projectId, suites }: SuiteRowsProps) {
 
 export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteListResultsProps) {
   const { t } = useTranslation()
-  const { suites, isLoading, isLoadingError, isPlaceholderData, refetch } = useSuiteSummaries(
-    projectId,
-    filters,
-  )
+  const {
+    suites,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    isLoading,
+    isLoadingError,
+    isFetchNextPageError,
+    isPlaceholderData,
+    refetch,
+  } = useSuiteSummaries(projectId, filters)
+  const { listProps, markActivation } = useLoadMoreFocus({
+    rowCount: suites.length,
+    isFetching: isFetchingNextPage,
+  })
+  const announcement = useResultsAnnouncement({
+    resultsKey: JSON.stringify(toSuiteSummariesQuery(filters)),
+    rowCount: suites.length,
+    isSettled: !isLoading && !isLoadingError && !isPlaceholderData && !isFetchingNextPage,
+    isFetchingMore: isFetchingNextPage,
+  })
 
   function renderContent() {
     if (isLoadingError) {
@@ -82,7 +104,27 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     }
 
     if (suites.length > 0) {
-      return <SuiteRows projectId={projectId} suites={suites} />
+      return (
+        <div className="space-y-4">
+          <SuiteRows projectId={projectId} suites={suites} listProps={listProps} />
+          {hasNextPage && (
+            <LoadMore
+              isFetching={isFetchingNextPage}
+              hasFailed={isFetchNextPageError}
+              onLoad={(event) => {
+                markActivation(event.currentTarget)
+                void fetchNextPage()
+              }}
+              labels={{
+                load: t('suites.loadMore'),
+                loading: t('suites.loadingMore'),
+                retry: t('common.retry'),
+                error: t('suites.loadError'),
+              }}
+            />
+          )}
+        </div>
+      )
     }
 
     if (hasSummariesFilter(filters)) {
@@ -123,8 +165,19 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
   }
 
   return (
-    <div className="min-w-0" aria-busy={isPlaceholderData} data-testid="suite-list-results">
-      {renderContent()}
-    </div>
+    <>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="suite-list-announcement"
+      >
+        {announcement}
+      </div>
+      <div className="min-w-0" aria-busy={isPlaceholderData} data-testid="suite-list-results">
+        {renderContent()}
+      </div>
+    </>
   )
 }

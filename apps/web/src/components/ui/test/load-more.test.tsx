@@ -29,6 +29,24 @@ describe('LoadMore', () => {
     expect(onLoad).toHaveBeenCalledTimes(1)
   })
 
+  it('hands the click to onLoad, so the caller can tell which button was used', async () => {
+    const user = userEvent.setup()
+    const activators: EventTarget[] = []
+    const onLoad = vi.fn((event: React.MouseEvent<HTMLButtonElement>) => {
+      activators.push(event.currentTarget)
+    })
+    renderLoadMore({ onLoad })
+    const button = screen.getByRole('button', { name: 'Show more' })
+
+    await user.click(button)
+    button.focus()
+    await user.keyboard('{Enter}')
+
+    expect(onLoad).toHaveBeenCalledTimes(2)
+    expect(activators[0]).toBe(button)
+    expect(activators[1]).toBe(button)
+  })
+
   it('is operable from the keyboard with Enter and Space', async () => {
     const user = userEvent.setup()
     const { onLoad } = renderLoadMore()

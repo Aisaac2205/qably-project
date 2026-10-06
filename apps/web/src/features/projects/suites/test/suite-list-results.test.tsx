@@ -43,7 +43,7 @@ describe('SuiteListResults', () => {
 
       await renderResults()
 
-      expect(screen.getByRole('status')).toHaveTextContent('Loading…')
+      expect(screen.getAllByRole('status').map((region) => region.textContent)).toContain('Loading…')
       expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
       expect(screen.queryByText('No suites match your filters')).not.toBeInTheDocument()
       expect(screen.queryByRole('list')).not.toBeInTheDocument()
