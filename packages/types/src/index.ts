@@ -413,36 +413,6 @@ export interface CiRunDetailRecord extends CiRunSummaryRecord {
 }
 
 /**
- * Bounded last-run summary used by the suite metrics endpoint. Deliberately
- * narrower than RunSummaryRecord: the metrics query never loads full case
- * lists, only the aggregate passRate for the suite's most recent run.
- */
-export interface SuiteMetricsLastRun {
-  id: string
-  status: RunStatus
-  source: RunSource
-  startedAt: string
-  finishedAt?: string
-  /**
-   * Fraction 0–1, consistent with RunSummaryRecord.passRate. `null` when the
-   * run has no decided case (pass/fail/blocked) yet — never a fabricated 0.
-   */
-  passRate: number | null
-}
-
-export interface SuiteMetricsEntry {
-  suiteId: string
-  suiteName: string
-  lastRun: SuiteMetricsLastRun | null
-  /** Up to 10 most recent run statuses for the suite, oldest first. */
-  trend: RunStatus[]
-}
-
-export interface SuiteMetricsRecord {
-  items: SuiteMetricsEntry[]
-}
-
-/**
  * A regression is a RunCase whose status is `fail` in a scanned finished run
  * while the same testCaseId was `pass` in the previous finished run of the
  * same suite. `runsScanned` reports how many of the project's most recent
