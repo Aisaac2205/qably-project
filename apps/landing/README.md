@@ -6,10 +6,9 @@ The landing application is the public-facing marketing website and interactive t
 
 - **Bilingual Content Routing:** Spanish serves as the primary locale at `/`, while English pages are routed under `/en/`. Dictionaries and navigation labels are managed in `src/features/i18n/`.
 - **Interactive Component Previews:** React 19 islands embed product interfaces directly into marketing sections:
-  - `DashboardWindowFrame`: Desktop window replica illustrating pass rates, active test runs, and test suites.
-  - `RealTraceabilityCalendar`: Contribution heatmap displaying daily execution density and test run outcomes.
-  - `MobileDashboardIphone`: Vector iPhone 16 Pro mockup rendering responsive QA telemetry.
-  - `PricingSection`: Dynamic pricing tier comparison.
+  - `DashboardWindowFrame`: Desktop browser-window replica of the product dashboard (KPI strip, executed-cases chart, projects table, case-priority donut, notification channels, recent activity) fed by mock data, with a 7, 30 and 90-day period selector.
+  - `MobileDashboardIphone`: Vector iPhone 16 Pro mockup rendering the same dashboard preview at phone width.
+  - `PricingSection`: Three-tier pricing comparison built from `src/features/pricing/data/tiers.ts`. A test checks the tiers against `PLAN_LIMITS` in `@qably/types`.
 - **Interactive Documentation Engine:** Available at `/docs` and `/en/docs`, featuring:
   - Topic navigation across setup steps, CI integration, SCM webhooks, and API references.
   - Code blocks with syntax highlighting and instant clipboard copying.
@@ -21,21 +20,34 @@ The landing application is the public-facing marketing website and interactive t
 ```text
 apps/landing/
 ├── src/
-│   ├── components/ui/        # Reusable visual shells and vector device mockups
+│   ├── components/
+│   │   ├── charts/           # Vendored chart primitives used by the dashboard preview
+│   │   └── ui/               # Reusable visual shells and vector device mockups
 │   ├── features/
-│   │   ├── dashboard-preview/ # Dashboard window frame and calendar preview
+│   │   ├── dashboard-preview/ # Dashboard window frame, preview cards, and mock data
 │   │   ├── documentation/     # Docs reader, syntax highlighting, and content dictionaries
 │   │   ├── features-grid/     # Grid highlighting platform capabilities
 │   │   ├── i18n/              # Translation dictionaries for marketing copy
-│   │   ├── integrations/      # SCM and CI/CD provider marquee animations
+│   │   ├── integrations/      # Marquee of language, framework, and tooling logos
 │   │   ├── mobile-dashboard/  # Mobile preview components
 │   │   ├── navigation/        # Header, footer, and call-to-action banners
 │   │   └── pricing/           # Tier comparison and plan selection cards
 │   ├── layouts/               # Base HTML templates and font definitions
+│   ├── lib/                   # Public URL helpers and the dashboard preview translation store
 │   ├── pages/                 # Astro file-based routes (root and /en/ variants)
 │   └── styles/                # Global Tailwind CSS custom properties
-└── public/                    # Static assets, logos, and OpenGraph images
+└── public/                    # Static assets, logos, technology icons, favicons, and the OpenGraph image
 ```
+
+## Environment
+
+The build reads three public variables and fails when one is missing. `.env.example` lists only `PUBLIC_WEB_URL`.
+
+| Variable | Purpose |
+|---|---|
+| `PUBLIC_SITE_URL` | Origin of this site. Sets the Astro `site`, which feeds the canonical and language alternate links. |
+| `PUBLIC_WEB_URL` | Origin of `apps/web`. The sign-in and sign-up links point to its `/login` page. |
+| `PUBLIC_API_URL` | Origin of the Qably API, inserted into the example requests on the documentation pages. |
 
 ## Available Scripts
 
@@ -57,7 +69,7 @@ Compile the static site and client-side JavaScript bundles to `dist/`:
 pnpm run build
 ```
 
-Preview the production build locally before deployment:
+Preview the production build locally before deployment (`pnpm run start` runs the same command):
 
 ```bash
 pnpm run preview
