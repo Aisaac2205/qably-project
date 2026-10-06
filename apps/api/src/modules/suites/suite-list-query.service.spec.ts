@@ -1,6 +1,7 @@
 import {
   SUITE_RUN_WINDOW,
   type RunStatus,
+  type SuiteRunStatus,
   type SuiteSortKey,
   type SuiteSummarySort,
 } from '@qably/types';
@@ -106,6 +107,27 @@ function cursorOf(nextCursor: string | null): SuiteSortKey {
   expect(decoded).not.toBeNull();
 
   return decoded as SuiteSortKey;
+}
+
+function repeat(status: RunStatus, count: number): RunStatus[] {
+  return Array.from({ length: count }, () => status);
+}
+
+function windowRead(prisma: FakePrisma, call = 0) {
+  const [sql] = prisma.$queryRaw.mock.calls[call];
+
+  return {
+    window: sql.values[0] as number,
+    organizationId: sql.values[1] as string,
+    suiteIds: sql.values.slice(2) as string[],
+  };
+}
+
+function runsFor(
+  rows: readonly SuiteSummaryRow[],
+  windowOf: (row: SuiteSummaryRow) => RunStatus[],
+): RunsBySuite {
+  return Object.fromEntries(rows.map((row) => [row.id, windowOf(row)]));
 }
 
 describe('SuiteListQueryService.page', () => {
@@ -261,6 +283,203 @@ describe('SuiteListQueryService.page', () => {
       expect([first, second, third].flatMap((page) => ids(page.items))).toEqual(
         ids(rows),
       );
+    });
+
+    it('finds the three failing suites at positions 7, 64 and 118 of 120 with limit 50 and no further page', async () => {
+      const rows = recentSuites(120);
+      const failing = [7, 64, 118].map((position) => rows[position].id);
+      const runs = runsFor(rows, (row) =>
+        failing.includes(row.id) ? ['fail', ...repeat('pass', 9)] : ['pass'],
+      );
+
+      const result = await build(createPrisma([...rows].reverse(), runs)).page(
+        org,
+        query({ status: 'fail' }),
+      );
+
+      expect(ids(result.items)).toEqual(failing);
+      expect(
+        result.items.map((item) => [item.status, item.recentPassRate]),
+      ).toEqual([
+        ['fail', 90],
+        ['fail', 90],
+        ['fail', 90],
+      ]);
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('keeps the pass rate order and the status across a cursor with a status filter', async () => {
+      const rows = [
+        suiteRow('pass-100', { createdAt: at(1) }),
+        suiteRow('pass-90', { createdAt: at(2) }),
+        suiteRow('pass-80', { createdAt: at(3) }),
+        suiteRow('fail-90', { createdAt: at(4) }),
+        suiteRow('never', { createdAt: at(5) }),
+      ];
+      const runs: RunsBySuite = {
+        'pass-100': ['pass'],
+        'pass-90': [...repeat('pass', 9), 'fail'],
+        'pass-80': [...repeat('pass', 8), 'fail', 'fail'],
+        'fail-90': ['fail', ...repeat('pass', 9)],
+      };
+      const service = build(createPrisma([...rows].reverse(), runs));
+      const base = { sort: 'pass-rate', status: 'pass', limit: 2 } as const;
+
+      const first = await service.page(org, query(base));
+      const second = await service.page(
+        org,
+        query({ ...base, cursor: cursorOf(first.nextCursor) }),
+      );
+
+      expect(ids(first.items)).toEqual(['pass-100', 'pass-90']);
+      expect(ids(second.items)).toEqual(['pass-80']);
+      expect(second.nextCursor).toBeNull();
+      expect(
+        [...first.items, ...second.items].map((item) => item.status),
+      ).toEqual(['pass', 'pass', 'pass']);
+    });
+
+    it('applies search, tag and status before cutting the page', async () => {
+      const rows = [
+        suiteRow('a', { name: 'Checkout', tags: ['api'], createdAt: at(1) }),
+        suiteRow('b', {
+          name: 'Checkout cart',
+          tags: ['web'],
+          createdAt: at(2),
+        }),
+        suiteRow('c', { name: 'Billing', tags: ['api'], createdAt: at(3) }),
+        suiteRow('d', {
+          name: 'Checkout export',
+          tags: ['api'],
+          createdAt: at(4),
+        }),
+        suiteRow('e', {
+          name: 'checkout api',
+          tags: ['api'],
+          createdAt: at(5),
+        }),
+      ];
+      const runs: RunsBySuite = {
+        a: ['pass'],
+        b: ['pass'],
+        c: ['pass'],
+        d: ['fail', 'pass', 'pass', 'pass'],
+        e: ['pass'],
+      };
+      const service = build(createPrisma(rows, runs));
+      const filters = {
+        search: 'checkout',
+        tag: 'api',
+        status: 'pass',
+        limit: 1,
+      } as const;
+
+      const first = await service.page(org, query(filters));
+      const second = await service.page(
+        org,
+        query({ ...filters, cursor: cursorOf(first.nextCursor) }),
+      );
+
+      expect(ids(first.items)).toEqual(['e']);
+      expect(first.nextCursor).not.toBeNull();
+      expect(ids(second.items)).toEqual(['a']);
+      expect(second.nextCursor).toBeNull();
+    });
+  });
+
+  describe('bounded reads', () => {
+    const variants = [
+      ['recent', undefined],
+      ['name', undefined],
+      ['cases', undefined],
+      ['pass-rate', undefined],
+      ['recent', 'fail'],
+    ] as [SuiteSummarySort, SuiteRunStatus | undefined][];
+
+    it.each(
+      variants.flatMap(([sort, status]) =>
+        [1, 100].map((count) => [sort, status, count] as const),
+      ),
+    )(
+      'reads the suites once and the run windows once for sort %s and status %s with %i suites',
+      async (sort, status, count) => {
+        const prisma = createPrisma(recentSuites(count));
+
+        await build(prisma).page(org, query({ sort, status, limit: 100 }));
+
+        expect(prisma.suite.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['recent', 'name', 'cases'] as SuiteSummarySort[])(
+      'reads the runs of the page only, not of the whole project, for sort %s',
+      async (sort) => {
+        const prisma = createPrisma(recentSuites(120));
+        const service = build(prisma);
+
+        const first = await service.page(org, query({ sort }));
+        const second = await service.page(
+          org,
+          query({ sort, cursor: cursorOf(first.nextCursor) }),
+        );
+
+        expect(windowRead(prisma, 0).suiteIds).toEqual(ids(first.items));
+        expect(windowRead(prisma, 1).suiteIds).toEqual(ids(second.items));
+        expect(windowRead(prisma, 0).suiteIds).toHaveLength(50);
+        expect(windowRead(prisma, 0).window).toBe(10);
+        expect(windowRead(prisma, 0).organizationId).toBe('org-1');
+      },
+    );
+
+    it.each([
+      ['pass-rate', undefined],
+      ['recent', 'pass'],
+      ['name', 'fail'],
+      ['cases', 'never-run'],
+    ] as [SuiteSummarySort, SuiteRunStatus | undefined][])(
+      'reads a window of 10 for every suite that passes the filters for sort %s and status %s',
+      async (sort, status) => {
+        const rows = recentSuites(120);
+        const prisma = createPrisma(rows);
+
+        await build(prisma).page(org, query({ sort, status, limit: 10 }));
+
+        const read = windowRead(prisma);
+        expect(read.window).toBe(10);
+        expect(read.organizationId).toBe('org-1');
+        expect([...read.suiteIds].sort()).toEqual(ids(rows).sort());
+      },
+    );
+
+    it('leaves the suites that miss the search out of the window read', async () => {
+      const rows = recentSuites(12).map((row, position) => ({
+        ...row,
+        name: position % 2 === 0 ? `Alpha ${position}` : `Beta ${position}`,
+      }));
+      const prisma = createPrisma(rows);
+
+      await build(prisma).page(
+        org,
+        query({ sort: 'pass-rate', search: 'alpha' }),
+      );
+
+      expect([...windowRead(prisma).suiteIds].sort()).toEqual(
+        ids(rows.filter((row) => row.name.startsWith('Alpha'))).sort(),
+      );
+    });
+
+    it('skips the window read when no suite survives the filters', async () => {
+      const prisma = createPrisma(recentSuites(5));
+
+      const result = await build(prisma).page(
+        org,
+        query({ search: 'nothing matches this', status: 'fail' }),
+      );
+
+      expect(result).toEqual({ items: [], nextCursor: null });
+      expect(prisma.suite.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 });
