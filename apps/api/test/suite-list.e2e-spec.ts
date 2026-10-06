@@ -420,6 +420,77 @@ describe('Suite list (e2e)', () => {
       expect(body.items.map((item) => item.id)).toEqual(['new', 'old']);
     });
 
+    it('applies a valid sort, search, tag and status together and reads the runs only of the suites that pass the first two', async () => {
+      const failing = ['fail', 'pass', 'pass', 'pass'];
+      const windows: Record<string, string[]> = {
+        a1: failing,
+        z1: failing,
+        e1: ['pass'],
+        w1: failing,
+        c1: failing,
+      };
+      prisma.suite.findMany.mockResolvedValue([
+        summaryRow('z1', {
+          name: 'Checkout refund',
+          tags: ['api'],
+          createdAt: new Date('2026-03-01T00:00:00.000Z'),
+        }),
+        summaryRow('a1', {
+          name: 'Checkout cart',
+          tags: ['api'],
+          createdAt: new Date('2026-02-01T00:00:00.000Z'),
+        }),
+        summaryRow('e1', {
+          name: 'Checkout export',
+          tags: ['api'],
+          createdAt: new Date('2026-04-01T00:00:00.000Z'),
+        }),
+        summaryRow('w1', {
+          name: 'Checkout web',
+          tags: ['web'],
+          createdAt: new Date('2026-05-01T00:00:00.000Z'),
+        }),
+        summaryRow('c1', {
+          name: 'Billing',
+          tags: ['api'],
+          createdAt: new Date('2026-06-01T00:00:00.000Z'),
+        }),
+      ]);
+      prisma.$queryRaw.mockImplementation((sql: { values: unknown[] }) =>
+        Promise.resolve(
+          (sql.values.slice(2) as string[]).flatMap((suiteId) =>
+            (windows[suiteId] ?? []).map((status) => ({ suiteId, status })),
+          ),
+        ),
+      );
+
+      const response = await request(app.getHttpServer())
+        .get('/suites/summaries')
+        .query({
+          projectId: 'project-1',
+          sort: 'name',
+          search: 'checkout',
+          tag: 'api',
+          status: 'fail',
+        })
+        .expect(200);
+
+      const body = response.body as PageBody;
+      expect(body.items.map((item) => [item.id, item.status])).toEqual([
+        ['a1', 'fail'],
+        ['z1', 'fail'],
+      ]);
+      expect(body.nextCursor).toBeNull();
+      expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
+        by: ['suiteId'],
+        where: { suiteId: { in: ['z1', 'a1', 'e1'] } },
+        _count: { _all: true },
+      });
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      const [sql] = prisma.$queryRaw.mock.calls[0] as [{ values: unknown[] }];
+      expect(sql.values.slice(2)).toEqual(['z1', 'a1', 'e1']);
+    });
+
     it('returns the summary fields with the case count and the derived status and never the cases', async () => {
       prisma.suite.findMany.mockResolvedValue([
         summaryRow('suite-1', {
