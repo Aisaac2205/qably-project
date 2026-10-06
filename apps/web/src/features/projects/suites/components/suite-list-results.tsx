@@ -19,6 +19,7 @@ import {
   toSuiteSummariesQuery,
   type SuiteSummariesFilters,
 } from '@/features/projects/suites/lib/suite-summaries-query'
+import { SuiteListError } from './suite-list-error'
 import { SuiteRow } from './suite-row'
 
 const ACTION_FOCUS_RING = 'focus-visible:outline-hidden! focus-visible:ring-primary'
@@ -89,10 +90,7 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
   function renderContent() {
     if (isLoadingError) {
       return (
-        <StateView
-          kind="error"
-          title={t('suites.loadError')}
-          focusOnMount
+        <SuiteListError
           action={
             <Button
               type="button"

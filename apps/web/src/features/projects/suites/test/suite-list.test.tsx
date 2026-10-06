@@ -109,6 +109,25 @@ describe('SuiteList', () => {
     })
   })
 
+  describe('when the first load fails', () => {
+    it('puts the focus on the error, beside the filter bar, and brings the suites back on retry', async () => {
+      const user = userEvent.setup()
+      listSummaries.mockRejectedValueOnce(new Error('down'))
+
+      await renderList()
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Could not load suites.')
+      expect(alert).toHaveFocus()
+      expect(screen.getByTestId('suite-search')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Retry' }))
+
+      await screen.findByTestId('suite-row-suite-4')
+      expect(rowIds()).toEqual(['suite-4', 'suite-3', 'suite-2', 'suite-1'])
+    })
+  })
+
   describe('when there is nothing to list', () => {
     it('says there are no suites yet, with the hint and a link to create the first one', async () => {
       await renderList('proj-empty')

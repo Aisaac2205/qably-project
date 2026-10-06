@@ -113,6 +113,40 @@ describe('SuiteListResults states', () => {
     })
   })
 
+  describe('when the answer to a change of filters fails', () => {
+    it('leaves the focus on the control the user is in', async () => {
+      const outside = document.createElement('input')
+      document.body.append(outside)
+
+      try {
+        const { rerenderWith } = await renderResults()
+        await screen.findByRole('list', { name: 'Filter suites' })
+        act(() => outside.focus())
+        listSummaries.mockRejectedValueOnce(new Error('down'))
+
+        await rerenderWith({ filters: { ...NO_FILTERS, search: 'abc' } })
+
+        const alert = await screen.findByRole('alert')
+        expect(alert).toHaveTextContent('Could not load suites.')
+        expect(outside).toHaveFocus()
+        expect(alert).not.toHaveFocus()
+      } finally {
+        outside.remove()
+      }
+    })
+
+    it('takes the focus when nothing else holds it', async () => {
+      const { rerenderWith } = await renderResults()
+      await screen.findByRole('list', { name: 'Filter suites' })
+      expect(document.body).toHaveFocus()
+      listSummaries.mockRejectedValueOnce(new Error('down'))
+
+      await rerenderWith({ filters: { ...NO_FILTERS, search: 'abc' } })
+
+      expect(await screen.findByRole('alert')).toHaveFocus()
+    })
+  })
+
   describe('when a refresh in the background fails', () => {
     it('keeps the rows and shows no blocking error', async () => {
       const { client } = await renderResults()

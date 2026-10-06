@@ -71,7 +71,7 @@ describe('SuiteList while the results change', () => {
     expect(listSummaries.mock.calls.map(([request]) => request.search)).toEqual([undefined, 'abc'])
   })
 
-  it('shows a failure inside the results area and keeps the filter bar with what was typed', async () => {
+  it('shows a failure inside the results area and keeps the filter bar with what was typed and its focus', async () => {
     const user = userEvent.setup()
     await renderList()
     await screen.findByTestId('suite-row-suite-4')
@@ -83,6 +83,23 @@ describe('SuiteList while the results change', () => {
     const alert = await within(resultsArea()).findByRole('alert')
     expect(alert).toHaveTextContent('Could not load suites.')
     expect(screen.getByTestId('suite-search')).toHaveValue('abc')
+    expect(input).toHaveFocus()
+    expect(alert).not.toHaveFocus()
+  })
+
+  it('keeps the keystrokes typed after the failure in the search input', async () => {
+    const user = userEvent.setup()
+    await renderList()
+    await screen.findByTestId('suite-row-suite-4')
+    listSummaries.mockRejectedValueOnce(new Error('down'))
+    const input = screen.getByTestId('suite-search')
+    await user.type(input, 'abc')
+    await within(resultsArea()).findByRole('alert')
+
+    await user.keyboard('def')
+
+    expect(input).toHaveValue('abcdef')
+    expect(input).toHaveFocus()
   })
 
   it('starts again from the first page, with no cursor and none of the old rows, when the search changes', async () => {
