@@ -43,14 +43,14 @@ describe('RunProgressHeader', () => {
     expect(screen.getByText('Authentication')).toBeInTheDocument()
   })
 
-  it('renders pass rate in mono font, from pass over decided cases, excluding pending', async () => {
+  it('renders pass rate in clean tabular font, from pass over decided cases, excluding pending', async () => {
     // 1 pass, 1 fail, 1 blocked, 1 pending → decided = 3, rate = 1/3 → 33%
     await act(async () => {
       renderWithQuery(<RunProgressHeader run={mockRun} />)
     })
     const passRate = screen.getByText('33%')
     expect(passRate).toBeInTheDocument()
-    expect(passRate.className).toContain('font-mono')
+    expect(passRate.className).toContain('tabular-nums')
   })
 
   it('renders status chip', async () => {

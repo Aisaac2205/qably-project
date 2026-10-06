@@ -63,27 +63,55 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
   const isCi = isCiRun(run)
   const isManual = run.source === 'manual'
   const { title, subtitle } = runTitleParts(run, suite?.name ?? '')
+  const hasCommitInfo = run.source === 'github_actions' && Boolean(run.commitSha)
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-4 py-1">
-        <div className="min-w-0 flex items-center gap-3">
-          <StatusChip status={run.status} />
-          <div className="min-w-0 space-y-0.5">
-            <h3
-              title={title}
-              className="text-base font-semibold leading-tight tracking-tight text-default truncate"
-            >
-              {title}
-            </h3>
-            {subtitle && <p className="text-sm text-muted-foreground truncate">{subtitle}</p>}
-          </div>
-        </div>
+    <div className="space-y-2.5">
+      <div className="min-w-0 space-y-0.5">
+        <h3
+          title={title}
+          className="text-base font-semibold leading-tight tracking-tight text-default truncate"
+        >
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-sm text-muted-foreground truncate" title={subtitle}>
+            {subtitle}
+          </p>
+        )}
+      </div>
 
-        <div className="flex items-center gap-5 shrink-0">
+      <div className="flex items-center justify-between gap-3 py-1">
+        {hasCommitInfo && run.commitSha ? (
+          <div
+            className="flex items-center gap-2 min-w-0"
+            data-testid="run-commit-info"
+          >
+            <GitCommit
+              size={16}
+              weight="duotone"
+              className="text-muted shrink-0"
+              aria-hidden="true"
+            />
+            <div className="flex items-center gap-x-2 text-xs text-muted min-w-0">
+              <span className="font-mono shrink-0">{run.commitSha.slice(0, 7)}</span>
+              {run.commitAuthor && (
+                <span className="truncate">
+                  {t('runs.byAuthor')}<span className="text-default font-medium">{run.commitAuthor}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        ) : (
+          <StatusChip status={run.status} />
+        )}
+
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0 ml-auto">
           <div className="text-right">
-            <div className="text-xs font-medium text-muted">{t('runs.passRate')}</div>
-            <div className="text-base font-mono font-semibold tabular-nums text-default">
+            <div className="hidden sm:block text-xs font-medium text-muted">
+              {t('runs.passRate')}
+            </div>
+            <div className="text-sm sm:text-base font-semibold tabular-nums text-default">
               {passRateDisplay}
             </div>
           </div>
@@ -124,32 +152,9 @@ export function RunProgressHeader({ run }: { run: RunRecord }) {
               <div className="text-sm text-default">{formatDate(run.finishedAt)}</div>
             </div>
           )}
+          {hasCommitInfo && <StatusChip status={run.status} />}
         </div>
       </div>
-
-      {run.source === 'github_actions' && run.commitSha && (
-        <div
-          className="flex items-start gap-3 py-1.5"
-          data-testid="run-commit-info"
-        >
-          <GitCommit
-            size={16}
-            weight="duotone"
-            className="text-muted shrink-0 mt-0.5"
-            aria-hidden="true"
-          />
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
-              <span className="font-mono">{run.commitSha.slice(0, 7)}</span>
-              {run.commitAuthor && (
-                <span>
-                  {t('runs.byAuthor')}<span className="text-default">{run.commitAuthor}</span>
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
