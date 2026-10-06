@@ -8,8 +8,9 @@ from the session and the optional `x-organization-id` header, exactly like the s
 
 They live in the same `RunsModule`, in a second controller (`RunQueriesController`) mounted on the
 same `runs` path as the api-key `RunsController`. The two controllers never collide: the api-key
-controller only owns `POST /runs/ingest`, marked `@Public()` to bypass the global session guard; this
-controller owns every other verb and path under `/runs`, none of which is `ingest`. The CI run routes
+controller only owns `POST /runs/ingest` and `POST /runs/ingest/junit`, marked `@Public()` to bypass the
+global session guard; this controller owns every other verb and path under `/runs`, none of which is
+`ingest`. The CI run routes
 (`GET /ci-runs` and `GET /ci-runs/:id`) live in a third controller of the same module,
 `CiRunsController`, on their own `ci-runs` path.
 
@@ -22,9 +23,20 @@ from "exists in an organization you cannot see".
 
 ## `GET /runs?projectId=<id>`
 
-Lists runs in the caller's organization, newest first (`startedAt` descending). `projectId` is
-optional; omitting it returns every run across every project in the organization, which is what an
-organization-wide dashboard needs.
+Lists runs in the caller's organization, newest first (`startedAt` descending, then `id` descending).
+`projectId` is optional; omitting it returns every run across every project in the organization, which
+is what an organization-wide dashboard needs.
+
+| Query parameter | Required | Notes |
+| --- | --- | --- |
+| `projectId` | no | Restricts the list to one project. |
+| `source` | no | `manual`, `api` or `github_actions`. |
+| `days` | no | 1 to 365. Only runs that started within the last `days` days. |
+| `limit` | no | 1 to 100. Without it, every matching run comes back in one response. |
+| `cursor` | no | The `nextCursor` of the previous page. |
+
+The response is `{ items, nextCursor }`. `nextCursor` is the id of the last item of the page and is
+present only when `limit` was sent and another row exists.
 
 `source` (`manual`, `api` or `github_actions`) restricts the list to the runs of that source and combines
 with `projectId`. The Manual tab of the runs page asks for `source=manual`, so it lists only the runs a
@@ -34,8 +46,8 @@ reachable only by its direct link and from the suites. The tab filters by source
 a CI run link because the link is a property of automated runs: filtering on it listed every unlinked
 automated run next to the runs a person started.
 
-`(projectId, source, startedAt)` is the index behind that filter. Each push adds about 350 automated runs
-(one per JUnit test suite), so without it the Manual tab would walk the whole `(projectId, startedAt)`
+`(projectId, source, startedAt)` is the index behind that filter. Each push adds several hundred automated
+runs (one per JUnit test suite), so without it the Manual tab would walk the whole `(projectId, startedAt)`
 index to find the few runs a person started, and the cost would grow with every push. A query parameter
 the endpoint does not declare, the retired `ungrouped` included, is ignored like any other one, so a
 client that still sends it gets the list unfiltered, not an error.
@@ -50,10 +62,12 @@ carries a `caseCounts` object with a slot per `CaseStatus` plus `total`, and a `
   "projectId": "project_123",
   "organizationId": "org_123",
   "suiteId": "suite_123",
+  "suiteName": "Checkout",
   "name": "Checkout regression",
   "status": "running",
   "source": "manual",
   "externalId": "",
+  "reportExternalId": "",
   "startedAt": "2026-09-01T10:00:00.000Z",
   "caseCounts": {
     "total": 4,
@@ -64,7 +78,8 @@ carries a `caseCounts` object with a slot per `CaseStatus` plus `total`, and a `
     "skip": 0,
     "blocked": 0
   },
-  "passRate": 0.5
+  "passRate": 0.5,
+  "delta": { "regressions": 0, "fixes": 1, "unchanged": 2 }
 }
 ```
 
@@ -91,7 +106,7 @@ omits the key otherwise.
 
 The detail carries `delta` too, but as names rather than counts: `{ regressions: CaseDeltaEntry[],
 fixes: CaseDeltaEntry[] }` with `{ testCaseId, caseName }` per entry, or `null` for a suite's first
-run. Its predecessor is found with a direct indexed `findFirst` (same suite, earlier `startedAt`,
+run and for a run that has not finished. Its predecessor is found with a direct indexed `findFirst` (same suite, earlier `startedAt`,
 finished, ordered newest first) instead of the window query: a window function answers for every row
 in the partition, and the detail needs exactly one. What stays shared is the classification,
 `classifyCaseDelta` in `apps/api/src/modules/notifications/lib/regression-check.ts`, so the page and
@@ -99,11 +114,24 @@ the regression alert never disagree.
 
 ## `GET /runs/regressions?projectId=<id>&limit=<n>`
 
-Scans the project's most recent finished runs, `limit` at most, and returns every case that passed in
+Scans the project's most recent finished runs, `limit` at most (1 to 50, default 20; `projectId` is
+required), and returns every case that passed in
 the previous finished run of its suite and fails in the scanned one, with the run, suite and case names
 and the id of the run it is compared against, plus `runsScanned`. It shipped before this document
 mentioned it. It uses the same window query and the same classifier as the list delta above, filtered
 to the `regression` answer; the quality page reads it to show what recently broke.
+
+## `GET /runs/push-pass-rate?projectId=<id>&days=<n>`
+
+Returns one candle per commit, oldest first, as `{ items }`; the quality page reads it. `projectId` is
+required and `days` is 1 to 365, default 30, counted back from now. Only runs with status `pass` or
+`fail`, a `commitSha` and at least one decided case (`pass`, `fail` or `blocked`) count. A run's pass
+rate is its `pass` cases over its decided cases. Per commit, `open` and `close` are the pass rate of
+its first and last run by `startedAt`, `high` and `low` the extremes across its runs, and `passRate`
+the pooled rate over all of them. A candle also carries `commitSha`, `shortSha` (its first 7
+characters), `startedAt` (the earliest run of the commit), `runCount`, `executed` (every case of those
+runs), `passed`, `failed` and `blocked`. The query is raw SQL, `PUSH_PASS_RATE_SQL` in
+`apps/api/src/modules/runs/lib/push-pass-rate.ts`, scoped by organization and project.
 
 ## `GET /ci-runs?projectId=<id>`
 
@@ -223,7 +251,7 @@ Body:
 }
 ```
 
-`name` is optional and defaults to the suite's name.
+`name` is optional and defaults to the suite's name. The response is `201` with the run and its cases.
 
 Behavior:
 
@@ -234,8 +262,10 @@ Behavior:
   either (wrong project, wrong organization, or a suite that does not exist) answers `404` with
   `suite-not-found`. The endpoint does not distinguish which part of the pair was wrong, for the same
   reason cross-organization runs answer `404` and not `403`.
-- A suite with zero `TestCase` rows is rejected with `400` — a run cannot execute nothing.
-- The run's cases are **snapshotted** from the suite's current `TestCase` rows at creation time:
+- A suite with no `TestCase` row that is both `active` and manual is rejected with `409` and the code
+  `no-manual-cases` — a run cannot execute nothing, and automated cases are read-only here.
+- The run's cases are **snapshotted** from the suite's current `active` manual `TestCase` rows at
+  creation time:
   `name`, `steps`, `expectedResult` are copied, `testCaseId` is linked, `position` follows the suite's
   own case order, and every case starts `pending`. This is deliberate: it is audit evidence of what was
   executed. If a test case is edited or reordered after the run starts, the run's snapshot must not
@@ -267,7 +297,9 @@ Body:
 `status` must be one of `pass`, `fail`, `skip`, `blocked` — `pending` and `running` cannot be set
 through this endpoint, since those are the run's own starting/in-flight states, not an outcome a human
 records. This is the endpoint the keyboard shortcuts described in thesis §4.7.3 call: one case, one
-cheap request.
+cheap request. A run whose source is not `manual` answers `409` with `source-not-editable`: the
+reporting tool records the statuses of an automated run. A `caseId` that is not a case of that run
+answers `404` with `case-not-found`.
 
 On a successful patch:
 
@@ -280,9 +312,13 @@ On a successful patch:
    if the run had not already finished. Once set, a later patch never overwrites it — finishing is a
    one-way transition for a manual run, since this endpoint can only move a case away from `pending`,
    never back to it.
+4. Notifications are published. A `fail` result compares the case with the previous finished run of the
+   same suite and publishes `case_regressed` when it passed there. A run whose status moves into `pass`
+   or `fail` publishes `run_completed` or `run_failed`.
 
-The response is the full updated run with its cases, the same shape `GET /runs/:id` returns, so the UI
-can re-render immediately after a single keystroke without a second round trip.
+The response is the full updated run with its cases, the same shape `GET /runs/:id` returns except that
+`delta` is `null`, so the UI can re-render immediately after a single keystroke without a second round
+trip.
 
 ## Known limitation: the cursor row is not scoped to the caller
 
