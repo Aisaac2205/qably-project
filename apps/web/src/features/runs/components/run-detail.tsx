@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { LockSimple } from '@phosphor-icons/react'
 import type { RunRecord, CaseStatus } from '@qably/types'
 import { useKeyboardShortcuts } from '@/features/runs/hooks/use-keyboard-shortcuts'
 import { useUpdateRunCase } from '@/features/runs/hooks/use-update-run-case'
@@ -160,21 +159,13 @@ export function RunDetail({
           ))}
         </div>
       ) : (
-        <div className="flex items-start gap-2 py-1 text-xs">
-          <LockSimple
-            size={14}
-            weight="bold"
-            className="mt-0.5 shrink-0 text-muted"
-            aria-hidden="true"
-          />
-          <div className="space-y-0.5">
-            <p className="font-semibold text-default">
-              {t('runs.readOnlyRun', {
-                source: t(SOURCE_LABELS[run.source] ?? 'runs.sourceApi'),
-              })}
-            </p>
-            <p className="text-muted">{t('runs.readOnlyRunHint')}</p>
-          </div>
+        <div className="sr-only">
+          <p>
+            {t('runs.readOnlyRun', {
+              source: t(SOURCE_LABELS[run.source] ?? 'runs.sourceApi'),
+            })}
+          </p>
+          <p>{t('runs.readOnlyRunHint')}</p>
         </div>
       )}
 
@@ -188,8 +179,8 @@ export function RunDetail({
         {announcement}
       </div>
 
-      {/* Two-pane workspace card: case list + detail */}
-      <div className="rounded-xl border border-border bg-surface overflow-hidden grid grid-cols-1 md:grid-cols-[280px_1fr] divide-y md:divide-y-0 md:divide-x divide-border min-h-[440px]">
+      {/* Two-pane workspace: case list + detail */}
+      <div className="rule-bleed !px-0 border-y border-border bg-surface grid grid-cols-1 md:grid-cols-[280px_1fr] divide-y md:divide-y-0 md:divide-x divide-border min-h-[440px]">
         <div className="flex flex-col overflow-y-auto">
           <CaseList
             cases={sortedCases}
@@ -214,7 +205,7 @@ export function RunDetail({
       {isEditable && automatedCoverage.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-default">{t('runs.coveredByCi')}</h2>
-          <div className="rounded-xl border border-border bg-surface overflow-hidden divide-y divide-border">
+          <div className="rule-bleed !px-0 border-y border-border bg-surface divide-y divide-border">
             {automatedCoverage.map((tc) => {
               const described = describeCase(tc)
               return (
