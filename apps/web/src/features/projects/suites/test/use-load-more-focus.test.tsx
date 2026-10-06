@@ -7,12 +7,22 @@ interface HarnessProps {
   ids: string[]
   pageCount: number
   showButton?: boolean
+  resultsKey?: string
+  hasFailed?: boolean
 }
 
-function Harness({ ids, pageCount, showButton = true }: HarnessProps) {
+function Harness({
+  ids,
+  pageCount,
+  showButton = true,
+  resultsKey = 'results',
+  hasFailed = false,
+}: HarnessProps) {
   const { listProps, markActivation } = useLoadMoreFocus({
     rowCount: ids.length,
     pageCount,
+    resultsKey,
+    hasFailed,
   })
 
   return (
@@ -37,7 +47,12 @@ function Harness({ ids, pageCount, showButton = true }: HarnessProps) {
 }
 
 function ListHarness({ ids, pageCount }: HarnessProps) {
-  const { listProps, markActivation } = useLoadMoreFocus({ rowCount: ids.length, pageCount })
+  const { listProps, markActivation } = useLoadMoreFocus({
+    rowCount: ids.length,
+    pageCount,
+    resultsKey: 'results',
+    hasFailed: false,
+  })
 
   return (
     <div>
@@ -175,6 +190,56 @@ describe('useLoadMoreFocus', () => {
       rerender(<Harness ids={[...FIRST_PAGE, 'refreshed', 'again']} pageCount={1} />)
 
       expect(screen.getByRole('button', { name: 'Load more' })).toHaveFocus()
+    })
+  })
+
+  describe('when the activation is overtaken before its page lands', () => {
+    it('forgets it when the results change, so the page of the new results leaves the focus alone', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<Harness ids={[]} pageCount={0} />)
+      await user.click(screen.getByRole('button', { name: 'Load more' }))
+
+      rerender(<Harness ids={[]} pageCount={0} resultsKey="other" showButton={false} />)
+      expect(document.body).toHaveFocus()
+      rerender(<Harness ids={FIRST_PAGE} pageCount={1} resultsKey="other" showButton={false} />)
+
+      expect(document.body).toHaveFocus()
+    })
+
+    it('forgets it when its fetch failed, so a page that lands later leaves the focus alone', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<Harness ids={[]} pageCount={0} />)
+      await user.click(screen.getByRole('button', { name: 'Load more' }))
+
+      rerender(<Harness ids={[]} pageCount={0} hasFailed />)
+      rerender(<Harness ids={[]} pageCount={0} showButton={false} />)
+      expect(document.body).toHaveFocus()
+      rerender(<Harness ids={FIRST_PAGE} pageCount={1} showButton={false} />)
+
+      expect(document.body).toHaveFocus()
+    })
+
+    it('serves the retry that follows a failure with the activation of the retry', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<Harness ids={FIRST_PAGE} pageCount={1} />)
+      await user.click(screen.getByRole('button', { name: 'Load more' }))
+      rerender(<Harness ids={FIRST_PAGE} pageCount={1} hasFailed />)
+
+      await user.click(screen.getByRole('button', { name: 'Load more' }))
+      rerender(<Harness ids={TWO_PAGES} pageCount={2} />)
+
+      expect(screen.getByRole('link', { name: 's4' })).toHaveFocus()
+    })
+
+    it('keeps the activation while the same results are still on their way', async () => {
+      const user = userEvent.setup()
+      const { rerender } = render(<Harness ids={FIRST_PAGE} pageCount={1} />)
+      await user.click(screen.getByRole('button', { name: 'Load more' }))
+
+      rerender(<Harness ids={FIRST_PAGE} pageCount={1} resultsKey="results" />)
+      rerender(<Harness ids={TWO_PAGES} pageCount={2} resultsKey="results" />)
+
+      expect(screen.getByRole('link', { name: 's4' })).toHaveFocus()
     })
   })
 

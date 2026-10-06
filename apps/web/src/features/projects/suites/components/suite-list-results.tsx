@@ -74,12 +74,15 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     pageCount,
     refetch,
   } = useSuiteSummaries(projectId, filters)
+  const resultsKey = JSON.stringify(toSuiteSummariesQuery(filters))
   const { listProps, markActivation } = useLoadMoreFocus({
     rowCount: suites.length,
     pageCount,
+    resultsKey: `${projectId}:${resultsKey}`,
+    hasFailed: isLoadingError || isFetchNextPageError,
   })
   const { message, eventId } = useResultsAnnouncement({
-    resultsKey: JSON.stringify(toSuiteSummariesQuery(filters)),
+    resultsKey,
     rowCount: suites.length,
     pageCount,
     isSettled: !isLoading && !isLoadingError && !isPlaceholderData && !isFetchingNextPage,

@@ -1,12 +1,15 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
+import { isFocusFree } from '@/features/projects/suites/lib/is-focus-free'
 
 const ROW_LINK = 'a[href]'
 
 interface UseLoadMoreFocusOptions {
   rowCount: number
   pageCount: number
+  resultsKey: string
+  hasFailed: boolean
 }
 
 interface PendingActivation {
@@ -14,9 +17,15 @@ interface PendingActivation {
   hadFocus: boolean
   firstNewIndex: number
   pageCount: number
+  resultsKey: string
 }
 
-export function useLoadMoreFocus({ rowCount, pageCount }: UseLoadMoreFocusOptions) {
+export function useLoadMoreFocus({
+  rowCount,
+  pageCount,
+  resultsKey,
+  hasFailed,
+}: UseLoadMoreFocusOptions) {
   const listRef = useRef<HTMLElement | null>(null)
   const pendingRef = useRef<PendingActivation | null>(null)
   const setList = useCallback((node: HTMLElement | null) => {
@@ -29,23 +38,29 @@ export function useLoadMoreFocus({ rowCount, pageCount }: UseLoadMoreFocusOption
       hadFocus: document.activeElement === activator,
       firstNewIndex: rowCount,
       pageCount,
+      resultsKey,
     }
   }
 
   useEffect(() => {
+    if (hasFailed) pendingRef.current = null
+  }, [hasFailed])
+
+  useEffect(() => {
     const pending = pendingRef.current
 
-    if (pending === null || pageCount <= pending.pageCount) return
+    if (pending === null) return
+
+    if (pending.resultsKey !== resultsKey) {
+      pendingRef.current = null
+      return
+    }
+
+    if (pageCount <= pending.pageCount) return
 
     pendingRef.current = null
 
-    if (!pending.hadFocus) return
-
-    const active = document.activeElement
-    const focusIsFree =
-      active === null || active === document.body || active === pending.activator
-
-    if (!focusIsFree) return
+    if (!pending.hadFocus || !isFocusFree(pending.activator)) return
 
     const firstNewRow =
       rowCount > pending.firstNewIndex
@@ -58,7 +73,7 @@ export function useLoadMoreFocus({ rowCount, pageCount }: UseLoadMoreFocusOption
     }
 
     if (!pending.activator.isConnected) listRef.current?.focus()
-  }, [pageCount, rowCount])
+  }, [pageCount, rowCount, resultsKey])
 
   return { listProps: { ref: setList, tabIndex: -1 }, markActivation }
 }

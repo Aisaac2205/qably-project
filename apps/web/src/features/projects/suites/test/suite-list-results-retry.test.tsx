@@ -153,6 +153,59 @@ describe('SuiteListResults after a first load that failed', () => {
     })
   })
 
+  describe('when other results arrive after a retry that did not bring suites', () => {
+    it('leaves the focus alone when new filters bring the suites after the retry failed', async () => {
+      const user = userEvent.setup()
+      listSummaries
+        .mockRejectedValueOnce(new Error('down'))
+        .mockImplementationOnce(failsLater)
+        .mockImplementationOnce(() => later(pageOfRows(2)))
+      const { rerenderWith } = await renderResults()
+      await user.click(await screen.findByRole('button', { name: 'Retry' }))
+      await waitFor(() => expect(screen.getByRole('alert')).toHaveFocus())
+
+      await rerenderWith({ filters: { ...NO_FILTERS, status: 'fail' } })
+
+      await screen.findByTestId('suite-row-s0')
+      expect(rowLink('s0')).not.toHaveFocus()
+      expect(document.body).toHaveFocus()
+    })
+
+    it('leaves the focus alone when new filters bring the suites while the retry is still on its way', async () => {
+      const user = userEvent.setup()
+      const slow = deferred<SuiteSummariesPage>()
+      listSummaries
+        .mockRejectedValueOnce(new Error('down'))
+        .mockImplementationOnce(() => slow.promise)
+        .mockImplementationOnce(() => later(pageOfRows(2)))
+      const { rerenderWith } = await renderResults()
+      await user.click(await screen.findByRole('button', { name: 'Retry' }))
+
+      await rerenderWith({ filters: { ...NO_FILTERS, status: 'fail' } })
+
+      await screen.findByTestId('suite-row-s0')
+      expect(rowLink('s0')).not.toHaveFocus()
+      expect(document.body).toHaveFocus()
+    })
+
+    it('leaves the focus alone when another project brings its suites while the retry is still on its way', async () => {
+      const user = userEvent.setup()
+      const slow = deferred<SuiteSummariesPage>()
+      listSummaries
+        .mockRejectedValueOnce(new Error('down'))
+        .mockImplementationOnce(() => slow.promise)
+        .mockImplementationOnce(() => later(pageOfRows(2)))
+      const { rerenderWith } = await renderResults()
+      await user.click(await screen.findByRole('button', { name: 'Retry' }))
+
+      await rerenderWith({ projectId: 'proj-2' })
+
+      await screen.findByTestId('suite-row-s0')
+      expect(rowLink('s0')).not.toHaveFocus()
+      expect(document.body).toHaveFocus()
+    })
+  })
+
   describe('when the retry finds nothing to list', () => {
     it('moves the focus to the empty state and announces it', async () => {
       const user = userEvent.setup()
