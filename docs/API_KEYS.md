@@ -34,8 +34,6 @@ default, and a broader one is an opt-in with a documented warning:
 | ------------ | -------------------------- | ---------------------------------------- |
 | Cypress Cloud | Record key                | Per project                              |
 | Codecov      | Upload token               | Per repository (org-wide token optional) |
-| Vercel       | Access token               | Account, team, or single project         |
-| Railway      | `RAILWAY_TOKEN`            | Project + environment, deploy only       |
 
 The consequence that matters for correctness: **the project is derived from the key, never from the
 request payload**. An ingestion endpoint that trusted a `projectId` in the body would let any holder
@@ -67,7 +65,7 @@ keys apart without ever showing the secret again.
 
 The stored column is `sha256(secret)`. Two decisions are deliberate here.
 
-**Hashed, not encrypted.** Compare with `Connection.encryptedToken`, which holds SCM personal access
+**Hashed, not encrypted.** Compare with `Connection.encryptedAccessToken`, which holds SCM personal access
 tokens under AES: those must be recovered in plaintext to call GitHub. A Qably API key is never
 recovered — only compared. Encrypting it would create a master key whose compromise would expose
 every customer credential, for no functional gain.
@@ -117,12 +115,16 @@ workflow file.
       --header "Authorization: Bearer $QABLY_API_KEY" \
       --header "Content-Type: application/json" \
       --data @results.json \
-      https://api.qably.app/runs/ingest
+      https://api.qably.dev/runs/ingest
 ```
 
 The payload carries the commit SHA, the external run identifier and the case results. It does not
 carry the project: that comes from the key. See `docs/RUN_INGESTION.md` for the full request and
 response contract, the idempotency guarantee, and how `Run.status` is derived from the cases.
+
+A runner that already produces a JUnit XML report can skip the hand-written request. The API serves
+a zero-dependency reporter at `GET /report.mjs` that reads the key from `QABLY_API_KEY` and posts the
+reports; see `docs/CI.md`.
 
 ## Threat model
 
@@ -135,6 +137,7 @@ response contract, the idempotency guarantee, and how `Run.status` is derived fr
 | Timing analysis of the comparison      | `timingSafeEqual` over fixed-length digests                     |
 | Replayed or retried CI runs            | Idempotency on the external run identifier, with the ingestion endpoint |
 | Key leaked in logs                     | The token is never logged, in success or in error paths         |
+| Guessing keys or flooding the API      | Requests are counted per address (600 per minute across all routes) and per well-formed key (120 per minute by default, 30 on the ingestion routes). A malformed `Authorization` value is counted against the address, not given a bucket of its own |
 
 ## Known gap
 
