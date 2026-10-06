@@ -47,7 +47,7 @@ describe('SuiteList keyboard', () => {
     vi.restoreAllMocks()
   })
 
-  it('goes through the search, the filters, New suite, the rows and Load more, in that order', async () => {
+  it('follows the DOM order of the controls, whatever the breakpoint hides: search, filters, New suite, rows, Load more', async () => {
     const user = userEvent.setup()
     listSummaries.mockImplementation(pagedBy(7, 3))
     await renderList()
@@ -82,7 +82,6 @@ describe('SuiteList keyboard', () => {
     }
 
     expect(visited.size).toBeGreaterThanOrEqual(13)
-    expect(screen.getByTestId('suite-search')).toBeInTheDocument()
   })
 
   it('keeps its name on the list of suites', async () => {

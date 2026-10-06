@@ -27,6 +27,7 @@ describe('useSpokenMessage', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.useRealTimers()
   })
 
@@ -86,6 +87,39 @@ describe('useSpokenMessage', () => {
     rerender({ message: '', eventId: 1 })
 
     expect(result.current).toBe('')
+  })
+
+  it('cancels the frame it is waiting for when it unmounts, so nothing runs after it', () => {
+    const request = vi.spyOn(globalThis, 'requestAnimationFrame')
+    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame')
+    const { unmount } = renderSpoken(SHOWN)
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(1)
+
+    unmount()
+
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(cancel).toHaveBeenCalledWith(request.mock.results[0].value)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('waits on one frame only when a new event arrives before the first frame', () => {
+    const { result, rerender } = renderSpoken(SHOWN)
+
+    rerender({ message: '1 more suite loaded', eventId: 2 })
+    expect(vi.getTimerCount()).toBe(1)
+    nextFrame()
+
+    expect(result.current).toBe('1 more suite loaded')
+  })
+
+  it('asks for no frame when there is no message to say', () => {
+    const request = vi.spyOn(globalThis, 'requestAnimationFrame')
+
+    renderSpoken({ message: '', eventId: 0 })
+
+    expect(request).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it('follows a change of wording of the same event without emptying the region', () => {
