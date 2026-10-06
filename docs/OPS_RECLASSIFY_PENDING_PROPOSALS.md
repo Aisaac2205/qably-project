@@ -41,8 +41,11 @@ key clears on both completion and failure.
 
 ```sh
 DATABASE_URL="postgresql://..." REDIS_URL="redis://..." \
-  pnpm --filter @qably/api exec tsx scripts/reclassify-pending-proposals.ts --confirm
+  pnpm --filter @qably/api exec ts-node --project tsconfig.json scripts/reclassify-pending-proposals.ts --confirm
 ```
+
+`ts-node` is the runner `apps/api` has installed; `tsx` is not a dependency of the package, so
+`pnpm exec tsx` fails with "command not found".
 
 Omitting `--confirm` always fails loudly before touching the database or
 the queue — this is intentional, so a bare invocation (for example, while
@@ -60,13 +63,13 @@ SELECT count(*) FROM "extracted_proposal"
 
 ## Local testing
 
-This script was verified against the disposable local bench Postgres
-(`qably-bench-pg`, the same container `scripts/bench/review-inbox-bench.ts`
-uses) — never against the shared Railway database. Point `DATABASE_URL`
-at that local container and a local Redis to dry-run it yourself:
+Dry-run it against a disposable local Postgres, never against a shared database.
+`scripts/bench/review-inbox-bench.ts` follows the same rule: it refuses any
+`BENCH_DATABASE_URL` whose host is not `localhost` or `127.0.0.1`. Point
+`DATABASE_URL` at that local database and a local Redis, for example:
 
 ```sh
 DATABASE_URL="postgresql://bench:bench@localhost:55432/qably_bench" \
   REDIS_URL="redis://localhost:6379" \
-  pnpm --filter @qably/api exec tsx scripts/reclassify-pending-proposals.ts --confirm
+  pnpm --filter @qably/api exec ts-node --project tsconfig.json scripts/reclassify-pending-proposals.ts --confirm
 ```
