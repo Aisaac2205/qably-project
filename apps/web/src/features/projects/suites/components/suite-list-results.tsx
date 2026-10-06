@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { suiteNewPath } from '@/features/projects/lib/routes'
 import { useLoadMoreFocus } from '@/features/projects/suites/hooks/use-load-more-focus'
 import { useResultsAnnouncement } from '@/features/projects/suites/hooks/use-results-announcement'
+import { useSpokenMessage } from '@/features/projects/suites/hooks/use-spoken-message'
 import { useSuiteSummaries } from '@/features/projects/suites/hooks/use-suite-summaries'
 import {
   hasSummariesFilter,
@@ -76,13 +77,14 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     rowCount: suites.length,
     pageCount,
   })
-  const announcement = useResultsAnnouncement({
+  const { message, eventId } = useResultsAnnouncement({
     resultsKey: JSON.stringify(toSuiteSummariesQuery(filters)),
     rowCount: suites.length,
     pageCount,
     isSettled: !isLoading && !isLoadingError && !isPlaceholderData && !isFetchingNextPage,
     hasFailed: isLoadingError,
   })
+  const announcement = useSpokenMessage(message, eventId)
 
   function renderContent() {
     if (isLoadingError) {

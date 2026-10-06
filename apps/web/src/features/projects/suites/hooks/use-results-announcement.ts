@@ -23,18 +23,38 @@ interface AnnouncementState {
   settled: SettledResults | null
   announcement: Announcement | null
   failedLoad: boolean
+  eventId: number
+}
+
+interface ResultsAnnouncement {
+  message: string
+  eventId: number
 }
 
 const INITIAL_STATE: AnnouncementState = {
   settled: null,
   announcement: null,
   failedLoad: false,
+  eventId: 0,
 }
 
 const MESSAGE_KEYS = {
   loadedMore: 'suites.loadedMoreSuites',
   shown: 'suites.suitesShown',
 } as const
+
+function settle(
+  state: AnnouncementState,
+  settled: SettledResults,
+  announcement: Announcement | null,
+): AnnouncementState {
+  return {
+    settled,
+    announcement,
+    failedLoad: false,
+    eventId: announcement === null ? state.eventId : state.eventId + 1,
+  }
+}
 
 function advance(
   state: AnnouncementState,
@@ -52,21 +72,17 @@ function advance(
   const shown: Announcement = { kind: 'shown', count: rowCount }
 
   if (state.settled === null) {
-    return { settled: current, announcement: state.failedLoad ? shown : null, failedLoad: false }
+    return settle(state, current, state.failedLoad ? shown : null)
   }
 
   if (state.settled.key !== resultsKey) {
-    return { settled: current, announcement: shown, failedLoad: false }
+    return settle(state, current, shown)
   }
 
   if (pageCount > state.settled.pageCount) {
     const added = rowCount - state.settled.rowCount
 
-    return {
-      settled: current,
-      announcement: added > 0 ? { kind: 'loadedMore', count: added } : null,
-      failedLoad: false,
-    }
+    return settle(state, current, added > 0 ? { kind: 'loadedMore', count: added } : null)
   }
 
   const unchanged =
@@ -77,14 +93,18 @@ function advance(
   return { ...state, settled: current, failedLoad: false }
 }
 
-export function useResultsAnnouncement(input: ResultsAnnouncementInput): string {
+export function useResultsAnnouncement(input: ResultsAnnouncementInput): ResultsAnnouncement {
   const { t } = useTranslation()
   const [state, setState] = useState(INITIAL_STATE)
   const next = advance(state, input)
 
   if (next !== state) setState(next)
 
-  return next.announcement === null
-    ? ''
-    : t(MESSAGE_KEYS[next.announcement.kind], { count: next.announcement.count })
+  return {
+    message:
+      next.announcement === null
+        ? ''
+        : t(MESSAGE_KEYS[next.announcement.kind], { count: next.announcement.count }),
+    eventId: next.eventId,
+  }
 }

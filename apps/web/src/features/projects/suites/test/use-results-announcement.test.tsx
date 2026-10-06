@@ -20,6 +20,12 @@ const SETTLED: Input = {
 }
 
 function renderAnnouncement(initial: Input = SETTLED) {
+  return renderHook((props: Input) => useResultsAnnouncement(props).message, {
+    initialProps: initial,
+  })
+}
+
+function renderEvents(initial: Input = SETTLED) {
   return renderHook((props: Input) => useResultsAnnouncement(props), { initialProps: initial })
 }
 
@@ -51,6 +57,54 @@ describe('useResultsAnnouncement', () => {
       rerender(settledWith(loading, { rowCount: 50, pageCount: 1 }))
 
       expect(result.current).toBe('')
+    })
+  })
+
+  describe('the event behind each message', () => {
+    it('gives every announcement its own event, even when the text is the same as before', () => {
+      const { result, rerender } = renderEvents()
+
+      rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 3 }))
+      const first = result.current
+      rerender(settledWith(SETTLED, { resultsKey: 'cases', rowCount: 3 }))
+      const second = result.current
+
+      expect(first.message).toBe('3 suites shown')
+      expect(second.message).toBe('3 suites shown')
+      expect(second.eventId).toBeGreaterThan(first.eventId)
+    })
+
+    it('keeps the event while the same announcement stays on screen', () => {
+      const { result, rerender } = renderEvents()
+      rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 3 }))
+      const announced = result.current
+
+      rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 3 }))
+
+      expect(result.current).toEqual(announced)
+    })
+
+    it('moves on to a later event for a page of more suites after a change of results', () => {
+      const { result, rerender } = renderEvents()
+      rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 3 }))
+      const shown = result.current
+      rerender(pending(SETTLED, 3))
+
+      rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 53, pageCount: 2 }))
+
+      expect(result.current.message).toBe('50 more suites loaded')
+      expect(result.current.eventId).toBeGreaterThan(shown.eventId)
+    })
+
+    it('has no message and an event that is not newer while nothing is announced', () => {
+      const { result, rerender } = renderEvents()
+      rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 3 }))
+      const shown = result.current
+
+      rerender(pending(SETTLED, 3))
+
+      expect(result.current.message).toBe('')
+      expect(result.current.eventId).toBe(shown.eventId)
     })
   })
 

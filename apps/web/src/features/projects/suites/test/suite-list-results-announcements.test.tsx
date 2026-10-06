@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { SuiteSummariesPage } from '@qably/types'
 import { useI18nStore } from '@/lib/i18n/store'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
+import type { SuiteSummariesQuery } from '@/features/projects/suites/lib/suite-summaries-query'
 import * as suitesApiStub from '@/test/suites-api-stub'
 import { renderResults } from './suite-list-results-harness'
 import { pagedBy, rowsFrom } from './suite-list-results-pages'
-import { NO_FILTERS, deferred } from './suite-summaries-test-data'
+import { NO_FILTERS, createQueryClient, deferred } from './suite-summaries-test-data'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -83,11 +85,11 @@ describe('SuiteListResults announcements', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Load more' }))
     await screen.findByTestId('suite-row-s3')
-    expect(announcement()).toHaveTextContent('3 more suites loaded')
+    await within(announcement()).findByText('3 more suites loaded')
 
     await user.click(await screen.findByRole('button', { name: 'Load more' }))
     await screen.findByTestId('suite-row-s6')
-    expect(announcement()).toHaveTextContent('1 more suite loaded')
+    await within(announcement()).findByText('1 more suite loaded')
   })
 
   it('says how many suites the page brought even when it answered at once', async () => {
@@ -125,11 +127,11 @@ describe('SuiteListResults announcements', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Cargar más' }))
     await screen.findByTestId('suite-row-s3')
-    expect(announcement()).toHaveTextContent('Se cargaron 3 suites más')
+    await within(announcement()).findByText('Se cargaron 3 suites más')
 
     await user.click(await screen.findByRole('button', { name: 'Cargar más' }))
     await screen.findByTestId('suite-row-s6')
-    expect(announcement()).toHaveTextContent('Se cargó 1 suite más')
+    await within(announcement()).findByText('Se cargó 1 suite más')
   })
 
   it('says nothing when the next page fails', async () => {
@@ -161,5 +163,31 @@ describe('SuiteListResults announcements', () => {
     })
 
     await within(announcement()).findByText('2 suites shown')
+  })
+
+  it('empties the region before it says the same count again for other results', async () => {
+    const client = createQueryClient()
+    client.setDefaultOptions({
+      queries: { retry: false, gcTime: Infinity, staleTime: Infinity, refetchOnMount: false },
+    })
+    const seed = (query: SuiteSummariesQuery, count: number) =>
+      client.setQueryData(suiteKeys.summaryPage('proj-1', query), {
+        pages: [{ items: rowsFrom(0, count), nextCursor: null }],
+        pageParams: [undefined],
+      })
+    seed({ sort: 'recent' }, 3)
+    seed({ sort: 'recent', search: 'a' }, 2)
+    seed({ sort: 'recent', search: 'b' }, 2)
+    const { rerenderWith } = await renderResults({}, client)
+    await rerenderWith({ filters: { ...NO_FILTERS, search: 'a' } })
+    await within(announcement()).findByText('2 suites shown')
+    const seen: string[] = []
+    const observer = new MutationObserver(() => seen.push(announcement().textContent ?? ''))
+    observer.observe(announcement(), { childList: true, characterData: true, subtree: true })
+
+    await rerenderWith({ filters: { ...NO_FILTERS, search: 'b' } })
+
+    await waitFor(() => expect(seen).toEqual(['', '2 suites shown']))
+    observer.disconnect()
   })
 })
