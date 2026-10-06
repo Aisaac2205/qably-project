@@ -1,5 +1,6 @@
 'use client'
 
+import type { RefObject } from 'react'
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
 import type { SuiteSummary } from '@qably/types'
@@ -29,6 +30,7 @@ const ROW_LINK_CLASS =
 interface SuiteListResultsProps {
   projectId: string
   filters: SuiteSummariesFilters
+  focusRegion: RefObject<HTMLElement | null>
   onClearFilters: () => void
 }
 
@@ -60,7 +62,12 @@ function SuiteRows({ projectId, suites, listProps }: SuiteRowsProps) {
   )
 }
 
-export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteListResultsProps) {
+export function SuiteListResults({
+  projectId,
+  filters,
+  focusRegion,
+  onClearFilters,
+}: SuiteListResultsProps) {
   const { t } = useTranslation()
   const {
     suites,
@@ -94,6 +101,7 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     if (isLoadingError) {
       return (
         <SuiteListError
+          focusRegion={focusRegion}
           action={
             <Button
               type="button"

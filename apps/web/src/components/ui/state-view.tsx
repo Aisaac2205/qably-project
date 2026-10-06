@@ -26,7 +26,7 @@ export interface StateViewProps {
   description?: ReactNode
   action?: ReactNode
   className?: string
-  focusOnMount?: boolean
+  focusOnMount?: boolean | (() => boolean)
   onAutofocus?: () => void
 }
 
@@ -38,6 +38,7 @@ export function StateView({ kind, title, description, action, className, focusOn
 
   useEffect(() => {
     if (!focusOnMount) return
+    if (typeof focusOnMount === 'function' && !focusOnMount()) return
     stateRef.current?.focus()
     onAutofocus?.()
   }, [focusOnMount, onAutofocus])

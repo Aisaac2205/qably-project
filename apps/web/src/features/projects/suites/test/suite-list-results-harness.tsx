@@ -1,3 +1,4 @@
+import { createRef, type ReactNode } from 'react'
 import { act, render } from '@testing-library/react'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { vi } from 'vitest'
@@ -18,17 +19,23 @@ export const NO_SUITES_PROJECT = 'proj-empty'
 export async function renderResults(
   overrides: ResultsOverrides = {},
   client: QueryClient = createQueryClient(),
+  toolbar: ReactNode = null,
 ) {
   const onClearFilters = vi.fn()
+  const region = createRef<HTMLDivElement>()
   const element = (next: ResultsOverrides) => (
     <QueryClientProvider client={client}>
-      <SuiteListResults
-        projectId="proj-1"
-        filters={NO_FILTERS}
-        onClearFilters={onClearFilters}
-        {...overrides}
-        {...next}
-      />
+      <div ref={region}>
+        {toolbar}
+        <SuiteListResults
+          projectId="proj-1"
+          filters={NO_FILTERS}
+          focusRegion={region}
+          onClearFilters={onClearFilters}
+          {...overrides}
+          {...next}
+        />
+      </div>
     </QueryClientProvider>
   )
   let view!: ReturnType<typeof render>

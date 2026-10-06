@@ -94,6 +94,41 @@ describe('shared Phase 1 UI components', () => {
     expect(screen.getByText('No review cases').parentElement?.parentElement).toHaveFocus()
   })
 
+  it('moves focus when the focusOnMount predicate agrees and reports it once the panel is in the page', () => {
+    const onAutofocus = vi.fn()
+    const decide = vi.fn(() => screen.queryByText('No review cases') !== null)
+
+    const { rerender } = render(
+      <StateView kind="empty" title="No review cases" focusOnMount={decide} onAutofocus={onAutofocus} />,
+    )
+
+    expect(screen.getByText('No review cases').parentElement?.parentElement).toHaveFocus()
+    expect(decide).toHaveBeenCalledTimes(1)
+    expect(onAutofocus).toHaveBeenCalledTimes(1)
+
+    rerender(<StateView kind="empty" title="No review cases" focusOnMount={decide} onAutofocus={onAutofocus} />)
+
+    expect(decide).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves the focus where it is when the focusOnMount predicate declines', () => {
+    const onAutofocus = vi.fn()
+    const outside = document.createElement('input')
+    document.body.append(outside)
+
+    try {
+      outside.focus()
+
+      render(<StateView kind="empty" title="No review cases" focusOnMount={() => false} onAutofocus={onAutofocus} />)
+
+      expect(outside).toHaveFocus()
+      expect(screen.getByText('No review cases').parentElement?.parentElement).not.toHaveFocus()
+      expect(onAutofocus).not.toHaveBeenCalled()
+    } finally {
+      outside.remove()
+    }
+  })
+
   it('renders provenance and evidence from a supplied evidence contract', () => {
     render(<><ProvenanceSummary evidence={evidence} /><EvidenceList evidence={[evidence]} /></>)
 

@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useCallback, type ReactNode, type RefObject } from 'react'
 import { StateView } from '@/components/ui/state-view'
 import { useTranslation } from '@/lib/i18n'
-import { isFocusFree } from '@/features/projects/suites/lib/is-focus-free'
+import { isFocusHeldWithin } from '@/features/projects/suites/lib/is-focus-held-within'
 
 interface SuiteListErrorProps {
+  focusRegion: RefObject<HTMLElement | null>
   action: ReactNode
 }
 
-export function SuiteListError({ action }: SuiteListErrorProps) {
+export function SuiteListError({ focusRegion, action }: SuiteListErrorProps) {
   const { t } = useTranslation()
-  const [takesFocus] = useState(() => isFocusFree())
+  const takesFocus = useCallback(() => !isFocusHeldWithin(focusRegion), [focusRegion])
 
   return (
     <StateView

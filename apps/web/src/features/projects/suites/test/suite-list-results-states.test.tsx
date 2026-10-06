@@ -1,11 +1,11 @@
-import { act, screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { SuiteSummariesPage } from '@qably/types'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import * as suitesApiStub from '@/test/suites-api-stub'
 import { EMPTY_PAGE, NO_SUITES_PROJECT, renderResults } from './suite-list-results-harness'
-import { NO_FILTERS, deferred } from './suite-summaries-test-data'
+import { NO_FILTERS, createQueryClient, deferred } from './suite-summaries-test-data'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -111,10 +111,64 @@ describe('SuiteListResults states', () => {
       await waitFor(() => expect(listSummaries).toHaveBeenCalledTimes(2))
       expect(listSummaries.mock.calls[1][0]).toMatchObject({ sort: 'cases', cursor: undefined })
     })
+
+    it('takes the focus from a link outside the list, as after a click in the sidebar', async () => {
+      const sidebarLink = document.createElement('a')
+      sidebarLink.href = '/projects'
+      document.body.append(sidebarLink)
+
+      try {
+        sidebarLink.focus()
+        expect(sidebarLink).toHaveFocus()
+        listSummaries.mockRejectedValueOnce(new Error('down'))
+
+        await renderResults()
+
+        expect(await screen.findByRole('alert')).toHaveFocus()
+      } finally {
+        sidebarLink.remove()
+      }
+    })
+
+    it('leaves the focus on a control of the list the user reached first', async () => {
+      const pending = deferred<SuiteSummariesPage>()
+      listSummaries.mockReturnValueOnce(pending.promise)
+      await renderResults({}, createQueryClient(), <input aria-label="Toolbar stand-in" />)
+      const control = screen.getByLabelText('Toolbar stand-in')
+      act(() => control.focus())
+
+      await act(async () => {
+        pending.reject(new Error('down'))
+      })
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Could not load suites.')
+      expect(control).toHaveFocus()
+      expect(alert).not.toHaveFocus()
+    })
   })
 
   describe('when the answer to a change of filters fails', () => {
-    it('leaves the focus on the control the user is in', async () => {
+    it('leaves the focus on the control of the list the user is in', async () => {
+      const { rerenderWith } = await renderResults(
+        {},
+        createQueryClient(),
+        <input aria-label="Toolbar stand-in" />,
+      )
+      await screen.findByRole('list', { name: 'Suites' })
+      const control = screen.getByLabelText('Toolbar stand-in')
+      act(() => control.focus())
+      listSummaries.mockRejectedValueOnce(new Error('down'))
+
+      await rerenderWith({ filters: { ...NO_FILTERS, search: 'abc' } })
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Could not load suites.')
+      expect(control).toHaveFocus()
+      expect(alert).not.toHaveFocus()
+    })
+
+    it('takes the focus from a control outside the list', async () => {
       const outside = document.createElement('input')
       document.body.append(outside)
 
@@ -122,14 +176,14 @@ describe('SuiteListResults states', () => {
         const { rerenderWith } = await renderResults()
         await screen.findByRole('list', { name: 'Suites' })
         act(() => outside.focus())
+        expect(outside).toHaveFocus()
         listSummaries.mockRejectedValueOnce(new Error('down'))
 
         await rerenderWith({ filters: { ...NO_FILTERS, search: 'abc' } })
 
         const alert = await screen.findByRole('alert')
         expect(alert).toHaveTextContent('Could not load suites.')
-        expect(outside).toHaveFocus()
-        expect(alert).not.toHaveFocus()
+        expect(alert).toHaveFocus()
       } finally {
         outside.remove()
       }
@@ -144,6 +198,21 @@ describe('SuiteListResults states', () => {
       await rerenderWith({ filters: { ...NO_FILTERS, search: 'abc' } })
 
       expect(await screen.findByRole('alert')).toHaveFocus()
+    })
+
+    it('takes the focus from the row link the error replaces', async () => {
+      const { rerenderWith } = await renderResults()
+      const list = await screen.findByRole('list', { name: 'Suites' })
+      const link = within(list).getAllByRole('link')[0]
+      act(() => link.focus())
+      expect(link).toHaveFocus()
+      listSummaries.mockRejectedValueOnce(new Error('down'))
+
+      await rerenderWith({ filters: { ...NO_FILTERS, search: 'abc' } })
+
+      const alert = await screen.findByRole('alert')
+      expect(link).not.toBeInTheDocument()
+      expect(alert).toHaveFocus()
     })
   })
 

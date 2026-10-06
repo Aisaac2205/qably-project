@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { useSuiteListFilters } from '@/features/projects/suites/hooks/use-suite-list-filters'
 import { useSuiteTags } from '@/features/projects/suites/hooks/use-suite-summaries'
 import { withActiveTag } from '@/features/projects/suites/lib/suite-filter-options'
@@ -14,9 +15,10 @@ export function SuiteList({ projectId }: SuiteListProps) {
   const filters = useSuiteListFilters()
   const { tags } = useSuiteTags(projectId)
   const { sort, appliedSearch, status, tag, clearFilters } = filters
+  const regionRef = useRef<HTMLDivElement>(null)
 
   return (
-    <div className="space-y-3">
+    <div ref={regionRef} className="space-y-3">
       <SuiteListToolbar
         projectId={projectId}
         filters={filters}
@@ -25,6 +27,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
       <SuiteListResults
         projectId={projectId}
         filters={{ sort, search: appliedSearch, status, tag }}
+        focusRegion={regionRef}
         onClearFilters={clearFilters}
       />
     </div>

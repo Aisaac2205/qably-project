@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { SuiteSummariesPage } from '@qably/types'
@@ -85,6 +85,22 @@ describe('SuiteList while the results change', () => {
     expect(screen.getByTestId('suite-search')).toHaveValue('abc')
     expect(input).toHaveFocus()
     expect(alert).not.toHaveFocus()
+  })
+
+  it('puts the focus on the failure when it replaces the row link the focus was on', async () => {
+    await renderList()
+    await screen.findByTestId('suite-row-suite-4')
+    const link = within(screen.getByRole('list', { name: 'Suites' })).getAllByRole('link')[0]
+    listSummaries.mockRejectedValueOnce(new Error('down'))
+    fireEvent.change(screen.getByTestId('suite-search'), { target: { value: 'abc' } })
+    act(() => link.focus())
+    expect(link).toHaveFocus()
+
+    const alert = await within(resultsArea()).findByRole('alert')
+
+    expect(link).not.toBeInTheDocument()
+    expect(alert).toHaveTextContent('Could not load suites.')
+    expect(alert).toHaveFocus()
   })
 
   it('keeps the keystrokes typed after the failure in the search input', async () => {

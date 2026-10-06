@@ -1,10 +1,12 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import type { SuiteSummariesPage } from '@qably/types'
 import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import * as suitesApiStub from '@/test/suites-api-stub'
 import { renderList } from './suite-list-harness'
 import { pagedBy, rowIds } from './suite-list-results-pages'
+import { deferred } from './suite-summaries-test-data'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -121,6 +123,44 @@ describe('SuiteList', () => {
 
       await screen.findByTestId('suite-row-suite-4')
       expect(rowIds()).toEqual(['suite-4', 'suite-3', 'suite-2', 'suite-1'])
+    })
+
+    it('puts the focus on the error when it was left on the sidebar link that opened the page', async () => {
+      const sidebarLink = document.createElement('a')
+      sidebarLink.href = '/projects/proj-1/suites'
+      document.body.append(sidebarLink)
+
+      try {
+        sidebarLink.focus()
+        expect(sidebarLink).toHaveFocus()
+        listSummaries.mockRejectedValueOnce(new Error('down'))
+
+        await renderList()
+
+        const alert = await screen.findByRole('alert')
+        expect(alert).toHaveTextContent('Could not load suites.')
+        expect(alert).toHaveFocus()
+      } finally {
+        sidebarLink.remove()
+      }
+    })
+
+    it('leaves the focus on the search input when the first load fails after the user reached it', async () => {
+      const user = userEvent.setup()
+      const pending = deferred<SuiteSummariesPage>()
+      listSummaries.mockReturnValueOnce(pending.promise)
+      await renderList()
+      const input = screen.getByTestId('suite-search')
+      await user.click(input)
+
+      await act(async () => {
+        pending.reject(new Error('down'))
+      })
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Could not load suites.')
+      expect(input).toHaveFocus()
+      expect(alert).not.toHaveFocus()
     })
   })
 
