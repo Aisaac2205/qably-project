@@ -29,6 +29,12 @@ export function buildTagOptions(t: Translate, availableTags: string[]): FilterOp
   ]
 }
 
+export function withActiveTag(tags: readonly string[], active: TagFilter): string[] {
+  if (active === 'all' || tags.includes(active)) return [...tags]
+
+  return [...tags, active].sort()
+}
+
 export function buildSortOptions(t: Translate): FilterOption<SortKey>[] {
   return [
     { value: 'recent', label: t('suites.sortMostRecent') },

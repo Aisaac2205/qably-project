@@ -2,6 +2,7 @@
 
 import { useSuiteListFilters } from '@/features/projects/suites/hooks/use-suite-list-filters'
 import { useSuiteTags } from '@/features/projects/suites/hooks/use-suite-summaries'
+import { withActiveTag } from '@/features/projects/suites/lib/suite-filter-options'
 import { SuiteListResults } from './suite-list-results'
 import { SuiteListToolbar } from './suite-list-toolbar'
 
@@ -16,7 +17,11 @@ export function SuiteList({ projectId }: SuiteListProps) {
 
   return (
     <div className="space-y-3">
-      <SuiteListToolbar projectId={projectId} filters={filters} availableTags={tags} />
+      <SuiteListToolbar
+        projectId={projectId}
+        filters={filters}
+        availableTags={withActiveTag(tags, tag)}
+      />
       <SuiteListResults
         projectId={projectId}
         filters={{ sort, search: appliedSearch, status, tag }}
