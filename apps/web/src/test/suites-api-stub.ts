@@ -2,10 +2,19 @@ import type {
   ConfirmDocumentationResult,
   DocumentFilesResult,
   Suite,
+  SuiteSummariesPage,
+  SuiteTagsFacet,
   TestCase,
 } from '@qably/types'
 import { mockSuites } from '@/lib/mock-data'
-import type { CreateCasePayload, UpdateCasePayload } from '@/features/projects/suites/api/suites.api'
+import type {
+  CreateCasePayload,
+  ListSuiteSummariesParams,
+  UpdateCasePayload,
+} from '@/features/projects/suites/api/suites.api'
+import { runFixtures } from './runs-api-stub'
+import { collectProjectSuiteTags } from './suite-summaries-stub'
+import { pageSuiteSummaries } from './suite-summaries-stub-page'
 
 let suites: Suite[] = structuredClone(mockSuites)
 let caseIdCounter = 0
@@ -21,6 +30,20 @@ export function listSuites(projectId?: string): Promise<Suite[]> {
       ? suites
       : suites.filter((suite) => suite.projectId === projectId),
   )
+}
+
+export function listSuiteSummaries(
+  params: ListSuiteSummariesParams,
+): Promise<SuiteSummariesPage> {
+  try {
+    return Promise.resolve(pageSuiteSummaries(suites, runFixtures, params))
+  } catch (error) {
+    return Promise.reject(error)
+  }
+}
+
+export function listSuiteTags(projectId: string): Promise<SuiteTagsFacet> {
+  return Promise.resolve(collectProjectSuiteTags(suites, projectId))
 }
 
 export function getSuite(id: string): Promise<Suite> {
