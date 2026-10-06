@@ -215,7 +215,7 @@ mutation that marks the details stale. The call uses `refetchType: 'none'`, like
 project detail after a suite mutation: the run is almost never on screen when the library changes, so a
 refetch would cost one request per mutation for a page nobody is looking at, and an invalidated query is
 stale whatever its age, so the next visit to the run refetches it. Run details live under their own key
-prefix (`['runs', 'detail', id]`) so this never touches the run list pages or the suite metrics.
+prefix (`['runs', 'detail', id]`) so this never touches the run list pages or the paged suite list (`SUITE_LIST_PAGINATION.md`).
 
 Deleting a suite is the one library mutation that also changes the run lists. `Run.suite` is
 `onDelete: Cascade`, so the runs of the suite are deleted with it, and a Manual tab cached before the
