@@ -1,6 +1,6 @@
 # Qably
 
-Qably is a QA management platform that integrates automated test suites, execution runs, CI pipeline ingestion, and test case documentation. When test files change or test runs complete, the platform extracts structured test cases using the Google Gemini API and queues them for human confirmation. The system manages the full quality lifecycle across projects, suites, manual runs, CI reporting, and analytics.
+Qably is a QA management platform that integrates automated test suites, execution runs, CI pipeline ingestion, and test case documentation. When test files change in a connected repository, or when a user asks for documentation, the platform extracts structured test cases with the Google Gemini API and queues them in a review inbox for human confirmation. The system manages the full quality lifecycle across projects, suites, manual runs, CI reporting, and analytics.
 
 ## Monorepo Layout
 
@@ -8,11 +8,11 @@ The repository is managed as a pnpm workspace orchestrated by Turborepo.
 
 | Path | Stack | Description |
 |---|---|---|
-| `apps/web` | Next.js 16 (App Router), React 19, Tailwind v4, TanStack Query, Zustand, Better Auth client | Primary web console for test suites, execution runs, review inbox, traceability calendars, and project settings. Communicates with `apps/api` via typed contracts and includes an in-memory mock store fallback. |
+| `apps/web` | Next.js 16 (App Router), React 19, Tailwind v4, TanStack Query, Zustand, Better Auth client | Primary web console for the dashboard, test library, CI and manual runs, review inbox, Aeris project chat, notifications, and organization and project settings. Communicates with `apps/api` over HTTP and requires `NEXT_PUBLIC_API_URL`. |
 | `apps/api` | NestJS 11, PostgreSQL, Prisma ORM, Redis, BullMQ, Better Auth, Google Gemini (`@google/genai`), Resend | Core transactional backend handling organizations, projects, test run ingestion (JSON and JUnit XML), async AI test case extraction, and webhook integrations. |
 | `apps/landing` | Astro 7, React 19 islands, Tailwind v4, Motion | Public marketing site and interactive technical documentation reader supporting Spanish (`/`) and English (`/en/`). |
-| `packages/types` | TypeScript | Shared domain models, status definitions, API request schemas, and entity contracts (`@qably/types`). |
-| `packages/ui` | React 19, Tailwind v4, Recharts | Shared dashboard analytics primitives including KPI cards, trend charts, status chips, and sparklines (`@qably/ui`). |
+| `packages/types` | TypeScript | Shared domain interfaces, status unions, API contracts, and a few pure helpers used by both apps (`@qably/types`). |
+| `packages/ui` | React 19, Tailwind v4, Recharts | Shared dashboard primitives including KPI tiles, status chips, sparklines, gauges, delivery bars, and a Recharts chart primitive (`@qably/ui`). |
 | `packages/i18n` | TypeScript | Centralized localization dictionaries (`en.json`, `es.json`) and RFC 4647/7231 locale negotiation helpers (`@qably/i18n`). |
 | `packages/test-naming` | TypeScript | Shared utilities for sanitizing, formatting, and humanizing test and suite identifiers (`@qably/test-naming`). |
 | `packages/config` | TypeScript | Shared TypeScript configuration (`tsconfig.base.json`) used across the workspace (`@qably/config`). |
@@ -21,10 +21,10 @@ The repository is managed as a pnpm workspace orchestrated by Turborepo.
 
 Qably isolates data ingestion into two independent channels:
 
-1. **Test Run Ingestion:** CI pipelines send execution results to `POST /runs/ingest` or `POST /runs/ingest/junit` using a project API key (`Authorization: Bearer <key>`). The backend updates suite pass rates, stores failure logs, and computes health metrics.
-2. **Repository Changes:** Source code providers send push events to `POST /webhooks/scm/:provider` with HMAC signatures. The backend enqueues jobs in Redis via BullMQ, loads test file diffs, and prompts the Google Gemini API (`gemini-3.1-flash-lite`) to extract structured test proposals into the review inbox.
+1. **Test Run Ingestion:** CI pipelines send execution results to `POST /runs/ingest` or `POST /runs/ingest/junit` using a project API key (`Authorization: Bearer <key>`). The backend stores each run with its per-case results and failure details, and derives run status and suite health from them. The JSON endpoint answers `200` after processing the run; the JUnit endpoint parses the XML in the HTTP handler and answers `202` once the parsed suites are queued.
+2. **Repository Changes:** Source code providers send push events to `POST /webhooks/scm/:provider` with HMAC signatures. The backend enqueues jobs in Redis via BullMQ, reads the changed test files at the pushed commit, and prompts the Google Gemini API (default model `gemini-3.1-flash-lite`, set by `GEMINI_MODEL`) to extract structured test proposals into the review inbox.
 
-The frontend (`apps/web`) communicates with `apps/api` through a centralized client that automatically attaches the current organization identifier (`x-organization-id`) and user session headers. When developing without a backend instance, the web application can run against a typed mock store.
+The frontend (`apps/web`) communicates with `apps/api` through a centralized client that automatically attaches the current organization identifier (`x-organization-id`) and sends the Better Auth session cookies. The web application reads its feature data from a running `apps/api` instance.
 
 ## Design System
 
@@ -37,9 +37,9 @@ The product interface enforces strict design constraints documented in `CLAUDE.m
 
 ## Prerequisites
 
-- Node.js >= 22.12.0
+- Node.js >= 22.22.1 (enforced by `engines` and `engine-strict=true` in `.npmrc`)
 - pnpm >= 10.0.0 (version 10.33.0 is configured in `package.json`)
-- Docker (required to run PostgreSQL and Redis locally for `apps/api`)
+- PostgreSQL and Redis for `apps/api`. `apps/api/docker-compose.yml` starts both locally with Docker.
 
 ## Getting Started
 
@@ -49,13 +49,13 @@ Install workspace dependencies from the root directory:
 pnpm install
 ```
 
-Start all applications concurrently in development mode:
+Start the apps that define a `dev` script, `apps/web` and `apps/landing`, concurrently:
 
 ```bash
 pnpm run dev
 ```
 
-Target a single application with the `--filter` flag:
+`apps/api` has no `dev` script, so `pnpm run dev` does not start it. Target a single application with the `--filter` flag:
 
 ```bash
 # Start the web console
@@ -70,14 +70,14 @@ pnpm --filter @qably/landing dev
 
 ## Workspace Commands
 
-The root `package.json` provides scripts that execute across all packages via Turborepo:
+The root `package.json` provides scripts that Turborepo runs in every workspace member that defines the matching script:
 
-- `pnpm run build` runs production builds for every app and package.
-- `pnpm run lint` executes ESLint across the codebase.
-- `pnpm run type-check` verifies TypeScript types across all projects.
+- `pnpm run build` runs production builds.
+- `pnpm run lint` executes ESLint in `apps/api` and `apps/web`.
+- `pnpm run type-check` verifies TypeScript types across the apps and packages.
 
 For service-specific testing and database operations, consult the README inside each application folder:
 
-- [`apps/api/README.md`](file:///c:/Users/Asus/Projects/qably/apps/api/README.md) for database migrations, queue debugging, and backend test runners.
-- [`apps/web/README.md`](file:///c:/Users/Asus/Projects/qably/apps/web/README.md) for frontend component testing and state management architecture.
-- [`apps/landing/README.md`](file:///c:/Users/Asus/Projects/qably/apps/landing/README.md) for public marketing routes, docs content, and preview islands.
+- [`apps/api/README.md`](apps/api/README.md) for modules, background workers, environment variables, database migrations, and backend test runners.
+- [`apps/web/README.md`](apps/web/README.md) for frontend component testing and state management architecture.
+- [`apps/landing/README.md`](apps/landing/README.md) for public marketing routes, docs content, and preview islands.
