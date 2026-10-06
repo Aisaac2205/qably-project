@@ -3,12 +3,16 @@
 Qably links a project to a repository without asking anyone to generate or paste a personal access
 token. The credential comes from the GitHub sign-in the user already performed.
 
+This guide covers GitHub. Connections also accept the `BITBUCKET` provider; its webhooks are handled
+by `apps/api/src/modules/ingestion/adapters/bitbucket.adapter.ts`.
+
 ## The flow
 
 1. The user signs in with GitHub. `better-auth` stores the provider access token on the `account`
    row it already owns.
 2. `GET /connections/available-repos` reads that token and asks GitHub for the repositories the user
-   can reach, across their own account and the organizations they belong to.
+   can reach, across their own account and the organizations they belong to (up to five pages of 100
+   repositories).
 3. The user picks a repository in the project form. The picker merges two sources into one list,
    ordered by most recent push so the repository someone touched today sits at the top: repositories
    already connected to the organization, and repositories that GitHub offers but Qably has not
@@ -48,16 +52,25 @@ The editor lives inline in the repository panel (`test-file-patterns-editor.tsx`
 
 ## Credentials, and what is deliberately absent
 
-`Connection` stores **no** GitHub credential. The column that used to hold an encrypted personal
-access token is gone. Every call to GitHub uses the acting user's OAuth token, which better-auth
-keeps and refreshes.
+`Connection` stores **no** GitHub OAuth credential. The required column that used to hold an
+encrypted personal access token is gone. Every call that comes from a user action, the repository
+picker and stack detection, uses the acting user's OAuth token, which better-auth keeps and
+refreshes.
+
+`Connection.encryptedAccessToken` is a different, optional column and is empty unless somebody sets
+it. `PUT /projects/:projectId/repository/access-token` stores a token of 1 to 500 characters,
+encrypted by `EncryptionService`, and `DELETE` on the same path clears it. Both require the `owner`
+or `admin` role, and `GET /projects/:projectId/repository` reports only `hasAccessToken`, never the
+value. `SourceReader` sends the token as a bearer credential when it reads a file, and sends an
+unauthenticated request when there is none, which is enough for a public repository. The web client
+has no screen for this token today.
 
 Provider tokens are encrypted at rest through `account.encryptOAuthTokens`. This is not the default:
 better-auth's `setTokenUtil` returns the token unchanged unless the option is set, which would leave
 a credential with repository access sitting in plaintext in the database.
 
-The only secret Qably still generates and encrypts itself is the per-connection webhook secret. That
-one is ours, not GitHub's.
+The webhook secret is the only secret Qably generates and encrypts itself. It is ours, not GitHub's.
+The optional access token above is encrypted the same way, but it is supplied by a person.
 
 ## Accepted risk: the `repo` scope is broad
 
@@ -101,13 +114,13 @@ nothing else. Dependency directories (`node_modules`, `vendor`) and build output
 | `pubspec.yaml` | Flutter, only when the manifest actually depends on the Flutter SDK |
 | `requirements.txt`, `pyproject.toml` | Python, Django, FastAPI, and the psycopg / PyMySQL / PyMongo / redis clients |
 | `go.mod` | Go, and PostgreSQL via `lib/pq` or `jackc/pgx` |
-| `docker-compose.yml` | Docker, and the engine behind each `image:` — Postgres, MySQL/MariaDB, Mongo, Redis |
+| `docker-compose.yml`, `docker-compose.yaml` | Docker, and the engine behind each `image:` — Postgres, MySQL/MariaDB, Mongo, Redis |
 
 Test runners matter more here than anywhere else: Qably exists to orchestrate them, so knowing a
 repository runs Playwright or Jest is the single most actionable thing detection can report.
 
 The compose file is the cheapest reliable signal for a database engine, because a language manifest
-often names an ORM rather than the engine behind it. It costs nothing extra: the root listing that
+often names an ORM rather than the engine behind it. It costs nothing extra: the tree listing that
 finds the manifests already tells us the file is there.
 
 **Deliberately not done: scanning source code.** Walking the repository tree to grep imports would
@@ -117,9 +130,13 @@ part of the stack. Manifests are a declaration of intent; loose code is circumst
 A polyglot repository reports every stack it declares. A Dart package that is not a Flutter app is
 not reported as Flutter, and a manifest that fails to parse is skipped rather than guessed at.
 
-## Background work has no credential yet
+## Background work has no OAuth credential
 
-Because every GitHub call borrows the acting user's token, any process that runs without a user
-present cannot reach GitHub today. The ingestion worker currently does not need to — it only marks
-events processed. The moment AI extraction needs to read repository files on its own schedule, this
-becomes a blocker, and it is the point at which the GitHub App migration stops being optional.
+Because the picker and stack detection borrow the acting user's token, a process that runs without a
+user present cannot use it. The ingestion worker only records code changes and enqueues extraction
+jobs, so it does not need GitHub access. The extraction worker does read repository files on its own
+schedule, through `SourceReader`, and it can only authenticate with the optional
+`Connection.encryptedAccessToken`. Without one it reads as an anonymous caller, so a private
+repository fails with an `http-<status>` reason, which the job records on the case (see
+`AI_EXTRACTION.md`). A GitHub App installation token would replace both the per-user token
+and the pasted one.
