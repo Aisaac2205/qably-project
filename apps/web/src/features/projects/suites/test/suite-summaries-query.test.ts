@@ -55,6 +55,27 @@ describe('toSuiteSummariesQuery', () => {
     expect(toSuiteSummariesQuery({ ...NO_FILTERS, search }).search).toBe('d'.repeat(200))
   })
 
+  it('never lets the cap leave a space at the end of the key', () => {
+    const search = `${'a'.repeat(199)} ${'b'.repeat(10)}`
+
+    const query = toSuiteSummariesQuery({ ...NO_FILTERS, search })
+
+    expect(query.search).toBe('a'.repeat(199))
+    expect(query.search?.endsWith(' ')).toBe(false)
+  })
+
+  it('trims again when the cap falls inside a run of spaces', () => {
+    const search = `a${' '.repeat(250)}b`
+
+    expect(toSuiteSummariesQuery({ ...NO_FILTERS, search }).search).toBe('a')
+  })
+
+  it('keeps the spaces inside a search that the cap does not cut', () => {
+    expect(toSuiteSummariesQuery({ ...NO_FILTERS, search: 'login  flow' }).search).toBe(
+      'login  flow',
+    )
+  })
+
   it('drops a search made only of whitespace', () => {
     expect(toSuiteSummariesQuery({ ...NO_FILTERS, search: '   ' })).toStrictEqual({
       sort: 'recent',

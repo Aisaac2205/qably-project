@@ -13,6 +13,7 @@ export interface SuiteListFilters {
   search: string
   appliedSearch: string
   setSearch: (value: string) => void
+  setSearchComposing: (composing: boolean) => void
   searchRef: RefObject<HTMLInputElement | null>
   status: StatusFilter
   setStatus: (value: StatusFilter) => void
@@ -27,16 +28,19 @@ export interface SuiteListFilters {
 export function useSuiteListFilters(): SuiteListFilters {
   const [search, setSearch] = useState('')
   const [appliedSearch, setAppliedSearch] = useState('')
+  const [isComposing, setSearchComposing] = useState(false)
   const [status, setStatus] = useState<StatusFilter>('all')
   const [tag, setTag] = useState<TagFilter>('all')
   const [sort, setSort] = useState<SortKey>('recent')
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
+    if (isComposing) return
+
     const timer = setTimeout(() => setAppliedSearch(search), SEARCH_DEBOUNCE_MS)
 
     return () => clearTimeout(timer)
-  }, [search])
+  }, [search, isComposing])
 
   const hasActiveFilter = search !== '' || status !== 'all' || tag !== 'all'
 
@@ -52,6 +56,7 @@ export function useSuiteListFilters(): SuiteListFilters {
     search,
     appliedSearch,
     setSearch,
+    setSearchComposing,
     searchRef,
     status,
     setStatus,

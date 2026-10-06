@@ -1,5 +1,5 @@
 import { createRef, useState } from 'react'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import { SuiteFilterBar, type SortKey } from '@/features/projects/suites/components/suite-filter-bar'
@@ -162,6 +162,40 @@ describe('SuiteFilterBar', () => {
       })
 
       expect((screen.getByTestId('suite-search') as HTMLInputElement).value).toHaveLength(200)
+    })
+
+    it('reports when the search starts and ends a composition', async () => {
+      const onSearchCompositionChange = vi.fn()
+      await act(async () => {
+        render(
+          <SuiteFilterBar
+            {...baseProps}
+            search=""
+            onSearchChange={vi.fn()}
+            onSearchCompositionChange={onSearchCompositionChange}
+          />,
+        )
+      })
+      const input = screen.getByTestId('suite-search')
+
+      fireEvent.compositionStart(input)
+      expect(onSearchCompositionChange).toHaveBeenLastCalledWith(true)
+
+      fireEvent.compositionEnd(input)
+      expect(onSearchCompositionChange).toHaveBeenLastCalledWith(false)
+      expect(onSearchCompositionChange).toHaveBeenCalledTimes(2)
+    })
+
+    it('takes a composition without a listener', async () => {
+      await act(async () => {
+        render(<SuiteFilterBar {...baseProps} search="" onSearchChange={vi.fn()} />)
+      })
+      const input = screen.getByTestId('suite-search')
+
+      expect(() => {
+        fireEvent.compositionStart(input)
+        fireEvent.compositionEnd(input)
+      }).not.toThrow()
     })
 
     it('is at least 44 px tall below md and the compact height from md up', async () => {

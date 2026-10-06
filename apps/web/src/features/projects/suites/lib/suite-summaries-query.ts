@@ -21,7 +21,7 @@ export function toSuiteSummariesQuery({
   status,
   tag,
 }: SuiteSummariesFilters): SuiteSummariesQuery {
-  const trimmedSearch = search.trim().slice(0, SUITE_SEARCH_MAX_LENGTH)
+  const trimmedSearch = search.trim().slice(0, SUITE_SEARCH_MAX_LENGTH).trim()
 
   return {
     sort,

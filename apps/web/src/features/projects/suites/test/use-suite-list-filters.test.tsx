@@ -165,6 +165,73 @@ describe('useSuiteListFilters search debounce', () => {
     expect(result.current.appliedSearch).toBe('')
   })
 
+  describe('while the search is being composed', () => {
+    it('keeps what is typed out of the applied search until the composition ends', () => {
+      const { result, applied } = renderRecording()
+
+      act(() => result.current.setSearchComposing(true))
+      act(() => result.current.setSearch('に'))
+      act(() => vi.advanceTimersByTime(1000))
+
+      expect(result.current.search).toBe('に')
+      expect(result.current.appliedSearch).toBe('')
+      expect(distinct(applied)).toEqual([''])
+    })
+
+    it('applies the composed text 300 ms after the composition ends', () => {
+      const { result } = renderRecording()
+      act(() => result.current.setSearchComposing(true))
+      act(() => result.current.setSearch('にほ'))
+      act(() => vi.advanceTimersByTime(1000))
+
+      act(() => result.current.setSearchComposing(false))
+      act(() => vi.advanceTimersByTime(299))
+      expect(result.current.appliedSearch).toBe('')
+
+      act(() => vi.advanceTimersByTime(1))
+      expect(result.current.appliedSearch).toBe('にほ')
+    })
+
+    it('applies the final text once when the last change lands after the composition ends', () => {
+      const { result, applied } = renderRecording()
+      act(() => result.current.setSearchComposing(true))
+      act(() => result.current.setSearch('に'))
+      act(() => result.current.setSearchComposing(false))
+      act(() => vi.advanceTimersByTime(100))
+
+      act(() => result.current.setSearch('にほん'))
+      act(() => vi.advanceTimersByTime(300))
+
+      expect(distinct(applied)).toEqual(['', 'にほん'])
+    })
+
+    it('debounces as usual once the composition has ended', () => {
+      const { result } = renderRecording()
+      act(() => result.current.setSearchComposing(true))
+      act(() => result.current.setSearchComposing(false))
+
+      act(() => result.current.setSearch('abc'))
+      act(() => vi.advanceTimersByTime(299))
+      expect(result.current.appliedSearch).toBe('')
+
+      act(() => vi.advanceTimersByTime(1))
+      expect(result.current.appliedSearch).toBe('abc')
+    })
+
+    it('does not delay a status, a tag or a sort while the search is being composed', () => {
+      const { result } = renderRecording()
+      act(() => result.current.setSearchComposing(true))
+
+      act(() => {
+        result.current.setStatus('fail')
+        result.current.setSort('name')
+      })
+
+      expect(result.current.status).toBe('fail')
+      expect(result.current.sort).toBe('name')
+    })
+  })
+
   describe('the query the list asks for', () => {
     function queryOf(filters: ReturnType<typeof useSuiteListFilters>) {
       return toSuiteSummariesQuery({
