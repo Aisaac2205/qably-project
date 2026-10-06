@@ -98,7 +98,7 @@ interface FakePrisma {
     createManyAndReturn: jest.Mock;
     update: jest.Mock;
   };
-  suite: { findFirst: jest.Mock; findMany: jest.Mock };
+  suite: { findFirst: jest.Mock };
   $queryRaw: jest.Mock;
   $queryRawUnsafe: jest.Mock;
   txRunCaseFindMany: jest.Mock;
@@ -125,9 +125,6 @@ function createPrisma(): FakePrisma {
     },
     suite: {
       findFirst: jest.fn().mockResolvedValue(suiteWithCases),
-      findMany: jest
-        .fn()
-        .mockResolvedValue([{ id: 'suite-1', name: 'Checkout' }]),
     },
     $queryRaw: jest.fn().mockResolvedValue([]),
     $queryRawUnsafe: jest.fn().mockResolvedValue([]),
