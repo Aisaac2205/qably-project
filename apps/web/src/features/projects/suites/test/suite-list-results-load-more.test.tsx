@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { SuiteSummariesPage } from '@qably/types'
+import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { expectFocusRing } from '@/features/runs/test/focus-ring'
 import * as suitesApiStub from '@/test/suites-api-stub'
 import { renderResults } from './suite-list-results-harness'
@@ -281,4 +282,47 @@ describe('SuiteListResults loading more', () => {
     })
   })
 
+  describe('when the next page answers at once', () => {
+    it('still moves the focus from the button to the first new row', async () => {
+      const user = userEvent.setup()
+      listSummaries
+        .mockResolvedValueOnce({ items: rowsFrom(0, 3), nextCursor: '3' })
+        .mockResolvedValueOnce({ items: rowsFrom(3, 6), nextCursor: null })
+      await renderResults()
+
+      await user.click(await screen.findByRole('button', { name: 'Load more' }))
+
+      await screen.findByTestId('suite-row-s3')
+      expect(rowLink('s3')).toHaveFocus()
+    })
+
+    it('leaves the focus alone on a later refresh when the page only repeated rows', async () => {
+      const user = userEvent.setup()
+      listSummaries
+        .mockResolvedValueOnce({ items: rowsFrom(0, 3), nextCursor: '3' })
+        .mockResolvedValueOnce({ items: rowsFrom(1, 3), nextCursor: '5' })
+      const { client } = await renderResults()
+      await user.click(await screen.findByRole('button', { name: 'Load more' }))
+      await waitFor(() => {
+        const data = client.getQueryData<{ pages: unknown[] }>(
+          suiteKeys.summaryPage('proj-1', { sort: 'recent' }),
+        )
+
+        expect(data?.pages).toHaveLength(2)
+      })
+      const button = screen.getByRole('button', { name: 'Load more' })
+      expect(button).toHaveFocus()
+      listSummaries
+        .mockResolvedValueOnce({ items: rowsFrom(0, 4), nextCursor: '4' })
+        .mockResolvedValueOnce({ items: rowsFrom(4, 6), nextCursor: '6' })
+
+      await act(async () => {
+        await client.invalidateQueries({ queryKey: suiteKeys.summaries('proj-1') })
+      })
+
+      await screen.findByTestId('suite-row-s5')
+      expect(rowIds()).toEqual(['s0', 's1', 's2', 's3', 's4', 's5'])
+      expect(screen.getByRole('button', { name: 'Load more' })).toHaveFocus()
+    })
+  })
 })

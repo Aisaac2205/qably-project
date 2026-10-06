@@ -33,7 +33,7 @@ interface SuiteListResultsProps {
 interface SuiteRowsProps {
   projectId: string
   suites: SuiteSummary[]
-  listProps: ReturnType<typeof useLoadMoreFocus>['listProps']
+  listProps: ReturnType<typeof useLoadMoreFocus<HTMLDivElement>>['listProps']
 }
 
 function SuiteRows({ projectId, suites, listProps }: SuiteRowsProps) {
@@ -65,17 +65,18 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     isLoadingError,
     isFetchNextPageError,
     isPlaceholderData,
+    pageCount,
     refetch,
   } = useSuiteSummaries(projectId, filters)
-  const { listProps, markActivation } = useLoadMoreFocus({
+  const { listProps, markActivation } = useLoadMoreFocus<HTMLDivElement>({
     rowCount: suites.length,
-    isFetching: isFetchingNextPage,
+    pageCount,
   })
   const announcement = useResultsAnnouncement({
     resultsKey: JSON.stringify(toSuiteSummariesQuery(filters)),
     rowCount: suites.length,
+    pageCount,
     isSettled: !isLoading && !isLoadingError && !isPlaceholderData && !isFetchingNextPage,
-    isFetchingMore: isFetchingNextPage,
   })
 
   function renderContent() {

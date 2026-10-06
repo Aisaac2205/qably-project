@@ -6,27 +6,27 @@ import { useResultsAnnouncement } from '@/features/projects/suites/hooks/use-res
 interface Input {
   resultsKey: string
   rowCount: number
+  pageCount: number
   isSettled: boolean
-  isFetchingMore: boolean
 }
 
 const SETTLED: Input = {
   resultsKey: 'recent',
   rowCount: 50,
+  pageCount: 1,
   isSettled: true,
-  isFetchingMore: false,
 }
 
 function renderAnnouncement(initial: Input = SETTLED) {
   return renderHook((props: Input) => useResultsAnnouncement(props), { initialProps: initial })
 }
 
-function loadingMore(from: Input, rowCount = from.rowCount): Input {
-  return { ...from, rowCount, isSettled: false, isFetchingMore: true }
+function pending(from: Input, rowCount = from.rowCount): Input {
+  return { ...from, rowCount, isSettled: false }
 }
 
 function settledWith(from: Input, patch: Partial<Input>): Input {
-  return { ...from, isSettled: true, isFetchingMore: false, ...patch }
+  return { ...from, isSettled: true, ...patch }
 }
 
 describe('useResultsAnnouncement', () => {
@@ -42,11 +42,11 @@ describe('useResultsAnnouncement', () => {
     })
 
     it('says nothing while the first page is loading, nor when it lands', () => {
-      const loading: Input = { ...SETTLED, rowCount: 0, isSettled: false }
+      const loading: Input = { ...SETTLED, rowCount: 0, pageCount: 0, isSettled: false }
       const { result, rerender } = renderAnnouncement(loading)
       expect(result.current).toBe('')
 
-      rerender(settledWith(loading, { rowCount: 50 }))
+      rerender(settledWith(loading, { rowCount: 50, pageCount: 1 }))
 
       expect(result.current).toBe('')
     })
@@ -56,8 +56,8 @@ describe('useResultsAnnouncement', () => {
     it('counts the suites that arrived', () => {
       const { result, rerender } = renderAnnouncement()
 
-      rerender(loadingMore(SETTLED))
-      rerender(settledWith(SETTLED, { rowCount: 100 }))
+      rerender(pending(SETTLED))
+      rerender(settledWith(SETTLED, { rowCount: 100, pageCount: 2 }))
 
       expect(result.current).toBe('50 more suites loaded')
     })
@@ -65,63 +65,97 @@ describe('useResultsAnnouncement', () => {
     it('uses the singular for a single suite', () => {
       const { result, rerender } = renderAnnouncement()
 
-      rerender(loadingMore(SETTLED))
-      rerender(settledWith(SETTLED, { rowCount: 51 }))
+      rerender(pending(SETTLED))
+      rerender(settledWith(SETTLED, { rowCount: 51, pageCount: 2 }))
 
       expect(result.current).toBe('1 more suite loaded')
     })
 
     it('counts only the new suites on each later page', () => {
       const { result, rerender } = renderAnnouncement()
-      rerender(loadingMore(SETTLED))
-      rerender(settledWith(SETTLED, { rowCount: 100 }))
+      rerender(pending(SETTLED))
+      rerender(settledWith(SETTLED, { rowCount: 100, pageCount: 2 }))
 
-      rerender(loadingMore(SETTLED, 100))
-      rerender(settledWith(SETTLED, { rowCount: 120 }))
+      rerender(pending(SETTLED, 100))
+      rerender(settledWith(SETTLED, { rowCount: 120, pageCount: 3 }))
 
       expect(result.current).toBe('20 more suites loaded')
+    })
+
+    it('announces a page that answered at once, with no pending state in between', () => {
+      const { result, rerender } = renderAnnouncement()
+
+      rerender(settledWith(SETTLED, { rowCount: 100, pageCount: 2 }))
+
+      expect(result.current).toBe('50 more suites loaded')
     })
 
     it('says nothing while the page is in flight', () => {
       const { result, rerender } = renderAnnouncement()
 
-      rerender(loadingMore(SETTLED))
+      rerender(pending(SETTLED))
 
       expect(result.current).toBe('')
     })
 
-    it('clears the previous message when the next page starts, so the same text can be read again', () => {
+    it('clears the previous message when the next page starts', () => {
       const { result, rerender } = renderAnnouncement()
-      rerender(loadingMore(SETTLED))
-      rerender(settledWith(SETTLED, { rowCount: 100 }))
+      rerender(pending(SETTLED))
+      rerender(settledWith(SETTLED, { rowCount: 100, pageCount: 2 }))
       expect(result.current).toBe('50 more suites loaded')
 
-      rerender(loadingMore(SETTLED, 100))
+      rerender(pending(SETTLED, 100))
       expect(result.current).toBe('')
 
-      rerender(settledWith(SETTLED, { rowCount: 150 }))
+      rerender(settledWith(SETTLED, { rowCount: 150, pageCount: 3 }))
       expect(result.current).toBe('50 more suites loaded')
     })
 
-    it('says nothing when the page fails or brings no new row', () => {
+    it('says nothing when the page fails', () => {
       const { result, rerender } = renderAnnouncement()
 
-      rerender(loadingMore(SETTLED))
+      rerender(pending(SETTLED))
       rerender(settledWith(SETTLED, { rowCount: 50 }))
 
       expect(result.current).toBe('')
+    })
+
+    it('says nothing when the page only repeats rows that were already loaded', () => {
+      const { result, rerender } = renderAnnouncement()
+
+      rerender(settledWith(SETTLED, { rowCount: 50, pageCount: 2 }))
+
+      expect(result.current).toBe('')
+    })
+
+    it('counts from the rows of the last settled result, so a refresh in between does not skew the count', () => {
+      const { result, rerender } = renderAnnouncement()
+      rerender(settledWith(SETTLED, { rowCount: 52 }))
+
+      rerender(settledWith(SETTLED, { rowCount: 102, pageCount: 2 }))
+
+      expect(result.current).toBe('50 more suites loaded')
+    })
+
+    it('counts from the rows left by a page that only repeated rows', () => {
+      const { result, rerender } = renderAnnouncement()
+      rerender(settledWith(SETTLED, { rowCount: 50, pageCount: 2 }))
+
+      rerender(settledWith(SETTLED, { rowCount: 70, pageCount: 3 }))
+
+      expect(result.current).toBe('20 more suites loaded')
     })
 
     it('is spoken in Spanish with the right plural', () => {
       useI18nStore.setState({ locale: 'es' })
       const { result, rerender } = renderAnnouncement()
 
-      rerender(loadingMore(SETTLED))
-      rerender(settledWith(SETTLED, { rowCount: 100 }))
+      rerender(pending(SETTLED))
+      rerender(settledWith(SETTLED, { rowCount: 100, pageCount: 2 }))
       expect(result.current).toBe('Se cargaron 50 suites más')
 
-      rerender(loadingMore(SETTLED, 100))
-      rerender(settledWith(SETTLED, { rowCount: 101 }))
+      rerender(pending(SETTLED, 100))
+      rerender(settledWith(SETTLED, { rowCount: 101, pageCount: 3 }))
       expect(result.current).toBe('Se cargó 1 suite más')
     })
   })
@@ -176,9 +210,9 @@ describe('useResultsAnnouncement', () => {
 
     it('reads a change that lands while a next page was in flight as a new result, not as more suites', () => {
       const { result, rerender } = renderAnnouncement()
-      rerender(loadingMore(SETTLED))
+      rerender(pending(SETTLED))
 
-      rerender(settledWith(SETTLED, { resultsKey: 'recent+abc', rowCount: 2 }))
+      rerender(settledWith(SETTLED, { resultsKey: 'recent+abc', rowCount: 2, pageCount: 2 }))
 
       expect(result.current).toBe('2 suites shown')
     })

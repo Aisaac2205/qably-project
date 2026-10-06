@@ -19,7 +19,12 @@ type SummaryPageKey = ReturnType<typeof suiteKeys.summaryPage>
 const NO_SUITES: SuiteSummary[] = []
 const NO_TAGS: string[] = []
 
-function flattenSummaries(data: SuiteSummariesData): SuiteSummary[] {
+interface SummariesView {
+  suites: SuiteSummary[]
+  pageCount: number
+}
+
+function summarize(data: SuiteSummariesData): SummariesView {
   const seen = new Set<string>()
   const rows: SuiteSummary[] = []
 
@@ -32,7 +37,7 @@ function flattenSummaries(data: SuiteSummariesData): SuiteSummary[] {
     }
   }
 
-  return rows
+  return { suites: rows, pageCount: data.pages.length }
 }
 
 export function useSuiteSummaries(projectId: string, filters: SuiteSummariesFilters) {
@@ -55,11 +60,12 @@ export function useSuiteSummaries(projectId: string, filters: SuiteSummariesFilt
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     placeholderData: keepPreviousOfProject,
-    select: flattenSummaries,
+    select: summarize,
   })
 
   return {
-    suites: result.data ?? NO_SUITES,
+    suites: result.data?.suites ?? NO_SUITES,
+    pageCount: result.data?.pageCount ?? 0,
     hasNextPage: result.hasNextPage,
     isFetchingNextPage: result.isFetchingNextPage,
     fetchNextPage: result.fetchNextPage,

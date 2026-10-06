@@ -73,6 +73,23 @@ describe('useSuiteSummaries pagination', () => {
     expect(result.current.hasNextPage).toBe(false)
   })
 
+  it('counts the pages that have landed, one per fetch, even when a page only repeats loaded rows', async () => {
+    list
+      .mockResolvedValueOnce(pageOf(['a', 'b'], 'cur-1'))
+      .mockResolvedValueOnce(pageOf(['b', 'a'], 'cur-2'))
+    const { result } = renderSummaries()
+    expect(result.current.pageCount).toBe(0)
+
+    await waitFor(() => expect(result.current.pageCount).toBe(1))
+
+    await act(async () => {
+      await result.current.fetchNextPage()
+    })
+
+    await waitFor(() => expect(result.current.pageCount).toBe(2))
+    expect(idsOf(result.current.suites)).toEqual(['a', 'b'])
+  })
+
   it('reports the next page as fetching while it is in flight and keeps the rows in view', async () => {
     const next = deferred<SuiteSummariesPage>()
     list.mockResolvedValueOnce(pageOf(['a'], 'cur-1')).mockReturnValueOnce(next.promise)
@@ -194,6 +211,7 @@ describe('useSuiteSummaries pagination', () => {
       await waitFor(() => expect(list).toHaveBeenCalledTimes(3))
       expect(idsOf(result.current.suites)).toEqual(rowsWhileLoading)
       expect(result.current.isPlaceholderData).toBe(isPlaceholder)
+      expect(result.current.pageCount).toBe(isPlaceholder ? 2 : 0)
       expect(result.current.hasNextPage).toBe(false)
 
       await act(async () => {
@@ -201,6 +219,7 @@ describe('useSuiteSummaries pagination', () => {
       })
 
       await waitFor(() => expect(idsOf(result.current.suites)).toEqual(['fresh']))
+      expect(result.current.pageCount).toBe(1)
       const request = list.mock.calls[2]?.[0]
       expect(request).toMatchObject({ projectId: next.projectId, sort: next.filters.sort })
       expect(request?.cursor).toBeUndefined()

@@ -6,21 +6,25 @@ import { useTranslation } from '@/lib/i18n'
 interface ResultsAnnouncementInput {
   resultsKey: string
   rowCount: number
+  pageCount: number
   isSettled: boolean
-  isFetchingMore: boolean
 }
 
 type Announcement = { kind: 'loadedMore' | 'shown'; count: number }
 
+interface SettledResults {
+  key: string
+  rowCount: number
+  pageCount: number
+}
+
 interface AnnouncementState {
-  settledKey: string | null
-  countBeforeFetch: number | null
+  settled: SettledResults | null
   announcement: Announcement | null
 }
 
 const INITIAL_STATE: AnnouncementState = {
-  settledKey: null,
-  countBeforeFetch: null,
+  settled: null,
   announcement: null,
 }
 
@@ -31,45 +35,35 @@ const MESSAGE_KEYS = {
 
 function advance(
   state: AnnouncementState,
-  { resultsKey, rowCount, isSettled, isFetchingMore }: ResultsAnnouncementInput,
+  { resultsKey, rowCount, pageCount, isSettled }: ResultsAnnouncementInput,
 ): AnnouncementState {
-  if (isFetchingMore) {
-    return state.countBeforeFetch !== null && state.announcement === null
-      ? state
-      : {
-          ...state,
-          countBeforeFetch: state.countBeforeFetch ?? rowCount,
-          announcement: null,
-        }
-  }
-
   if (!isSettled) {
     return state.announcement === null ? state : { ...state, announcement: null }
   }
 
-  if (state.settledKey === null) {
-    return { settledKey: resultsKey, countBeforeFetch: null, announcement: null }
+  const current: SettledResults = { key: resultsKey, rowCount, pageCount }
+
+  if (state.settled === null) {
+    return { settled: current, announcement: null }
   }
 
-  if (state.settledKey !== resultsKey) {
-    return {
-      settledKey: resultsKey,
-      countBeforeFetch: null,
-      announcement: { kind: 'shown', count: rowCount },
-    }
+  if (state.settled.key !== resultsKey) {
+    return { settled: current, announcement: { kind: 'shown', count: rowCount } }
   }
 
-  if (state.countBeforeFetch !== null) {
-    const added = rowCount - state.countBeforeFetch
+  if (pageCount > state.settled.pageCount) {
+    const added = rowCount - state.settled.rowCount
 
     return {
-      ...state,
-      countBeforeFetch: null,
+      settled: current,
       announcement: added > 0 ? { kind: 'loadedMore', count: added } : null,
     }
   }
 
-  return state
+  const unchanged =
+    state.settled.rowCount === rowCount && state.settled.pageCount === pageCount
+
+  return unchanged ? state : { ...state, settled: current }
 }
 
 export function useResultsAnnouncement(input: ResultsAnnouncementInput): string {

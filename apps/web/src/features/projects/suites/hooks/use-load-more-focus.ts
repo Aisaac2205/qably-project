@@ -6,17 +6,21 @@ const ROW_LINK = 'a[href]'
 
 interface UseLoadMoreFocusOptions {
   rowCount: number
-  isFetching: boolean
+  pageCount: number
 }
 
 interface PendingActivation {
   activator: HTMLElement
   hadFocus: boolean
   firstNewIndex: number
+  pageCount: number
 }
 
-export function useLoadMoreFocus({ rowCount, isFetching }: UseLoadMoreFocusOptions) {
-  const listRef = useRef<HTMLDivElement | null>(null)
+export function useLoadMoreFocus<T extends HTMLElement>({
+  rowCount,
+  pageCount,
+}: UseLoadMoreFocusOptions) {
+  const listRef = useRef<T | null>(null)
   const pendingRef = useRef<PendingActivation | null>(null)
 
   function markActivation(activator: HTMLElement) {
@@ -24,13 +28,14 @@ export function useLoadMoreFocus({ rowCount, isFetching }: UseLoadMoreFocusOptio
       activator,
       hadFocus: document.activeElement === activator,
       firstNewIndex: rowCount,
+      pageCount,
     }
   }
 
   useEffect(() => {
     const pending = pendingRef.current
 
-    if (pending === null || isFetching) return
+    if (pending === null || pageCount <= pending.pageCount) return
 
     pendingRef.current = null
 
@@ -53,7 +58,7 @@ export function useLoadMoreFocus({ rowCount, isFetching }: UseLoadMoreFocusOptio
     }
 
     if (!pending.activator.isConnected) listRef.current?.focus()
-  }, [isFetching, rowCount])
+  }, [pageCount, rowCount])
 
   return { listProps: { ref: listRef, tabIndex: -1 }, markActivation }
 }

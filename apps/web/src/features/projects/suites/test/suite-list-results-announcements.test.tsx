@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import type { SuiteSummariesPage } from '@qably/types'
@@ -88,6 +88,33 @@ describe('SuiteListResults announcements', () => {
     await user.click(await screen.findByRole('button', { name: 'Load more' }))
     await screen.findByTestId('suite-row-s6')
     expect(announcement()).toHaveTextContent('1 more suite loaded')
+  })
+
+  it('says how many suites the page brought even when it answered at once', async () => {
+    const user = userEvent.setup()
+    listSummaries
+      .mockResolvedValueOnce({ items: rowsFrom(0, 3), nextCursor: '3' })
+      .mockResolvedValueOnce({ items: rowsFrom(3, 4), nextCursor: null })
+    await renderResults()
+
+    await user.click(await screen.findByRole('button', { name: 'Load more' }))
+
+    await within(announcement()).findByText('1 more suite loaded')
+  })
+
+  it('says nothing when the page only repeated rows that were already shown', async () => {
+    const user = userEvent.setup()
+    listSummaries
+      .mockResolvedValueOnce({ items: rowsFrom(0, 3), nextCursor: '3' })
+      .mockResolvedValueOnce({ items: rowsFrom(1, 3), nextCursor: null })
+    await renderResults()
+
+    await user.click(await screen.findByRole('button', { name: 'Load more' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
+    })
+    expect(announcement()).toBeEmptyDOMElement()
   })
 
   it('speaks Spanish with the right plural', async () => {
