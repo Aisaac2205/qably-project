@@ -1,50 +1,60 @@
 # CI — GitHub Actions
 
-`.github/workflows/ci.yml` runs on every push to `main` and on every pull request targeting
-`main`. It has two independent jobs, `api` and `web`, running in parallel on `ubuntu-latest`.
+`.github/workflows/ci.yml` runs on every push to `main`, on every pull request targeting `main`
+and on manual dispatch (`workflow_dispatch`). A newer run on the same ref cancels the one in
+progress (`concurrency` with `cancel-in-progress`). It has three independent jobs, `api`, `web` and
+`landing`, running in parallel on `ubuntu-latest` with Node 22.
 
 ## What each job does
 
-Both jobs follow the same shape: checkout, install with a frozen lockfile, then type-check, lint,
-build and test.
+All three jobs follow the same shape: checkout, install with a frozen lockfile, build the
+workspace packages the app imports, check the app, run its tests, report the results and upload
+the JUnit file.
 
 ### `api`
 
-1. `pnpm --filter @qably/api run type-check` — `tsc --noEmit`.
-2. `pnpm --filter @qably/api run lint` — eslint.
-3. `pnpm --filter @qably/api run build` — `nest build`.
-4. `diff apps/api/dist/src/reporter/qably-report.mjs apps/api/src/reporter/qably-report.mjs` — fails
+1. `pnpm --filter @qably/types --filter @qably/i18n --filter @qably/test-naming run build` — the
+   workspace packages the API imports.
+2. Type-check and test `@qably/types` and `@qably/test-naming`.
+3. `pnpm --filter @qably/api exec prisma generate` — the Prisma client.
+4. `pnpm --filter @qably/api run type-check` — `tsc --noEmit`.
+5. `pnpm --filter @qably/api run lint` — eslint.
+6. `pnpm --filter @qably/api run build` — `prisma generate && nest build`.
+7. `diff apps/api/dist/src/reporter/qably-report.mjs apps/api/src/reporter/qably-report.mjs` — fails
    the job if the built reporter asset (served at `GET /report.mjs`, see below) is missing or stale,
    instead of letting a broken `nest-cli.json` asset copy ship silently and only surface as a 503 in
    production.
-5. `pnpm --filter @qably/api run test` — unit tests (jest, `src/**/*.spec.ts`).
-6. `pnpm --filter @qably/api run test:e2e` — e2e tests (jest, `test/**/*.e2e-spec.ts`).
-7. Report unit and e2e results to Qably (see below), regardless of whether the tests passed.
-8. Upload the JUnit XML files as a workflow artifact.
+8. `pnpm --filter @qably/api run test:ci` — unit tests (jest, `src/**/*.spec.ts`) with the JUnit
+   reporter.
+9. `pnpm --filter @qably/api run test:e2e:ci` — e2e tests (jest, `test/**/*.e2e-spec.ts`) with the
+   JUnit reporter.
+10. Report unit and e2e results to Qably (see below), regardless of whether the tests passed.
+11. Upload the JUnit XML files as the `api-junit-reports` workflow artifact (kept 14 days).
 
-The `api` job needs no database, no Redis and no other external service. Every e2e spec
-overrides `PrismaService` with `jest.fn()` mocks via `Test.createTestingModule().overrideProvider`,
-and the one spec that boots `IngestionModule` (which registers a BullMQ queue) also overrides the
-queue token (`getQueueToken(INGESTION_QUEUE)`) with a mock. The suite finishes in a few seconds
-precisely because nothing ever opens a socket to a real Postgres or Redis instance — confirmed by
-reading every `*.e2e-spec.ts` file under `apps/api/test/`. No `services:` block was added to this
-job for that reason; adding one would start infrastructure the tests never touch.
+The `api` job needs no database, no Redis and no other external service. The e2e specs replace
+`PrismaService` with `jest.fn()` mocks through `Test.createTestingModule().overrideProvider`. The
+specs that compile modules with queues or Redis clients replace those too: `stubQueues` in
+`apps/api/test/support/stub-queues.ts` overrides the five BullMQ queue tokens, their processors and
+the Redis clients (`AI_DAILY_BUDGET_REDIS`, `REPORT_BATCH_REDIS`) with mocks. The suites finish
+quickly because nothing opens a socket to a real Postgres or Redis instance. No `services:` block
+is declared for that reason; adding one would start infrastructure the tests never touch.
 
-Nothing in the `api` job needs environment variables to boot. `ConfigModule` (which validates
-`process.env` against the zod schema in `apps/api/src/config/env.ts`) is only pulled in by
-`AppModule` and `IngestionModule`. No unit spec imports either module, and every e2e spec that does
-import `ConfigModule` overrides the `ENV` provider with an inline dummy `Env` object before the
-Nest testing module compiles. `nest build` is a pure TypeScript compile and never touches
-`process.env` either.
+Nothing in the `api` job needs environment variables to boot. `ConfigModule` validates
+`process.env` against the zod schema in `apps/api/src/config/env.ts`. No unit spec imports it or
+`AppModule`, and every e2e spec that loads `ConfigModule` overrides the `ENV` provider with the
+shared `testEnv` object in `apps/api/test/support/test-env.ts` before the Nest testing module
+compiles. `nest build` is a pure TypeScript compile and never touches `process.env` either.
 
 ### `web`
 
-1. `pnpm --filter @qably/web run type-check` — `tsc --noEmit`.
-2. `pnpm --filter @qably/web run lint` — eslint.
-3. `pnpm --filter @qably/web run build` — `next build`.
-4. `pnpm --filter @qably/web run test:run` — vitest (`vitest run`).
-5. Report results to Qably, regardless of whether the tests passed.
-6. Upload the JUnit XML file as a workflow artifact.
+1. Build the workspace packages (`@qably/types`, `@qably/i18n`, `@qably/test-naming`).
+2. Type-check and test `@qably/test-naming`.
+3. `pnpm --filter @qably/web run type-check` — `tsc --noEmit`.
+4. `pnpm --filter @qably/web run lint` — eslint.
+5. `pnpm --filter @qably/web run build` — `next build`.
+6. `pnpm --filter @qably/web run test:ci` — vitest (`vitest run --maxWorkers=2`).
+7. Report results to Qably, regardless of whether the tests passed.
+8. Upload the JUnit XML file as the `web-junit-report` workflow artifact (kept 14 days).
 
 `apps/web/next.config.ts` calls `resolveApiBaseUrl()` at module-load time, which throws if
 `NEXT_PUBLIC_API_URL` is unset or not a URL — this runs during `next build`. The `web` job sets
@@ -58,34 +68,48 @@ link is a same-origin path (`/docs#...`, `/en/docs#...`), which is right for loc
 where the two apps are proxied together. Production should set the real docs origin; no value is
 guessed here because domains are the owner's call.
 
+### `landing`
+
+1. `pnpm --filter @qably/types run build`.
+2. `pnpm --filter @qably/landing run type-check` — `astro sync && tsc --noEmit`.
+3. `pnpm --filter @qably/landing run test:ci` — vitest (`vitest run --maxWorkers=2
+   --no-file-parallelism`).
+4. Report results to Qably, regardless of whether the tests passed.
+5. Upload the JUnit XML file as the `landing-junit-report` workflow artifact (kept 14 days).
+6. `pnpm --filter @qably/landing run build` — `astro build`.
+
+The job sets `PUBLIC_SITE_URL`, `PUBLIC_WEB_URL` and `PUBLIC_API_URL` from repository variables of
+the same names, each with a default in the workflow, so the Astro build resolves its public URLs.
+The landing page has no lint step.
+
 ### `type-check`
 
-Both apps' `package.json` gained a `"type-check": "tsc --noEmit"` script as part of this change —
-`turbo.json` already declared a `type-check` task, but neither app defined the script it was
-supposed to run, so it was a phantom task before this workflow.
+Every app defines a `type-check` script (`tsc --noEmit`; `astro sync && tsc --noEmit` for the
+landing app), and `turbo.json`'s `type-check` task runs it after building the dependencies.
 
-## Local worker caps are not used in CI
+## Test scripts and worker caps
 
-`--maxWorkers=4` and `--pool=threads` (jest and vitest, respectively) exist locally so the laptop
-running them doesn't overheat. GitHub-hosted runners are dedicated, disposable machines with no
-such constraint, so CI intentionally omits both flags and lets each tool pick its own default
-parallelism. The local `test`, `test:run` and `test:e2e` scripts in `package.json` are unchanged —
-CI passes the JUnit reporter flags as extra CLI arguments on top of the existing scripts, it does
-not redefine them.
+CI runs the dedicated `:ci` scripts, which are the local scripts plus the JUnit reporter. The
+`apps/api` scripts embed no worker cap, so the api unit and e2e suites run with jest's default
+parallelism on the runner. The `test:run` and `test:ci` scripts of `apps/web` embed
+`--maxWorkers=2`, and the landing ones embed `--maxWorkers=2 --no-file-parallelism`, so CI runs
+those two suites with the same caps as a local run. The caps exist so a laptop running the suites
+doesn't overheat. See `docs/TESTING.md` for the local commands.
 
 ## JUnit reporters
 
-- **api** (jest): `jest-junit` is a devDependency. CI runs
-  `jest --reporters=default --reporters=jest-junit` with `JEST_JUNIT_OUTPUT_DIR` and
-  `JEST_JUNIT_OUTPUT_NAME` set per step, so unit and e2e runs write to
-  `apps/api/reports/junit-unit.xml` and `apps/api/reports/junit-e2e.xml` respectively. Nothing in
-  `package.json`'s `jest` config was changed — the reporter is opt-in, passed only in the workflow.
+- **api** (jest): `jest-junit` is a devDependency. The `test:ci` and `test:e2e:ci` scripts run
+  `jest --ci --reporters=default --reporters=jest-junit`, with `JEST_JUNIT_OUTPUT_DIR` and
+  `JEST_JUNIT_OUTPUT_NAME` set per step in the workflow, so unit and e2e runs write to
+  `apps/api/reports/junit-unit.xml` and `apps/api/reports/junit-e2e.xml` respectively. The `jest`
+  config in `package.json` does not declare the reporter, so the plain `test` and `test:e2e`
+  scripts do not produce XML.
 - **web** and **landing** (vitest): the JUnit reporter is declared in each `vitest.config.ts`,
-  gated on `CI`, writing `reports/junit.xml` under the app. It used to be passed on the command
-  line; it moved into the config because the one option that matters below is a reporter option
-  with no CLI flag, and a `--reporter` on the command line replaces whatever the config declares.
+  gated on `CI`, writing `reports/junit.xml` under the app. It lives in the config because the
+  one option that matters below is a reporter option with no CLI flag, and a `--reporter` on the
+  command line replaces whatever the config declares.
 
-Both XML files are uploaded via `actions/upload-artifact` so a failed run is diagnosable without
+The XML files are uploaded via `actions/upload-artifact` so a failed run is diagnosable without
 re-running anything.
 
 ### The `file` attribute is what lets Aeris read a test
@@ -139,6 +163,7 @@ source directly instead, `if: always()`, once per generated JUnit file:
 node apps/api/src/reporter/qably-report.mjs apps/api/reports/junit-unit.xml
 node apps/api/src/reporter/qably-report.mjs apps/api/reports/junit-e2e.xml
 node apps/api/src/reporter/qably-report.mjs apps/web/reports/junit.xml
+node apps/api/src/reporter/qably-report.mjs apps/landing/reports/junit.xml
 ```
 
 This is a deliberate deviation from the "download the served script" pattern: fetching and
@@ -161,11 +186,9 @@ validators are all honoured, and a `304` response carries only the cache-related
 body.
 
 The script reads `QABLY_API_KEY` (a GitHub Actions **secret**) from the environment. **If it is
-unset, the script logs a message and exits 0 without doing anything.** This is deliberate: the
-Qably API is not deployed yet — `https://api.qably.dev` resolves through Cloudflare to Railway but
-answers Railway's own `{"status":"error","code":404,"message":"Application not found"}`, because
-the project has only a Postgres and a Redis service. There is nowhere to POST to today, and the
-workflow must stay green until that changes.
+unset, the script logs a `::warning::` and exits 0 without doing anything**, unless
+`QABLY_FAIL_ON_ERROR=true`, in which case it exits `1`. This is deliberate: a workflow in a
+repository that has not configured a key stays green.
 
 The API origin defaults to `https://api.qably.dev` (`DEFAULT_API_BASE_URL` in the script).
 `QABLY_API_BASE_URL` overrides it and is **optional**: it exists for local runs
@@ -199,13 +222,13 @@ invocation.
 "suiteName", "jobId" }, ...], "rejected": [{ "suiteName", "reason" }, ...], "caseIdentityCollisions":
 [{ "suiteName", "key", "count" }, ...], "truncatedFields": { "<field>": <count>, ... } }` — see
 `docs/RUN_INGESTION.md`'s "Response — `202 Accepted`, asynchronous" for the full contract. The
-script logs `accepted` and each entry's `externalId` from that body; it does not, and cannot, know
-whether the run each `jobId` refers to has actually been written by the time the script exits,
-because ingestion happens on a worker after the HTTP response is sent. This is not a regression
-from an older synchronous contract — it is a deliberate design so that a slow ingestion (suite
-adoption, case linking) never adds latency to the CI job that is reporting it.
+script logs the `accepted` count and the number of cases in each file it sent, plus a summary; it
+does not, and cannot, know whether the run each `jobId` refers to has actually been written by the
+time the script exits, because ingestion happens on a worker after the HTTP response is sent. This
+is not a regression from an older synchronous contract — it is a deliberate design so that a slow
+ingestion (suite adoption, case linking) never adds latency to the CI job that is reporting it.
 
-Since unit 10, acceptance is per suite group, not all-or-nothing: a report with several `<testsuite>`
+Acceptance is per suite group, not all-or-nothing: a report with several `<testsuite>`
 elements can have some groups queued and others rejected in the same response — the script prints one
 `::warning::` per rejected group (suite name and reason) and one per case identity collision (two
 differently-reported cases resolving to the same key — see `docs/RUN_INGESTION.md`'s "Case identity"),
@@ -265,8 +288,6 @@ transient throttling, not because chattiness is expected day to day.
 
 ### Enabling it
 
-Once the API is deployed and reachable:
-
 1. Issue a project-scoped API key from the project's **API Keys** screen (`POST
    /projects/:projectId/api-keys` under the hood — see `docs/API_KEYS.md`).
 2. In the GitHub repository settings, add:
@@ -290,7 +311,8 @@ instead a query parameter the reporter builds from the environment:
 
 | Query parameter | Built from |
 | --- | --- |
-| `source` | fixed `github_actions` |
+| `source` | `github_actions` when `GITHUB_ACTIONS` is `true`, otherwise `api` |
+| `reportSize` | how many suite groups the whole file becomes on the server (see "The reporter's grouping count must match the server's") |
 | `externalId` | `gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>` — see below |
 | `commitSha` | `$GITHUB_SHA` |
 | `commitMessage` / `commitAuthor` | `git log -1 --pretty=%s` / `%an` (best-effort, read locally — cheaper than parsing the event payload) |
