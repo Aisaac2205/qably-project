@@ -4,6 +4,8 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 import { ProposalClassificationModule } from '../proposal-classification/proposal-classification.module';
 import { ReviewModule } from '../review/review.module';
 import { SuiteCasesService } from './suite-cases.service';
+import { SuiteListController } from './suite-list.controller';
+import { SuiteListQueryService } from './suite-list-query.service';
 import { SuiteViewAssembler } from './suite-view.assembler';
 import { SuitesController } from './suites.controller';
 import { SuitesService } from './suites.service';
@@ -15,7 +17,12 @@ import { SuitesService } from './suites.service';
     AiModule,
     ProposalClassificationModule,
   ],
-  controllers: [SuitesController],
-  providers: [SuitesService, SuiteCasesService, SuiteViewAssembler],
+  controllers: [SuiteListController, SuitesController],
+  providers: [
+    SuitesService,
+    SuiteCasesService,
+    SuiteViewAssembler,
+    SuiteListQueryService,
+  ],
 })
 export class SuitesModule {}
