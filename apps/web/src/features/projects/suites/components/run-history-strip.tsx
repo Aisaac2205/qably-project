@@ -1,6 +1,6 @@
 'use client'
 
-import type { RunStatus } from '@qably/types'
+import { SUITE_PASS_RATE_THRESHOLD, type RunStatus } from '@qably/types'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
@@ -13,7 +13,7 @@ interface RunHistoryStripProps {
 
 function toneClass(passRate: number | null): string {
   if (passRate === null) return 'text-muted'
-  if (passRate >= 70) return 'text-pass'
+  if (passRate >= SUITE_PASS_RATE_THRESHOLD) return 'text-pass'
   if (passRate > 0) return 'text-warn'
   return 'text-muted'
 }
