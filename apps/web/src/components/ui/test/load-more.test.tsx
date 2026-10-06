@@ -83,7 +83,7 @@ describe('LoadMore', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   })
 
-  it('keeps a 44px touch target, the focus ring and the caller class on the button', () => {
+  it('keeps the h-11 touch target below md, the focus ring and the caller class on the button', () => {
     renderLoadMore({ className: 'hover:bg-runs-hover' })
 
     const button = screen.getByRole('button', { name: 'Show more' })

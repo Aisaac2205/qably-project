@@ -10,11 +10,6 @@ vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
 
-vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
-    <a href={href} {...props}>{children}</a>,
-}))
-
 const row: SuiteRowData = {
   id: 'suite-1',
   name: 'Authentication',
