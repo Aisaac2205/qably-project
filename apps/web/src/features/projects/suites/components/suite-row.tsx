@@ -38,7 +38,7 @@ function SuiteRowImpl({ suite }: SuiteRowProps) {
 
   return (
     <div
-      className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto] gap-3.5 md:gap-4 items-center py-3.5 px-4 sm:px-5 group"
+      className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto] gap-3.5 md:gap-4 items-center py-3.5 px-4 sm:px-5"
       data-testid={`suite-row-${suite.id}`}
     >
       <TestTube
