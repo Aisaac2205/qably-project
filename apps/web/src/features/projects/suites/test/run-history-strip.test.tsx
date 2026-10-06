@@ -1,9 +1,17 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { RunStatus } from '@qably/types'
+import { SUITE_PASS_RATE_THRESHOLD, type RunStatus } from '@qably/types'
 import { RunHistoryStrip } from '@/features/projects/suites/components/run-history-strip'
 
 const fourRuns: RunStatus[] = ['fail', 'pass', 'pass', 'pass']
+const TONES = ['text-pass', 'text-warn', 'text-muted']
+
+function expectOnlyTone(element: HTMLElement, tone: string) {
+  expect(element).toHaveClass(tone)
+  for (const other of TONES.filter((candidate) => candidate !== tone)) {
+    expect(element).not.toHaveClass(other)
+  }
+}
 
 describe('RunHistoryStrip', () => {
   it('exposes the strip as a single accessible image', () => {
@@ -76,6 +84,21 @@ describe('RunHistoryStrip', () => {
     render(<RunHistoryStrip history={[]} passRate={null} />)
     expect(screen.getByText('Not measured yet')).toBeInTheDocument()
     expect(screen.queryByText('0%')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [SUITE_PASS_RATE_THRESHOLD, 'text-pass'],
+    [SUITE_PASS_RATE_THRESHOLD - 1, 'text-warn'],
+    [1, 'text-warn'],
+    [0, 'text-muted'],
+  ])('tones a pass rate of %i as %s and no other tone', (passRate, tone) => {
+    render(<RunHistoryStrip history={fourRuns} passRate={passRate} />)
+    expectOnlyTone(screen.getByText(`${passRate}%`), tone)
+  })
+
+  it('tones the "not measured" label as muted, never as a passing or warning rate', () => {
+    render(<RunHistoryStrip history={[]} passRate={null} />)
+    expectOnlyTone(screen.getByText('Not measured yet'), 'text-muted')
   })
 
   it('accepts a custom className on the root element', () => {
