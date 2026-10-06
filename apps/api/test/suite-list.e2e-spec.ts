@@ -257,6 +257,105 @@ describe('Suite list (e2e)', () => {
     });
   });
 
+  describe('GET /suites/tags', () => {
+    it('refuses the route without a session', async () => {
+      read.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/suites/tags')
+        .query({ projectId: 'project-1' })
+        .expect(401);
+    });
+
+    it('answers 403 when the organization header names a foreign organization', async () => {
+      prisma.orgMember.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get('/suites/tags')
+        .query({ projectId: 'project-1' })
+        .set('x-organization-id', 'org-someone-else')
+        .expect(403);
+    });
+
+    it('rejects a request without a project instead of looking up a suite named tags', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/suites/tags')
+        .expect(400);
+
+      const body = response.body as {
+        message: string;
+        issues: { path: string }[];
+      };
+      expect(body.message).toBe('Validation failed');
+      expect(body.issues.map((issue) => issue.path)).toContain('projectId');
+      expect(prisma.suite.findFirst).not.toHaveBeenCalled();
+      expect(prisma.suite.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns the distinct tags of the project in code unit order', async () => {
+      prisma.suite.findMany.mockResolvedValue([
+        { tags: ['b', 'a'] },
+        { tags: ['b', 'C'] },
+        { tags: [] },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/suites/tags')
+        .query({ projectId: 'project-1' })
+        .expect(200);
+
+      expect(response.body).toEqual({ items: ['C', 'a', 'b'] });
+    });
+
+    it('answers a project of another organization or without suites with an empty list scoped to the caller', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/suites/tags')
+        .query({ projectId: 'project-x' })
+        .expect(200);
+
+      expect(response.body).toEqual({ items: [] });
+      expect(prisma.suite.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1', projectId: 'project-x' },
+        select: { tags: true },
+      });
+    });
+
+    it('reaches the tags handler and not the suite lookup by id', async () => {
+      prisma.suite.findMany.mockResolvedValue([{ tags: ['api'] }]);
+
+      const response = await request(app.getHttpServer())
+        .get('/suites/tags')
+        .query({ projectId: 'project-1' })
+        .expect(200);
+
+      expect(response.body).toEqual({ items: ['api'] });
+      expect(prisma.suite.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('does not narrow the facet by search, status or tag', async () => {
+      prisma.suite.findMany.mockResolvedValue([
+        { tags: ['api'] },
+        { tags: ['web'] },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/suites/tags')
+        .query({
+          projectId: 'project-1',
+          search: 'checkout',
+          status: 'fail',
+          tag: 'api',
+        })
+        .expect(200);
+
+      expect(response.body).toEqual({ items: ['api', 'web'] });
+      expect(prisma.suite.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1', projectId: 'project-1' },
+        select: { tags: true },
+      });
+    });
+  });
+
   describe('GET /suites/summaries query contract', () => {
     it.each(['0', '101', '1.5', 'abc'])('rejects limit %s', async (limit) => {
       await request(app.getHttpServer())

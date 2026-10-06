@@ -8,8 +8,11 @@ const org: OrgContext = {
   role: 'admin',
 };
 
-function fakeQueries(pageResult: unknown) {
-  return { page: jest.fn().mockResolvedValue(pageResult) };
+function fakeQueries(pageResult: unknown, tagsResult: unknown = null) {
+  return {
+    page: jest.fn().mockResolvedValue(pageResult),
+    tags: jest.fn().mockResolvedValue(tagsResult),
+  };
 }
 
 function build(queries: ReturnType<typeof fakeQueries>) {
@@ -51,5 +54,33 @@ describe('SuiteListController', () => {
 
     expect(queries.page).toHaveBeenCalledWith(other, query);
     expect(response).toBe(page);
+  });
+
+  it('forwards the tags query to SuiteListQueryService.tags and returns its facet', async () => {
+    const facet = { items: ['api', 'smoke'] };
+    const queries = fakeQueries(null, facet);
+
+    const response = await build(queries).tags(org, {
+      projectId: 'project-1',
+    });
+
+    expect(queries.tags).toHaveBeenCalledWith(org, { projectId: 'project-1' });
+    expect(queries.page).not.toHaveBeenCalled();
+    expect(response).toBe(facet);
+  });
+
+  it('forwards the tags query of another organization and project unchanged', async () => {
+    const facet = { items: [] };
+    const queries = fakeQueries(null, facet);
+    const other: OrgContext = { ...org, organizationId: 'org-2' };
+
+    const response = await build(queries).tags(other, {
+      projectId: 'project-9',
+    });
+
+    expect(queries.tags).toHaveBeenCalledWith(other, {
+      projectId: 'project-9',
+    });
+    expect(response).toBe(facet);
   });
 });
