@@ -19,7 +19,7 @@ The API writes one log line per HTTP response so production traffic can be read 
 | `durationMs` | Wall-clock time from middleware entry to response finish, rounded to one decimal. |
 | `requestId` | Value of `x-request-id`. An incoming header is reused when it matches `[A-Za-z0-9._-]{1,128}`; otherwise a UUID is generated. The same value is echoed back on the response. |
 
-In production (`NODE_ENV=production`) every line is a single JSON object, which Railway indexes as structured attributes. In any other environment the line is human readable: `GET /projects 200 4.2ms <requestId>`.
+In production (`NODE_ENV=production`) every line is a single JSON object, which a log platform can index as structured attributes. In any other environment the line is human readable: `GET /projects 200 4.2ms <requestId>`.
 
 ## What is never logged
 
@@ -30,11 +30,11 @@ In production (`NODE_ENV=production`) every line is a single JSON object, which 
 
 ## Excluded traffic
 
-Requests whose path starts with `/health` are not logged. Railway polls that endpoint continuously and the lines would drown real traffic.
+Requests whose path starts with `/health` are not logged. The platform's health check polls that endpoint continuously and the lines would drown real traffic.
 
 ## Reading production traffic
 
-Filter the Railway deploy logs with structured attributes, for example:
+Filter the deploy logs with structured attributes, for example:
 
 ```text
 @status:>=500
