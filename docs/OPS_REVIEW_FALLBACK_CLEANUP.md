@@ -5,8 +5,10 @@ Owner-run only. Never executed automatically by this codebase.
 ## Purpose
 
 Removes legacy manual-review fallback proposals — the kind
-`ExtractionFailureRecorder` stopped creating once S2a landed
-(`needsManualReview=true`, still `in_review`, not a chat-case proposal).
+`ExtractionFailureRecorder` no longer creates (`needsManualReview=true`,
+still `in_review`, not a chat-case proposal). The recorder now marks the
+target case as failed instead; see "Failure handling" in
+`docs/AI_EXTRACTION.md`.
 Every one of these proposals has `steps=[]`, so approving it always fails
 with `incomplete-proposal`; none of them can ever be published. Their
 target case is instead marked `documentationOutcome='failed'` with the
