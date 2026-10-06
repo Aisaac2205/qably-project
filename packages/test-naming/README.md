@@ -8,16 +8,21 @@ Automated test cases in codebases and JUnit XML reports often use programmatic n
 
 ## Key Features
 
-- **Test Name Humanization:** Converts automated test identifiers into natural declarative titles while preserving technical terms.
-- **Suite Title Normalization:** Cleans file paths and class names into clean test suite names.
-- **Lexicon and Abbreviations:** Preserves common engineering abbreviations (such as API, HTTP, UUID, OAuth, and DB) during case conversion.
-- **Sanitization:** Removes test runner artifacts, control characters, and regex markers.
+- **Test Name Humanization:** Splits identifiers on case boundaries and separators, drops filler prefixes, and sentence-cases the result. All-uppercase tokens of two or more characters, such as API, stay intact.
+- **Convention Detection:** Recognizes the naming shapes of Vitest, Playwright, pytest, JUnit (Java), GoogleTest, and Jest JUnit reports, and splits the name into a path (describe blocks or class) and a leaf title. Bracketed or parenthesized arguments and leading invocation indexes are returned separately as a parameter.
+- **Suite Title Normalization:** Cleans file paths and class names into clean test suite names by removing file extensions, Python test markers, and `Test` or `Tests` class suffixes.
+- **Lexicon:** `src/lexicon.ts` holds the filler prefixes (`test`, `spec`, `it`, `prueba`, `caso`, and similar) and the sentence openers (`should`, `when`, `given`, `debería`, `cuando`, and similar) in English and Spanish.
+- **Sanitization:** Normalizes input to NFC, strips control characters, collapses whitespace, and clamps length: 500 characters of input, 200 for a test title, and 120 for a suite name.
 
-## Exported Functions
+## Exported Functions and Types
 
-- `humanizeTestName(rawName)`: Converts raw test descriptions into polished test case titles.
-- `humanizeSuiteName(rawSuite)`: Transforms class names and file paths into standardized suite titles.
-- `sanitize(input)`: Cleans unexpected formatting and special characters from input strings.
+- `humanizeTestName(input)`: Takes `{ name, className?, filePath? }` and returns `{ title, path, raw, convention, parameter? }`. An empty name returns an empty title with convention `'unknown'`.
+- `humanizeSuiteName(name)`: Transforms class names and file paths into a standardized suite title string.
+- `detectConvention(name, className, filePath)`: Returns the detected `Convention`: `'vitest'`, `'playwright'`, `'pytest'`, `'junit-java'`, `'gtest'`, `'jest-junit'`, or `'unknown'`.
+- `isIdentifier(value)` and `isDottedIdentifier(value)`: Check whether a string is a plain or dotted programmatic identifier.
+- `Convention`, `HumanizedTest`, `TestNameInput`: The types of the values above.
+
+`sanitize` is internal and not part of the package entry point.
 
 ## Available Scripts
 
