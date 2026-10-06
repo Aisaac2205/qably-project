@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { SUITE_RUN_STATUSES, SUITE_SUMMARY_SORTS } from '@qably/types'
 import {
+  hasSummariesFilter,
   toSuiteSummariesQuery,
   type SuiteSummariesFilters,
 } from '@/features/projects/suites/lib/suite-summaries-query'
@@ -102,5 +103,32 @@ describe('toSuiteSummariesQuery', () => {
 
   it.each(['all', ''])('drops the %j tag', (tag) => {
     expect(toSuiteSummariesQuery({ ...NO_FILTERS, tag })).not.toHaveProperty('tag')
+  })
+})
+
+describe('hasSummariesFilter', () => {
+  it.each(SUITE_SUMMARY_SORTS)('is false with only the %s sort', (sort) => {
+    expect(hasSummariesFilter({ ...NO_FILTERS, sort })).toBe(false)
+  })
+
+  it.each([
+    ['a search', { search: 'login' }],
+    ['a status', { status: 'fail' as const }],
+    ['a tag', { tag: 'smoke' }],
+    ['every filter', { search: 'login', status: 'pass' as const, tag: 'api' }],
+  ])('is true with %s', (_label, filters) => {
+    expect(hasSummariesFilter({ ...NO_FILTERS, ...filters })).toBe(true)
+  })
+
+  it.each([
+    ['a search of only whitespace', { search: '   ' }],
+    ['an empty tag', { tag: '' }],
+    ['the all sentinels', { status: 'all' as const, tag: 'all' }],
+  ])('is false with %s, which the server never receives', (_label, filters) => {
+    expect(hasSummariesFilter({ ...NO_FILTERS, ...filters })).toBe(false)
+  })
+
+  it('looks at the search once it is trimmed', () => {
+    expect(hasSummariesFilter({ ...NO_FILTERS, search: '  a ' })).toBe(true)
   })
 })

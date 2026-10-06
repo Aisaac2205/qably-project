@@ -30,3 +30,9 @@ export function toSuiteSummariesQuery({
     ...(tag === 'all' || tag === '' ? {} : { tag }),
   }
 }
+
+export function hasSummariesFilter(filters: SuiteSummariesFilters): boolean {
+  const { search, status, tag } = toSuiteSummariesQuery(filters)
+
+  return search !== undefined || status !== undefined || tag !== undefined
+}
