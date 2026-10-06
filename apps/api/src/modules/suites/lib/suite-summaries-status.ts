@@ -7,7 +7,7 @@ import {
 } from '@qably/types';
 import type { SuiteSummaryBase } from './suite-summaries-candidates';
 
-export type RunStatusWindows = ReadonlyMap<string, readonly RunStatus[]>;
+type RunStatusWindows = ReadonlyMap<string, readonly RunStatus[]>;
 
 type StatusResolutionPlan =
   | {

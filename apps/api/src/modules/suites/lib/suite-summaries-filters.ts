@@ -1,6 +1,6 @@
 import { matchesSuiteSearch, type SuiteSummary } from '@qably/types';
 
-export interface SuiteSummaryFilters {
+interface SuiteSummaryFilters {
   search?: string | undefined;
   tag?: string | undefined;
 }

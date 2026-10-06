@@ -5,7 +5,7 @@ export interface SuiteCaseCountRow {
   _count: { _all: number };
 }
 
-export interface SuiteCaseCountReader {
+interface SuiteCaseCountReader {
   testCase: Pick<PrismaService['testCase'], 'groupBy'>;
 }
 

@@ -7,7 +7,7 @@ export interface RecentRunStatusRow {
   status: RunStatus;
 }
 
-export interface RecentRunStatusReader {
+interface RecentRunStatusReader {
   $queryRaw: PrismaService['$queryRaw'];
 }
 
