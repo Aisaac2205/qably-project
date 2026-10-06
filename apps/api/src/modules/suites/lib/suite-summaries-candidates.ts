@@ -2,6 +2,17 @@ import type { SuiteSummary } from '@qably/types';
 
 export type SuiteSummaryBase = Omit<SuiteSummary, 'status' | 'recentPassRate'>;
 
+export const SUITE_SUMMARY_SELECT = {
+  id: true,
+  projectId: true,
+  name: true,
+  description: true,
+  tags: true,
+  isDefault: true,
+  createdAt: true,
+  _count: { select: { cases: true } },
+} as const;
+
 export interface SuiteSummaryRow {
   id: string;
   projectId: string;
