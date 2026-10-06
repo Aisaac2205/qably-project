@@ -88,7 +88,8 @@ the *Case content* section below and exists for a different reason.
 
 `RunQueriesService.updateCaseStatus` rejects any status edit on a run whose `source` is not `manual`,
 answering HTTP 409. `RunDetail` mirrors this: the keyboard handler is disabled and the shortcut bar is
-replaced by a notice naming the tool that recorded the run.
+replaced by a notice naming the tool that recorded the run. The notice is visually hidden (`sr-only`), so
+only assistive technology reads it; the source chip in the run header names the source for everyone else.
 
 This is a correctness rule, not a UX preference. Without it a user could press `P` on a run reported by
 GitHub Actions and turn a failed case into a passed one; the regression check and the notifications would
@@ -157,7 +158,7 @@ lose that name to the next ingestion. The consequence is worth stating plainly �
 never rewrites titles that already exist, it only affects cases created afterwards.
 
 A manual run is a commitment a human makes to execute a specific set of cases right now, so
-`RunQueriesService.createManual` snapshots only `manual` cases into it. Automated cases in the same suite
+`RunQueriesService.createManual` snapshots only `active` `manual` cases into it. Automated cases in the same suite
 are shown alongside, read-only, with their latest verdict and commit — evidence, not something this run
 asks anyone to redo. A suite with no manual cases has nothing for a manual run to snapshot, so the "Run
 this suite" action does not appear for it; every case in it is already covered by CI.
@@ -243,8 +244,8 @@ run it would also end in a 409 `not-automated`, since only automated cases can b
 ### Proactive pending-review state
 
 `SuiteView.cases[n].pendingProposalId` is the id of the case's `in_review` `ExtractedProposal`, if any —
-one additional projected column on the suite read query (`SuitesService.withLastResults`, alongside the
-existing last-result lookup), not a new endpoint. Before this field existed, a case whose documentation
+one additional projected column on the suite read query (`SuiteViewAssembler.withLastResults` in
+`suite-view.assembler.ts`, alongside the existing last-result lookup), not a new endpoint. Before this field existed, a case whose documentation
 was already queued still showed a clickable "Document with AI" button; the only way a user learned a
 proposal was pending was by clicking it again and reading the `already-pending` 409. `CaseCard` now renders
 a non-interactive "In review" state instead, linking straight to that proposal in `/review-inbox`. The
@@ -287,9 +288,9 @@ describes which side supplies each field when the link exists.
 `expected_result` and `priority`; `test_case_version` is the immutable history. Every writer that
 publishes a version must update both rows in the same transaction. `publishTestCaseVersion`
 (`apps/api/src/modules/review/lib/publish-test-case-version.ts`) is the single choke point for this —
-both the approval flow (`ReviewService.publish`) and the direct-documentation write-through
-(`ExtractionProcessor.persistDocumentFileTargets`) call it, so the mirroring only has to be correct in
-one place. The duplication is deliberate, so the invariant has to be honoured by every future writer,
+both the approval flow (`ReviewDecisionService`) and the direct-documentation write-through
+(`ExtractionProcessor.persistDocumentFileTargets`, through `publishWithNameFallback`) call it, so the
+mirroring only has to be correct in one place. The duplication is deliberate, so the invariant has to be honoured by every future writer,
 not just that one.
 
 `objective` and `preconditions` are the IEEE 829 fields the extractor has produced since
@@ -298,11 +299,10 @@ official `test_case` row (and therefore the suites read model and the case card)
 on every publish. Manual case create/update also accepts them now (`suites.schemas.ts`), bounded the
 same way the UI already bounds objective/precondition text.
 
-A case with no steps is a normal, expected state. Three producers create it:
+A case with no steps is a normal, expected state. Two producers create it:
 
 1. `OfficialCaseReconciler` during CI ingestion, from a name in a JUnit report.
-2. `ExtractionService.seed`, which currently drafts a proposal titled with the changed file path.
-3. A person who created the case before writing it up.
+2. A person who created the case before writing it up.
 
 JUnit carries no steps and no expected result, so there is nothing to lose — the data never existed.
 Neither surface renders a heading over an empty box for these: the run case explains it was discovered
@@ -312,8 +312,9 @@ review copilot, which is why the empty state is a call to action rather than an 
 ## Case health signals
 
 `deriveCaseHealth` (`apps/api/src/common/quality/case-health.ts`) is a pure, Prisma-free function that
-flags six deterministic signals — `no-steps`, `raw-name`, `never-run`, `flaky`, `duplicate-key`,
-`near-duplicate-title` — from data the suite read model already loads. No model call is involved; this is
+flags five deterministic signals — `no-steps`, `raw-name`, `flaky`, `duplicate-key`,
+`near-duplicate-title` — from data the suite read model already loads. `no-steps` applies only to
+automated cases: a manual case with no steps is not flagged. No model call is involved; this is
 the "guía integrada" the thesis asks for (CONTEXT §1.6.1 alcance 2), implemented as code that runs against
 data Qably already has.
 
@@ -321,20 +322,20 @@ data Qably already has.
 `humanizeTestName` already uses to decide whether a name looks machine-generated — rather than re-deriving
 the heuristic. A name only counts as raw when it has no spaces **and** either mixes case or contains an
 underscore; a single lowercase English word (`"checkout"`) is not flagged, since `isIdentifier` alone would
-match it too loosely.
+match it too loosely. A name that equals the case's `automationKey` is raw whatever its shape.
 
-`flaky` needs the last six results per case, not the one `SuitesService.withLastResults` already fetches
-(`distinct: ['testCaseId']`). A fourth query, added to the same `Promise.all` as the existing two, uses a
+`flaky` needs the last six results per case, not the one `SuiteViewAssembler.withLastResults` already
+fetches (`distinct: ['testCaseId']`). A further query in the same `Promise.all` uses a
 `ROW_NUMBER() OVER (PARTITION BY "testCaseId" ORDER BY "startedAt" DESC, "id" DESC)` window function capped
-at `rn <= 6`, matching the raw-SQL-over-typed-API precedent `DASHBOARD_METRICS.md` documents for the same
+at `rn <= 6`, over the results of finished runs, matching the raw-SQL-over-typed-API precedent `DASHBOARD_METRICS.md` documents for the same
 class of per-group problem. Flakiness is a strict alternation count (at least two pass/fail transitions in
 that window), not a raw fail rate — a case that failed once and recovered is not flaky.
 
 `duplicate-key` is scoped to the **project**, not the suite (`@@unique([suiteId, automationKey])` allows the
 same key to legitimately repeat across suites after a re-parent). `SuitesService.findOne` only loads one
-suite's cases, so a fifth query fetches every other case in the project that carries a non-null
-`automationKey`, feeding `deriveCaseHealth` a wider batch than what is actually rendered — the extra rows
-inform the duplicate check but their own computed signals are discarded. `CaseHealthInput` therefore carries
+suite's cases, so another query in the same `Promise.all` fetches the cases of the project whose
+`automationKey` is one of the rendered keys, feeding `deriveCaseHealth` a wider batch than what is actually
+rendered — the extra rows inform the duplicate check but their own computed signals are discarded. `CaseHealthInput` therefore carries
 `suiteId` and `projectId`, one field more than the interface first sketched for this slice: `suiteId` scopes
 `near-duplicate-title` to the owning suite, `projectId` scopes `duplicate-key` to the owning project, and
 neither signal is decidable without them once the batch can span more than one suite.

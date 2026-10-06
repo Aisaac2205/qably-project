@@ -113,7 +113,7 @@ A suite's window is its 10 most recent runs, ordered by `startedAt` and `id` des
 
 - Completed runs are `pass` and `fail`. `recentPassRate` is `Math.round(pass / completed * 100)`, an integer from 0 to 100, or `null` when no run has completed.
 - `status` is `running` when any run in the window is running, and `never-run` when the window is empty. It is `needs-attention` when no run has completed or the pass rate is below 70. Otherwise it is `pass` or `fail`, following the last completed run.
-- The API and the web test stub share this single function, exported with `SUITE_RUN_WINDOW` (10) and `SUITE_PASS_RATE_THRESHOLD` (70). The web no longer keeps a derivation of its own.
+- The API and the web test stub share this single function, exported with `SUITE_RUN_WINDOW` (10) and `SUITE_PASS_RATE_THRESHOLD` (70). The web no longer keeps a derivation of its own, and the run history strip of the suite detail reads the same threshold to tone its pass rate.
 
 ## Case count
 
@@ -126,7 +126,7 @@ The service computes everything per request, without denormalizing status or pas
 | Read | Content | When |
 |---|---|---|
 | Project suites | `id`, `projectId`, `name`, `description`, `tags`, `isDefault`, `createdAt`, filtered by organization and project | Always |
-| Case counts | One `testCase.groupBy` on `suiteId`, limited to the ids that passed `search` and `tag` | When any suite remains |
+| Case counts | One `testCase.groupBy` on `suiteId` (`readSuiteCaseCounts`), limited to the ids that passed `search` and `tag` | When any suite remains |
 | Run windows | One SQL query with `CROSS JOIN LATERAL` and `LIMIT 10` per suite | When there are ids to resolve |
 
 The path of the request decides which ids reach the third read:
@@ -142,21 +142,19 @@ The work does grow with the number of suites. Every page rereads the project's s
 
 The initial design counted cases with `_count: { select: { cases: true } }`. Prisma 7 compiles that count into a `LEFT JOIN` against the subquery `SELECT "suiteId", COUNT(*) FROM test_case WHERE 1=1 GROUP BY "suiteId"`. The aggregate is not filtered by project or organization, so every page would have counted all cases of all organizations. The review before the first push caught it.
 
-The scoped `groupBy` in the table above replaces it, with `where: { suiteId: { in: ids } }`. Its scope is the ids of the suites the caller already read under their organization and project. It keeps the semantics of the relation count and can use the `@@index([suiteId])` index.
+The scoped `groupBy` in the table above replaces it, with `where: { suiteId: { in: ids } }`. Its scope is the ids of the suites the caller already read under their organization and project. It keeps the semantics of the relation count and can use the `@@index([suiteId])` index. It lives in `readSuiteCaseCounts` (`apps/api/src/modules/suites/lib/suite-case-counts.ts`), which the project chat context also uses for its suite case counts.
 
-### Measurement on production
+### Query plans
 
-On 2026-10-06 a read-only `EXPLAIN ANALYZE` ran on PostgreSQL 18. The measured project had several hundred suites and about twenty thousand runs.
+A read-only `EXPLAIN ANALYZE` of the reads on PostgreSQL, run against a populated project, showed these plans:
 
-| Query | Plan | Time |
-|---|---|---|
-| LATERAL windows over every suite of the project (worst case, status-first path) | `Index Scan Backward` on `run_suiteId_startedAt_idx`, `Incremental Sort`, and `Limit`. One loop per suite of about 10 rows each, no `Seq Scan` on `run` | 15 ms |
-| `ROW_NUMBER` window of `GET /runs/suite-metrics` | `Seq Scan` over every run of the project and a sort | 38 ms |
-| Case-count `groupBy` | `Seq Scan` and `HashAggregate` | 6 ms |
+| Query | Plan |
+|---|---|
+| LATERAL windows over every suite of the project (worst case, status-first path) | `Index Scan Backward` on `run_suiteId_startedAt_idx`, `Incremental Sort`, and `Limit`. One loop per suite of about 10 rows each, no `Seq Scan` on `run` |
+| `ROW_NUMBER` window of the retired `GET /runs/suite-metrics` | `Seq Scan` over every run of the project and a sort |
+| Case-count `groupBy` | `Seq Scan` and `HashAggregate` |
 
-Reading the light suite columns took under 1 ms.
-
-The `Seq Scan` on the count is the right plan when the id list covers most of `test_case`, as it did in this measurement. On a larger table the planner can use the `suiteId` index instead.
+The `Seq Scan` on the count is the right plan when the id list covers most of `test_case`. On a larger table the planner can use the `suiteId` index instead.
 
 ### When to revisit
 
@@ -168,7 +166,7 @@ A hard ceiling also exists: a query binds at most 65,535 parameters, and the id 
 
 `SuiteListController` is the first entry of `SuitesModule.controllers`, ahead of `SuitesController`, which declares `GET /suites/:id`. With the order reversed, `summaries` and `tags` are read as suite ids. The `:id` handler looks up a suite with that id, finds none, and answers 404, and the list never runs.
 
-NestJS 11.1.27 registers modules, then controllers in array order, then methods in declaration order. The `routeResolutionStrategy` option does not exist in that version, and the documentation that describes it belongs to a later release. `apps/api/test/suite-list.e2e-spec.ts` protects the order. It imports the real `SuitesModule`, and reversing the array makes the tests of both routes fail (31 of its 39 tests).
+NestJS 11.1.27 registers modules, then controllers in array order, then methods in declaration order. The `routeResolutionStrategy` option does not exist in that version, and the documentation that describes it belongs to a later release. `apps/api/test/suite-list.e2e-spec.ts` protects the order. It imports the real `SuitesModule`, and reversing the array makes the tests of both routes fail.
 
 If local registration order stops being enough, plan B is to move the routes under their own prefix, `/suite-summaries`. That avoids the shadowing at the cost of splitting the resource.
 
@@ -210,8 +208,7 @@ The route walked the whole run history of every suite with `ROW_NUMBER() OVER (P
 
 ## Out of scope and follow-ups
 
-- **`GET /suites` stays unbounded.** It returns the full array with cases, ordered by `isDefault` and `createdAt` descending. The project chat uses it and needs every case, and so does the new run form, which reads only `id` and `name`. Follow-ups: server-side case search for the chat and a searchable selector for the new run. Paginating `GET /suites` would break the contract of its clients.
-- **The same relation count in the chat.** `apps/api/src/modules/chat/chat.service.ts:977` uses `_count: { select: { cases: true } }` and reads `suite._count.cases` at line 998, so it scans all of `test_case` the way the list used to. Follow-up: replace it with a scoped `groupBy`.
+- **`GET /suites` stays unbounded.** It returns the full array with cases, ordered by `isDefault` and `createdAt` descending, and three web components still read it through `useSuites`: the chat composer and the project chat panel, which need every case to offer it as an attachment, and the new run form, which reads only `id` and `name`. Follow-ups: server-side case search for the chat and a searchable selector for the new run. Paginating `GET /suites` would break the contract of its clients.
 - **No total.** The paged response carries no suite total.
 
 ## What automated tests do not cover
