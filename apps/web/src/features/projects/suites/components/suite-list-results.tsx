@@ -22,7 +22,7 @@ import { SuiteRow } from './suite-row'
 
 const ACTION_FOCUS_RING = 'focus-visible:outline-hidden! focus-visible:ring-primary'
 const ROW_LINK_CLASS =
-  'block focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2!'
+  'block transition-colors hover:bg-surface-hover/60 focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary forced-colors:focus-visible:-outline-offset-2!'
 
 interface SuiteListResultsProps {
   projectId: string

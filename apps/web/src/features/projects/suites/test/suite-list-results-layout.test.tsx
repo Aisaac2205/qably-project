@@ -81,6 +81,23 @@ describe('SuiteListResults layout', () => {
       expectFocusRing(link)
     })
 
+    it('paints the hover surface on the link that draws the ring, so nothing inside the row covers it', async () => {
+      await renderResults()
+      await screen.findByRole('list', { name: 'Filter suites' })
+
+      const items = screen.getAllByRole('listitem')
+
+      expect(items).toHaveLength(4)
+      for (const item of items) {
+        const link = item.querySelector('a')
+
+        expect(link).not.toBeNull()
+        expect(item.querySelectorAll('[class~="hover:bg-surface-hover/60"]')).toHaveLength(1)
+        expect(link).toHaveClass('hover:bg-surface-hover/60')
+        expectFocusRing(link as HTMLElement, { inset: true })
+      }
+    })
+
     it('draws the focus ring of the repo, inset, on the link of every row', async () => {
       await renderResults()
       await screen.findByRole('list', { name: 'Filter suites' })
