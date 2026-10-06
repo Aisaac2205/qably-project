@@ -1,26 +1,29 @@
 # Test suite health
 
-How the two suites are run, and why the web suite is configured the way it is. For the CI workflow itself, see `CI.md`.
+How the api and web suites are run, and why the web suite is configured the way it is. For the CI workflow itself, see `CI.md`.
 
 ## Running them
 
 ```
 cd apps/api && npx jest --maxWorkers=2
-cd apps/web && npx vitest run --maxWorkers=2
+cd apps/api && npx jest --config ./test/jest-e2e.json --maxWorkers=2
+cd apps/web && npx vitest run --pool=threads --maxWorkers=2
 ```
+
+The first command runs the api unit specs (`src/**/*.spec.ts`), the second the api e2e specs (`test/**/*.e2e-spec.ts`).
 
 Two traps make a local run lie about its result:
 
 - **`pnpm --filter @qably/web test -- --flag` does not do what it looks like.** pnpm forwards everything after `--` to the underlying binary as positional arguments, and both jest and vitest read a bare positional as a *test path pattern*. `pnpm --filter @qably/api test -- --maxWorkers=2` therefore matches zero test files, runs zero tests, and still exits `0`. Call the binary directly from the app directory instead.
 - **Piping a long run into `tail`** leaves the output file empty until the process exits. The run looks hung; it is not.
 
-The worker cap is not optional locally: an uncapped run saturates every core and overheats the development laptop. CI omits it deliberately (`CI.md`).
+The worker cap is not optional locally: an uncapped run saturates every core and overheats the development laptop. Only the `apps/api` scripts carry no cap, so pass it by hand there. The `test:run` and `test:ci` scripts of `apps/web` and `apps/landing`, and the `test` script of every package that has one, already embed `--maxWorkers=2`. CI runs the web and landing suites through those same scripts and the api suites with jest's default parallelism (`CI.md`).
 
 ## `deps.optimizer` has to name the right mode
 
 `apps/web/vitest.config.ts` declared the optimizer under `deps.optimizer.web`. Vitest has no `web` mode: it uses `optimizer.client` for the `jsdom` and `happy-dom` environments and `optimizer.ssr` for `node` and `edge`. Unknown keys are not validated, so the block was silently inert and every test file re-resolved `@phosphor-icons/react` — a barrel that re-exports thousands of icon modules — through Vite's transform pipeline.
 
-Renaming the key to `client` is the entire fix. Measured on this machine with `--maxWorkers=2`:
+Renaming the key to `client` is the entire fix. Measured on this machine with `--maxWorkers=2`, when the web suite had 159 test files and 1088 tests:
 
 | | before | after |
 | --- | --- | --- |
@@ -31,12 +34,12 @@ The lesson generalises: when a Vitest suite spends the bulk of its wall time in 
 
 ## Where the remaining time goes
 
-After the fix, the full run reports `import 95.6s, tests 70.3s, environment 211.6s, setup 30.4s`. `environment` is jsdom construction — roughly 1.3s for every one of the 159 files — and it is now the dominant term.
+After the fix, the full run reported `import 95.6s, tests 70.3s, environment 211.6s, setup 30.4s`. `environment` is jsdom construction — roughly 1.3s for every one of the 159 files — and it was the dominant term. The suite has about twice as many test files now, so read the figures in this section as proportions, not as current timings.
 
 `vitest.config.ts` sets `environment: 'jsdom'` globally, so pure-logic files (title formatting, metric derivation, the i18n resolver) pay for a DOM they never touch. There are two ways to spend that 211s, and both are still open:
 
-- **Run pure-logic files under `environment: 'node'`.** This needs `test.projects`; `environmentMatchGlobs` was removed in Vitest 4. It is not free: a file's environment cannot be inferred from its extension (`use-auth.test.ts` renders hooks, `store.test.ts` persists to `localStorage`), so the node project needs an explicit include list, and `src/test/setup.ts` calls `localStorage.clear()`, so it needs its own setup file. About 22 of the 159 files are provably pure today, which caps the saving at roughly 15s of wall time.
-- **Replace jsdom with happy-dom for every file.** happy-dom constructs much faster, so this attacks all 159 files rather than 14% of them, and the config change is one line. It is a new devDependency and a different DOM implementation, so the 1088 tests are the acceptance test for it. This is the larger lever and it has not been tried.
+- **Run pure-logic files under `environment: 'node'`.** This needs `test.projects`; `environmentMatchGlobs` was removed in Vitest 4. It is not free: a file's environment cannot be inferred from its extension (`use-auth.test.ts` renders hooks, `store.test.ts` persists to `localStorage`), so the node project needs an explicit include list, and `src/test/setup.ts` calls `localStorage.clear()`, so it needs its own setup file. About 22 of those 159 files were provably pure, which capped the saving at roughly 15s of wall time.
+- **Replace jsdom with happy-dom for every file.** happy-dom constructs much faster, so this attacks every file rather than 14% of them, and the config change is one line. It is a new devDependency and a different DOM implementation, so the whole suite is the acceptance test for it. This is the larger lever and it has not been tried.
 
 ## Opening a Base UI Select in a test
 
@@ -67,4 +70,4 @@ cd apps/api && GEMINI_API_KEY=... npx jest --maxWorkers=2 gemini.extractor.integ
 
 ## Lint baselines
 
-Both apps lint clean as of this change: `apps/api` reports 0 errors and 0 warnings, `apps/web` 0 errors and 4 warnings. All four are `@next/next/no-img-element` on externally hosted technology logos; clearing them means `next/image` plus a `remotePatterns` entry, which changes how those images are served.
+Both apps lint without errors at the time of writing: `apps/api` reports 0 warnings, `apps/web` reports 7. Five are `@next/next/no-img-element` on static assets served from `public/` (the Aeris mark, the GitHub mark and the technology logos); clearing them means switching those components to `next/image`, which changes how the images are served. The other two are `react-hooks/exhaustive-deps` on a `useMemo` in each of two dashboard chart components (`pass-rate-hero.tsx`, `daily-activity-bar-chart.tsx`).
