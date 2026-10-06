@@ -1,12 +1,5 @@
 'use client'
 
-/**
- * SuiteRow — enriched row for the suites list.
- *
- * Desktop layout (md+): 3-column grid
- *   [icon] [info: name + description + tags + default] [status]
- * Mobile layout: 2 columns (icon + info + status)
- */
 import { memo } from 'react'
 import { TestTube, Star } from '@phosphor-icons/react'
 import type { Suite } from '@qably/types'
@@ -45,7 +38,6 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
       className="grid grid-cols-[auto_1fr_auto] md:grid-cols-[auto_1fr_auto] gap-3.5 md:gap-4 items-center py-3.5 px-4 sm:px-5 hover:bg-surface-hover/60 transition-colors group"
       data-testid={`suite-row-${suite.id}`}
     >
-      {/* Col 1: status-tinted icon */}
       <TestTube
         size={20}
         weight="duotone"
@@ -53,7 +45,6 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         aria-hidden="true"
       />
 
-      {/* Col 2: name + description + tags + default */}
       <div className="min-w-0 flex flex-col gap-1">
         <div className="flex items-center gap-1.5 min-w-0">
           <InlineEditableText
@@ -85,9 +76,6 @@ function SuiteRowImpl({ suite, metrics }: SuiteRowProps) {
         )}
       </div>
 
-      {/* Col 3: status chip (visible on all sizes). Fixed width sized to the
-          longest status label ("Requiere atención") so this column — and
-          the 1fr name column before it — align the same way on every row. */}
       <div className="flex justify-end shrink-0 md:w-32">
         <StatusChip status={status} />
       </div>

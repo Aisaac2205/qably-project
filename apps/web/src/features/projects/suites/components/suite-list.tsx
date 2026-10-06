@@ -1,23 +1,16 @@
 'use client'
 
-/**
- * SuiteList — composes the filter bar and enriched rows for a project.
- *
- * Owns filter state (search, status, tag, sort). Renders a `SuiteFilterBar`
- * above the list of `SuiteRow` components. Two distinct empty states:
- *   1. Project has 0 suites: "No suites yet" + hint
- *   2. Filter excludes everything: "No matches" + clear-filters button
- */
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import { Plus } from '@phosphor-icons/react'
 import { buttonVariants } from '@/components/ui/button'
 import { EntityList } from '@/components/ui/entity-list'
 import { StateView } from '@/components/ui/state-view'
-import { SuiteFilterBar, type SortKey } from './suite-filter-bar'
-import { SuiteFiltersSheet } from './suite-filters-sheet'
+import { SuiteListToolbar } from './suite-list-toolbar'
 import { SuiteRow } from './suite-row'
 import { useSuiteMetrics, type SuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
+import { useSuiteListFilters } from '@/features/projects/suites/hooks/use-suite-list-filters'
+import type { SortKey } from '@/features/projects/suites/lib/suite-filter-options'
 import type { SuiteRunStatus } from '@qably/types'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -73,11 +66,8 @@ function applyFilters(
 export function SuiteList({ projectId }: SuiteListProps) {
   const { t } = useTranslation()
   const { perSuite, isLoading, isError } = useSuiteMetrics(projectId)
-
-  const [search, setSearch] = useState('')
-  const [status, setStatus] = useState<SuiteRunStatus | 'all'>('all')
-  const [tag, setTag] = useState<string>('all')
-  const [sort, setSort] = useState<SortKey>('recent')
+  const filters = useSuiteListFilters()
+  const { search, status, tag, sort, hasActiveFilter, clearFilters } = filters
 
   const availableTags = useMemo(() => {
     const set = new Set<string>()
@@ -102,7 +92,6 @@ export function SuiteList({ projectId }: SuiteListProps) {
     return <StateView kind="error" title={t('suites.loadError')} focusOnMount />
   }
 
-  // Empty state 1: project has no suites at all
   if (perSuite.length === 0) {
     return (
       <StateView
@@ -119,57 +108,18 @@ export function SuiteList({ projectId }: SuiteListProps) {
     )
   }
 
-  const hasActiveFilter = search !== '' || status !== 'all' || tag !== 'all'
-
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-        <SuiteFilterBar
-          className="md:min-w-0 md:flex-1"
-          search={search}
-          onSearchChange={setSearch}
-          status={status}
-          onStatusChange={setStatus}
-          tag={tag}
-          onTagChange={setTag}
-          sort={sort}
-          onSortChange={setSort}
-          availableTags={availableTags}
-        />
-        <div className="grid grid-cols-2 gap-2 md:flex md:shrink-0">
-          <Link
-            href={suiteNewPath(projectId)}
-            className={cn(buttonVariants(), 'w-full md:w-auto')}
-          >
-            <Plus size={16} weight="bold" aria-hidden="true" />
-            {t('suites.newSuite')}
-          </Link>
-          <SuiteFiltersSheet
-            className="md:hidden"
-            status={status}
-            onStatusChange={setStatus}
-            tag={tag}
-            onTagChange={setTag}
-            sort={sort}
-            onSortChange={setSort}
-            availableTags={availableTags}
-          />
-        </div>
-      </div>
+      <SuiteListToolbar projectId={projectId} filters={filters} availableTags={availableTags} />
 
       {sorted.length === 0 ? (
-        // Empty state 2: filter excludes everything
         <StateView
           kind="empty"
           title={t('suites.noSuitesMatch')}
           action={hasActiveFilter ? (
             <button
               type="button"
-              onClick={() => {
-                setSearch('')
-                setStatus('all')
-                setTag('all')
-              }}
+              onClick={clearFilters}
               className="text-sm text-default font-medium hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-primary"
             >
               {t('suites.clearFilters')}
