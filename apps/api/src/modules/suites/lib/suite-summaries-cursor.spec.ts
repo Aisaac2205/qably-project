@@ -168,6 +168,30 @@ describe('suite summaries cursor refusals', () => {
   });
 
   it.each([
+    ['a bare number', '1'],
+    ['a month name without a year', 'March 7'],
+    ['a calendar day that does not exist', '2026-02-30T00:00:00.000Z'],
+    ['a date without a time', '2026-03-07'],
+    ['a time without milliseconds', '2026-03-07T10:00:00Z'],
+    ['a time with an offset instead of Z', '2026-03-07T10:00:00.000+02:00'],
+  ])(
+    'refuses a createdAt that is %s on every sort that carries one',
+    (_label, value) => {
+      expect(
+        decodeSuiteSummariesCursor(tuple([1, 'recent', value, 'suite-1'])),
+      ).toBeNull();
+      expect(
+        decodeSuiteSummariesCursor(
+          tuple([1, 'pass-rate', 80, value, 'suite-1']),
+        ),
+      ).toBeNull();
+      expect(
+        decodeSuiteSummariesCursor(tuple([1, 'cases', 3, value, 'suite-1'])),
+      ).toBeNull();
+    },
+  );
+
+  it.each([
     ['above one hundred', 101],
     ['below zero', -1],
     ['fractional', 66.5],
@@ -182,12 +206,27 @@ describe('suite summaries cursor refusals', () => {
   it.each([
     ['negative', -1],
     ['fractional', 2.5],
+    ['beyond the safe integer range', 1e21],
+    ['one past the largest safe integer', Number.MAX_SAFE_INTEGER + 1],
   ])('refuses a case count that is %s', (_label, count) => {
     expect(
       decodeSuiteSummariesCursor(
         tuple([1, 'cases', count, CREATED_AT, 'suite-1']),
       ),
     ).toBeNull();
+  });
+
+  it('accepts the largest safe integer as a case count', () => {
+    expect(
+      decodeSuiteSummariesCursor(
+        tuple([1, 'cases', Number.MAX_SAFE_INTEGER, CREATED_AT, 'suite-1']),
+      ),
+    ).toEqual({
+      sort: 'cases',
+      caseCount: Number.MAX_SAFE_INTEGER,
+      createdAt: CREATED_AT,
+      id: 'suite-1',
+    });
   });
 
   it('accepts the boundary pass rates zero and one hundred', () => {

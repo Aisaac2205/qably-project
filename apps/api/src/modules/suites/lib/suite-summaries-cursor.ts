@@ -50,7 +50,13 @@ function isIdentifier(value: unknown): value is string {
 }
 
 function isTimestamp(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value));
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const parsed = new Date(value);
+
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString() === value;
 }
 
 function isPassRate(value: unknown): value is number | null {
@@ -64,7 +70,7 @@ function isPassRate(value: unknown): value is number | null {
 }
 
 function isCaseCount(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0;
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
 function decodeRecent(fields: unknown[]): SuiteSortKey | null {
