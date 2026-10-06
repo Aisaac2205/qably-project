@@ -251,17 +251,21 @@ describe('SuiteListResults loading more', () => {
       listSummaries
         .mockImplementationOnce(pagedBy(7, 3))
         .mockImplementationOnce(() => second.promise)
-      await renderResults()
-      await user.click(await screen.findByRole('button', { name: 'Load more' }))
 
-      act(() => outside.focus())
-      await act(async () => {
-        second.resolve({ items: rowsFrom(3, 6), nextCursor: '6' })
-      })
+      try {
+        await renderResults()
+        await user.click(await screen.findByRole('button', { name: 'Load more' }))
 
-      await screen.findByTestId('suite-row-s5')
-      expect(outside).toHaveFocus()
-      outside.remove()
+        act(() => outside.focus())
+        await act(async () => {
+          second.resolve({ items: rowsFrom(3, 6), nextCursor: '6' })
+        })
+
+        await screen.findByTestId('suite-row-s5')
+        expect(outside).toHaveFocus()
+      } finally {
+        outside.remove()
+      }
     })
 
     it('goes to the list when the last page brings no new row and the button is gone', async () => {

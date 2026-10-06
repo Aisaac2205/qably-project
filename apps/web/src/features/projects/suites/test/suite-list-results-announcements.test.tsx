@@ -44,7 +44,9 @@ describe('SuiteListResults announcements', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
-    useI18nStore.setState({ locale: 'en' })
+    act(() => {
+      useI18nStore.setState({ locale: 'en' })
+    })
   })
 
   it('is a polite status region that is mounted from the first render, even while loading', async () => {
@@ -121,7 +123,9 @@ describe('SuiteListResults announcements', () => {
 
   it('speaks Spanish with the right plural', async () => {
     const user = userEvent.setup()
-    useI18nStore.setState({ locale: 'es' })
+    act(() => {
+      useI18nStore.setState({ locale: 'es' })
+    })
     listSummaries.mockImplementation(pagedBy(7, 3))
     await renderResults()
 

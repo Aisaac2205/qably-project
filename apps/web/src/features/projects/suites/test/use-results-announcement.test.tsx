@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react'
+import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { useI18nStore } from '@/lib/i18n/store'
 import { useResultsAnnouncement } from '@/features/projects/suites/hooks/use-results-announcement'
@@ -39,7 +39,9 @@ function settledWith(from: Input, patch: Partial<Input>): Input {
 
 describe('useResultsAnnouncement', () => {
   afterEach(() => {
-    useI18nStore.setState({ locale: 'en' })
+    act(() => {
+      useI18nStore.setState({ locale: 'en' })
+    })
   })
 
   describe('on the first render', () => {
@@ -272,7 +274,9 @@ describe('useResultsAnnouncement', () => {
     })
 
     it('is spoken in Spanish with the right plural', () => {
-      useI18nStore.setState({ locale: 'es' })
+      act(() => {
+        useI18nStore.setState({ locale: 'es' })
+      })
       const { result, rerender } = renderAnnouncement()
 
       rerender(pending(SETTLED))
@@ -351,7 +355,9 @@ describe('useResultsAnnouncement', () => {
     })
 
     it('is spoken in Spanish with the right plural', () => {
-      useI18nStore.setState({ locale: 'es' })
+      act(() => {
+        useI18nStore.setState({ locale: 'es' })
+      })
       const { result, rerender } = renderAnnouncement()
 
       rerender(settledWith(SETTLED, { resultsKey: 'name', rowCount: 3 }))
