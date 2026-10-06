@@ -68,6 +68,22 @@ describe('SuiteList tag filter', () => {
       expect(namesOf(await tagOptions(user))).toEqual(['All tags', 'only-on-a-later-page', 'smoke'])
     })
 
+    it('are the same in the sheet of the filters, which has its own tag selector', async () => {
+      const user = userEvent.setup()
+      listTags.mockResolvedValue({ items: ['only-on-a-later-page', 'smoke'] })
+      const { client } = await renderList()
+      await screen.findByTestId('suite-row-suite-4')
+      await facetSettled(client, 'success')
+
+      await user.click(screen.getByTestId('suite-filters-trigger'))
+      const sheet = await screen.findByRole('dialog')
+      const [, tagSelect] = within(sheet).getAllByRole('combobox')
+      await user.click(tagSelect)
+
+      const options = await screen.findAllByRole('option')
+      expect(namesOf(options)).toEqual(['All tags', 'only-on-a-later-page', 'smoke'])
+    })
+
     it('are only All tags while the facet loads, and the list does not wait for it', async () => {
       const user = userEvent.setup()
       listTags.mockReturnValue(new Promise(() => undefined))
