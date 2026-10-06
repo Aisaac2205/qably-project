@@ -34,6 +34,27 @@ describe('toSuiteSummariesQuery', () => {
     })
   })
 
+  it.each([201, 300])('caps a search of %i characters at the 200 the API accepts', (length) => {
+    const search = `${'a'.repeat(199)}${'b'.repeat(length - 199)}`
+
+    const query = toSuiteSummariesQuery({ ...NO_FILTERS, search })
+
+    expect(query.search).toBe(`${'a'.repeat(199)}b`)
+    expect(query.search).toHaveLength(200)
+  })
+
+  it('keeps a search of exactly 200 characters whole', () => {
+    const search = 'c'.repeat(200)
+
+    expect(toSuiteSummariesQuery({ ...NO_FILTERS, search }).search).toBe(search)
+  })
+
+  it('trims before capping so the padding never eats into the 200 characters', () => {
+    const search = `   ${'d'.repeat(200)}   `
+
+    expect(toSuiteSummariesQuery({ ...NO_FILTERS, search }).search).toBe('d'.repeat(200))
+  })
+
   it('drops a search made only of whitespace', () => {
     expect(toSuiteSummariesQuery({ ...NO_FILTERS, search: '   ' })).toStrictEqual({
       sort: 'recent',
