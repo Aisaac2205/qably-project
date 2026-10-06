@@ -7,14 +7,15 @@ practice this redesign introduced.
 
 ## Page composition
 
-`dashboard-page.tsx` renders, in order, inside a single lifted `period` state (`useState<DashboardPeriod>(30)`):
+`dashboard-page.tsx` renders, in order, inside a single lifted `period` state (`useState<DashboardPeriod>(7)`):
 
-1. `DashboardHeader` — title, subtitle, period toggle (7/30/90).
-2. `KpiStrip` — 4 `KpiTile`s (pass rate, runs, failed cases, avg run duration), each with a
-   sparkline and a delta against the previous window.
+1. `DashboardHeader` — subtitle and a period dropdown (7, 30 or 90 days).
+2. `KpiStrip` — 4 `KpiStatCard`s (executed cases, runs, failed cases, failed runs), each with a
+   mini area chart and a trend against the previous window.
 3. `PassRateHero` — full-width executed-cases comparison chart (see "The hero shows executed
    cases" below).
-4. A `@3xl:grid-cols-3` row: `ProjectsTable` (`col-span-2`) and `CasesGaugeCard`.
+4. A `@3xl:grid-cols-3` row: `ProjectsTable` (`col-span-2`) and `CasesGaugeCard`, the case-priority
+   donut.
 5. A `@3xl:grid-cols-2` row: `ChannelsCard` and `ActivityCard`.
 
 Both two-column rows live inside their own `max-w-dashboard` (`--container-dashboard: 1128px`, a
@@ -25,29 +26,38 @@ because `ResponsiveContainer` (Recharts) cannot shrink a flex/grid child below i
 without it.
 
 Every widget manages its own `isLoading`/`isError`/`retry` independently — a failed
-`GET /dashboard/channels` only degrades the channels and activity cards, never the KPI strip or the
-hero, which read from `GET /dashboard/overview`.
+`GET /dashboard/channels` only degrades the channels card, never the KPI strip, the hero, the projects
+table, the gauge or the activity card, which all read from `GET /dashboard/overview`.
 
-## The dashboard blocks live in `@qably/ui`, built on a vendored shadcn chart
+## Where the dashboard blocks come from
+
+Two sets of chart code exist side by side: `apps/web` draws its charts with its own primitives, and
+`@qably/ui` ships the presentational blocks around them.
+
+`apps/web/src/components/charts` holds the area, bar, line and pie chart primitives, with a tooltip
+and a legend, vendored from bklit. `KpiStrip` draws its four cards with `KpiStatCard`
+(`components/ui/kpi-stat-card.tsx`), `PassRateHero` uses `AreaChart`, and `CasesGaugeCard` uses
+`PieChart` with a `Legend`.
+
+`packages/ui/src/dashboard/` holds the presentational components: `Sparkline` (compact area chart),
+`Gauge` (half-donut), `PassRateBar`, `DeliveryBars` (per-channel 14-day bar strip), `ChartDataTable`
+(the `sr-only` mirror table), `KpiTile`, `StatusChip`, `Link`, `ChannelStat` and `ActivityEntryRow`.
+The dashboard consumes `ActivityEntryRow` (and the `StatusChip` inside it), `ChannelStat`,
+`ChartDataTable`, `DeliveryBars` and `PassRateBar`; `Sparkline`, `Gauge` and `KpiTile` are still in the
+package but no app renders them. The components take data and copy through props and know nothing
+about react-query, Next.js or the i18n store — `apps/web` wraps them in containers that fetch real
+data and translate labels. `apps/landing` does not render this package's components: it imports only
+the `KpiDeltaTone` type and keeps its own copies of the dashboard components for its preview.
 
 `packages/ui/src/chart/chart.tsx` is a hand-vendored copy of shadcn/ui's `chart` primitive
 (`ChartContainer`, `ChartTooltip`, `ChartTooltipContent`, `ChartLegend`, `ChartLegendContent`,
 `ChartStyle`, `ChartConfig`) over Recharts 3.8.1, rewritten so it speaks only this package's
 `qb-*` token contract instead of shadcn's own `muted-foreground`/`background`/`border` class names
-— those collide with names this repo already uses for other things. There is no `components.json`
-in `packages/ui`; the file was copied and adapted by hand rather than run through the shadcn CLI,
-because `apps/web/components.json` targets a different style base and icon library (lucide, banned
-in this repo) that the CLI would otherwise re-apply here.
-
-`packages/ui/src/dashboard/` holds the presentational chart components built on that primitive:
-`Sparkline` (compact area chart for KPI tiles), `Gauge` (the cases-passing donut), `PassRateBar`,
-`DeliveryBars` (per-channel 14-day bar strip), `ChartDataTable` (the shared `sr-only` mirror table
-every chart renders alongside itself), `KpiTile`, `StatusChip`, `Link`, `ChannelStat` and
-`ActivityEntryRow`. They take data and copy through props and know nothing about react-query,
-Next.js or the i18n store — `apps/web` wraps them in containers that fetch real data and translate
-labels; `apps/landing`'s own dashboard preview (`landing-dashboard-previews`, a separate change) will
-render the same components with demo data, so the marketing preview is never a re-implementation of
-the product's charts.
+— those collide with names this repo already uses for other things. `Sparkline` and `Gauge` are built
+on it, and no app uses it directly. There is no `components.json` in `packages/ui`; the file was
+copied and adapted by hand rather than run through the shadcn CLI, because `apps/web/components.json`
+targets a different style base and icon library (lucide, banned in this repo) that the CLI would
+otherwise re-apply here.
 
 ### `ChannelStat`: a number over its label, not a sentence
 
@@ -57,9 +67,11 @@ with the full sentence available to assistive tech only: the value and unit sit 
 under it), and a sibling `.sr-only` span carries the plural-correct phrase a screen reader announces
 instead (`"3 sent"`, `"1 failed"`). A `tone` prop (`default | muted | pass | fail`) maps to the
 matching `qb-*` text colour — `apps/web`'s `channel-row.tsx`/`channels-card.tsx` pass `fail` when a
-channel's failed count is greater than zero and `pass` otherwise, so a channel with zero failures
-reads as healthy rather than neutral. `apps/web` resolves `unit`/`srText` through i18n
-(`dashboard.channels{Sent,Failed,Unread}Unit_one/_other`); the component itself never calls `t()`.
+channel's failed count is greater than zero and `pass` otherwise. They render the stats inside an
+`sr-only` wrapper: the visible row shows the `DeliveryBars` strip and a "Connected" status, and the
+sent, failed and unread counts reach screen readers only. `apps/web` resolves `unit`/`srText` through
+i18n (`dashboard.channels{Sent,Failed,Unread}Unit_one/_other` for the unit); the component itself never
+calls `t()`.
 
 ### `ActivityEntryRow`: one row per commit or per standalone run
 
@@ -81,9 +93,9 @@ Like every other block in this package, `ActivityEntryRow` owns no icon assets: 
 optional `commitIcon` are `ReactNode` slots the web container fills (a GitHub Actions icon, a
 `next/image` logo) so the shared component never imports `next/image` or a specific icon library.
 
-`ChartContainer` always forwards `initialDimension` — pass the chart's intrinsic design size, not a
-guess. Recharts 3.8.1's `ResponsiveContainer` skips measuring entirely when `ResizeObserver` is
-`undefined` (true in most test environments and on first paint before layout settles) and renders
+In `@qably/ui/chart`, `ChartContainer` always forwards `initialDimension` — pass the chart's intrinsic
+design size, not a guess. Recharts 3.8.1's `ResponsiveContainer` skips measuring entirely when
+`ResizeObserver` is `undefined` (true in most test environments and on first paint before layout settles) and renders
 at `initialDimension` instead of the historical `-1×-1` fallback that produced sizing warnings.
 Passing the real intrinsic size means the chart is never invisible on first paint or inside a test.
 
@@ -92,16 +104,16 @@ Passing the real intrinsic size means the chart is never invisible on first pain
 Every block speaks only Tailwind `qb-*` utilities (`--color-qb-*`, declared in each app's `@theme
 inline`) and, for charts, raw `--qb-chart-*` CSS variables read directly (`stroke="var(--qb-chart-line)"`,
 or as a `ChartConfig` series `color` — `ChartConfig.color` is typed as `` `var(--qb-chart-${string})` ``
-so a raw hex/oklch value fails to compile). `apps/web/src/app/globals.css` binds them to its light
-OKLCH tokens; `apps/landing/src/styles/global.css` binds them to its own dark hex/rgba mirror. The
-two token files are separate systems — never copy a value from one into the other. Both apps
+so a raw hex/oklch value fails to compile). `apps/web/src/app/globals.css` binds the `--color-qb-*`
+names and declares the `--qb-chart-*` variables in its light OKLCH tokens;
+`apps/landing/src/styles/global.css` declares only the `--qb-chart-*` variables and binds no
+`--color-qb-*` names, because the landing app does not render this package's components. The two token
+files are separate systems — never copy a value from one into the other. Both apps
 `@source packages/ui/src` so Tailwind generates the package's utility classes.
 
-`--qb-chart-compare` is this redesign's one new package-level contract variable (bound to
-`var(--fg-muted)` in `apps/web`): the muted, dashed "previous period" series colour used by the
-hero and by `Sparkline`'s `muted` tone. It is a package contract var like the others, not a
-web-local token — `apps/landing` will bind its own value when the landing preview change lands,
-never copy `apps/web`'s.
+`--qb-chart-compare` is the muted "previous period" series colour: the hero draws its dashed previous
+series with it, and `Sparkline`'s `muted` tone reads it. It is a package contract var like the others,
+not a web-local token, and each app declares its own value in its own token file.
 
 ### Runs hover token
 
@@ -120,19 +132,20 @@ so the page background `--bg` shows through at 40% and the rendered row keeps a 
 
 ## Accessibility contract
 
-Every chart component satisfies the same three rules, independent of which one it is:
+The dashboard charts follow two rules:
 
 1. **An `sr-only` data table mirrors the chart.** `ChartDataTable` renders a real `<table>` with a
    `<caption>`, one column per series, `sr-only` so it is never visible but always in the
    accessibility tree — a screen reader gets the same date/value pairs a sighted reader gets from
-   the plotted line or bar.
-2. **Keyboard focus reveals the same content hover does.** The hero and any other Recharts-backed
-   chart use Recharts 3's native `accessibilityLayer` (a focusable chart root, arrow keys move the
-   active point) rather than a hand-rolled roving-tabindex overlay — one tooltip implementation
-   serves mouse, touch and keyboard instead of three.
-3. **A `null` point renders as a visual gap, never a drop to zero.** `Sparkline` and the hero both
-   use `connectNulls={false}`/real gaps in the underlying series; a day with no runs is invisible on
-   the line, not a dip to the axis.
+   the plotted line or bar. The hero and `DeliveryBars` render one next to the plot, and so do the
+   charts of the project quality page. The KPI cards give their chart an `aria-label` instead, and
+   the priority donut is a `role="img"` with an `aria-label`.
+2. **A value that was not measured is not drawn as zero.** See the meter contract below. The hero and
+   the KPI cards plot daily counts, so a day with no runs is a real zero there.
+
+The charts in `apps/web/src/components/charts` are pointer-driven: they handle mouse hover and touch,
+and register no keyboard handler and no focusable chart root. The `sr-only` data table is the only way
+to read the plotted values without a pointer, so keyboard users depend on it.
 
 `Gauge` and `PassRateBar` additionally carry a proper meter contract: when their value is a real
 number they render `role="meter"` with `aria-valuenow`/`aria-valuemin`/`aria-valuemax`/`aria-valuetext`;
@@ -140,24 +153,24 @@ when the value is `null` (not measured) they fall back to `role="img"` with just
 because a meter with no value to report is a contradiction — there is nothing to measure against a
 min/max.
 
-### Touch and coarse-pointer input
+### Touch input
+
+The charts in `apps/web/src/components/charts` handle touch themselves (`use-chart-interaction.ts`):
+one finger moves the tooltip along the series and two fingers select a range. The plot sets
+`touch-action: none`, so a vertical swipe that starts on a chart does not scroll the page.
 
 `useCoarsePointer()` (`@qably/ui/chart`, a `useSyncExternalStore` wrapper over
-`matchMedia('(pointer: coarse)')`) decides whether a chart's tooltip trigger is `'hover'` or
-`'click'`. Recharts 3.8.1 only dispatches its touch handling on `touchmove`, so a tap with no
-movement would not reliably open a hover-triggered tooltip on a touch device; switching the trigger
-to `'click'` on coarse pointers makes a tap open it every time. The plot itself gets
-`touch-action: pan-y` (Tailwind's `touch-pan-y`) so vertical page scrolling still works over the
-chart while a horizontal drag can still scrub it.
+`matchMedia('(pointer: coarse)')`) is exported to switch a Recharts tooltip trigger between `'hover'`
+and `'click'`, because Recharts 3.8.1 only dispatches its touch handling on `touchmove`. No component
+uses it today.
 
 ## Responsive rules, verified at 390px
 
 - KPI cards: 1 column by default, 2 columns from the strip's own `@xs` container breakpoint (not
   `@md` — a 390px viewport produces roughly a 350px container width once page padding is
   subtracted, which only clears `@xs`), 4 columns from `@2xl`.
-- `KpiTile` itself is a `@container`: it stacks its value/label above its sparkline below 220px of
-  its own width and goes side-by-side above that, so a narrow 2-up tile on a small phone never
-  overflows its sparkline into the tile next to it.
+- `KpiTile` (in `@qably/ui`, not rendered by any app today) is itself a `@container`: it stacks its
+  value/label above its sparkline below 220px of its own width and goes side-by-side above that.
 - Both `@3xl` two-column rows (projects/gauge, channels/activity) stack to one column below their
   own `@3xl`.
 - The projects table is `table-fixed w-full` with the Suites and Cases columns
@@ -168,18 +181,18 @@ chart while a horizontal drag can still scrub it.
   used a horizontally scrollable region (`tabIndex={0}`, `role="region"`) with a `min-w-xl` table;
   dropped in favour of the fixed layout because a scroll-only-if-you-know-to-drag pattern is worse
   than showing fewer columns outright on a table this narrow.
-- Channel rows stack identity above delivery bars below `@md`.
-- Each channel's sent/failed/unread counts render as `ChannelStat` (`@qably/ui/dashboard`): a
-  value-over-unit visual stack, with the plural-correct sentence available to screen readers via a
-  `.sr-only` sibling rather than an `aria-label` on the visible number.
+- Channel rows keep one three-column grid (identity, delivery bars, status) at every width, and the
+  identity column truncates (`min-w-0`).
+- Each channel's sent/failed/unread counts are `ChannelStat`s (`@qably/ui/dashboard`) inside an
+  `sr-only` wrapper, so screen readers get the plural-correct sentence while the visible row shows the
+  delivery bars and the connected status.
 - `ActivityCard` groups the window's runs into one row per commit (or per standalone run) via
   `ActivityEntryRow` (`@qably/ui/dashboard`) — see `docs/DASHBOARD_METRICS.md`'s `recentActivity`
   section for the grouping and status-precedence rules behind what each row shows.
-- Every interactive control (the period toggle segments, sort buttons) meets the 24×24px minimum
-  target size.
+- Every interactive control meets the 24×24px minimum target size.
 
 The 390px gate — no horizontal `scrollWidth` overflow, hero tooltip opens on tap, horizontal drag
-scrubs it, vertical swipe still scrolls the page, the table scrolls inside its own card — is
+scrubs it, the projects table fits its card without scrolling — is
 verified manually (Chrome device mode at 390×844, plus one real phone when available) and recorded
 in the change's apply-progress. jsdom tests cover the same structural rules
 (`min-w-0`, `role="region"`, no `max-w-[1128px]` arbitrary values, loading/empty/error states) but
@@ -199,11 +212,12 @@ bug jsdom structurally cannot.
 ## Deviations from the original spec, evaluated and accepted
 
 - **The hero shows executed cases, not pass rate.** The original spec described the hero as a pass-rate
-  comparison chart. The pass rate KPI tile already covers that number, so the hero was changed to a
-  two-line "executed cases" comparison (current period solid, previous period dashed, both real
-  zeros on no-run days rather than connected gaps) with a tooltip breaking each day down into
-  passed/failed/blocked and a footer trend against the previous period. This is a deliberate,
-  approved deviation from the spec text, not an oversight.
+  comparison chart and the KPI strip as pass rate, runs, failed cases and average run duration. The
+  hero was changed to a two-line "executed cases" comparison (current period solid, previous period
+  dashed, both real zeros on no-run days rather than connected gaps) with a tooltip breaking each day
+  down into passed/failed/blocked and a footer trend against the previous period, and the strip shows
+  executed cases, runs, failed cases and failed runs. This is a deliberate, approved deviation from the
+  spec text, not an oversight.
 - **Project monograms are neutral, not a deterministic per-id color hash.** The spec asked for a
   monogram colour derived from a hash of the project id. Shipped, `project-monogram.tsx` renders a
   plain neutral badge (`bg-canvas-hover`/`text-default`) with the project's initials; the per-row
@@ -211,10 +225,9 @@ bug jsdom structurally cannot.
   second, unrelated colour signal on the monogram itself tested as visual noise rather than useful
   information. `monogram-tone.ts` was removed rather than kept unused.
 - **The hero's debounced `aria-live` announcer was not ported** when the hero was rewritten for
-  executed cases. Recharts' `accessibilityLayer` plus the `sr-only` data table cover the same
-  keyboard/assistive-technology path; a live-region announcement on every arrow-key move was judged
-  a WARNING-level nice-to-have, not a blocking gap, but it has not yet had a manual screen-reader
-  spot check.
+  executed cases. The `sr-only` data table covers the assistive-technology path; a live-region
+  announcement on every point change was judged a WARNING-level nice-to-have, not a blocking gap, but
+  it has not yet had a manual screen-reader spot check.
 
 See `docs/design/2026-09-22-dashboard-redesign.md`'s "Implementation notes" section for the full
 list of where the shipped dashboard differs from the original brief, including the two backend
