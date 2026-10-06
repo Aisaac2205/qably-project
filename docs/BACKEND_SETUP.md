@@ -8,11 +8,12 @@ The `@qably/api` service is the transactional backend behind the Qably chain: re
 cd apps/api
 docker compose up -d
 cp .env.example .env
-pnpm exec prisma migrate dev --name init
+pnpm exec prisma migrate dev
+pnpm exec prisma generate
 pnpm start:dev
 ```
 
-The service listens on `PORT` (default `3001`). `GET /health` reports service and database status.
+The generated Prisma client lives in `apps/api/generated` and is not committed, and `prisma migrate dev` does not regenerate it, so run `prisma generate` after a fresh clone and after every migration (`pnpm run build` also does it). The service listens on `PORT` (default `3001`). `GET /health` reports service and database status.
 
 ## Environment variables
 
@@ -27,16 +28,18 @@ On a deployed environment the platform injects the variables directly and no `.e
 | `NODE_ENV` | no | `development` \| `test` \| `production` | Defaults to `development`. In `production` the exception filter hides internal error messages. |
 | `PORT` | no | integer | HTTP port. Defaults to `3001`. |
 | `DATABASE_URL` | yes | URL | PostgreSQL connection string used by the Prisma pg driver adapter. |
-| `REDIS_URL` | yes | URL | Redis connection string for BullMQ ingestion and extraction queues. |
+| `REDIS_URL` | yes | URL | Redis connection string for the BullMQ queues, the daily Aeris budget counter and report batching. |
 | `BETTER_AUTH_SECRET` | yes | string, min 32 chars | Signing secret for better-auth sessions. |
-| `BETTER_AUTH_URL` | yes | http(s) URL | Public base URL of the API itself. |
-| `WEB_APP_URL` | yes | http(s) URL | Browser origin of the Next.js web app. Sole allowed CORS origin and the only better-auth trusted origin. Path, query and trailing slash are ignored — only scheme, host and port are compared. |
-| `ENCRYPTION_KEY` | yes | 64 hex chars | AES-256-GCM key for provider tokens and webhook secrets at rest. Generate with `openssl rand -hex 32`. |
+| `BETTER_AUTH_URL` | yes | bare http(s) origin | Public base URL of the API itself. A path, query or fragment aborts startup; a trailing slash is accepted. |
+| `WEB_APP_URL` | yes | bare http(s) origin | Browser origin of the Next.js web app. Sole allowed CORS origin and the only better-auth trusted origin. A path, query or fragment aborts startup; a trailing slash is accepted. |
+| `ENCRYPTION_KEY` | yes | 64 hex chars | AES-256-GCM key for SCM webhook secrets, repository access tokens and notification webhook URLs at rest. Generate with `openssl rand -hex 32`. |
 | `GITHUB_CLIENT_ID` | yes | string | GitHub OAuth application id. |
 | `GITHUB_CLIENT_SECRET` | yes | string | GitHub OAuth application secret. |
-| `GEMINI_API_KEY` | no | string | Key for the Gemini AI extraction provider. Optional at boot because extraction degrades to a manual-review fallback without it; the `ai` module requires it at its own boundary to activate `GeminiExtractor`. See `docs/AI_EXTRACTION.md`. |
-| `GEMINI_MODEL` | no | string | Gemini model id used for extraction. Defaults to `gemini-3.1-flash-lite` (see `src/config/env.ts` for the current value). |
-| `RESEND_API_KEY` | no | string | Resend API key for run notifications. Optional because notifications ship last; when supplied it must be non-empty. The Unit 4 notification service requires it at its own boundary. |
+| `GEMINI_API_KEY` | no | string | Key for the Gemini provider used by extraction, suite summaries and chat. Optional at boot: without it `AiModule` binds `DisabledExtractor`, chat reports the provider as unavailable, and extraction failures are recorded on the case. See `docs/AI_EXTRACTION.md`. |
+| `GEMINI_MODEL` | no | string | Gemini model id used for extraction, suite summaries and chat. Defaults to `gemini-3.1-flash-lite` (see `src/config/env.ts` for the current value). |
+| `AERIS_DAILY_BUDGET` | no | positive integer | Maximum Gemini calls per Pacific calendar day against the platform key, counted in Redis across extraction and chat. Unset means unmetered. |
+| `RESEND_API_KEY` | no | string | Resend API key for transactional email: invitations, authentication emails and notification emails. Optional: when it is missing, `MailerService` logs a warning and skips the send. When supplied it must be non-empty. |
+| `RESEND_FROM_EMAIL` | no | string | Sender address, for example `Display Name <address@domain>`. Set it together with `RESEND_API_KEY`. |
 
 Local development values for `DATABASE_URL` and `REDIS_URL` match the `docker-compose.yml` services:
 
@@ -65,7 +68,7 @@ Cookies work under `SameSite=Lax` while both apps share a site — different por
 
 ### The web client half
 
-`apps/web` talks to the API through a single better-auth client at `src/lib/auth-client.ts`. It is the only place allowed to know the API exists.
+`apps/web` reaches the API through two clients, and both read the origin from `resolveApiBaseUrl()` (`src/lib/api-base-url.ts`). The better-auth client at `src/lib/auth-client.ts` handles sign-in, sign-up and the session. `apiRequest` in `src/lib/api-client.ts` handles every other call and attaches the `x-organization-id` header.
 
 | Variable | Required | Purpose |
 |---|---|---|
@@ -73,13 +76,13 @@ Cookies work under `SameSite=Lax` while both apps share a site — different por
 
 Three constraints hold this together:
 
-- `fetchOptions.credentials: 'include'` on the client. Without it the browser never attaches the session cookie to a cross-origin request, no matter how permissive CORS is.
+- `credentials: 'include'` on both clients (`fetchOptions.credentials` for better-auth, the `fetch` option in `apiRequest`). Without it the browser never attaches the session cookie to a cross-origin request, no matter how permissive CORS is.
 - `NEXT_PUBLIC_` prefix. Next inlines the value into the browser bundle **at build time**, so a deployed build is frozen to whatever the variable held when `next build` ran. Setting it only at runtime does nothing.
 - `next.config.ts` calls `resolveApiBaseUrl()` at load, so a missing or malformed value fails the build with the variable named instead of shipping a bundle that silently posts to the wrong origin.
 
-`useAuth` (`src/features/auth/hooks/use-auth.ts`) is the only consumer of the client in feature code. It returns `{ error: string | null }` rather than throwing, so forms render a message instead of an error boundary. `toAuthMessage` (`src/features/auth/lib/auth-errors.ts`) maps better-auth's `BASE_ERROR_CODES` to user-facing copy; `USER_NOT_FOUND` and `INVALID_EMAIL_OR_PASSWORD` deliberately produce the same sentence so the form cannot be used to enumerate registered accounts.
+`useAuth` (`src/features/auth/hooks/use-auth.ts`) wraps the sign-in, sign-up, GitHub sign-in and sign-out calls. Each action resolves to `{ error: string | null }` rather than throwing, so forms render a message instead of an error boundary. The session hooks and gates (`use-current-user`, `session-gate`, `guest-gate`) read the same client directly. `toAuthMessage` (`src/features/auth/lib/auth-errors.ts`) maps better-auth's `BASE_ERROR_CODES` to user-facing copy; `USER_NOT_FOUND` and `INVALID_EMAIL_OR_PASSWORD` deliberately produce the same sentence so the form cannot be used to enumerate registered accounts.
 
-`validatePassword` enforces 12 characters because `minPasswordLength` in `auth.options.ts` is 12. These two numbers must move together — a lower client rule just converts an inline field error into a round trip that fails.
+`validatePassword` (`src/features/auth/lib/validation.ts`) enforces 12 characters because `minPasswordLength` in `auth.options.ts` is 12. These two numbers must move together — a lower client rule just converts an inline field error into a round trip that fails.
 
 ### GitHub OAuth
 
@@ -137,7 +140,7 @@ Every case mutation returns the **whole suite**, not the case. The UI renders a 
 
 `packages/types` is the single source of truth for shapes crossing the API/web boundary. The API imports it; `apps/api/src/**/*.contracts.ts` files alias those types rather than redeclaring them.
 
-`Project` holds only the persisted fields the API can return. `ProjectSummary` extends it with the aggregates (`healthScore`, `suiteCount`, `lastRunStatus`, …) that the web currently computes in `mock-store`. When Runs land, the API can fill `ProjectSummary` and the mock disappears; until then the split keeps the compiler honest about which fields actually come from the database.
+`Project` holds only the persisted fields the API can return. `ProjectListItem` extends it with `suiteCount` and an `activity` object (`healthScore`, `lastRunStatus`, `lastRunAt`, `activeRunCount`, and an optional `aiPendingCount` the API does not fill today) that `ProjectsService` computes from runs. `activity` is `null` for a project that has never run, and `healthScore` is `null` when no run falls inside the metrics window, so the UI never renders an invented zero. `ProjectSummary`, the older flat shape, is only used by the web mock store and its test fixtures.
 
 Nullable columns are returned as **omitted keys**, never `null`, so one optional TypeScript property describes both the Prisma row and the JSON payload.
 
@@ -147,14 +150,19 @@ Modules are organised by feature, not by technical layer. Each feature module ow
 
 ```
 src/
-├── config/     environment parsing and the global ENV provider
-├── common/     Result type, Zod validation pipe, exception filter
+├── config/     environment parsing, CORS and the global ENV provider
+├── common/     Result type, Zod validation pipe, exception filter, access log, throttler, crypto, locale and prompt helpers
 ├── prisma/     PrismaService and the adapters that implement feature contracts
 ├── health/     liveness and database readiness
-├── auth/       sessions, guards, organisation scoping
-├── repository/ SCM connections, webhooks, ingestion, code changes
-├── review/     AI extraction, proposals, atomic approval
-└── runs/       executions, results, evidence, notifications
+├── reporter/   serves the CI reporter script at GET /report.mjs
+└── modules/    one folder per feature
+    ├── auth, organizations, invites, api-keys    sessions, organization scoping, membership, programmatic keys
+    ├── projects, connections, repository         projects, SCM connections, per-project repository settings
+    ├── ingestion                                 SCM webhooks, code changes
+    ├── suites, runs                              suites and cases, executions and results
+    ├── review, proposal-classification           extraction jobs, proposals, approval, duplicate classification
+    ├── ai, chat                                  Gemini integration, project chat
+    └── dashboard, notifications, mailer          aggregates, notifications, email
 ```
 
 ### Dependency inversion
@@ -179,7 +187,7 @@ A failed session lookup is logged with its stack and answered with a generic `40
 
 Inside a protected handler, `@CurrentUser()` returns the authenticated user. It throws if the route is not covered by `SessionGuard`, so a missing guard fails loudly instead of yielding `undefined`.
 
-Express's JSON body parser is disabled globally and re-applied to every path except `/api/auth`, because better-auth needs to read the raw request body.
+Nest's own body parser is disabled (`bodyParser: false` in `main.ts`) and `configureHttpPipeline` installs the parsers by hand after Helmet and CORS. A JSON parser that also keeps the raw body runs on every path except `/api/auth`, because better-auth needs to read the raw request body. A text parser for `application/xml` and `text/xml` runs only on `POST /runs/ingest/junit`, with a 10 MB limit.
 
 #### Testing against better-auth
 
@@ -207,7 +215,7 @@ generator client {
 
 Without `moduleFormat = "cjs"` the generated client emits `import.meta` and Jest fails to parse it. Without `importFileExtension = ""` the generated modules import `./enums.js`, which resolves at runtime but not under ts-jest.
 
-Derived project figures — health score, suite count, active run count, pending proposal count — are computed in queries rather than stored, so they cannot drift from the rows they summarise.
+Derived project figures — health score, suite count and active run count — are computed in queries rather than stored, so they cannot drift from the rows they summarise.
 
 ## Verification
 
