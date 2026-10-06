@@ -8,9 +8,6 @@ import { pagedBy } from './suite-list-results-pages'
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
 )
-vi.mock('@/features/runs/api/runs.api', async () =>
-  await import('@/test/runs-api-stub'),
-)
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
