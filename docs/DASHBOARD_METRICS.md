@@ -1,11 +1,12 @@
 # Dashboard Metrics — Server-Owned Quality Snapshot
 
-Three read endpoints feed the redesigned `/dashboard`: `GET /dashboard/overview` (the hero, the
-four KPI cards, the projects table and the cases-passing gauge), `GET /dashboard/channels` (the
-notification channels card) and `GET /dashboard/traceability` (still consumed by `/quality`'s
-traceability calendar, unchanged in shape). `GET /dashboard/summary` also stays — `/quality`'s KPI
-strip and pass-rate trend still call it — and now computes its pass rate with the same pinned
-formula as everything else.
+Two read endpoints feed the redesigned `/dashboard`: `GET /dashboard/overview` (the hero, the
+four KPI cards, the projects table, the cases-passing gauge, the case-priority donut and the recent
+activity feed) and `GET /dashboard/channels` (the notification channels card). `/quality` reads
+`GET /dashboard/overview` too, with a `projectId`, next to `GET /runs/push-pass-rate`.
+`GET /dashboard/traceability` and `GET /dashboard/summary` also stay on the API and compute their
+pass rate with the same pinned formula as everything else, but no page in `apps/web` renders them
+today: the web client keeps hooks for both (`use-traceability-calendar`, `use-dashboard-summary`).
 
 Every metric is computed server-side from real `Run` and `RunCase` rows. Nothing on `/dashboard`
 reads a mock store or a client-side clock.
@@ -50,7 +51,7 @@ for the 0–100 percentage form) is the only place this math is written:
 | `GET /dashboard/overview` `passRateSeries[].passRate` | Per-bucket pass rate (see "Series granularity" below). |
 | `GET /dashboard/overview` `casesPassing` | Raw `RunCaseCounts`; the client derives the rate for the gauge. |
 | `GET /dashboard/overview` `projects[].passRate` | Per-project pass rate over the current window. |
-| `GET /dashboard/summary` `passRate`/`passRateTrend` | Same formula, still windowed at the fixed `DASHBOARD_WINDOW_DAYS` (7), used by `/quality`. |
+| `GET /dashboard/summary` `passRate`/`passRateTrend` | Same formula, still windowed at the fixed `DASHBOARD_WINDOW_DAYS` (7). |
 | `GET /projects` `ProjectListItem.activity.healthScore` | Same formula, rendered 0–100. |
 
 ## Time zone: the client's clock decides the calendar day
@@ -133,6 +134,11 @@ An earlier version of this bucketing anchored to ISO week boundaries instead, wh
 partial chunk could be misaligned with the window's actual end date; anchoring to the window itself
 guarantees exactly 13 buckets that tile the requested range with no gap and no overlap.
 
+Each `DailyPoint` carries `date` (the first day of the bucket) and `rangeEnd` (its last day, equal to
+`date` for a daily bucket), and `passRateSeries.granularity` is `'week'` when `period` is 90 and
+`'day'` otherwise. A consumer labels a 90-day point with the range it covers, not with the single day
+in `date`, so a weekly sum is never presented as one day.
+
 A bucket with zero runs reports `passRate: null`, `runs: 0`, `failedRuns: 0` — an unmeasured day is
 not a zero day.
 
@@ -158,6 +164,14 @@ whole organization, or one project when `projectId` narrows it), only its single
 selected with `ROW_NUMBER() OVER (PARTITION BY suiteId ORDER BY startedAt DESC)`. This answers "if
 I ran every suite once right now, what would pass?" — a suite with ten runs today should count once,
 not ten times, or its case counts would dominate a suite that only ran once.
+
+### `casePriorities`: active cases by priority
+
+`casePriorities` counts the cases with `state: 'active'` in scope (the whole organization, or one
+project when `projectId` narrows it) grouped by `priority`, and always returns all four keys
+(`critical`, `high`, `medium`, `low`) with `0` for a priority that has no cases. It does not depend
+on `period` or on any run, so the donut shows the size of the active library, not what ran in the
+window.
 
 ### Projects
 
@@ -273,9 +287,10 @@ could still be the user's own email.
 
 ## `GET /dashboard/traceability?year=<YYYY>&tz=<iana>&projectId=<id>`
 
-Unchanged in shape from before this change — still consumed by `/quality`'s traceability calendar,
-still returns per-stage day counts for `scm`, `proposals`, `official` and `runs` with days that had
-no activity omitted rather than padded. What changed is that it now accepts the same dynamic `tz`
+Unchanged in shape from before this change. The web client's traceability calendar component is not
+rendered by any page today, so nothing in `apps/web` calls it at the moment. It still returns
+per-stage day counts for `scm`, `proposals`, `official` and `runs` with days that had no activity
+omitted rather than padded. What changed is that it now accepts the same dynamic `tz`
 query parameter as `overview` and `channels` (previously bucketed on a hardcoded
 `TRACEABILITY_TIME_ZONE = 'America/Guatemala'` constant regardless of who was looking), and both its
 day-bucketing query and its year-boundary `WHERE` clause now use the corrected
@@ -284,7 +299,7 @@ this change made everywhere else.
 
 ## `GET /dashboard/summary` and `ProjectListItem.activity` — unchanged shape, same pinned formula
 
-`/quality`'s KPI strip and pass-rate trend still call `GET /dashboard/summary`, and `GET /projects`
+`GET /dashboard/summary` is still served, though no `apps/web` page calls it today, and `GET /projects`
 still returns `ProjectListItem.activity.healthScore`. Neither endpoint's window logic changed in
 this redesign (both still use the fixed, non-timezone-aware `DASHBOARD_WINDOW_DAYS` window), but
 both now compute their pass rate through the same pinned `computePassRate` this document describes,
