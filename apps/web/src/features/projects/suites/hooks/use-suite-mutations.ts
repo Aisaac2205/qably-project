@@ -27,6 +27,7 @@ import {
   markProjectStale,
   patchSuiteList,
 } from '../lib/suite-cache'
+import { invalidateSuiteSummaries, removeFromSuiteSummaries } from '../lib/suite-summaries-cache'
 import { ApiError } from '@/lib/api-client'
 import { markCiRunsStale } from '@/features/runs/lib/mark-ci-runs-stale'
 import { markRunDetailsStale } from '@/features/runs/lib/mark-run-details-stale'
@@ -90,8 +91,10 @@ export function useDeleteSuite() {
       queryClient.setQueryData<Suite[]>(suiteKeys.list(projectId), (cached) =>
         cached?.filter((entry) => entry.id !== id),
       )
+      removeFromSuiteSummaries(queryClient, projectId, id)
       evictSuiteDetail(queryClient, id)
       void invalidateSuiteList(queryClient, projectId)
+      void invalidateSuiteSummaries(queryClient, projectId)
       markProjectStale(queryClient, projectId)
       markRunDetailsStale(queryClient)
       markRunPagesStale(queryClient, projectId)

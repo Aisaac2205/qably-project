@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { Project, Suite } from '@qably/types'
 import { projectKeys, suiteKeys } from '../../lib/query-keys'
+import { invalidateSuiteSummaries, patchSuiteSummaries } from './suite-summaries-cache'
 
 export function patchSuiteList(queryClient: QueryClient, fresh: Suite) {
   const listKey = suiteKeys.list(fresh.projectId)
@@ -61,8 +62,10 @@ export async function adoptSuite(queryClient: QueryClient, suite: Suite) {
   await queryClient.cancelQueries({ queryKey: detailKey, exact: true })
   queryClient.setQueryData(detailKey, suite)
   patchSuiteList(queryClient, suite)
+  patchSuiteSummaries(queryClient, suite)
   reflectManualCases(queryClient, suite)
   void invalidateSuiteList(queryClient, suite.projectId)
+  void invalidateSuiteSummaries(queryClient, suite.projectId)
 }
 
 export function evictSuiteDetail(queryClient: QueryClient, suiteId: string) {
