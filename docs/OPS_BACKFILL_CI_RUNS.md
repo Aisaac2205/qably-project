@@ -100,9 +100,10 @@ in between.
 A later pass is not always a no-op. A reporter older than 10.1.0 (a vendored or pinned copy of
 `qably-report.mjs`) produced runs whose `externalId` is attributable and whose `ciRunId` is `NULL`
 until ingestion started linking them from the id; every pass links the ones that arrived before that.
-Runs posted with `curl`, as in the public CI documentation, carry the bare GitHub run id as
-`externalId`, which does not match `^gha-(\d{1,20})-`: they are unattributable, stay unlinked on every pass
-and stay out of both tabs, reachable by their direct link and from the suites.
+Runs posted with `curl` carry whatever `externalId` the command sets. The `curl` step of the public CI
+guide builds `gha-<run id>-<job>`, which matches `^gha-(\d{1,20})-` and is attributable. A run whose
+`externalId` is a bare GitHub run id, or any other string that does not match, is unattributable: it stays
+unlinked on every pass and stays out of both tabs, reachable by its direct link and from the suites.
 
 The script does not use a transaction across groups. Each group is a lookup, a create or an update,
 and a link. If the process stops between the create and the link, a `CiRun` without runs remains; the
@@ -279,8 +280,8 @@ in a quieter moment if the same group is skipped twice.
    unlinked run of the same GitHub run, its `lastReportedAt` earlier than the latest one, or a `NULL`
    commit field that one of those runs carries. Create it with a 10.1.0 reporter or by hand. That is the
    only way the compare-and-set update runs before the shared database: when every group creates its
-   `CiRun`, no update is issued and `CiRuns updated` stays 0. The equality on the values it read has not
-   run against a real Postgres, so expect `CiRuns updated` to be above 0 on this pass and check the
+   `CiRun`, no update is issued and `CiRuns updated` stays 0. No automated test runs the equality on the
+   values it read against a real Postgres, so expect `CiRuns updated` to be above 0 on this pass and check the
    widened row by hand. For the job key, the database needs at least one run with a `ciJobKey` in each
    project, so that the project has a key to resolve against, and at least one run of a job that has
    none, so that `Linked runs left without a job key` is above 0 once.
@@ -298,8 +299,8 @@ in a quieter moment if the same group is skipped twice.
 3. Run it a second time on the same database and confirm `CiRuns created`, `CiRuns updated`,
    `Runs linked` and `Job keys set` are all 0, the unattributable count and `Linked runs left without a
    job key` are unchanged and the exit code is 0.
-4. Practice the rollback on the disposable database: its statements have not been executed against a
-   real database. Take the snapshot before step 2 for that, run the rollback after it and confirm the
+4. Practice the rollback on the disposable database: no automated test executes its statements. Take
+   the snapshot before step 2 for that, run the rollback after it and confirm the
    counts of "Pre-checks" are back.
 5. Only then take the pre-run snapshot in the shared database and run the same command against it with
    its `DATABASE_URL`:
@@ -473,10 +474,9 @@ The grouping, merge, batching, skip and idempotency rules and the job key recove
 tests against an in-memory port, and the Prisma calls (filters, ordering, the `ciRunId IS NULL` guard
 on the link, the `ciJobKey IS NULL AND ciRunId IS NOT NULL` guard on the job key, the `groupBy` that
 reads the known keys) by unit tests against a mocked client. The resolution of a job key from an
-external id is tested with ids produced by the reporter itself. The script has not been executed
-against a real database as part of the change that introduced it, so the first run on a disposable
-database (see "Recommended order") is also its first real execution. The concurrent-write guard (the
-conditional update and the retry after a unique violation) is proven against an in-memory port and a
-mocked client, not against concurrent writers on a real database. The snapshot, the dump and the
-rollback statements, including the restore of `ciJobKey` from `run_link`, have not been executed
-either, and neither has the pre-check query for job keys that extend one another.
+external id is tested with ids produced by the reporter itself. No automated test runs the script
+against a real database, which is why "Recommended order" starts on a disposable one. The
+concurrent-write guard (the conditional update and the retry after a unique violation) is proven
+against an in-memory port and a mocked client, not against concurrent writers on a real database. No
+automated test executes the snapshot, the dump or the rollback statements, including the restore of
+`ciJobKey` from `run_link`, and none executes the pre-check query for job keys that extend one another.
