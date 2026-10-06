@@ -59,6 +59,7 @@ Rejections:
 | Field                | Required | Notes                                                              |
 | --------------------- | -------- | ------------------------------------------------------------------- |
 | `externalId`          | yes      | Non-empty. The idempotency key — see below.                         |
+| `reportExternalId`    | no       | Identifies the report the run belongs to; defaults to `externalId`. `POST /runs/ingest/junit` sets it to the query's `externalId` on every run it creates from one file, which is how those runs share one notification batch (see "One run per `<testsuite>`"). |
 | `source`               | no       | `api` (default) or `github_actions`. `manual` is rejected: manual runs come from the session-authenticated UI, never from a key. |
 | `suiteId` / `suiteName` | exactly one | Resolved against the key's project. Case-sensitive exact match by name. `suiteId` never creates a suite; `suiteName` adopts one on a miss — see "Suite adoption" below. |
 | `name`                | yes      | The run's display name.                                             |
@@ -97,11 +98,14 @@ audit detail on `RunCase`; nothing in test case linking or run status derivation
   key's project, named exactly as reported) and the report proceeds as if it had always existed. This
   is what lets the very first CI report for a new project succeed instead of 404ing — see the "Known
   limitation" section that used to live in `docs/CI.md`, which this closes.
-- **A known suite with case names that have no matching `TestCase` → those names are adopted too.**
-  Every reported case name is resolved against the suite's existing `TestCase` rows by exact name; any
-  name with no match gets a new `TestCase` created for it. This is the ongoing value, not just a
-  first-run fix: a test added in the repository shows up in Qably automatically on its next CI report,
-  with no human and no AI in the loop.
+- **A known suite with cases that have no matching `TestCase` → those cases are adopted too.**
+  Every reported case is resolved against the suite's existing `TestCase` rows (see "Test case
+  linking" below); any case with no match gets a new `TestCase` created for it. The new row is named
+  after the humanized title of the reported name (`humanizeTestName` from `@qably/test-naming`), or
+  after its identity key when that title is empty or already taken in the suite; it has
+  `executionMode: 'automated'` and the identity key stored as `automationKey`. This is the ongoing
+  value, not just a first-run fix: a test added in the repository shows up in Qably automatically on
+  its next CI report, with no human and no AI in the loop.
 
 Every case created this way is created with **`state: 'draft'`** — never `active`. This is not a
 detail, it is the product's backbone (§4.3.4 rule b): *"Ningún caso de prueba generado por inteligencia
@@ -118,9 +122,10 @@ the suites module. No separate promotion endpoint exists: promoting is just anot
 Nothing adopted this way is ever deleted or deprecated automatically. A case that stops appearing in
 later reports is left exactly as it is — draft or active — until a human acts on it.
 
-Suite and case adoption are idempotent: `TestCase` has `@@unique([suiteId, name])`, and adoption uses
-`skipDuplicates` against it, so replaying the same report (or two reports racing each other) never
-creates a second draft for the same name. `Suite` already has `@@unique([projectId, name])`, which is
+Suite and case adoption are idempotent: `TestCase` has `@@unique([suiteId, name])` and
+`@@unique([suiteId, automationKey])`, and adoption uses `skipDuplicates` against them, so replaying
+the same report (or two reports racing each other) never creates a second draft for the same case.
+`Suite` already has `@@unique([projectId, name])`, which is
 what makes name-based suite resolution — and adoption — safe in the first place; a create that loses a
 race against that constraint falls back to reading the row the other request just created.
 
@@ -130,10 +135,11 @@ A `draft` `TestCase` is real — it can be linked from `RunCase.testCaseId`, it 
 `GET /suites` and `GET /suites/:id` so a human can review and promote it — but it must never be counted
 as part of the official test set. The one place in the API where "official test set" was previously
 computed without a state filter was `POST /runs` (starting a manual run from the session-authenticated
-UI, documented in `docs/RUN_QUERIES.md`): the run's case snapshot, and the "a suite with zero cases
-cannot run" check, now consider only `state: 'active'` cases. A suite that has cases but all of them are
-still `draft` is treated as empty for that endpoint, the same as a suite with no cases at all — this is
-a real behavior change to `POST /runs`'s numbers for any suite that has draft cases, not a cosmetic one.
+UI, documented in `docs/RUN_QUERIES.md`): the run's case snapshot, and the "nothing to run" check, now
+consider only cases that are `state: 'active'` and `executionMode: 'manual'`. A suite whose cases are
+all `draft` or automated is treated like a suite with no cases at all: it answers `409` with
+`no-manual-cases`. This is a real behavior change to `POST /runs`'s numbers for any suite that has
+draft cases, not a cosmetic one.
 
 Every other place that counts or lists runs and cases — suite listing (`GET /suites`), project activity,
 and the dashboard summary — was checked and found to already operate on `RunCase.status` (what actually
@@ -157,12 +163,13 @@ the endpoint.
 ## Test case linking
 
 `OfficialCaseReconciler.reconcile` loads every `TestCase` row of the resolved suite once (regardless of
-state or execution mode) and resolves each reported case against it in memory — it no longer filters the
-match in SQL. Two lookups run in parallel, both keyed by `normalizeAutomationKeyForMatch`
-(`apps/api/src/modules/runs/lib/normalize-automation-key.ts`): official `automationKey`, and — only for a
-row whose `automationKey` is still `null` and whose `executionMode` is `automated` — the case `name` as a
-legacy fallback. `normalizeAutomationKeyForMatch` builds on the review module's
-`normalizeAutomationKey` (trims, collapses whitespace, treats `" > "` and a plain space as the same
+state or execution mode) and resolves each reported case against it in memory with `resolveCaseMatch`
+(`apps/api/src/modules/runs/lib/official-case-matcher.ts`) — it does not filter the match in SQL. The
+lookups are keyed by `normalizeAutomationKeyForMatch`
+(`apps/api/src/modules/runs/lib/normalize-automation-key.ts`): official `automationKey` first, exact and
+then normalized, and — only for a row whose `automationKey` is still `null` and whose `executionMode`
+is `automated` — the case `name` as a legacy fallback. `normalizeAutomationKeyForMatch` builds on the
+review module's `normalizeAutomationKey` (trims, collapses whitespace, treats `" > "` and a plain space as the same
 join — vitest emits the former, jest-junit the latter) and additionally lowercases it, so a key that
 only changed reporter or casing still resolves to the same official case; the review module itself stays
 case-preserving on purpose, since proposal deduplication there treats a case difference as a real
@@ -170,9 +177,9 @@ difference. A legacy name match backfills `automationKey` onto that row, same as
 
 A match whose `automationFilePath` or `automationClassName` is still `null` is backfilled from the
 parsed ref's `filePath`/`className` when the report carries them — a later, richer CI report can fill in
-what an earlier one left blank. An already-set field is never overwritten by a later report. All
-backfills for a run are batched into one `testCase.update` per row (merging a legacy key backfill and a
-file/class backfill together when both apply) inside the ingest transaction.
+what an earlier one left blank. An already-set field is never overwritten by a later report. The
+file and class backfills of a run are one `testCase.update` per row, inside the ingest transaction. A
+key backfill or migration is a separate update per row, wrapped in a savepoint (see "Case identity").
 
 A key with no match at all is adopted — see "Suite adoption" above — as a new `draft` `TestCase`, which
 is then linked the same way, so `RunCase.testCaseId` is never left `null` because a key was simply
@@ -218,18 +225,16 @@ new draft case under its own distinct composite key (safe — it cannot collide 
 name); a plain identity does not get drafted at all, because drafting under the exact bare name would
 just silently re-claim whichever row already holds it.
 
-**This is not the same collision set as `caseIdentityCollisions`, and it is not surfaced today.**
+**This is not the same collision set as `caseIdentityCollisions`, and it never reaches the caller.**
 `findLegacyKeyCollisions` runs only inside `OfficialCaseReconciler.reconcile`, which executes inside
 the ingest transaction on the worker (`RunIngestProcessor`) — after `POST /runs/ingest/junit` has
 already answered `202`. The response's `caseIdentityCollisions` field (see "Response" above) is
 `findCaseIdentityCollisions` output computed synchronously in the controller, before any job is
 enqueued, and it never includes a legacy-key collision: that check has nothing to read from yet at
 that point, since it needs the suite's existing `TestCase` rows, which only load inside the worker's
-transaction. A legacy-key collision is therefore silently unlinked with no signal to the caller at
-all today — no `202` field, no `::warning::` annotation, no log line. Making this visible needs the
-same design work as the paragraph below ("Collisions are not persisted"): a later `/review-inbox` SDD
-should decide how a legacy-key collision is surfaced, alongside the in-batch collisions
-`caseIdentityCollisions` already reports.
+transaction. A legacy-key collision therefore reaches the caller through no `202` field and no
+`::warning::` annotation. It is recorded like every other collision, as described under "Collisions
+are persisted" below.
 
 The migration itself is race-safe independently of whether a collision was reported: on a `P2002`
 from the migrating `testCase.update` (a concurrent ingest already claimed the same composite
@@ -247,17 +252,19 @@ same check per suite group before enqueuing, and lists any collision in the resp
 `caseIdentityCollisions` (see "Response" above) — the group itself is still accepted and queued, only
 the colliding cases are left unlinked until a human renames one of them.
 
-**Collisions are not persisted.** `caseIdentityCollisions` and the legacy-key collisions above exist
-only in the `202` response and the CI reporter's `::warning::` annotations — nothing is written to the
-`Run` row or any other table. A collision a human never sees (a local run, a CI log nobody reads) is
-silently forgotten once the response is gone. Making this durable needs its own design, not a field
-bolted on here: a later `/review-inbox` SDD should decide where collisions live (a column on `Run`
-versus a dedicated table — a dedicated table reads better once collisions need their own list/filter/
-resolve lifecycle independent of any one run), whether ambiguous legacy rows created a real orphaned
-`TestCase` that also needs surfacing (see the paragraph above — the contested legacy row itself is
-left untouched, not linked to anything, which is a distinct fact from "these two identities collided"),
-and how a human resolution (renaming a test, deleting a stale draft) retroactively closes the
-collisions it caused.
+**Collisions are persisted.** Both kinds are recorded in the `case_identity_collision` table
+(`CaseIdentityCollision` in the Prisma schema), one row per `(suiteId, kind, key)`, where `kind` is
+`identity` for an in-batch collision and `legacy_key` for a legacy-row collision.
+`OfficialCaseReconciler.syncCollisions` writes them in the ingest transaction on the worker, after the
+run upsert. It upserts a row for every collision the report carries: `claimantCount`, `lastSeenAt` and
+`lastRunId` follow the latest report, and an upsert reopens a row that had been closed. It sets
+`closedAt` on the open rows whose key the report resolved without a collision: for `identity`, a key
+the report matched or created; for `legacy_key`, a reported case name that is not a collision in that
+report. A row therefore closes only when a later report for the same suite carries that key or name
+again, so a collision whose tests were renamed away or deleted stays open. The open rows
+(`closedAt IS NULL`) are what the product shows: `openCollisions` on each suite view (`GET /suites`,
+`GET /suites/:id`) and in the review inbox counts, which the web app renders as a notice on the suite
+and on the inbox.
 
 ## Idempotency
 
@@ -272,8 +279,9 @@ upserts on that compound key:
   overwritten only when the replay actually supplies them. A lightweight replay that omits commit
   metadata does not erase metadata a previous, richer report already stored.
 
-The whole write — suite adoption, the test case lookup and draft creation, the run upsert, the case
-delete, and the case recreate — happens inside a single `prisma.$transaction`, so a replay (or a first
+The whole write — suite adoption, the test case lookup and draft creation, the run upsert, the
+collision records, the case delete, and the case recreate — happens inside a single
+`prisma.$transaction`, so a replay (or a first
 report that adopts a suite) is never observed half-applied. The one step that runs outside it is
 resolving the CI run the report belongs to — see "CI run linking" below.
 
@@ -346,8 +354,9 @@ the transaction then writes on the run. When the request has no `ciRunExternalId
 id from the run's `externalId` instead, with one extra read described under "Linking from the external
 id"; a request that sends `ciRunExternalId` never pays for it.
 
-It is outside the transaction on purpose. A push produces on the order of 350 ingests that all write
-the same `CiRun` row, and the worker runs 4 jobs at a time (`concurrency: 4`). An interactive
+It is outside the transaction on purpose. A push to this repository produces several hundred ingests
+(one per test file) that all write the same `CiRun` row, and the worker runs 4 jobs at a time
+(`concurrency: 4`). An interactive
 transaction keeps the row lock until it commits, and this one also adopts the suite, reconciles the
 official cases and writes the cases, with Prisma's default 5 second interactive timeout. Inside it, the
 effective concurrency on that row would drop to 1 and the waiting jobs would spend their timeout
@@ -389,8 +398,9 @@ When a request has no `ciRunExternalId`, `CiRunLinker` reads the run id from `ex
 `parseCiRunExternalId` (`^gha-(\d{1,20})-`, a run id of 1 to 20 digits) and links the run exactly as if
 that id had been sent: the same `ciRun.upsert`, with the `source` of the request and the other `ci*` and
 commit fields it carries. Nothing is linked when the id does not match: `gha-local-job-...` (a local
-reporter run), `curl` examples that use the bare run id, ids from other tools and manual runs keep
-`ciRunId = null`.
+reporter run), `curl` calls whose id is a bare run id or any other string that does not start with
+`gha-<digits>-` (the `gh-run-482913` of the examples below), ids from other tools and manual runs keep
+`ciRunId = null`. The `curl` step of the public CI guide builds `gha-<run id>-<job>` and is linked.
 
 The id that is read is `externalId`, the one stored in `Run.externalId`, not `reportExternalId`. They
 share the same prefix, but `externalId` is the field the run is stored under, it is always present, and
@@ -454,10 +464,10 @@ attribution stays.
 The known-key lookup is the main cost of the fallback and runs only for a request without
 `ciRunExternalId` and without `ciJobKey`, whose `externalId` parses. Two things limit it:
 
-- The 30 day window keeps it from grouping the whole history of the project, which produces on the order
-  of 350 runs per push.
+- The 30 day window keeps it from grouping the whole history of the project, which produces several
+  hundred runs per push.
 - The 60 second cache keeps it from running on every ingest. A push from a reporter older than 10.1.0
-  ingests about 350 reports, and without the cache each one would issue its own `groupBy`. The cache
+  ingests several hundred reports, and without the cache each one would issue its own `groupBy`. The cache
   lives in each API process and is not shared between processes or instances, so every process reads
   once per project a minute at most. A read that fails is never cached.
 
@@ -593,6 +603,11 @@ status code should not depend on whether Qably happened to already have a row fo
 }
 ```
 
+The example leaves out two parts of the run view. The run carries `delta`, which is `null` on ingest.
+Each case carries `officialCase`: the linked official `TestCase` (`id`, `suiteId`, `version`, `name`,
+`steps`, `expectedResult`, `executionMode`, plus `automationKey`, `automationClassName` and
+`automationFilePath` when set), or `null` when the case is not linked.
+
 Case adoption applies identically whether the suite was resolved by `suiteId` or by `suiteName` (or
 just adopted): every reported case name is matched against the resolved suite's `TestCase` rows, and
 any name with no match is drafted and linked. `testCaseId` is therefore never `null` on the output of a
@@ -607,7 +622,8 @@ returning `null`. `ciJobKey` is not part of this view: it is exposed per run by 
 The body is the **raw JUnit XML report**, sent as-is — no JSON envelope. Everything that would be a
 body field on `POST /runs/ingest` is instead a query parameter, and `cases` is derived entirely from
 the XML by the server's own parser (`apps/api/src/modules/runs/lib/parse-junit-xml.ts`); the caller
-never parses XML itself.
+never parses XML itself. The `Content-Type` must be `application/xml` or `text/xml`; with any other
+type the body does not reach the controller as text and the request answers `400`.
 
 ```
 POST /runs/ingest/junit?externalId=gha-482913-api-abcd1234&source=github_actions&name=CI%20%2F%20api%20(%23482913)&commitSha=a1b2c3d
@@ -642,8 +658,8 @@ notification — happens later, on a worker, off the request path:
 {
   "accepted": 2,
   "runs": [
-    { "externalId": "gha-482913-a1b2c3d4", "suiteName": "src/a.test.ts", "jobId": "project_123:github_actions:gha-482913-a1b2c3d4" },
-    { "externalId": "gha-482913-c9d0e1f2", "suiteName": "src/c.test.ts", "jobId": "project_123:github_actions:gha-482913-c9d0e1f2" }
+    { "externalId": "gha-482913-a1b2c3d4", "suiteName": "src/a.test.ts", "jobId": "ingest-<sha256 hex>" },
+    { "externalId": "gha-482913-c9d0e1f2", "suiteName": "src/c.test.ts", "jobId": "ingest-<sha256 hex>" }
   ],
   "rejected": [
     { "suiteName": "src/b.test.ts", "reason": "suiteName: String must contain at least 1 character(s)" }
@@ -660,8 +676,9 @@ notification — happens later, on a worker, off the request path:
   below.
 - `runs[].suiteName` — the run's suite name, before truncation-driven ambiguity: the first case's
   (truncated) `suiteName` in that group.
-- `runs[].jobId` — the queue job id for that run, `${projectId}:${source}:${externalId}` with any
-  character outside `[A-Za-z0-9_.:-]` replaced by `-`. It is deterministic: replaying the same
+- `runs[].jobId` — the queue job id for that run: `ingest-` followed by the SHA-256 hex digest of the
+  JSON array `[projectId, source, externalId]` (`buildJobId`, `apps/api/src/common/queue/job-id.ts`).
+  It is deterministic: replaying the same
   `(projectId, source, externalId)` produces the same `jobId`, so a duplicate delivery of the same
   report (a GitHub Actions re-run, a network retry) collides with the still-queued or still-processing
   job for that run instead of enqueuing a second one.
@@ -682,10 +699,10 @@ payload is built and validated with the same schema `POST /runs/ingest` uses (`i
 go into the `rejected` array — while every other, valid group in the same report is still enqueued
 normally. The response is still `202`, never `400`, for a per-group validation failure; a caller
 reconciles partial acceptance by reading `rejected`, not by retrying the whole report. Only a
-structural problem in the XML itself (invalid XML, no `<testcase>` anywhere, nesting past 32 levels,
-more than 10,000 cases, or grouping into more than 500 distinct suites — see "What the parser reads"
-below) still answers `400` and enqueues nothing, because there is no group to build a per-suite result
-from in the first place.
+structural problem in the XML itself (invalid XML, a `<!DOCTYPE>` declaration, no `<testsuite>` or
+`<testsuites>` root, no `<testcase>` anywhere, nesting past 32 levels, more than 10,000 cases, or
+grouping into more than 500 distinct suites — see "What the parser reads" below) still answers `400`
+and enqueues nothing, because there is no group to build a per-suite result from in the first place.
 
 **The run is not necessarily visible the instant the request returns.** `202` means "accepted for
 processing", not "processed". A worker (`RunIngestProcessor`, `apps/api/src/modules/runs/run-ingest.processor.ts`)
@@ -758,7 +775,9 @@ does not do that:
   match instead of completing early — a safety net against any one call undercounting the true total.
 - **Rejected groups still count toward the batch.** A group that fails validation (see "Response" above)
   is recorded into the same Redis batch as a `rejected` result, the same way an accepted group's `pass`/
-  `fail` outcome is, as soon as the controller rejects it — not just dropped from the size. This is what
+  `fail` outcome is, as soon as the controller rejects it — not just dropped from the size. The controller
+  does this only when the batch size (`reportSize`) is greater than 1; a lone group needs no batch.
+  This is what
   makes the batch complete correctly when the rejecting group is not in the first chunk to arrive: before
   this, `reportSize` was reduced by that request's own rejected-group count, but the batch's locked size
   had already been set by whichever chunk arrived first, so a reject in a *later* chunk was invisible to
@@ -812,42 +831,38 @@ the parser always derives a non-empty suite name, so this is a defensive fallbac
 - `<system-out>`, `<system-err>` and `<properties>` are never read.
 
 A report is capped at 10,000 `<testcase>` elements; beyond that the request is rejected rather than
-processed partially. The request body itself is capped at 10 MB (`main.ts`). Every string field
+processed partially. The request body itself is capped at 10 MB
+(`apps/api/src/common/http/configure-http-pipeline.ts`). Every string field
 above is truncated to the limit in the table in "Request body", never rejected for being long — only
-structural problems (invalid XML, no `<testcase>` elements anywhere, nesting past 32 levels, more
-than 10,000 cases, or grouping into more than 500 distinct suites) fail the request. Every truncation
+structural problems (invalid XML, a `<!DOCTYPE>` declaration, no root, no `<testcase>` elements
+anywhere, nesting past 32 levels, more than 10,000 cases, or grouping into more than 500 distinct
+suites) fail the request. Every truncation
 across the whole parsed report is counted per field name and returned as `truncatedFields` in the
 `202` body (see "Response" above) — a value being clipped is never silent, even though it never
 rejects anything on its own.
 
 ### Security limits
 
-`fast-xml-parser` 5 **does** substitute entities declared in a `<!DOCTYPE>` block — it is not immune
-to a classic "billion laughs" entity-expansion attack by default. The protection here is not "the
-parser ignores DOCTYPE"; it is the parser's own `processEntities` limits, configured explicitly in
-`parse-junit-xml.ts`:
+`fast-xml-parser` 5 substitutes entities declared in a `<!DOCTYPE>` block, so the parser alone is not
+immune to a classic "billion laughs" entity-expansion attack. `parseJunitXml` therefore rejects any
+document that contains a `<!DOCTYPE` declaration before it parses anything, with the
+`doctype-not-allowed` error code, answered as `400`. Entity-expansion attacks and external entities
+need an entity declared in a DTD, and a JUnit report never needs one. The five predefined entities
+(`&lt;` `&gt;` `&amp;` `&quot;` `&apos;`) are still decoded, with no cap: each expands to a single
+character and cannot amplify, and the parser runs with `processEntities: true` and no further limits.
 
-| Limit | Value | Stops |
-| --- | --- | --- |
-| `maxEntitySize` | 1,000 | A single declared entity's raw definition from being enormous. |
-| `maxEntityCount` | 50 | A document declaring an unbounded number of entities. |
-| `maxExpansionDepth` | 20 | Entities that reference entities that reference entities, nested past a shallow, legitimate depth. |
-| `maxTotalExpansions` | 100 | The total number of substitutions performed across the whole document. |
-| `maxExpandedLength` | 100,000 | The final expanded string size, even if every individual limit above was respected. |
+The application-level limits are the second, independent layer:
 
-A payload that would exceed any of these is rejected by the parser itself, before Qably's own
-application-level limits ever see it. Those application-level limits are the second, independent
-layer:
-
-- **10 MB** request body cap (`main.ts`), before the XML is even handed to the parser.
+- **10 MB** request body cap (`apps/api/src/common/http/configure-http-pipeline.ts`), before the XML
+  is even handed to the parser.
 - **32** levels of `<testsuite>` nesting (`MAX_TESTSUITE_DEPTH`).
 - **10,000** `<testcase>` elements per report (`MAX_TESTCASES`).
 - **500** distinct suite groups per report (`MAX_GROUPS`, in `group-junit-report.ts`).
 
-None of these five is a substitute for the others — `processEntities` stops entity-expansion memory
-blowups specifically, the 10 MB cap stops a merely large document, and the depth/count/group caps
-stop a well-formed-but-adversarially-shaped document from producing unbounded work downstream (one
-`Run` per group, one `RunCase` per case) even though it parsed cleanly.
+None of these four is a substitute for the others — the DOCTYPE check stops entity-expansion attacks
+specifically, the 10 MB cap stops a merely large document, and the depth/count/group caps stop a
+well-formed-but-adversarially-shaped document from producing unbounded work downstream (one `Run` per
+group, one `RunCase` per case) even though it parsed cleanly.
 
 ### Integration fixture
 
@@ -883,15 +898,15 @@ the run and the file path — see `docs/CI.md`; the server then re-derives a per
 from this base when the file holds more than one suite), `source`, the commit metadata already
 read from `$GITHUB_SHA` and `git log`, and, since 10.1.0, the `ci*` parameters read from the real
 `GITHUB_*` environment (see "CI run linking") — there is no `name` parameter, the server derives each
-run's name from the suite it actually parsed. On success the reporter reads `accepted` and the `runs`
-array's `externalId`s from the `202` JSON response to log how many jobs were queued and for which
-runs — it does not (and cannot) know whether ingestion itself has finished by the time it logs. The
+run's name from the suite it actually parsed. On success the reporter reads `accepted` from the `202`
+JSON response and logs it as the number of runs queued for that file, next to the file's case count —
+it does not (and cannot) know whether ingestion itself has finished by the time it logs. The
 `429`/`5xx`/network retry-with-backoff and `::warning`/`::notice` annotation behavior is unchanged
 in spirit; reporting failures never fail the CI job unless `QABLY_FAIL_ON_ERROR=true` is set (see
 `docs/CI.md`). Each outbound attempt is also bounded by a request timeout (`AbortSignal.timeout`,
 60s by default, overridable with `QABLY_REPORT_TIMEOUT_MS`) — a hanging server is treated as a
 retryable network error exactly like a connection failure, instead of blocking the CI job
-indefinitely. Since unit 10 the reporter also reads `rejected`, `caseIdentityCollisions` and
+indefinitely. The reporter also reads `rejected`, `caseIdentityCollisions` and
 `truncatedFields` off the same `202` body and prints one `::warning::` per rejected group and per
 case identity collision, and one `::notice::` per request that truncated at least one field — see
 `docs/CI.md` for the exact wording and the `QABLY_FAIL_ON_ERROR` interaction.
@@ -984,7 +999,7 @@ curl --fail --silent \
       { "name": "Adds an item to the cart", "status": "pass" }
     ]
   }' \
-  https://api.qably.app/runs/ingest
+  https://api.qably.dev/runs/ingest
 ```
 
 ```bash
@@ -992,5 +1007,5 @@ curl --fail --silent \
   --header "Authorization: Bearer $QABLY_API_KEY" \
   --header "Content-Type: application/xml" \
   --data-binary @reports/junit.xml \
-  "https://api.qably.app/runs/ingest/junit?externalId=gh-run-482913&source=github_actions"
+  "https://api.qably.dev/runs/ingest/junit?externalId=gh-run-482913&source=github_actions"
 ```
