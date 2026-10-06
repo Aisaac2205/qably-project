@@ -3,6 +3,7 @@
 import { useCallback } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { CaseStatus } from '@qably/types'
+import { markSuiteSummariesStale } from '@/features/projects/suites/lib/suite-summaries-cache'
 import { updateRunCase } from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
 
@@ -17,6 +18,7 @@ export function useUpdateRunCase(
       updateRunCase(runId, caseId, { status }),
     onSuccess: (run) => {
       queryClient.setQueryData(runKeys.detail(runId), run)
+      markSuiteSummariesStale(queryClient, run.projectId)
     },
     onError,
   })

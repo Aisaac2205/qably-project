@@ -3,6 +3,7 @@
 import { useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { invalidateSuiteSummaries } from '@/features/projects/suites/lib/suite-summaries-cache'
 import { createRun } from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
 
@@ -16,6 +17,7 @@ export function useCreateRun(projectId: string, options: { replaceOnCreate?: boo
       createRun({ projectId, suiteId, name }),
     onSuccess: async (run) => {
       queryClient.setQueryData(runKeys.detail(run.id), run)
+      void invalidateSuiteSummaries(queryClient, projectId)
       await queryClient.invalidateQueries({ queryKey: runKeys.all })
       const href = `/projects/${projectId}/runs/${run.id}`
 
