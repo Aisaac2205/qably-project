@@ -1,5 +1,8 @@
+import { SUITE_RUN_STATUSES, SUITE_SUMMARY_SORTS } from '@qably/types';
 import { z } from 'zod';
+import { decodeSuiteSummariesCursor } from './lib/suite-summaries-cursor';
 
+const projectId = z.string().min(1);
 const name = z.string().trim().min(1).max(120);
 const description = z.string().trim().max(1000);
 const tags = z.array(z.string().trim().min(1).max(40)).max(20);
@@ -11,7 +14,7 @@ const priority = z.enum(['critical', 'high', 'medium', 'low']);
 const state = z.enum(['active', 'draft', 'deprecated']);
 
 export const createSuiteSchema = z.object({
-  projectId: z.string().min(1),
+  projectId,
   name,
   description: description.default(''),
   tags: tags.default([]),
@@ -54,8 +57,37 @@ export const updateCaseSchema = z
   });
 
 export const listSuitesQuerySchema = z.object({
-  projectId: z.string().min(1).optional(),
+  projectId: projectId.optional(),
 });
+
+export const listSuiteSummariesQuerySchema = z
+  .object({
+    projectId,
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    sort: z.enum(SUITE_SUMMARY_SORTS).default('recent'),
+    search: z.string().trim().min(1).max(200).optional(),
+    tag: z.string().min(1).max(40).optional(),
+    status: z.enum(SUITE_RUN_STATUSES).optional(),
+    cursor: z.string().min(1).max(2048).optional(),
+  })
+  .transform(({ cursor, ...query }, ctx) => {
+    const position =
+      cursor === undefined ? undefined : decodeSuiteSummariesCursor(cursor);
+
+    if (position === null || (position && position.sort !== query.sort)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message:
+          'cursor must be a valid opaque suite summaries cursor for the requested sort',
+      });
+      return z.NEVER;
+    }
+
+    return { ...query, cursor: position };
+  });
+
+export const listSuiteTagsQuerySchema = z.object({ projectId });
 
 export const confirmDocumentationSchema = z
   .object({ caseIds: z.array(z.string().min(1)).min(1).max(500).optional() })
@@ -66,6 +98,10 @@ export type UpdateSuiteInput = z.infer<typeof updateSuiteSchema>;
 export type CreateCaseInput = z.infer<typeof createCaseSchema>;
 export type UpdateCaseInput = z.infer<typeof updateCaseSchema>;
 export type ListSuitesQuery = z.infer<typeof listSuitesQuerySchema>;
+export type ListSuiteSummariesQuery = z.infer<
+  typeof listSuiteSummariesQuerySchema
+>;
+export type ListSuiteTagsQuery = z.infer<typeof listSuiteTagsQuerySchema>;
 export type ConfirmDocumentationInput = z.infer<
   typeof confirmDocumentationSchema
 >;
