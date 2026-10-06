@@ -134,7 +134,7 @@ Conflicting case lookup failed: proposal=<proposalId> suite=<suiteId>
 | The proposal has no `suiteId`, so approval falls back to the default suite, which the reclassifier never visits | automationKey | Yes | Edge case |
 | Two approvals publish a version to the same case at the same time | other (`publish-conflict`) | No | Race |
 
-Which constraint fired for the September 2026 production reports (`cmulizy510ey40lqzlzdouhnk`, `cmulizy4s0ey20lqzuo9padfx`, `cmulizy4j0ey00lqzo8hukcmp`, `cmum2xnkw008d0lmti0qmjkhk`) is unverified. The new log line answers it the next time a reviewer hits the conflict.
+Which constraint fired for the production reports of September 2026 is unverified. The new log line answers it the next time a reviewer hits the conflict.
 
 ## What the reviewer sees
 
