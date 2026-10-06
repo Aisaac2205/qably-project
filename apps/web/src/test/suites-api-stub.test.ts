@@ -106,4 +106,15 @@ describe('listSuiteTags', () => {
   it('lists nothing for a project that has no suites', async () => {
     await expect(listSuiteTags('proj-9')).resolves.toEqual({ items: [] })
   })
+
+  it('fails the request with the API validation error when the project id is empty', async () => {
+    const request = listSuiteTags('')
+
+    await expect(request).rejects.toBeInstanceOf(ApiError)
+    await expect(request).rejects.toMatchObject({
+      status: 400,
+      message: 'Validation failed',
+      details: { issues: [{ path: 'projectId' }] },
+    })
+  })
 })

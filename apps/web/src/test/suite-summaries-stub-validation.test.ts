@@ -8,7 +8,10 @@ import {
 import { ApiError } from '@/lib/api-client'
 import type { ListSuiteSummariesParams } from '@/features/projects/suites/api/suites.api'
 import { encodeCursor } from '@/test/suite-summaries-stub-cursor'
-import { validateSuiteSummariesRequest } from '@/test/suite-summaries-stub-validation'
+import {
+  validateSuiteSummariesRequest,
+  validateSuiteTagsRequest,
+} from '@/test/suite-summaries-stub-validation'
 import { PROJECT } from '@/test/suite-summaries-fixtures'
 
 interface Issue {
@@ -176,5 +179,29 @@ describe('validateSuiteSummariesRequest', () => {
     it('does not read the cursor while another field is invalid', () => {
       expect(pathsOf({ limit: 0, cursor: 'not-a-cursor' })).toEqual(['limit'])
     })
+  })
+})
+
+describe('validateSuiteTagsRequest', () => {
+  it('accepts a project id', () => {
+    expect(() => validateSuiteTagsRequest(PROJECT)).not.toThrow()
+  })
+
+  it('rejects an empty project id with the issue the summaries request gives for it', () => {
+    let failure: unknown
+
+    try {
+      validateSuiteTagsRequest('')
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(ApiError)
+    expect(failure).toMatchObject({
+      status: 400,
+      message: 'Validation failed',
+      details: { issues: issuesOf({ projectId: '' }) },
+    })
+    expect(issuesOf({ projectId: '' })).toHaveLength(1)
   })
 })

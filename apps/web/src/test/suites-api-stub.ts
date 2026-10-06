@@ -15,6 +15,7 @@ import type {
 import { runFixtures } from './runs-api-stub'
 import { collectProjectSuiteTags } from './suite-summaries-stub'
 import { pageSuiteSummaries } from './suite-summaries-stub-page'
+import { validateSuiteTagsRequest } from './suite-summaries-stub-validation'
 
 let suites: Suite[] = structuredClone(mockSuites)
 let caseIdCounter = 0
@@ -43,7 +44,13 @@ export function listSuiteSummaries(
 }
 
 export function listSuiteTags(projectId: string): Promise<SuiteTagsFacet> {
-  return Promise.resolve(collectProjectSuiteTags(suites, projectId))
+  try {
+    validateSuiteTagsRequest(projectId)
+
+    return Promise.resolve(collectProjectSuiteTags(suites, projectId))
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
 export function getSuite(id: string): Promise<Suite> {

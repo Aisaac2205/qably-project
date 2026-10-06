@@ -17,6 +17,11 @@ interface ValidationIssue {
   message: string
 }
 
+const PROJECT_ID_ISSUE: ValidationIssue = {
+  path: 'projectId',
+  message: 'projectId must not be empty',
+}
+
 export interface ValidatedSuiteSummariesRequest {
   limit: number
   cursor: SuiteSortKey | undefined
@@ -38,7 +43,7 @@ function fieldIssues({
   const issues: ValidationIssue[] = []
 
   if (projectId.length < 1) {
-    issues.push({ path: 'projectId', message: 'projectId must not be empty' })
+    issues.push(PROJECT_ID_ISSUE)
   }
 
   if (limit !== undefined && !(Number.isInteger(limit) && isBetween(limit, MIN_LIMIT, MAX_LIMIT))) {
@@ -78,6 +83,12 @@ function fieldIssues({
   }
 
   return issues
+}
+
+export function validateSuiteTagsRequest(projectId: string): void {
+  if (projectId.length < 1) {
+    throw new ApiError(400, 'Validation failed', undefined, { issues: [PROJECT_ID_ISSUE] })
+  }
 }
 
 export function validateSuiteSummariesRequest(
