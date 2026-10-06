@@ -1,11 +1,17 @@
-import type { RunStatus, SuiteRunStatus, SuiteSummarySort } from '@qably/types';
+import {
+  suiteSortKey,
+  type RunStatus,
+  type SuiteRunStatus,
+  type SuiteSortSource,
+  type SuiteSummarySort,
+} from '@qably/types';
 import {
   toSummaryBase,
   type SuiteSummaryRow,
 } from './suite-summaries-candidates';
 import { matchesFilters } from './suite-summaries-filters';
 import {
-  needsStatusBeforeCut,
+  planStatusResolution,
   resolveSuiteSummaries,
   withRunStatus,
 } from './suite-summaries-status';
@@ -215,20 +221,50 @@ describe('resolveSuiteSummaries', () => {
   });
 });
 
-describe('needsStatusBeforeCut', () => {
+describe('planStatusResolution', () => {
   it.each([
-    ['recent', undefined, false],
-    ['name', undefined, false],
-    ['cases', undefined, false],
-    ['pass-rate', undefined, true],
-    ['recent', 'fail', true],
-    ['name', 'never-run', true],
-    ['cases', 'running', true],
-    ['pass-rate', 'pass', true],
-  ] as [SuiteSummarySort, SuiteRunStatus | undefined, boolean][])(
-    'for sort %s and status %s answers %s',
-    (sort, status, expected) => {
-      expect(needsStatusBeforeCut({ sort, status })).toBe(expected);
+    ['recent', undefined],
+    ['name', undefined],
+    ['cases', undefined],
+  ] as [SuiteSummarySort, undefined][])(
+    'cuts the page first for sort %s without a status filter',
+    (sort, status) => {
+      expect(planStatusResolution({ sort, status })).toEqual({
+        order: 'page-first',
+        sort,
+      });
     },
   );
+
+  it.each([
+    ['pass-rate', undefined],
+    ['recent', 'fail'],
+    ['name', 'never-run'],
+    ['cases', 'running'],
+    ['pass-rate', 'pass'],
+  ] as [SuiteSummarySort, SuiteRunStatus | undefined][])(
+    'resolves the status before the cut for sort %s and status %s',
+    (sort, status) => {
+      expect(planStatusResolution({ sort, status })).toEqual({
+        order: 'status-first',
+        sort,
+        status,
+      });
+    },
+  );
+
+  it('gives a page-first plan a sort that builds a key without a pass rate', () => {
+    const plan = planStatusResolution({ sort: 'name', status: undefined });
+    const item: SuiteSortSource = base('a', { name: 'Alpha' });
+
+    if (plan.order !== 'page-first') {
+      throw new Error('expected a page-first plan');
+    }
+
+    expect(suiteSortKey(item, plan.sort)).toEqual({
+      sort: 'name',
+      name: 'Alpha',
+      id: 'a',
+    });
+  });
 });

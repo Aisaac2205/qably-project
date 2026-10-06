@@ -9,11 +9,23 @@ import type { SuiteSummaryBase } from './suite-summaries-candidates';
 
 export type RunStatusWindows = ReadonlyMap<string, readonly RunStatus[]>;
 
-export function needsStatusBeforeCut(query: {
+type StatusResolutionPlan =
+  | {
+      order: 'status-first';
+      sort: SuiteSummarySort;
+      status: SuiteRunStatus | undefined;
+    }
+  | { order: 'page-first'; sort: Exclude<SuiteSummarySort, 'pass-rate'> };
+
+export function planStatusResolution(query: {
   sort: SuiteSummarySort;
   status?: SuiteRunStatus | undefined;
-}): boolean {
-  return query.sort === 'pass-rate' || query.status !== undefined;
+}): StatusResolutionPlan {
+  if (query.sort === 'pass-rate' || query.status !== undefined) {
+    return { order: 'status-first', sort: query.sort, status: query.status };
+  }
+
+  return { order: 'page-first', sort: query.sort };
 }
 
 export function withRunStatus(
