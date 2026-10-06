@@ -20,7 +20,6 @@ function row(overrides: Partial<SuiteSummaryRow> = {}): SuiteSummaryRow {
     tags: [],
     isDefault: false,
     createdAt: new Date('2026-09-24T10:00:00.123Z'),
-    _count: { cases: 0 },
     ...overrides,
   };
 }
@@ -29,14 +28,18 @@ function at(seconds: number): Date {
   return new Date(Date.UTC(2026, 0, 1, 0, 0, seconds));
 }
 
-function base(id: string, overrides: Partial<SuiteSummaryRow> = {}) {
-  return toSummaryBase(row({ id, ...overrides }));
+type BaseOverrides = Partial<SuiteSummaryRow> & { cases?: number };
+
+function base(id: string, overrides: BaseOverrides = {}) {
+  const { cases = 0, ...columns } = overrides;
+
+  return toSummaryBase(row({ id, ...columns }), new Map([[id, cases]]));
 }
 
 function rated(
   id: string,
   recentPassRate: number | null,
-  overrides: Partial<SuiteSummaryRow> = {},
+  overrides: BaseOverrides = {},
 ): SuiteSummary {
   return {
     ...base(id, overrides),
@@ -144,10 +147,10 @@ describe('cutPage ordering', () => {
 
   it('orders by case count descending, ties by newest, with empty suites last', () => {
     const items = [
-      base('three-old', { createdAt: at(1), _count: { cases: 3 } }),
-      base('ten', { createdAt: at(2), _count: { cases: 10 } }),
-      base('empty-newest', { createdAt: at(99), _count: { cases: 0 } }),
-      base('three-new', { createdAt: at(3), _count: { cases: 3 } }),
+      base('three-old', { createdAt: at(1), cases: 3 }),
+      base('ten', { createdAt: at(2), cases: 10 }),
+      base('empty-newest', { createdAt: at(99), cases: 0 }),
+      base('three-new', { createdAt: at(3), cases: 3 }),
     ];
 
     expect(ids(cutPage(items, byCases, { limit: 50 }).page)).toEqual([
@@ -178,7 +181,7 @@ describe('cutPage paging', () => {
       base(`suite-${String(index).padStart(3, '0')}`, {
         createdAt: at(index),
         name: `Suite ${String(index).padStart(3, '0')}`,
-        _count: { cases: index % 4 },
+        cases: index % 4,
       }),
     );
 

@@ -3,6 +3,7 @@ import { collectSuiteTags, suiteSortKey } from '@qably/types';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { readRecentRunStatuses } from './lib/recent-run-statuses';
+import { readSuiteCaseCounts } from './lib/suite-case-counts';
 import {
   SUITE_SUMMARY_SELECT,
   toSummaryBase,
@@ -36,9 +37,12 @@ export class SuiteListQueryService {
       },
       select: SUITE_SUMMARY_SELECT,
     });
-    const candidates = rows
-      .map(toSummaryBase)
-      .filter((candidate) => matchesFilters(candidate, query));
+    const matching = rows.filter((row) => matchesFilters(row, query));
+    const caseCounts = await readSuiteCaseCounts(
+      this.prisma,
+      matching.map((row) => row.id),
+    );
+    const candidates = matching.map((row) => toSummaryBase(row, caseCounts));
     const plan = planStatusResolution(query);
 
     if (plan.order === 'status-first') {

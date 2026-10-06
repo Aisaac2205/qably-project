@@ -10,7 +10,6 @@ export const SUITE_SUMMARY_SELECT = {
   tags: true,
   isDefault: true,
   createdAt: true,
-  _count: { select: { cases: true } },
 } as const;
 
 export interface SuiteSummaryRow {
@@ -21,10 +20,12 @@ export interface SuiteSummaryRow {
   tags: string[];
   isDefault: boolean;
   createdAt: Date;
-  _count: { cases: number };
 }
 
-export function toSummaryBase(row: SuiteSummaryRow): SuiteSummaryBase {
+export function toSummaryBase(
+  row: SuiteSummaryRow,
+  caseCounts: ReadonlyMap<string, number>,
+): SuiteSummaryBase {
   return {
     id: row.id,
     projectId: row.projectId,
@@ -33,6 +34,6 @@ export function toSummaryBase(row: SuiteSummaryRow): SuiteSummaryBase {
     tags: row.tags,
     isDefault: row.isDefault,
     createdAt: row.createdAt.toISOString(),
-    caseCount: row._count.cases,
+    caseCount: caseCounts.get(row.id) ?? 0,
   };
 }

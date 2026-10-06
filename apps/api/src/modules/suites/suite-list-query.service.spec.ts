@@ -26,10 +26,14 @@ const SUMMARY_SELECT = {
   tags: true,
   isDefault: true,
   createdAt: true,
-  _count: { select: { cases: true } },
 };
 
 type RunsBySuite = Record<string, RunStatus[]>;
+type CasesBySuite = Record<string, number>;
+
+interface CaseCountArgs {
+  where: { suiteId: { in: string[] } };
+}
 
 function at(seconds: number): Date {
   return new Date(Date.UTC(2026, 0, 1, 0, 0, seconds));
@@ -47,7 +51,6 @@ function suiteRow(
     tags: [],
     isDefault: false,
     createdAt: at(0),
-    _count: { cases: 0 },
     ...overrides,
   };
 }
@@ -60,9 +63,26 @@ function recentSuites(count: number): SuiteSummaryRow[] {
   );
 }
 
-function createPrisma(rows: SuiteSummaryRow[], runs: RunsBySuite = {}) {
+function createPrisma(
+  rows: SuiteSummaryRow[],
+  runs: RunsBySuite = {},
+  cases: CasesBySuite = {},
+) {
   return {
     suite: { findMany: jest.fn().mockResolvedValue(rows) },
+    testCase: {
+      groupBy: jest.fn((args: CaseCountArgs) =>
+        Promise.resolve(
+          [...args.where.suiteId.in]
+            .sort()
+            .filter((suiteId) => (cases[suiteId] ?? 0) > 0)
+            .map((suiteId) => ({
+              suiteId,
+              _count: { _all: cases[suiteId] },
+            })),
+        ),
+      ),
+    },
     $queryRaw: jest.fn((sql: Prisma.Sql) => {
       const requested = sql.values.slice(2) as string[];
 
@@ -136,7 +156,7 @@ describe('SuiteListQueryService.page', () => {
       ['org-1', 'project-1'],
       ['org-9', 'project-7'],
     ])(
-      'reads the suites of organization %s and project %s with the summary columns and a case count only',
+      'reads the suites of organization %s and project %s with the summary columns only',
       async (organizationId, projectId) => {
         const prisma = createPrisma([]);
 
@@ -170,6 +190,78 @@ describe('SuiteListQueryService.page', () => {
     });
   });
 
+  describe('case counts', () => {
+    it('counts the cases with one group by over the ids of the suites the caller read', async () => {
+      const prisma = createPrisma(recentSuites(3), {}, { 'suite-001': 2 });
+
+      await build(prisma).page(org, query());
+
+      expect(prisma.testCase.groupBy).toHaveBeenCalledTimes(1);
+      expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
+        by: ['suiteId'],
+        where: { suiteId: { in: ['suite-000', 'suite-001', 'suite-002'] } },
+        _count: { _all: true },
+      });
+    });
+
+    it('leaves the suites that miss the search out of the count', async () => {
+      const rows = recentSuites(6).map((row, position) => ({
+        ...row,
+        name: position % 2 === 0 ? `Alpha ${position}` : `Beta ${position}`,
+      }));
+      const prisma = createPrisma(rows);
+
+      await build(prisma).page(org, query({ search: 'alpha' }));
+
+      expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
+        by: ['suiteId'],
+        where: { suiteId: { in: ['suite-000', 'suite-002', 'suite-004'] } },
+        _count: { _all: true },
+      });
+    });
+
+    it('counts every suite that passes the filters, not only the ones on the page', async () => {
+      const prisma = createPrisma(recentSuites(120));
+
+      const result = await build(prisma).page(org, query({ limit: 10 }));
+
+      expect(result.items).toHaveLength(10);
+      const [args] = prisma.testCase.groupBy.mock.calls[0];
+      expect(args.where.suiteId.in).toHaveLength(120);
+    });
+
+    it('reports the count of the group and zero for a suite the group by does not return', async () => {
+      const rows = [
+        suiteRow('with-cases', { createdAt: at(2) }),
+        suiteRow('empty', { createdAt: at(1) }),
+      ];
+      const prisma = createPrisma(rows, {}, { 'with-cases': 7 });
+
+      const result = await build(prisma).page(org, query());
+
+      expect(result.items.map((item) => [item.id, item.caseCount])).toEqual([
+        ['with-cases', 7],
+        ['empty', 0],
+      ]);
+    });
+
+    it.each([
+      ['a project without suites', [], undefined],
+      ['a search nothing matches', recentSuites(3), 'nothing matches this'],
+    ] as [string, SuiteSummaryRow[], string | undefined][])(
+      'does not count anything for %s',
+      async (_label, rows, search) => {
+        const prisma = createPrisma(rows);
+
+        const result = await build(prisma).page(org, query({ search }));
+
+        expect(result).toEqual({ items: [], nextCursor: null });
+        expect(prisma.suite.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.testCase.groupBy).not.toHaveBeenCalled();
+      },
+    );
+  });
+
   describe('response shape', () => {
     it('returns the summary fields, the case count and the derived status, never the cases', async () => {
       const rows = [
@@ -180,14 +272,15 @@ describe('SuiteListQueryService.page', () => {
           tags: ['api', 'smoke'],
           isDefault: true,
           createdAt: new Date('2026-03-07T10:15:30.456Z'),
-          _count: { cases: 5 },
         }),
       ];
       const runs: RunsBySuite = {
         'suite-a': ['fail', 'pass', 'pass', 'pass', 'pass', 'pass', 'pass'],
       };
 
-      const result = await build(createPrisma(rows, runs)).page(org, query());
+      const result = await build(
+        createPrisma(rows, runs, { 'suite-a': 5 }),
+      ).page(org, query());
 
       expect(result).toEqual({
         items: [
@@ -227,22 +320,24 @@ describe('SuiteListQueryService.page', () => {
       const result = await build(prisma).page(org, query());
 
       expect(result).toEqual({ items: [], nextCursor: null });
+      expect(prisma.testCase.groupBy).not.toHaveBeenCalled();
       expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 
   describe('ordering', () => {
     const rows = [
-      suiteRow('a', { name: 'beta', createdAt: at(1), _count: { cases: 3 } }),
-      suiteRow('b', { name: 'Alpha', createdAt: at(2), _count: { cases: 10 } }),
+      suiteRow('a', { name: 'beta', createdAt: at(1) }),
+      suiteRow('b', { name: 'Alpha', createdAt: at(2) }),
       suiteRow('c', { name: 'alpha', createdAt: at(3) }),
-      suiteRow('d', { name: 'Gamma', createdAt: at(4), _count: { cases: 3 } }),
+      suiteRow('d', { name: 'Gamma', createdAt: at(4) }),
     ];
     const runs: RunsBySuite = {
       a: ['pass'],
       b: ['fail', 'pass'],
       d: ['pass'],
     };
+    const cases: CasesBySuite = { a: 3, b: 10, d: 3 };
 
     it.each([
       ['recent', ['d', 'c', 'b', 'a']],
@@ -252,7 +347,7 @@ describe('SuiteListQueryService.page', () => {
     ] as [SuiteSummarySort, string[]][])(
       'orders by %s whatever order the database returns',
       async (sort, expected) => {
-        const prisma = createPrisma([...rows].reverse(), runs);
+        const prisma = createPrisma([...rows].reverse(), runs, cases);
 
         const result = await build(prisma).page(org, query({ sort }));
 
@@ -401,13 +496,14 @@ describe('SuiteListQueryService.page', () => {
         [1, 100].map((count) => [sort, status, count] as const),
       ),
     )(
-      'reads the suites once and the run windows once for sort %s and status %s with %i suites',
+      'reads the suites once, the case counts once and the run windows once for sort %s and status %s with %i suites',
       async (sort, status, count) => {
         const prisma = createPrisma(recentSuites(count));
 
         await build(prisma).page(org, query({ sort, status, limit: 100 }));
 
         expect(prisma.suite.findMany).toHaveBeenCalledTimes(1);
+        expect(prisma.testCase.groupBy).toHaveBeenCalledTimes(1);
         expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
       },
     );
@@ -479,6 +575,7 @@ describe('SuiteListQueryService.page', () => {
 
       expect(result).toEqual({ items: [], nextCursor: null });
       expect(prisma.suite.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.testCase.groupBy).not.toHaveBeenCalled();
       expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });

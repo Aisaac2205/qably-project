@@ -25,7 +25,6 @@ function row(overrides: Partial<SuiteSummaryRow> = {}): SuiteSummaryRow {
     tags: [],
     isDefault: false,
     createdAt: new Date('2026-09-24T10:00:00.123Z'),
-    _count: { cases: 0 },
     ...overrides,
   };
 }
@@ -34,8 +33,12 @@ function at(seconds: number): Date {
   return new Date(Date.UTC(2026, 0, 1, 0, 0, seconds));
 }
 
-function base(id: string, overrides: Partial<SuiteSummaryRow> = {}) {
-  return toSummaryBase(row({ id, ...overrides }));
+type BaseOverrides = Partial<SuiteSummaryRow> & { cases?: number };
+
+function base(id: string, overrides: BaseOverrides = {}) {
+  const { cases = 0, ...columns } = overrides;
+
+  return toSummaryBase(row({ id, ...columns }), new Map([[id, cases]]));
 }
 
 function ids(page: readonly { id: string }[]): string[] {
@@ -103,7 +106,7 @@ describe('withRunStatus', () => {
         name: 'Payments',
         tags: ['api'],
         isDefault: true,
-        _count: { cases: 4 },
+        cases: 4,
       }),
     );
 

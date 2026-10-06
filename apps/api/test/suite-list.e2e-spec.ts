@@ -41,7 +41,6 @@ function summaryRow(id: string, overrides: Record<string, unknown> = {}) {
     tags: [] as string[],
     isDefault: false,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
-    _count: { cases: 0 },
     ...overrides,
   };
 }
@@ -101,6 +100,7 @@ describe('Suite list (e2e)', () => {
       delete: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+      groupBy: jest.fn(),
     },
     extractedProposal: { findMany: jest.fn() },
     runCase: { findMany: jest.fn() },
@@ -124,6 +124,7 @@ describe('Suite list (e2e)', () => {
     prisma.extractedProposal.findMany.mockResolvedValue([]);
     prisma.testCase.findMany.mockResolvedValue([]);
     prisma.testCase.count.mockResolvedValue(0);
+    prisma.testCase.groupBy.mockResolvedValue([]);
     prisma.runCase.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.organization.findUnique.mockResolvedValue({
@@ -426,8 +427,10 @@ describe('Suite list (e2e)', () => {
           tags: ['api'],
           isDefault: true,
           createdAt: new Date('2026-03-07T10:15:30.456Z'),
-          _count: { cases: 3 },
         }),
+      ]);
+      prisma.testCase.groupBy.mockResolvedValue([
+        { suiteId: 'suite-1', _count: { _all: 3 } },
       ]);
       prisma.$queryRaw.mockResolvedValue([
         { suiteId: 'suite-1', status: 'pass' },
@@ -454,6 +457,30 @@ describe('Suite list (e2e)', () => {
           },
         ],
         nextCursor: null,
+      });
+    });
+
+    it('counts the cases of the suites it read with one grouped read and no relation count', async () => {
+      prisma.suite.findMany.mockResolvedValue([
+        summaryRow('suite-1'),
+        summaryRow('suite-2'),
+      ]);
+
+      await request(app.getHttpServer())
+        .get('/suites/summaries')
+        .query({ projectId: 'project-1' })
+        .expect(200);
+
+      const [args] = prisma.suite.findMany.mock.calls[0] as [
+        { select: Record<string, unknown> },
+      ];
+      expect(args.select).toHaveProperty('name', true);
+      expect(args.select).not.toHaveProperty('_count');
+      expect(prisma.testCase.groupBy).toHaveBeenCalledTimes(1);
+      expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
+        by: ['suiteId'],
+        where: { suiteId: { in: ['suite-1', 'suite-2'] } },
+        _count: { _all: true },
       });
     });
 
