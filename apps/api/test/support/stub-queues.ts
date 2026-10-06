@@ -1,5 +1,6 @@
 import { getQueueToken } from '@nestjs/bullmq';
 import type { TestingModuleBuilder } from '@nestjs/testing';
+import { AI_DAILY_BUDGET_REDIS } from '../../src/modules/ai/ai.tokens';
 import { IngestionProcessor } from '../../src/modules/ingestion/ingestion.processor';
 import { INGESTION_QUEUE } from '../../src/modules/ingestion/ingestion.tokens';
 import { NOTIFICATIONS_QUEUE } from '../../src/modules/notifications/notifications.contracts';
@@ -8,6 +9,7 @@ import { PROPOSAL_CLASSIFICATION_QUEUE } from '../../src/modules/proposal-classi
 import { ReclassifySuiteProcessor } from '../../src/modules/proposal-classification/reclassify-suite.processor';
 import { ExtractionProcessor } from '../../src/modules/review/extraction.processor';
 import { EXTRACTION_QUEUE } from '../../src/modules/review/review.contracts';
+import { REPORT_BATCH_REDIS } from '../../src/modules/runs/report-batch.tokens';
 import { RunIngestProcessor } from '../../src/modules/runs/run-ingest.processor';
 import { RUN_INGEST_QUEUE } from '../../src/modules/runs/runs.contracts';
 
@@ -21,6 +23,10 @@ function queueStub(): {
     addBulk: jest.fn().mockResolvedValue([{ id: 'job-1' }]),
     close: jest.fn().mockResolvedValue(undefined),
   };
+}
+
+function redisStub(): { quit: jest.Mock } {
+  return { quit: jest.fn().mockResolvedValue(undefined) };
 }
 
 export function stubQueues(
@@ -46,5 +52,9 @@ export function stubQueues(
     .overrideProvider(getQueueToken(PROPOSAL_CLASSIFICATION_QUEUE))
     .useValue(queueStub())
     .overrideProvider(ReclassifySuiteProcessor)
-    .useValue({});
+    .useValue({})
+    .overrideProvider(AI_DAILY_BUDGET_REDIS)
+    .useValue(redisStub())
+    .overrideProvider(REPORT_BATCH_REDIS)
+    .useValue(redisStub());
 }
