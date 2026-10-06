@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { ApiError } from '@/lib/api-client'
 import {
   __resetSuitesStub,
   createSuite,
@@ -65,10 +66,15 @@ describe('listSuiteSummaries', () => {
     })
   })
 
-  it('fails the request when the cursor is not one the stub issued', async () => {
-    await expect(
-      listSuiteSummaries({ projectId: 'proj-1', sort: 'recent', cursor: 'nope' }),
-    ).rejects.toThrow(/cursor/i)
+  it('fails the request with the API validation error when the cursor is not one the stub issued', async () => {
+    const request = listSuiteSummaries({ projectId: 'proj-1', sort: 'recent', cursor: 'nope' })
+
+    await expect(request).rejects.toBeInstanceOf(ApiError)
+    await expect(request).rejects.toMatchObject({
+      status: 400,
+      message: 'Validation failed',
+      details: { issues: [{ path: 'cursor' }] },
+    })
   })
 })
 

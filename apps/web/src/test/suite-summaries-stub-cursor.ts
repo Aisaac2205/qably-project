@@ -50,24 +50,18 @@ export function encodeCursor(key: SuiteSortKey): string {
   return `${CURSOR_PREFIX}${JSON.stringify(key)}`
 }
 
-export function decodeCursor(cursor: string, sort: SuiteSummarySort): SuiteSortKey {
-  const invalid = new Error('Invalid suite summaries cursor')
-
-  if (!cursor.startsWith(CURSOR_PREFIX)) throw invalid
+export function decodeCursor(cursor: string, sort: SuiteSummarySort): SuiteSortKey | null {
+  if (!cursor.startsWith(CURSOR_PREFIX)) return null
 
   let parsed: unknown
 
   try {
     parsed = JSON.parse(cursor.slice(CURSOR_PREFIX.length))
   } catch {
-    throw invalid
+    return null
   }
 
-  if (typeof parsed !== 'object' || parsed === null) throw invalid
+  if (typeof parsed !== 'object' || parsed === null) return null
 
-  const key = toKey(sort, parsed as Record<string, unknown>)
-
-  if (key === null) throw invalid
-
-  return key
+  return toKey(sort, parsed as Record<string, unknown>)
 }

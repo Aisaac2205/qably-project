@@ -5,19 +5,16 @@ import {
   type SuiteSummariesPage,
 } from '@qably/types'
 import type { ListSuiteSummariesParams } from '@/features/projects/suites/api/suites.api'
-import { decodeCursor, encodeCursor } from './suite-summaries-stub-cursor'
+import { encodeCursor } from './suite-summaries-stub-cursor'
 import { orderSuiteSummaries, type SuiteRunSource } from './suite-summaries-stub'
-import { assertValidSelection, resolveLimit } from './suite-summaries-stub-validation'
+import { validateSuiteSummariesRequest } from './suite-summaries-stub-validation'
 
 export function pageSuiteSummaries(
   suites: readonly Suite[],
   runs: readonly SuiteRunSource[],
   params: ListSuiteSummariesParams,
 ): SuiteSummariesPage {
-  assertValidSelection(params)
-  const limit = resolveLimit(params.limit)
-  const cursor =
-    params.cursor === undefined ? undefined : decodeCursor(params.cursor, params.sort)
+  const { limit, cursor } = validateSuiteSummariesRequest(params)
   const keyed = orderSuiteSummaries(suites, runs, params).map((summary) => ({
     summary,
     key: suiteSortKey(summary, params.sort),

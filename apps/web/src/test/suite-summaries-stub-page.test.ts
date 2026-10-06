@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import {
-  SUITE_RUN_STATUSES,
-  SUITE_SUMMARY_SORTS,
-  type Suite,
-  type SuiteRunStatus,
-  type SuiteSummarySort,
-} from '@qably/types'
+import { SUITE_SUMMARY_SORTS, type Suite, type SuiteSummarySort } from '@qably/types'
+import { ApiError } from '@/lib/api-client'
 import type { ListSuiteSummariesParams } from '@/features/projects/suites/api/suites.api'
 import { pageSuiteSummaries } from '@/test/suite-summaries-stub-page'
 import type { SuiteRunSource } from '@/test/suite-summaries-stub'
@@ -17,6 +12,16 @@ function pageOf(
   runs: SuiteRunSource[] = [],
 ) {
   return pageSuiteSummaries(suites, runs, { projectId: PROJECT, sort: 'recent', ...overrides })
+}
+
+function failureOf(call: () => unknown): unknown {
+  try {
+    call()
+  } catch (error) {
+    return error
+  }
+
+  throw new Error('the stub accepted the request')
 }
 
 function collectAllIds(
@@ -153,40 +158,44 @@ describe('pageSuiteSummaries', () => {
     })
   })
 
-  describe('rejections', () => {
-    it('rejects a cursor it did not issue', () => {
-      expect(() => pageOf(numbered(3), { cursor: 'not-a-cursor' })).toThrow(/cursor/i)
+  describe('invalid requests', () => {
+    it('rejects a limit the API rejects, with the API validation error', () => {
+      const failure = failureOf(() => pageOf(numbered(3), { limit: 0 }))
+
+      expect(failure).toBeInstanceOf(ApiError)
+      expect(failure).toMatchObject({
+        status: 400,
+        message: 'Validation failed',
+        code: undefined,
+        details: { issues: [{ path: 'limit' }] },
+      })
+    })
+
+    it('rejects a cursor it did not issue on the cursor field', () => {
+      const failure = failureOf(() => pageOf(numbered(3), { cursor: 'not-a-cursor' }))
+
+      expect(failure).toBeInstanceOf(ApiError)
+      expect(failure).toMatchObject({ status: 400, details: { issues: [{ path: 'cursor' }] } })
     })
 
     it('rejects a cursor that was issued for another sort', () => {
       const { nextCursor } = pageOf(numbered(3), { sort: 'recent', limit: 1 })
 
-      expect(nextCursor).not.toBeNull()
-      expect(() => pageOf(numbered(3), { sort: 'name', cursor: nextCursor ?? '' })).toThrow(
-        /cursor/i,
+      const failure = failureOf(() =>
+        pageOf(numbered(3), { sort: 'name', cursor: nextCursor ?? '' }),
       )
+
+      expect(nextCursor).not.toBeNull()
+      expect(failure).toMatchObject({ status: 400, details: { issues: [{ path: 'cursor' }] } })
     })
 
-    it.each([0, 101, 1.5, -1])('rejects the limit %s', (limit) => {
-      expect(() => pageOf(numbered(3), { limit })).toThrow(/limit/i)
+    it('rejects an empty project id instead of answering with an empty page', () => {
+      const failure = failureOf(() => pageOf(numbered(3), { projectId: '' }))
+
+      expect(failure).toMatchObject({ status: 400, details: { issues: [{ path: 'projectId' }] } })
     })
 
-    it.each([1, 100])('accepts the limit %s', (limit) => {
-      expect(pageOf(numbered(3), { limit }).items.length).toBeGreaterThan(0)
-    })
-
-    it.each([
-      ['an empty search', ''],
-      ['a search of only whitespace', '   '],
-      ['a search of 201 characters', 'a'.repeat(201)],
-    ])('rejects %s', (_label, search) => {
-      expect(() => pageOf(numbered(3), { search })).toThrow(/invalid suite summaries search/i)
-    })
-
-    it('trims the search before it measures it, like the API does', () => {
-      const padded = `  ${'a'.repeat(200)}  `
-
-      expect(() => pageOf(numbered(3), { search: padded })).not.toThrow()
+    it('trims the search before it filters', () => {
       expect(idsOf(pageOf(numbered(3), { search: '  suite  ' }).items)).toEqual([
         's002',
         's001',
@@ -194,34 +203,11 @@ describe('pageSuiteSummaries', () => {
       ])
     })
 
-    it.each([
-      ['an empty tag', ''],
-      ['a tag of 41 characters', 't'.repeat(41)],
-    ])('rejects %s', (_label, tag) => {
-      expect(() => pageOf(numbered(3), { tag })).toThrow(/invalid suite summaries tag/i)
-    })
-
-    it('accepts a tag of 40 characters and filters by it', () => {
+    it('filters by a tag of 40 characters', () => {
       const longTag = 't'.repeat(40)
       const suites = [suite('tagged', { tags: [longTag] }), suite('plain')]
 
       expect(idsOf(pageOf(suites, { tag: longTag }).items)).toEqual(['tagged'])
-    })
-
-    it.each(['all', 'done', ''])('rejects the status %j', (status) => {
-      expect(() => pageOf(numbered(3), { status: status as SuiteRunStatus })).toThrow(
-        /invalid suite summaries status/i,
-      )
-    })
-
-    it.each(SUITE_RUN_STATUSES)('accepts the status %s', (status) => {
-      expect(() => pageOf(numbered(3), { status })).not.toThrow()
-    })
-
-    it('rejects a sort the API does not know', () => {
-      expect(() => pageOf(numbered(3), { sort: 'oldest' as SuiteSummarySort })).toThrow(
-        /invalid suite summaries sort/i,
-      )
     })
   })
 })

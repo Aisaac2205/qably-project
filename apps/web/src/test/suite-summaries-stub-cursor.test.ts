@@ -64,29 +64,27 @@ describe('stub suite summaries cursor', () => {
       ['a prefix followed by a JSON number', 'stub-cursor:5'],
       ['a prefix followed by JSON null', 'stub-cursor:null'],
     ])('rejects %s', (_label, cursor) => {
-      expect(() => decodeCursor(cursor, 'recent')).toThrow(/cursor/i)
+      expect(decodeCursor(cursor, 'recent')).toBeNull()
     })
 
     it('rejects a cursor issued for another sort', () => {
-      expect(() => decodeCursor(encodeCursor(RECENT), 'name')).toThrow(/cursor/i)
+      expect(decodeCursor(encodeCursor(RECENT), 'name')).toBeNull()
     })
 
     it.each(SUITE_SUMMARY_SORTS)('rejects a %s key without an id', (sort) => {
-      expect(() => decodeCursor(forged(without(KEYS[sort], 'id')), sort)).toThrow(/cursor/i)
+      expect(decodeCursor(forged(without(KEYS[sort], 'id')), sort)).toBeNull()
     })
 
     it.each(SUITE_SUMMARY_SORTS)('rejects a %s key with an empty id', (sort) => {
-      expect(() => decodeCursor(forged({ ...KEYS[sort], id: '' }), sort)).toThrow(/cursor/i)
+      expect(decodeCursor(forged({ ...KEYS[sort], id: '' }), sort)).toBeNull()
     })
 
     it.each(SUITE_SUMMARY_SORTS)('rejects a %s key whose id is not a string', (sort) => {
-      expect(() => decodeCursor(forged({ ...KEYS[sort], id: 7 }), sort)).toThrow(/cursor/i)
+      expect(decodeCursor(forged({ ...KEYS[sort], id: 7 }), sort)).toBeNull()
     })
 
     it.each(DATED_SORTS)('rejects a %s key without createdAt', (sort) => {
-      expect(() => decodeCursor(forged(without(KEYS[sort], 'createdAt')), sort)).toThrow(
-        /cursor/i,
-      )
+      expect(decodeCursor(forged(without(KEYS[sort], 'createdAt')), sort)).toBeNull()
     })
 
     it.each(DATED_SORTS)('rejects a %s key whose createdAt is not canonical ISO', (sort) => {
@@ -99,14 +97,15 @@ describe('stub suite summaries cursor', () => {
         1767323045678,
       ]
 
+      expect(notCanonical).toHaveLength(6)
       for (const createdAt of notCanonical) {
-        expect(() => decodeCursor(forged({ ...KEYS[sort], createdAt }), sort)).toThrow(/cursor/i)
+        expect(decodeCursor(forged({ ...KEYS[sort], createdAt }), sort)).toBeNull()
       }
     })
 
     it('rejects a name key without a string name', () => {
-      expect(() => decodeCursor(forged(without(NAME, 'name')), 'name')).toThrow(/cursor/i)
-      expect(() => decodeCursor(forged({ ...NAME, name: 5 }), 'name')).toThrow(/cursor/i)
+      expect(decodeCursor(forged(without(NAME, 'name')), 'name')).toBeNull()
+      expect(decodeCursor(forged({ ...NAME, name: 5 }), 'name')).toBeNull()
     })
 
     it.each([
@@ -116,9 +115,7 @@ describe('stub suite summaries cursor', () => {
       ['not an integer', 33.3],
       ['a string', '60'],
     ])('rejects a pass rate that is %s', (_label, recentPassRate) => {
-      expect(() => decodeCursor(forged({ ...PASS_RATE, recentPassRate }), 'pass-rate')).toThrow(
-        /cursor/i,
-      )
+      expect(decodeCursor(forged({ ...PASS_RATE, recentPassRate }), 'pass-rate')).toBeNull()
     })
 
     it.each([
@@ -129,7 +126,7 @@ describe('stub suite summaries cursor', () => {
       ['a string', '3'],
       ['null', null],
     ])('rejects a case count that is %s', (_label, caseCount) => {
-      expect(() => decodeCursor(forged({ ...CASES, caseCount }), 'cases')).toThrow(/cursor/i)
+      expect(decodeCursor(forged({ ...CASES, caseCount }), 'cases')).toBeNull()
     })
   })
 })
