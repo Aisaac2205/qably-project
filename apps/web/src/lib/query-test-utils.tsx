@@ -9,6 +9,8 @@ import { runKeys } from '@/features/runs/lib/query-keys'
 import { dashboardKeys } from '@/features/dashboard/lib/query-keys'
 import { getBrowserTimeZone } from '@/lib/time-zone'
 import { computeSuiteMetrics, runFixtures, suiteNameById } from '@/test/runs-api-stub'
+import { collectProjectSuiteTags } from '@/test/suite-summaries-stub'
+import { pageSuiteSummaries } from '@/test/suite-summaries-stub-page'
 import { projectFixtures } from '@/test/projects-api-stub'
 import { organizationFixtures } from '@/test/organizations-api-stub'
 import {
@@ -121,6 +123,21 @@ function seedSuiteMetrics(client: QueryClient): void {
   }
 }
 
+function seedSuiteSummaries(client: QueryClient): void {
+  for (const projectId of new Set(mockSuites.map((suite) => suite.projectId))) {
+    client.setQueryData(suiteKeys.summaryPage(projectId, { sort: 'recent' }), {
+      pages: [pageSuiteSummaries(mockSuites, runFixtures, { projectId, sort: 'recent' })],
+      pageParams: [undefined],
+    })
+  }
+}
+
+function seedSuiteTags(client: QueryClient): void {
+  for (const projectId of new Set(mockSuites.map((suite) => suite.projectId))) {
+    client.setQueryData(suiteKeys.tags(projectId), collectProjectSuiteTags(mockSuites, projectId))
+  }
+}
+
 function seedProjects(client: QueryClient): void {
   client.setQueryData(projectKeys.all, structuredClone(projectFixtures))
 }
@@ -217,6 +234,8 @@ export function createTestQueryClient(): QueryClient {
   seedSuites(client)
   seedRuns(client)
   seedSuiteMetrics(client)
+  seedSuiteSummaries(client)
+  seedSuiteTags(client)
   seedProjects(client)
   seedOrganizations(client)
   seedDashboardSummary(client)
