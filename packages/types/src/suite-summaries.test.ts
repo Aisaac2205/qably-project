@@ -3,7 +3,9 @@ import type { SuiteRunStatus } from './index';
 import {
   SUITE_RUN_STATUSES,
   SUITE_SUMMARY_SORTS,
+  collectSuiteTags,
   compareSuiteSortKeys,
+  matchesSuiteSearch,
   suiteSortKey,
   type SuiteSortKey,
   type SuiteSummariesPage,
@@ -280,5 +282,78 @@ describe('compareSuiteSortKeys across sorts', () => {
     const name: SuiteSortKey = { sort: 'name', name: 'x', id: 'x' };
 
     expect(() => compareSuiteSortKeys(recent, name)).toThrow();
+  });
+});
+
+describe('matchesSuiteSearch', () => {
+  const login = { name: 'Login', description: 'flow' };
+
+  it('matches a substring of the name without regard to case', () => {
+    expect(matchesSuiteSearch(login, 'LOG')).toBe(true);
+  });
+
+  it('matches a substring of the description on its own', () => {
+    expect(matchesSuiteSearch(login, 'flow')).toBe(true);
+  });
+
+  it('does not join name and description into one string', () => {
+    expect(matchesSuiteSearch(login, 'login flow')).toBe(false);
+  });
+
+  it('rejects text that appears in neither field', () => {
+    expect(matchesSuiteSearch(login, 'checkout')).toBe(false);
+  });
+
+  it('trims the search before matching', () => {
+    expect(matchesSuiteSearch({ name: 'Checkout', description: '' }, '  Checkout  ')).toBe(true);
+  });
+
+  it('matches everything when the search is blank', () => {
+    expect(matchesSuiteSearch(login, '   ')).toBe(true);
+  });
+
+  it('treats the percent sign as a literal character', () => {
+    const percent = { name: 'Pricing 100%', description: '' };
+    const digits = { name: 'Pricing 1000', description: '' };
+
+    expect(matchesSuiteSearch(percent, '100%')).toBe(true);
+    expect(matchesSuiteSearch(digits, '100%')).toBe(false);
+  });
+
+  it('treats the underscore as a literal character, not a wildcard', () => {
+    expect(matchesSuiteSearch({ name: 'a_b', description: '' }, 'a_b')).toBe(true);
+    expect(matchesSuiteSearch({ name: 'axb', description: '' }, 'a_b')).toBe(false);
+  });
+
+  it('treats the backslash as a literal character', () => {
+    expect(matchesSuiteSearch({ name: 'C:\\tmp', description: '' }, 'C:\\tmp')).toBe(true);
+    expect(matchesSuiteSearch({ name: 'C:tmp', description: '' }, 'C:\\tmp')).toBe(false);
+  });
+
+  it('folds the case of non-ASCII letters in both directions', () => {
+    expect(matchesSuiteSearch({ name: 'árbol', description: '' }, 'ÁRBOL')).toBe(true);
+    expect(matchesSuiteSearch({ name: 'ÁRBOL', description: '' }, 'árbol')).toBe(true);
+  });
+});
+
+describe('collectSuiteTags', () => {
+  it('returns the distinct tags sorted by code unit, uppercase before lowercase', () => {
+    expect(collectSuiteTags([['b', 'a'], ['b', 'C'], []])).toEqual(['C', 'a', 'b']);
+  });
+
+  it('removes duplicates across suites', () => {
+    expect(collectSuiteTags([['api'], ['api', 'ui'], ['ui']])).toEqual(['api', 'ui']);
+  });
+
+  it('returns an empty list when no suite has tags', () => {
+    expect(collectSuiteTags([[], []])).toEqual([]);
+  });
+
+  it('does not mutate the lists it receives', () => {
+    const lists = [['b', 'a']];
+
+    collectSuiteTags(lists);
+
+    expect(lists).toEqual([['b', 'a']]);
   });
 });

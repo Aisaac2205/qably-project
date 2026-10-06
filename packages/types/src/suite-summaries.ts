@@ -121,3 +121,18 @@ export function compareSuiteSortKeys(a: SuiteSortKey, b: SuiteSortKey): number {
 
   throw new Error(`Cannot compare suite sort keys of different sorts: ${a.sort} and ${b.sort}`);
 }
+
+export function matchesSuiteSearch(
+  item: Pick<SuiteSummary, 'name' | 'description'>,
+  search: string,
+): boolean {
+  const needle = search.trim().toLowerCase();
+
+  return (
+    item.name.toLowerCase().includes(needle) || item.description.toLowerCase().includes(needle)
+  );
+}
+
+export function collectSuiteTags(tagLists: readonly (readonly string[])[]): string[] {
+  return [...new Set(tagLists.flat())].sort();
+}
