@@ -235,6 +235,41 @@ describe('suites.api', () => {
       expect(lastCall()[0]).toContain('projectId=proj%2F1%26x%3D2')
     })
 
+    it('escapes a hash so it never starts a fragment', async () => {
+      await listSuiteSummaries({
+        projectId: 'proj-1',
+        sort: 'recent',
+        search: 'issue #42',
+        tag: '#smoke',
+        cursor: 'abc#def',
+      })
+
+      const [url] = lastCall()
+      expect(new URL(url).hash).toBe('')
+      expect(url).toContain('search=issue+%2342')
+      expect(url).toContain('tag=%23smoke')
+      expect(url).toContain('cursor=abc%23def')
+      expect(lastRequest().params).toMatchObject({
+        search: 'issue #42',
+        tag: '#smoke',
+        cursor: 'abc#def',
+      })
+    })
+
+    it('encodes non-ASCII values as UTF-8 and reads them back unchanged', async () => {
+      await listSuiteSummaries({
+        projectId: 'proj-1',
+        sort: 'name',
+        search: 'árbol ñandú',
+        tag: '日本',
+      })
+
+      const [url] = lastCall()
+      expect(url).toContain('search=%C3%A1rbol+%C3%B1and%C3%BA')
+      expect(url).toContain('tag=%E6%97%A5%E6%9C%AC')
+      expect(lastRequest().params).toMatchObject({ search: 'árbol ñandú', tag: '日本' })
+    })
+
     it('hands the abort signal to the request', async () => {
       const controller = new AbortController()
 

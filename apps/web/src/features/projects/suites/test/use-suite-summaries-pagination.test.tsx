@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
+import type { InfiniteData } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SuiteSummariesPage } from '@qably/types'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
@@ -141,28 +142,69 @@ describe('useSuiteSummaries pagination', () => {
     )
   })
 
-  it.each<[string, HookProps]>([
-    ['search', { projectId: 'proj-1', filters: { ...NO_FILTERS, search: 'login' } }],
-    ['status', { projectId: 'proj-1', filters: { ...NO_FILTERS, status: 'fail' } }],
-    ['tag', { projectId: 'proj-1', filters: { ...NO_FILTERS, tag: 'api' } }],
-    ['sort', { projectId: 'proj-1', filters: { ...NO_FILTERS, sort: 'name' } }],
-    ['project', { projectId: 'proj-2', filters: NO_FILTERS }],
+  it.each<{
+    label: string
+    next: HookProps
+    rowsWhileLoading: string[]
+    isPlaceholder: boolean
+  }>([
+    {
+      label: 'search',
+      next: { projectId: 'proj-1', filters: { ...NO_FILTERS, search: 'login' } },
+      rowsWhileLoading: ['a', 'b'],
+      isPlaceholder: true,
+    },
+    {
+      label: 'status',
+      next: { projectId: 'proj-1', filters: { ...NO_FILTERS, status: 'fail' } },
+      rowsWhileLoading: ['a', 'b'],
+      isPlaceholder: true,
+    },
+    {
+      label: 'tag',
+      next: { projectId: 'proj-1', filters: { ...NO_FILTERS, tag: 'api' } },
+      rowsWhileLoading: ['a', 'b'],
+      isPlaceholder: true,
+    },
+    {
+      label: 'sort',
+      next: { projectId: 'proj-1', filters: { ...NO_FILTERS, sort: 'name' } },
+      rowsWhileLoading: ['a', 'b'],
+      isPlaceholder: true,
+    },
+    {
+      label: 'project',
+      next: { projectId: 'proj-2', filters: NO_FILTERS },
+      rowsWhileLoading: [],
+      isPlaceholder: false,
+    },
   ])(
-    'starts again from the first page, without the old rows, when the %s changes',
-    async (_label, next) => {
+    'starts again from the first page when the $label changes, with $rowsWhileLoading in view while it loads',
+    async ({ next, rowsWhileLoading, isPlaceholder }) => {
+      const fresh = deferred<SuiteSummariesPage>()
       list
         .mockResolvedValueOnce(pageOf(['a'], 'cur-1'))
         .mockResolvedValueOnce(pageOf(['b'], 'cur-2'))
-        .mockResolvedValueOnce(pageOf(['fresh'], null))
+        .mockReturnValueOnce(fresh.promise)
       const { result, rerender } = renderSummaries()
       await loadNextPage(result, ['a', 'b'])
 
       rerender(next)
 
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(3))
+      expect(idsOf(result.current.suites)).toEqual(rowsWhileLoading)
+      expect(result.current.isPlaceholderData).toBe(isPlaceholder)
+      expect(result.current.hasNextPage).toBe(false)
+
+      await act(async () => {
+        fresh.resolve(pageOf(['fresh'], null))
+      })
+
       await waitFor(() => expect(idsOf(result.current.suites)).toEqual(['fresh']))
       const request = list.mock.calls[2]?.[0]
       expect(request).toMatchObject({ projectId: next.projectId, sort: next.filters.sort })
       expect(request?.cursor).toBeUndefined()
+      expect(result.current.isPlaceholderData).toBe(false)
       expect(result.current.hasNextPage).toBe(false)
     },
   )
@@ -173,7 +215,7 @@ describe('useSuiteSummaries pagination', () => {
       .mockResolvedValueOnce(pageOf(['a'], 'cur-1'))
       .mockReturnValueOnce(lateNextPage.promise)
       .mockResolvedValueOnce(pageOf(['fresh'], null))
-    const { result, rerender } = renderSummaries()
+    const { result, rerender, client } = renderSummaries()
     await waitFor(() => expect(result.current.hasNextPage).toBe(true))
     act(() => {
       void result.current.fetchNextPage()
@@ -188,6 +230,11 @@ describe('useSuiteSummaries pagination', () => {
     })
 
     expect(idsOf(result.current.suites)).toEqual(['fresh'])
+    const abandoned = client.getQueryData<InfiniteData<SuiteSummariesPage, string | undefined>>(
+      suiteKeys.summaryPage('proj-1', { sort: 'recent' }),
+    )
+    expect(abandoned?.pages).toHaveLength(1)
+    expect(idsOf(abandoned?.pages[0]?.items ?? [])).toEqual(['a'])
   })
 
   it('shows the answer of the latest search even when an older one answers after it', async () => {
