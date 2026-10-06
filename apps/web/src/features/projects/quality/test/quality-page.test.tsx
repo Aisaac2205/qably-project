@@ -35,7 +35,6 @@ vi.mock('@/features/runs/api/runs.api', () => ({
   getRegressions: (...args: unknown[]) => getRegressions(...args),
   getPushPassRate: (...args: unknown[]) => getPushPassRate(...args),
   listRuns: vi.fn(),
-  getSuiteMetrics: vi.fn(),
   getRun: vi.fn(),
   createRun: vi.fn(),
   updateRunCase: vi.fn(),

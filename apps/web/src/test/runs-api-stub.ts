@@ -6,14 +6,8 @@ import type {
   RunsPageRecord,
   RunSource,
   RunSummaryRecord,
-  SuiteMetricsEntry,
-  SuiteMetricsLastRun,
-  SuiteMetricsRecord,
 } from '@qably/types'
 import { computePassRate } from '@qably/types'
-import { mockSuites } from '@/lib/mock-data'
-
-const SUITE_METRICS_TREND_LIMIT = 10
 
 function countCases(cases: RunCaseRecord[]): RunCaseCounts {
   const counts: RunCaseCounts = {
@@ -226,42 +220,6 @@ export function listRuns(
     items: page.map(toSummary),
     ...(hasMore ? { nextCursor: page[page.length - 1].id } : {}),
   })
-}
-
-export function computeSuiteMetrics(projectId: string): SuiteMetricsRecord {
-  const projectSuites = mockSuites.filter((suite) => suite.projectId === projectId)
-
-  const items: SuiteMetricsEntry[] = projectSuites.map(({ id: suiteId, name: suiteName }) => {
-    const suiteRuns = runs
-      .filter((run) => run.suiteId === suiteId)
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
-      .slice(0, SUITE_METRICS_TREND_LIMIT)
-
-    const trend = suiteRuns.slice().reverse().map((run) => run.status)
-    const mostRecent = suiteRuns[0]
-
-    const lastRun: SuiteMetricsLastRun | null =
-      mostRecent === undefined
-        ? null
-        : {
-            id: mostRecent.id,
-            status: mostRecent.status,
-            source: mostRecent.source,
-            startedAt: mostRecent.startedAt,
-            ...(mostRecent.finishedAt === undefined
-              ? {}
-              : { finishedAt: mostRecent.finishedAt }),
-            passRate: passRateOf(countCases(mostRecent.cases)),
-          }
-
-    return { suiteId, suiteName, lastRun, trend }
-  })
-
-  return { items }
-}
-
-export function getSuiteMetrics(projectId: string): Promise<SuiteMetricsRecord> {
-  return Promise.resolve(computeSuiteMetrics(projectId))
 }
 
 export function getRun(id: string): Promise<RunRecord> {

@@ -6,7 +6,6 @@ import {
   getPushPassRate,
   getRegressions,
   getRun,
-  getSuiteMetrics,
   listRuns,
 } from '../api/runs.api'
 import { runKeys } from '../lib/query-keys'
@@ -44,21 +43,6 @@ export function usePushPassRate(projectId: string, days: number) {
 
   return {
     candles: query.data?.items ?? [],
-    isLoading: query.isLoading,
-    isError: query.isError,
-    refetch: query.refetch,
-  }
-}
-
-export function useSuiteMetricsQuery(projectId: string) {
-  const query = useQuery({
-    queryKey: runKeys.suiteMetrics(projectId),
-    queryFn: ({ signal }) => getSuiteMetrics(projectId, signal),
-    enabled: projectId !== '',
-  })
-
-  return {
-    items: query.data?.items ?? [],
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,

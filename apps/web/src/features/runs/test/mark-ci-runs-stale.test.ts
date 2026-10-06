@@ -14,7 +14,7 @@ function seededClient() {
   client.setQueryData(ciRunKeys.detail('ci-2'), { id: 'ci-2', runs: [] })
   client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
   client.setQueryData(runKeys.page('proj-1', 'all'), { pages: [], pageParams: [] })
-  client.setQueryData(runKeys.suiteMetrics('proj-1'), { items: [] })
+  client.setQueryData(runKeys.regressions('proj-1', 20), { items: [], runsScanned: 0 })
   return client
 }
 
@@ -57,14 +57,14 @@ describe('markCiRunsStale', () => {
     expect(client.getQueryState(ciRunKeys.page('proj-10'))?.isInvalidated).toBe(false)
   })
 
-  it('leaves the run details, the run pages and the metrics alone', () => {
+  it('leaves the run details, the run pages and the regressions alone', () => {
     const client = seededClient()
 
     markCiRunsStale(client, 'proj-1')
 
     expect(client.getQueryState(runKeys.detail('run-1'))?.isInvalidated).toBe(false)
     expect(client.getQueryState(runKeys.page('proj-1', 'all'))?.isInvalidated).toBe(false)
-    expect(client.getQueryState(runKeys.suiteMetrics('proj-1'))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(runKeys.regressions('proj-1', 20))?.isInvalidated).toBe(false)
   })
 
   it('never fetches, so a mutation costs no request even for a CI run that still has an observer', async () => {

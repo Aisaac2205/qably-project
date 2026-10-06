@@ -5,7 +5,6 @@ import type {
   RunRecord,
   RunsPageRecord,
   RunSource,
-  SuiteMetricsRecord,
 } from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
@@ -54,16 +53,6 @@ export function getPushPassRate(
 
   return apiRequest<PushPassRateRecord>(
     `/runs/push-pass-rate?${search.toString()}`,
-    { signal },
-  )
-}
-
-export function getSuiteMetrics(
-  projectId: string,
-  signal?: AbortSignal,
-): Promise<SuiteMetricsRecord> {
-  return apiRequest<SuiteMetricsRecord>(
-    `/runs/suite-metrics?projectId=${encodeURIComponent(projectId)}`,
     { signal },
   )
 }

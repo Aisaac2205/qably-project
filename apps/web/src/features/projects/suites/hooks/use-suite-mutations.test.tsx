@@ -1010,7 +1010,7 @@ describe('run details', () => {
   it.each(triggers)('marks cached run details stale after %s, without fetching them', async (label, trigger) => {
     const { client, invalidateSpy } = setup()
     client.setQueryData(runKeys.detail('run-1'), { id: 'run-1' })
-    client.setQueryData(runKeys.suiteMetrics('proj-1'), { items: [] })
+    client.setQueryData(runKeys.regressions('proj-1', 20), { items: [], runsScanned: 0 })
     client.setQueryData(runKeys.page('proj-1', 'manual'), { pages: [], pageParams: [] })
 
     trigger(client)
@@ -1022,7 +1022,7 @@ describe('run details', () => {
       queryKey: runKeys.details,
       refetchType: 'none',
     })
-    expect(client.getQueryState(runKeys.suiteMetrics('proj-1'))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(runKeys.regressions('proj-1', 20))?.isInvalidated).toBe(false)
     expect(client.getQueryState(runKeys.page('proj-1', 'manual'))?.isInvalidated).toBe(
       label === 'deleting a suite',
     )

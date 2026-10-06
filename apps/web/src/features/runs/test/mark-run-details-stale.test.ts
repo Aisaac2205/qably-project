@@ -11,7 +11,7 @@ function seededClient() {
   client.setQueryData(runKeys.detail('run-2'), { id: 'run-2' })
   client.setQueryData(runKeys.regressions('proj-1', 20), { items: [], runsScanned: 0 })
   client.setQueryData(runKeys.page('proj-1', 'all'), { pages: [], pageParams: [] })
-  client.setQueryData(runKeys.suiteMetrics('proj-1'), { items: [] })
+  client.setQueryData(runKeys.pushPassRate('proj-1', 30), { items: [] })
   return client
 }
 
@@ -25,7 +25,7 @@ describe('runKeys.detail', () => {
   it('never collides with the other run keys', () => {
     expect(runKeys.regressions('proj-1', 20).slice(0, 2)).not.toEqual(runKeys.details)
     expect(runKeys.page('proj-1', 'all').slice(0, 2)).not.toEqual(runKeys.details)
-    expect(runKeys.suiteMetrics('proj-1').slice(0, 2)).not.toEqual(runKeys.details)
+    expect(runKeys.pushPassRate('proj-1', 30).slice(0, 2)).not.toEqual(runKeys.details)
   })
 })
 
@@ -39,14 +39,14 @@ describe('markRunDetailsStale', () => {
     expect(client.getQueryState(runKeys.detail('run-2'))?.isInvalidated).toBe(true)
   })
 
-  it('leaves the run pages, metrics and regressions alone', () => {
+  it('leaves the run pages, the regressions and the push pass rate alone', () => {
     const client = seededClient()
 
     markRunDetailsStale(client)
 
     expect(client.getQueryState(runKeys.regressions('proj-1', 20))?.isInvalidated).toBe(false)
     expect(client.getQueryState(runKeys.page('proj-1', 'all'))?.isInvalidated).toBe(false)
-    expect(client.getQueryState(runKeys.suiteMetrics('proj-1'))?.isInvalidated).toBe(false)
+    expect(client.getQueryState(runKeys.pushPassRate('proj-1', 30))?.isInvalidated).toBe(false)
   })
 
   it('never fetches, so a mutation costs no request even for a run detail that still has an observer', async () => {

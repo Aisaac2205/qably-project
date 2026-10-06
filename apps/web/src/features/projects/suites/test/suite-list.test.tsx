@@ -2,7 +2,6 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { expectFocusRing } from '@/features/runs/test/focus-ring'
-import * as runsApiStub from '@/test/runs-api-stub'
 import * as suitesApiStub from '@/test/suites-api-stub'
 import { renderList } from './suite-list-harness'
 import { pagedBy, rowIds } from './suite-list-results-pages'
@@ -23,14 +22,12 @@ describe('SuiteList', () => {
   let listSummaries: MockInstance<typeof suitesApiStub.listSuiteSummaries>
   let listTags: MockInstance<typeof suitesApiStub.listSuiteTags>
   let listSuites: MockInstance<typeof suitesApiStub.listSuites>
-  let getSuiteMetrics: MockInstance<typeof runsApiStub.getSuiteMetrics>
 
   beforeEach(() => {
     suitesApiStub.__resetSuitesStub()
     listSummaries = vi.spyOn(suitesApiStub, 'listSuiteSummaries')
     listTags = vi.spyOn(suitesApiStub, 'listSuiteTags')
     listSuites = vi.spyOn(suitesApiStub, 'listSuites')
-    getSuiteMetrics = vi.spyOn(runsApiStub, 'getSuiteMetrics')
   })
 
   afterEach(() => {
@@ -55,7 +52,6 @@ describe('SuiteList', () => {
       expect(listTags).toHaveBeenCalledTimes(1)
       expect(listTags.mock.calls[0][0]).toBe('proj-1')
       expect(listSuites).not.toHaveBeenCalled()
-      expect(getSuiteMetrics).not.toHaveBeenCalled()
     })
 
     it('shows the filter bar and the suites, most recent first, each linking to its page', async () => {
