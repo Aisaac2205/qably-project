@@ -4,16 +4,27 @@ The AI (chat replies, extraction proposals) and notifications need to know which
 
 ## Resolution chain
 
-Highest priority first:
+Highest priority first, for the steps that apply to a flow:
 
 1. **Explicit persisted user preference** — `User.locale`, set only through `PATCH /me`.
-2. **Organization default** — the earliest-joined `owner` member's `User.locale`.
-3. **`Accept-Language`** (BCP 47) from the incoming request.
-4. **System default** — `DEFAULT_LOCALE` from `@qably/i18n`.
+2. **Organization default** — the earliest-joined `owner` member's `User.locale` (`resolveOrgDefaultLocale`, `apps/api/src/common/locale/org-default-locale.ts`).
+3. **System default** — `DEFAULT_LOCALE` from `@qably/i18n` (`'en'`).
 
-`resolveLocale(...candidates)` (`packages/i18n/src/index.ts`) implements this generically: it returns the first candidate whose BCP 47 primary subtag is a supported locale, trying each candidate in priority order, and falls back to `DEFAULT_LOCALE` when none match. `parseAcceptLanguage(header)` expands a raw `Accept-Language` header into an ordered list of tags, respecting `q` values.
+Each flow uses the steps that fit who reads its output:
 
-The rule that matters most: **the locale follows the recipient of the output, not the owner of the resource.** A code-change proposal is read by whoever reviews it, not by whoever pushed the commit; a notification email is read by its recipient, not by the organization's owner.
+| Flow | Chain |
+|---|---|
+| Chat reply | the asking user's `User.locale`, then the system default |
+| Case, file, suite and project documentation requested by a user | the acting user's `User.locale`, then the organization default, then the system default |
+| Code-change extraction, triggered by a webhook | the organization default, then the system default |
+| Notification email | the recipient's `User.locale`, then the system default |
+| Slack and Discord notification webhooks | the organization default |
+| Verification and password reset emails | the user's `User.locale`, then the system default |
+| Invitation email | the invited person's `User.locale` if they already have an account, then the inviter's, then the system default |
+
+`resolveLocale(...candidates)` (`packages/i18n/src/index.ts`) implements the matching generically: it returns the first candidate whose BCP 47 primary subtag is a supported locale, trying each candidate in priority order, and falls back to `DEFAULT_LOCALE` when none match. `parseAcceptLanguage(header)` expands a raw `Accept-Language` header into an ordered list of tags, respecting `q` values, and `resolveLocale` runs each candidate through it. No `apps/api` code passes a request's `Accept-Language` header to it today: `apps/web` sends the header with every request, but the API does not read it.
+
+The rule that matters most: **the locale follows the recipient of the output, not the owner of the resource.** A notification email is read by its recipient, not by the organization's owner. The exception is a code-change proposal, which has no acting user when a webhook triggers it, so it uses the organization default.
 
 ## Why `User.locale` is nullable
 
@@ -21,9 +32,9 @@ The rule that matters most: **the locale follows the recipient of the output, no
 
 ## Queued jobs resolve locale at enqueue time, not at run time
 
-Extraction jobs (`ExtractionProcessor`) run later, without an HTTP request, and their output (a proposal) is persisted for a human to read afterward. Resolving the locale when the job *runs* would have no `Accept-Language` header and no request-scoped user context to fall back on. Instead, `ExtractionService` resolves the locale once, at enqueue time, and carries it in `ExtractionJobData.locale` — the same pattern as Laravel's `Queueable::$locale` or Rails ActiveJob serializing `I18n.locale`.
+Extraction jobs (`ExtractionProcessor`) run later, without an HTTP request, and their output (a proposal or case documentation) is persisted for a human to read afterward. Resolving the locale when the job *runs* would have no `Accept-Language` header and no request-scoped user context to fall back on. Instead, `ExtractionService` resolves the locale once, at enqueue time, and carries it in `ExtractionJobData.locale` — the same pattern as Laravel's `Queueable::$locale` or Rails ActiveJob serializing `I18n.locale`.
 
-- `enqueueDocumentCase` has an acting user (a reviewer clicked "document this case"): resolve `actor locale -> organization default -> DEFAULT_LOCALE`.
+- `enqueueDocumentCase` and `enqueueDocumentFiles` have an acting user (a reviewer clicked "document this case" or "document with Aeris"): resolve `actor locale -> organization default -> DEFAULT_LOCALE`. The standalone suite metadata job that `enqueueDocumentFiles` adds carries the same locale.
 - `enqueueCodeChanges` is webhook-triggered and has no acting user: resolve the organization default directly (`organization default -> DEFAULT_LOCALE`).
 
 `ExtractionProcessor` reads `job.data.locale` directly. Jobs enqueued before this change (or redelivered from before a deploy) may not carry a `locale` field at all; `resolveLocale(job.data.locale)` handles that by falling back to `DEFAULT_LOCALE`, so no separate migration of in-flight jobs is needed.
