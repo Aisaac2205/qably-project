@@ -103,7 +103,7 @@ describe('groupStatusesBySuite', () => {
     expect(grouped.size).toBe(2);
   });
 
-  it('puts the run with the higher id last when two runs share a start time', () => {
+  it('reverses a pair of rows so the first one the statement returns ends up last', () => {
     const rowsAsOrderedBySql: RecentRunStatusRow[] = [
       { suiteId: 'suite-1', status: 'fail' },
       { suiteId: 'suite-1', status: 'pass' },

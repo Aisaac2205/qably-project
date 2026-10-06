@@ -240,7 +240,7 @@ describe('cutPage paging', () => {
     ['name', byName],
     ['cases', byCases],
   ] as const)(
-    'walks all suites of sort %s without gaps or repeats when keys tie',
+    'walks all suites of sort %s without gaps or repeats across pages',
     (_sort, keyOf) => {
       const items = suites(23);
       const full = ids(cutPage(items, keyOf, { limit: 100 }).page);
@@ -251,6 +251,36 @@ describe('cutPage paging', () => {
       expect(pages.flat()).toEqual(full);
     },
   );
+
+  describe('names that collate equal', () => {
+    const items = [
+      base('a3', { name: 'ALPHA' }),
+      base('b1', { name: 'beta' }),
+      base('a1', { name: 'Alpha' }),
+      base('a2', { name: 'alpha' }),
+    ];
+
+    it('walks them one per page in id order, with the cursor on the tied name', () => {
+      const { pages, cursors } = walk(items, byName, 1);
+
+      expect(pages).toEqual([['a1'], ['a2'], ['a3'], ['b1']]);
+      expect(cursors[3]).toBeNull();
+      expect(decodeSuiteSummariesCursor(cursors[1] ?? '')).toEqual({
+        sort: 'name',
+        name: 'alpha',
+        id: 'a2',
+      });
+    });
+
+    it('keeps the id order when a page boundary falls inside the tie', () => {
+      const { pages } = walk(items, byName, 2);
+
+      expect(pages).toEqual([
+        ['a1', 'a2'],
+        ['a3', 'b1'],
+      ]);
+    });
+  });
 
   it('walks the pass rate order across ties and null rates', () => {
     const items = Array.from({ length: 17 }, (_value, index) =>
