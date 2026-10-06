@@ -2,25 +2,28 @@
 name: Qably
 description: QA lifecycle management with AI-assisted test case generation
 colors:
-  bg: "oklch(0.978 0.002 85)"
+  bg: "oklch(0.970 0.006 260)"
   bg-surface: "oklch(1.000 0.000 0)"
   bg-surface-raised: "oklch(0.995 0.002 85)"
-  bg-sidebar: "oklch(0.950 0.003 85)"
-  bg-sidebar-hover: "oklch(0.920 0.004 85)"
-  bg-sidebar-active: "oklch(0.995 0.001 85)"
+  bg-sidebar: "oklch(1.000 0.000 0)"
+  bg-sidebar-hover: "oklch(0.958 0.007 260)"
+  bg-sidebar-active: "oklch(0.945 0.008 260)"
   fg: "oklch(0.185 0.004 85)"
   fg-muted: "oklch(0.475 0.008 85)"
   fg-sidebar: "oklch(0.205 0.004 85)"
   fg-sidebar-muted: "oklch(0.465 0.008 85)"
   border: "oklch(0.890 0.004 85)"
   border-strong: "oklch(0.820 0.006 85)"
-  border-sidebar: "oklch(0.865 0.005 85)"
+  border-sidebar: "oklch(0.890 0.004 85)"
   primary: "oklch(0.185 0.004 85)"
   primary-hover: "oklch(0.290 0.006 85)"
   primary-fg: "oklch(0.990 0.000 0)"
-  surface-hover: "oklch(0.930 0.004 85)"
+  surface-hover: "oklch(0.935 0.008 260)"
+  runs-hover: "oklch(0.935 0.000 0)"
   accent-ai: "oklch(0.405 0.008 85)"
   accent-ai-bg: "oklch(0.940 0.003 85)"
+  accent-icon: "oklch(0.623 0.214 259.815)"
+  brand-github-actions: "oklch(0.635 0.199 256)"
   status-pass: "oklch(0.45 0.15 145)"
   status-pass-bg: "oklch(0.95 0.05 145)"
   status-fail: "oklch(0.45 0.20 25)"
@@ -33,11 +36,19 @@ colors:
   status-running-bg: "oklch(0.95 0.05 240)"
   status-warn: "oklch(0.53 0.15 80)"
   status-warn-bg: "oklch(0.97 0.05 80)"
-  heatmap-l0: "oklch(0.930 0.004 85)"
+  heatmap-l0: "oklch(0.935 0.008 260)"
   heatmap-l1: "oklch(0.850 0.090 145)"
   heatmap-l2: "oklch(0.700 0.150 145)"
   heatmap-l3: "oklch(0.560 0.180 145)"
   heatmap-l4: "oklch(0.440 0.200 145)"
+  qb-chart-line: "oklch(0.623 0.214 259.815)"
+  qb-chart-pass: "oklch(0.723 0.219 149.579)"
+  qb-chart-fail: "oklch(0.637 0.237 25.331)"
+  qb-chart-skip: "oklch(0.704 0.040 256.788)"
+  qb-chart-warn: "oklch(0.769 0.188 70.080)"
+  qb-chart-compare: "oklch(0.707 0.022 261.325)"
+  qb-chart-info: "oklch(0.715 0.143 215.221)"
+  qb-chart-accent: "oklch(0.606 0.250 292.717)"
   mesh-ink: "oklch(0.000 0.000 0)"
   mesh-graphite: "oklch(0.220 0.000 0)"
   mesh-ash: "oklch(0.380 0.000 0)"
@@ -70,8 +81,8 @@ components:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.primary-fg}"
     rounded: "lg"
-    padding: "0 0.75rem"
-    height: "2.25rem"
+    padding: "0 1rem"
+    height: "2.75rem (md: 2.5rem)"
   button-outline:
     backgroundColor: "{colors.bg}"
     textColor: "{colors.fg}"
@@ -100,11 +111,11 @@ components:
 
 **Creative North Star: "The Instrument Panel"**
 
-Qably reads like an instrument panel for a QA discipline, not a marketing surface for one. Every number, status, and generated field has a needle pointing back to where it came from: a PR, a commit, a file, a run. The palette is a single near-neutral ink-on-paper scale with color spent only on semantic status, never on brand decoration. Density is welcomed where the task needs it (tables, runs, case lists), and restraint governs everything else: one accent-free surface, one type family, one shadow vocabulary used sparingly.
+Qably reads like an instrument panel for a QA discipline, not a marketing surface for one. Every number, status, and generated field has a needle pointing back to where it came from: a PR, a commit, a file, a run. The palette is a single near-neutral ink-on-paper scale with color spent only on semantic status, chart series and entity icons, never on brand decoration. Density is welcomed where the task needs it (tables, runs, case lists), and restraint governs everything else: one accent-free surface, one type family, one shadow vocabulary used sparingly.
 
 This system explicitly rejects the SaaS-dashboard cliché of a rediscovered TestRail with a chatbot bolted on, gradient hero metrics, and uppercase tracked eyebrows. It also rejects color-only status signaling: every status pairs an icon with a text label, because the interface must communicate the same information to a QA lead skimming a dashboard and to a screen reader user auditing a run.
 
-Motion is functional, not decorative: a single page-enter fade-rise on mount, nothing more, fully disabled under `prefers-reduced-motion`.
+Motion is functional, not decorative: a page-enter fade-rise on mount (200ms), an enter-only disclosure reveal, a notification badge pop and the spinner, which is the only loop. The vendored chart primitives in `src/components/charts` animate their own reveal and loading states. Page-enter is not applied under `prefers-reduced-motion`, and a global guard cuts every remaining animation and transition to 0.01ms.
 
 **Key Characteristics:**
 - Ink-on-paper neutral scale (near-black text, near-white surfaces), zero saturated brand color.
@@ -115,21 +126,22 @@ Motion is functional, not decorative: a single page-enter fade-rise on mount, no
 
 ## 2. Colors
 
-The palette is a single warm-neutral ink/paper ramp (hue 85, chroma near zero) plus a fixed semantic status vocabulary. There is no brand accent color; the darkest neutral (`--primary`) doubles as the sole "brand" color, used for primary actions and focus rings.
+The palette is a near-neutral ink/paper ramp plus a fixed semantic status vocabulary. Text, borders and the primary sit at hue 85 with chroma near zero; the canvas and the hover surfaces (`--bg`, `--surface-hover`, `--bg-sidebar-hover`, `--bg-sidebar-active`) sit at hue 260 with chroma under 0.01. There is no brand accent color; the darkest neutral (`--primary`) doubles as the sole "brand" color, used for primary actions and focus rings.
 
 ### Primary
 - **Ink** (`--primary`, `oklch(0.185 0.004 85)`): primary buttons, focus rings, active sidebar state, links. This is also the default text color (`--fg`), so "brand" and "text" share one value by design.
 - **Ink Hover** (`--primary-hover`, `oklch(0.290 0.006 85)`): hover state for primary buttons only.
 
 ### Neutral
-- **Paper** (`--bg`, `oklch(0.978 0.002 85)`): page canvas background.
-- **Surface** (`--bg-surface`, `oklch(1.000 0.000 0)`): cards, panels, inputs, dialogs — pure white against the slightly warm paper canvas.
-- **Surface Raised** (`--bg-surface-raised`, `oklch(0.995 0.002 85)`): KPI cards and elements that sit one step above surface.
-- **Sidebar Paper** (`--bg-sidebar`, `oklch(0.950 0.003 85)`) / **Sidebar Hover** (`--bg-sidebar-hover`) / **Sidebar Active** (`--bg-sidebar-active`): the sidebar's own neutral layer, distinct from content surfaces.
+- **Paper** (`--bg`, `oklch(0.970 0.006 260)`): page canvas background.
+- **Surface** (`--bg-surface`, `oklch(1.000 0.000 0)`): cards, panels, inputs, dialogs — pure white against the slightly cool paper canvas.
+- **Surface Raised** (`--bg-surface-raised`, `oklch(0.995 0.002 85)`): the monogram tile in the project grid. KPI cards use `--bg-surface`.
+- **Sidebar** (`--bg-sidebar`, `oklch(1.000 0.000 0)`) / **Sidebar Hover** (`--bg-sidebar-hover`) / **Sidebar Active** (`--bg-sidebar-active`): the sidebar's own tokens. The sidebar is the same white as `--bg-surface`; its hover and active states use the hue 260 tints.
 - **Text** (`--fg`, `oklch(0.185 0.004 85)`): default body and heading text.
 - **Muted Text** (`--fg-muted`, `oklch(0.475 0.008 85)`): secondary text, descriptions, timestamps.
 - **Border** (`--border`, `oklch(0.890 0.004 85)`) / **Border Strong** (`--border-strong`, `oklch(0.820 0.006 85)`): default dividers and hover/focus borders.
 - **Hover Surface** (`--surface-hover`, `oklch(0.930 0.004 85)`): background for ghost/outline interactive hover states. Distinct from muted text; this is a background token, never a text color.
+- **Runs Hover** (`--runs-hover`, `oklch(0.935 0.000 0)`): the achromatic row hover on the runs lists.
 
 ### Status (semantic only, never decorative)
 - **Pass** (`--status-pass` / `--status-pass-bg`, green, hue 145): passed tests, confirmed reviews, active cases.
@@ -142,13 +154,20 @@ The palette is a single warm-neutral ink/paper ramp (hue 85, chroma near zero) p
 ### AI accent
 - **AI Ink** (`--accent-ai` / `--accent-ai-bg`, hue 85, near-neutral): reserved exclusively for markers on AI-generated content. It is deliberately close to the neutral ramp rather than a saturated "AI purple," so generated content is flagged without visually competing with status colors.
 
+### Entity icons and brand marks
+- **Entity Icon** (`--accent-icon`, `oklch(0.623 0.214 259.815)`, blue): the mark that identifies a credential in a list or section header. It is used by the API key row and the signing key section.
+- **Brand Mark** (`--brand-github-actions`, `oklch(0.635 0.199 256)`): the real brand color of a third-party integration, used only on that integration's identification icon (the GitHub Actions source icon). Not a UI accent.
+
+### Chart series
+- **Chart bridge** (`--qb-chart-line`, `-pass`, `-fail`, `-skip`, `-warn`, `-compare`, `-info`, `-accent`): the series colors for `@qably/ui` and the vendored chart primitives. The steps are re-stepped from the status hues so pass and fail stay apart under deuteranopia. Status chips keep the `--status-*` tokens because they carry an icon and a label. The `--chart-*` tokens that the vendored primitives read alias back to these values.
+
 ### Decorative-only
 - **Auth Mesh** (`--mesh-ink` / `--mesh-graphite` / `--mesh-ash`): pure grayscale values used only by the authentication page's decorative shader panel. Never used for content or status; the shader's color-dodge grain doubles each channel; these stay dark enough that the doubled result never reaches white.
 
 ### Named Rules
 **The No-Color-Alone Rule.** Every semantic status pairs its color with a Phosphor icon and a translated text label (see `status-presentation.tsx`). A status token's color value is never the sole carrier of meaning.
 
-**The One Ink Rule.** There is exactly one non-neutral, non-status color role (`--primary`), and it does the double duty of text, brand, and focus. No second accent competes with it.
+**The One Ink Rule.** There is exactly one color role for text, brand and focus (`--primary`). Status, AI markers, entity icons, third-party brand marks and chart series have their own tokens, and no second accent competes with `--primary` for actions or focus.
 
 ## 3. Typography
 
@@ -161,7 +180,7 @@ The palette is a single warm-neutral ink/paper ramp (hue 85, chroma near zero) p
 - **Page Title** (`font-semibold`, `text-2xl sm:text-3xl`, `tracking-tight`): the single `PageHeader` title per route.
 - **Section/Card Title** (`font-semibold`, `text-base`, `tracking-tight`): `CardTitle`, `InspectorPanel` title.
 - **Body** (`font-normal` to `font-medium`, `text-sm`): default UI text, descriptions, list rows. `text-wrap-pretty` on longer descriptive copy, `text-wrap-balance` on headings.
-- **Label** (`font-medium` to `font-semibold`, `text-xs`): form labels, status chip text, badges, KPI labels.
+- **Label** (`font-medium` to `font-bold`, `text-xs`): form labels, status chip text, badges, KPI labels.
 - **Technical/Mono** (`font-mono`, `text-xs`): raw automation names, file paths, diff lines, IDs. Always paired with a humanized label as the primary text; mono is secondary.
 
 Sizing uses Tailwind's fixed rem scale directly (`text-xs` / `text-sm` / `text-base` / `text-2xl` / `text-3xl`), not a fluid `clamp()` scale — consistent with product UI viewed at fixed DPI rather than a marketing surface.
@@ -171,11 +190,12 @@ Sizing uses Tailwind's fixed rem scale directly (`text-xs` / `text-sm` / `text-b
 
 ## 4. Elevation
 
-The system is flat by default. Resting surfaces (cards, KPI cards, the AI diff panel) carry a barely-visible 1px shadow, tinted to the ink hue rather than pure black. Layered, floating surfaces (dialogs, select popups, menus, tooltips) use a stronger two-layer shadow. There is no tonal elevation ramp beyond these two roles.
+The system is flat by default. `Card`, the KPI card and the AI diff container are bordered and carry no shadow. Layered, floating surfaces (dialogs, select popups, menus, the notification menu) use a stronger two-layer shadow. There is no tonal elevation ramp beyond these two roles.
 
 ### Shadow Vocabulary
-- **Card** (`--shadow-card`: `0 1px 1px 0 oklch(0.185 0.004 85 / 0.025)`): resting cards, KPI cards, the AI diff container. Nearly imperceptible; communicates "this is a discrete surface," not depth.
-- **Pop** (`--shadow-pop`: `0 4px 12px -2px oklch(0.12 0 0 / 0.08), 0 2px 4px -2px oklch(0.12 0 0 / 0.04)`): dialogs, select/menu popovers, sheets. The only shadow strong enough to read as "floating above the page."
+- **Card** (`--shadow-card`: `0 1px 1px 0 oklch(0.185 0.004 85 / 0.025)`): a barely-visible 1px shadow tinted to the ink hue rather than pure black. `Card` does not apply it; toasts are the only component that does. Nearly imperceptible; communicates "this is a discrete surface," not depth.
+- **Pop** (`--shadow-pop`: `0 4px 12px -2px oklch(0.12 0 0 / 0.08), 0 2px 4px -2px oklch(0.12 0 0 / 0.04)`): dialogs, select/menu popovers, the notification menu. The only shadow strong enough to read as "floating above the page." Sheets and the vendored chart tooltips use Tailwind's `shadow-lg` instead, and `Tooltip` has no shadow.
+- **Control shadows:** inputs, textareas and selects use `shadow-xs`; switches and checkboxes use `shadow-2xs`. A few hand-rolled elements also use Tailwind's `shadow-sm`: the AI diff accept button, a primary button on the projects page and in the project grid, and a `kbd` in the run detail.
 
 ### Named Rules
 **The Flat-By-Default Rule.** Surfaces are flat at rest. A shadow appears only to mark a discrete card boundary (`shadow-card`) or an overlay that floats above the page (`shadow-pop`). No shadow scale beyond these two steps exists; do not invent a third.
@@ -183,65 +203,65 @@ The system is flat by default. Resting surfaces (cards, KPI cards, the AI diff p
 ## 5. Components
 
 ### Buttons
-- **Shape:** `rounded-lg` at default/sm/lg sizes; small icon-only sizes (`xs`) clamp to `min(var(--radius-md), 10-12px)`. Border-radius comes from Tailwind's stock theme scale, not a project-defined token.
+- **Shape:** `rounded-lg` at default and lg sizes; `xs` and `icon-xs` clamp to `min(var(--radius-md), 10px)`, `sm` and `icon-sm` to `min(var(--radius-md), 12px)`. Border-radius comes from Tailwind's stock theme scale, not a project-defined token.
 - **Primary:** ink background (`--primary`), `--primary-fg` text, `hover:bg-primary/80`.
 - **Outline:** transparent/background fill, `--border` stroke, `hover:bg-surface-hover`.
 - **Secondary:** muted fill with a 5%-ink-mixed hover.
 - **Ghost:** no border or fill at rest, `hover:bg-surface-hover`.
 - **Destructive:** `--status-fail`-tinted background at 10% opacity, deepening on hover. Used for irreversible actions (see `ConfirmDialog`).
 - **Link:** primary-colored text with underline on hover only.
-- **Sizes:** `xs` / `sm` / `default` / `lg`, plus square `icon-xs` / `icon-sm` / `icon` / `icon-lg` variants.
-- **Feedback:** all variants translate `1px` down on `:active`; focus shows a 2px primary ring at 25% opacity with 1px offset.
+- **Sizes:** `xs` / `sm` / `default` / `lg`, plus square `icon-xs` / `icon-sm` / `icon` / `icon-lg` variants. Heights are touch-sized below `md` and step down at `md`: `default` `h-11` then `h-10`, `lg` `h-12` then `h-11`, `sm` `h-9` then `h-8`, `xs` `h-8` then `h-7`.
+- **Feedback:** all variants except `aria-haspopup` triggers translate `1px` down on `:active`; focus shows a 2px primary ring at 25% opacity with 1px offset.
 
 ### Badges & Status Chips
 - **Badge:** `rounded` (4px-class), bordered, tonal background per variant (`default`, `pass`, `fail`, `running`, `warn`, `skip`, `outline`). Used for static labels.
-- **Status Chip:** the canonical status renderer (`status-chip.tsx` + `status-presentation.tsx`). Always icon (Phosphor, 12px, `weight="fill"`) plus translated text label plus a tone-derived background/text pair. Three scoped presentation registries — execution status (pass/fail/skip/blocked/running/pending/needs-attention/never-run), review status (pending/confirmed/rejected), and case lifecycle (active/draft/deprecated) — so no module invents a local status color.
+- **Status Chip:** the canonical status renderer (`status-chip.tsx` + `status-presentation.tsx`). Always icon (Phosphor, 12px, `weight="fill"`) plus translated text label plus a tone-derived background/text pair. Four scoped presentation registries — execution status (pass/fail/skip/blocked/running/pending/needs-attention/never-run, plus the legacy `cancelled`), review status (pending/confirmed/rejected), case lifecycle (active/draft/deprecated), and CI run status (passing/failing) — so no module invents a local status color.
 
 ### Cards / Containers
-- **Corner Style:** `rounded-xl`.
+- **Corner Style:** `rounded-lg`.
 - **Background:** `--card` (maps to `--bg-surface`).
-- **Shadow Strategy:** `shadow-card` at rest; KPI cards add `hover:shadow-xs` and a subtle border-strong shift on hover/focus.
+- **Shadow Strategy:** none. `Card` is flat and bordered; see Elevation.
 - **Border:** 1px `--border`.
-- **Internal Padding:** header/content/footer each use `p-5` (content drops top padding against the header).
+- **Internal Padding:** header/content/footer each use `p-5` (content drops top padding against the header). The KPI card overrides this with `px-4 py-3`.
 
 ### Inputs / Fields
-- **Style:** `--border` stroke, `--bg-surface` fill, `rounded-lg`, `shadow-xs`, `h-10` for text inputs, `h-9` for selects.
+- **Style:** `--border` stroke, `--bg-surface` fill, `rounded-lg`, `shadow-xs`, `h-10` for text inputs, `h-11 md:h-10` for selects.
 - **Focus:** border shifts to `--primary` plus a 1px primary ring at 20% opacity (no thick double outline; native `outline` is suppressed on all form controls in favor of this ring).
 - **Error / Disabled:** `aria-invalid` swaps the border/ring to `--status-fail`-derived tokens; `disabled` drops opacity to 50% and adds a faint hover-tint background.
 - **Field composition:** `Field` / `FieldLabel` / `FieldContent` / `FieldDescription` / `FieldError` compose label, helper text, and inline error under one `role="group"` wrapper, with vertical, horizontal, or responsive orientation.
 
 ### Navigation (Sidebar)
-- **Style:** collapsible sidebar with its own neutral layer (`--bg-sidebar` family, distinct border token `--border-sidebar`), collapses to an icon rail or an off-canvas sheet on mobile (`useIsMobile`), persists open/collapsed state in a cookie, and exposes a `Cmd/Ctrl+B` keyboard shortcut.
+- **Style:** collapsible sidebar with its own token family (`--bg-sidebar`, `--bg-sidebar-hover`, `--bg-sidebar-active`, border token `--border-sidebar`), collapses to an icon rail or an off-canvas sheet on mobile (`useIsMobile`), persists open/collapsed state in a cookie, and exposes a `Cmd/Ctrl+B` keyboard shortcut.
 
 ### Dialogs, Sheets, Menus, Tooltips, Tabs
-- **Dialog:** centered, `shadow-pop`, `rounded-lg`, backdrop blur over a 50%-black overlay, built-in close button.
-- **Sheet:** off-canvas panel from any edge (`top` / `right` / `bottom` / `left`), lighter overlay (10% black, background blur) than the centered dialog.
+- **Dialog:** centered, `shadow-pop`, `rounded-lg`, backdrop blur over a 50%-black overlay, built-in close button (a 44px target below `md`, `size-6` from `md`).
+- **Sheet:** off-canvas panel from any edge (`top` / `right` / `bottom` / `left`), `shadow-lg`, lighter overlay (10% black, background blur) than the centered dialog.
 - **ConfirmDialog:** the single shared "are you sure?" pattern for destructive actions across the product; its confirm button always uses the `destructive` button variant rather than inventing a new warning color.
 - **Menu:** popover list, `shadow-pop`, highlighted item uses `primary/10` background with primary text.
 - **Tooltip:** dark (`--foreground`-background) inverted popover with an arrow, zero default delay.
-- **Tabs:** underline-style tab list (`border-b`), selected tab gets a 2px primary underline.
+- **Tabs:** underline-style tab list (`border-b`), selected tab gets a 2px primary underline and a 2px primary focus ring with an offset. Tabs are at least 44px tall below `md`. In forced-colors mode the selected tab keeps its underline.
 
 ### SegmentedControl
-- **The one option selector in the product.** Any group of mutually exclusive options presented as a row of pills goes through `components/ui/segmented-control.tsx`. Six surfaces used to hand-roll this with six different selected states; there is now one.
-- **Selected state:** solid `--primary` fill with `--primary-fg` text (`bg-primary text-primary-fg shadow-2xs border border-primary`). The selected option is the only near-black element in the group, which is what makes it readable at a glance. Faint tints such as `primary/10` are not a selected state here.
-- **Track:** standalone `rounded-full` pills with `gap-2`. Options use `rounded-full` pill geometry with high-contrast visible typography and smooth tactile transitions.
+- **The one option selector in the product.** Any group of mutually exclusive options presented as a row of options goes through `components/ui/segmented-control.tsx`. Six surfaces used to hand-roll this with six different selected states; there is now one.
+- **Selected state:** `--bg-surface` fill with default text and a 1px `primary/60` border (`border border-primary/60 bg-surface text-default`). Unselected options have a transparent border, muted text, and move to default text on hover.
+- **Track:** a single `rounded-lg` track with a `--border` stroke, `bg-canvas` fill, `p-0.5` and `gap-0.5`; options are `rounded-md`. Two sizes: `md` (default, `min-h-11 md:min-h-10`) and `sm` (`min-h-9 md:min-h-8`).
 - **Two semantics, one look.** `semantics="tabs"` emits `role="tablist"` / `role="tab"` / `aria-selected` / `aria-controls` with roving tabindex and arrow, Home and End keys, for a switcher that owns tabpanels. `semantics="toggle"` (the default) emits `role="group"` with `aria-pressed` per button, for a filter that owns nothing. Picking the wrong one lies to screen readers, so the choice is explicit rather than inferred.
 - **Not this component:** the underline page tabs in Settings (navigation, not options), the multi-select technology chips on a project, and the active-conversation highlight in the chat sidebar (a list of things, not a set of options).
 
 ### List & Table Primitives
 - **EntityList:** a plain `<ul>` with `divide-y` row separators; the shared list primitive instead of ad hoc bordered rows.
-- **DataTable:** horizontally scrollable wrapper around a plain `<table>` with a screen-reader-only `<caption>`; never forces horizontal scroll to complete a primary decision per the roadmap's responsive rule, so dense tables must expose priority columns plus an inspector rather than relying on scroll alone.
-- **InspectorPanel:** a bordered, titled `<aside>` used as the secondary detail pane in split layouts.
+- **DataTable:** horizontally scrollable wrapper around a plain `<table>` with a screen-reader-only `<caption>`; never forces horizontal scroll to complete a primary decision per the roadmap's responsive rule, so dense tables must expose priority columns plus an inspector rather than relying on scroll alone. No feature renders it today.
+- **InspectorPanel:** a bordered, titled `<aside>` used as the secondary detail pane in split layouts. No feature renders it today; the review inbox has its own inspector under `features/review-inbox`.
 - **ResizableSplit:** the two-pane layout primitive (list + inspector). Drag handle is a 1px line with a 12px invisible hit zone, fully keyboard-operable (arrow keys, Home/End, Enter/Space to reset), persists width to `localStorage` per `storageKey`.
 
 ### KPI Card
-- Three-tier vertical layout: label + icon, then a large tabular-nums metric, then a trend or status footer. Whole card is a tactile click target when `href` is provided (`active:scale-[0.985]`).
+- `KpiStatCard` (`components/ui/kpi-stat-card.tsx`): a header row with the label and a `TrendBadge`, then a large `text-3xl` animated value, then an optional area sparkline whose tone maps to a `--qb-chart-*` variable. The whole card is a link when `href` is provided, with a primary focus ring and a `--border-strong` border on hover.
 
 ### Provenance & Traceability
-- **EvidenceList**, **ProvenanceSummary**, **TraceabilityTrail**: dedicated components rendering the source PR/commit/file/run behind any generated content, each with its own labeled section and icon. These exist specifically so provenance is never buried in prose.
+- **EvidenceList**, **ProvenanceSummary**, **TraceabilityTrail**: dedicated components rendering the source PR/commit/file/run behind any generated content, each with its own labeled section and icon. These exist specifically so provenance is never buried in prose. Only the review inbox inspector renders `EvidenceList` and `TraceabilityTrail`; no feature renders `ProvenanceSummary`.
 
 ### AI Diff
-- A proposed AI edit awaiting a human accept/reject decision. Added/removed lines use `--status-pass` / `--status-fail` tints; accepting or rejecting flashes a brief background tint and collapses rejected lines to zero height. This component defines its own inline OKLCH flash tints (`oklch(72% 0.17 150 / 0.14)`, `oklch(63% 0.21 25 / 0.12)`) rather than referencing the `--status-pass`/`--status-fail` tokens directly — a deviation from the tokens-only rule worth reconciling if this component is touched again.
+- A proposed AI edit awaiting a human accept/reject decision. No feature renders it today. Added/removed lines use `--status-pass` / `--status-fail` tints; accepting or rejecting flashes a brief background tint and collapses rejected lines to zero height. This component defines its own inline OKLCH flash tints (`oklch(72% 0.17 150 / 0.14)`, `oklch(63% 0.21 25 / 0.12)`) rather than referencing the `--status-pass`/`--status-fail` tokens directly — a deviation from the tokens-only rule worth reconciling if this component is touched again.
 
 ## 6. Do's and Don'ts
 
@@ -250,7 +270,7 @@ The system is flat by default. Resting surfaces (cards, KPI cards, the AI diff p
 - **Do** keep Geist Mono scoped to technical data (raw names, paths, SHAs, durations, code); everything else is Geist Sans.
 - **Do** use the two-shadow vocabulary only: `shadow-card` for resting surfaces, `shadow-pop` for floating/overlay surfaces.
 - **Do** route every AI-generated field through `EvidenceList` / `ProvenanceSummary` / `TraceabilityTrail` so provenance stays visible and one interaction away.
-- **Do** build the page shell as `w-full space-y-6 px-5 py-6 sm:px-7 lg:px-9 lg:py-6 animate-page-enter`, matching every existing route.
+- **Do** build the page shell as `w-full space-y-6 px-5 py-6 sm:px-7 lg:px-9 lg:py-6 animate-page-enter`, as the list and detail routes do. The dashboard and quality pages add `mx-auto max-w-dashboard` (`--container-dashboard`, 1128px).
 - **Do** respect `prefers-reduced-motion`; the codebase already disables all animation/transition duration globally under that media query.
 
 ### Don't:
