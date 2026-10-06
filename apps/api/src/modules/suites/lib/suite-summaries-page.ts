@@ -1,6 +1,9 @@
 import {
   compareSuiteSortKeys,
+  deriveSuiteRunStatus,
   matchesSuiteSearch,
+  type RunStatus,
+  type SuiteRunStatus,
   type SuiteSortKey,
   type SuiteSummary,
 } from '@qably/types';
@@ -55,6 +58,32 @@ export function matchesFilters(
   }
 
   return filters.tag === undefined || candidate.tags.includes(filters.tag);
+}
+
+export function needsStatusBeforeCut(
+  query: Pick<ListSuiteSummariesQuery, 'sort' | 'status'>,
+): boolean {
+  return query.sort === 'pass-rate' || query.status !== undefined;
+}
+
+export function withRunStatus(
+  candidate: SuiteSummaryBase,
+  windows: ReadonlyMap<string, readonly RunStatus[]>,
+): SuiteSummary {
+  return {
+    ...candidate,
+    ...deriveSuiteRunStatus(windows.get(candidate.id) ?? []),
+  };
+}
+
+export function resolveSuiteSummaries(
+  candidates: readonly SuiteSummaryBase[],
+  windows: ReadonlyMap<string, readonly RunStatus[]>,
+  status: SuiteRunStatus | undefined,
+): SuiteSummary[] {
+  return candidates
+    .map((candidate) => withRunStatus(candidate, windows))
+    .filter((summary) => status === undefined || summary.status === status);
 }
 
 export function cutPage<T>(
