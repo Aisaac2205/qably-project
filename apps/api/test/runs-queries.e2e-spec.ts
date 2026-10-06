@@ -404,4 +404,119 @@ describe('Runs queries (e2e)', () => {
       );
     });
   });
+
+  describe('routes registered next to the retired one', () => {
+    it('serves GET /runs/regressions with the regression it detects', async () => {
+      prisma.run.findMany.mockResolvedValue([
+        {
+          id: 'run-2',
+          name: 'Checkout regression',
+          suiteId: 'suite-1',
+          startedAt: new Date('2026-01-02T00:00:00.000Z'),
+          finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+          suite: { name: 'Checkout' },
+        },
+      ]);
+      prisma.$queryRaw.mockResolvedValueOnce([
+        { id: 'run-2', suiteId: 'suite-1', previousId: 'run-1' },
+      ]);
+      prisma.runCase.findMany.mockResolvedValue([
+        {
+          runId: 'run-1',
+          testCaseId: 'case-1',
+          name: 'Adds to cart',
+          status: 'pass',
+        },
+        {
+          runId: 'run-2',
+          testCaseId: 'case-1',
+          name: 'Adds to cart',
+          status: 'fail',
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/runs/regressions?projectId=project-1')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        items: [
+          {
+            runId: 'run-2',
+            runName: 'Checkout regression',
+            suiteId: 'suite-1',
+            suiteName: 'Checkout',
+            testCaseId: 'case-1',
+            caseName: 'Adds to cart',
+            previousRunId: 'run-1',
+            detectedAt: '2026-01-02T00:05:00.000Z',
+          },
+        ],
+        runsScanned: 1,
+      });
+    });
+
+    it('answers 400 for GET /runs/regressions without a project instead of reading a run named regressions', async () => {
+      await request(app.getHttpServer()).get('/runs/regressions').expect(400);
+
+      expect(prisma.run.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('serves GET /runs/push-pass-rate with one entry per commit', async () => {
+      prisma.$queryRawUnsafe.mockResolvedValueOnce([
+        {
+          commitSha: 'abcdef0123456789',
+          startedAt: new Date('2026-01-02T00:00:00.000Z'),
+          open: 0.5,
+          close: 1,
+          high: 1,
+          low: 0.5,
+          runCount: 2,
+          passRate: 0.75,
+          executed: 8,
+          passed: 6,
+          failed: 2,
+          blocked: 0,
+        },
+      ]);
+
+      const response = await request(app.getHttpServer())
+        .get('/runs/push-pass-rate?projectId=project-1')
+        .expect(200);
+
+      expect(response.body).toEqual({
+        items: [
+          {
+            commitSha: 'abcdef0123456789',
+            shortSha: 'abcdef0',
+            startedAt: '2026-01-02T00:00:00.000Z',
+            open: 0.5,
+            close: 1,
+            high: 1,
+            low: 0.5,
+            runCount: 2,
+            passRate: 0.75,
+            executed: 8,
+            passed: 6,
+            failed: 2,
+            blocked: 0,
+          },
+        ],
+      });
+      expect(prisma.$queryRawUnsafe).toHaveBeenCalledWith(
+        expect.any(String),
+        'org-1',
+        'project-1',
+        expect.any(Date),
+      );
+    });
+
+    it('answers 400 for GET /runs/push-pass-rate without a project instead of reading a run named push-pass-rate', async () => {
+      await request(app.getHttpServer())
+        .get('/runs/push-pass-rate')
+        .expect(400);
+
+      expect(prisma.run.findFirst).not.toHaveBeenCalled();
+    });
+  });
 });
