@@ -18,7 +18,6 @@ function buildController(findOne: jest.Mock) {
   const service = {
     findOne,
     list: jest.fn(),
-    suiteMetrics: jest.fn(),
     regressions: jest.fn(),
     createManual: jest.fn(),
     updateCaseStatus: jest.fn(),

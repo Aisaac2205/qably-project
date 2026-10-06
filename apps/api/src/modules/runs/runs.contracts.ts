@@ -8,7 +8,6 @@ import type {
   RunRecord,
   RunsPageRecord,
   RunSummaryRecord,
-  SuiteMetricsRecord,
 } from '@qably/types';
 import type { ApiKeyIdentity } from '../api-keys/api-keys.contracts';
 import type { IngestRunInput } from './runs.schemas';
@@ -23,7 +22,6 @@ export type RunSummaryView = RunSummaryRecord;
 export type RunsPageView = RunsPageRecord;
 export type CiRunsPageView = CiRunsPageRecord;
 export type CiRunDetailView = CiRunDetailRecord;
-export type SuiteMetricsView = SuiteMetricsRecord;
 export type RegressionsView = RegressionsRecord;
 export type PushPassRateOhlcView = PushPassRateRecord;
 export type JunitIngestView = JunitIngestRecord;

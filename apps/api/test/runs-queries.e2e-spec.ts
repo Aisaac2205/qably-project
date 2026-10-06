@@ -357,33 +357,51 @@ describe('Runs queries (e2e)', () => {
       .expect(404);
   });
 
-  it('reports a null passRate for the last run of a suite when its cases are only pending or skipped', async () => {
-    prisma.suite.findMany.mockResolvedValue([
-      { id: 'suite-1', name: 'Checkout' },
-    ]);
-    prisma.$queryRaw.mockResolvedValueOnce([
-      {
-        id: 'run-1',
-        suiteId: 'suite-1',
-        status: 'pending',
-        source: 'manual',
-        startedAt: new Date('2026-01-01T00:00:00.000Z'),
-        finishedAt: null,
-      },
-    ]);
-    prisma.runCase.groupBy.mockResolvedValue([
-      { runId: 'run-1', status: 'pending', _count: { _all: 1 } },
-      { runId: 'run-1', status: 'skip', _count: { _all: 1 } },
-    ]);
+  describe('retired suite metrics route', () => {
+    const retiredSegment = 'suite-metrics';
 
-    const response = await request(app.getHttpServer())
-      .get('/runs/suite-metrics?projectId=project-1')
-      .expect(200);
+    it('falls into the run detail handler and answers 404 run not found', async () => {
+      prisma.run.findFirst.mockResolvedValue(null);
 
-    const body = response.body as {
-      items: { suiteId: string; lastRun: { passRate: number | null } | null }[];
-    };
-    expect(body.items).toHaveLength(1);
-    expect(body.items[0].lastRun?.passRate).toBeNull();
+      const response = await request(app.getHttpServer())
+        .get(`/runs/${retiredSegment}?projectId=project-1`)
+        .expect(404);
+
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          code: 'not-found',
+          message: 'Run not found',
+        }),
+      );
+      expect(prisma.run.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: retiredSegment, organizationId: 'org-1' },
+        }),
+      );
+    });
+
+    it('reads no suite, run window or case count for it', async () => {
+      prisma.run.findFirst.mockResolvedValue(null);
+
+      await request(app.getHttpServer())
+        .get(`/runs/${retiredSegment}?projectId=project-1`)
+        .expect(404);
+
+      expect(prisma.suite.findMany).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.runCase.groupBy).not.toHaveBeenCalled();
+    });
+
+    it('no longer validates the query, so a missing project still answers 404 run not found', async () => {
+      prisma.run.findFirst.mockResolvedValue(null);
+
+      const response = await request(app.getHttpServer())
+        .get(`/runs/${retiredSegment}`)
+        .expect(404);
+
+      expect(response.body).toEqual(
+        expect.objectContaining({ code: 'not-found' }),
+      );
+    });
   });
 });

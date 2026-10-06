@@ -26,20 +26,17 @@ import type {
   RunQueryError,
   RunsPageView,
   RunView,
-  SuiteMetricsView,
 } from './runs.contracts';
 import {
   createManualRunSchema,
   listRunsQuerySchema,
   pushPassRateQuerySchema,
   regressionsQuerySchema,
-  suiteMetricsQuerySchema,
   updateRunCaseStatusSchema,
   type CreateManualRunInput,
   type ListRunsQuery,
   type PushPassRateQuery,
   type RegressionsQuery,
-  type SuiteMetricsQuery,
   type UpdateRunCaseStatusInput,
 } from './runs.schemas';
 import { RunQueriesService } from './run-queries.service';
@@ -94,15 +91,6 @@ export class RunQueriesController {
     @Query(new ZodValidationPipe(listRunsQuerySchema)) query: ListRunsQuery,
   ): Promise<RunsPageView> {
     return this.runs.list(org, query);
-  }
-
-  @Get('suite-metrics')
-  suiteMetrics(
-    @CurrentOrg() org: OrgContext,
-    @Query(new ZodValidationPipe(suiteMetricsQuerySchema))
-    query: SuiteMetricsQuery,
-  ): Promise<SuiteMetricsView> {
-    return this.runs.suiteMetrics(org, query.projectId);
   }
 
   @Get('regressions')

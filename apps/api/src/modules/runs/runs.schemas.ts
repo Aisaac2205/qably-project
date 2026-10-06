@@ -92,12 +92,6 @@ export const ingestRunSchema = z
 export type IngestCaseInput = z.infer<typeof ingestCaseSchema>;
 export type IngestRunInput = z.infer<typeof ingestRunSchema>;
 
-export const suiteMetricsQuerySchema = z.object({
-  projectId: z.string().min(1),
-});
-
-export type SuiteMetricsQuery = z.infer<typeof suiteMetricsQuerySchema>;
-
 export const regressionsQuerySchema = z.object({
   projectId: z.string().min(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),

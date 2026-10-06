@@ -32,11 +32,6 @@ import {
   type RunListRow,
   type RunRow,
 } from './lib/run-view';
-import {
-  buildSuiteMetrics,
-  SUITE_METRICS_TREND_LIMIT,
-  type RankedRunRow,
-} from './lib/suite-metrics';
 import type {
   PushPassRateOhlcView,
   RegressionsView,
@@ -44,7 +39,6 @@ import type {
   RunsPageView,
   RunSummaryView,
   RunView,
-  SuiteMetricsView,
 } from './runs.contracts';
 import type {
   CreateManualRunInput,
@@ -202,77 +196,6 @@ export class RunQueriesService {
     return hasMore
       ? { items, nextCursor: runs[runs.length - 1].id }
       : { items };
-  }
-
-  /**
-   * Bounded per-suite metrics for the suites list: one query for the
-   * project's suite ids, one ranked query for at most
-   * SUITE_METRICS_TREND_LIMIT recent runs per suite, and one case-count
-   * query scoped to just the most-recent run of each suite. Never loads
-   * the project's full run history.
-   */
-  async suiteMetrics(
-    org: OrgContext,
-    projectId: string,
-  ): Promise<SuiteMetricsView> {
-    const suites = await this.prisma.suite.findMany({
-      where: { projectId, organizationId: org.organizationId },
-      select: { id: true, name: true },
-    });
-
-    if (suites.length === 0) return { items: [] };
-
-    const suiteIds = suites.map((suite) => suite.id);
-
-    const rankedRuns = await this.prisma.$queryRaw<RankedRunRow[]>(Prisma.sql`
-      SELECT id, "suiteId", status, source, "startedAt", "finishedAt"
-      FROM (
-        SELECT id, "suiteId", status, source, "startedAt", "finishedAt",
-          ROW_NUMBER() OVER (
-            PARTITION BY "suiteId" ORDER BY "startedAt" DESC, "id" DESC
-          ) AS rn
-        FROM "run"
-        WHERE "organizationId" = ${org.organizationId}
-          AND "suiteId" IN (${Prisma.join(suiteIds)})
-      ) ranked
-      WHERE rn <= ${SUITE_METRICS_TREND_LIMIT}
-      ORDER BY "suiteId" ASC, "startedAt" DESC, "id" DESC
-    `);
-
-    const lastRunIdBySuite = new Map<string, string>();
-    for (const row of rankedRuns) {
-      if (!lastRunIdBySuite.has(row.suiteId)) {
-        lastRunIdBySuite.set(row.suiteId, row.id);
-      }
-    }
-
-    const lastRunIds = [...lastRunIdBySuite.values()];
-    let groups: {
-      runId: string;
-      status: CaseStatus;
-      _count: { _all: number };
-    }[] = [];
-
-    if (lastRunIds.length > 0) {
-      const groupsResult = await this.prisma.runCase.groupBy({
-        by: ['runId', 'status'],
-        where: { runId: { in: lastRunIds } },
-        orderBy: { runId: 'asc' },
-        _count: { _all: true },
-      });
-      groups = groupsResult;
-    }
-
-    const countsByRun = buildCaseCountsByRun(groups);
-    const passRateByRunId = new Map<string, number | null>();
-    for (const runId of lastRunIds) {
-      passRateByRunId.set(
-        runId,
-        computePassRate(countsByRun.get(runId) ?? emptyCaseCounts()),
-      );
-    }
-
-    return { items: buildSuiteMetrics(suites, rankedRuns, passRateByRunId) };
   }
 
   /**
