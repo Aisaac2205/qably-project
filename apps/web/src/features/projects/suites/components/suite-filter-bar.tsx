@@ -72,9 +72,15 @@ export function SuiteFilterBar({
           maxLength={SUITE_SEARCH_MAX_LENGTH}
           placeholder={t('suites.searchPlaceholder')}
           value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={(e) => {
+            if ('isComposing' in e.nativeEvent) {
+              onSearchCompositionChange?.(e.nativeEvent.isComposing === true)
+            }
+            onSearchChange(e.target.value)
+          }}
           onCompositionStart={() => onSearchCompositionChange?.(true)}
           onCompositionEnd={() => onSearchCompositionChange?.(false)}
+          onBlur={() => onSearchCompositionChange?.(false)}
           className="h-11 pl-8 text-sm md:h-10"
           aria-label={t('suites.ariaSearchSuites')}
           data-testid="suite-search"

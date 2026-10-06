@@ -337,6 +337,18 @@ describe('useSuiteListFilters search debounce', () => {
       expect(result.current.tag).toBe('all')
     })
 
+    it('closes a composition that was still open, so the typing after the clear is applied', () => {
+      const { result } = renderRecording()
+      act(() => result.current.setSearchComposing(true))
+      act(() => result.current.setSearch('に'))
+
+      act(() => result.current.clearFilters())
+      act(() => result.current.setSearch('abc'))
+      act(() => vi.advanceTimersByTime(300))
+
+      expect(result.current.appliedSearch).toBe('abc')
+    })
+
     it('moves the focus to the search input', () => {
       const { result } = renderRecording()
       const input = document.createElement('input')

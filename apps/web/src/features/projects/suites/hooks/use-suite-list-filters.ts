@@ -47,6 +47,7 @@ export function useSuiteListFilters(): SuiteListFilters {
   function clearFilters() {
     setSearch('')
     setAppliedSearch('')
+    setSearchComposing(false)
     setStatus('all')
     setTag('all')
     searchRef.current?.focus()

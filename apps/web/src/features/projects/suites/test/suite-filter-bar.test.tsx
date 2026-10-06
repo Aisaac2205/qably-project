@@ -186,6 +186,69 @@ describe('SuiteFilterBar', () => {
       expect(onSearchCompositionChange).toHaveBeenCalledTimes(2)
     })
 
+    it('reads whether a composition is open from each input event that says so', async () => {
+      const onSearchCompositionChange = vi.fn()
+      await act(async () => {
+        render(
+          <SuiteFilterBar
+            {...baseProps}
+            search=""
+            onSearchChange={vi.fn()}
+            onSearchCompositionChange={onSearchCompositionChange}
+          />,
+        )
+      })
+      const input = screen.getByTestId('suite-search')
+
+      fireEvent.input(input, { target: { value: 'に' }, isComposing: true })
+      expect(onSearchCompositionChange).toHaveBeenLastCalledWith(true)
+
+      fireEvent.input(input, { target: { value: 'にほ' }, isComposing: false })
+      expect(onSearchCompositionChange).toHaveBeenLastCalledWith(false)
+      expect(onSearchCompositionChange).toHaveBeenCalledTimes(2)
+    })
+
+    it('leaves the composition alone when the event cannot say whether one is open', async () => {
+      const onSearchCompositionChange = vi.fn()
+      await act(async () => {
+        render(
+          <SuiteFilterBar
+            {...baseProps}
+            search=""
+            onSearchChange={vi.fn()}
+            onSearchCompositionChange={onSearchCompositionChange}
+          />,
+        )
+      })
+
+      fireEvent.change(screen.getByTestId('suite-search'), { target: { value: 'abc' } })
+
+      expect(onSearchCompositionChange).not.toHaveBeenCalled()
+    })
+
+    it('reports the end of the composition when the input loses the focus', async () => {
+      const onSearchCompositionChange = vi.fn()
+      await act(async () => {
+        render(
+          <SuiteFilterBar
+            {...baseProps}
+            search=""
+            onSearchChange={vi.fn()}
+            onSearchCompositionChange={onSearchCompositionChange}
+          />,
+        )
+      })
+      const input = screen.getByTestId('suite-search')
+      act(() => input.focus())
+      fireEvent.compositionStart(input)
+      expect(onSearchCompositionChange).toHaveBeenLastCalledWith(true)
+
+      act(() => input.blur())
+
+      expect(onSearchCompositionChange).toHaveBeenLastCalledWith(false)
+      expect(onSearchCompositionChange).toHaveBeenCalledTimes(2)
+    })
+
     it('takes a composition without a listener', async () => {
       await act(async () => {
         render(<SuiteFilterBar {...baseProps} search="" onSearchChange={vi.fn()} />)
@@ -194,7 +257,9 @@ describe('SuiteFilterBar', () => {
 
       expect(() => {
         fireEvent.compositionStart(input)
+        fireEvent.input(input, { target: { value: 'に' }, isComposing: true })
         fireEvent.compositionEnd(input)
+        fireEvent.blur(input)
       }).not.toThrow()
     })
 

@@ -66,6 +66,45 @@ describe('SuiteListToolbar search', () => {
     expect(screen.getByTestId('applied')).toHaveTextContent('にほん')
   })
 
+  it('applies the typing again after the input lost the focus in the middle of a composition', () => {
+    render(<Harness />)
+    const input = screen.getByTestId('suite-search')
+    act(() => input.focus())
+    fireEvent.compositionStart(input)
+    fireEvent.change(input, { target: { value: 'に' } })
+    act(() => vi.advanceTimersByTime(1000))
+    expect(screen.getByTestId('applied')).toBeEmptyDOMElement()
+
+    act(() => input.blur())
+    act(() => vi.advanceTimersByTime(300))
+
+    expect(screen.getByTestId('applied')).toHaveTextContent('に')
+  })
+
+  it('applies the text of an input event that says the composition is over, even without a compositionend', () => {
+    render(<Harness />)
+    const input = screen.getByTestId('suite-search')
+    fireEvent.compositionStart(input)
+    fireEvent.input(input, { target: { value: 'に' }, isComposing: true })
+    act(() => vi.advanceTimersByTime(1000))
+    expect(screen.getByTestId('applied')).toBeEmptyDOMElement()
+
+    fireEvent.input(input, { target: { value: 'にほん' }, isComposing: false })
+    act(() => vi.advanceTimersByTime(300))
+
+    expect(screen.getByTestId('applied')).toHaveTextContent('にほん')
+  })
+
+  it('holds back an input event that says a composition is open, even without a compositionstart', () => {
+    render(<Harness />)
+    const input = screen.getByTestId('suite-search')
+
+    fireEvent.input(input, { target: { value: 'に' }, isComposing: true })
+    act(() => vi.advanceTimersByTime(1000))
+
+    expect(screen.getByTestId('applied')).toBeEmptyDOMElement()
+  })
+
   it('applies plain typing after the debounce, with no composition involved', () => {
     render(<Harness />)
 
