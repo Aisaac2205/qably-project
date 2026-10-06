@@ -4,23 +4,22 @@ import { useCallback } from 'react'
 import {
   useInfiniteQuery,
   useQuery,
-  type InfiniteData,
   type PlaceholderDataFunction,
 } from '@tanstack/react-query'
-import type { SuiteSummariesPage, SuiteSummary } from '@qably/types'
+import type { SuiteSummary } from '@qably/types'
 import { listSuiteSummaries, listSuiteTags } from '../api/suites.api'
 import { suiteKeys } from '../../lib/query-keys'
+import type { SuiteSummariesData } from '../lib/suite-summaries-cache'
 import { toSuiteSummariesQuery, type SuiteSummariesFilters } from '../lib/suite-summaries-query'
 
 const SUITE_SUMMARIES_PAGE_SIZE = 50
 
-type SummariesData = InfiniteData<SuiteSummariesPage, string | undefined>
 type SummaryPageKey = ReturnType<typeof suiteKeys.summaryPage>
 
 const NO_SUITES: SuiteSummary[] = []
 const NO_TAGS: string[] = []
 
-function flattenSummaries(data: SummariesData): SuiteSummary[] {
+function flattenSummaries(data: SuiteSummariesData): SuiteSummary[] {
   const seen = new Set<string>()
   const rows: SuiteSummary[] = []
 
@@ -39,7 +38,7 @@ function flattenSummaries(data: SummariesData): SuiteSummary[] {
 export function useSuiteSummaries(projectId: string, filters: SuiteSummariesFilters) {
   const query = toSuiteSummariesQuery(filters)
   const keepPreviousOfProject = useCallback<
-    PlaceholderDataFunction<SummariesData, Error, SummariesData, SummaryPageKey>
+    PlaceholderDataFunction<SuiteSummariesData, Error, SuiteSummariesData, SummaryPageKey>
   >(
     (previousData, previousQuery) =>
       previousQuery?.queryKey[2] === projectId ? previousData : undefined,
