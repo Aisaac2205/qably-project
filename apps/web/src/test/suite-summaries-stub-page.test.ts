@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { SUITE_SUMMARY_SORTS, type Suite, type SuiteSummarySort } from '@qably/types'
+import {
+  SUITE_RUN_STATUSES,
+  SUITE_SUMMARY_SORTS,
+  type Suite,
+  type SuiteRunStatus,
+  type SuiteSummarySort,
+} from '@qably/types'
 import type { ListSuiteSummariesParams } from '@/features/projects/suites/api/suites.api'
 import { pageSuiteSummaries } from '@/test/suite-summaries-stub-page'
 import type { SuiteRunSource } from '@/test/suite-summaries-stub'
@@ -167,6 +173,55 @@ describe('pageSuiteSummaries', () => {
 
     it.each([1, 100])('accepts the limit %s', (limit) => {
       expect(pageOf(numbered(3), { limit }).items.length).toBeGreaterThan(0)
+    })
+
+    it.each([
+      ['an empty search', ''],
+      ['a search of only whitespace', '   '],
+      ['a search of 201 characters', 'a'.repeat(201)],
+    ])('rejects %s', (_label, search) => {
+      expect(() => pageOf(numbered(3), { search })).toThrow(/invalid suite summaries search/i)
+    })
+
+    it('trims the search before it measures it, like the API does', () => {
+      const padded = `  ${'a'.repeat(200)}  `
+
+      expect(() => pageOf(numbered(3), { search: padded })).not.toThrow()
+      expect(idsOf(pageOf(numbered(3), { search: '  suite  ' }).items)).toEqual([
+        's002',
+        's001',
+        's000',
+      ])
+    })
+
+    it.each([
+      ['an empty tag', ''],
+      ['a tag of 41 characters', 't'.repeat(41)],
+    ])('rejects %s', (_label, tag) => {
+      expect(() => pageOf(numbered(3), { tag })).toThrow(/invalid suite summaries tag/i)
+    })
+
+    it('accepts a tag of 40 characters and filters by it', () => {
+      const longTag = 't'.repeat(40)
+      const suites = [suite('tagged', { tags: [longTag] }), suite('plain')]
+
+      expect(idsOf(pageOf(suites, { tag: longTag }).items)).toEqual(['tagged'])
+    })
+
+    it.each(['all', 'done', ''])('rejects the status %j', (status) => {
+      expect(() => pageOf(numbered(3), { status: status as SuiteRunStatus })).toThrow(
+        /invalid suite summaries status/i,
+      )
+    })
+
+    it.each(SUITE_RUN_STATUSES)('accepts the status %s', (status) => {
+      expect(() => pageOf(numbered(3), { status })).not.toThrow()
+    })
+
+    it('rejects a sort the API does not know', () => {
+      expect(() => pageOf(numbered(3), { sort: 'oldest' as SuiteSummarySort })).toThrow(
+        /invalid suite summaries sort/i,
+      )
     })
   })
 })

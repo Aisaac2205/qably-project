@@ -1,10 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
-import {
-  SUITE_SUMMARIES_PAGE_SIZE,
-  useSuiteSummaries,
-} from '@/features/projects/suites/hooks/use-suite-summaries'
+import { useSuiteSummaries } from '@/features/projects/suites/hooks/use-suite-summaries'
 import { listSuiteSummaries } from '@/features/projects/suites/api/suites.api'
 import { createTestQueryClient } from '@/lib/query-test-utils'
 import {
@@ -37,7 +34,6 @@ describe('useSuiteSummaries', () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false))
 
-    expect(SUITE_SUMMARIES_PAGE_SIZE).toBe(50)
     expect(list).toHaveBeenCalledTimes(1)
     expect(list).toHaveBeenCalledWith(
       { projectId: 'proj-1', sort: 'recent', limit: 50 },

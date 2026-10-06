@@ -12,7 +12,7 @@ import { listSuiteSummaries, listSuiteTags } from '../api/suites.api'
 import { suiteKeys } from '../../lib/query-keys'
 import { toSuiteSummariesQuery, type SuiteSummariesFilters } from '../lib/suite-summaries-query'
 
-export const SUITE_SUMMARIES_PAGE_SIZE = 50
+const SUITE_SUMMARIES_PAGE_SIZE = 50
 
 type SummariesData = InfiniteData<SuiteSummariesPage, string | undefined>
 type SummaryPageKey = ReturnType<typeof suiteKeys.summaryPage>

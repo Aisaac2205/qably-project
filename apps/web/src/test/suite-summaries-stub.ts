@@ -18,7 +18,7 @@ export interface SuiteRunSource {
   startedAt: string
 }
 
-export type SuiteSummariesSelection = Pick<
+type SuiteSummariesSelection = Pick<
   ListSuiteSummariesParams,
   'projectId' | 'sort' | 'search' | 'status' | 'tag'
 >

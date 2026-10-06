@@ -3,6 +3,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { SuiteSummariesPage, SuiteSummary } from '@qably/types'
 import type { SuiteSummariesFilters } from '@/features/projects/suites/lib/suite-summaries-query'
 
+export { idsOf } from '@/test/suite-summaries-fixtures'
+
 export const NO_FILTERS: SuiteSummariesFilters = {
   sort: 'recent',
   search: '',
@@ -28,10 +30,6 @@ export function summary(id: string, overrides: Partial<SuiteSummary> = {}): Suit
 
 export function pageOf(ids: string[], nextCursor: string | null = null): SuiteSummariesPage {
   return { items: ids.map((id) => summary(id)), nextCursor }
-}
-
-export function idsOf(rows: { id: string }[]): string[] {
-  return rows.map((row) => row.id)
 }
 
 export function deferred<T>() {
