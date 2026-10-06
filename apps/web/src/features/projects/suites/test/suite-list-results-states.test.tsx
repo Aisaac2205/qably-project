@@ -43,7 +43,7 @@ describe('SuiteListResults states', () => {
     it('keeps the previous rows and marks the area busy until the answer lands', async () => {
       const pending = deferred<SuiteSummariesPage>()
       const { rerenderWith } = await renderResults()
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
       expect(screen.getByTestId('suite-list-results')).toHaveAttribute('aria-busy', 'false')
       listSummaries.mockReturnValueOnce(pending.promise)
 
@@ -96,7 +96,7 @@ describe('SuiteListResults states', () => {
 
       await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-      expect(await screen.findByRole('list', { name: 'Filter suites' })).toBeInTheDocument()
+      expect(await screen.findByRole('list', { name: 'Suites' })).toBeInTheDocument()
       expect(listSummaries).toHaveBeenCalledTimes(2)
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
@@ -120,7 +120,7 @@ describe('SuiteListResults states', () => {
 
       try {
         const { rerenderWith } = await renderResults()
-        await screen.findByRole('list', { name: 'Filter suites' })
+        await screen.findByRole('list', { name: 'Suites' })
         act(() => outside.focus())
         listSummaries.mockRejectedValueOnce(new Error('down'))
 
@@ -137,7 +137,7 @@ describe('SuiteListResults states', () => {
 
     it('takes the focus when nothing else holds it', async () => {
       const { rerenderWith } = await renderResults()
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
       expect(document.body).toHaveFocus()
       listSummaries.mockRejectedValueOnce(new Error('down'))
 
@@ -150,7 +150,7 @@ describe('SuiteListResults states', () => {
   describe('when a refresh in the background fails', () => {
     it('keeps the rows and shows no blocking error', async () => {
       const { client } = await renderResults()
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
       listSummaries.mockRejectedValueOnce(new Error('down'))
 
       await act(async () => {

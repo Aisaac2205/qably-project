@@ -45,7 +45,7 @@ function SuiteRows({ projectId, suites, listProps }: SuiteRowsProps) {
     <div className="rule-bleed border-y border-border">
       <EntityList
         {...listProps}
-        aria-label={t('suites.ariaFilterSuites')}
+        aria-label={t('suites.suitesLabel')}
         className="divide-y divide-border"
       >
         {suites.map((suite) => (

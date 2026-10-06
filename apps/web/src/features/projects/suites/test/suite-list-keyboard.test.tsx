@@ -84,9 +84,11 @@ describe('SuiteList keyboard', () => {
     expect(visited.size).toBeGreaterThanOrEqual(13)
   })
 
-  it('keeps its name on the list of suites', async () => {
+  it('names the list after the suites and keeps the search landmark under its own name', async () => {
     await renderList()
 
-    expect(await screen.findByRole('list', { name: 'Filter suites' })).toBeInTheDocument()
+    expect(await screen.findByRole('list', { name: 'Suites' })).toBeInTheDocument()
+    expect(screen.getByRole('search', { name: 'Filter suites' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Filter suites' })).not.toBeInTheDocument()
   })
 })

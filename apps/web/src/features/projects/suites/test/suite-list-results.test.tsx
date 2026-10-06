@@ -52,7 +52,7 @@ describe('SuiteListResults', () => {
     it('lists the suites of the page, most recent first, in a list that has a name', async () => {
       await renderResults()
 
-      const list = await screen.findByRole('list', { name: 'Filter suites' })
+      const list = await screen.findByRole('list', { name: 'Suites' })
       const rowIds = within(list)
         .getAllByTestId(/^suite-row-/)
         .map((row) => row.getAttribute('data-testid'))
@@ -70,7 +70,7 @@ describe('SuiteListResults', () => {
     it('links every row to its own suite', async () => {
       await renderResults()
 
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
 
       for (const id of ['suite-1', 'suite-2', 'suite-3', 'suite-4']) {
         expect(screen.getByTestId(`suite-row-${id}`).closest('a')).toHaveAttribute(
@@ -92,7 +92,7 @@ describe('SuiteListResults', () => {
     it('asks the server for the filters it was given, and for no cursor', async () => {
       await renderResults({ filters: { ...NO_FILTERS, sort: 'name', status: 'needs-attention' } })
 
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
 
       expect(listSummaries).toHaveBeenCalledTimes(1)
       expect(listSummaries.mock.calls[0][0]).toMatchObject({

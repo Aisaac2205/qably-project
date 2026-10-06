@@ -90,7 +90,7 @@ describe('SuiteListResults layout', () => {
 
     it('paints the hover surface on the link that draws the ring, so nothing inside the row covers it', async () => {
       await renderResults()
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
 
       const items = screen.getAllByRole('listitem')
 
@@ -107,7 +107,7 @@ describe('SuiteListResults layout', () => {
 
     it('draws the focus ring of the repo, inset, on the link of every row', async () => {
       await renderResults()
-      await screen.findByRole('list', { name: 'Filter suites' })
+      await screen.findByRole('list', { name: 'Suites' })
 
       const links = screen.getAllByRole('listitem').map((row) => row.querySelector('a'))
 

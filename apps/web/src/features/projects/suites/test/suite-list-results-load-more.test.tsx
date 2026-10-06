@@ -280,7 +280,7 @@ describe('SuiteListResults loading more', () => {
       await waitFor(() => {
         expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument()
       })
-      const list = screen.getByRole('list', { name: 'Filter suites' })
+      const list = screen.getByRole('list', { name: 'Suites' })
       await waitFor(() => expect(list).toHaveFocus())
       expect(list).toHaveAttribute('tabindex', '-1')
       expect(rowIds()).toEqual(['s0', 's1', 's2'])
