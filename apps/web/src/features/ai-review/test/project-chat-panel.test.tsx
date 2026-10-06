@@ -109,6 +109,17 @@ describe('ProjectChatPanel', () => {
     )
   })
 
+  it('reads the suites of the project with listSuites, the whole list the composer needs', async () => {
+    listThreads.mockResolvedValue([])
+
+    await act(async () => {
+      renderPanel()
+    })
+
+    await waitFor(() => expect(listSuitesMock).toHaveBeenCalledTimes(1))
+    expect(listSuitesMock.mock.calls[0][0]).toBe('proj-1')
+  })
+
   it('starts a new thread and shows the assistant reply after sending a message', async () => {
     listThreads.mockResolvedValue([])
     createThread.mockResolvedValue(thread)

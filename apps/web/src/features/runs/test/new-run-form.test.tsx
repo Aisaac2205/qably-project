@@ -62,6 +62,20 @@ describe('NewRunForm', () => {
     expect(screen.getByRole('button', { name: 'Start run' })).toBeInTheDocument()
   })
 
+  it('reads the suites of the project with listSuites, never from the paged summaries or the tag facet', async () => {
+    const suitesApi = await import('@/features/projects/suites/api/suites.api')
+    const listSuites = vi.spyOn(suitesApi, 'listSuites')
+    const listSummaries = vi.spyOn(suitesApi, 'listSuiteSummaries')
+    const listTags = vi.spyOn(suitesApi, 'listSuiteTags')
+
+    await openForm({ projectId: 'proj-unseeded' })
+
+    await waitFor(() => expect(listSuites).toHaveBeenCalledTimes(1))
+    expect(listSuites.mock.calls[0][0]).toBe('proj-unseeded')
+    expect(listSummaries).not.toHaveBeenCalled()
+    expect(listTags).not.toHaveBeenCalled()
+  })
+
   it('shows error when submitting without suite', async () => {
     const user = userEvent.setup()
     await openForm()
