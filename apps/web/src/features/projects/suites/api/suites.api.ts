@@ -4,6 +4,10 @@ import type {
   ConfirmDocumentationResult,
   DocumentFilesResult,
   Suite,
+  SuiteRunStatus,
+  SuiteSummariesPage,
+  SuiteSummarySort,
+  SuiteTagsFacet,
 } from '@qably/types'
 import { apiRequest } from '@/lib/api-client'
 
@@ -52,6 +56,46 @@ export function listSuites(
       : `?projectId=${encodeURIComponent(projectId)}`
 
   return apiRequest<Suite[]>(`/suites${query}`, { signal })
+}
+
+export interface ListSuiteSummariesParams {
+  projectId: string
+  sort: SuiteSummarySort
+  search?: string
+  status?: SuiteRunStatus
+  tag?: string
+  cursor?: string
+  limit?: number
+}
+
+export function listSuiteSummaries(
+  params: ListSuiteSummariesParams,
+  signal?: AbortSignal,
+): Promise<SuiteSummariesPage> {
+  const query = new URLSearchParams({
+    projectId: params.projectId,
+    sort: params.sort,
+  })
+  const search = params.search?.trim()
+
+  if (search) query.set('search', search)
+  if (params.status !== undefined) query.set('status', params.status)
+  if (params.tag) query.set('tag', params.tag)
+  if (params.cursor) query.set('cursor', params.cursor)
+  if (params.limit !== undefined) query.set('limit', String(params.limit))
+
+  return apiRequest<SuiteSummariesPage>(`/suites/summaries?${query.toString()}`, {
+    signal,
+  })
+}
+
+export function listSuiteTags(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<SuiteTagsFacet> {
+  const query = new URLSearchParams({ projectId })
+
+  return apiRequest<SuiteTagsFacet>(`/suites/tags?${query.toString()}`, { signal })
 }
 
 export function getSuite(id: string, signal?: AbortSignal): Promise<Suite> {

@@ -9,6 +9,8 @@ import {
   documentProject,
   documentSuite,
   getSuite,
+  listSuiteSummaries,
+  listSuiteTags,
   listSuites,
   updateCase,
   updateSuite,
@@ -21,6 +23,17 @@ function lastCall(): [string, RequestInit] {
     string,
     RequestInit,
   ]
+}
+
+function lastRequest(): { path: string; params: Record<string, string>; init: RequestInit } {
+  const [url, init] = lastCall()
+  const parsed = new URL(url)
+
+  return {
+    path: parsed.pathname,
+    params: Object.fromEntries(parsed.searchParams),
+    init,
+  }
 }
 
 describe('suites.api', () => {
@@ -156,5 +169,117 @@ describe('suites.api', () => {
     expect(init.method).toBe('POST')
     expect(init.body).toBe('{"mode":"undocumented"}')
     expect(JSON.parse(init.body as string)).toEqual({ mode: 'undocumented' })
+  })
+
+  describe('listSuiteSummaries', () => {
+    it('asks the summaries route for the project and sort alone when nothing else is set', async () => {
+      await listSuiteSummaries({ projectId: 'proj-1', sort: 'recent' })
+
+      const { path, params, init } = lastRequest()
+      expect(path).toBe('/suites/summaries')
+      expect(init.method).toBe('GET')
+      expect(params).toEqual({ projectId: 'proj-1', sort: 'recent' })
+    })
+
+    it('sends every filter, the cursor and the limit when they are set', async () => {
+      await listSuiteSummaries({
+        projectId: 'proj-1',
+        sort: 'pass-rate',
+        search: 'checkout',
+        status: 'needs-attention',
+        tag: 'api',
+        cursor: 'opaque-cursor',
+        limit: 50,
+      })
+
+      expect(lastRequest().params).toEqual({
+        projectId: 'proj-1',
+        sort: 'pass-rate',
+        search: 'checkout',
+        status: 'needs-attention',
+        tag: 'api',
+        cursor: 'opaque-cursor',
+        limit: '50',
+      })
+    })
+
+    it('trims the search before sending it', async () => {
+      await listSuiteSummaries({ projectId: 'proj-1', sort: 'recent', search: '  abc ' })
+
+      expect(lastRequest().params.search).toBe('abc')
+    })
+
+    it.each([
+      ['an empty search', { search: '' }],
+      ['a whitespace search', { search: '   ' }],
+      ['an empty tag', { tag: '' }],
+      ['an empty cursor', { cursor: '' }],
+    ])('leaves %s out of the query string', async (_label, extra) => {
+      await listSuiteSummaries({ projectId: 'proj-1', sort: 'name', ...extra })
+
+      expect(lastRequest().params).toEqual({ projectId: 'proj-1', sort: 'name' })
+    })
+
+    it('escapes values that would otherwise break the query string', async () => {
+      await listSuiteSummaries({
+        projectId: 'proj/1&x=2',
+        sort: 'recent',
+        search: '100% & more',
+        tag: 'a=b',
+      })
+
+      const { params } = lastRequest()
+      expect(params.projectId).toBe('proj/1&x=2')
+      expect(params.search).toBe('100% & more')
+      expect(params.tag).toBe('a=b')
+      expect(lastCall()[0]).toContain('projectId=proj%2F1%26x%3D2')
+    })
+
+    it('hands the abort signal to the request', async () => {
+      const controller = new AbortController()
+
+      await listSuiteSummaries({ projectId: 'proj-1', sort: 'recent' }, controller.signal)
+
+      expect(lastRequest().init.signal).toBe(controller.signal)
+    })
+
+    it('resolves with the page the server sent', async () => {
+      const page = { items: [], nextCursor: 'next-1' }
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(page) })
+
+      await expect(listSuiteSummaries({ projectId: 'proj-1', sort: 'recent' })).resolves.toEqual(page)
+    })
+  })
+
+  describe('listSuiteTags', () => {
+    it('asks the tags route for the tags of one project', async () => {
+      await listSuiteTags('proj-1')
+
+      const { path, params, init } = lastRequest()
+      expect(path).toBe('/suites/tags')
+      expect(init.method).toBe('GET')
+      expect(params).toEqual({ projectId: 'proj-1' })
+    })
+
+    it('escapes a project id that would otherwise break the query string', async () => {
+      await listSuiteTags('proj/1&x=2')
+
+      expect(lastCall()[0]).toContain('/suites/tags?projectId=proj%2F1%26x%3D2')
+    })
+
+    it('hands the abort signal to the request', async () => {
+      const controller = new AbortController()
+
+      await listSuiteTags('proj-1', controller.signal)
+
+      expect(lastRequest().init.signal).toBe(controller.signal)
+    })
+
+    it('resolves with the facet the server sent', async () => {
+      const facet = { items: ['C', 'a', 'b'] }
+      fetchMock.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(facet) })
+
+      await expect(listSuiteTags('proj-1')).resolves.toEqual(facet)
+    })
   })
 })
