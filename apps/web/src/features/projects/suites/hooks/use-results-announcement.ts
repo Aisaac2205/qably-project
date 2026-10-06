@@ -8,6 +8,7 @@ interface ResultsAnnouncementInput {
   rowCount: number
   pageCount: number
   isSettled: boolean
+  hasFailed: boolean
 }
 
 type Announcement = { kind: 'loadedMore' | 'shown'; count: number }
@@ -21,11 +22,13 @@ interface SettledResults {
 interface AnnouncementState {
   settled: SettledResults | null
   announcement: Announcement | null
+  failedLoad: boolean
 }
 
 const INITIAL_STATE: AnnouncementState = {
   settled: null,
   announcement: null,
+  failedLoad: false,
 }
 
 const MESSAGE_KEYS = {
@@ -35,20 +38,25 @@ const MESSAGE_KEYS = {
 
 function advance(
   state: AnnouncementState,
-  { resultsKey, rowCount, pageCount, isSettled }: ResultsAnnouncementInput,
+  { resultsKey, rowCount, pageCount, isSettled, hasFailed }: ResultsAnnouncementInput,
 ): AnnouncementState {
   if (!isSettled) {
-    return state.announcement === null ? state : { ...state, announcement: null }
+    const failedLoad = state.failedLoad || hasFailed
+
+    return failedLoad === state.failedLoad && state.announcement === null
+      ? state
+      : { ...state, failedLoad, announcement: null }
   }
 
   const current: SettledResults = { key: resultsKey, rowCount, pageCount }
+  const shown: Announcement = { kind: 'shown', count: rowCount }
 
   if (state.settled === null) {
-    return { settled: current, announcement: null }
+    return { settled: current, announcement: state.failedLoad ? shown : null, failedLoad: false }
   }
 
   if (state.settled.key !== resultsKey) {
-    return { settled: current, announcement: { kind: 'shown', count: rowCount } }
+    return { settled: current, announcement: shown, failedLoad: false }
   }
 
   if (pageCount > state.settled.pageCount) {
@@ -57,13 +65,16 @@ function advance(
     return {
       settled: current,
       announcement: added > 0 ? { kind: 'loadedMore', count: added } : null,
+      failedLoad: false,
     }
   }
 
   const unchanged =
     state.settled.rowCount === rowCount && state.settled.pageCount === pageCount
 
-  return unchanged ? state : { ...state, settled: current }
+  if (unchanged) return state.failedLoad ? { ...state, failedLoad: false } : state
+
+  return { ...state, settled: current, failedLoad: false }
 }
 
 export function useResultsAnnouncement(input: ResultsAnnouncementInput): string {

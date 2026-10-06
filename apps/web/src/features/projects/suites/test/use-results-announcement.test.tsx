@@ -8,6 +8,7 @@ interface Input {
   rowCount: number
   pageCount: number
   isSettled: boolean
+  hasFailed: boolean
 }
 
 const SETTLED: Input = {
@@ -15,6 +16,7 @@ const SETTLED: Input = {
   rowCount: 50,
   pageCount: 1,
   isSettled: true,
+  hasFailed: false,
 }
 
 function renderAnnouncement(initial: Input = SETTLED) {
@@ -47,6 +49,75 @@ describe('useResultsAnnouncement', () => {
       expect(result.current).toBe('')
 
       rerender(settledWith(loading, { rowCount: 50, pageCount: 1 }))
+
+      expect(result.current).toBe('')
+    })
+  })
+
+  describe('after a first load that failed', () => {
+    const FAILED: Input = {
+      resultsKey: 'recent',
+      rowCount: 0,
+      pageCount: 0,
+      isSettled: false,
+      hasFailed: true,
+    }
+    const RETRYING: Input = { ...FAILED, hasFailed: false }
+
+    it('announces the suites that a retry brings', () => {
+      const { result, rerender } = renderAnnouncement(FAILED)
+      rerender(RETRYING)
+
+      rerender(settledWith(RETRYING, { rowCount: 7, pageCount: 1 }))
+
+      expect(result.current).toBe('7 suites shown')
+    })
+
+    it('announces a retry that finds no suites', () => {
+      const { result, rerender } = renderAnnouncement(FAILED)
+      rerender(RETRYING)
+
+      rerender(settledWith(RETRYING, { rowCount: 0, pageCount: 1 }))
+
+      expect(result.current).toBe('0 suites shown')
+    })
+
+    it('announces the suites even when the retry answered before the pending state was seen', () => {
+      const { result, rerender } = renderAnnouncement(FAILED)
+
+      rerender(settledWith(FAILED, { rowCount: 1, pageCount: 1, hasFailed: false }))
+
+      expect(result.current).toBe('1 suite shown')
+    })
+
+    it('announces the suites after more than one failure', () => {
+      const { result, rerender } = renderAnnouncement(FAILED)
+      rerender(RETRYING)
+      rerender(FAILED)
+      rerender(RETRYING)
+
+      rerender(settledWith(RETRYING, { rowCount: 3, pageCount: 1 }))
+
+      expect(result.current).toBe('3 suites shown')
+    })
+
+    it('announces the recovery once, not again at every later settle of the same results', () => {
+      const { result, rerender } = renderAnnouncement(FAILED)
+      rerender(settledWith(FAILED, { rowCount: 3, pageCount: 1, hasFailed: false }))
+      expect(result.current).toBe('3 suites shown')
+
+      rerender({ ...RETRYING, rowCount: 3, pageCount: 1 })
+      expect(result.current).toBe('')
+
+      rerender(settledWith(RETRYING, { rowCount: 3, pageCount: 1 }))
+      expect(result.current).toBe('')
+    })
+
+    it('does not read the first load of a list that never failed', () => {
+      const loading: Input = { ...RETRYING }
+      const { result, rerender } = renderAnnouncement(loading)
+
+      rerender(settledWith(loading, { rowCount: 7, pageCount: 1 }))
 
       expect(result.current).toBe('')
     })

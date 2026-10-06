@@ -77,6 +77,7 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
     rowCount: suites.length,
     pageCount,
     isSettled: !isLoading && !isLoadingError && !isPlaceholderData && !isFetchingNextPage,
+    hasFailed: isLoadingError,
   })
 
   function renderContent() {
@@ -91,7 +92,10 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
               type="button"
               variant="outline"
               className={ACTION_FOCUS_RING}
-              onClick={() => void refetch()}
+              onClick={(event) => {
+                markActivation(event.currentTarget)
+                void refetch()
+              }}
             >
               {t('common.retry')}
             </Button>
@@ -130,38 +134,42 @@ export function SuiteListResults({ projectId, filters, onClearFilters }: SuiteLi
 
     if (hasSummariesFilter(filters)) {
       return (
-        <StateView
-          kind="empty"
-          title={t('suites.noSuitesMatch')}
-          action={
-            <Button
-              type="button"
-              variant="outline"
-              className={ACTION_FOCUS_RING}
-              onClick={onClearFilters}
-            >
-              {t('suites.clearFilters')}
-            </Button>
-          }
-        />
+        <div {...listProps}>
+          <StateView
+            kind="empty"
+            title={t('suites.noSuitesMatch')}
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                className={ACTION_FOCUS_RING}
+                onClick={onClearFilters}
+              >
+                {t('suites.clearFilters')}
+              </Button>
+            }
+          />
+        </div>
       )
     }
 
     return (
-      <StateView
-        kind="empty"
-        title={t('suites.noSuitesHeading')}
-        description={t('suites.createSuiteHint')}
-        action={
-          <Link
-            href={suiteNewPath(projectId)}
-            className={cn(buttonVariants(), ACTION_FOCUS_RING)}
-          >
-            <Plus size={14} weight="bold" aria-hidden="true" />
-            {t('suites.newSuite')}
-          </Link>
-        }
-      />
+      <div {...listProps}>
+        <StateView
+          kind="empty"
+          title={t('suites.noSuitesHeading')}
+          description={t('suites.createSuiteHint')}
+          action={
+            <Link
+              href={suiteNewPath(projectId)}
+              className={cn(buttonVariants(), ACTION_FOCUS_RING)}
+            >
+              <Plus size={14} weight="bold" aria-hidden="true" />
+              {t('suites.newSuite')}
+            </Link>
+          }
+        />
+      </div>
     )
   }
 
