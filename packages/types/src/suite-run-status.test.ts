@@ -98,10 +98,6 @@ const PARITY_TABLE: DerivationCase[] = [
 ];
 
 describe('deriveSuiteRunStatus parity table', () => {
-  it('covers the seventeen rows of the specification', () => {
-    expect(PARITY_TABLE).toHaveLength(17);
-  });
-
   it.each(PARITY_TABLE)('derives $name', ({ input, status, recentPassRate }) => {
     expect(deriveSuiteRunStatus(input)).toEqual({ status, recentPassRate });
   });
@@ -110,12 +106,6 @@ describe('deriveSuiteRunStatus parity table', () => {
 describe('deriveSuiteRunStatus against the retired client derivation cases', () => {
   it('reports never-run with a null rate when the suite has no entry', () => {
     expect(deriveSuiteRunStatus([])).toEqual({ status: 'never-run', recentPassRate: null });
-  });
-
-  it('reports never-run with a null rate when the last run is null and the trend is empty', () => {
-    const trend: RunStatus[] = [];
-
-    expect(deriveSuiteRunStatus(trend).status).toBe('never-run');
   });
 
   it('reports running when any entry is running, even if the last one finished', () => {

@@ -39,12 +39,20 @@ export type SuiteSortKey =
   | { sort: 'pass-rate'; recentPassRate: number | null; createdAt: string; id: string }
   | { sort: 'cases'; caseCount: number; createdAt: string; id: string };
 
-export type SuiteSortSource = Pick<SuiteSummary, 'id' | 'name' | 'createdAt' | 'caseCount'> &
-  Partial<Pick<SuiteSummary, 'recentPassRate'>>;
+export type SuiteSortSource = Pick<SuiteSummary, 'id' | 'name' | 'createdAt' | 'caseCount'>;
+export type SuiteRateSortSource = SuiteSortSource & Pick<SuiteSummary, 'recentPassRate'>;
 
 const NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base' });
 
-export function suiteSortKey(item: SuiteSortSource, sort: SuiteSummarySort): SuiteSortKey {
+export function suiteSortKey(
+  item: SuiteSortSource,
+  sort: Exclude<SuiteSummarySort, 'pass-rate'>,
+): SuiteSortKey;
+export function suiteSortKey(item: SuiteRateSortSource, sort: SuiteSummarySort): SuiteSortKey;
+export function suiteSortKey(
+  item: SuiteSortSource & Partial<Pick<SuiteSummary, 'recentPassRate'>>,
+  sort: SuiteSummarySort,
+): SuiteSortKey {
   switch (sort) {
     case 'recent':
       return { sort, createdAt: item.createdAt, id: item.id };

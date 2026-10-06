@@ -36,6 +36,14 @@ function orderedIds(items: readonly SuiteSummary[], sort: SuiteSummarySort): str
     .map((item) => item.id);
 }
 
+type Unresolved = Pick<SuiteSummary, 'id' | 'name' | 'createdAt' | 'caseCount'>;
+type Resolved = Unresolved & Pick<SuiteSummary, 'recentPassRate'>;
+type AcceptsArguments<Args extends unknown[]> = typeof suiteSortKey extends (
+  ...args: Args
+) => unknown
+  ? true
+  : false;
+
 const T1 = '2026-03-01T10:00:00.000Z';
 const T2 = '2026-03-02T10:00:00.000Z';
 const T3 = '2026-03-03T10:00:00.000Z';
@@ -49,6 +57,10 @@ describe('suite summary contract constants', () => {
     const expected: SuiteRunStatus[] = ['running', 'pass', 'fail', 'needs-attention', 'never-run'];
 
     expect([...SUITE_RUN_STATUSES].sort()).toEqual([...expected].sort());
+  });
+
+  it('covers every suite run status at the type level', () => {
+    expectTypeOf<(typeof SUITE_RUN_STATUSES)[number]>().toEqualTypeOf<SuiteRunStatus>();
   });
 
   it('keeps cases and the run content out of the summary type', () => {
@@ -107,15 +119,28 @@ describe('suiteSortKey', () => {
     });
   });
 
-  it('keys pass-rate with a null rate when the source has not been resolved yet', () => {
+  it('keys a source without the pass rate for the sorts that do not read it', () => {
     const unresolved = { id: 'suite-9', name: 'Payments', createdAt: T2, caseCount: 4 };
 
-    expect(suiteSortKey(unresolved, 'pass-rate')).toEqual({
-      sort: 'pass-rate',
-      recentPassRate: null,
+    expect(suiteSortKey(unresolved, 'cases')).toEqual({
+      sort: 'cases',
+      caseCount: 4,
       createdAt: T2,
       id: 'suite-9',
     });
+  });
+
+  it('accepts a source without the pass rate only for the sorts that do not read it', () => {
+    expectTypeOf<AcceptsArguments<[Unresolved, 'recent']>>().toEqualTypeOf<true>();
+    expectTypeOf<AcceptsArguments<[Unresolved, 'name']>>().toEqualTypeOf<true>();
+    expectTypeOf<AcceptsArguments<[Unresolved, 'cases']>>().toEqualTypeOf<true>();
+    expectTypeOf<AcceptsArguments<[Unresolved, 'pass-rate']>>().toEqualTypeOf<false>();
+  });
+
+  it('requires the pass rate when the sort is pass-rate or only known at run time', () => {
+    expectTypeOf<AcceptsArguments<[Resolved, 'pass-rate']>>().toEqualTypeOf<true>();
+    expectTypeOf<AcceptsArguments<[Resolved, SuiteSummarySort]>>().toEqualTypeOf<true>();
+    expectTypeOf<AcceptsArguments<[Unresolved, SuiteSummarySort]>>().toEqualTypeOf<false>();
   });
 });
 
@@ -241,6 +266,16 @@ describe('compareSuiteSortKeys pass-rate', () => {
     ];
 
     expect(orderedIds(items, 'pass-rate')).toEqual(['zero-rate', 'null-rate']);
+  });
+
+  it('breaks a full tie of equal non-null rates and creation times by id, highest first', () => {
+    const items = [
+      summary({ id: 'suite-a', recentPassRate: 80, createdAt: T1 }),
+      summary({ id: 'suite-c', recentPassRate: 80, createdAt: T1 }),
+      summary({ id: 'suite-b', recentPassRate: 80, createdAt: T1 }),
+    ];
+
+    expect(orderedIds(items, 'pass-rate')).toEqual(['suite-c', 'suite-b', 'suite-a']);
   });
 
   it('orders a group of null rates by creation time and then by id, both newest first', () => {
