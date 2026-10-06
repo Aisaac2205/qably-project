@@ -20,7 +20,7 @@ interface SuiteListProps {
   projectId: string
 }
 
-function applySort(items: SuiteMetrics[], sort: SortKey): SuiteMetrics[] {
+function applySort<T extends SuiteMetrics>(items: T[], sort: SortKey): T[] {
   const arr = [...items]
   switch (sort) {
     case 'name':
@@ -43,8 +43,8 @@ function applySort(items: SuiteMetrics[], sort: SortKey): SuiteMetrics[] {
   return arr
 }
 
-function applyFilters(
-  items: SuiteMetrics[],
+function applyFilters<T extends SuiteMetrics>(
+  items: T[],
   filters: {
     search: string
     status: SuiteRunStatus | 'all'
@@ -77,9 +77,14 @@ export function SuiteList({ projectId }: SuiteListProps) {
     return Array.from(set).sort()
   }, [perSuite])
 
+  const rows = useMemo(
+    () => perSuite.map((m) => ({ ...m, row: { ...m.suite, status: m.status } })),
+    [perSuite],
+  )
+
   const filtered = useMemo(
-    () => applyFilters(perSuite, { search, status, tag }),
-    [perSuite, search, status, tag],
+    () => applyFilters(rows, { search, status, tag }),
+    [rows, search, status, tag],
   )
 
   const sorted = useMemo(() => applySort(filtered, sort), [filtered, sort])
@@ -135,7 +140,7 @@ export function SuiteList({ projectId }: SuiteListProps) {
                   href={`/projects/${projectId}/suites/${m.suite.id}`}
                   className="block focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
                 >
-                  <SuiteRow suite={m.suite} metrics={m} />
+                  <SuiteRow suite={m.row} />
                 </Link>
               </li>
             ))}
