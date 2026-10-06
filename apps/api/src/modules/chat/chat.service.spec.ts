@@ -354,6 +354,11 @@ describe('ChatService', () => {
       content: 'What is missing in checkout?',
     });
 
+    expect(prisma.suite.findMany).toHaveBeenCalledWith({
+      where: { projectId: 'project-1' },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
     expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
       by: ['suiteId'],
       where: { suiteId: { in: ['suite-1', 'suite-2'] } },
