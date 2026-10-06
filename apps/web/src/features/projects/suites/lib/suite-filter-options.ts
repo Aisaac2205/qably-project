@@ -1,6 +1,6 @@
-import type { CaseStatus, SuiteRunStatus, TestCase } from '@qably/types'
+import type { CaseStatus, SuiteRunStatus, SuiteSummarySort, TestCase } from '@qably/types'
 
-export type SortKey = 'recent' | 'name' | 'pass-rate' | 'cases'
+export type SortKey = SuiteSummarySort
 export type StatusFilter = SuiteRunStatus | 'all'
 export type TagFilter = string
 

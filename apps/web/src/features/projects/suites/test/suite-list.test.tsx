@@ -1,13 +1,11 @@
-import { render, screen, act, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { SuiteList } from '@/features/projects/suites/components/suite-list'
-import { __resetStore } from '@/lib/mock-store'
-import { createTestQueryClient, renderWithQuery } from '@/lib/query-test-utils'
-import { useSuiteMetrics } from '@/features/projects/suites/hooks/use-suite-metrics'
-import { suiteKeys } from '@/features/projects/lib/query-keys'
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
+import { expectFocusRing } from '@/features/runs/test/focus-ring'
+import * as runsApiStub from '@/test/runs-api-stub'
 import * as suitesApiStub from '@/test/suites-api-stub'
+import { renderList } from './suite-list-harness'
+import { pagedBy, rowIds } from './suite-list-results-pages'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -15,180 +13,130 @@ vi.mock('@/features/projects/suites/api/suites.api', async () =>
 vi.mock('@/features/runs/api/runs.api', async () =>
   await import('@/test/runs-api-stub'),
 )
-vi.mock('@/features/projects/suites/hooks/use-suite-metrics', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@/features/projects/suites/hooks/use-suite-metrics')>()
-  return { ...actual, useSuiteMetrics: vi.fn(actual.useSuiteMetrics) }
-})
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [k: string]: unknown }) =>
     <a href={href} {...props}>{children}</a>,
 }))
 
-function SuiteListForTest() {
-  return <SuiteList projectId="proj-1" />
-}
-
 describe('SuiteList', () => {
+  let listSummaries: MockInstance<typeof suitesApiStub.listSuiteSummaries>
+  let listTags: MockInstance<typeof suitesApiStub.listSuiteTags>
+  let listSuites: MockInstance<typeof suitesApiStub.listSuites>
+  let getSuiteMetrics: MockInstance<typeof runsApiStub.getSuiteMetrics>
+
   beforeEach(() => {
-    __resetStore()
+    suitesApiStub.__resetSuitesStub()
+    listSummaries = vi.spyOn(suitesApiStub, 'listSuiteSummaries')
+    listTags = vi.spyOn(suitesApiStub, 'listSuiteTags')
+    listSuites = vi.spyOn(suitesApiStub, 'listSuites')
+    getSuiteMetrics = vi.spyOn(runsApiStub, 'getSuiteMetrics')
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('renders the filter bar and the 3 seeded suites', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    expect(screen.getByText('Authentication')).toBeInTheDocument()
-    expect(screen.getByText('Checkout')).toBeInTheDocument()
-    expect(screen.getByText('User Account')).toBeInTheDocument()
-  })
+  describe('when it opens', () => {
+    it('asks for one page of summaries and for the tags, and for nothing else', async () => {
+      await renderList()
 
-  it('shows "No suites yet" empty state for a project with no suites', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteList projectId="proj-empty" />)
-    })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
-    expect(screen.getByText('No suites yet')).toBeInTheDocument()
-  })
+      await screen.findByTestId('suite-row-suite-4')
 
-  it('shows "No matches" empty state when filter excludes everything', async () => {
-    const user = userEvent.setup()
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
+      expect(listSummaries).toHaveBeenCalledTimes(1)
+      const [request] = listSummaries.mock.calls[0]
+      expect(request).toMatchObject({ projectId: 'proj-1', sort: 'recent' })
+      expect(request.search).toBeUndefined()
+      expect(request.status).toBeUndefined()
+      expect(request.tag).toBeUndefined()
+      expect(request.cursor).toBeUndefined()
+      expect(request.limit).toBeGreaterThan(0)
+      expect(request.limit).toBeLessThanOrEqual(100)
+      expect(listTags).toHaveBeenCalledTimes(1)
+      expect(listTags.mock.calls[0][0]).toBe('proj-1')
+      expect(listSuites).not.toHaveBeenCalled()
+      expect(getSuiteMetrics).not.toHaveBeenCalled()
     })
-    const input = screen.getByTestId('suite-search')
-    await user.type(input, 'xyz-no-match')
-    expect(screen.getByText(/No suites match your filters/)).toBeInTheDocument()
-  })
 
-  it('shows "Clear filters" button when filter is active', async () => {
-    const user = userEvent.setup()
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    const input = screen.getByTestId('suite-search')
-    await user.type(input, 'xyz')
-    const clearBtn = screen.getByText('Clear filters')
-    expect(clearBtn).toBeInTheDocument()
-  })
+    it('shows the filter bar and the suites, most recent first, each linking to its page', async () => {
+      await renderList()
 
-  it('clears filters when "Clear filters" is clicked', async () => {
-    const user = userEvent.setup()
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    const input = screen.getByTestId('suite-search') as HTMLInputElement
-    await user.type(input, 'xyz')
-    expect(input.value).toBe('xyz')
-    const clearBtn = screen.getByText('Clear filters')
-    await user.click(clearBtn)
-    expect(input.value).toBe('')
-    // All 3 suites should be back
-    expect(screen.getByText('Authentication')).toBeInTheDocument()
-  })
+      await screen.findByTestId('suite-row-suite-4')
 
-  it('filters by search (case-insensitive)', async () => {
-    const user = userEvent.setup()
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    const input = screen.getByTestId('suite-search')
-    await user.type(input, 'CHECKOUT')
-    expect(screen.getByText('Checkout')).toBeInTheDocument()
-    expect(screen.queryByText('Authentication')).not.toBeInTheDocument()
-    expect(screen.queryByText('User Account')).not.toBeInTheDocument()
-  })
-
-  it('search matches description text too', async () => {
-    const user = userEvent.setup()
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    const input = screen.getByTestId('suite-search')
-    // "Cart, payment" is in the description of suite-2 (Checkout)
-    await user.type(input, 'cart')
-    expect(screen.getByText('Checkout')).toBeInTheDocument()
-  })
-
-  it('suite rows link to suite detail', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    const link = screen.getByText('Authentication').closest('a')
-    expect(link?.getAttribute('href')).toBe('/projects/proj-1/suites/suite-1')
-  })
-
-  it('the "New suite" button is a link to the create-suite page, not a modal trigger', async () => {
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    expect(screen.getByRole('link', { name: /new suite/i })).toHaveAttribute(
-      'href',
-      '/projects/proj-1/suites/new',
-    )
-  })
-
-  it('shows a loading state while suites are loading, not the empty state', async () => {
-    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
-      perSuite: [],
-      isLoading: true,
-      isError: false,
-    })
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    expect(screen.getByRole('status')).toBeInTheDocument()
-    expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
-  })
-
-  it('shows an error state when suite metrics fail to load', async () => {
-    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
-      perSuite: [],
-      isLoading: false,
-      isError: true,
-    })
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
-    })
-    expect(screen.getByRole('alert')).toBeInTheDocument()
-    expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
-  })
-
-  it('keeps the cached suites on screen, not the error view, when a background refetch fails', async () => {
-    vi.spyOn(suitesApiStub, 'listSuites').mockRejectedValue(new Error('network down'))
-    const client = createTestQueryClient()
-
-    await act(async () => {
-      render(
-        <QueryClientProvider client={client}>
-          <SuiteListForTest />
-        </QueryClientProvider>,
+      expect(screen.getByTestId('suite-search')).toBeInTheDocument()
+      expect(rowIds()).toEqual(['suite-4', 'suite-3', 'suite-2', 'suite-1'])
+      expect(screen.getByText('Authentication').closest('a')).toHaveAttribute(
+        'href',
+        '/projects/proj-1/suites/suite-1',
       )
     })
-    await waitFor(() => {
-      expect(client.getQueryState(suiteKeys.list('proj-1'))?.status).toBe('error')
+
+    it('offers a New suite link to the create-suite page, not a modal trigger', async () => {
+      await renderList()
+
+      await screen.findByTestId('suite-row-suite-4')
+
+      expect(screen.getByRole('link', { name: /new suite/i })).toHaveAttribute(
+        'href',
+        '/projects/proj-1/suites/new',
+      )
     })
 
-    expect(screen.getByText('Authentication')).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    it('draws the focus ring of the repo, inset, on every row link', async () => {
+      await renderList()
+      await screen.findByTestId('suite-row-suite-4')
+
+      const links = screen.getAllByRole('listitem').map((row) => row.querySelector('a'))
+
+      expect(links).toHaveLength(4)
+      for (const link of links) {
+        expect(link).not.toBeNull()
+        expectFocusRing(link as HTMLElement, { inset: true })
+      }
+    })
   })
 
-  it('shows the empty state only once loading has finished with zero suites', async () => {
-    vi.mocked(useSuiteMetrics).mockReturnValueOnce({
-      perSuite: [],
-      isLoading: false,
-      isError: false,
+  describe('with more suites than one page', () => {
+    it('shows one page of rows and offers to load more', async () => {
+      listSummaries.mockImplementation(pagedBy(120, 50))
+
+      await renderList()
+
+      await screen.findByTestId('suite-row-s49')
+      expect(rowIds()).toHaveLength(50)
+      expect(screen.queryByTestId('suite-row-s50')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument()
     })
-    await act(async () => {
-      renderWithQuery(<SuiteListForTest />)
+  })
+
+  describe('when there is nothing to list', () => {
+    it('says there are no suites yet, with the hint and a link to create the first one', async () => {
+      await renderList('proj-empty')
+
+      expect(await screen.findByText('No suites yet')).toBeInTheDocument()
+      expect(
+        screen.getByText('Create your first suite to start organizing test cases.'),
+      ).toBeInTheDocument()
+      const links = screen.getAllByRole('link', { name: /new suite/i })
+      expect(links).toHaveLength(2)
+      for (const link of links) {
+        expect(link).toHaveAttribute('href', '/projects/proj-empty/suites/new')
+      }
+      expect(screen.getByTestId('suite-search')).toBeInTheDocument()
     })
-    expect(screen.getByText('No suites yet')).toBeInTheDocument()
+
+    it('says no suite matches, with a way to clear the filters, when the search finds nothing', async () => {
+      const user = userEvent.setup()
+      await renderList()
+      await screen.findByTestId('suite-row-suite-4')
+
+      await user.type(screen.getByTestId('suite-search'), 'xyz-no-match')
+
+      expect(await screen.findByText('No suites match your filters')).toBeInTheDocument()
+      expectFocusRing(screen.getByRole('button', { name: 'Clear filters' }))
+      expect(screen.queryByText('No suites yet')).not.toBeInTheDocument()
+      await waitFor(() => expect(listSummaries).toHaveBeenCalledTimes(2))
+      expect(listSummaries.mock.calls[1][0]).toMatchObject({ search: 'xyz-no-match' })
+    })
   })
 })
