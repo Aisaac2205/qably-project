@@ -109,7 +109,7 @@ interface FakePrisma {
   };
   chatMessage: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
   suite: { findMany: jest.Mock; findFirst: jest.Mock };
-  testCase: { findMany: jest.Mock; findFirst: jest.Mock };
+  testCase: { findMany: jest.Mock; findFirst: jest.Mock; groupBy: jest.Mock };
   run: { findMany: jest.Mock };
   evidence: { create: jest.Mock };
   extractedProposal: {
@@ -158,9 +158,7 @@ function createPrisma(): FakePrisma {
     suite: {
       findMany: jest
         .fn()
-        .mockResolvedValue([
-          { id: 'suite-1', name: 'Checkout', _count: { cases: 4 } },
-        ]),
+        .mockResolvedValue([{ id: 'suite-1', name: 'Checkout' }]),
       findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     testCase: {
@@ -171,6 +169,9 @@ function createPrisma(): FakePrisma {
         automationFilePath: 'src/checkout.spec.ts',
         documentationSource: 'aeris',
       }),
+      groupBy: jest
+        .fn()
+        .mockResolvedValue([{ suiteId: 'suite-1', _count: { _all: 4 } }]),
     },
     run: {
       findMany: jest

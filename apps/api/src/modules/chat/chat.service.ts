@@ -13,6 +13,7 @@ import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { buildBlobUrl } from '../repository/source-reader';
+import { readSuiteCaseCounts } from '../suites/lib/suite-case-counts';
 import {
   buildGroundingManifest,
   groundingDeclarationSchema,
@@ -966,17 +967,32 @@ export class ChatService {
     return resolveLocale(row?.locale);
   }
 
+  private async readSuiteSummaries(
+    projectId: string,
+  ): Promise<ChatProjectContext['suites']> {
+    const suites = await this.prisma.suite.findMany({
+      where: { projectId },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    const caseCounts = await readSuiteCaseCounts(
+      this.prisma,
+      suites.map((suite) => suite.id),
+    );
+
+    return suites.map((suite) => ({
+      name: suite.name,
+      cases: caseCounts.get(suite.id) ?? 0,
+    }));
+  }
+
   private async buildContext(projectId: string): Promise<ChatProjectContext> {
     const [project, suites, cases, runs] = await Promise.all([
       this.prisma.project.findFirst({
         where: { id: projectId },
         select: { name: true },
       }),
-      this.prisma.suite.findMany({
-        where: { projectId },
-        select: { id: true, name: true, _count: { select: { cases: true } } },
-        orderBy: { name: 'asc' },
-      }),
+      this.readSuiteSummaries(projectId),
       this.prisma.testCase.findMany({
         where: { projectId, state: 'active' },
         select: { name: true },
@@ -993,10 +1009,7 @@ export class ChatService {
 
     return {
       projectName: project?.name ?? projectId,
-      suites: suites.map((suite) => ({
-        name: suite.name,
-        cases: suite._count.cases,
-      })),
+      suites,
       caseTitles: cases.map((testCase) => testCase.name),
       recentRuns: runs.map((run) => ({ name: run.name, status: run.status })),
     };

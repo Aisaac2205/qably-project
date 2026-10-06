@@ -76,7 +76,7 @@ interface FakePrisma {
   };
   chatMessage: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock };
   suite: { findMany: jest.Mock; findFirst: jest.Mock };
-  testCase: { findMany: jest.Mock; findFirst: jest.Mock };
+  testCase: { findMany: jest.Mock; findFirst: jest.Mock; groupBy: jest.Mock };
   run: { findMany: jest.Mock };
   evidence: { create: jest.Mock };
   extractedProposal: {
@@ -116,9 +116,7 @@ function createPrisma(): FakePrisma {
     suite: {
       findMany: jest
         .fn()
-        .mockResolvedValue([
-          { id: 'suite-1', name: 'Checkout', _count: { cases: 4 } },
-        ]),
+        .mockResolvedValue([{ id: 'suite-1', name: 'Checkout' }]),
       findFirst: jest.fn().mockResolvedValue({ id: 'suite-1' }),
     },
     testCase: {
@@ -148,6 +146,9 @@ function createPrisma(): FakePrisma {
         automationFilePath: 'src/checkout.spec.ts',
         documentationSource: 'aeris',
       }),
+      groupBy: jest
+        .fn()
+        .mockResolvedValue([{ suiteId: 'suite-1', _count: { _all: 4 } }]),
     },
     run: {
       findMany: jest
@@ -328,6 +329,67 @@ describe('ChatService', () => {
 
     expect(assistant.reply).toHaveBeenCalledWith(
       containing({ locale: DEFAULT_LOCALE }),
+    );
+  });
+
+  it('counts the cases of the project suites with one grouped query and reports empty suites as zero', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([
+      { id: 'suite-1', name: 'Checkout' },
+      { id: 'suite-2', name: 'Payments' },
+    ]);
+    prisma.testCase.groupBy.mockResolvedValue([
+      { suiteId: 'suite-1', _count: { _all: 4 } },
+    ]);
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [],
+      usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      grounding: { status: 'grounded', references: [] },
+    });
+    const service = build(prisma, assistant);
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    expect(prisma.testCase.groupBy).toHaveBeenCalledWith({
+      by: ['suiteId'],
+      where: { suiteId: { in: ['suite-1', 'suite-2'] } },
+      _count: { _all: true },
+    });
+    expect(assistant.reply).toHaveBeenCalledWith(
+      containing({
+        context: containing({
+          suites: [
+            { name: 'Checkout', cases: 4 },
+            { name: 'Payments', cases: 0 },
+          ],
+        }),
+      }),
+    );
+  });
+
+  it('skips the case count query when the project has no suites', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([]);
+    const assistant = createAssistant({
+      kind: 'replied',
+      reply: 'Here is a case worth adding.',
+      cases: [],
+      usage: { promptTokens: 10, candidatesTokens: 5, totalTokens: 15 },
+      grounding: { status: 'grounded', references: [] },
+    });
+    const service = build(prisma, assistant);
+
+    await service.sendMessage(org, user, 'project-1', 'thread-1', {
+      content: 'What is missing in checkout?',
+    });
+
+    expect(prisma.testCase.groupBy).not.toHaveBeenCalled();
+    expect(assistant.reply).toHaveBeenCalledWith(
+      containing({ context: containing({ suites: [] }) }),
     );
   });
 
