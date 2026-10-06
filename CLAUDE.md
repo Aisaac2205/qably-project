@@ -57,7 +57,7 @@ Each surface owns its own token file, and they are separate systems:
 - `apps/web/src/app/globals.css` — light theme, OKLCH.
 - `apps/landing/src/styles/global.css` — dark theme, hex and rgba.
 
-Token names collide across the two files with opposite values: `--primary` is near-black in `apps/web` and `#ffffff` in `apps/landing`. Never copy a token block, a colour value or a component's colour classes from one surface to the other. Confirm which file governs before editing colour.
+Token names collide across the two files with opposite values: `--primary` is near-black in `apps/web` and `#fafafa` in `apps/landing`. Never copy a token block, a colour value or a component's colour classes from one surface to the other. Confirm which file governs before editing colour.
 
 ## Typography
 
