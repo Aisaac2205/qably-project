@@ -180,79 +180,79 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
 
   return (
     <div className="w-full space-y-6 px-5 py-6 text-default sm:px-7 lg:px-9 lg:py-6 animate-page-enter">
-      <div className="flex min-w-0 items-center gap-1.5">
-        <BackButton onClick={goBack} />
-        <Breadcrumbs
-          className="hidden md:flex"
-          items={[
-            { label: t('suites.breadcrumbProjects'), href: '/projects' },
-            ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
-            { label: t('suites.breadcrumbSuites'), href: projectSuitesPath(projectId) },
-            { label: suite.name },
-          ]}
-        />
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <BackButton onClick={goBack} />
+          <Breadcrumbs
+            className="hidden md:flex"
+            items={[
+              { label: t('suites.breadcrumbProjects'), href: '/projects' },
+              ...(project ? [{ label: project.name, href: projectRootPath(projectId) }] : []),
+              { label: t('suites.breadcrumbSuites'), href: projectSuitesPath(projectId) },
+              { label: suite.name },
+            ]}
+          />
+        </div>
+
+        {/* Suite actions */}
+        <Menu>
+          <MenuTrigger
+            aria-label={t('suites.suiteActions')}
+            className="size-11 shrink-0 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary md:size-8"
+          >
+            <DotsThreeVertical size={16} weight="bold" aria-hidden="true" />
+          </MenuTrigger>
+          <MenuPortal>
+            <MenuPositioner align="end">
+              <MenuContent>
+                <MenuItem onClick={() => router.push(suiteEditPath(projectId, suite.id))}>
+                  <PencilSimple size={14} aria-hidden="true" />
+                  {t('suites.editSuite')}
+                </MenuItem>
+                <MenuItem
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
+                >
+                  <Trash size={14} aria-hidden="true" />
+                  {t('suites.deleteSuite')}
+                </MenuItem>
+              </MenuContent>
+            </MenuPositioner>
+          </MenuPortal>
+        </Menu>
       </div>
 
       {/* Hero */}
       <header className="rule-bleed space-y-4 border-b border-border pb-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-default text-wrap-balance">
-                {suite.name}
-              </h1>
-              {suite.isDefault && (
-                <span
-                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-warn bg-warn-bg border border-warn/20 rounded px-2 py-0.5"
-                  title={t('suites.defaultSuiteTooltip')}
-                >
-                  <Star size={12} weight="fill" aria-hidden="true" />
-                  {t('suites.defaultBadge')}
-                </span>
-              )}
-            </div>
-            {suite.description && (
-              <p className="text-sm text-muted max-w-[65ch] text-wrap-pretty">
-                {suite.description}
-              </p>
-            )}
-            {suite.tags.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                {suite.tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
+        <div className="space-y-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h1 className="min-w-0 text-2xl font-semibold tracking-tight text-default wrap-anywhere sm:text-3xl">
+              {suite.name}
+            </h1>
+            {suite.isDefault && (
+              <span
+                className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-warn bg-warn-bg border border-warn/20 rounded px-2 py-0.5"
+                title={t('suites.defaultSuiteTooltip')}
+              >
+                <Star size={12} weight="fill" aria-hidden="true" />
+                {t('suites.defaultBadge')}
+              </span>
             )}
           </div>
-
-          {/* Suite actions — pinned top-right regardless of how the title wraps */}
-          <Menu>
-            <MenuTrigger
-              aria-label={t('suites.suiteActions')}
-              className="size-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-border text-muted hover:text-default hover:bg-surface-hover transition-colors focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              <DotsThreeVertical size={16} weight="bold" aria-hidden="true" />
-            </MenuTrigger>
-            <MenuPortal>
-              <MenuPositioner align="end">
-                <MenuContent>
-                  <MenuItem onClick={() => router.push(suiteEditPath(projectId, suite.id))}>
-                    <PencilSimple size={14} aria-hidden="true" />
-                    {t('suites.editSuite')}
-                  </MenuItem>
-                  <MenuItem
-                    onClick={() => setDeleteOpen(true)}
-                    className="text-fail data-[highlighted]:bg-fail-bg data-[highlighted]:text-fail"
-                  >
-                    <Trash size={14} aria-hidden="true" />
-                    {t('suites.deleteSuite')}
-                  </MenuItem>
-                </MenuContent>
-              </MenuPositioner>
-            </MenuPortal>
-          </Menu>
+          {suite.description && (
+            <p className="text-sm text-muted max-w-[65ch] text-wrap-pretty">
+              {suite.description}
+            </p>
+          )}
+          {suite.tags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {suite.tags.map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
