@@ -12,12 +12,16 @@ import { AUTH_INSTANCE } from '../src/modules/auth/auth.instance';
 import { AuthModule } from '../src/modules/auth/auth.module';
 import { EncryptionService } from '../src/common/crypto/encryption.service';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { DomainEventsModule } from '../src/common/events/domain-events.module';
+import { DomainEvents } from '../src/common/events/domain-events.service';
 import { jsonWithRawBody } from '../src/common/http/raw-body';
 import { ConfigModule } from '../src/config/config.module';
 import { ENV } from '../src/config/config.tokens';
 import { IngestionModule } from '../src/modules/ingestion/ingestion.module';
 import { IngestionProcessor } from '../src/modules/ingestion/ingestion.processor';
 import { INGESTION_QUEUE } from '../src/modules/ingestion/ingestion.tokens';
+import { NotificationsModule } from '../src/modules/notifications/notifications.module';
+import { NOTIFICATIONS_QUEUE } from '../src/modules/notifications/notifications.contracts';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { stubQueues } from './support/stub-queues';
@@ -48,6 +52,11 @@ const pushPayload = {
   },
 };
 
+// The notifications subscriber runs on setImmediate, after the publisher returned.
+function settle(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
 function signed(body: string, signingSecret = secret): string {
   return `sha256=${createHmac('sha256', signingSecret).update(body).digest('hex')}`;
 }
@@ -58,7 +67,7 @@ describe('SCM webhook ingestion (e2e)', () => {
   const queue = { add: jest.fn() };
   const prisma = {
     connection: { findMany: jest.fn() },
-    scmEvent: { create: jest.fn(), findUnique: jest.fn() },
+    scmEvent: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
   };
 
   beforeEach(async () => {
@@ -66,6 +75,7 @@ describe('SCM webhook ingestion (e2e)', () => {
     read.mockResolvedValue(session);
     queue.add.mockResolvedValue({ id: 'job-1' });
     prisma.scmEvent.create.mockResolvedValue({ id: 'event-1' });
+    prisma.scmEvent.update.mockResolvedValue({});
     prisma.scmEvent.findUnique.mockResolvedValue({
       id: 'event-1',
       status: 'PROCESSED',
@@ -73,7 +83,13 @@ describe('SCM webhook ingestion (e2e)', () => {
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
-        imports: [ConfigModule, PrismaModule, AuthModule, IngestionModule],
+        imports: [
+          ConfigModule,
+          PrismaModule,
+          AuthModule,
+          NotificationsModule,
+          IngestionModule,
+        ],
       }),
     )
       .overrideProvider(PrismaService)
@@ -217,5 +233,69 @@ describe('SCM webhook ingestion (e2e)', () => {
       .expect(202);
 
     expect(prisma.scmEvent.create).not.toHaveBeenCalled();
+  });
+
+  describe('ingestion failure notification', () => {
+    function notificationsQueue(): { add: jest.Mock } {
+      return app.get(getQueueToken(NOTIFICATIONS_QUEUE));
+    }
+
+    function processor(): IngestionProcessor {
+      return new IngestionProcessor(prisma as never, app.get(DomainEvents), {
+        enqueueCodeChanges: jest.fn(),
+      } as never);
+    }
+
+    it('queues one ingestion_failed notification when processing an SCM event fails', async () => {
+      const failure = new Error('downstream unavailable');
+      prisma.scmEvent.findUnique
+        .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce({
+          organizationId: 'org-1',
+          repo: 'acme/shop',
+          connectionId: 'connection-1',
+        });
+
+      await expect(
+        processor().process({ data: { scmEventId: 'event-1' } } as never),
+      ).rejects.toBe(failure);
+      await settle();
+
+      const { add } = notificationsQueue();
+      expect(add).toHaveBeenCalledTimes(1);
+      expect(add).toHaveBeenCalledWith('ingestion_failed', {
+        eventType: 'ingestion_failed',
+        organizationId: 'org-1',
+        severity: 'high',
+        payload: { repo: 'acme/shop' },
+        dedupeKey: 'ingestion_failed:event-1',
+        connectionId: 'connection-1',
+      });
+    });
+
+    it('queues no notification when the SCM event is processed', async () => {
+      prisma.scmEvent.findUnique.mockResolvedValue({
+        id: 'event-1',
+        organizationId: 'org-1',
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        commitSha: 'a'.repeat(40),
+        changedFiles: [],
+        connection: { projects: [] },
+      });
+
+      await processor().process({ data: { scmEventId: 'event-1' } } as never);
+      await settle();
+
+      expect(notificationsQueue().add).not.toHaveBeenCalled();
+    });
+
+    it('imports the domain event bus, which the processor needs to publish failures', () => {
+      // The processor is replaced in this suite, so Nest never resolves its
+      // dependencies here; a missing import would only surface at boot.
+      expect(Reflect.getMetadata('imports', IngestionModule)).toContain(
+        DomainEventsModule,
+      );
+    });
   });
 });

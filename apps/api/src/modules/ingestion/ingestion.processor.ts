@@ -5,8 +5,9 @@ import {
   matchDeclaredTestPattern,
   type RepoConnectionProvider,
 } from '@qably/types';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import { DomainEvents } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { ExtractionService } from '../review/extraction.service';
 import type { ScmEventJob } from './ingestion.contracts';
 import { INGESTION_QUEUE } from './ingestion.tokens';
@@ -37,7 +38,7 @@ export class IngestionProcessor extends WorkerHost {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsPublisher,
+    private readonly events: DomainEvents,
     private readonly extraction: ExtractionService,
   ) {
     super();
@@ -66,22 +67,33 @@ export class IngestionProcessor extends WorkerHost {
     }
   }
 
+  /**
+   * Announces the failure to whoever cares. It runs inside the catch block, so
+   * it must never throw: a failing lookup here would replace the processing
+   * error that BullMQ has to see and retry on.
+   */
   private async publishFailure(scmEventId: string): Promise<void> {
-    const event = await this.prisma.scmEvent.findUnique({
-      where: { id: scmEventId },
-      select: { organizationId: true, repo: true, connectionId: true },
-    });
+    try {
+      const event = await this.prisma.scmEvent.findUnique({
+        where: { id: scmEventId },
+        select: { organizationId: true, repo: true, connectionId: true },
+      });
 
-    if (event === null) return;
+      if (event === null) return;
 
-    await this.notifications.publish({
-      eventType: 'ingestion_failed',
-      organizationId: event.organizationId,
-      severity: 'high',
-      payload: { repo: event.repo },
-      dedupeKey: `ingestion_failed:${scmEventId}`,
-      connectionId: event.connectionId,
-    });
+      this.events.publish(DOMAIN_EVENTS.scmEventFailed, {
+        scmEventId,
+        organizationId: event.organizationId,
+        repo: event.repo,
+        connectionId: event.connectionId,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Failed to announce the failure of SCM event ${scmEventId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
   }
 
   private async pendingEvent(scmEventId: string): Promise<PendingEvent | null> {

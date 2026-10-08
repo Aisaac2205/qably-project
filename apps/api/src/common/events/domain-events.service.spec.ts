@@ -4,6 +4,7 @@ import {
   DOMAIN_EVENTS,
   type ProposalApprovedEvent,
   type ProposalRejectedEvent,
+  type ScmEventFailedEvent,
 } from './domain-events';
 import { DomainEvents } from './domain-events.service';
 
@@ -25,6 +26,13 @@ const rejected: ProposalRejectedEvent = {
   suiteId: null,
   decisionId: 'decision-1',
   actorId: 'user-1',
+};
+
+const scmEventFailed: ScmEventFailedEvent = {
+  scmEventId: 'scm-event-1',
+  organizationId: 'org-1',
+  repo: 'acme/shop',
+  connectionId: 'connection-1',
 };
 
 function build(emit: jest.Mock = jest.fn()): {
@@ -53,6 +61,15 @@ describe('DomainEvents.publish', () => {
     events.publish(DOMAIN_EVENTS.proposalRejected, rejected);
 
     expect(emit).toHaveBeenCalledWith('proposal.rejected', rejected);
+  });
+
+  it('emits the ingestion failure under the scm_event.failed name', () => {
+    const { events, emit } = build();
+
+    events.publish(DOMAIN_EVENTS.scmEventFailed, scmEventFailed);
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith('scm_event.failed', scmEventFailed);
   });
 
   it('delivers the payload to a listener registered on the real emitter', () => {

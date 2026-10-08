@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
 import { IngestionProcessor } from './ingestion.processor';
 
 interface FakePrisma {
@@ -56,8 +58,8 @@ function job(scmEventId: string) {
   return { data: { scmEventId } } as never;
 }
 
-function createNotifications() {
-  return { publish: jest.fn().mockResolvedValue(undefined) };
+function createEvents() {
+  return { publish: jest.fn() };
 }
 
 function createExtraction() {
@@ -70,7 +72,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
@@ -93,7 +95,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
@@ -108,7 +110,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
@@ -135,7 +137,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
@@ -154,7 +156,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
@@ -173,7 +175,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
@@ -182,14 +184,13 @@ describe('IngestionProcessor', () => {
 
   it('marks the event failed and rethrows when processing breaks', async () => {
     const prisma = createPrisma();
-    const notifications = createNotifications();
     const failure = new Error('downstream unavailable');
     prisma.ingestionBatch.create.mockRejectedValueOnce(failure);
 
     await expect(
       new IngestionProcessor(
         prisma as never,
-        notifications as never,
+        createEvents() as never,
         createExtraction() as never,
       ).process(job('event-2')),
     ).rejects.toThrow(failure);
@@ -200,46 +201,116 @@ describe('IngestionProcessor', () => {
     });
   });
 
-  it('publishes ingestion_failed with the event organization and repo once marked FAILED', async () => {
+  it('publishes scm_event.failed exactly once, with the ids and repo of the failed event', async () => {
     const prisma = createPrisma({
       ...defaultEvent,
       organizationId: 'org-1',
       connectionId: 'connection-1',
     });
-    const notifications = createNotifications();
+    const events = createEvents();
     const failure = new Error('downstream unavailable');
     prisma.ingestionBatch.create.mockRejectedValueOnce(failure);
 
     await expect(
       new IngestionProcessor(
         prisma as never,
-        notifications as never,
+        events as never,
         createExtraction() as never,
       ).process(job('event-2')),
     ).rejects.toThrow(failure);
 
-    expect(notifications.publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventType: 'ingestion_failed',
-        organizationId: 'org-1',
-        connectionId: 'connection-1',
-        dedupeKey: 'ingestion_failed:event-2',
-        payload: { repo: 'acme/shop' },
-      }),
-    );
+    expect(events.publish).toHaveBeenCalledTimes(1);
+    expect(events.publish).toHaveBeenCalledWith(DOMAIN_EVENTS.scmEventFailed, {
+      scmEventId: 'event-2',
+      organizationId: 'org-1',
+      repo: 'acme/shop',
+      connectionId: 'connection-1',
+    });
   });
 
-  it('does not publish a failure notification on the success path', async () => {
+  it('publishes the failure only after the event has been written as FAILED', async () => {
+    const prisma = createPrisma({
+      ...defaultEvent,
+      connectionId: 'connection-1',
+    });
+    const events = createEvents();
+    prisma.ingestionBatch.create.mockRejectedValueOnce(new Error('boom'));
+
+    await expect(
+      new IngestionProcessor(
+        prisma as never,
+        events as never,
+        createExtraction() as never,
+      ).process(job('event-2')),
+    ).rejects.toThrow('boom');
+
+    const failedWrite = prisma.scmEvent.update.mock.invocationCallOrder.at(-1);
+    const publish = events.publish.mock.invocationCallOrder[0];
+    expect(failedWrite).toBeDefined();
+    expect(publish).toBeGreaterThan(failedWrite as number);
+  });
+
+  it('publishes nothing when the event row is gone by the time the failure is reported', async () => {
     const prisma = createPrisma();
-    const notifications = createNotifications();
+    const events = createEvents();
+    const failure = new Error('downstream unavailable');
+    prisma.scmEvent.findUnique
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      new IngestionProcessor(
+        prisma as never,
+        events as never,
+        createExtraction() as never,
+      ).process(job('event-2')),
+    ).rejects.toBe(failure);
+
+    expect(events.publish).not.toHaveBeenCalled();
+  });
+
+  it('rethrows the original error when the lookup inside the failure path throws', async () => {
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const prisma = createPrisma();
+    const events = createEvents();
+    const failure = new Error('downstream unavailable');
+    prisma.scmEvent.findUnique
+      .mockRejectedValueOnce(failure)
+      .mockRejectedValueOnce(new Error('connection reset'));
+
+    await expect(
+      new IngestionProcessor(
+        prisma as never,
+        events as never,
+        createExtraction() as never,
+      ).process(job('event-2')),
+    ).rejects.toBe(failure);
+
+    expect(prisma.scmEvent.update).toHaveBeenLastCalledWith({
+      where: { id: 'event-2' },
+      data: { status: 'FAILED' },
+    });
+    expect(events.publish).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(1);
+    const [message] = warn.mock.calls[0] as [string];
+    expect(message).toContain('event-2');
+    expect(message).toContain('connection reset');
+    warn.mockRestore();
+  });
+
+  it('does not publish a failure event on the success path', async () => {
+    const prisma = createPrisma();
+    const events = createEvents();
 
     await new IngestionProcessor(
       prisma as never,
-      notifications as never,
+      events as never,
       createExtraction() as never,
     ).process(job('event-1'));
 
-    expect(notifications.publish).not.toHaveBeenCalled();
+    expect(events.publish).not.toHaveBeenCalled();
   });
 
   it('seeds review proposals from the code changes it just recorded', async () => {
@@ -265,7 +336,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       extraction as never,
     ).process(job('event-1'));
 
@@ -282,7 +353,7 @@ describe('IngestionProcessor', () => {
 
     await new IngestionProcessor(
       prisma as never,
-      createNotifications() as never,
+      createEvents() as never,
       extraction as never,
     ).process(job('event-1'));
 

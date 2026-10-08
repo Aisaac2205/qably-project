@@ -6,6 +6,7 @@
 export const DOMAIN_EVENTS = {
   proposalApproved: 'proposal.approved',
   proposalRejected: 'proposal.rejected',
+  scmEventFailed: 'scm_event.failed',
 } as const;
 
 export interface ProposalApprovedEvent {
@@ -29,7 +30,15 @@ export interface ProposalRejectedEvent {
   readonly actorId: string;
 }
 
+export interface ScmEventFailedEvent {
+  readonly scmEventId: string;
+  readonly organizationId: string;
+  readonly repo: string;
+  readonly connectionId: string;
+}
+
 export interface DomainEventMap {
   [DOMAIN_EVENTS.proposalApproved]: ProposalApprovedEvent;
   [DOMAIN_EVENTS.proposalRejected]: ProposalRejectedEvent;
+  [DOMAIN_EVENTS.scmEventFailed]: ScmEventFailedEvent;
 }

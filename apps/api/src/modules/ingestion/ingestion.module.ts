@@ -4,8 +4,8 @@ import { ConfigModule } from '../../config/config.module';
 import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { DomainEventsModule } from '../../common/events/domain-events.module';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { ReviewModule } from '../review/review.module';
 import { BitbucketAdapter } from './adapters/bitbucket.adapter';
 import { GithubAdapter } from './adapters/github.adapter';
@@ -22,7 +22,7 @@ import {
   imports: [
     PrismaModule,
     ConfigModule,
-    NotificationsModule,
+    DomainEventsModule,
     ReviewModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
