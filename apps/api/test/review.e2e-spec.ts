@@ -1,3 +1,4 @@
+import { getQueueToken } from '@nestjs/bullmq';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -14,6 +15,10 @@ import { ENV } from '../src/config/config.tokens';
 import { OrganizationsModule } from '../src/modules/organizations/organizations.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import {
+  PROPOSAL_CLASSIFICATION_QUEUE,
+  RECLASSIFY_SUITE_JOB,
+} from '../src/modules/proposal-classification/proposal-classification.contracts';
 import { ReviewModule } from '../src/modules/review/review.module';
 import {
   testCaseAutomationKeyViolation,
@@ -119,6 +124,11 @@ function findOfficialCase(
   return row === undefined
     ? null
     : { id: row.id, name: row.name, suiteId: row.suiteId };
+}
+
+// The reclassify subscriber runs on setImmediate, after the response is built.
+function settle(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
 }
 
 describe('Review (e2e)', () => {
@@ -547,5 +557,49 @@ describe('Review (e2e)', () => {
 
     expect(prisma.testCase.create).not.toHaveBeenCalled();
     expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
+  });
+
+  describe('reclassify subscriber', () => {
+    function classificationQueue(): { add: jest.Mock } {
+      return app.get(getQueueToken(PROPOSAL_CLASSIFICATION_QUEUE));
+    }
+
+    it('queues one reclassify job for the suite once an approval is committed', async () => {
+      await request(app.getHttpServer())
+        .post('/review/proposals/proposal-1/approve')
+        .send({})
+        .expect(201);
+      await settle();
+
+      const { add } = classificationQueue();
+      expect(add).toHaveBeenCalledTimes(1);
+      expect(add).toHaveBeenCalledWith(
+        RECLASSIFY_SUITE_JOB,
+        { suiteId: 'suite-1' },
+        expect.anything(),
+      );
+    });
+
+    it('queues nothing when the approval collides on the case title', async () => {
+      prisma.testCase.create.mockRejectedValue(testCaseNameViolation());
+
+      await request(app.getHttpServer())
+        .post('/review/proposals/proposal-1/approve')
+        .send({})
+        .expect(409);
+      await settle();
+
+      expect(classificationQueue().add).not.toHaveBeenCalled();
+    });
+
+    it('queues nothing when a proposal is rejected', async () => {
+      await request(app.getHttpServer())
+        .post('/review/proposals/proposal-1/reject')
+        .send({})
+        .expect(201);
+      await settle();
+
+      expect(classificationQueue().add).not.toHaveBeenCalled();
+    });
   });
 });

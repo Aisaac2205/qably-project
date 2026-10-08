@@ -5,6 +5,7 @@ import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { PROPOSAL_CLASSIFICATION_QUEUE } from './proposal-classification.contracts';
 import { ProposalReclassifier } from './proposal-reclassifier';
+import { ReclassifyOnProposalApproved } from './reclassify-on-proposal-approved.subscriber';
 import { ReclassifySuiteProcessor } from './reclassify-suite.processor';
 
 @Module({
@@ -25,7 +26,11 @@ import { ReclassifySuiteProcessor } from './reclassify-suite.processor';
       },
     }),
   ],
-  providers: [ProposalReclassifier, ReclassifySuiteProcessor],
+  providers: [
+    ProposalReclassifier,
+    ReclassifySuiteProcessor,
+    ReclassifyOnProposalApproved,
+  ],
   exports: [ProposalReclassifier],
 })
 export class ProposalClassificationModule {}

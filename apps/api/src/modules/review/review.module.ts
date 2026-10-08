@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { DomainEventsModule } from '../../common/events/domain-events.module';
 import { ConfigModule } from '../../config/config.module';
 import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
@@ -25,6 +26,8 @@ import { ReviewDecisionService } from './review-decision.service';
     OrganizationsModule,
     ConfigModule,
     AiModule,
+    DomainEventsModule,
+    // Stays: it provides ProposalReclassifier and registers the proposal.approved subscriber.
     ProposalClassificationModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
