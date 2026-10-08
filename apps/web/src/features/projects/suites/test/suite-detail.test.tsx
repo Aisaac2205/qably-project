@@ -9,6 +9,7 @@ import { __resetStore } from '@/lib/mock-store'
 import { createMockSuite, createMockTestCase } from '@/lib/test-utils'
 import { suiteKeys } from '@/features/projects/lib/query-keys'
 import { notify } from '@/lib/notify'
+import { ApiError } from '@/lib/api-client'
 
 import { renderWithQuery } from '@/lib/query-test-utils'
 
@@ -52,6 +53,7 @@ describe('SuiteDetail (redesigned)', () => {
     mockBack.mockClear()
     vi.mocked(notify.success).mockClear()
     vi.mocked(notify.info).mockClear()
+    vi.mocked(notify.error).mockClear()
   })
 
   afterEach(() => {
@@ -590,6 +592,44 @@ describe('SuiteDetail (redesigned)', () => {
     })
     expect(screen.getByRole('heading', { level: 1, name: 'Authentication' })).toBeInTheDocument()
     expect(screen.queryByText('Loading suites…')).not.toBeInTheDocument()
+  })
+
+  it('stays on the suite and says why when the delete is refused for its run history', async () => {
+    const user = userEvent.setup()
+    const deleteSuiteSpy = vi
+      .spyOn(suitesApiStub, 'deleteSuite')
+      .mockRejectedValue(new ApiError(409, 'refused', 'has-history'))
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    await user.click(screen.getByRole('button', { name: /suite actions/i }))
+    await user.click(await screen.findByText('Delete suite'))
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }))
+
+    await vi.waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith("This suite has run history, so it can't be deleted.")
+    })
+    expect(deleteSuiteSpy).toHaveBeenCalledWith('suite-1')
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { level: 1, name: 'Authentication' })).toBeInTheDocument()
+  })
+
+  it('stays on the suite without a notification when the delete fails for any other reason', async () => {
+    const user = userEvent.setup()
+    const deleteSuiteSpy = vi
+      .spyOn(suitesApiStub, 'deleteSuite')
+      .mockRejectedValue(new ApiError(500, 'boom'))
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    await user.click(screen.getByRole('button', { name: /suite actions/i }))
+    await user.click(await screen.findByText('Delete suite'))
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }))
+
+    await vi.waitFor(() => {
+      expect(deleteSuiteSpy).toHaveBeenCalledWith('suite-1')
+    })
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+    expect(notify.error).not.toHaveBeenCalled()
+    expect(mockPush).not.toHaveBeenCalled()
   })
 
   it('navigates to the suite edit page instead of opening a modal', async () => {

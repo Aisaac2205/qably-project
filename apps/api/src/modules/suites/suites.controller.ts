@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { isErr, type Result } from '../../common/result';
+import { err, isErr, type Result } from '../../common/result';
 import { AiEntitlementGuard } from '../ai/guards/ai-entitlement.guard';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -36,6 +36,7 @@ import {
 import type {
   ConfirmDocumentationResult,
   SuiteError,
+  SuiteRemoveError,
   SuiteView,
 } from './suites.contracts';
 import {
@@ -68,6 +69,19 @@ function unwrap<T>(result: Result<T, SuiteError>): T {
     case 'forbidden':
       throw new ForbiddenException('Your role cannot perform this action');
   }
+}
+
+function unwrapRemove(result: Result<void, SuiteRemoveError>): void {
+  if (!isErr(result)) return;
+
+  if (result.error === 'has-history') {
+    throw new ConflictException({
+      code: result.error,
+      message: 'This suite has run history and cannot be deleted',
+    });
+  }
+
+  unwrap(err(result.error));
 }
 
 function unwrapDocumentCase<T>(result: Result<T, DocumentCaseError>): T {
@@ -163,7 +177,7 @@ export class SuitesController {
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
   ): Promise<void> {
-    unwrap(await this.suites.remove(org, id));
+    unwrapRemove(await this.suites.remove(org, id));
   }
 
   @Post(':id/cases')

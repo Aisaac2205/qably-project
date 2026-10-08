@@ -218,9 +218,15 @@ refetch would cost one request per mutation for a page nobody is looking at, and
 stale whatever its age, so the next visit to the run refetches it. Run details live under their own key
 prefix (`['runs', 'detail', id]`) so this never touches the run list pages or the paged suite list (`SUITE_LIST_PAGINATION.md`).
 
-Deleting a suite is the one library mutation that also changes the run lists. `Run.suite` is
-`onDelete: Cascade`, so the runs of the suite are deleted with it, and a Manual tab cached before the
-deletion would keep listing them until the 60 second stale time ran out. `useDeleteSuite` therefore also
+A suite that has runs cannot be deleted. `DELETE /suites/:id` answers 409 with the code `has-history` and
+deletes nothing: `SuitesService.remove` checks the role and the organization scope, then looks for one run
+of the suite. Without the check, `Run.suite` being `onDelete: Cascade` would erase the suite together with
+its runs and run cases. The web client reports the refusal with the `suites.deleteSuiteHasHistory`
+notification and keeps the suite. Archiving a suite is future work; nothing in the API archives one today.
+
+Deleting a suite can still change the run lists, because that cascade remains: a run recorded between the
+`has-history` check and the delete goes with the suite, and a Manual tab cached before the deletion would
+keep listing it until the 60 second stale time ran out. `useDeleteSuite` therefore also
 marks the run list pages of its project stale through `markRunPagesStale`
 (`apps/web/src/features/runs/lib/mark-run-pages-stale.ts`), with the same `refetchType: 'none'`: the lists
 are not on screen while a suite is deleted, and an infinite query would refetch every loaded page one after

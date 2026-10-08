@@ -1016,6 +1016,7 @@
     "suiteActions": "Acciones de la suite",
     "deleteSuiteTitle": "¿Eliminar suite?",
     "deleteSuiteDescription": "Esto elimina permanentemente {{name}} y sus {{count}} casos de prueba. Esta acción no se puede deshacer.",
+    "deleteSuiteHasHistory": "Esta suite tiene historial de ejecuciones, por lo que no se puede eliminar.",
     "suiteNameLabel": "Nombre",
     "suiteNamePlaceholder": "ej. Smoke tests de checkout",
     "suiteDescriptionLabel": "Descripción",

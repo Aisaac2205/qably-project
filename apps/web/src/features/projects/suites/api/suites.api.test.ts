@@ -104,6 +104,23 @@ describe('suites.api', () => {
     expect(lastCall()[1].method).toBe('DELETE')
   })
 
+  it('surfaces the has-history code when the API refuses to delete a suite with runs', async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: () =>
+        Promise.resolve({
+          code: 'has-history',
+          message: 'This suite has run history and cannot be deleted',
+        }),
+    })
+
+    await expect(deleteSuite('suite-1')).rejects.toMatchObject({
+      status: 409,
+      code: 'has-history',
+    })
+  })
+
   it('adds a case under its suite', async () => {
     await createCase('suite-1', { name: 'Empty cart' })
 

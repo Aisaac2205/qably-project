@@ -10,3 +10,5 @@ export type SuiteView = Suite;
 export type TestCaseView = TestCase;
 
 export type SuiteError = 'not-found' | 'name-taken' | 'forbidden';
+
+export type SuiteRemoveError = SuiteError | 'has-history';

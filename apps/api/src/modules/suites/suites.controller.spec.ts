@@ -32,6 +32,7 @@ function fakeExtraction(result: unknown) {
 function fakeSuites(result?: unknown) {
   return {
     confirmDocumentation: jest.fn().mockResolvedValue(result),
+    remove: jest.fn().mockResolvedValue(result),
   };
 }
 
@@ -147,6 +148,48 @@ describe('SuitesController.documentSuite', () => {
         mode: 'undocumented',
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('SuitesController.remove', () => {
+  const noExtraction = fakeExtraction(null);
+
+  it('resolves with nothing once the suite is deleted', async () => {
+    const suites = fakeSuites({ ok: true, value: undefined });
+
+    await expect(
+      build(noExtraction, suites).remove(org, 'suite-1'),
+    ).resolves.toBeUndefined();
+    expect(suites.remove).toHaveBeenCalledWith(org, 'suite-1');
+  });
+
+  it('throws a coded ConflictException when the suite has run history', async () => {
+    const suites = fakeSuites({ ok: false, error: 'has-history' });
+    const refusal = build(noExtraction, suites).remove(org, 'suite-1');
+
+    await expect(refusal).rejects.toBeInstanceOf(ConflictException);
+    await expect(refusal).rejects.toMatchObject({
+      response: {
+        code: 'has-history',
+        message: 'This suite has run history and cannot be deleted',
+      },
+    });
+  });
+
+  it('keeps mapping a missing suite to NotFoundException', async () => {
+    const suites = fakeSuites({ ok: false, error: 'not-found' });
+
+    await expect(
+      build(noExtraction, suites).remove(org, 'suite-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('keeps mapping a role that cannot write to ForbiddenException', async () => {
+    const suites = fakeSuites({ ok: false, error: 'forbidden' });
+
+    await expect(
+      build(noExtraction, suites).remove(org, 'suite-1'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

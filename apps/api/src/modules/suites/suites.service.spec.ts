@@ -57,6 +57,7 @@ interface FakePrisma {
     findMany: jest.Mock;
     count: jest.Mock;
   };
+  run: { findFirst: jest.Mock };
   runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
   extractedProposal: { findMany: jest.Mock };
@@ -85,6 +86,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
       count: jest.fn().mockResolvedValue(0),
     },
+    run: { findFirst: jest.fn().mockResolvedValue(null) },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
     extractedProposal: { findMany: jest.fn().mockResolvedValue([]) },
@@ -309,18 +311,47 @@ describe('SuitesService.remove', () => {
 
     expect(result).toEqual({ ok: false, error: 'forbidden' });
     expect(prisma.suite.findFirst).not.toHaveBeenCalled();
+    expect(prisma.run.findFirst).not.toHaveBeenCalled();
+    expect(prisma.suite.delete).not.toHaveBeenCalled();
   });
 
-  it('deletes a suite the owner can see', async () => {
+  it('refuses a suite from another organization without looking at its runs', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findFirst.mockResolvedValue(null);
+
+    await expect(build(prisma).remove(owner, 'suite-x')).resolves.toEqual({
+      ok: false,
+      error: 'not-found',
+    });
+    expect(prisma.run.findFirst).not.toHaveBeenCalled();
+    expect(prisma.suite.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes a suite the owner can see when it has no runs', async () => {
     const prisma = createPrisma();
 
     await expect(build(prisma).remove(owner, 'suite-1')).resolves.toEqual({
       ok: true,
       value: undefined,
     });
+    expect(prisma.run.findFirst).toHaveBeenCalledWith({
+      where: { suiteId: 'suite-1' },
+      select: { id: true },
+    });
     expect(prisma.suite.delete).toHaveBeenCalledWith({
       where: { id: 'suite-1' },
     });
+  });
+
+  it('refuses to delete a suite that has run history, since the delete would cascade over its runs', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst.mockResolvedValue({ id: 'run-1' });
+
+    await expect(build(prisma).remove(owner, 'suite-1')).resolves.toEqual({
+      ok: false,
+      error: 'has-history',
+    });
+    expect(prisma.suite.delete).not.toHaveBeenCalled();
   });
 });
 

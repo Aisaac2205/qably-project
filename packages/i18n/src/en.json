@@ -1016,6 +1016,7 @@
     "suiteActions": "Suite actions",
     "deleteSuiteTitle": "Delete suite?",
     "deleteSuiteDescription": "This permanently deletes {{name}} and its {{count}} test cases. This action cannot be undone.",
+    "deleteSuiteHasHistory": "This suite has run history, so it can't be deleted.",
     "suiteNameLabel": "Name",
     "suiteNamePlaceholder": "e.g. Checkout smoke tests",
     "suiteDescriptionLabel": "Description",
