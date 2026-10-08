@@ -84,6 +84,10 @@ describe('GithubAdapter.normalize', () => {
       title: 'Add checkout guard',
       url: 'https://github.com/acme/shop/commit/aaa',
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     });
   });
 
@@ -114,6 +118,10 @@ describe('GithubAdapter.normalize', () => {
       title: 'Guard the checkout',
       url: 'https://github.com/acme/shop/pull/42',
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     });
   });
 
@@ -196,5 +204,446 @@ describe('GithubAdapter.normalize changed files', () => {
     );
 
     expect(event?.changedFiles).toEqual([]);
+  });
+});
+
+const pushHeaders = {
+  'x-github-event': 'push',
+  'x-github-delivery': 'delivery-commits',
+};
+
+type CommitFixture = Record<string, unknown>;
+
+function sha(n: number): string {
+  return n.toString(16).padStart(40, '0');
+}
+
+function commitOf(n: number, extra: CommitFixture = {}): CommitFixture {
+  return { id: sha(n), message: `commit ${n}`, ...extra };
+}
+
+// Mirrors a real delivery: oldest commit first, head_commit and after equal to
+// the last one. Overrides model the payloads that deviate from that.
+function pushOf(commits: unknown[], extra: CommitFixture = {}) {
+  const head = commits[commits.length - 1] as CommitFixture;
+
+  return {
+    ref: 'refs/heads/main',
+    repository: { full_name: 'acme/shop' },
+    pusher: { name: 'ada' },
+    after: head.id,
+    head_commit: head,
+    commits,
+    ...extra,
+  };
+}
+
+function normalizePush(payload: unknown) {
+  return build().normalize(payload, pushHeaders);
+}
+
+function changedFilesOf(commits: unknown[], extra: CommitFixture = {}) {
+  return normalizePush(pushOf(commits, extra))?.changedFiles;
+}
+
+describe('GithubAdapter.normalize pushed commits', () => {
+  it('lists every commit of a multi-commit push in delivered order', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1, {
+          message: 'feat: add cart\n\nLonger body of the first commit',
+          author: {
+            username: 'ada',
+            name: 'Ada Lovelace',
+            email: 'ada@acme.dev',
+          },
+          timestamp: '2026-03-01T10:00:00+02:00',
+          url: 'https://github.com/acme/shop/commit/1',
+        }),
+        commitOf(2, {
+          message: '  fix: guard the checkout  \r\nbody',
+          author: { name: 'Grace Hopper' },
+          timestamp: '2026-03-01T11:00:00Z',
+        }),
+        commitOf(3, { message: 'chore: bump' }),
+      ]),
+    );
+
+    expect(event?.commitSha).toBe(sha(3));
+    expect(event?.commits).toEqual([
+      {
+        sha: sha(1),
+        position: 0,
+        message: 'feat: add cart',
+        author: 'ada',
+        committedAt: '2026-03-01T10:00:00+02:00',
+        url: 'https://github.com/acme/shop/commit/1',
+      },
+      {
+        sha: sha(2),
+        position: 1,
+        message: 'fix: guard the checkout',
+        author: 'Grace Hopper',
+        committedAt: '2026-03-01T11:00:00Z',
+        url: null,
+      },
+      {
+        sha: sha(3),
+        position: 2,
+        message: 'chore: bump',
+        author: 'unknown',
+        committedAt: null,
+        url: null,
+      },
+    ]);
+  });
+
+  it('falls back from username to name to unknown, ignoring blank and non-string values', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1, { author: { username: '  ', name: 'Grace Hopper' } }),
+        commitOf(2, { author: { username: 42, name: null } }),
+        commitOf(3, { author: 'ada' }),
+      ]),
+    );
+
+    expect(event?.commits.map((entry) => entry.author)).toEqual([
+      'Grace Hopper',
+      'unknown',
+      'unknown',
+    ]);
+  });
+
+  it('keeps a parsable timestamp as delivered and nulls anything else', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1, { timestamp: '2026-03-01T10:00:00+02:00' }),
+        commitOf(2, { timestamp: 'not-a-date' }),
+        commitOf(3, { timestamp: 1772000000 }),
+        commitOf(4),
+      ]),
+    );
+
+    expect(event?.commits.map((entry) => entry.committedAt)).toEqual([
+      '2026-03-01T10:00:00+02:00',
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('keeps only the first line of a message, capped at 200 characters', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1, { message: 'x'.repeat(250) }),
+        commitOf(2, { message: 42 }),
+        commitOf(3, { message: `${'x'.repeat(199)}\u{1F600} tail` }),
+      ]),
+    );
+
+    expect(event?.commits.map((entry) => entry.message)).toEqual([
+      'x'.repeat(200),
+      '',
+      'x'.repeat(199),
+    ]);
+  });
+
+  it('lowercases commit shas and skips entries without a valid 40-hex id', () => {
+    const event = normalizePush(
+      pushOf([
+        { id: 'A'.repeat(40), message: 'uppercase sha' },
+        { id: 'abc123', message: 'short sha' },
+        { id: 'g'.repeat(40), message: 'not hex' },
+        { id: 12345, message: 'numeric id' },
+        { message: 'no id' },
+        'not an object',
+        null,
+        commitOf(2),
+      ]),
+    );
+
+    expect(event?.commits).toEqual([
+      expect.objectContaining({ sha: 'a'.repeat(40), position: 0 }),
+      expect.objectContaining({ sha: sha(2), position: 1 }),
+    ]);
+  });
+
+  it.each([
+    ['a sha', 'B'.repeat(40), 'b'.repeat(40)],
+    ['the all-zero sha of a newly created ref', '0'.repeat(40), null],
+    ['missing', undefined, null],
+    ['not a string', 123, null],
+    ['not a 40-hex sha', 'abc', null],
+  ])('reads before when it is %s', (_label, before, expected) => {
+    const event = normalizePush(pushOf([commitOf(1)], { before }));
+
+    expect(event?.beforeSha).toBe(expected);
+  });
+
+  it.each([
+    [true, true],
+    ['true', false],
+    [1, false],
+    [undefined, false],
+  ])('reads forced=%p as %p', (forced, expected) => {
+    const event = normalizePush(pushOf([commitOf(1)], { forced }));
+
+    expect(event?.forced).toBe(expected);
+  });
+
+  it('keeps the last 250 commits, renumbers positions and flags a longer push', () => {
+    const commits = Array.from({ length: 300 }, (_, index) =>
+      commitOf(index + 1, { added: [`src/file-${index + 1}.spec.ts`] }),
+    );
+
+    const event = normalizePush(pushOf(commits));
+
+    expect(event?.commits).toHaveLength(250);
+    expect(event?.commits[0]).toEqual(
+      expect.objectContaining({ sha: sha(51), position: 0 }),
+    );
+    expect(event?.commits[249]).toEqual(
+      expect.objectContaining({ sha: sha(300), position: 249 }),
+    );
+    expect(event?.commitsTruncated).toBe(true);
+    // The cap bounds the stored list only; extraction still sees every file.
+    expect(event?.changedFiles).toHaveLength(300);
+  });
+
+  it('does not flag a push of exactly 250 commits', () => {
+    const commits = Array.from({ length: 250 }, (_, index) =>
+      commitOf(index + 1),
+    );
+
+    const event = normalizePush(pushOf(commits));
+
+    expect(event?.commits).toHaveLength(250);
+    expect(event?.commits[0]).toEqual(
+      expect.objectContaining({ sha: sha(1), position: 0 }),
+    );
+    expect(event?.commitsTruncated).toBe(false);
+  });
+
+  it('flags a delivery that reaches the 2048-commit limit GitHub may have applied', () => {
+    const delivered = [...Array<null>(2047).fill(null), commitOf(1)];
+
+    const event = normalizePush(pushOf(delivered));
+
+    expect(event?.commits).toHaveLength(1);
+    expect(event?.commitsTruncated).toBe(true);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['not an array', 'oops'],
+    ['empty', []],
+    ['made only of invalid entries', [{ id: 'nope' }, null]],
+  ])(
+    'accepts the push with no commit list when commits is %s',
+    (_label, commits) => {
+      const event = normalizePush({
+        ...pushPayload,
+        head_commit: {
+          ...pushPayload.head_commit,
+          added: ['src/cart.spec.ts'],
+          modified: ['src/cart.ts'],
+          removed: ['src/legacy.ts'],
+        },
+        commits,
+      });
+
+      expect(event?.commitSha).toBe('a'.repeat(40));
+      expect(event?.commits).toEqual([]);
+      expect(event?.commitsTruncated).toBe(false);
+      expect(event?.changedFiles).toEqual(['src/cart.spec.ts', 'src/cart.ts']);
+    },
+  );
+
+  it('ignores a push that carries commits but no head commit', () => {
+    expect(
+      normalizePush({
+        ref: 'refs/heads/main',
+        repository: { full_name: 'acme/shop' },
+        head_commit: null,
+        commits: [commitOf(1)],
+      }),
+    ).toBeNull();
+  });
+
+  it('keeps pull request events metadata-only', () => {
+    const event = build().normalize(
+      {
+        action: 'synchronize',
+        repository: { full_name: 'acme/shop' },
+        before: 'c'.repeat(40),
+        forced: true,
+        commits: [commitOf(1)],
+        pull_request: {
+          head: { ref: 'feat/cart', sha: 'b'.repeat(40) },
+          title: 'Guard the cart',
+          html_url: 'https://github.com/acme/shop/pull/7',
+          user: { login: 'ada' },
+        },
+      },
+      { 'x-github-event': 'pull_request', 'x-github-delivery': 'delivery-pr' },
+    );
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        kind: 'pull_request',
+        beforeSha: null,
+        forced: false,
+        commits: [],
+        commitsTruncated: false,
+        changedFiles: [],
+      }),
+    );
+  });
+});
+
+describe('GithubAdapter.normalize net changed files', () => {
+  it('merges added and modified paths across commits, counting a repeated change once', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, { added: ['a.spec.ts'], modified: ['README.md'] }),
+        commitOf(2, { added: ['b.spec.ts'], modified: ['a.spec.ts'] }),
+        commitOf(3, { modified: ['a.spec.ts'] }),
+      ]),
+    ).toEqual(['a.spec.ts', 'README.md', 'b.spec.ts']);
+  });
+
+  it('includes files of earlier commits that the head commit does not touch', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, { added: ['early.spec.ts'] }),
+        commitOf(2, { modified: ['late.spec.ts'] }),
+      ]),
+    ).toEqual(['early.spec.ts', 'late.spec.ts']);
+  });
+
+  it('drops a file added by one commit and removed by a later one', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, { added: ['tmp.spec.ts', 'keep.spec.ts'] }),
+        commitOf(2, { removed: ['tmp.spec.ts'] }),
+      ]),
+    ).toEqual(['keep.spec.ts']);
+  });
+
+  it('keeps a file removed by an earlier commit and added again by a later one', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, { removed: ['x.spec.ts'] }),
+        commitOf(2, { added: ['x.spec.ts'] }),
+      ]),
+    ).toEqual(['x.spec.ts']);
+  });
+
+  it('keeps a re-added file at the position where it was first seen', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, { added: ['a.spec.ts', 'x.spec.ts'] }),
+        commitOf(2, { removed: ['a.spec.ts'] }),
+        commitOf(3, { added: ['a.spec.ts'] }),
+      ]),
+    ).toEqual(['a.spec.ts', 'x.spec.ts']);
+  });
+
+  it('trusts the delivered order when the last commit matches head_commit and after is absent', () => {
+    expect(
+      changedFilesOf(
+        [
+          commitOf(1, { added: ['a.spec.ts'] }),
+          commitOf(2, { removed: ['a.spec.ts'] }),
+        ],
+        { after: undefined },
+      ),
+    ).toEqual([]);
+  });
+
+  describe('when the last delivered commit is not the head', () => {
+    // Newest first: the head sits at the front, so the delivered order is
+    // not chronological and removals of earlier commits cannot be replayed.
+    it('unions added and modified paths minus the head removals', () => {
+      const head = commitOf(3, {
+        modified: ['c.spec.ts'],
+        removed: ['b.spec.ts'],
+      });
+
+      const event = normalizePush(
+        pushOf(
+          [
+            head,
+            commitOf(2, { added: ['b.spec.ts'] }),
+            commitOf(1, { added: ['a.spec.ts'], modified: ['c.spec.ts'] }),
+          ],
+          { after: sha(3), head_commit: head },
+        ),
+      );
+
+      expect(event?.commitSha).toBe(sha(3));
+      expect(event?.changedFiles).toEqual(['c.spec.ts', 'a.spec.ts']);
+    });
+
+    it('ignores removals made by commits other than the head', () => {
+      const head = commitOf(3, { modified: ['z.spec.ts'] });
+
+      const event = normalizePush(
+        pushOf(
+          [
+            head,
+            commitOf(2, { removed: ['a.spec.ts'] }),
+            commitOf(1, { added: ['a.spec.ts'] }),
+          ],
+          { after: sha(3), head_commit: head },
+        ),
+      );
+
+      expect(event?.changedFiles).toEqual(['z.spec.ts', 'a.spec.ts']);
+    });
+
+    it('still extracts the head commit files when the head was not delivered', () => {
+      const event = normalizePush(
+        pushOf(
+          [
+            commitOf(1, { added: ['a.spec.ts'] }),
+            commitOf(2, { added: ['b.spec.ts'] }),
+          ],
+          {
+            after: sha(3),
+            head_commit: commitOf(3, { added: ['head.spec.ts'] }),
+          },
+        ),
+      );
+
+      expect(event?.changedFiles).toEqual([
+        'a.spec.ts',
+        'b.spec.ts',
+        'head.spec.ts',
+      ]);
+    });
+  });
+
+  it('ignores path entries that are not strings', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, {
+          added: ['a.spec.ts', 5, null, {}],
+          modified: 'b.spec.ts',
+          removed: [7],
+        }),
+      ]),
+    ).toEqual(['a.spec.ts']);
+
+    expect(
+      normalizePush({
+        ...pushPayload,
+        head_commit: {
+          ...pushPayload.head_commit,
+          added: [1, 'x.spec.ts'],
+          modified: null,
+        },
+      })?.changedFiles,
+    ).toEqual(['x.spec.ts']);
   });
 });

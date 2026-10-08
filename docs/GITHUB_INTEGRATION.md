@@ -24,6 +24,56 @@ A `Connection` belongs to the organization and owns the webhook secret. A `Proje
 `Connection` through a nullable foreign key, so the repository of a project is always **derived**
 from its connection and never stored twice.
 
+## What Qably reads from a push
+
+`github.adapter.ts` turns a `push` webhook into one normalized event. From the payload it reads
+`ref` (the branch), `repository.full_name`, `pusher.name` and `head_commit` (id, message, url and
+the `added`, `modified` and `removed` lists). It also reads three fields that describe the whole
+push, not just its last commit:
+
+- `before`, the commit the ref pointed at before the push. An all-zero value (a newly created ref)
+  or anything that is not a 40-character hex sha becomes `null`.
+- `forced`, true only when the payload says `forced: true`.
+- `commits`, every commit of the push. Each one keeps its sha (lowercase), its position in the
+  delivered order, the first line of its message (trimmed, at most 200 characters), its author
+  (username, else name, else `unknown`), its timestamp (kept as delivered only if it parses as a
+  date, otherwise `null`) and its url. An entry whose id is not a 40-character hex sha is skipped.
+
+GitHub caps `commits` at 2048 entries. Qably keeps at most 250: when a push delivers more, it keeps
+the last 250 and numbers them from 0 again. `commitsTruncated` is true whenever the list is not the
+whole push, either because Qably cut it or because the delivery reached GitHub's own 2048 limit. The
+cap bounds only that list; the changed files below are computed from every delivered commit.
+
+These values are normalized but not stored yet. Ingestion still persists `changedFiles` only.
+
+### Changed files are the net effect of the push
+
+Until now only `head_commit` was read, so the files of every earlier commit in a multi-commit push
+never reached extraction. `changedFiles` is now the net effect over all delivered commits. Commits
+are replayed in delivered order against a set of present paths: an added or modified path joins the
+set and a removed path leaves it. A file added and then removed inside the same push disappears, a
+file removed and then added again stays, and a file modified in several commits counts once. Paths
+keep the position where they were first seen, and entries that are not strings are ignored.
+
+GitHub does not document the order of `commits`, so the replay only runs when the last delivered
+commit is the head of the push, that is, its id equals `after` or `head_commit.id`. When it is not,
+the order cannot be trusted and Qably falls back to the union of added and modified paths across
+every commit and the head commit, minus the paths the head commit removed. That can keep a file an
+earlier commit deleted, which is the safer error: a deleted file left in the list fails when it
+is read, while a live file dropped from the list would never be extracted. When `commits` is missing or
+empty (for example a payload that omits it) only `head_commit` is used, as before.
+
+The behavior change is that files from earlier commits of a multi-commit push are now extracted.
+They still pass through `Project.testFilePatterns`, so only matching test files become a
+`CodeChange` and can trigger AI extraction.
+
+### Pull requests and Bitbucket stay metadata-only
+
+A `pull_request` payload carries neither a file list nor the commits of the branch. Those events
+therefore report `changedFiles: []`, `commits: []`, `beforeSha: null`, `forced: false` and
+`commitsTruncated: false`. The Bitbucket adapter reports the same neutral values for its events;
+its push handling is unchanged.
+
 ## What counts as a test file
 
 `Project.testFilePatterns` decides which files in a push are test files. It is the gate in front of everything expensive: only a matching file becomes a `CodeChange` that can trigger AI extraction, which is also the rule the thesis states — repository files, and only repository files, start AI generation.

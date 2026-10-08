@@ -73,6 +73,10 @@ describe('BitbucketAdapter.normalize', () => {
       title: 'Add checkout guard',
       url: 'https://bitbucket.org/acme/shop/commits/ccc',
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     });
   });
 
@@ -106,6 +110,10 @@ describe('BitbucketAdapter.normalize', () => {
       title: 'Guard the checkout',
       url: 'https://bitbucket.org/acme/shop/pull-requests/7',
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     });
   });
 

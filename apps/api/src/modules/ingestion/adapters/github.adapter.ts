@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type {
+  NormalizedScmCommit,
   NormalizedScmEvent,
   ScmHeaders,
   ScmPayloadAdapter,
@@ -11,18 +12,40 @@ const EVENT_HEADER = 'x-github-event';
 const DELIVERY_HEADER = 'x-github-delivery';
 const BRANCH_PREFIX = 'refs/heads/';
 const HANDLED_PR_ACTIONS = ['opened', 'synchronize'];
+const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const NULL_SHA = '0'.repeat(40);
+const MAX_KEPT_COMMITS = 250;
+// GitHub documents "a maximum of 2048 commits" in a push payload, so a delivery
+// that long may have been cut by GitHub itself.
+const GITHUB_COMMIT_LIMIT = 2048;
+const MAX_MESSAGE_LENGTH = 200;
+
+interface FileChanges {
+  added?: unknown;
+  modified?: unknown;
+  removed?: unknown;
+}
 
 interface PushPayload {
   ref?: string;
+  before?: unknown;
+  after?: unknown;
+  forced?: unknown;
   repository?: { full_name?: string };
   pusher?: { name?: string };
-  head_commit?: {
-    id?: string;
-    message?: string;
-    url?: string;
-    added?: string[];
-    modified?: string[];
-  } | null;
+  head_commit?:
+    | (FileChanges & {
+        id?: string;
+        message?: string;
+        url?: string;
+      })
+    | null;
+  commits?: unknown;
+}
+
+interface PushedCommit {
+  commit: Omit<NormalizedScmCommit, 'position'>;
+  files: FileChanges;
 }
 
 interface PullRequestPayload {
@@ -40,6 +63,126 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function readText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+function readSha(value: unknown): string | null {
+  const sha = typeof value === 'string' ? value.toLowerCase() : '';
+
+  return SHA_PATTERN.test(sha) ? sha : null;
+}
+
+function readPaths(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((path): path is string => typeof path === 'string')
+    : [];
+}
+
+function readMessage(value: unknown): string {
+  if (typeof value !== 'string') return '';
+
+  const firstLine = value.split(/\r?\n/, 1)[0].trim();
+  const cut = firstLine.slice(0, MAX_MESSAGE_LENGTH);
+  const last = cut.charCodeAt(cut.length - 1);
+
+  // Never leave half of a surrogate pair at the cut.
+  return cut.length < firstLine.length && last >= 0xd800 && last <= 0xdbff
+    ? cut.slice(0, -1)
+    : cut;
+}
+
+function readTimestamp(value: unknown): string | null {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+    ? value
+    : null;
+}
+
+function readPushedCommit(entry: unknown): PushedCommit[] {
+  const raw = asRecord(entry);
+  const sha = readSha(raw?.id);
+
+  if (raw === null || sha === null) return [];
+
+  const author = asRecord(raw.author);
+
+  return [
+    {
+      commit: {
+        sha,
+        message: readMessage(raw.message),
+        author:
+          readText(author?.username) ?? readText(author?.name) ?? 'unknown',
+        committedAt: readTimestamp(raw.timestamp),
+        url: readText(raw.url),
+      },
+      files: raw,
+    },
+  ];
+}
+
+// Replays the commits in order against a set of present paths: an addition or
+// modification puts a path in, a removal takes it out. A path keeps the place
+// where it was first seen, so the output order is stable.
+function netChangedFiles(history: FileChanges[]): string[] {
+  const present = new Map<string, boolean>();
+
+  for (const files of history) {
+    for (const path of readPaths(files.removed)) present.set(path, false);
+    for (const path of readPaths(files.added)) present.set(path, true);
+    for (const path of readPaths(files.modified)) present.set(path, true);
+  }
+
+  return [...present]
+    .filter(([, isPresent]) => isPresent)
+    .map(([path]) => path);
+}
+
+// Without a verified order a removal cannot be tied to the commit that came
+// after the addition, so only the head commit's removals are trusted.
+function unorderedChangedFiles(
+  history: FileChanges[],
+  head: FileChanges,
+): string[] {
+  const touched = new Set<string>();
+
+  for (const files of history) {
+    for (const path of readPaths(files.added)) touched.add(path);
+    for (const path of readPaths(files.modified)) touched.add(path);
+  }
+
+  const removedByHead = new Set(readPaths(head.removed));
+
+  return [...touched].filter((path) => !removedByHead.has(path));
+}
+
+// A newly created ref has no previous commit; GitHub reports it as all zeros.
+function readBeforeSha(value: unknown): string | null {
+  const sha = readSha(value);
+
+  return sha === NULL_SHA ? null : sha;
+}
+
+// The file list spans every delivered commit, not only the kept ones: the cap
+// bounds what is stored about the push, not what extraction can see.
+function resolveChangedFiles(
+  payload: PushPayload,
+  head: FileChanges & { id?: string },
+  pushed: PushedCommit[],
+): string[] {
+  if (pushed.length === 0) return netChangedFiles([head]);
+
+  const history = pushed.map(({ files }) => files);
+  const lastSha = pushed[pushed.length - 1].commit.sha;
+  const headShas = [readSha(payload.after), readSha(head.id)];
+
+  // GitHub does not document the order of `commits`, so it is only replayed
+  // when the last delivered commit is provably the head of the push.
+  return headShas.includes(lastSha)
+    ? netChangedFiles(history)
+    : unorderedChangedFiles([...history, head], head);
 }
 
 @Injectable()
@@ -87,6 +230,10 @@ export class GithubAdapter implements ScmPayloadAdapter {
 
     if (!commit?.id || repo === undefined) return null;
 
+    const delivered = Array.isArray(payload.commits) ? payload.commits : [];
+    const pushed = delivered.flatMap(readPushedCommit);
+    const kept = pushed.slice(-MAX_KEPT_COMMITS);
+
     return {
       eventId,
       provider: this.provider,
@@ -97,7 +244,16 @@ export class GithubAdapter implements ScmPayloadAdapter {
       author: payload.pusher?.name ?? 'unknown',
       title: commit.message ?? '',
       url: commit.url ?? '',
-      changedFiles: [...(commit.added ?? []), ...(commit.modified ?? [])],
+      changedFiles: resolveChangedFiles(payload, commit, pushed),
+      beforeSha: readBeforeSha(payload.before),
+      forced: payload.forced === true,
+      commits: kept.map(({ commit: entry }, position) => ({
+        ...entry,
+        position,
+      })),
+      commitsTruncated:
+        pushed.length > MAX_KEPT_COMMITS ||
+        delivered.length >= GITHUB_COMMIT_LIMIT,
     };
   }
 
@@ -122,7 +278,13 @@ export class GithubAdapter implements ScmPayloadAdapter {
       author: pull.user?.login ?? 'unknown',
       title: pull.title ?? '',
       url: pull.html_url ?? '',
+      // The pull request payload carries neither a file list nor the commits,
+      // so it stays metadata-only.
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     };
   }
 }
