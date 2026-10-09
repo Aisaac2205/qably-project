@@ -19,6 +19,8 @@ const MAX_KEPT_COMMITS = 250;
 // that long may have been cut by GitHub itself.
 const GITHUB_COMMIT_LIMIT = 2048;
 const MAX_MESSAGE_LENGTH = 200;
+const ISO_8601_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 interface FileChanges {
   added?: unknown;
@@ -94,10 +96,27 @@ function readMessage(value: unknown): string {
     : cut;
 }
 
+// GitHub sends commit times as ISO 8601 with an explicit offset. Date.parse
+// alone also accepts local-time and free-form strings, so the shape is checked
+// first and Date.parse only rules out impossible values such as month 13.
 function readTimestamp(value: unknown): string | null {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+  return typeof value === 'string' &&
+    ISO_8601_TIMESTAMP.test(value) &&
+    !Number.isNaN(Date.parse(value))
     ? value
     : null;
+}
+
+function distinctBySha(commits: PushedCommit[]): PushedCommit[] {
+  const seen = new Set<string>();
+
+  return commits.filter(({ commit }) => {
+    if (seen.has(commit.sha)) return false;
+
+    seen.add(commit.sha);
+
+    return true;
+  });
 }
 
 function readPushedCommit(entry: unknown): PushedCommit[] {
@@ -232,7 +251,10 @@ export class GithubAdapter implements ScmPayloadAdapter {
 
     const delivered = Array.isArray(payload.commits) ? payload.commits : [];
     const pushed = delivered.flatMap(readPushedCommit);
-    const kept = pushed.slice(-MAX_KEPT_COMMITS);
+    // A repeated sha would break the (event, sha) uniqueness of the stored list,
+    // and that violation is indistinguishable from a replayed delivery.
+    const distinct = distinctBySha(pushed);
+    const kept = distinct.slice(-MAX_KEPT_COMMITS);
 
     return {
       eventId,
@@ -252,7 +274,7 @@ export class GithubAdapter implements ScmPayloadAdapter {
         position,
       })),
       commitsTruncated:
-        pushed.length > MAX_KEPT_COMMITS ||
+        distinct.length > MAX_KEPT_COMMITS ||
         delivered.length >= GITHUB_COMMIT_LIMIT,
     };
   }

@@ -333,28 +333,48 @@ enum ScmEventStatus {
 }
 
 model ScmEvent {
-  id             String             @id @default(cuid())
-  connectionId   String
-  connection     Connection         @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  organizationId String
-  provider       ConnectionProvider
-  eventId        String
-  kind           ScmEventKind
-  repo           String
-  branch         String
-  commitSha      String
-  author         String
-  title          String
-  url            String
-  changedFiles   String[]           @default([])
-  status         ScmEventStatus     @default(PENDING)
-  receivedAt     DateTime           @default(now())
-  batches        IngestionBatch[]
+  id               String             @id @default(cuid())
+  connectionId     String
+  connection       Connection         @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organizationId   String
+  provider         ConnectionProvider
+  eventId          String
+  kind             ScmEventKind
+  repo             String
+  branch           String
+  commitSha        String
+  author           String
+  title            String
+  url              String
+  changedFiles     String[]           @default([])
+  beforeSha        String?
+  forced           Boolean            @default(false)
+  commitsTruncated Boolean            @default(false)
+  status           ScmEventStatus     @default(PENDING)
+  receivedAt       DateTime           @default(now())
+  batches          IngestionBatch[]
+  commits          ScmCommit[]
 
   @@unique([provider, eventId])
   @@index([organizationId])
   @@index([connectionId])
   @@map("scm_event")
+}
+
+model ScmCommit {
+  id          String    @id @default(cuid())
+  scmEventId  String
+  scmEvent    ScmEvent  @relation(fields: [scmEventId], references: [id], onDelete: Cascade)
+  sha         String
+  position    Int
+  message     String
+  author      String
+  committedAt DateTime?
+  url         String?
+
+  @@unique([scmEventId, sha])
+  @@index([sha])
+  @@map("scm_commit")
 }
 
 enum EvidenceKind {

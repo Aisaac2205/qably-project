@@ -314,22 +314,40 @@ describe('GithubAdapter.normalize pushed commits', () => {
     ]);
   });
 
-  it('keeps a parsable timestamp as delivered and nulls anything else', () => {
-    const event = normalizePush(
-      pushOf([
-        commitOf(1, { timestamp: '2026-03-01T10:00:00+02:00' }),
-        commitOf(2, { timestamp: 'not-a-date' }),
-        commitOf(3, { timestamp: 1772000000 }),
-        commitOf(4),
-      ]),
-    );
+  it.each([
+    ['an offset', '2026-03-01T10:00:00+02:00'],
+    ['a negative offset', '2026-03-01T10:00:00-05:30'],
+    ['Z', '2026-03-01T11:00:00Z'],
+    ['fractional seconds', '2026-03-01T11:00:00.123Z'],
+  ])(
+    'keeps an ISO 8601 timestamp with %s as delivered',
+    (_label, timestamp) => {
+      const event = normalizePush(pushOf([commitOf(1, { timestamp })]));
 
-    expect(event?.commits.map((entry) => entry.committedAt)).toEqual([
-      '2026-03-01T10:00:00+02:00',
-      null,
-      null,
-      null,
-    ]);
+      expect(event?.commits[0].committedAt).toBe(timestamp);
+    },
+  );
+
+  it.each([
+    ['text', 'not-a-date'],
+    ['a number', 1772000000],
+    ['a missing value', undefined],
+    ['null', null],
+    ['an empty string', ''],
+    ['a date without a time', '2026-03-01'],
+    ['a time without an offset', '2026-03-01T10:00:00'],
+    ['a space instead of the T separator', '2026-03-01 10:00:00Z'],
+    ['an offset without a colon', '2026-03-01T10:00:00+0200'],
+    ['an RFC 2822 date', 'Sun, 01 Mar 2026 10:00:00 GMT'],
+    ['a long-form date', 'March 1, 2026 10:00 UTC'],
+    ['a bare year', '2026'],
+    ['an impossible month', '2026-13-01T10:00:00Z'],
+    ['an impossible hour', '2026-03-01T25:00:00Z'],
+    ['trailing text after a valid timestamp', '2026-03-01T10:00:00Z later'],
+  ])('nulls a timestamp that is %s', (_label, timestamp) => {
+    const event = normalizePush(pushOf([commitOf(1, { timestamp })]));
+
+    expect(event?.commits[0].committedAt).toBeNull();
   });
 
   it('keeps only the first line of a message, capped at 200 characters', () => {
@@ -408,6 +426,49 @@ describe('GithubAdapter.normalize pushed commits', () => {
     expect(event?.commitsTruncated).toBe(true);
     // The cap bounds the stored list only; extraction still sees every file.
     expect(event?.changedFiles).toHaveLength(300);
+  });
+
+  it('lists a repeated sha once, keeping its first occurrence and a gapless numbering', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1),
+        commitOf(2),
+        commitOf(1, { message: 'repeated' }),
+        { id: sha(2).toUpperCase(), message: 'repeated in uppercase' },
+        commitOf(3),
+      ]),
+    );
+
+    expect(event?.commits).toEqual([
+      expect.objectContaining({
+        sha: sha(1),
+        position: 0,
+        message: 'commit 1',
+      }),
+      expect.objectContaining({
+        sha: sha(2),
+        position: 1,
+        message: 'commit 2',
+      }),
+      expect.objectContaining({
+        sha: sha(3),
+        position: 2,
+        message: 'commit 3',
+      }),
+    ]);
+    expect(event?.commitsTruncated).toBe(false);
+  });
+
+  it('does not count repeated shas against the 250-commit cap', () => {
+    const commits = [
+      ...Array.from({ length: 250 }, (_, index) => commitOf(index + 1)),
+      commitOf(250),
+    ];
+
+    const event = normalizePush(pushOf(commits));
+
+    expect(event?.commits).toHaveLength(250);
+    expect(event?.commitsTruncated).toBe(false);
   });
 
   it('does not flag a push of exactly 250 commits', () => {
