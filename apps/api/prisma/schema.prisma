@@ -563,6 +563,7 @@ model TestCaseVersion {
   priority       CasePriority @default(medium)
   publishedAt    DateTime     @default(now())
   locale         String?
+  runCases       RunCase[]
 
   @@unique([testCaseId, version])
   @@index([testCaseId])
@@ -697,9 +698,19 @@ model RunCase {
   failureDetails String?
   skipReason     String?
 
+  // Provenance only: the catalog version in force when the run executed. The
+  // version row goes away with its test case, so the content that survives is
+  // `catalogSnapshot`, never this link.
+  testCaseVersionId String?
+  testCaseVersion   TestCaseVersion? @relation(fields: [testCaseVersionId], references: [id], onDelete: SetNull)
+  // The catalog content as executed: { name, steps, expectedResult, version }.
+  // Null on rows recorded before snapshots existed, which read the live case.
+  catalogSnapshot   Json?
+
   @@unique([runId, position])
   @@index([runId])
   @@index([testCaseId])
+  @@index([testCaseVersionId])
   @@map("run_case")
 }
 

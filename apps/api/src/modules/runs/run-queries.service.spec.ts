@@ -77,12 +77,16 @@ const suiteWithCases = {
       name: 'Adds to cart',
       steps: ['open', 'add'],
       expectedResult: 'cart has one item',
+      currentVersionId: 'version-4',
+      currentVersion: { version: 4 },
     },
     {
       id: 'case-2',
       name: 'Removes from cart',
       steps: ['open', 'remove'],
       expectedResult: 'cart is empty',
+      currentVersionId: null,
+      currentVersion: null,
     },
   ],
 };
@@ -854,6 +858,8 @@ describe('RunQueriesService.findOne', () => {
       id: 'case-9',
       suiteId: 'suite-1',
       version: 3,
+      executedVersion: 3,
+      documented: true,
       name: 'Vacía el carrito',
       steps: ['Open the cart'],
       expectedResult: 'The cart is empty',
@@ -908,6 +914,52 @@ describe('RunQueriesService.findOne', () => {
       automationKey: true,
       automationClassName: true,
       automationFilePath: true,
+    });
+  });
+
+  it('reads the catalog snapshot together with the live case', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).findOne(org, 'run-1');
+
+    const [call] = prisma.runCase.findMany.mock.calls as [
+      [{ select: Record<string, unknown> }],
+    ];
+    expect(call[0].select.catalogSnapshot).toBe(true);
+  });
+
+  it('shows the content the run executed after the library case was edited', async () => {
+    const prisma = createPrisma();
+    prisma.runCase.findMany.mockResolvedValue([
+      runCaseRow({
+        testCaseId: 'case-9',
+        catalogSnapshot: {
+          name: 'Adds to cart',
+          steps: ['Open the cart', 'Add an item'],
+          expectedResult: 'The cart holds one item',
+          version: 2,
+        },
+        testCase: officialCaseRow({
+          id: 'case-9',
+          name: 'Adds an item to the shopping cart',
+          steps: ['Edited step'],
+          expectedResult: 'Edited result',
+          currentVersion: { version: 5 },
+        }),
+      }),
+    ]);
+
+    const result = await build(prisma).findOne(org, 'run-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.cases[0].officialCase).toMatchObject({
+      id: 'case-9',
+      version: 5,
+      executedVersion: 2,
+      name: 'Adds to cart',
+      steps: ['Open the cart', 'Add an item'],
+      expectedResult: 'The cart holds one item',
     });
   });
 
@@ -1100,6 +1152,52 @@ describe('RunQueriesService.createManual', () => {
         position: 1,
       }),
     ]);
+  });
+
+  it('records the version in force and the catalog content of every case as executed', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).createManual(org, user, input);
+
+    const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+      [{ data: Record<string, unknown>[] }],
+    ];
+    expect(call[0].data).toEqual([
+      expect.objectContaining({
+        testCaseId: 'case-1',
+        testCaseVersionId: 'version-4',
+        catalogSnapshot: {
+          name: 'Adds to cart',
+          steps: ['open', 'add'],
+          expectedResult: 'cart has one item',
+          version: 4,
+        },
+      }),
+      expect.objectContaining({
+        testCaseId: 'case-2',
+        testCaseVersionId: null,
+        catalogSnapshot: {
+          name: 'Removes from cart',
+          steps: ['open', 'remove'],
+          expectedResult: 'cart is empty',
+          version: null,
+        },
+      }),
+    ]);
+  });
+
+  it('selects the version in force of every manual case it snapshots', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).createManual(org, user, input);
+
+    const [call] = prisma.suite.findFirst.mock.calls as [
+      [{ select: { cases: { select: Record<string, unknown> } } }],
+    ];
+    expect(call[0].select.cases.select).toMatchObject({
+      currentVersionId: true,
+      currentVersion: { select: { version: true } },
+    });
   });
 
   it('projects the linked official case onto the response, since createManyAndReturn cannot select nested relations', async () => {

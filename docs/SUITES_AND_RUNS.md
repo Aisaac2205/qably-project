@@ -81,6 +81,11 @@ The copy freezes what the case said **at execution time**. Editing the case tomo
 record of what was executed last week, the same way an invoice stores a price instead of pointing at a
 catalogue that will change. Removing the copy would make historical runs silently mutate.
 
+An automated run cannot use those two columns for this, because they hold whatever the reporter sent, which
+for JUnit is nothing. Every run case therefore also records the catalog content it executed in its own
+column, `catalog_snapshot`, for the same reason (*The catalog content a run executed*, below). For a manual
+run the two copies agree at creation.
+
 The reverse relationship — `test_case` holding a copy of its current version's content — is described in
 the *Case content* section below and exists for a different reason.
 
@@ -176,38 +181,45 @@ level up, so a QA never has to click into a suite to learn what the project view
 
 A `run_case` keeps what the reporter sent: the raw test name, and empty `steps` and `expected_result`,
 because JUnit carries neither. The linked `test_case` can hold more: a title and documentation that Aeris
-wrote and a person approved. `publishTestCaseVersion` overwrites `test_case.name` and bumps the version on
-approval; a proposal that is still `in_review` never touches `test_case`. The run detail reads both, and
-`resolveRunCase` (`apps/web/src/features/runs/lib/resolve-run-case.ts`) decides which one speaks for each
-field, so the case list and the case detail cannot disagree.
+wrote and a person approved, or that a person typed into the library. That content moves.
+`publishTestCaseVersion` overwrites `test_case.name` and bumps the version on approval,
+`SuiteCasesService.updateCase` edits a case in place without publishing a version, and a proposal that is
+still `in_review` never touches `test_case`. A finished run must not follow any of it, so a `run_case` also
+records the catalog content it executed (*The catalog content a run executed*, below). The run detail reads
+both, and `resolveRunCase` (`apps/web/src/features/runs/lib/resolve-run-case.ts`) decides which one speaks
+for each field, so the case list and the case detail cannot disagree.
 
 | Run | Title, steps, expected result | Version badge | Aeris action |
 | --- | --- | --- | --- |
-| Manual | The `run_case` snapshot, exactly as copied at creation | Never | Never |
-| Automated (`api`, `github_actions`) with a linked case | The library case: its `name` (through `describeCase`, which falls back to the humanized `automation_key` when the name is blank), its `steps` and its `expected_result` | The linked case's current version, only once one is published | Only when the linked case is `automated` and has neither steps nor expected result |
-| Automated without a linked case | The humanized reported name and the `run_case` snapshot | Never | Never |
+| Manual | The `run_case` copy, exactly as made at creation | Never | Never |
+| Automated (`api`, `github_actions`) with a linked case | The catalog case as the run executed it: its `name` (through `describeCase`, which falls back to the humanized `automation_key` when the name is blank), its `steps` and its `expected_result`, read from `catalog_snapshot`. A row recorded before snapshots existed reads the live case instead | The version in force when the run executed (`officialCase.executedVersion`), only when there was one | Only when the linked case is `automated` and has neither steps nor expected result today (`officialCase.documented` is `false`) |
+| Automated without a linked case | The humanized reported name and the `run_case` copy | Never | Never |
 
 For an automated run the reporter's raw name stays on a secondary line, in monospace, whenever it differs
 from the title after trimming and ignoring case. Status, duration, failure, skip reason and file path
 always come from the `run_case` row, whatever the library says.
 
 The split follows two rules from the thesis. An automated result is read-only evidence that keeps exactly
-what the tool reported (CONTEXT 4.7.3), so nothing is ever written onto a `run_case` to improve its title:
-the library is read when the run is displayed, through `RunCaseRecord.officialCase`, and the raw name is
-never hidden when it differs, because it is what the tool emitted and what a developer searches for. And
-only human-approved AI content is official (CONTEXT 4.3.4 b), so documentation reaches a run view only
-through `test_case`, which approval alone updates.
+what the tool reported (CONTEXT 4.7.3), so nothing is ever written onto the reported columns of a
+`run_case` (`name`, `steps`, `expected_result`) to improve its title, and the raw name is never hidden when
+it differs, because it is what the tool emitted and what a developer searches for. The catalog content is
+not a reported fact: it is recorded beside the report, in its own column, and read through
+`RunCaseRecord.officialCase`. And only human-approved AI content is official (CONTEXT 4.3.4 b), so
+documentation reaches a run view only through `test_case`, which approval alone updates; the snapshot is a
+copy of that content, taken when the run recorded the case.
 
-The consequence is deliberate. In an automated run the title, the steps and the version badge reflect the
-library today, not the library at execution time. Nothing frozen is contradicted: JUnit recorded no steps,
-and renaming a case relabels a result without changing its verdict. A manual run is different. It is a
-record of what a person was asked to execute, so it keeps the snapshot (*Why `run_case` duplicates the
-case content*) and shows no badge. The badge copy lives under `runs.caseVersion` because it names the
-current library version, not a snapshot.
+The consequence is deliberate. Renaming or rewriting a case no longer relabels a finished automated run:
+its title, its steps, its expected result and its version badge are the ones it executed. What still
+follows the library today is limited to the questions about the case itself: where the library link goes,
+whether the Aeris action still has something to do, and the rows that predate snapshots. A manual run
+keeps its own copy in `steps` and `expected_result` (*Why `run_case` duplicates the case content*) and
+shows no badge. The badge copy lives under `runs.caseVersion`; it names the version the run executed, not
+the one in force now.
 
-Because the run detail reads the library when it is displayed, a cached detail must not outlive a library
-change, and the detail query keeps the default 60 second stale time. Every mutation that can change what
-`officialCase` carries marks all cached run details stale through `markRunDetailsStale`
+Because the run detail still reads the live case for those fields, and for every row without a snapshot, a
+cached detail must not outlive a library change, and the detail query keeps the default 60 second stale
+time. Every mutation that can change what `officialCase` carries marks all cached run details stale through
+`markRunDetailsStale`
 (`apps/web/src/features/runs/lib/mark-run-details-stale.ts`): an inbox approval, a case create, edit or
 delete, a suite edit or delete and a documentation confirmation. A rejection does not, because it never
 writes `test_case`, and neither does a single-case documentation request: it only enqueues an extraction,
@@ -245,7 +257,48 @@ The Aeris action is gated for the same reason as the empty state. The single-cas
 (`ExtractionService.enqueueDocumentCase`) rejects a case that is not automated, has a pending proposal or has no
 automation key, but not one that is already documented, and the extraction job spends an AI credit. Offering
 the action on a documented case would invite a second charge for content that already exists. On a manual
-run it would also end in a 409 `not-automated`, since only automated cases can be documented.
+run it would also end in a 409 `not-automated`, since only automated cases can be documented. Whether the
+case is documented is therefore read from the live case (`officialCase.documented`), not from the executed
+content shown above it: a run that executed an undocumented case must not invite a charge for a case that
+has been documented since.
+
+### The catalog content a run executed
+
+Two nullable columns on `run_case` record it:
+
+- `catalog_snapshot` is the content: JSON of `{ name, steps, expectedResult, version }`
+  (`RunCaseCatalogSnapshot` in `apps/api/src/modules/runs/lib/catalog-snapshot.ts`). `version` is the
+  number of the catalog version in force at the time, or `null` when the case had none, which is the case
+  for a draft that ingestion has just created and for a case that was never approved. It is JSON because a
+  Prisma `String[]` cannot be null, and a row that was never snapshotted has to stay distinguishable from a
+  case documented with no steps.
+- `test_case_version_id` is a foreign key to `test_case_version` with `ON DELETE SET NULL`. It is
+  provenance only: it says which version was in force and nothing reads content through it. Deleting a
+  `test_case` cascades its versions away, so the link goes `NULL` and the snapshot is what survives.
+
+Ingestion writes both when it records the case. `OfficialCaseReconciler.reconcile` returns the content of
+every catalog case the report matched or created, read with one query for exactly those ids, so the
+suite-wide match still loads no steps. A draft created by the same ingest is snapshotted with its current
+content and `version: null`, and a reported case that matched no catalog case (an identity collision)
+records neither column. `RunQueriesService.createManual` writes both from the case it copies, with the
+version in force. Re-reporting a run replaces its rows, and the replacement keeps what the run already
+recorded: before deleting, `RunsService.ingest` reads the previous snapshot and version id of each linked
+row, and a case that already has a valid snapshot keeps it, the first valid one when a case appears twice.
+A late re-send therefore never replaces "as executed" with newer content. A case that had no usable
+snapshot, or that the earlier report did not hold, is snapshotted from the catalog as it stands.
+
+`toRunView` (`runs/lib/run-view.ts`) reads the snapshot through `parseCatalogSnapshot`, which returns `null`
+for anything that is not exactly that shape, and falls back to the live case in that event, exactly as
+before snapshots existed. From the snapshot come `officialCase.name`, `steps`, `expectedResult` and
+`executedVersion`. The rest of `officialCase` stays live because it answers questions about the case today:
+`id` and `suiteId` for the library link, `version` for the current version, `executionMode` and the
+`automation*` fields, and `documented`, which is `true` when the live case has steps or an expected result
+and is what the Aeris action reads.
+
+Two limits are worth stating. Rows recorded before this change have `NULL` in both columns and keep
+reading the live case until a backfill gives them a snapshot. And when a catalog case is deleted,
+`run_case.test_case_id` is set to `NULL`, `officialCase` is `null` and the run detail falls back to what the
+reporter sent; the snapshot is still stored on the row, but no read path surfaces it for an unlinked row.
 
 ### Proactive pending-review state
 
@@ -278,8 +331,10 @@ Aeris proposal can replace a raw ingested name but never one a person chose.
 
 The foreign key is the only link between the two surfaces, and it is what makes traceability possible.
 `CASE_READ_SELECT` in `runs/lib/run-view.ts` projects it as `RunCaseRecord.officialCase`, carrying the
-linked case's id, suite, published version, title (`name`), documented steps and expected result, and its
-`executionMode` with the automation key, class name and file path when it has them.
+linked case's id, suite, current version, whether it is documented today, and its `executionMode` with the
+automation key, class name and file path when it has them. The title (`name`), steps, expected result and
+`executedVersion` come from the row's own `catalog_snapshot` when it has one, which `CASE_READ_SELECT`
+selects next to the live case, and from the live case otherwise (*The catalog content a run executed*).
 
 `CASE_SELECT` deliberately does **not** carry that relation: two `createManyAndReturn` calls share it, and
 Prisma cannot select nested relations in that operation. Keep the read and write selects separate.

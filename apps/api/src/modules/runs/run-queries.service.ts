@@ -20,6 +20,7 @@ import {
 } from '../notifications/lib/regression-check';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
+import { buildCatalogSnapshot, toCatalogColumns } from './lib/catalog-snapshot';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
   PUSH_PASS_RATE_SQL,
@@ -548,7 +549,14 @@ export class RunQueriesService {
         name: true,
         cases: {
           where: { state: 'active', executionMode: 'manual' },
-          select: { id: true, name: true, steps: true, expectedResult: true },
+          select: {
+            id: true,
+            name: true,
+            steps: true,
+            expectedResult: true,
+            currentVersionId: true,
+            currentVersion: { select: { version: true } },
+          },
           orderBy: { position: 'asc' },
         },
       },
@@ -576,6 +584,10 @@ export class RunQueriesService {
         data: suite.cases.map((testCase, index) => ({
           runId: run.id,
           testCaseId: testCase.id,
+          ...toCatalogColumns({
+            testCaseVersionId: testCase.currentVersionId,
+            snapshot: buildCatalogSnapshot(testCase),
+          }),
           name: testCase.name,
           suiteName: suite.name,
           steps: testCase.steps,

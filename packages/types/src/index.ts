@@ -236,13 +236,24 @@ export interface Suite {
   openCollisions?: number
 }
 
+/**
+ * The catalog case a run case is linked to. `name`, `steps`, `expectedResult`
+ * and `executedVersion` are the content the run executed, read from the
+ * snapshot taken at that time; rows recorded before snapshots existed fall back
+ * to the live case. Every other field describes the case as it is today.
+ */
 export interface RunCaseOfficialCase {
   id: string
   suiteId: string
+  /** The catalog version in force today. */
   version: number | null
+  /** The catalog version the run executed, or null when the case had none. */
+  executedVersion: number | null
   name: string
   steps: string[]
   expectedResult: string
+  /** Whether the live case has steps or an expected result today. */
+  documented: boolean
   executionMode: ExecutionMode
   automationKey?: string
   automationClassName?: string

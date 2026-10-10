@@ -73,6 +73,8 @@ const suiteWithCases = {
       name: 'Adds to cart',
       steps: ['open', 'add'],
       expectedResult: 'cart has one item',
+      currentVersionId: 'version-1',
+      currentVersion: { version: 1 },
     },
   ],
 };

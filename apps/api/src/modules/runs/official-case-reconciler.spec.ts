@@ -81,6 +81,156 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
   });
 });
 
+function catalogRow(id: string, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    name: `Case ${id}`,
+    steps: [`Step of ${id}`],
+    expectedResult: `Result of ${id}`,
+    currentVersionId: null,
+    currentVersion: null,
+    ...overrides,
+  };
+}
+
+function suiteRow(
+  id: string,
+  automationKey: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    name: automationKey,
+    automationKey,
+    automationClassName: null,
+    automationFilePath: null,
+    executionMode: 'automated',
+    ...overrides,
+  };
+}
+
+describe('OfficialCaseReconciler.reconcile catalog content', () => {
+  it('returns the content of every matched case from one extra query', async () => {
+    const tx = createReconcileTx();
+    tx.testCase.findMany
+      .mockResolvedValueOnce([
+        suiteRow('case-1', 'Adds to cart'),
+        suiteRow('case-2', 'Removes from cart'),
+        suiteRow('case-3', 'Not reported in this run'),
+      ])
+      .mockResolvedValueOnce([
+        catalogRow('case-1', {
+          currentVersionId: 'version-7',
+          currentVersion: { version: 7 },
+        }),
+        catalogRow('case-2'),
+      ]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [{ name: 'Adds to cart' }, { name: 'Removes from cart' }],
+    );
+
+    expect(tx.testCase.findMany).toHaveBeenCalledTimes(2);
+    expect(tx.testCase.findMany).toHaveBeenLastCalledWith({
+      where: { id: { in: ['case-1', 'case-2'] } },
+      select: {
+        id: true,
+        name: true,
+        steps: true,
+        expectedResult: true,
+        currentVersionId: true,
+        currentVersion: { select: { version: true } },
+      },
+    });
+    expect([...result.catalogByCaseId.keys()].sort()).toEqual([
+      'case-1',
+      'case-2',
+    ]);
+    expect(result.catalogByCaseId.get('case-1')).toEqual(
+      catalogRow('case-1', {
+        currentVersionId: 'version-7',
+        currentVersion: { version: 7 },
+      }),
+    );
+  });
+
+  it('carries no version for a case that has none in force', async () => {
+    const tx = createReconcileTx();
+    tx.testCase.findMany
+      .mockResolvedValueOnce([suiteRow('case-1', 'Adds to cart')])
+      .mockResolvedValueOnce([catalogRow('case-1')]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [{ name: 'Adds to cart' }],
+    );
+
+    const matched = result.catalogByCaseId.get('case-1');
+    expect(matched?.currentVersionId).toBeNull();
+    expect(matched?.currentVersion).toBeNull();
+  });
+
+  it('returns the content of a newly created draft alongside the matched cases', async () => {
+    const tx = createReconcileTx();
+    tx.testCase.findMany
+      .mockResolvedValueOnce([suiteRow('case-1', 'Adds to cart')])
+      .mockResolvedValueOnce([
+        { id: 'draft-1', automationKey: 'Brand new case' },
+      ])
+      .mockResolvedValueOnce([
+        catalogRow('case-1', {
+          currentVersionId: 'version-2',
+          currentVersion: { version: 2 },
+        }),
+        catalogRow('draft-1', { name: 'Brand new case', steps: [] }),
+      ]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [{ name: 'Adds to cart' }, { name: 'Brand new case' }],
+    );
+
+    expect(result.createdCaseIds).toEqual(['draft-1']);
+    expect(tx.testCase.findMany).toHaveBeenCalledTimes(3);
+    expect(tx.testCase.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: { in: ['case-1', 'draft-1'] } },
+      }),
+    );
+    expect(result.catalogByCaseId.get('draft-1')).toEqual(
+      catalogRow('draft-1', { name: 'Brand new case', steps: [] }),
+    );
+    expect(result.catalogByCaseId.get('case-1')?.currentVersionId).toBe(
+      'version-2',
+    );
+  });
+
+  it('skips the content query when no reported case resolves to a catalog case', async () => {
+    const tx = createReconcileTx();
+    tx.testCase.findMany.mockResolvedValue([]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [
+        { name: 'tests.checkout.test_checkout::test_add_item' },
+        { name: 'test_add_item', className: 'tests.checkout.test_checkout' },
+      ],
+    );
+
+    expect(result.catalogByCaseId.size).toBe(0);
+    expect(tx.testCase.findMany).toHaveBeenCalledTimes(1);
+  });
+});
+
 interface UpsertCallArg {
   where: { suiteId_kind_key: { suiteId: string; kind: string; key: string } };
   create: {

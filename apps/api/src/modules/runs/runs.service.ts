@@ -13,6 +13,11 @@ import {
 } from './official-case-reconciler';
 import { ReportBatchService } from './report-batch.service';
 import type { RunError, RunView } from './runs.contracts';
+import {
+  resolveExecutedCatalog,
+  toCatalogColumns,
+  type PreviousRunCaseCatalog,
+} from './lib/catalog-snapshot';
 import { deriveRunStatus } from './lib/derive-run-status';
 import { resolveCaseIdentityKey } from './lib/case-identity';
 import {
@@ -92,6 +97,7 @@ export class RunsService {
 
       const {
         caseIdByKey: testCaseIdByIdentity,
+        catalogByCaseId,
         createdCaseIds: created,
         identityKeys,
         legacyKeys,
@@ -175,13 +181,29 @@ export class RunsService {
         resolvedLegacyKeys,
       );
 
+      // A re-report replaces every row, so the catalog content the run already
+      // recorded as executed has to be read before the rows go.
+      const executedCatalog = resolveExecutedCatalog(
+        catalogByCaseId,
+        await this.loadPreviousCatalog(tx, run.id),
+      );
+
       await tx.runCase.deleteMany({ where: { runId: run.id } });
+
+      const testCaseIds = input.cases.map(
+        (testCase) =>
+          testCaseIdByIdentity.get(resolveCaseIdentityKey(testCase)) ?? null,
+      );
 
       await tx.runCase.createManyAndReturn({
         data: input.cases.map((testCase: IngestCaseInput, index: number) => ({
           runId: run.id,
-          testCaseId:
-            testCaseIdByIdentity.get(resolveCaseIdentityKey(testCase)) ?? null,
+          testCaseId: testCaseIds[index],
+          ...toCatalogColumns(
+            testCaseIds[index] === null
+              ? undefined
+              : executedCatalog.get(testCaseIds[index]),
+          ),
           name: testCase.name,
           suiteName: testCase.suiteName ?? suite.name,
           steps: testCase.steps,
@@ -253,6 +275,21 @@ export class RunsService {
     }
 
     return ok(toRunView(run, cases));
+  }
+
+  private async loadPreviousCatalog(
+    tx: CaseReloadTx,
+    runId: string,
+  ): Promise<PreviousRunCaseCatalog[]> {
+    return await tx.runCase.findMany({
+      where: { runId, testCaseId: { not: null } },
+      select: {
+        testCaseId: true,
+        testCaseVersionId: true,
+        catalogSnapshot: true,
+      },
+      orderBy: { position: 'asc' },
+    });
   }
 
   private async reloadCases(

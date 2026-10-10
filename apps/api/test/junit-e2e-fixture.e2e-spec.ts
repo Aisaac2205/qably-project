@@ -71,6 +71,12 @@ interface FakeTestCaseRow {
   automationKey: string | null;
   automationClassName: string | null;
   automationFilePath: string | null;
+  steps: string[];
+  expectedResult: string;
+  currentVersionId: string | null;
+  // The fake stores the joined version next to its id, so a read that selects
+  // `currentVersion` needs no second table.
+  currentVersion: { version: number } | null;
 }
 
 interface FakeRunRow {
@@ -95,6 +101,8 @@ interface FakeRunCaseRow {
   id: string;
   runId: string;
   testCaseId: string | null;
+  testCaseVersionId: string | null;
+  catalogSnapshot: unknown;
   name: string;
   suiteName: string;
   steps: string[];
@@ -125,6 +133,8 @@ type FakeRunCaseInput = Pick<
   Partial<
     Pick<
       FakeRunCaseRow,
+      | 'testCaseVersionId'
+      | 'catalogSnapshot'
       | 'recordedAt'
       | 'className'
       | 'filePath'
@@ -144,7 +154,8 @@ function project<T extends Record<string, unknown>>(
 
   const result: Partial<T> = {};
   for (const key of Object.keys(select)) {
-    if (select[key] === true && key in row) {
+    const selected = select[key];
+    if ((selected === true || typeof selected === 'object') && key in row) {
       (result as Record<string, unknown>)[key] = row[key];
     }
   }
@@ -167,6 +178,15 @@ function matches(
     ) {
       const list = (condition as { in: unknown[] }).in;
       if (!list.includes(row[key])) return false;
+      continue;
+    }
+
+    if (
+      condition !== null &&
+      typeof condition === 'object' &&
+      'not' in (condition as Record<string, unknown>)
+    ) {
+      if (row[key] === (condition as { not: unknown }).not) return false;
       continue;
     }
 
@@ -323,6 +343,10 @@ function createFakeDb() {
             automationKey: entry.automationKey,
             automationClassName: entry.automationClassName ?? null,
             automationFilePath: entry.automationFilePath ?? null,
+            steps: [],
+            expectedResult: '',
+            currentVersionId: null,
+            currentVersion: null,
           });
           count += 1;
         }
@@ -394,6 +418,24 @@ function createFakeDb() {
         );
       },
     ),
+    findFirst: jest.fn(
+      ({
+        where,
+        select,
+      }: {
+        where: Record<string, unknown>;
+        select?: Record<string, unknown>;
+      }) => {
+        const found = [...runs.values()].find((row) =>
+          matches(row as unknown as Record<string, unknown>, where),
+        );
+        return Promise.resolve(
+          found === undefined
+            ? null
+            : project(found as unknown as Record<string, unknown>, select),
+        );
+      },
+    ),
   };
 
   const runCaseApi = {
@@ -416,6 +458,8 @@ function createFakeDb() {
             id: `run-case-${runCaseSeq}`,
             runId: entry.runId,
             testCaseId: entry.testCaseId,
+            testCaseVersionId: entry.testCaseVersionId ?? null,
+            catalogSnapshot: entry.catalogSnapshot ?? null,
             name: entry.name,
             suiteName: entry.suiteName,
             steps: entry.steps,
@@ -453,17 +497,38 @@ function createFakeDb() {
         select,
         orderBy,
       }: {
-        where: { runId: string };
+        where: { runId: string; testCaseId?: { not: null } };
         select?: Record<string, unknown>;
         orderBy?: { position: 'asc' | 'desc' };
       }) => {
-        const rows = [...(runCasesByRun.get(where.runId) ?? [])];
+        const rows = (runCasesByRun.get(where.runId) ?? []).filter((row) =>
+          matches(row as unknown as Record<string, unknown>, where),
+        );
         if (orderBy?.position === 'asc')
           rows.sort((a, b) => a.position - b.position);
         return Promise.resolve(
-          rows.map((row) =>
-            project(row as unknown as Record<string, unknown>, select),
-          ),
+          rows.map((row) => {
+            const joined: Record<string, unknown> = { ...row };
+            const testCaseSelect = (
+              select?.testCase as
+                | { select: Record<string, unknown> }
+                | undefined
+            )?.select;
+            if (testCaseSelect !== undefined) {
+              const linked =
+                row.testCaseId === null
+                  ? undefined
+                  : testCases.get(row.testCaseId);
+              joined.testCase =
+                linked === undefined
+                  ? null
+                  : project(
+                      linked as unknown as Record<string, unknown>,
+                      testCaseSelect,
+                    );
+            }
+            return project(joined, select);
+          }),
         );
       },
     ),
@@ -496,6 +561,16 @@ function createFakeDb() {
     updateMany: jest.fn(() => Promise.resolve({ count: 0 })),
   };
 
+  const orgMemberApi = {
+    findFirst: jest.fn(() =>
+      Promise.resolve({
+        organizationId,
+        role: 'member',
+        organization: { slug: 'acme' },
+      }),
+    ),
+  };
+
   const tx = {
     suite: suiteApi,
     testCase: testCaseApi,
@@ -512,6 +587,7 @@ function createFakeDb() {
     run: runApi,
     runCase: runCaseApi,
     caseIdentityCollision: caseIdentityCollisionApi,
+    orgMember: orgMemberApi,
     $transaction: jest.fn((fn: (transaction: Tx) => unknown) => fn(tx)),
     seedApiKey(row: FakeApiKeyRow) {
       apiKeys.set(row.lookupId, row);
@@ -521,6 +597,7 @@ function createFakeDb() {
     allRuns: () => [...runs.values()],
     testCasesBySuite: (suiteId: string) =>
       [...testCases.values()].filter((row) => row.suiteId === suiteId),
+    runCasesOf: (runId: string) => [...(runCasesByRun.get(runId) ?? [])],
   };
 
   return prisma;
@@ -666,9 +743,9 @@ describe('JUnit e2e fixture ingestion (e2e)', () => {
       .fakePrisma;
   }
 
-  function postFixture() {
+  function postFixture(externalId = 'fixture-run-1') {
     return request(app.getHttpServer())
-      .post('/runs/ingest/junit?externalId=fixture-run-1&source=github_actions')
+      .post(`/runs/ingest/junit?externalId=${externalId}&source=github_actions`)
       .set('Authorization', `Bearer ${generated.token}`)
       .set('Content-Type', 'application/xml')
       .send(fixtureXml);
@@ -778,5 +855,123 @@ describe('JUnit e2e fixture ingestion (e2e)', () => {
     const firstIds = firstRuns.map((run) => run.id).sort();
     const secondIds = secondRuns.map((run) => run.id).sort();
     expect(secondIds).toEqual(firstIds);
+  });
+
+  describe('catalog content as executed', () => {
+    const documented = {
+      steps: ['Open the page', 'Press the button'],
+      expectedResult: 'The page confirms the action',
+    };
+
+    function caseOf(runs: RunView[], testCaseId: string) {
+      const run = runs.find((candidate) =>
+        candidate.cases.some((c) => c.testCaseId === testCaseId),
+      ) as RunView;
+
+      return {
+        run,
+        runCase: run.cases.find((c) => c.testCaseId === testCaseId),
+      };
+    }
+
+    it('keeps showing what a run executed after the catalog case is edited', async () => {
+      await postFixture('fixture-run-1').expect(202);
+      const firstRuns = await drain(0);
+
+      const prisma = getFakePrisma();
+      const target = prisma.allTestCases()[0];
+      const originalName = target.name;
+
+      // The draft is documented and approved as version 1 before the next run.
+      await prisma.testCase.update({
+        where: { id: target.id },
+        data: {
+          ...documented,
+          currentVersionId: 'version-1',
+          currentVersion: { version: 1 },
+        },
+      });
+
+      await postFixture('fixture-run-2').expect(202);
+      const second = caseOf(await drain(1), target.id);
+
+      // A person then rewrites the case and approves version 2.
+      await prisma.testCase.update({
+        where: { id: target.id },
+        data: {
+          name: 'Renamed after the run',
+          steps: ['An edited step'],
+          expectedResult: 'An edited result',
+          currentVersionId: 'version-2',
+          currentVersion: { version: 2 },
+        },
+      });
+
+      const response = await request(app.getHttpServer())
+        .get(`/runs/${second.run.id}`)
+        .expect(200);
+      const executed = (response.body as RunView).cases.find(
+        (c) => c.testCaseId === target.id,
+      );
+
+      expect(executed?.officialCase).toMatchObject({
+        id: target.id,
+        name: originalName,
+        steps: documented.steps,
+        expectedResult: documented.expectedResult,
+        version: 2,
+        executedVersion: 1,
+        documented: true,
+      });
+      expect(
+        prisma
+          .runCasesOf(second.run.id)
+          .find((row) => row.testCaseId === target.id)?.testCaseVersionId,
+      ).toBe('version-1');
+
+      const first = caseOf(firstRuns, target.id);
+      const earlier = (
+        (
+          await request(app.getHttpServer())
+            .get(`/runs/${first.run.id}`)
+            .expect(200)
+        ).body as RunView
+      ).cases.find((c) => c.testCaseId === target.id);
+
+      expect(earlier?.officialCase).toMatchObject({
+        name: originalName,
+        steps: [],
+        expectedResult: '',
+        executedVersion: null,
+        documented: true,
+      });
+    });
+
+    it('keeps the first snapshot when the same report is sent again', async () => {
+      await postFixture('fixture-run-1').expect(202);
+      await drain(0);
+
+      const prisma = getFakePrisma();
+      const target = prisma.allTestCases()[0];
+
+      await prisma.testCase.update({
+        where: { id: target.id },
+        data: {
+          ...documented,
+          currentVersionId: 'version-1',
+          currentVersion: { version: 1 },
+        },
+      });
+
+      await postFixture('fixture-run-1').expect(202);
+      const replayed = caseOf(await drain(1), target.id);
+
+      expect(replayed.runCase?.officialCase).toMatchObject({
+        steps: [],
+        expectedResult: '',
+        executedVersion: null,
+        documented: true,
+      });
+    });
   });
 });

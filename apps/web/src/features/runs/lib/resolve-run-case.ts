@@ -55,10 +55,9 @@ export function resolveRunCase(c: RunCaseRecord, source: RunSource): ResolvedRun
     ...withRawName(c, title),
     steps: official.steps,
     expectedResult: official.expectedResult,
-    ...(official.version === null ? {} : { version: official.version }),
-    showAerisAction:
-      official.executionMode === 'automated' &&
-      official.steps.length === 0 &&
-      official.expectedResult === '',
+    ...(official.executedVersion === null ? {} : { version: official.executedVersion }),
+    // The content above is what the run executed. Whether the case still needs
+    // documenting is a fact about the library today, so it reads `documented`.
+    showAerisAction: official.executionMode === 'automated' && !official.documented,
   }
 }
