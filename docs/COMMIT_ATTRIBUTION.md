@@ -72,3 +72,50 @@ When the walk from the later run's commit does not reach the baseline, the reaso
 - **Rebases and squash merges.** A squash or rebase merge creates new shas on the target branch. The original feature-branch commits are then not part of the main chain.
 - **No filtering.** A candidate is any commit in the chain, whether or not it touched the code a test covers.
 - **Run shas are not normalized upstream.** `Run.commitSha` may be a full sha, a short sha, mixed case, or null. SCM shas are expected to be lowercase 40-character hex, as the ingestion adapters store them.
+
+## API
+
+The runs API carries the range as an `attribution` field, so the client never recomputes it. The service behind it is `RunAttributionService` (`apps/api/src/modules/runs/run-attribution.service.ts`); the types are `RunAttribution`, `AttributedCommit` and `RunAttributionUnknownReason` in `@qably/types`.
+
+### Where it appears
+
+| Payload | Field | Pair that is compared |
+|---|---|---|
+| `GET /runs/:id` | `delta.attribution` | the previous finished run of the same suite, and this run |
+| `GET /runs/regressions` | `items[].attribution` | the previous finished run of the same suite, and the run that detected the regression |
+
+Every entry of one run in `GET /runs/regressions` carries the same value. The response is computed with one attribution call, whatever the number of entries.
+
+### Shape
+
+```ts
+type RunAttribution =
+  | { kind: 'same_commit'; sha: string }
+  | { kind: 'range'; baseSha: string; headSha: string; commits: AttributedCommit[] }
+  | { kind: 'unknown'; reason: RunAttributionUnknownReason };
+
+interface AttributedCommit {
+  sha: string;
+  message: string;
+  author: string;
+  committedAt: string | null; // ISO timestamp, null when the provider did not report it
+  url: string | null;
+  branch: string; // branch of the push the commit was read from
+}
+```
+
+`range.commits` is oldest first, the baseline excluded and the later run's commit included. `unknown.reason` is one of the [reasons](#reasons) above. An `unknown` result is a value, not an absence: it says the recorded history could not prove a chain.
+
+### When it is `null`
+
+- `delta.attribution` is `null` when the delta has no regressions and no fixes: there is nothing to attribute, so the work is skipped. The same holds when `delta` itself is `null` (open run, or no earlier finished run).
+- `attribution` is also `null` on either payload when computing it failed. The failure is logged as a warning and the request still succeeds with the rest of the response.
+- `items[].attribution` of `GET /runs/regressions` is otherwise always computed.
+
+### Limits
+
+- **Candidates, never a cause.** The list is the commits that landed between the two runs. It does not say which commit changed a result, and a client must not present it as the cause.
+- **Only recorded pushes count.** Pushes received before the push history was stored (the commits of a push are persisted from the ingestion change onwards) carry no commits, so a range that needs them is `unknown`, typically `history_gap` or `commit_not_in_history`. Nothing is backfilled.
+- **Scan limit.** For each call the service reads the newest 1000 `PUSH` events of the project's repository connection (`MAX_SCANNED_EVENTS`). If the connection has more, the oldest are not scanned, and a chain that needs them ends as `history_gap` instead of being guessed. `PULL_REQUEST` events are never read.
+- **Connection scope.** A project without a repository connection answers `no_repository_connected`, unless the two runs report the same commit or one of them reports none, which are decided from the run shas alone and need no connection. In those cases, and whenever no run pair needs the history, the database is not read at all.
+- **Run shas.** A run that reports no commit gives `no_commit_reported`. Short shas (7 or more hex characters) are matched against the recorded commits as described [above](#how-the-range-is-found).

@@ -1,3 +1,5 @@
+import { Logger } from '@nestjs/common';
+import type { RunAttribution } from '@qably/types';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { RunQueriesService } from './run-queries.service';
@@ -148,11 +150,22 @@ function createPrisma(): FakePrisma {
   return prisma;
 }
 
+function createAttribution() {
+  return {
+    attribute: jest.fn().mockResolvedValue(new Map<string, RunAttribution>()),
+  };
+}
+
 function build(
   prisma: FakePrisma,
   notifications: { publish: jest.Mock } = createNotifications(),
+  attribution: { attribute: jest.Mock } = createAttribution(),
 ) {
-  return new RunQueriesService(prisma as never, notifications as never);
+  return new RunQueriesService(
+    prisma as never,
+    notifications as never,
+    attribution as never,
+  );
 }
 
 describe('RunQueriesService.list', () => {
@@ -394,6 +407,30 @@ describe('RunQueriesService.list source filter', () => {
   });
 });
 
+const BASE_SHA = 'a'.repeat(40);
+const HEAD_SHA = 'b'.repeat(40);
+
+const RANGE_ATTRIBUTION: RunAttribution = {
+  kind: 'range',
+  baseSha: BASE_SHA,
+  headSha: HEAD_SHA,
+  commits: [
+    {
+      sha: HEAD_SHA,
+      message: 'Fix the cart total',
+      author: 'Ada',
+      committedAt: '2026-01-02T00:01:00.000Z',
+      url: 'https://example.test/commit/b',
+      branch: 'main',
+    },
+  ],
+};
+
+const UNKNOWN_ATTRIBUTION: RunAttribution = {
+  kind: 'unknown',
+  reason: 'history_gap',
+};
+
 function scannedRunRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'run-2',
@@ -401,6 +438,7 @@ function scannedRunRow(overrides: Record<string, unknown> = {}) {
     suiteId: 'suite-1',
     startedAt: new Date('2026-01-02T00:00:00.000Z'),
     finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+    commitSha: HEAD_SHA,
     suite: { name: 'Checkout' },
     ...overrides,
   };
@@ -459,8 +497,16 @@ describe('RunQueriesService.regressions', () => {
         status: 'fail',
       },
     ]);
+    const attribution = createAttribution();
+    attribution.attribute.mockResolvedValue(
+      new Map([['run-2', RANGE_ATTRIBUTION]]),
+    );
 
-    const result = await build(prisma).regressions(org, 'project-1', 20);
+    const result = await build(
+      prisma,
+      createNotifications(),
+      attribution,
+    ).regressions(org, 'project-1', 20);
 
     expect(result).toEqual({
       items: [
@@ -473,6 +519,7 @@ describe('RunQueriesService.regressions', () => {
           caseName: 'Adds to cart',
           previousRunId: 'run-1',
           detectedAt: '2026-01-02T00:05:00.000Z',
+          attribution: RANGE_ATTRIBUTION,
         },
       ],
       runsScanned: 1,
@@ -544,6 +591,207 @@ describe('RunQueriesService.regressions', () => {
         where: { runId: { in: ['run-2', 'run-1'] } },
       }),
     );
+  });
+});
+
+describe('RunQueriesService.regressions attribution', () => {
+  const regressedCases = (runId: string, previousRunId: string) => [
+    {
+      runId: previousRunId,
+      testCaseId: 'case-1',
+      name: 'Adds to cart',
+      status: 'pass',
+    },
+    {
+      runId: previousRunId,
+      testCaseId: 'case-2',
+      name: 'Removes from cart',
+      status: 'pass',
+    },
+    { runId, testCaseId: 'case-1', name: 'Adds to cart', status: 'fail' },
+    { runId, testCaseId: 'case-2', name: 'Removes from cart', status: 'fail' },
+  ];
+
+  it('attributes every regression of a run to the commits between the previous run and that run, with one call for the whole response', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([
+      scannedRunRow({ id: 'run-2', commitSha: HEAD_SHA }),
+      scannedRunRow({
+        id: 'run-4',
+        suiteId: 'suite-2',
+        commitSha: 'c'.repeat(40),
+      }),
+    ]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        previousId: 'run-1',
+        previousCommitSha: BASE_SHA,
+      },
+      {
+        id: 'run-4',
+        suiteId: 'suite-2',
+        previousId: 'run-3',
+        previousCommitSha: null,
+      },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      ...regressedCases('run-2', 'run-1'),
+      ...regressedCases('run-4', 'run-3'),
+    ]);
+    const attribution = createAttribution();
+    attribution.attribute.mockResolvedValue(
+      new Map<string, RunAttribution>([
+        ['run-2', RANGE_ATTRIBUTION],
+        ['run-4', { kind: 'unknown', reason: 'no_commit_reported' }],
+      ]),
+    );
+
+    const result = await build(
+      prisma,
+      createNotifications(),
+      attribution,
+    ).regressions(org, 'project-1', 20);
+
+    expect(result.items).toHaveLength(4);
+    expect(result.items.map((item) => [item.runId, item.attribution])).toEqual([
+      ['run-2', RANGE_ATTRIBUTION],
+      ['run-2', RANGE_ATTRIBUTION],
+      ['run-4', { kind: 'unknown', reason: 'no_commit_reported' }],
+      ['run-4', { kind: 'unknown', reason: 'no_commit_reported' }],
+    ]);
+    expect(attribution.attribute).toHaveBeenCalledTimes(1);
+    expect(attribution.attribute).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      pairs: [
+        { key: 'run-2', baseSha: BASE_SHA, headSha: HEAD_SHA },
+        { key: 'run-4', baseSha: null, headSha: 'c'.repeat(40) },
+      ],
+    });
+  });
+
+  it('asks only about runs that regressed', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([
+      scannedRunRow({ id: 'run-2' }),
+      scannedRunRow({ id: 'run-4', suiteId: 'suite-2' }),
+    ]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        previousId: 'run-1',
+        previousCommitSha: BASE_SHA,
+      },
+      {
+        id: 'run-4',
+        suiteId: 'suite-2',
+        previousId: 'run-3',
+        previousCommitSha: BASE_SHA,
+      },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([
+      ...regressedCases('run-2', 'run-1'),
+      { runId: 'run-3', testCaseId: 'case-1', name: 'Adds', status: 'fail' },
+      { runId: 'run-4', testCaseId: 'case-1', name: 'Adds', status: 'fail' },
+    ]);
+    const attribution = createAttribution();
+
+    await build(prisma, createNotifications(), attribution).regressions(
+      org,
+      'project-1',
+      20,
+    );
+
+    const [call] = attribution.attribute.mock.calls[0] as [
+      { pairs: { key: string }[] },
+    ];
+    expect(call.pairs.map((pair) => pair.key)).toEqual(['run-2']);
+  });
+
+  it('does not attribute anything when no run regressed', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        previousId: 'run-1',
+        previousCommitSha: BASE_SHA,
+      },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([]);
+    const attribution = createAttribution();
+
+    const result = await build(
+      prisma,
+      createNotifications(),
+      attribution,
+    ).regressions(org, 'project-1', 20);
+
+    expect(result).toEqual({ items: [], runsScanned: 1 });
+    expect(attribution.attribute).not.toHaveBeenCalled();
+  });
+
+  it('reports a null attribution on every entry, and still succeeds, when attribution fails', async () => {
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        previousId: 'run-1',
+        previousCommitSha: BASE_SHA,
+      },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue(regressedCases('run-2', 'run-1'));
+    const attribution = createAttribution();
+    attribution.attribute.mockRejectedValue(new Error('database down'));
+
+    try {
+      const result = await build(
+        prisma,
+        createNotifications(),
+        attribution,
+      ).regressions(org, 'project-1', 20);
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items.every((item) => item.attribution === null)).toBe(
+        true,
+      );
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain('database down');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('selects the commit of the scanned runs and of their previous runs without extra queries', async () => {
+    const prisma = createPrisma();
+    prisma.run.findMany.mockResolvedValue([scannedRunRow()]);
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: 'run-2',
+        suiteId: 'suite-1',
+        previousId: 'run-1',
+        previousCommitSha: BASE_SHA,
+      },
+    ]);
+    prisma.runCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).regressions(org, 'project-1', 20);
+
+    expect(prisma.run.findMany).toHaveBeenCalledTimes(1);
+    expect(prisma.run.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ commitSha: true }) as unknown,
+      }),
+    );
+    const [sqlArg] = prisma.$queryRaw.mock.calls[0] as [{ sql: string }];
+    expect(sqlArg.sql).toContain('"previousCommitSha"');
   });
 });
 
@@ -1358,6 +1606,7 @@ describe('RunQueriesService.findOne delta', () => {
     ...runRow,
     status: 'pass' as const,
     finishedAt: new Date('2026-01-01T01:00:00.000Z'),
+    commitSha: HEAD_SHA,
   };
 
   it('reports no delta and asks for no predecessor while the run is still open', async () => {
@@ -1399,11 +1648,38 @@ describe('RunQueriesService.findOne delta', () => {
     );
   });
 
+  function mockDelta(
+    prisma: FakePrisma,
+    statuses: { current: 'pass' | 'fail'; previous: 'pass' | 'fail' }[],
+  ) {
+    prisma.run.findFirst
+      .mockResolvedValueOnce(finishedRow)
+      .mockResolvedValueOnce({ id: 'run-0', commitSha: BASE_SHA });
+    prisma.runCase.findMany
+      .mockResolvedValueOnce(
+        statuses.map((entry, index) =>
+          runCaseRow({
+            id: `rc-${index}`,
+            testCaseId: `case-${index}`,
+            name: `Case ${index}`,
+            status: entry.current,
+            position: index,
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        statuses.map((entry, index) => ({
+          testCaseId: `case-${index}`,
+          status: entry.previous,
+        })),
+      );
+  }
+
   it('lists the regressed and fixed cases by name against the previous run', async () => {
     const prisma = createPrisma();
     prisma.run.findFirst
       .mockResolvedValueOnce(finishedRow)
-      .mockResolvedValueOnce({ id: 'run-0' });
+      .mockResolvedValueOnce({ id: 'run-0', commitSha: BASE_SHA });
     prisma.runCase.findMany
       .mockResolvedValueOnce([
         runCaseRow({
@@ -1441,6 +1717,129 @@ describe('RunQueriesService.findOne delta', () => {
     expect(result.value.delta).toEqual({
       regressions: [{ testCaseId: 'case-1', caseName: 'Adds' }],
       fixes: [{ testCaseId: 'case-2', caseName: 'Removes' }],
+      attribution: null,
+    });
+  });
+
+  it('selects the commit of the previous run along with its id', async () => {
+    const prisma = createPrisma();
+    prisma.run.findFirst
+      .mockResolvedValueOnce(finishedRow)
+      .mockResolvedValueOnce(null);
+
+    await build(prisma).findOne(org, 'run-1');
+
+    expect(prisma.run.findFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({ select: { id: true, commitSha: true } }),
+    );
+  });
+
+  describe('attribution', () => {
+    it('carries the commit range between the previous run and this run', async () => {
+      const prisma = createPrisma();
+      mockDelta(prisma, [{ current: 'fail', previous: 'pass' }]);
+      const attribution = createAttribution();
+      attribution.attribute.mockResolvedValue(
+        new Map([['run-1', RANGE_ATTRIBUTION]]),
+      );
+
+      const result = await build(
+        prisma,
+        createNotifications(),
+        attribution,
+      ).findOne(org, 'run-1');
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.delta?.attribution).toEqual(RANGE_ATTRIBUTION);
+      expect(attribution.attribute).toHaveBeenCalledTimes(1);
+      expect(attribution.attribute).toHaveBeenCalledWith({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        pairs: [{ key: 'run-1', baseSha: BASE_SHA, headSha: HEAD_SHA }],
+      });
+    });
+
+    it('carries an unknown attribution as a value, not as null', async () => {
+      const prisma = createPrisma();
+      mockDelta(prisma, [{ current: 'pass', previous: 'fail' }]);
+      const attribution = createAttribution();
+      attribution.attribute.mockResolvedValue(
+        new Map([['run-1', UNKNOWN_ATTRIBUTION]]),
+      );
+
+      const result = await build(
+        prisma,
+        createNotifications(),
+        attribution,
+      ).findOne(org, 'run-1');
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.delta?.attribution).toEqual(UNKNOWN_ATTRIBUTION);
+    });
+
+    it('reports a null attribution and skips the work when the delta has no regressions and no fixes', async () => {
+      const prisma = createPrisma();
+      mockDelta(prisma, [
+        { current: 'pass', previous: 'pass' },
+        { current: 'fail', previous: 'fail' },
+      ]);
+      const attribution = createAttribution();
+
+      const result = await build(
+        prisma,
+        createNotifications(),
+        attribution,
+      ).findOne(org, 'run-1');
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.delta).toEqual({
+        regressions: [],
+        fixes: [],
+        attribution: null,
+      });
+      expect(attribution.attribute).not.toHaveBeenCalled();
+    });
+
+    it('reports a null attribution, and still succeeds, when attribution fails', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      const prisma = createPrisma();
+      mockDelta(prisma, [{ current: 'fail', previous: 'pass' }]);
+      const attribution = createAttribution();
+      attribution.attribute.mockRejectedValue(new Error('database down'));
+
+      try {
+        const result = await build(
+          prisma,
+          createNotifications(),
+          attribution,
+        ).findOne(org, 'run-1');
+
+        expect(result.ok).toBe(true);
+        if (!result.ok) return;
+        expect(result.value.delta).toEqual({
+          regressions: [{ testCaseId: 'case-0', caseName: 'Case 0' }],
+          fixes: [],
+          attribution: null,
+        });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0][0])).toContain('database down');
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('reports a null attribution when the service has no answer for the pair', async () => {
+      const prisma = createPrisma();
+      mockDelta(prisma, [{ current: 'fail', previous: 'pass' }]);
+
+      const result = await build(prisma).findOne(org, 'run-1');
+
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.delta?.attribution).toBeNull();
     });
   });
 });

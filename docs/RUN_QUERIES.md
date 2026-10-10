@@ -112,6 +112,10 @@ in the partition, and the detail needs exactly one. What stays shared is the cla
 `classifyCaseDelta` in `apps/api/src/modules/notifications/lib/regression-check.ts`, so the page and
 the regression alert never disagree.
 
+A non-null `delta` also carries `attribution`: the candidate commits between the predecessor's commit
+and this run's commit, or the reason it could not be computed. It is `null` when the delta has no
+regressions and no fixes. See `docs/COMMIT_ATTRIBUTION.md` for the shape and the limits.
+
 ## `GET /runs/regressions?projectId=<id>&limit=<n>`
 
 Scans the project's most recent finished runs, `limit` at most (1 to 50, default 20; `projectId` is
@@ -119,7 +123,9 @@ required), and returns every case that passed in
 the previous finished run of its suite and fails in the scanned one, with the run, suite and case names
 and the id of the run it is compared against, plus `runsScanned`. It shipped before this document
 mentioned it. It uses the same window query and the same classifier as the list delta above, filtered
-to the `regression` answer; the quality page reads it to show what recently broke.
+to the `regression` answer; the quality page reads it to show what recently broke. Each entry also
+carries `attribution` (the candidate commit range for the run that regressed, computed once per run;
+`null` only when attribution failed). See `docs/COMMIT_ATTRIBUTION.md`.
 
 ## `GET /runs/push-pass-rate?projectId=<id>&days=<n>`
 

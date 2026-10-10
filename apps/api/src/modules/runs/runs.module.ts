@@ -19,6 +19,7 @@ import { KnownCiJobKeys } from './known-ci-job-keys';
 import { OfficialCaseReconciler } from './official-case-reconciler';
 import { ReportBatchService } from './report-batch.service';
 import { REPORT_BATCH_REDIS } from './report-batch.tokens';
+import { RunAttributionService } from './run-attribution.service';
 import { RunIngestProcessor } from './run-ingest.processor';
 import { RunQueriesController } from './run-queries.controller';
 import { RunQueriesService } from './run-queries.service';
@@ -51,6 +52,7 @@ import { RunsService } from './runs.service';
   controllers: [RunsController, RunQueriesController, CiRunsController],
   providers: [
     RunsService,
+    RunAttributionService,
     RunQueriesService,
     RunIngestProcessor,
     ReportBatchService,

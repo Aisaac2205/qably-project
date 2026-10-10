@@ -442,6 +442,7 @@ describe('RunDetail what changed', () => {
     run.delta = {
       regressions: [{ testCaseId: 'tc-1', caseName: 'Login with valid credentials' }],
       fixes: [{ testCaseId: 'tc-2', caseName: 'Reset password' }],
+      attribution: null,
     }
     await act(async () => {
       renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
