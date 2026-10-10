@@ -1,4 +1,4 @@
-import { screen, act, fireEvent, waitFor } from '@testing-library/react'
+import { screen, act, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { RunDetail } from '@/features/runs/components/run-detail'
@@ -453,6 +453,36 @@ describe('RunDetail what changed', () => {
     expect(section).toHaveTextContent('Reset password')
     const link = screen.getByRole('link', { name: 'Login with valid credentials' })
     expect(link).toHaveAttribute('href', '/projects/proj-1/suites/suite-1')
+  })
+
+  it('lists the candidate commits between the runs inside the what-changed section', async () => {
+    const run = getFreshRun()
+    run.delta = {
+      regressions: [{ testCaseId: 'tc-1', caseName: 'Login with valid credentials' }],
+      fixes: [],
+      attribution: {
+        kind: 'range',
+        baseSha: 'b'.repeat(40),
+        headSha: 'a1b2c3d'.padEnd(40, '0'),
+        commits: [
+          {
+            sha: 'a1b2c3d'.padEnd(40, '0'),
+            message: 'fix: checkout total',
+            author: 'Ada Lovelace',
+            committedAt: '2026-06-16T10:00:00Z',
+            url: `https://github.com/acme/app/commit/${'a1b2c3d'.padEnd(40, '0')}`,
+            branch: 'main',
+          },
+        ],
+      },
+    }
+    await act(async () => {
+      renderWithQuery(<RunDetail projectId="proj-1" run={run} />)
+    })
+
+    const section = screen.getByRole('region', { name: /what changed/i })
+    expect(within(section).getByRole('heading', { level: 3, name: 'Candidate commits' })).toBeInTheDocument()
+    expect(within(section).getByText('fix: checkout total')).toBeInTheDocument()
   })
 
   it('hides the what-changed section entirely when there is nothing to compare (first run)', async () => {

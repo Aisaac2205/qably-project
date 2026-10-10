@@ -119,3 +119,19 @@ interface AttributedCommit {
 - **Scan limit.** For each call the service reads the newest 1000 `PUSH` events of the project's repository connection (`MAX_SCANNED_EVENTS`). If the connection has more, the oldest are not scanned, and a chain that needs them ends as `history_gap` instead of being guessed. `PULL_REQUEST` events are never read.
 - **Connection scope.** A project without a repository connection answers `no_repository_connected`, unless the two runs report the same commit or one of them reports none, which are decided from the run shas alone and need no connection. In those cases, and whenever no run pair needs the history, the database is not read at all.
 - **Run shas.** A run that reports no commit gives `no_commit_reported`. Short shas (7 or more hex characters) are matched against the recorded commits as described [above](#how-the-range-is-found).
+
+## Web
+
+The run detail page shows `delta.attribution` inside the "What changed" strip (`WhatChangedStrip`), below the regressions and fixes. `CommitRangeBlock` (`apps/web/src/features/runs/components/commit-range-block.tsx`) is the presentational block; the strip only decides whether to render it. When `attribution` is `null` no block is shown and the strip is unchanged.
+
+The block always has the heading "Candidate commits" and a hint saying the range comes from recorded pushes and does not prove which commit caused the change. Its body depends on the result:
+
+| Result | What is shown |
+|---|---|
+| `range` | A one-line summary with the commit count, then the commits **newest first**, like `git log`. The API still returns them oldest first; the block reverses a copy for display and never changes the payload. Each row has the short sha (7 characters, a link to `url` that opens in a new tab, plain text when there is no usable url), the first line of the message, the author, the branch and the commit date. The 5 newest are shown; when there are more, a "Show N more commits" button (`aria-expanded`, `aria-controls`) reveals the older ones below them. |
+| `same_commit` | One neutral line: both runs ran the same commit, with its short sha. |
+| `unknown` | One neutral line chosen by `reason`. It is informational, not an error: no alarm colour and no alert role. Each reason has its own copy in `runs.attribution.unknown.*`; the mapping is a `Record` over `RunAttributionUnknownReason`, so a new reason does not compile until it has copy. |
+
+Copy rule: the interface says "candidate", never "cause". The only place that mentions causes is the hint, and it denies it. Keep that when adding or translating strings under `runs.attribution`.
+
+Only `http` and `https` urls become links. A commit url comes from a webhook payload, so any other scheme is rendered as plain text.
