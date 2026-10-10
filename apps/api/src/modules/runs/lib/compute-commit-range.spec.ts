@@ -139,6 +139,18 @@ describe('computeCommitRange', () => {
       ).toEqual({ kind: 'same_commit', sha: sha('a') });
     });
 
+    it('returns the short sha as reported when both runs gave the same 7-character prefix', () => {
+      const short = sha('a').slice(0, 7);
+
+      expect(
+        computeCommitRange({
+          baseSha: short.toUpperCase(),
+          headSha: ` ${short} `,
+          events: null,
+        }),
+      ).toEqual({ kind: 'same_commit', sha: short });
+    });
+
     it('does not treat a 6-character prefix as the same commit', () => {
       const tooShort = sha('a').slice(0, 6);
 
@@ -588,6 +600,95 @@ describe('computeCommitRange', () => {
     });
   });
 
+  describe('order of candidate pushes', () => {
+    /** Two pushes list f1 and f2 and both reach the base `a`: only the order decides. */
+    const bothReachTheBase = (
+      featureId: string,
+      mainId: string,
+    ): CommitRangeEvent[] => [
+      push({ id: 'p0', at: 1, commits: ['a'], before: 'a0' }),
+      push({
+        id: featureId,
+        at: 2,
+        branch: 'feature',
+        commits: ['f1', 'f2'],
+        before: 'a',
+      }),
+      push({ id: mainId, at: 2, commits: ['f1', 'f2', 'm'], before: 'a' }),
+    ];
+    const rangeOf = (events: readonly CommitRangeEvent[]) =>
+      computeCommitRange({ baseSha: sha('a'), headSha: sha('f2'), events });
+
+    it.each<[string, string, string, string]>([
+      ['the feature push', 'a-feature', 'b-main', 'feature'],
+      ['the main push', 'b-feature', 'a-main', 'main'],
+    ])(
+      'attributes the commits to %s when receivedAt ties and its id is smaller',
+      (_name, featureId, mainId, expectedBranch) => {
+        const events = bothReachTheBase(featureId, mainId);
+        const expectedEventId = [featureId, mainId].sort()[0];
+
+        const result = rangeOf(events);
+
+        expect(shasOf(result)).toEqual(labelsToShas('f1', 'f2'));
+        expect(
+          result.kind === 'range' &&
+            result.commits.map((c) => [c.eventId, c.branch]),
+        ).toEqual([
+          [expectedEventId, expectedBranch],
+          [expectedEventId, expectedBranch],
+        ]);
+        for (const ordering of permutations(events)) {
+          expect(rangeOf(ordering)).toEqual(result);
+        }
+      },
+    );
+
+    const withReceivedAt = (
+      events: CommitRangeEvent[],
+      receivedAt: Record<string, Date | string>,
+    ): CommitRangeEvent[] =>
+      events.map((event) =>
+        event.id in receivedAt
+          ? { ...event, receivedAt: receivedAt[event.id] }
+          : event,
+      );
+
+    it.each<[string, Record<string, Date | string>, string]>([
+      [
+        'sorts an unparseable string as the oldest push',
+        { feature: 'not-a-date' },
+        'merge',
+      ],
+      [
+        'sorts an Invalid Date as the oldest push',
+        { merge: new Date(Number.NaN) },
+        'feature',
+      ],
+      [
+        'falls back to the id when every receivedAt is unparseable',
+        { feature: 'not-a-date', merge: 'also-not-a-date' },
+        'feature',
+      ],
+    ])(
+      '%s without throwing, for every input order',
+      (_name, receivedAt, expectedEventId) => {
+        const events = withReceivedAt(
+          bothReachTheBase('feature', 'merge'),
+          receivedAt,
+        );
+
+        for (const ordering of permutations(events)) {
+          const result = rangeOf(ordering);
+          expect(result.kind).toBe('range');
+          expect(
+            result.kind === 'range' && result.commits.map((c) => c.eventId),
+          ).toEqual([expectedEventId, expectedEventId]);
+        }
+      },
+    );
+  });
+
   describe('history_gap', () => {
     const base = push({ id: 'e0', at: 1, commits: ['b'], before: 'b0' });
 
@@ -697,6 +798,51 @@ describe('computeCommitRange', () => {
       expect(
         computeCommitRange({ baseSha: sha('b'), headSha: sha('c'), events }),
       ).toEqual({ kind: 'unknown', reason: 'history_rewritten' });
+    });
+
+    it.each<[string, string]>([
+      ['an unrecorded tip', 'old'],
+      ['the baseline', 'b'],
+    ])(
+      'reports it, not a gap, when the push is forced and truncated (beforeSha is %s)',
+      (_name, before) => {
+        const events = [
+          push({ id: 'e1', at: 1, commits: ['b'], before: 'b0' }),
+          push({
+            id: 'e2',
+            at: 2,
+            commits: ['c'],
+            before,
+            forced: true,
+            truncated: true,
+          }),
+        ];
+
+        expect(
+          computeCommitRange({ baseSha: sha('b'), headSha: sha('c'), events }),
+        ).toEqual({ kind: 'unknown', reason: 'history_rewritten' });
+      },
+    );
+
+    it('still returns a range when the base is inside a forced and truncated push', () => {
+      const events = [
+        push({
+          id: 'e1',
+          at: 1,
+          commits: ['b', 'c'],
+          before: 'old',
+          forced: true,
+          truncated: true,
+        }),
+      ];
+
+      const result = computeCommitRange({
+        baseSha: sha('b'),
+        headSha: sha('c'),
+        events,
+      });
+
+      expect(shasOf(result)).toEqual(labelsToShas('c'));
     });
 
     it('still returns a range when the base is inside the forced push', () => {
@@ -924,6 +1070,47 @@ describe('computeCommitRange', () => {
       expect(
         computeCommitRange({ baseSha: sha('b'), headSha: sha('h'), events }),
       ).toEqual({ kind: 'unknown', reason: 'history_rewritten' });
+    });
+
+    it.each<[string, string]>([
+      ['never recorded', sha('stranger')],
+      ['not hex', 'not-a-sha'],
+      ['shorter than 7 characters', sha('c1').slice(0, 6)],
+    ])(
+      'reports commit_not_in_history before range_too_large when the base is %s',
+      (_name, baseSha) => {
+        const events = [
+          push({
+            id: 'e1',
+            at: 1,
+            commits: ['c1', 'c2', 'c3', 'c4'],
+            before: 'x',
+          }),
+        ];
+
+        expect(
+          computeCommitRange({
+            baseSha,
+            headSha: sha('c4'),
+            events,
+            maxCommits: 3,
+          }),
+        ).toEqual({ kind: 'unknown', reason: 'commit_not_in_history' });
+      },
+    );
+
+    it('reports commit_not_in_history before history_rewritten when the base is unresolved', () => {
+      const events = [
+        push({ id: 'e1', at: 1, commits: ['h'], before: 'old', forced: true }),
+      ];
+
+      expect(
+        computeCommitRange({
+          baseSha: sha('stranger'),
+          headSha: sha('h'),
+          events,
+        }),
+      ).toEqual({ kind: 'unknown', reason: 'commit_not_in_history' });
     });
 
     it('reports commit_not_in_history for an unknown base even when the head chain is intact', () => {

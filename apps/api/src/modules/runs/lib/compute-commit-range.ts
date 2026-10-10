@@ -149,8 +149,9 @@ export function computeCommitRange(
 }
 
 /**
- * Picks the reason when no chain was proven, by priority: out_of_order,
- * range_too_large, history_rewritten, commit_not_in_history (base unknown),
+ * Picks the reason when no chain was proven, by priority: out_of_order (needs
+ * a resolved base), commit_not_in_history (unresolved base: no cap or history
+ * could make the range computable), range_too_large, history_rewritten,
  * different_branch, history_gap.
  */
 function explainFailure(
@@ -170,9 +171,9 @@ function explainFailure(
   ) {
     return 'out_of_order';
   }
+  if (baseSha === null) return 'commit_not_in_history';
   if (walk.hitLimit) return 'range_too_large';
   if (walk.crossedForcedPush) return 'history_rewritten';
-  if (baseSha === null) return 'commit_not_in_history';
   const baseBranches = branchesInvolving(events, baseSha);
   const headBranches = branchesInvolving(events, headSha);
   return areDisjoint(baseBranches, headBranches)
@@ -230,11 +231,13 @@ function walkBack(
     ) {
       return true;
     }
-    if (event.commitsTruncated) return false;
+    // Forced is checked before truncated: a rewrite is the stronger fact when
+    // a push is both, and neither lets the walk continue.
     if (event.forced) {
       crossedForcedPush = true;
       return false;
     }
+    if (event.commitsTruncated) return false;
     if (event.beforeSha === null) return false;
     return explore(event.beforeSha);
   };
