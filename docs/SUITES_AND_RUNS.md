@@ -266,10 +266,12 @@ has been documented since.
 
 Two nullable columns on `run_case` record it:
 
-- `catalog_snapshot` is the content: JSON of `{ name, steps, expectedResult, version }`
+- `catalog_snapshot` is the content: JSON of `{ name, steps, expectedResult, version, origin }`
   (`RunCaseCatalogSnapshot` in `apps/api/src/modules/runs/lib/catalog-snapshot.ts`). `version` is the
   number of the catalog version in force at the time, or `null` when the case had none, which is the case
-  for a draft that ingestion has just created and for a case that was never approved. It is JSON because a
+  for a draft that ingestion has just created and for a case that was never approved. `origin` is `ingest`
+  for content read from the catalog when the run was reported and `backfill` for content filled in
+  afterwards (below); it is absent on snapshots written before the marker existed. It is JSON because a
   Prisma `String[]` cannot be null, and a row that was never snapshotted has to stay distinguishable from a
   case documented with no steps.
 - `test_case_version_id` is a foreign key to `test_case_version` with `ON DELETE SET NULL`. It is
@@ -296,7 +298,9 @@ before snapshots existed. From the snapshot come `officialCase.name`, `steps`, `
 and is what the Aeris action reads.
 
 Two limits are worth stating. Rows recorded before this change have `NULL` in both columns and keep
-reading the live case until a backfill gives them a snapshot. And when a catalog case is deleted,
+reading the live case until a backfill gives them a snapshot; the owner-run backfill, which fills them with
+the last published version in force when the run started and marks the result `origin: 'backfill'`, is
+`docs/OPS_BACKFILL_RUN_CASE_SNAPSHOTS.md`. And when a catalog case is deleted,
 `run_case.test_case_id` is set to `NULL`, `officialCase` is `null` and the run detail falls back to what the
 reporter sent; the snapshot is still stored on the row, but no read path surfaces it for an unlinked row.
 

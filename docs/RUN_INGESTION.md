@@ -195,8 +195,9 @@ the run and a finished run has to keep showing what it ran. For every case the r
 the ingest transaction reads the content of the linked `TestCase` once (the same read serves matched cases
 and the drafts it just created) and writes two columns on the `RunCase`: `testCaseVersionId`, the
 `currentVersionId` in force (`null` for a draft or a case never approved), and `catalogSnapshot`, JSON of
-`{ name, steps, expectedResult, version }`. The version link is provenance only; the snapshot is the
-content and is what survives when the case is deleted. A reported case that matched no catalog case
+`{ name, steps, expectedResult, version, origin }`, where `origin` is `ingest` here and `backfill` for
+rows filled later by `docs/OPS_BACKFILL_RUN_CASE_SNAPSHOTS.md`. The version link is provenance only; the
+snapshot is the content and is what survives when the case is deleted. A reported case that matched no catalog case
 records neither. How the run detail reads the snapshot, and what stays live, is described in
 `docs/SUITES_AND_RUNS.md`, *The catalog content a run executed*.
 

@@ -1,14 +1,30 @@
 /**
+ * How a snapshot came to exist. `ingest` is the exact content read from the
+ * catalog when the run was reported. `backfill` is the last published version
+ * in force when the run started, filled in afterwards for a row recorded before
+ * snapshots existed: an approximation, because content edited in place after a
+ * publish belongs to no version and cannot be reconstructed.
+ */
+export type CatalogSnapshotOrigin = 'ingest' | 'backfill';
+
+const SNAPSHOT_ORIGINS: readonly CatalogSnapshotOrigin[] = [
+  'ingest',
+  'backfill',
+];
+
+/**
  * The catalog content a run case executed against, stored inline on the run
  * case so a finished run keeps showing it after the catalog case is edited or
  * deleted. `version` is the number of the catalog version in force at the time,
  * or null when the case had none (a draft, or a case never approved).
+ * `origin` is absent on snapshots written before the marker existed.
  */
 export type RunCaseCatalogSnapshot = {
   name: string;
   steps: string[];
   expectedResult: string;
   version: number | null;
+  origin?: CatalogSnapshotOrigin;
 };
 
 /** The columns of a catalog case a snapshot is built from. */
@@ -37,6 +53,7 @@ export function buildCatalogSnapshot(
     steps: [...catalogCase.steps],
     expectedResult: catalogCase.expectedResult,
     version: catalogCase.currentVersion?.version ?? null,
+    origin: 'ingest',
   };
 }
 
@@ -48,6 +65,10 @@ function isStringArray(value: unknown): value is string[] {
 
 function isVersionNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1;
+}
+
+function isSnapshotOrigin(value: unknown): value is CatalogSnapshotOrigin {
+  return SNAPSHOT_ORIGINS.some((origin) => origin === value);
 }
 
 /**
@@ -63,7 +84,7 @@ export function parseCatalogSnapshot(
   }
 
   try {
-    const { name, steps, expectedResult, version } = value as Record<
+    const { name, steps, expectedResult, version, origin } = value as Record<
       string,
       unknown
     >;
@@ -72,8 +93,15 @@ export function parseCatalogSnapshot(
     if (!isStringArray(steps)) return null;
     if (typeof expectedResult !== 'string') return null;
     if (version !== null && !isVersionNumber(version)) return null;
+    if (origin !== undefined && !isSnapshotOrigin(origin)) return null;
 
-    return { name, steps: [...steps], expectedResult, version };
+    return {
+      name,
+      steps: [...steps],
+      expectedResult,
+      version,
+      ...(origin === undefined ? {} : { origin }),
+    };
   } catch {
     return null;
   }

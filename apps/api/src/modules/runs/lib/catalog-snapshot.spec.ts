@@ -20,6 +20,7 @@ function content(
   };
 }
 
+// The shape of a snapshot written before the origin marker existed.
 const validSnapshot = {
   name: 'Valid login redirects to dashboard',
   steps: ['Open /login', 'Submit valid credentials'],
@@ -29,7 +30,14 @@ const validSnapshot = {
 
 describe('buildCatalogSnapshot', () => {
   it('copies the executed content and the version number in force', () => {
-    expect(buildCatalogSnapshot(content())).toEqual(validSnapshot);
+    expect(buildCatalogSnapshot(content())).toEqual({
+      ...validSnapshot,
+      origin: 'ingest',
+    });
+  });
+
+  it('marks the snapshot as taken at ingest', () => {
+    expect(buildCatalogSnapshot(content()).origin).toBe('ingest');
   });
 
   it('records a null version for a case that has never been approved', () => {
@@ -65,6 +73,35 @@ describe('buildCatalogSnapshot', () => {
     expect(parseCatalogSnapshot(JSON.parse(JSON.stringify(snapshot)))).toEqual(
       snapshot,
     );
+  });
+});
+
+describe('parseCatalogSnapshot origin marker', () => {
+  it.each(['ingest', 'backfill'] as const)(
+    'accepts the %s origin and returns it',
+    (origin) => {
+      expect(parseCatalogSnapshot({ ...validSnapshot, origin })).toEqual({
+        ...validSnapshot,
+        origin,
+      });
+    },
+  );
+
+  it('tolerates a snapshot without an origin and does not invent one', () => {
+    const parsed = parseCatalogSnapshot(validSnapshot);
+
+    expect(parsed).toEqual(validSnapshot);
+    expect(parsed).not.toHaveProperty('origin');
+  });
+
+  it.each([
+    ['an unknown value', 'import'],
+    ['an empty string', ''],
+    ['a number', 1],
+    ['null', null],
+    ['an object', { kind: 'backfill' }],
+  ])('returns null when the origin is %s', (_label, origin) => {
+    expect(parseCatalogSnapshot({ ...validSnapshot, origin })).toBeNull();
   });
 });
 
@@ -174,7 +211,7 @@ describe('resolveExecutedCatalog', () => {
 
     expect(executed.get('case-1')).toEqual({
       testCaseVersionId: 'version-3',
-      snapshot: { ...validSnapshot, name: 'Edited title' },
+      snapshot: { ...validSnapshot, name: 'Edited title', origin: 'ingest' },
     });
   });
 
@@ -237,10 +274,32 @@ describe('resolveExecutedCatalog', () => {
 
       expect(executed.get('case-1')).toEqual({
         testCaseVersionId: 'version-3',
-        snapshot: { ...validSnapshot, name: 'Edited title' },
+        snapshot: { ...validSnapshot, name: 'Edited title', origin: 'ingest' },
       });
     },
   );
+
+  it('keeps the backfill origin of a previous snapshot instead of relabelling it as ingest', () => {
+    const backfilled = {
+      name: 'Title in force when the run started',
+      steps: ['Step in force'],
+      expectedResult: 'Result in force',
+      version: 2,
+      origin: 'backfill',
+    };
+
+    const executed = resolveExecutedCatalog(current, [
+      previousRow({
+        testCaseVersionId: 'version-2',
+        catalogSnapshot: backfilled,
+      }),
+    ]);
+
+    expect(executed.get('case-1')).toEqual({
+      testCaseVersionId: 'version-2',
+      snapshot: backfilled,
+    });
+  });
 
   it('skips a previous row that is a malformed one and uses the next valid snapshot of the same case', () => {
     const executed = resolveExecutedCatalog(current, [

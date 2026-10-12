@@ -1171,6 +1171,7 @@ describe('RunQueriesService.createManual', () => {
           steps: ['open', 'add'],
           expectedResult: 'cart has one item',
           version: 4,
+          origin: 'ingest',
         },
       }),
       expect.objectContaining({
@@ -1181,6 +1182,7 @@ describe('RunQueriesService.createManual', () => {
           steps: ['open', 'remove'],
           expectedResult: 'cart is empty',
           version: null,
+          origin: 'ingest',
         },
       }),
     ]);

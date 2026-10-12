@@ -1473,6 +1473,7 @@ interface SnapshotWrite {
     steps: string[];
     expectedResult: string;
     version: number | null;
+    origin?: string;
   };
 }
 
@@ -1543,6 +1544,7 @@ describe('RunsService.ingest catalog snapshot', () => {
           steps: ['Open the cart', 'Add an item'],
           expectedResult: 'The cart holds one item',
           version: 1,
+          origin: 'ingest',
         },
       }),
     );
@@ -1603,6 +1605,7 @@ describe('RunsService.ingest catalog snapshot', () => {
           steps: [],
           expectedResult: '',
           version: null,
+          origin: 'ingest',
         },
       }),
     );
@@ -1739,6 +1742,7 @@ describe('RunsService.ingest catalog snapshot on a re-report', () => {
           steps: ['Remove it'],
           expectedResult: 'The cart is empty',
           version: 9,
+          origin: 'ingest',
         },
       }),
     );
