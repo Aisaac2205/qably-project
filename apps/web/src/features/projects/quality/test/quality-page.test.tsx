@@ -80,6 +80,7 @@ const regressions: RegressionsRecord = {
       caseName: 'Applies discount code',
       previousRunId: 'run-1',
       detectedAt: '2026-06-16T10:05:00Z',
+      attribution: null,
     },
   ],
   runsScanned: 2,

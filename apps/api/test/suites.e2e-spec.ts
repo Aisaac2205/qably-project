@@ -83,6 +83,7 @@ describe('Suites (e2e)', () => {
       count: jest.fn(),
     },
     extractedProposal: { findMany: jest.fn() },
+    run: { findFirst: jest.fn() },
     runCase: { findMany: jest.fn() },
     caseIdentityCollision: { groupBy: jest.fn() },
     $transaction: jest.fn(),
@@ -111,6 +112,7 @@ describe('Suites (e2e)', () => {
     prisma.extractedProposal.findMany.mockResolvedValue([]);
     prisma.testCase.findMany.mockResolvedValue([]);
     prisma.testCase.count.mockResolvedValue(0);
+    prisma.run.findFirst.mockResolvedValue(null);
     prisma.runCase.findMany.mockResolvedValue([]);
     prisma.$queryRaw.mockResolvedValue([]);
     prisma.organization.findUnique.mockResolvedValue({
@@ -324,6 +326,19 @@ describe('Suites (e2e)', () => {
     expect(prisma.suite.delete).toHaveBeenCalledWith({
       where: { id: 'suite-1' },
     });
+  });
+
+  it('answers 409 has-history and keeps the suite when it has runs', async () => {
+    prisma.run.findFirst.mockResolvedValue({ id: 'run-1' });
+
+    const response = await request(app.getHttpServer())
+      .delete('/suites/suite-1')
+      .expect(409);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({ code: 'has-history' }),
+    );
+    expect(prisma.suite.delete).not.toHaveBeenCalled();
   });
 
   it('answers 403 when the organization header names a foreign organization', async () => {

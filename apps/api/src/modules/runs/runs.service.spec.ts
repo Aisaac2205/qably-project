@@ -16,7 +16,15 @@ const apiKey: ApiKeyIdentity = {
 const suiteRow = { id: 'suite-1', name: 'Checkout' };
 
 const officialCases = [
-  { id: 'case-1', name: 'Adds to cart', automationKey: 'Adds to cart' },
+  {
+    id: 'case-1',
+    name: 'Adds to cart',
+    automationKey: 'Adds to cart',
+    steps: ['Open the cart', 'Add an item'],
+    expectedResult: 'The cart holds one item',
+    currentVersionId: 'version-1',
+    currentVersion: { version: 1 },
+  },
 ];
 
 const runRow = {
@@ -594,7 +602,8 @@ describe('RunsService.ingest test case linking', () => {
     await build(prisma).ingest(apiKey, baseInput);
 
     expect(prisma.testCase.createMany).not.toHaveBeenCalled();
-    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(1);
+    // One read of the suite to match, one read of the matched cases' content.
+    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -630,6 +639,10 @@ describe('RunsService.ingest legacy name fallback', () => {
         id: 'case-1',
         automationKey: 'Adds to cart',
         name: 'Adds an item to the shopping cart',
+        steps: [],
+        expectedResult: '',
+        currentVersionId: null,
+        currentVersion: null,
       },
     ]);
 
@@ -1436,16 +1449,347 @@ describe('RunsService.ingest official case linkage', () => {
 
     await build(prisma).ingest(apiKey, baseInput);
 
-    const [call] = prisma.txRunCaseFindMany.mock.calls as [
-      [{ select: { testCase: { select: Record<string, unknown> } } }],
-    ];
-    expect(call[0].select.testCase.select).toMatchObject({
+    const reloads = (
+      prisma.txRunCaseFindMany.mock.calls as [
+        { select: { testCase?: { select: Record<string, unknown> } } },
+      ][]
+    ).filter(([arg]) => arg.select.testCase !== undefined);
+    expect(reloads).toHaveLength(1);
+    expect(reloads[0][0].select.testCase?.select).toMatchObject({
       name: true,
       executionMode: true,
       automationKey: true,
       automationClassName: true,
       automationFilePath: true,
     });
+  });
+});
+
+interface SnapshotWrite {
+  testCaseId: string | null;
+  testCaseVersionId?: string | null;
+  catalogSnapshot?: {
+    name: string;
+    steps: string[];
+    expectedResult: string;
+    version: number | null;
+    origin?: string;
+  };
+}
+
+function writtenRows(prisma: FakePrisma): SnapshotWrite[] {
+  const [call] = prisma.runCase.createManyAndReturn.mock.calls as [
+    [{ data: SnapshotWrite[] }],
+  ];
+
+  return call[0].data;
+}
+
+function catalogContent(
+  id: string,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id,
+    name: `Catalog ${id}`,
+    steps: [`Catalog step of ${id}`],
+    expectedResult: `Catalog result of ${id}`,
+    currentVersionId: null,
+    currentVersion: null,
+    ...overrides,
+  };
+}
+
+function previousRunCase(
+  testCaseId: string | null,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    testCaseId,
+    testCaseVersionId: 'version-old',
+    catalogSnapshot: {
+      name: 'Title as first executed',
+      steps: ['Step as first executed'],
+      expectedResult: 'Result as first executed',
+      version: 1,
+    },
+    ...overrides,
+  };
+}
+
+describe('RunsService.ingest catalog snapshot', () => {
+  it('records the version in force and the catalog content, not what the reporter sent', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'Adds to cart',
+          steps: ['Reporter step'],
+          expectedResult: 'Reporter result',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(writtenRows(prisma)[0]).toEqual(
+      expect.objectContaining({
+        testCaseId: 'case-1',
+        testCaseVersionId: 'version-1',
+        steps: ['Reporter step'],
+        expectedResult: 'Reporter result',
+        catalogSnapshot: {
+          name: 'Adds to cart',
+          steps: ['Open the cart', 'Add an item'],
+          expectedResult: 'The cart holds one item',
+          version: 1,
+          origin: 'ingest',
+        },
+      }),
+    );
+  });
+
+  it('snapshots the content of a case that has no version in force with a null version', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([
+      {
+        ...officialCases[0],
+        currentVersionId: null,
+        currentVersion: null,
+      },
+    ]);
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    const row = writtenRows(prisma)[0];
+    expect(row.testCaseVersionId).toBeNull();
+    expect(row.catalogSnapshot).toEqual(
+      expect.objectContaining({ name: 'Adds to cart', version: null }),
+    );
+  });
+
+  it('snapshots a freshly created draft with its current content and a null version', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'draft-case-1', automationKey: 'Unmatched case' },
+      ])
+      .mockResolvedValueOnce([
+        catalogContent('draft-case-1', {
+          name: 'Unmatched case',
+          steps: [],
+          expectedResult: '',
+        }),
+      ]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'Unmatched case',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(writtenRows(prisma)[0]).toEqual(
+      expect.objectContaining({
+        testCaseId: 'draft-case-1',
+        testCaseVersionId: null,
+        catalogSnapshot: {
+          name: 'Unmatched case',
+          steps: [],
+          expectedResult: '',
+          version: null,
+          origin: 'ingest',
+        },
+      }),
+    );
+  });
+
+  it('records neither a version nor a snapshot for a case that matched no catalog case', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'tests.a::test_x',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+        {
+          name: 'test_x',
+          className: 'tests.a',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    for (const row of writtenRows(prisma)) {
+      expect(row.testCaseId).toBeNull();
+      expect(row.testCaseVersionId).toBeNull();
+      expect(row).not.toHaveProperty('catalogSnapshot');
+    }
+  });
+
+  it('reads the content with a single extra query and loads no steps for unreported cases', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    const [matchCall, contentCall] = prisma.testCase.findMany.mock.calls as [
+      [{ where: unknown; select: Record<string, unknown> }],
+      [{ where: unknown; select: Record<string, unknown> }],
+    ];
+    expect(prisma.testCase.findMany).toHaveBeenCalledTimes(2);
+    expect(matchCall[0].select).not.toHaveProperty('steps');
+    expect(contentCall[0].where).toEqual({ id: { in: ['case-1'] } });
+    expect(contentCall[0].select).toMatchObject({
+      steps: true,
+      expectedResult: true,
+      currentVersionId: true,
+    });
+  });
+});
+
+describe('RunsService.ingest catalog snapshot on a re-report', () => {
+  it('reads the rows it is about to replace before deleting them', async () => {
+    const prisma = createPrisma();
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(prisma.txRunCaseFindMany).toHaveBeenCalledWith({
+      where: { runId: 'run-1', testCaseId: { not: null } },
+      select: {
+        testCaseId: true,
+        testCaseVersionId: true,
+        catalogSnapshot: true,
+      },
+      orderBy: { position: 'asc' },
+    });
+    const readOrder = prisma.txRunCaseFindMany.mock.invocationCallOrder[0];
+    const deleteOrder = prisma.runCase.deleteMany.mock.invocationCallOrder[0];
+    expect(readOrder).toBeLessThan(deleteOrder);
+  });
+
+  it('keeps the snapshot the run already holds instead of the newer catalog content', async () => {
+    const prisma = createPrisma();
+    prisma.txRunCaseFindMany.mockResolvedValueOnce([previousRunCase('case-1')]);
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(writtenRows(prisma)[0]).toEqual(
+      expect.objectContaining({
+        testCaseId: 'case-1',
+        testCaseVersionId: 'version-old',
+        catalogSnapshot: {
+          name: 'Title as first executed',
+          steps: ['Step as first executed'],
+          expectedResult: 'Result as first executed',
+          version: 1,
+        },
+      }),
+    );
+  });
+
+  it('snapshots the current content for a case the previous report did not hold', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([
+      officialCases[0],
+      {
+        ...officialCases[0],
+        id: 'case-2',
+        name: 'Removes from cart',
+        automationKey: 'Removes from cart',
+        steps: ['Remove it'],
+        expectedResult: 'The cart is empty',
+        currentVersionId: 'version-9',
+        currentVersion: { version: 9 },
+      },
+    ]);
+    prisma.txRunCaseFindMany.mockResolvedValueOnce([previousRunCase('case-1')]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        { name: 'Adds to cart', steps: [], expectedResult: '', status: 'pass' },
+        {
+          name: 'Removes from cart',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    const [first, second] = writtenRows(prisma);
+    expect(first.catalogSnapshot?.name).toBe('Title as first executed');
+    expect(second).toEqual(
+      expect.objectContaining({
+        testCaseId: 'case-2',
+        testCaseVersionId: 'version-9',
+        catalogSnapshot: {
+          name: 'Removes from cart',
+          steps: ['Remove it'],
+          expectedResult: 'The cart is empty',
+          version: 9,
+          origin: 'ingest',
+        },
+      }),
+    );
+  });
+
+  it('snapshots the current content when the previous row predates snapshots', async () => {
+    const prisma = createPrisma();
+    prisma.txRunCaseFindMany.mockResolvedValueOnce([
+      previousRunCase('case-1', {
+        testCaseVersionId: null,
+        catalogSnapshot: null,
+      }),
+    ]);
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    expect(writtenRows(prisma)[0]).toEqual(
+      expect.objectContaining({
+        testCaseVersionId: 'version-1',
+        catalogSnapshot: expect.objectContaining({
+          name: 'Adds to cart',
+          version: 1,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('lets the first of two previous rows for the same case win', async () => {
+    const prisma = createPrisma();
+    prisma.txRunCaseFindMany.mockResolvedValueOnce([
+      previousRunCase('case-1', { testCaseVersionId: 'version-first' }),
+      previousRunCase('case-1', {
+        testCaseVersionId: 'version-second',
+        catalogSnapshot: {
+          name: 'Second row',
+          steps: [],
+          expectedResult: '',
+          version: 2,
+        },
+      }),
+    ]);
+
+    await build(prisma).ingest(apiKey, baseInput);
+
+    const row = writtenRows(prisma)[0];
+    expect(row.testCaseVersionId).toBe('version-first');
+    expect(row.catalogSnapshot?.name).toBe('Title as first executed');
   });
 });
 

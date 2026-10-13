@@ -83,6 +83,7 @@ export function useUpdateSuite() {
 }
 
 export function useDeleteSuite() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -99,6 +100,11 @@ export function useDeleteSuite() {
       markRunDetailsStale(queryClient)
       markRunPagesStale(queryClient, projectId)
       markCiRunsStale(queryClient, projectId)
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.code === 'has-history') {
+        notify.error(t('suites.deleteSuiteHasHistory'))
+      }
     },
   })
 }

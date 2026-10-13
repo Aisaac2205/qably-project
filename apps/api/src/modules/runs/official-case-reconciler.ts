@@ -3,6 +3,10 @@ import { humanizeTestName } from '@qably/test-naming';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  CATALOG_CONTENT_SELECT,
+  type CatalogCaseContent,
+} from './lib/catalog-snapshot';
+import {
   findCaseIdentityCollisions,
   findLegacyKeyCollisions,
   resolveCaseIdentityKey,
@@ -43,6 +47,12 @@ export interface CollisionTx {
 
 export interface ReconcileResult {
   caseIdByKey: Map<string, string>;
+  /**
+   * The catalog content of every case in `caseIdByKey`, matched or newly
+   * created, as it stands when the reconcile finishes. It is what a run
+   * snapshots as the content it executed.
+   */
+  catalogByCaseId: Map<string, CatalogCaseContent>;
   createdCaseIds: string[];
   identityKeys: CaseIdentityCollision[];
   legacyKeys: LegacyKeyCollision[];
@@ -167,6 +177,7 @@ export class OfficialCaseReconciler {
     if (missingKeys.length === 0) {
       return {
         caseIdByKey: resultByKey,
+        catalogByCaseId: await this.loadCatalogContent(tx, resultByKey),
         createdCaseIds: [],
         identityKeys: identityCollisions,
         legacyKeys: legacyCollisions,
@@ -217,10 +228,31 @@ export class OfficialCaseReconciler {
 
     return {
       caseIdByKey: resultByKey,
+      catalogByCaseId: await this.loadCatalogContent(tx, resultByKey),
       createdCaseIds,
       identityKeys: identityCollisions,
       legacyKeys: legacyCollisions,
     };
+  }
+
+  /**
+   * One query for the content of exactly the cases this report resolved to, so
+   * the suite-wide match above never has to carry steps or expected results.
+   */
+  private async loadCatalogContent(
+    tx: Pick<AdoptionTx, 'testCase'>,
+    caseIdByKey: ReadonlyMap<string, string>,
+  ): Promise<Map<string, CatalogCaseContent>> {
+    const ids = [...new Set(caseIdByKey.values())];
+
+    if (ids.length === 0) return new Map();
+
+    const rows = await tx.testCase.findMany({
+      where: { id: { in: ids } },
+      select: CATALOG_CONTENT_SELECT,
+    });
+
+    return new Map(rows.map((row) => [row.id, row]));
   }
 
   async syncCollisions(

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DomainEventsModule } from './common/events/domain-events.module';
 import { ThrottlingModule } from './common/throttler/throttling.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -22,6 +23,7 @@ import { SuitesModule } from './modules/suites/suites.module';
 @Module({
   imports: [
     ThrottlingModule,
+    DomainEventsModule,
     ConfigModule,
     PrismaModule,
     AuthModule,

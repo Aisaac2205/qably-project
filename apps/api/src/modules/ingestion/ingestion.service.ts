@@ -9,6 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type {
   IngestError,
   IngestOutcome,
+  NormalizedScmCommit,
   NormalizedScmEvent,
   ScmEventJob,
   ScmHeaders,
@@ -36,6 +37,28 @@ function isUniqueViolation(error: unknown): boolean {
     error !== null &&
     (error as { code?: unknown }).code === UNIQUE_VIOLATION
   );
+}
+
+// An adapter promises an ISO timestamp or null; a stray value must not turn
+// into an Invalid Date that makes the whole insert throw.
+function toCommitTime(value: string | null): Date | null {
+  if (value === null) return null;
+
+  const time = new Date(value);
+
+  return Number.isNaN(time.getTime()) ? null : time;
+}
+
+function toCommitRow(commit: NormalizedScmCommit) {
+  return {
+    sha: commit.sha,
+    position: commit.position,
+    message: commit.message,
+    author: commit.author,
+    committedAt: toCommitTime(commit.committedAt),
+    url: commit.url,
+    attributedFiles: commit.attributedFiles,
+  };
 }
 
 function parseJson(rawBody: string): unknown {
@@ -153,6 +176,12 @@ export class IngestionService {
           title: event.title,
           url: event.url,
           changedFiles: event.changedFiles,
+          beforeSha: event.beforeSha,
+          forced: event.forced,
+          commitsTruncated: event.commitsTruncated,
+          // Nested so the event and its commits are written in one statement,
+          // which keeps unique(provider, eventId) the only idempotency guard.
+          commits: { create: event.commits.map(toCommitRow) },
         },
         select: { id: true },
       });

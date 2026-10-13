@@ -1,4 +1,7 @@
 import { Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import { DomainEvents } from '../../common/events/domain-events.service';
 import {
   testCaseAutomationKeyViolation,
   testCaseNameViolation,
@@ -98,13 +101,18 @@ function fakeReclassifier(
   return { enqueue } as unknown as ProposalReclassifier;
 }
 
+function fakeEvents(publish: jest.Mock = jest.fn()): DomainEvents {
+  return { publish } as unknown as DomainEvents;
+}
+
 function build(
   prisma: FakePrisma,
+  events: DomainEvents = fakeEvents(),
   reclassifier: ProposalReclassifier = fakeReclassifier(),
 ) {
   return new ReviewDecisionService(
     prisma as never,
-    reclassifier,
+    events,
     new ApprovalConflictDiagnoser(prisma as never, reclassifier),
   );
 }
@@ -550,7 +558,7 @@ describe('ReviewDecisionService.approve', () => {
     const add = jest.fn().mockRejectedValue(new Error('redis is down'));
     const reclassifier = new ProposalReclassifier({ add } as never);
 
-    const result = await build(prisma, reclassifier).approve(
+    const result = await build(prisma, fakeEvents(), reclassifier).approve(
       org,
       'proposal-1',
       { actorId: 'user-1' },
@@ -661,43 +669,6 @@ describe('ReviewDecisionService.approve', () => {
     expect(prisma.traceabilityLink.createMany).not.toHaveBeenCalled();
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
-
-  it('enqueues a reclassify job for the suite of a newly created case', async () => {
-    const prisma = createPrisma();
-    const enqueue = jest.fn().mockResolvedValue(undefined);
-
-    await build(prisma, fakeReclassifier(enqueue)).approve(org, 'proposal-1', {
-      actorId: 'user-1',
-    });
-
-    expect(enqueue).toHaveBeenCalledWith('suite-1');
-  });
-
-  it('enqueues a reclassify job for the suite of an existing target case', async () => {
-    const prisma = createPrisma({
-      targetTestCaseId: 'case-existing',
-      suiteId: 'suite-of-existing-case',
-    });
-    const enqueue = jest.fn().mockResolvedValue(undefined);
-
-    await build(prisma, fakeReclassifier(enqueue)).approve(org, 'proposal-1', {
-      actorId: 'user-1',
-    });
-
-    expect(enqueue).toHaveBeenCalledWith('suite-of-existing-case');
-  });
-
-  it('never enqueues a reclassify job when a concurrent decision wins the claim', async () => {
-    const prisma = createPrisma();
-    prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
-    const enqueue = jest.fn().mockResolvedValue(undefined);
-
-    await build(prisma, fakeReclassifier(enqueue)).approve(org, 'proposal-1', {
-      actorId: 'user-1',
-    });
-
-    expect(enqueue).not.toHaveBeenCalled();
-  });
 });
 
 describe('ReviewDecisionService.reject', () => {
@@ -749,17 +720,6 @@ describe('ReviewDecisionService.reject', () => {
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
   });
 
-  it('never enqueues a reclassify job on reject, since nothing about the case identity changed', async () => {
-    const prisma = createPrisma();
-    const enqueue = jest.fn().mockResolvedValue(undefined);
-
-    await build(prisma, fakeReclassifier(enqueue)).reject(org, 'proposal-1', {
-      actorId: 'user-1',
-    });
-
-    expect(enqueue).not.toHaveBeenCalled();
-  });
-
   it('still rejects a proposal that documents no steps', async () => {
     const prisma = createPrisma({ steps: [], needsManualReview: true });
 
@@ -788,6 +748,386 @@ describe('ReviewDecisionService.reject', () => {
 
     expect(result).toEqual({ ok: false, error: 'invalid-transition' });
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+// Resolves once every microtask the pending decision could still make has run.
+function settle(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
+
+// Holds the transaction open after its callback finished, so a publish that
+// happens "inside" it is distinguishable from one that waits for the commit.
+function holdTransactionOpen(prisma: FakePrisma): () => void {
+  const run = prisma.$transaction.getMockImplementation() as (
+    callback: unknown,
+  ) => Promise<unknown>;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  prisma.$transaction.mockImplementation(async (callback: unknown) => {
+    const value = await run(callback);
+    await gate;
+    return value;
+  });
+  return release;
+}
+
+function throwingEmitter(): DomainEvents {
+  const emit = jest.fn().mockImplementation(() => {
+    throw new Error('emitter failure');
+  });
+  return new DomainEvents({ emit } as unknown as EventEmitter2);
+}
+
+describe('ReviewDecisionService domain events', () => {
+  let error: jest.SpyInstance;
+
+  beforeEach(() => {
+    error = jest
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    error.mockRestore();
+  });
+
+  describe('approve', () => {
+    it('publishes proposal.approved once, with the ids of the new case', async () => {
+      const prisma = createPrisma();
+      const publish = jest.fn();
+
+      await build(prisma, fakeEvents(publish)).approve(org, 'proposal-1', {
+        actorId: 'user-1',
+      });
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith(DOMAIN_EVENTS.proposalApproved, {
+        proposalId: 'proposal-1',
+        projectId: 'project-1',
+        organizationId: 'org-1',
+        suiteId: 'suite-1',
+        testCaseId: 'case-new',
+        versionId: 'version-1',
+        createdNewCase: true,
+        actorId: 'user-1',
+      });
+    });
+
+    it('publishes the suite and version of an existing target case', async () => {
+      const prisma = createPrisma({
+        targetTestCaseId: 'case-existing',
+        suiteId: 'suite-of-existing-case',
+      });
+      prisma.testCaseVersion.count.mockResolvedValue(2);
+      prisma.testCaseVersion.create.mockResolvedValue({
+        id: 'version-3',
+        version: 3,
+      });
+      const publish = jest.fn();
+
+      await build(prisma, fakeEvents(publish)).approve(org, 'proposal-1', {
+        actorId: 'user-1',
+      });
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith(
+        DOMAIN_EVENTS.proposalApproved,
+        expect.objectContaining({
+          suiteId: 'suite-of-existing-case',
+          testCaseId: 'case-existing',
+          versionId: 'version-3',
+          createdNewCase: false,
+        }),
+      );
+    });
+
+    it('publishes a null suite when the targeted proposal carries none', async () => {
+      const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+      const publish = jest.fn();
+
+      await build(prisma, fakeEvents(publish)).approve(org, 'proposal-1', {
+        actorId: 'user-1',
+      });
+
+      expect(publish).toHaveBeenCalledWith(
+        DOMAIN_EVENTS.proposalApproved,
+        expect.objectContaining({ suiteId: null }),
+      );
+    });
+
+    it('publishes only after the transaction has resolved, never inside it', async () => {
+      const prisma = createPrisma();
+      const release = holdTransactionOpen(prisma);
+      const publish = jest.fn();
+
+      const pending = build(prisma, fakeEvents(publish)).approve(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+      await settle();
+
+      expect(prisma.reviewDecision.create).toHaveBeenCalledTimes(1);
+      expect(publish).not.toHaveBeenCalled();
+
+      release();
+      await pending;
+
+      expect(publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes nothing when the transaction throws', async () => {
+      const prisma = createPrisma();
+      prisma.testCase.create.mockRejectedValue(new Error('connection lost'));
+      const publish = jest.fn();
+
+      await expect(
+        build(prisma, fakeEvents(publish)).approve(org, 'proposal-1', {
+          actorId: 'user-1',
+        }),
+      ).rejects.toThrow('connection lost');
+
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes nothing on a unique violation', async () => {
+      const prisma = createPrisma();
+      prisma.testCase.create.mockRejectedValue(testCaseNameViolation());
+      const publish = jest.fn();
+
+      const result = await build(prisma, fakeEvents(publish)).approve(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result.ok).toBe(false);
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes nothing when a concurrent decision wins the claim', async () => {
+      const prisma = createPrisma();
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+
+      const result = await build(prisma, fakeEvents(publish)).approve(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'invalid-transition' });
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes nothing when the proposal is already decided', async () => {
+      const prisma = createPrisma({ status: 'approved' });
+      const publish = jest.fn();
+
+      await build(prisma, fakeEvents(publish)).approve(org, 'proposal-1', {
+        actorId: 'user-1',
+      });
+
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('returns the approval when publishing does nothing', async () => {
+      const prisma = createPrisma();
+
+      const result = await build(prisma, fakeEvents(jest.fn())).approve(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: { testCaseId: 'case-new', decisionId: 'decision-1' },
+      });
+    });
+
+    it('returns the approval when the emitter fails, because the decision is already committed', async () => {
+      const prisma = createPrisma();
+
+      const result = await build(prisma, throwingEmitter()).approve(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result).toMatchObject({
+        ok: true,
+        value: { testCaseId: 'case-new', decisionId: 'decision-1' },
+      });
+      expect(error).toHaveBeenCalledTimes(1);
+    });
+
+    it('no longer enqueues the reclassify job itself; the subscriber owns it', async () => {
+      const prisma = createPrisma();
+      const enqueue = jest.fn().mockResolvedValue(undefined);
+
+      await build(prisma, fakeEvents(), fakeReclassifier(enqueue)).approve(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(enqueue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('reject', () => {
+    it('publishes proposal.rejected once, with the decision id', async () => {
+      const prisma = createPrisma({ suiteId: 'suite-from-extraction' });
+      const publish = jest.fn();
+
+      await build(prisma, fakeEvents(publish)).reject(org, 'proposal-1', {
+        actorId: 'user-1',
+        comment: 'Evidence does not support the steps',
+      });
+
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith(DOMAIN_EVENTS.proposalRejected, {
+        proposalId: 'proposal-1',
+        projectId: 'project-1',
+        organizationId: 'org-1',
+        suiteId: 'suite-from-extraction',
+        decisionId: 'decision-1',
+        actorId: 'user-1',
+      });
+    });
+
+    it('falls back to the suite of the targeted case, then to null', async () => {
+      const targeted = createPrisma({
+        targetTestCaseId: 'case-existing',
+        targetTestCase: { automationFilePath: null, suiteId: 'suite-9' },
+      });
+      const targetedPublish = jest.fn();
+      const bare = createPrisma();
+      const barePublish = jest.fn();
+
+      await build(targeted, fakeEvents(targetedPublish)).reject(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+      await build(bare, fakeEvents(barePublish)).reject(org, 'proposal-1', {
+        actorId: 'user-1',
+      });
+
+      expect(targetedPublish).toHaveBeenCalledWith(
+        DOMAIN_EVENTS.proposalRejected,
+        expect.objectContaining({ suiteId: 'suite-9' }),
+      );
+      expect(barePublish).toHaveBeenCalledWith(
+        DOMAIN_EVENTS.proposalRejected,
+        expect.objectContaining({ suiteId: null }),
+      );
+    });
+
+    it('publishes only after the transaction has resolved, never inside it', async () => {
+      const prisma = createPrisma();
+      const release = holdTransactionOpen(prisma);
+      const publish = jest.fn();
+
+      const pending = build(prisma, fakeEvents(publish)).reject(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+      await settle();
+
+      expect(prisma.reviewDecision.create).toHaveBeenCalledTimes(1);
+      expect(publish).not.toHaveBeenCalled();
+
+      release();
+      await pending;
+
+      expect(publish).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes nothing when a concurrent decision wins the claim', async () => {
+      const prisma = createPrisma();
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+
+      const result = await build(prisma, fakeEvents(publish)).reject(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result).toEqual({ ok: false, error: 'invalid-transition' });
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes nothing when the transaction throws', async () => {
+      const prisma = createPrisma();
+      prisma.reviewDecision.create.mockRejectedValue(
+        new Error('connection lost'),
+      );
+      const publish = jest.fn();
+
+      await expect(
+        build(prisma, fakeEvents(publish)).reject(org, 'proposal-1', {
+          actorId: 'user-1',
+        }),
+      ).rejects.toThrow('connection lost');
+
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('publishes nothing when the proposal is already decided', async () => {
+      const prisma = createPrisma({ status: 'rejected' });
+      const publish = jest.fn();
+
+      await build(prisma, fakeEvents(publish)).reject(org, 'proposal-1', {
+        actorId: 'user-1',
+      });
+
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('returns the rejection when publishing does nothing', async () => {
+      const prisma = createPrisma();
+
+      const result = await build(prisma, fakeEvents(jest.fn())).reject(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result).toEqual({ ok: true, value: { decisionId: 'decision-1' } });
+    });
+
+    it('returns the rejection when the emitter fails, because the decision is already committed', async () => {
+      const prisma = createPrisma();
+
+      const result = await build(prisma, throwingEmitter()).reject(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(result).toEqual({ ok: true, value: { decisionId: 'decision-1' } });
+      expect(error).toHaveBeenCalledTimes(1);
+    });
+
+    it('never enqueues a reclassify job, since nothing about the case identity changed', async () => {
+      const prisma = createPrisma();
+      const enqueue = jest.fn().mockResolvedValue(undefined);
+
+      await build(prisma, fakeEvents(), fakeReclassifier(enqueue)).reject(
+        org,
+        'proposal-1',
+        { actorId: 'user-1' },
+      );
+
+      expect(enqueue).not.toHaveBeenCalled();
+    });
   });
 });
 

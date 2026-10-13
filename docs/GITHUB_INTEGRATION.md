@@ -24,6 +24,107 @@ A `Connection` belongs to the organization and owns the webhook secret. A `Proje
 `Connection` through a nullable foreign key, so the repository of a project is always **derived**
 from its connection and never stored twice.
 
+## What Qably reads from a push
+
+`github.adapter.ts` turns a `push` webhook into one normalized event. From the payload it reads
+`ref` (the branch), `repository.full_name`, `pusher.name` and `head_commit` (id, message, url and
+the `added`, `modified` and `removed` lists). It also reads three fields that describe the whole
+push, not just its last commit:
+
+- `before`, the commit the ref pointed at before the push. An all-zero value (a newly created ref)
+  or anything that is not a 40-character hex sha becomes `null`.
+- `forced`, true only when the payload says `forced: true`.
+- `commits`, every commit of the push. Each one keeps its sha (lowercase), its position in the
+  delivered order, the first line of its message (trimmed, at most 200 characters), its author
+  (username, else name, else `unknown`), its timestamp (kept as delivered only if it parses as a
+  date, otherwise `null`), its url and its `attributedFiles`, which is **not** the list of files the
+  commit touched (see
+  [Each code change names the last commit that touched its file](#each-code-change-names-the-last-commit-that-touched-its-file)).
+  An entry whose id is not a 40-character hex sha cannot be stored as a commit, but its files still
+  count for the changed files below.
+
+GitHub caps `commits` at 2048 entries. Qably keeps at most 250: when a push delivers more, it keeps
+the last 250 and numbers them from 0 again. `commitsTruncated` is true whenever the list is not the
+whole push, either because Qably cut it or because the delivery reached GitHub's own 2048 limit. The
+cap bounds only that list; the changed files below are computed from every delivered commit,
+including the ones that cannot be stored.
+
+Ingestion persists the event with `changedFiles`, `beforeSha`, `forced` and `commitsTruncated`
+(`scm_event`), and the kept commits in the same write (`scm_commit`).
+
+### Changed files are the net effect of the push
+
+Until now only `head_commit` was read, so the files of every earlier commit in a multi-commit push
+never reached extraction. `changedFiles` is now the net effect over all delivered commits. Commits
+are replayed in delivered order against a set of present paths: an added or modified path joins the
+set and a removed path leaves it. A file added and then removed inside the same push disappears, a
+file removed and then added again stays, and a file modified in several commits counts once. Paths
+keep the position where they were first seen, and entries that are not strings are ignored.
+
+GitHub does not document the order of `commits`, so the replay only runs when the last delivered
+commit is the head of the push, that is, its id equals `after` or `head_commit.id` (a last commit
+without a valid id never qualifies). When it is not, the order cannot be trusted and Qably falls
+back to the union of added and modified paths across every commit and the head commit, minus the
+paths the head commit removed. That can keep a file an earlier commit deleted, which is the safer
+error: a deleted file left in the list fails when it is read, while a live file dropped from the
+list would never be extracted. When `commits` is missing or empty (for example a payload that omits
+it) only `head_commit` is used, as before.
+
+The behavior change is that files from earlier commits of a multi-commit push are now extracted.
+They still pass through `Project.testFilePatterns`, so only matching test files become a
+`CodeChange` and can trigger AI extraction.
+
+A delivered commit whose id is missing, not a string or not a 40-character hex sha is still replayed
+with the others: its additions, modifications and removals take part in the net effect, so its files
+are never dropped from `changedFiles`. It is only left out of the stored `commits`. If it is the last
+delivered commit, the order cannot be verified (see above), so the union fallback applies.
+
+### Each code change names the last commit that touched its file
+
+`CodeChange.commitSha` is the last commit of the push that touched the file, not the tip of the push.
+Extraction reads the file at that sha, and the content there is the content at the tip, because no
+later commit of the push touched it.
+
+Each stored commit carries `scm_commit."attributedFiles"`: the paths a code change may be attributed
+to that commit for. **It is not the list of files the commit touched**, it can be partial or empty,
+and it must never be used to answer "which commits touched file X". The adapter fills it from the
+paths the commit added, modified or removed (distinct, in the order the payload lists them: added,
+modified, removed), but only the ones the commit can safely be named for:
+
+- at most 1000 paths per commit; the rest are not attributed to it;
+- empty when the delivered order is not verified (see above), because "later" is unknown;
+- without a path that a later commit touched but that no stored commit records (a commit without a
+  valid id, a repeated sha, or a path past the cap), so that no earlier commit is named for an older
+  version of the file;
+- empty for every commit stored before the column existed.
+
+When the ingestion processor creates the code changes of an event, `lastCommitPerFile`
+(`apps/api/src/modules/ingestion/lib/last-commit-per-file.ts`) maps every path to the stored commit
+with the highest `position` whose `attributedFiles` lists it, and the code change takes that sha.
+The evidence link of the code change still points at the file on the tip of the push.
+
+The tip sha (`scm_event.commitSha`) is kept, as before, in every case where no stored commit is
+attributed the file:
+
+- the provider reports no commits (Bitbucket pushes, and any push without a `commits` list);
+- the push was truncated and no kept commit is attributed the file;
+- the delivered order is not verified (the last delivered commit is not the head of the push), so
+  the adapter stores every commit with an empty `attributedFiles`;
+- the file is not in the first 1000 paths of the last commit that touched it, or a later commit that
+  could not be stored (invalid id, repeated sha) touched it, so the adapter leaves the path out of
+  every earlier commit's `attributedFiles` instead of naming a commit with an older version of the
+  file;
+- the event was stored before the `attributedFiles` column existed: its commits read
+  `attributedFiles = []` (the migration adds the column with a constant default and does not
+  backfill), so its code changes keep the tip sha. Code changes already written are never rewritten.
+
+### Pull requests and Bitbucket stay metadata-only
+
+A `pull_request` payload carries neither a file list nor the commits of the branch. Those events
+therefore report `changedFiles: []`, `commits: []`, `beforeSha: null`, `forced: false` and
+`commitsTruncated: false`. The Bitbucket adapter reports the same neutral values for its events;
+its push handling is unchanged.
+
 ## What counts as a test file
 
 `Project.testFilePatterns` decides which files in a push are test files. It is the gate in front of everything expensive: only a matching file becomes a `CodeChange` that can trigger AI extraction, which is also the rule the thesis states — repository files, and only repository files, start AI generation.

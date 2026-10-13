@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { assessCaseDocumentation } from '@qably/types';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import { DomainEvents } from '../../common/events/domain-events.service';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ProposalReclassifier } from '../proposal-classification/proposal-reclassifier';
 import { ApprovalConflictDiagnoser } from './approval-conflict-diagnoser';
 import type {
   ApprovalError,
@@ -115,7 +116,7 @@ function documentedStateFor(proposal: ProposalRow): {
 export class ReviewDecisionService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly reclassifier: ProposalReclassifier,
+    private readonly events: DomainEvents,
     private readonly conflicts: ApprovalConflictDiagnoser,
   ) {}
 
@@ -138,10 +139,10 @@ export class ReviewDecisionService {
 
     if (target === null && suiteId === null) return err('missing-suite');
 
+    let approval: ApprovalView;
+
     try {
-      const approval = await this.publish(proposal.value, suiteId, input);
-      await this.reclassifier.enqueue(approval.suiteId);
-      return ok(approval);
+      approval = await this.publish(proposal.value, suiteId, input);
     } catch (error) {
       if (isUniqueViolation(error)) {
         return err(
@@ -151,6 +152,19 @@ export class ReviewDecisionService {
       if (error instanceof DecisionConflict) return err('invalid-transition');
       throw error;
     }
+
+    this.events.publish(DOMAIN_EVENTS.proposalApproved, {
+      proposalId: proposal.value.id,
+      projectId: proposal.value.projectId,
+      organizationId: org.organizationId,
+      suiteId: approval.suiteId,
+      testCaseId: approval.testCaseId,
+      versionId: approval.versionId,
+      createdNewCase: approval.createdNewCase,
+      actorId: input.actorId,
+    });
+
+    return ok(approval);
   }
 
   async reject(
@@ -162,8 +176,10 @@ export class ReviewDecisionService {
 
     if (!proposal.ok) return proposal;
 
+    let decisionId: string;
+
     try {
-      const decisionId = await this.prisma.$transaction(async (tx) => {
+      decisionId = await this.prisma.$transaction(async (tx) => {
         const claim = await tx.extractedProposal.updateMany({
           where: { id: proposal.value.id, status: PENDING_STATUS },
           data: { status: 'rejected' },
@@ -182,12 +198,24 @@ export class ReviewDecisionService {
 
         return decision.id;
       });
-
-      return ok({ decisionId });
     } catch (error) {
       if (error instanceof DecisionConflict) return err('invalid-transition');
       throw error;
     }
+
+    this.events.publish(DOMAIN_EVENTS.proposalRejected, {
+      proposalId: proposal.value.id,
+      projectId: proposal.value.projectId,
+      organizationId: org.organizationId,
+      suiteId:
+        proposal.value.suiteId ??
+        proposal.value.targetTestCase?.suiteId ??
+        null,
+      decisionId,
+      actorId: input.actorId,
+    });
+
+    return ok({ decisionId });
   }
 
   async lastDecision(

@@ -68,7 +68,15 @@ const revokedKeyRow = {
 const suiteRow = { id: 'suite-1', name: 'Checkout' };
 
 const officialCases = [
-  { id: 'case-1', name: 'Adds to cart', automationKey: 'Adds to cart' },
+  {
+    id: 'case-1',
+    name: 'Adds to cart',
+    automationKey: 'Adds to cart',
+    steps: ['Open the cart', 'Add an item'],
+    expectedResult: 'The cart holds one item',
+    currentVersionId: 'version-1',
+    currentVersion: { version: 1 },
+  },
 ];
 
 const runRow = {

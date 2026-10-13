@@ -333,28 +333,54 @@ enum ScmEventStatus {
 }
 
 model ScmEvent {
-  id             String             @id @default(cuid())
-  connectionId   String
-  connection     Connection         @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  organizationId String
-  provider       ConnectionProvider
-  eventId        String
-  kind           ScmEventKind
-  repo           String
-  branch         String
-  commitSha      String
-  author         String
-  title          String
-  url            String
-  changedFiles   String[]           @default([])
-  status         ScmEventStatus     @default(PENDING)
-  receivedAt     DateTime           @default(now())
-  batches        IngestionBatch[]
+  id               String             @id @default(cuid())
+  connectionId     String
+  connection       Connection         @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  organizationId   String
+  provider         ConnectionProvider
+  eventId          String
+  kind             ScmEventKind
+  repo             String
+  branch           String
+  commitSha        String
+  author           String
+  title            String
+  url              String
+  changedFiles     String[]           @default([])
+  beforeSha        String?
+  forced           Boolean            @default(false)
+  commitsTruncated Boolean            @default(false)
+  status           ScmEventStatus     @default(PENDING)
+  receivedAt       DateTime           @default(now())
+  batches          IngestionBatch[]
+  commits          ScmCommit[]
 
   @@unique([provider, eventId])
   @@index([organizationId])
   @@index([connectionId])
   @@map("scm_event")
+}
+
+model ScmCommit {
+  id              String    @id @default(cuid())
+  scmEventId      String
+  scmEvent        ScmEvent  @relation(fields: [scmEventId], references: [id], onDelete: Cascade)
+  sha             String
+  position        Int
+  message         String
+  author          String
+  committedAt     DateTime?
+  url             String?
+  // NOT the files the commit touched. These are only the paths a code change may
+  // be attributed to this commit for: capped at 1000, empty when the push order
+  // was not verified, and without a path a later commit touched but could not be
+  // recorded. Empty on rows stored before the column existed. Never use it to
+  // answer "which commits touched file X".
+  attributedFiles String[]  @default([])
+
+  @@unique([scmEventId, sha])
+  @@index([sha])
+  @@map("scm_commit")
 }
 
 enum EvidenceKind {
@@ -543,6 +569,7 @@ model TestCaseVersion {
   priority       CasePriority @default(medium)
   publishedAt    DateTime     @default(now())
   locale         String?
+  runCases       RunCase[]
 
   @@unique([testCaseId, version])
   @@index([testCaseId])
@@ -677,9 +704,19 @@ model RunCase {
   failureDetails String?
   skipReason     String?
 
+  // Provenance only: the catalog version in force when the run executed. The
+  // version row goes away with its test case, so the content that survives is
+  // `catalogSnapshot`, never this link.
+  testCaseVersionId String?
+  testCaseVersion   TestCaseVersion? @relation(fields: [testCaseVersionId], references: [id], onDelete: SetNull)
+  // The catalog content as executed: { name, steps, expectedResult, version }.
+  // Null on rows recorded before snapshots existed, which read the live case.
+  catalogSnapshot   Json?
+
   @@unique([runId, position])
   @@index([runId])
   @@index([testCaseId])
+  @@index([testCaseVersionId])
   @@map("run_case")
 }
 

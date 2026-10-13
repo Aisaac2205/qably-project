@@ -11,6 +11,7 @@ import { NOTIFICATIONS_QUEUE } from './notifications.contracts';
 import { NotificationsProcessor } from './notifications.processor';
 import { NotificationsPublisher } from './notifications.publisher';
 import { NotificationsService } from './notifications.service';
+import { NotificationsSubscriber } from './notifications.subscriber';
 import { NotificationWebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
@@ -37,6 +38,7 @@ import { NotificationWebhooksModule } from './webhooks/webhooks.module';
     NotificationsService,
     NotificationsPublisher,
     NotificationsProcessor,
+    NotificationsSubscriber,
   ],
   exports: [NotificationsPublisher],
 })

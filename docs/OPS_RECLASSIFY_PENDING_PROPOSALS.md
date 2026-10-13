@@ -15,6 +15,12 @@ create/rename, or a run ingest that creates a case) — `GET
 'none'`, but `duplicatesOnly` cannot find a real duplicate among them
 until they are reclassified at least once.
 
+It is also the backstop for the approval trigger. Approving a proposal
+publishes `proposal.approved` on an in-process event bus, and a subscriber
+enqueues the reclassify job (see [`DOMAIN_EVENTS.md`](DOMAIN_EVENTS.md)). If the
+API process dies between the approval commit and that subscriber, the job is
+never enqueued, and running this script enqueues it.
+
 The script does not classify anything itself. It finds every suite that
 currently has at least one `in_review` proposal and enqueues one
 `reclassify-suite` BullMQ job per suite, using the same

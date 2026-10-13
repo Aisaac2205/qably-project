@@ -1,10 +1,12 @@
 import type {
   CaseStatus,
   ExecutionMode,
+  RunCaseOfficialCase,
   RunSource,
   RunStatus,
 } from '@qably/types';
 import type { RunView } from '../runs.contracts';
+import { parseCatalogSnapshot } from './catalog-snapshot';
 
 export const RUN_SELECT = {
   id: true,
@@ -51,6 +53,7 @@ export const CASE_SELECT = {
 
 export const CASE_READ_SELECT = {
   ...CASE_SELECT,
+  catalogSnapshot: true,
   testCase: {
     select: {
       id: true,
@@ -107,6 +110,8 @@ export interface RunCaseRow {
   failureMessage?: string | null;
   failureDetails?: string | null;
   skipReason?: string | null;
+  /** Untyped JSON; read it only through `parseCatalogSnapshot`. */
+  catalogSnapshot?: unknown;
   testCase?: {
     id: string;
     suiteId: string;
@@ -119,6 +124,47 @@ export interface RunCaseRow {
     automationFilePath: string | null;
     currentVersion: { version: number } | null;
   } | null;
+}
+
+/**
+ * The live case supplies identity, links and automation metadata. The content
+ * (name, steps, expected result, version) is what the run executed, read from
+ * the snapshot; a row without a usable snapshot reads the live content, as every
+ * row did before snapshots existed.
+ */
+function toOfficialCase(row: RunCaseRow): RunCaseOfficialCase | null {
+  const live = row.testCase;
+
+  if (live === undefined || live === null) return null;
+
+  const liveVersion = live.currentVersion?.version ?? null;
+  const executed = parseCatalogSnapshot(row.catalogSnapshot) ?? {
+    name: live.name,
+    steps: live.steps,
+    expectedResult: live.expectedResult,
+    version: liveVersion,
+  };
+
+  return {
+    id: live.id,
+    suiteId: live.suiteId,
+    version: liveVersion,
+    executedVersion: executed.version,
+    name: executed.name,
+    steps: executed.steps,
+    expectedResult: executed.expectedResult,
+    documented: live.steps.length > 0 || live.expectedResult !== '',
+    executionMode: live.executionMode,
+    ...(live.automationKey === null
+      ? {}
+      : { automationKey: live.automationKey }),
+    ...(live.automationClassName === null
+      ? {}
+      : { automationClassName: live.automationClassName }),
+    ...(live.automationFilePath === null
+      ? {}
+      : { automationFilePath: live.automationFilePath }),
+  };
 }
 
 export function toRunView(
@@ -151,27 +197,7 @@ export function toRunView(
       .map((row) => ({
         id: row.id,
         testCaseId: row.testCaseId,
-        officialCase:
-          row.testCase === undefined || row.testCase === null
-            ? null
-            : {
-                id: row.testCase.id,
-                suiteId: row.testCase.suiteId,
-                version: row.testCase.currentVersion?.version ?? null,
-                name: row.testCase.name,
-                steps: row.testCase.steps,
-                expectedResult: row.testCase.expectedResult,
-                executionMode: row.testCase.executionMode,
-                ...(row.testCase.automationKey === null
-                  ? {}
-                  : { automationKey: row.testCase.automationKey }),
-                ...(row.testCase.automationClassName === null
-                  ? {}
-                  : { automationClassName: row.testCase.automationClassName }),
-                ...(row.testCase.automationFilePath === null
-                  ? {}
-                  : { automationFilePath: row.testCase.automationFilePath }),
-              },
+        officialCase: toOfficialCase(row),
         name: row.name,
         suiteName: row.suiteName,
         steps: row.steps,

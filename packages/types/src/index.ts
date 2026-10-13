@@ -236,13 +236,24 @@ export interface Suite {
   openCollisions?: number
 }
 
+/**
+ * The catalog case a run case is linked to. `name`, `steps`, `expectedResult`
+ * and `executedVersion` are the content the run executed, read from the
+ * snapshot taken at that time; rows recorded before snapshots existed fall back
+ * to the live case. Every other field describes the case as it is today.
+ */
 export interface RunCaseOfficialCase {
   id: string
   suiteId: string
+  /** The catalog version in force today. */
   version: number | null
+  /** The catalog version the run executed, or null when the case had none. */
+  executedVersion: number | null
   name: string
   steps: string[]
   expectedResult: string
+  /** Whether the live case has steps or an expected result today. */
+  documented: boolean
   executionMode: ExecutionMode
   automationKey?: string
   automationClassName?: string
@@ -280,9 +291,57 @@ export interface CaseDeltaEntry {
   caseName: string
 }
 
+/**
+ * Why no commit range could be proven between two runs. The recorded push
+ * history is the only evidence, so each reason names what it was missing.
+ */
+export type RunAttributionUnknownReason =
+  | 'no_commit_reported'
+  | 'no_repository_connected'
+  | 'commit_not_in_history'
+  | 'different_branch'
+  | 'history_gap'
+  | 'history_rewritten'
+  | 'out_of_order'
+  | 'range_too_large'
+
+/** A commit pushed between two runs. A candidate, never a proven cause. */
+export interface AttributedCommit {
+  sha: string
+  message: string
+  author: string
+  /** ISO timestamp of the commit, or null when the provider did not report it. */
+  committedAt: string | null
+  url: string | null
+  /** Branch of the push this commit was read from. */
+  branch: string
+}
+
+/**
+ * The commits pushed between a baseline run and a later run. `range` lists
+ * candidates oldest first, with the baseline excluded and the later run's
+ * commit included. `unknown` means the recorded history could not prove a
+ * chain; it is not an empty range.
+ */
+export type RunAttribution =
+  | { kind: 'same_commit'; sha: string }
+  | {
+      kind: 'range'
+      baseSha: string
+      headSha: string
+      commits: AttributedCommit[]
+    }
+  | { kind: 'unknown'; reason: RunAttributionUnknownReason }
+
 export interface RunDeltaDetail {
   regressions: CaseDeltaEntry[]
   fixes: CaseDeltaEntry[]
+  /**
+   * Commits pushed between the baseline run and this run. Null only when it
+   * was not computed: the delta has no regressions and no fixes, or the
+   * computation failed.
+   */
+  attribution: RunAttribution | null
 }
 
 export interface RunRecord {
@@ -427,6 +486,11 @@ export interface RegressionEntry {
   caseName: string
   previousRunId: string
   detectedAt: string
+  /**
+   * Commits pushed between the previous run and the run that detected the
+   * regression. Null only when the computation failed.
+   */
+  attribution: RunAttribution | null
 }
 
 export interface RegressionsRecord {

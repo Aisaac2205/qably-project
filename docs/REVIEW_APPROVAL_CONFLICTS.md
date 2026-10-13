@@ -130,7 +130,7 @@ Conflicting case lookup failed: proposal=<proposalId> suite=<suiteId>
 | A previous extraction of the same test was approved under a different `automationKey`, and the new proposal reuses the title | name | Yes | Plausible, unverified |
 | Two cases in one batch get the same title from different tests (different keys) | name | Yes, for the second approval | Plausible for one proposal per batch, not for three |
 | The target case is renamed to a title another case in the suite already uses | name | Yes | Possible |
-| An official case gets the same `automationKey` after the proposal was written (ingestion or another approval) | automationKey | No: ingestion and approval both reclassify the suite, which sets the target | Unlikely to persist |
+| An official case gets the same `automationKey` after the proposal was written (ingestion or another approval) | automationKey | No: ingestion and approval both reclassify the suite (approval through the `proposal.approved` event, see `DOMAIN_EVENTS.md`), which sets the target | Unlikely to persist |
 | The proposal has no `suiteId`, so approval falls back to the default suite, which the reclassifier never visits | automationKey | Yes | Edge case |
 | Two approvals publish a version to the same case at the same time | other (`publish-conflict`) | No | Race |
 

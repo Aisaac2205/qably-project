@@ -10,6 +10,7 @@ import { SuiteViewAssembler } from './suite-view.assembler';
 import type {
   ConfirmDocumentationResult,
   SuiteError,
+  SuiteRemoveError,
   SuiteView,
 } from './suites.contracts';
 import type { CreateSuiteInput, UpdateSuiteInput } from './suites.schemas';
@@ -154,12 +155,23 @@ export class SuitesService {
     }
   }
 
-  async remove(org: OrgContext, id: string): Promise<Result<void, SuiteError>> {
+  async remove(
+    org: OrgContext,
+    id: string,
+  ): Promise<Result<void, SuiteRemoveError>> {
     if (!canWrite(org)) return err('forbidden');
 
     const existing = await this.scoped(org, id);
 
     if (existing === null) return err('not-found');
+
+    // Run.suite cascades on delete, so removing the suite would erase its history.
+    const anyRun = await this.prisma.run.findFirst({
+      where: { suiteId: id },
+      select: { id: true },
+    });
+
+    if (anyRun !== null) return err('has-history');
 
     await this.prisma.suite.delete({ where: { id } });
 

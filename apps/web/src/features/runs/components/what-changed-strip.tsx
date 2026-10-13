@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { CaseDeltaEntry, RunDeltaDetail } from '@qably/types'
 import { ArrowDown, ArrowUp } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import { CommitRangeBlock } from './commit-range-block'
 
 function DeltaGroup({
   heading,
@@ -85,6 +86,7 @@ export function WhatChangedStrip({
           href={suiteHref}
         />
       </div>
+      {delta.attribution && <CommitRangeBlock attribution={delta.attribution} />}
     </section>
   )
 }

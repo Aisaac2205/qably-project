@@ -73,6 +73,8 @@ const suiteWithCases = {
       name: 'Adds to cart',
       steps: ['open', 'add'],
       expectedResult: 'cart has one item',
+      currentVersionId: 'version-1',
+      currentVersion: { version: 1 },
     },
   ],
 };
@@ -95,6 +97,8 @@ describe('Runs queries (e2e)', () => {
       update: jest.fn(),
     },
     suite: { findFirst: jest.fn(), findMany: jest.fn() },
+    project: { findFirst: jest.fn() },
+    scmEvent: { findMany: jest.fn() },
     $queryRaw: jest.fn().mockResolvedValue([]),
     $queryRawUnsafe: jest.fn().mockResolvedValue([]),
     $transaction: jest.fn(),
@@ -123,6 +127,8 @@ describe('Runs queries (e2e)', () => {
     prisma.runCase.update.mockResolvedValue(runCaseRow({ status: 'pass' }));
     prisma.suite.findFirst.mockResolvedValue(suiteWithCases);
     prisma.suite.findMany.mockResolvedValue([]);
+    prisma.project.findFirst.mockResolvedValue({ connectionId: null });
+    prisma.scmEvent.findMany.mockResolvedValue([]);
 
     const moduleFixture = await stubQueues(
       Test.createTestingModule({
@@ -292,6 +298,123 @@ describe('Runs queries (e2e)', () => {
     expect(body.cases).toHaveLength(1);
   });
 
+  describe('commit attribution', () => {
+    const baseSha = 'a'.repeat(40);
+    const headSha = 'b'.repeat(40);
+    const pushEvents = [
+      {
+        id: 'push-2',
+        kind: 'PUSH',
+        branch: 'main',
+        commitSha: headSha,
+        beforeSha: baseSha,
+        forced: false,
+        commitsTruncated: false,
+        receivedAt: new Date('2026-01-02T00:00:00.000Z'),
+        commits: [
+          {
+            sha: headSha,
+            position: 0,
+            message: 'Fix the cart total',
+            author: 'Ada',
+            committedAt: new Date('2026-01-01T23:50:00.000Z'),
+            url: 'https://example.test/commit/b',
+          },
+        ],
+      },
+      {
+        id: 'push-1',
+        kind: 'PUSH',
+        branch: 'main',
+        commitSha: baseSha,
+        beforeSha: null,
+        forced: false,
+        commitsTruncated: false,
+        receivedAt: new Date('2026-01-01T00:00:00.000Z'),
+        commits: [
+          {
+            sha: baseSha,
+            position: 0,
+            message: 'Add the cart',
+            author: 'Ada',
+            committedAt: null,
+            url: null,
+          },
+        ],
+      },
+    ];
+    const expectedRange = {
+      kind: 'range',
+      baseSha,
+      headSha,
+      commits: [
+        {
+          sha: headSha,
+          message: 'Fix the cart total',
+          author: 'Ada',
+          committedAt: '2026-01-01T23:50:00.000Z',
+          url: 'https://example.test/commit/b',
+          branch: 'main',
+        },
+      ],
+    };
+
+    it('carries the commits between the previous run and this one on GET /runs/:id', async () => {
+      prisma.run.findFirst
+        .mockResolvedValueOnce({
+          ...runRow,
+          status: 'fail' as const,
+          finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+          commitSha: headSha,
+        })
+        .mockResolvedValueOnce({ id: 'run-0', commitSha: baseSha });
+      prisma.runCase.findMany
+        .mockResolvedValueOnce([runCaseRow({ status: 'fail' })])
+        .mockResolvedValueOnce([{ testCaseId: 'case-1', status: 'pass' }]);
+      prisma.project.findFirst.mockResolvedValue({
+        connectionId: 'connection-1',
+      });
+      prisma.scmEvent.findMany.mockResolvedValue(pushEvents);
+
+      const response = await request(app.getHttpServer())
+        .get('/runs/run-1')
+        .expect(200);
+
+      const body = response.body as { delta: unknown };
+      expect(body.delta).toEqual({
+        regressions: [{ testCaseId: 'case-1', caseName: 'Adds to cart' }],
+        fixes: [],
+        attribution: expectedRange,
+      });
+      expect(prisma.scmEvent.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('answers GET /runs/:id with a null attribution instead of failing when reading the history fails', async () => {
+      prisma.run.findFirst
+        .mockResolvedValueOnce({
+          ...runRow,
+          status: 'fail' as const,
+          finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+          commitSha: headSha,
+        })
+        .mockResolvedValueOnce({ id: 'run-0', commitSha: baseSha });
+      prisma.runCase.findMany
+        .mockResolvedValueOnce([runCaseRow({ status: 'fail' })])
+        .mockResolvedValueOnce([{ testCaseId: 'case-1', status: 'pass' }]);
+      prisma.project.findFirst.mockResolvedValue({
+        connectionId: 'connection-1',
+      });
+      prisma.scmEvent.findMany.mockRejectedValue(new Error('database down'));
+
+      const response = await request(app.getHttpServer())
+        .get('/runs/run-1')
+        .expect(200);
+
+      const body = response.body as { delta: { attribution: unknown } };
+      expect(body.delta.attribution).toBeNull();
+    });
+  });
+
   it('starts a manual run and returns 201 with the snapshotted cases', async () => {
     const response = await request(app.getHttpServer())
       .post('/runs')
@@ -414,11 +537,17 @@ describe('Runs queries (e2e)', () => {
           suiteId: 'suite-1',
           startedAt: new Date('2026-01-02T00:00:00.000Z'),
           finishedAt: new Date('2026-01-02T00:05:00.000Z'),
+          commitSha: null,
           suite: { name: 'Checkout' },
         },
       ]);
       prisma.$queryRaw.mockResolvedValueOnce([
-        { id: 'run-2', suiteId: 'suite-1', previousId: 'run-1' },
+        {
+          id: 'run-2',
+          suiteId: 'suite-1',
+          previousId: 'run-1',
+          previousCommitSha: null,
+        },
       ]);
       prisma.runCase.findMany.mockResolvedValue([
         {
@@ -450,6 +579,7 @@ describe('Runs queries (e2e)', () => {
             caseName: 'Adds to cart',
             previousRunId: 'run-1',
             detectedAt: '2026-01-02T00:05:00.000Z',
+            attribution: { kind: 'unknown', reason: 'no_commit_reported' },
           },
         ],
         runsScanned: 1,

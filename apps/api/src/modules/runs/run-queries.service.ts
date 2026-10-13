@@ -1,5 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import type { CaseStatus, RunCaseCounts, RunStatus } from '@qably/types';
+import { Injectable, Logger } from '@nestjs/common';
+import type {
+  CaseStatus,
+  RunAttribution,
+  RunCaseCounts,
+  RunStatus,
+} from '@qably/types';
 import { Prisma } from '../../../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import {
@@ -15,6 +20,7 @@ import {
 } from '../notifications/lib/regression-check';
 import { NotificationsPublisher } from '../notifications/notifications.publisher';
 import { PrismaService } from '../../prisma/prisma.service';
+import { buildCatalogSnapshot, toCatalogColumns } from './lib/catalog-snapshot';
 import { deriveRunStatus } from './lib/derive-run-status';
 import {
   PUSH_PASS_RATE_SQL,
@@ -32,6 +38,10 @@ import {
   type RunListRow,
   type RunRow,
 } from './lib/run-view';
+import {
+  RunAttributionService,
+  type AttributionPair,
+} from './run-attribution.service';
 import type {
   PushPassRateOhlcView,
   RegressionsView,
@@ -60,6 +70,7 @@ interface ScannedRunRow {
   suiteId: string;
   startedAt: Date;
   finishedAt: Date | null;
+  commitSha: string | null;
   suite: { name: string };
 }
 
@@ -67,6 +78,12 @@ interface PreviousRunLinkRow {
   id: string;
   suiteId: string;
   previousId: string | null;
+  previousCommitSha: string | null;
+}
+
+interface PreviousRun {
+  id: string;
+  commitSha: string | null;
 }
 
 interface RegressionCaseRow {
@@ -143,9 +160,12 @@ function toSummaryView(
 
 @Injectable()
 export class RunQueriesService {
+  private readonly logger = new Logger(RunQueriesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsPublisher,
+    private readonly attribution: RunAttributionService,
   ) {}
 
   async list(org: OrgContext, query: ListRunsQuery): Promise<RunsPageView> {
@@ -202,7 +222,8 @@ export class RunQueriesService {
    * Bounded regression scan: one query for the latest `limit` finished runs
    * of the project, one window-function query resolving each of those
    * suites' previous-finished-run chain, and one `runCase.findMany` for
-   * every run id involved. Never issues a per-case or per-run query.
+   * every run id involved. Never issues a per-case or per-run query. The
+   * commit range of every run that regressed is attributed with one call.
    */
   async regressions(
     org: OrgContext,
@@ -224,6 +245,7 @@ export class RunQueriesService {
         suiteId: true,
         startedAt: true,
         finishedAt: true,
+        commitSha: true,
         suite: { select: { name: true } },
       },
     })) as ScannedRunRow[];
@@ -231,13 +253,13 @@ export class RunQueriesService {
     if (scannedRuns.length === 0) return { items: [], runsScanned: 0 };
 
     const suiteIds = [...new Set(scannedRuns.map((run) => run.suiteId))];
-    const previousIdByRunId = await this.previousRunChain(
+    const previousByRunId = await this.previousRunChain(
       org.organizationId,
       suiteIds,
     );
 
     const previousRunIds = scannedRuns
-      .map((run) => previousIdByRunId.get(run.id))
+      .map((run) => previousByRunId.get(run.id)?.id)
       .filter((id): id is string => id !== undefined);
 
     const involvedRunIds = [
@@ -254,14 +276,16 @@ export class RunQueriesService {
 
     const casesByRun = groupCasesByRun(cases);
 
-    const items: RegressionsView['items'] = [];
+    const entries: Omit<RegressionsView['items'][number], 'attribution'>[] = [];
+    const pairs: AttributionPair[] = [];
 
     for (const run of scannedRuns) {
-      const previousRunId = previousIdByRunId.get(run.id);
-      if (previousRunId === undefined) continue;
+      const previous = previousByRunId.get(run.id);
+      if (previous === undefined) continue;
 
-      const previousCases = casesByRun.get(previousRunId) ?? [];
+      const previousCases = casesByRun.get(previous.id) ?? [];
       const currentCases = casesByRun.get(run.id) ?? [];
+      let regressed = false;
 
       for (const currentCase of currentCases) {
         if (currentCase.testCaseId === null) continue;
@@ -269,18 +293,37 @@ export class RunQueriesService {
           continue;
         }
 
-        items.push({
+        regressed = true;
+        entries.push({
           runId: run.id,
           runName: run.name,
           suiteId: run.suiteId,
           suiteName: run.suite.name,
           testCaseId: currentCase.testCaseId,
           caseName: currentCase.name,
-          previousRunId,
+          previousRunId: previous.id,
           detectedAt: (run.finishedAt ?? run.startedAt).toISOString(),
         });
       }
+
+      if (regressed) {
+        pairs.push({
+          key: run.id,
+          baseSha: previous.commitSha,
+          headSha: run.commitSha,
+        });
+      }
     }
+
+    const attributions = await this.attributeSafely(
+      org.organizationId,
+      projectId,
+      pairs,
+    );
+    const items: RegressionsView['items'] = entries.map((entry) => ({
+      ...entry,
+      attribution: attributions.get(entry.runId) ?? null,
+    }));
 
     return { items, runsScanned: scannedRuns.length };
   }
@@ -335,28 +378,33 @@ export class RunQueriesService {
   private async previousRunChain(
     organizationId: string,
     suiteIds: string[],
-  ): Promise<Map<string, string>> {
-    const previousIdByRunId = new Map<string, string>();
-    if (suiteIds.length === 0) return previousIdByRunId;
+  ): Promise<Map<string, PreviousRun>> {
+    const previousByRunId = new Map<string, PreviousRun>();
+    if (suiteIds.length === 0) return previousByRunId;
 
     const chain = await this.prisma.$queryRaw<PreviousRunLinkRow[]>(Prisma.sql`
       SELECT id, "suiteId",
-        LAG(id) OVER (
-          PARTITION BY "suiteId" ORDER BY "startedAt" ASC, "id" ASC
-        ) AS "previousId"
+        LAG(id) OVER w AS "previousId",
+        LAG("commitSha") OVER w AS "previousCommitSha"
       FROM "run"
       WHERE "organizationId" = ${organizationId}
         AND "suiteId" IN (${Prisma.join(suiteIds)})
         AND status IN ('pass', 'fail')
         AND "finishedAt" IS NOT NULL
+      WINDOW w AS (
+        PARTITION BY "suiteId" ORDER BY "startedAt" ASC, "id" ASC
+      )
     `);
 
     for (const row of chain) {
-      if (row.previousId !== null)
-        previousIdByRunId.set(row.id, row.previousId);
+      if (row.previousId === null) continue;
+      previousByRunId.set(row.id, {
+        id: row.previousId,
+        commitSha: row.previousCommitSha ?? null,
+      });
     }
 
-    return previousIdByRunId;
+    return previousByRunId;
   }
 
   private async listDeltas(
@@ -365,19 +413,19 @@ export class RunQueriesService {
   ): Promise<Map<string, RunSummaryView['delta']>> {
     const deltaByRun = new Map<string, RunSummaryView['delta']>();
     const suiteIds = [...new Set(runs.map((run) => run.suiteId))];
-    const previousIdByRunId = await this.previousRunChain(
+    const previousByRunId = await this.previousRunChain(
       organizationId,
       suiteIds,
     );
 
-    const comparable = runs.filter((run) => previousIdByRunId.has(run.id));
+    const comparable = runs.filter((run) => previousByRunId.has(run.id));
     if (comparable.length === 0) return deltaByRun;
 
     const involvedRunIds = [
       ...new Set(
         comparable.flatMap((run) => [
           run.id,
-          previousIdByRunId.get(run.id) as string,
+          (previousByRunId.get(run.id) as PreviousRun).id,
         ]),
       ),
     ];
@@ -388,7 +436,7 @@ export class RunQueriesService {
     const casesByRun = groupCasesByRun(rows);
 
     for (const run of comparable) {
-      const previousId = previousIdByRunId.get(run.id) as string;
+      const previousId = (previousByRunId.get(run.id) as PreviousRun).id;
       deltaByRun.set(
         run.id,
         countDelta(
@@ -423,7 +471,7 @@ export class RunQueriesService {
         ],
       },
       orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
-      select: { id: true },
+      select: { id: true, commitSha: true },
     });
     if (previous === null) return null;
 
@@ -432,7 +480,11 @@ export class RunQueriesService {
       select: { testCaseId: true, status: true },
     })) as { testCaseId: string | null; status: CaseStatus }[];
 
-    const delta: NonNullable<RunView['delta']> = { regressions: [], fixes: [] };
+    const delta: NonNullable<RunView['delta']> = {
+      regressions: [],
+      fixes: [],
+      attribution: null,
+    };
     for (const current of cases) {
       if (current.testCaseId === null) continue;
       const kind = classifyCaseDelta(current, previousCases);
@@ -441,7 +493,44 @@ export class RunQueriesService {
       if (kind === 'fix') delta.fixes.push(entry);
     }
 
+    if (delta.regressions.length === 0 && delta.fixes.length === 0) {
+      return delta;
+    }
+
+    const attributions = await this.attributeSafely(
+      organizationId,
+      run.projectId,
+      [{ key: run.id, baseSha: previous.commitSha, headSha: run.commitSha }],
+    );
+    delta.attribution = attributions.get(run.id) ?? null;
+
     return delta;
+  }
+
+  /**
+   * Attribution adds to an answer and never fails it: any error is logged and
+   * every pair is reported without an attribution.
+   */
+  private async attributeSafely(
+    organizationId: string,
+    projectId: string,
+    pairs: readonly AttributionPair[],
+  ): Promise<Map<string, RunAttribution>> {
+    if (pairs.length === 0) return new Map();
+
+    try {
+      return await this.attribution.attribute({
+        organizationId,
+        projectId,
+        pairs,
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `Commit attribution failed for project ${projectId}: ${reason}`,
+      );
+      return new Map();
+    }
   }
 
   async createManual(
@@ -460,7 +549,14 @@ export class RunQueriesService {
         name: true,
         cases: {
           where: { state: 'active', executionMode: 'manual' },
-          select: { id: true, name: true, steps: true, expectedResult: true },
+          select: {
+            id: true,
+            name: true,
+            steps: true,
+            expectedResult: true,
+            currentVersionId: true,
+            currentVersion: { select: { version: true } },
+          },
           orderBy: { position: 'asc' },
         },
       },
@@ -488,6 +584,10 @@ export class RunQueriesService {
         data: suite.cases.map((testCase, index) => ({
           runId: run.id,
           testCaseId: testCase.id,
+          ...toCatalogColumns({
+            testCaseVersionId: testCase.currentVersionId,
+            snapshot: buildCatalogSnapshot(testCase),
+          }),
           name: testCase.name,
           suiteName: suite.name,
           steps: testCase.steps,

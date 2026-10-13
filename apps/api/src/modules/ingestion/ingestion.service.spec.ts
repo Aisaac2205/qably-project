@@ -189,7 +189,184 @@ describe('IngestionService.ingest', () => {
       title: 'Add checkout guard',
       url: 'https://github.com/acme/shop/commit/aaa',
       changedFiles: ['src/cart.spec.ts', 'src/cart.ts'],
+      beforeSha: null,
+      forced: false,
+      commitsTruncated: false,
+      commits: { create: [] },
     });
+  });
+
+  it('stores the commits of a push in the same create as the event', async () => {
+    const prisma = createPrisma();
+    const body = JSON.stringify({
+      ...pushPayload,
+      before: 'b'.repeat(40),
+      forced: true,
+      commits: [
+        {
+          id: 'c'.repeat(40),
+          message: 'feat: add cart\n\nbody',
+          author: { username: 'ada', name: 'Ada Lovelace' },
+          timestamp: '2026-03-01T10:00:00+02:00',
+          url: 'https://github.com/acme/shop/commit/ccc',
+          added: ['src/cart.spec.ts'],
+          modified: ['src/cart.ts'],
+          removed: ['src/legacy.ts'],
+        },
+        {
+          id: 'a'.repeat(40),
+          message: 'Add checkout guard',
+          modified: ['src/cart.ts'],
+        },
+      ],
+    });
+
+    const result = await build(
+      prisma,
+      createEncryption(),
+      createQueue(),
+    ).ingest('github', body, githubHeaders(body));
+
+    expect(result).toEqual({ ok: true, value: 'accepted' });
+    expect(prisma.scmEvent.create).toHaveBeenCalledTimes(1);
+
+    const [call] = prisma.scmEvent.create.mock.calls as [
+      [{ data: Record<string, unknown> }],
+    ];
+    expect(call[0].data).toEqual(
+      expect.objectContaining({
+        beforeSha: 'b'.repeat(40),
+        forced: true,
+        commitsTruncated: false,
+        commits: {
+          create: [
+            {
+              sha: 'c'.repeat(40),
+              position: 0,
+              message: 'feat: add cart',
+              author: 'ada',
+              committedAt: new Date('2026-03-01T08:00:00.000Z'),
+              url: 'https://github.com/acme/shop/commit/ccc',
+              attributedFiles: [
+                'src/cart.spec.ts',
+                'src/cart.ts',
+                'src/legacy.ts',
+              ],
+            },
+            {
+              sha: 'a'.repeat(40),
+              position: 1,
+              message: 'Add checkout guard',
+              author: 'unknown',
+              committedAt: null,
+              url: null,
+              attributedFiles: ['src/cart.ts'],
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it('flags the stored event when the commit list was cut short', async () => {
+    const prisma = createPrisma();
+    const commits = Array.from({ length: 251 }, (_, index) => ({
+      id: index.toString(16).padStart(40, '0'),
+      message: `commit ${index}`,
+    }));
+    const body = JSON.stringify({
+      ...pushPayload,
+      head_commit: { ...commits[250] },
+      commits,
+    });
+
+    await build(prisma, createEncryption(), createQueue()).ingest(
+      'github',
+      body,
+      githubHeaders(body),
+    );
+
+    const [call] = prisma.scmEvent.create.mock.calls as [
+      [{ data: { commitsTruncated: boolean; commits: { create: unknown[] } } }],
+    ];
+    expect(call[0].data.commitsTruncated).toBe(true);
+    expect(call[0].data.commits.create).toHaveLength(250);
+  });
+
+  it('never sends the same sha twice, so a unique violation always means a replayed event', async () => {
+    const prisma = createPrisma();
+    const body = JSON.stringify({
+      ...pushPayload,
+      commits: [
+        { id: 'c'.repeat(40), message: 'first' },
+        { id: 'a'.repeat(40), message: 'second' },
+        { id: 'c'.repeat(40), message: 'first again' },
+      ],
+    });
+
+    await build(prisma, createEncryption(), createQueue()).ingest(
+      'github',
+      body,
+      githubHeaders(body),
+    );
+
+    const [call] = prisma.scmEvent.create.mock.calls as [
+      [{ data: { commits: { create: { sha: string; message: string }[] } } }],
+    ];
+    expect(
+      call[0].data.commits.create.map(({ sha, message }) => [sha, message]),
+    ).toEqual([
+      ['c'.repeat(40), 'first'],
+      ['a'.repeat(40), 'second'],
+    ]);
+  });
+
+  it('stores no commit time for an adapter timestamp that is not a date', async () => {
+    const prisma = createPrisma();
+    const adapter = {
+      provider: 'GITHUB' as const,
+      verifySignature: () => true,
+      normalize: () => ({
+        eventId: 'delivery-x',
+        provider: 'GITHUB' as const,
+        kind: 'push' as const,
+        repo: 'acme/shop',
+        branch: 'main',
+        commitSha: 'a'.repeat(40),
+        author: 'ada',
+        title: 'Add checkout guard',
+        url: 'https://github.com/acme/shop/commit/aaa',
+        changedFiles: [],
+        beforeSha: null,
+        forced: false,
+        commitsTruncated: false,
+        commits: [
+          {
+            sha: 'a'.repeat(40),
+            position: 0,
+            message: 'Add checkout guard',
+            author: 'ada',
+            committedAt: 'not-a-date',
+            url: null,
+            attributedFiles: [],
+          },
+        ],
+      }),
+    };
+
+    const result = await new IngestionService(
+      prisma as never,
+      createEncryption() as never,
+      createQueue() as never,
+      [adapter],
+    ).ingest('github', rawBody, {});
+
+    expect(result).toEqual({ ok: true, value: 'accepted' });
+
+    const [call] = prisma.scmEvent.create.mock.calls as [
+      [{ data: { commits: { create: { committedAt: Date | null }[] } } }],
+    ];
+    expect(call[0].data.commits.create[0].committedAt).toBeNull();
   });
 
   it('queues the stored event for processing', async () => {

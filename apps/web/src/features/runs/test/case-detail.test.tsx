@@ -160,6 +160,36 @@ describe('CaseDetail with an official case in an automated run', () => {
     )
   })
 
+  it('labels the content with the executed version while the library has moved on', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseDetail
+          c={reportedRunCase({ officialCase: automatedOfficialCase({ ...documented, version: 5, executedVersion: 2 }) })}
+          source="github_actions"
+          projectId="proj-1"
+        />,
+      )
+    })
+    expect(screen.getByText('Version 2')).toBeInTheDocument()
+    expect(screen.queryByText('Version 5')).not.toBeInTheDocument()
+  })
+
+  it('does not offer to document an undocumented execution of a case that is documented today', async () => {
+    await act(async () => {
+      renderWithQuery(
+        <CaseDetail
+          c={reportedRunCase({
+            officialCase: automatedOfficialCase({ steps: [], expectedResult: '', documented: true }),
+          })}
+          source="github_actions"
+          projectId="proj-1"
+        />,
+      )
+    })
+    expect(screen.getByText(/no documented steps yet/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /document with aeris/i })).not.toBeInTheDocument()
+  })
+
   it('hides the version badge but keeps the library link while the library case has no published version', async () => {
     await act(async () => {
       renderWithQuery(

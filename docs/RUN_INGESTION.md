@@ -185,10 +185,21 @@ A key with no match at all is adopted — see "Suite adoption" above — as a ne
 is then linked the same way, so `RunCase.testCaseId` is never left `null` because a key was simply
 unrecognized; it links to a draft from the very first report. This is what lets a suite's test cases
 reflect the latest execution automatically, without a human updating them by hand, and without an AI
-writing the case for them either — the case exists, unofficially, until a human promotes it. The full
-snapshot (`name`, `steps`, `expectedResult`) is still stored on `RunCase` even when linked — that is
-deliberate audit evidence of what was actually reported, not redundant with the official test case,
+writing the case for them either — the case exists, unofficially, until a human promotes it. The
+reported fields (`name`, `steps`, `expectedResult`) are still stored on `RunCase` even when linked — that
+is deliberate audit evidence of what was actually reported, not redundant with the official test case,
 which can itself change after the run.
+
+The catalog content the run executed is recorded beside them, because the official case does change after
+the run and a finished run has to keep showing what it ran. For every case the report matched or created,
+the ingest transaction reads the content of the linked `TestCase` once (the same read serves matched cases
+and the drafts it just created) and writes two columns on the `RunCase`: `testCaseVersionId`, the
+`currentVersionId` in force (`null` for a draft or a case never approved), and `catalogSnapshot`, JSON of
+`{ name, steps, expectedResult, version, origin }`, where `origin` is `ingest` here and `backfill` for
+rows filled later by `docs/OPS_BACKFILL_RUN_CASE_SNAPSHOTS.md`. The version link is provenance only; the
+snapshot is the content and is what survives when the case is deleted. A reported case that matched no catalog case
+records neither. How the run detail reads the snapshot, and what stays live, is described in
+`docs/SUITES_AND_RUNS.md`, *The catalog content a run executed*.
 
 ### Case identity — `classname` + `name`
 
@@ -272,7 +283,12 @@ Replaying the same `(projectId, source, externalId)` does not create a second ru
 upserts on that compound key:
 
 - **Case set** — always fully replaced: the previous cases are deleted and the payload's cases are
-  recreated in payload order (`position` follows array index), never appended.
+  recreated in payload order (`position` follows array index), never appended. The replacement keeps what
+  the run already recorded as executed: the previous `testCaseVersionId` and `catalogSnapshot` of each
+  linked case are read before the delete and reused for a case that has a valid snapshot (the first one
+  when a case appears twice), so a late re-send never replaces the executed content with newer catalog
+  content. A case with no earlier snapshot, such as a row recorded before snapshots existed, or one the
+  first report did not hold, is snapshotted from the catalog as it stands.
 - **`name`, `suiteId`/suite resolution, and the derived `status`** — always overwritten with the
   latest report's values.
 - **Optional metadata** (`startedAt`, `finishedAt`, `commitSha`, `commitMessage`, `commitAuthor`) —
@@ -604,9 +620,13 @@ status code should not depend on whether Qably happened to already have a row fo
 ```
 
 The example leaves out two parts of the run view. The run carries `delta`, which is `null` on ingest.
-Each case carries `officialCase`: the linked official `TestCase` (`id`, `suiteId`, `version`, `name`,
-`steps`, `expectedResult`, `executionMode`, plus `automationKey`, `automationClassName` and
-`automationFilePath` when set), or `null` when the case is not linked.
+Each case carries `officialCase`: the linked official `TestCase` (`id`, `suiteId`, `version`,
+`executedVersion`, `name`, `steps`, `expectedResult`, `documented`, `executionMode`, plus `automationKey`,
+`automationClassName` and `automationFilePath` when set), or `null` when the case is not linked. `name`,
+`steps`, `expectedResult` and `executedVersion` are the catalog content the run executed, read from the
+snapshot (the live case for a row recorded before snapshots existed); `version` is the version in force
+today, and `id`, `suiteId`, `documented`, `executionMode` and the automation fields describe the case as it
+is now.
 
 Case adoption applies identically whether the suite was resolved by `suiteId` or by `suiteName` (or
 just adopted): every reported case name is matched against the resolved suite's `TestCase` rows, and

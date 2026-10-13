@@ -133,6 +133,48 @@ describe.each(AUTOMATED_SOURCES)('resolveRunCase in a %s run with an official ca
     expect(resolved.version).toBeUndefined()
   })
 
+  it('labels the content with the version the run executed, not the one in force today', () => {
+    const resolved = resolveRunCase(
+      reportedRunCase({
+        officialCase: automatedOfficialCase({ version: 5, executedVersion: 2 }),
+      }),
+      source,
+    )
+
+    expect(resolved.version).toBe(2)
+  })
+
+  it('shows no version for a run that executed a case with none, whatever the library has now', () => {
+    const resolved = resolveRunCase(
+      reportedRunCase({
+        officialCase: automatedOfficialCase({ version: 5, executedVersion: null }),
+      }),
+      source,
+    )
+
+    expect(resolved.version).toBeUndefined()
+  })
+
+  it('renders the executed content even though the library case was rewritten since', () => {
+    const resolved = resolveRunCase(
+      reportedRunCase({
+        officialCase: automatedOfficialCase({
+          version: 5,
+          executedVersion: 2,
+          name: 'Executed title',
+          steps: ['Executed step'],
+          expectedResult: 'Executed result',
+          documented: true,
+        }),
+      }),
+      source,
+    )
+
+    expect(resolved.title).toBe('Executed title')
+    expect(resolved.steps).toEqual(['Executed step'])
+    expect(resolved.expectedResult).toBe('Executed result')
+  })
+
   it('offers Aeris when the automated library case has neither steps nor expected result', () => {
     const resolved = resolveRunCase(
       reportedRunCase({ officialCase: automatedOfficialCase() }),
@@ -158,6 +200,35 @@ describe.each(AUTOMATED_SOURCES)('resolveRunCase in a %s run with an official ca
     )
 
     expect(resolved.showAerisAction).toBe(false)
+  })
+
+  it('does not offer Aeris when the run executed an undocumented case that is documented today', () => {
+    const resolved = resolveRunCase(
+      reportedRunCase({
+        officialCase: automatedOfficialCase({ steps: [], expectedResult: '', documented: true }),
+      }),
+      source,
+    )
+
+    expect(resolved.steps).toEqual([])
+    expect(resolved.expectedResult).toBe('')
+    expect(resolved.showAerisAction).toBe(false)
+  })
+
+  it('offers Aeris when the library case lost its documentation after the run executed it documented', () => {
+    const resolved = resolveRunCase(
+      reportedRunCase({
+        officialCase: automatedOfficialCase({
+          steps: ['Executed step'],
+          expectedResult: 'Executed result',
+          documented: false,
+        }),
+      }),
+      source,
+    )
+
+    expect(resolved.steps).toEqual(['Executed step'])
+    expect(resolved.showAerisAction).toBe(true)
   })
 
   it('does not offer Aeris for a manual library case', () => {

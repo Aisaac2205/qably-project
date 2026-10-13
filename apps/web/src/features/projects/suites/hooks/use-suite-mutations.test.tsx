@@ -889,6 +889,39 @@ describe('useDeleteSuite', () => {
     expect(client.getQueryState(runKeys.page('proj-2', 'manual'))?.isInvalidated).toBe(false)
   })
 
+  it('tells the user the suite cannot be deleted when the API refuses it for its run history, and keeps the suite cached', async () => {
+    const { client } = setup()
+    await cacheInactiveList(client, 'proj-1', [suite, otherSuite])
+    client.setQueryData(suiteKeys.detail('suite-1'), suite)
+    deleteSuiteApi.mockRejectedValueOnce(new ApiError(409, 'refused', 'has-history'))
+
+    const result = runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+    expect(notify.error).toHaveBeenCalledTimes(1)
+    expect(notify.error).toHaveBeenCalledWith("This suite has run history, so it can't be deleted.")
+    expect(client.getQueryData<Suite[]>(suiteKeys.list('proj-1'))).toEqual([suite, otherSuite])
+    expect(client.getQueryData(suiteKeys.detail('suite-1'))).toEqual(suite)
+  })
+
+  it.each([
+    ['another 409 code', new ApiError(409, 'taken', 'name-taken')],
+    ['a server error', new ApiError(500, 'boom')],
+    ['a network failure', new Error('offline')],
+  ])('shows no notification for %s', async (_label, failure) => {
+    const { client } = setup()
+    deleteSuiteApi.mockRejectedValueOnce(failure)
+
+    const result = runMutation(client, useDeleteSuite, { id: 'suite-1', projectId: 'proj-1' })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+    expect(notify.error).not.toHaveBeenCalled()
+  })
+
   it('keeps the detail while its page is still mounted, then evicts it once the page leaves', async () => {
     const { client } = setup()
     const page = await mountDetailPageWithDelete(client)

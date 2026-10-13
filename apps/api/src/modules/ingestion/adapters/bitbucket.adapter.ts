@@ -98,6 +98,10 @@ export class BitbucketAdapter implements ScmPayloadAdapter {
       title: change.target.message ?? '',
       url: change.target.links?.html?.href ?? '',
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     };
   }
 
@@ -122,6 +126,10 @@ export class BitbucketAdapter implements ScmPayloadAdapter {
       title: pull?.title ?? '',
       url: pull?.links?.html?.href ?? '',
       changedFiles: [],
+      beforeSha: null,
+      forced: false,
+      commits: [],
+      commitsTruncated: false,
     };
   }
 }
