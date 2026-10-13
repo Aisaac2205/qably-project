@@ -4,13 +4,15 @@
 
 Skill sets are scoped by surface. Load the set for the app you are editing, before writing code. Loading the wrong set is worse than loading none: a marketing skill applied to the dashboard produces hero typography in a data table.
 
+Skills are installed per machine under `.claude/skills/<name>/SKILL.md`, which is gitignored. Before relying on a skill, validate that its path resolves. If a skill of the set is not installed, say so and carry on with the rules of this file; never claim a skill was applied unless its `SKILL.md` was actually read. Do not hardcode paths inside a skill: follow the pointers in its own `SKILL.md`, which is the source of truth for where its registers and references live.
+
 ### apps/web — product surface
 
 Dashboard, admin, settings, data tables, authenticated flows.
 
-- `.claude/skills/impeccable/SKILL.md` — register is `reference/product.md`
-- `.claude/skills/accessibility/SKILL.md`
-- `.claude/skills/emil-design-eng/SKILL.md`
+- `impeccable`, in its product register
+- `accessibility`
+- `emil-design-eng`
 
 Never load `design-taste-frontend` here. Its Section 13 excludes dashboards, dense product UI and data tables by its own declaration, and its typography defaults target marketing heroes.
 
@@ -18,10 +20,10 @@ Never load `design-taste-frontend` here. Its Section 13 excludes dashboards, den
 
 Public pages, pricing, documentation, hero and dashboard previews.
 
-- `.claude/skills/design-taste-frontend/SKILL.md`
-- `.claude/skills/impeccable/SKILL.md` — register is `reference/brand.md`
-- `.claude/skills/accessibility/SKILL.md`
-- `.claude/skills/seo/SKILL.md`
+- `design-taste-frontend`
+- `impeccable`, in its brand register
+- `accessibility`
+- `seo`
 
 ### Excluded from both sets
 
