@@ -64,8 +64,16 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
     ]);
   });
 
-  it('reports a legacy-key collision when two composites share a bare name from different classnames', async () => {
+  it('reports a legacy-key collision when two composites share a bare name and the suite holds a row keyed by that bare name', async () => {
     const tx = createReconcileTx();
+    tx.testCase.findMany.mockResolvedValueOnce([
+      {
+        id: 'legacy-1',
+        name: 'test_add_item',
+        automationKey: 'test_add_item',
+        executionMode: 'automated',
+      },
+    ]);
 
     const result = await new OfficialCaseReconciler().reconcile(
       tx as never,
@@ -78,6 +86,102 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
     );
 
     expect(result.legacyKeys).toEqual([{ key: 'test_add_item', count: 2 }]);
+  });
+
+  it('reports a legacy-key collision when the suite holds an unkeyed automated case named by that bare name', async () => {
+    const tx = createReconcileTx();
+    tx.testCase.findMany.mockResolvedValueOnce([
+      {
+        id: 'legacy-1',
+        name: 'test_add_item',
+        automationKey: null,
+        executionMode: 'automated',
+      },
+    ]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [
+        { name: 'test_add_item', className: 'tests.checkout.a' },
+        { name: 'test_add_item', className: 'tests.checkout.b' },
+      ],
+    );
+
+    expect(result.legacyKeys).toEqual([{ key: 'test_add_item', count: 2 }]);
+  });
+
+  it('reports no legacy-key collision when two composites share a bare name but no suite row could be claimed by it', async () => {
+    const tx = createReconcileTx();
+    tx.testCase.findMany.mockResolvedValueOnce([
+      {
+        id: 'case-a',
+        name: 'Adds an item',
+        automationKey: 'tests.checkout.a::test_add_item',
+        executionMode: 'automated',
+      },
+      {
+        id: 'manual-1',
+        name: 'test_add_item',
+        automationKey: null,
+        executionMode: 'manual',
+      },
+    ]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [
+        { name: 'test_add_item', className: 'tests.checkout.a' },
+        { name: 'test_add_item', className: 'tests.checkout.b' },
+      ],
+    );
+
+    expect(result.legacyKeys).toEqual([]);
+  });
+
+  it('still reports a legacy-key collision when the report itself carries a plain case under that bare name', async () => {
+    const tx = createReconcileTx();
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [
+        { name: 'test_add_item' },
+        { name: 'test_add_item', className: 'tests.checkout.a' },
+      ],
+    );
+
+    expect(result.legacyKeys).toEqual([{ key: 'test_add_item', count: 2 }]);
+  });
+
+  it('keeps the composites off an unreachable bare name while still drafting each under its own key', async () => {
+    const tx = createReconcileTx();
+
+    await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [
+        { name: 'test_add_item', className: 'tests.checkout.a' },
+        { name: 'test_add_item', className: 'tests.checkout.b' },
+      ],
+    );
+
+    expect(tx.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          automationKey: 'tests.checkout.a::test_add_item',
+        }),
+        expect.objectContaining({
+          automationKey: 'tests.checkout.b::test_add_item',
+        }),
+      ],
+      skipDuplicates: true,
+    });
   });
 });
 

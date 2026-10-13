@@ -18,6 +18,7 @@ import {
   resolveCaseMatch,
   type RawCaseRef,
   type SuiteCaseRow,
+  type SuiteIndex,
 } from './lib/official-case-matcher';
 
 const AUTOMATION_KEY_MIGRATION_SAVEPOINT = 'automation_key_migration';
@@ -56,6 +57,32 @@ export interface ReconcileResult {
   createdCaseIds: string[];
   identityKeys: CaseIdentityCollision[];
   legacyKeys: LegacyKeyCollision[];
+}
+
+const NO_AMBIGUOUS_LEGACY_KEYS: ReadonlySet<string> = new Set();
+
+/**
+ * A shared bare name is a real collision only when something answers to it:
+ * the report carries a plain case keyed by that name (which then stays
+ * unlinked), or the suite holds a row the legacy fallback would claim by it.
+ * Asking the matcher itself, with nothing ambiguous, keeps the two definitions
+ * of "a legacy row" from drifting apart.
+ */
+function isLegacyKeyReachable(
+  legacyKey: string,
+  refByKey: ReadonlyMap<string, RawCaseRef>,
+  index: SuiteIndex,
+): boolean {
+  if (refByKey.get(legacyKey)?.name === legacyKey) return true;
+
+  return (
+    resolveCaseMatch(
+      legacyKey,
+      { name: legacyKey },
+      NO_AMBIGUOUS_LEGACY_KEYS,
+      index,
+    ).match !== undefined
+  );
 }
 
 @Injectable()
@@ -100,9 +127,16 @@ export class OfficialCaseReconciler {
       automationClassName?: string;
     }
 
+    // Matching treats every shared bare name as ambiguous, so no identity can
+    // ever claim a row by it. Only the names something can actually reach are
+    // a collision worth recording: otherwise two classes that merely share a
+    // method name would reopen a collision on every ingest.
     const legacyCollisions = findLegacyKeyCollisions(cases);
     const ambiguousLegacyKeys = new Set(
       legacyCollisions.map((collision) => collision.key),
+    );
+    const reachableLegacyCollisions = legacyCollisions.filter((collision) =>
+      isLegacyKeyReachable(collision.key, refByKey, index),
     );
 
     const resultByKey = new Map<string, string>();
@@ -180,7 +214,7 @@ export class OfficialCaseReconciler {
         catalogByCaseId: await this.loadCatalogContent(tx, resultByKey),
         createdCaseIds: [],
         identityKeys: identityCollisions,
-        legacyKeys: legacyCollisions,
+        legacyKeys: reachableLegacyCollisions,
       };
     }
 
@@ -231,7 +265,7 @@ export class OfficialCaseReconciler {
       catalogByCaseId: await this.loadCatalogContent(tx, resultByKey),
       createdCaseIds,
       identityKeys: identityCollisions,
-      legacyKeys: legacyCollisions,
+      legacyKeys: reachableLegacyCollisions,
     };
   }
 

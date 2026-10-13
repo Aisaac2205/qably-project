@@ -236,6 +236,15 @@ new draft case under its own distinct composite key (safe — it cannot collide 
 name); a plain identity does not get drafted at all, because drafting under the exact bare name would
 just silently re-claim whichever row already holds it.
 
+Matching treats every shared bare name as ambiguous, but only a bare name something can actually reach
+is recorded as a `legacy_key` collision: the report carries a plain case keyed by that name, or the
+suite holds a row the legacy fallback would claim by it (a row whose `automationKey` is the bare name,
+or an unkeyed `automated` case with that name). Two classes that merely share a method name
+(`ClassA::test_create` and `ClassB::test_create`) in a suite with no such row are matched by their own
+composite keys and are not a collision; a run like that closes any `legacy_key` row still open for the
+name. `OfficialCaseReconciler.reconcile` answers the question by asking the matcher itself, with
+nothing marked ambiguous, whether the bare name would match a row.
+
 **This is not the same collision set as `caseIdentityCollisions`, and it never reaches the caller.**
 `findLegacyKeyCollisions` runs only inside `OfficialCaseReconciler.reconcile`, which executes inside
 the ingest transaction on the worker (`RunIngestProcessor`) — after `POST /runs/ingest/junit` has
