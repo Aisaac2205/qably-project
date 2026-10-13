@@ -283,8 +283,11 @@ the report matched or created; for `legacy_key`, a reported case name that is no
 report. A row therefore closes only when a later report for the same suite carries that key or name
 again, so a collision whose tests were renamed away or deleted stays open. The open rows
 (`closedAt IS NULL`) are what the product shows: `openCollisions` on each suite view (`GET /suites`,
-`GET /suites/:id`) and in the review inbox counts, which the web app renders as a notice on the suite
-and on the inbox.
+`GET /suites/:id`), which counts colliding keys, and in the review inbox counts
+(`GET /review/inbox/counts`), where `openCollisions` counts the suites holding at least one open row
+and `openCollisionSuites` lists them (`suiteId`, `suiteName`, `projectId`, `projectName`, and `count`,
+the suite's open keys, most first). The web app renders them as a notice on the suite and on the inbox,
+where each affected suite links to its page.
 
 ## Idempotency
 

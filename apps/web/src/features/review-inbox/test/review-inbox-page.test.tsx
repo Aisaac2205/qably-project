@@ -306,6 +306,7 @@ describe('ReviewInboxPage', () => {
       client.setQueryData(reviewKeys.inboxCounts({ search: title }), {
         byStatus: proposalInboxCountsFixtures({ search: title }),
         openCollisions: 0,
+        openCollisionSuites: [],
         version: 'test-version',
       })
       return render(
@@ -936,6 +937,7 @@ describe('ReviewInboxPage origin summary', () => {
     client.setQueryData(reviewKeys.inboxCounts({ search }), {
       byStatus: proposalInboxCountsFixtures({ search }),
       openCollisions: 0,
+      openCollisionSuites: [],
       version: 'test-version',
     })
 

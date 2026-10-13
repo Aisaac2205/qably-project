@@ -43,6 +43,7 @@ describe('useInboxCounts', () => {
     vi.spyOn(reviewApi, 'getInboxCounts').mockResolvedValue({
       byStatus: { in_review: 3, approved: 1, rejected: 0, changes_requested: 0 },
       openCollisions: 0,
+      openCollisionSuites: [],
       version: 'v1',
     })
 
@@ -52,22 +53,31 @@ describe('useInboxCounts', () => {
     expect(result.current.counts.approved).toBe(1)
   })
 
-  it('exposes openCollisions from the counts endpoint', async () => {
+  it('exposes the suites with open collisions from the counts endpoint', async () => {
+    const suite = {
+      suiteId: 'suite-1',
+      suiteName: 'Checkout',
+      projectId: 'proj-1',
+      projectName: 'Storefront',
+      count: 5,
+    }
     vi.spyOn(reviewApi, 'getInboxCounts').mockResolvedValue({
       byStatus: { in_review: 0, approved: 0, rejected: 0, changes_requested: 0 },
-      openCollisions: 5,
+      openCollisions: 1,
+      openCollisionSuites: [suite],
       version: 'v1',
     })
 
     const { result } = renderHook(() => useInboxCounts({}), { wrapper })
 
-    await waitFor(() => expect(result.current.openCollisions).toBe(5))
+    await waitFor(() => expect(result.current.openCollisionSuites).toEqual([suite]))
   })
 
   it('forwards projectId and search to the counts request', async () => {
     const spy = vi.spyOn(reviewApi, 'getInboxCounts').mockResolvedValue({
       byStatus: { in_review: 0, approved: 0, rejected: 0, changes_requested: 0 },
       openCollisions: 0,
+      openCollisionSuites: [],
       version: 'v1',
     })
 
@@ -78,7 +88,7 @@ describe('useInboxCounts', () => {
     )
   })
 
-  it('defaults every status and openCollisions to zero while the request is pending', () => {
+  it('defaults every status to zero and the collision suites to none while the request is pending', () => {
     vi.spyOn(reviewApi, 'getInboxCounts').mockReturnValue(new Promise(() => {}))
 
     const { result } = renderHook(() => useInboxCounts({}), { wrapper })
@@ -89,13 +99,14 @@ describe('useInboxCounts', () => {
       rejected: 0,
       changes_requested: 0,
     })
-    expect(result.current.openCollisions).toBe(0)
+    expect(result.current.openCollisionSuites).toEqual([])
   })
 
   it('does not invalidate the inbox lists on the first load', async () => {
     vi.spyOn(reviewApi, 'getInboxCounts').mockResolvedValue({
       byStatus: { in_review: 3, approved: 0, rejected: 0, changes_requested: 0 },
       openCollisions: 0,
+      openCollisionSuites: [],
       version: 'v1',
     })
     const client = makeClient()
@@ -115,11 +126,13 @@ describe('useInboxCounts', () => {
       .mockResolvedValueOnce({
         byStatus: { in_review: 3, approved: 0, rejected: 0, changes_requested: 0 },
         openCollisions: 0,
+        openCollisionSuites: [],
         version: 'v1',
       })
       .mockResolvedValueOnce({
         byStatus: { in_review: 2, approved: 1, rejected: 0, changes_requested: 0 },
         openCollisions: 0,
+        openCollisionSuites: [],
         version: 'v2',
       })
     const client = makeClient()

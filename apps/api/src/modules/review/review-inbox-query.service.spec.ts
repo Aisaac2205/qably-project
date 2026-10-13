@@ -638,7 +638,8 @@ interface PageFakePrisma {
   };
   testCase: { findMany: jest.Mock };
   traceabilityLink: { findMany: jest.Mock };
-  caseIdentityCollision: { count: jest.Mock };
+  caseIdentityCollision: { groupBy: jest.Mock };
+  suite: { findMany: jest.Mock };
 }
 
 function createPageFixture(rows: Record<string, unknown>[]): PageFakePrisma {
@@ -650,7 +651,8 @@ function createPageFixture(rows: Record<string, unknown>[]): PageFakePrisma {
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
     traceabilityLink: { findMany: jest.fn().mockResolvedValue([]) },
-    caseIdentityCollision: { count: jest.fn().mockResolvedValue(0) },
+    caseIdentityCollision: { groupBy: jest.fn().mockResolvedValue([]) },
+    suite: { findMany: jest.fn().mockResolvedValue([]) },
   };
 }
 
@@ -1223,27 +1225,92 @@ describe('ReviewInboxQueryService.counts', () => {
     expect(first.version).not.toBe(second.version);
   });
 
-  it('reports the open case identity collision count from the collisions table', async () => {
+  it('counts the suites with open collisions, not the colliding keys, and names each suite', async () => {
     const prisma = createPageFixture([]);
-    prisma.caseIdentityCollision.count.mockResolvedValue(5);
+    prisma.caseIdentityCollision.groupBy.mockResolvedValue([
+      { suiteId: 'suite-a', _count: { _all: 1 } },
+      { suiteId: 'suite-b', _count: { _all: 4 } },
+    ]);
+    prisma.suite.findMany.mockResolvedValue([
+      {
+        id: 'suite-a',
+        name: 'Checkout',
+        projectId: 'project-1',
+        project: { name: 'Storefront' },
+      },
+      {
+        id: 'suite-b',
+        name: 'Billing',
+        projectId: 'project-2',
+        project: { name: 'Back office' },
+      },
+    ]);
 
     const result = await buildService(prisma).counts(serviceOrg, {});
 
-    expect(result.openCollisions).toBe(5);
+    expect(result.openCollisions).toBe(2);
+    expect(result.openCollisionSuites).toEqual([
+      {
+        suiteId: 'suite-b',
+        suiteName: 'Billing',
+        projectId: 'project-2',
+        projectName: 'Back office',
+        count: 4,
+      },
+      {
+        suiteId: 'suite-a',
+        suiteName: 'Checkout',
+        projectId: 'project-1',
+        projectName: 'Storefront',
+        count: 1,
+      },
+    ]);
   });
 
-  it('scopes the open collisions count to the organization and, when given, the project', async () => {
+  it('scopes the open collisions to the organization and, when given, the project', async () => {
     const prisma = createPageFixture([]);
 
     await buildService(prisma).counts(serviceOrg, { projectId: 'project-1' });
 
-    expect(prisma.caseIdentityCollision.count).toHaveBeenCalledWith({
+    expect(prisma.caseIdentityCollision.groupBy).toHaveBeenCalledWith({
+      by: ['suiteId'],
       where: {
         closedAt: null,
         project: { organizationId: serviceOrg.organizationId },
         projectId: 'project-1',
       },
+      _count: { _all: true },
     });
+  });
+
+  it('never looks suites up when no collision is open', async () => {
+    const prisma = createPageFixture([]);
+
+    const result = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(prisma.suite.findMany).not.toHaveBeenCalled();
+    expect(result.openCollisionSuites).toEqual([]);
+  });
+
+  it('changes the version hash when a different suite holds the open collisions', async () => {
+    const prisma = createPageFixture([]);
+    prisma.caseIdentityCollision.groupBy.mockResolvedValueOnce([
+      { suiteId: 'suite-a', _count: { _all: 1 } },
+    ]);
+    prisma.suite.findMany.mockResolvedValueOnce([
+      { id: 'suite-a', name: 'A', projectId: 'p', project: { name: 'P' } },
+    ]);
+    const first = await buildService(prisma).counts(serviceOrg, {});
+
+    prisma.caseIdentityCollision.groupBy.mockResolvedValueOnce([
+      { suiteId: 'suite-b', _count: { _all: 1 } },
+    ]);
+    prisma.suite.findMany.mockResolvedValueOnce([
+      { id: 'suite-b', name: 'B', projectId: 'p', project: { name: 'P' } },
+    ]);
+    const second = await buildService(prisma).counts(serviceOrg, {});
+
+    expect(first.version).not.toBe(second.version);
   });
 
   it('defaults open collisions to zero when nothing is open', async () => {

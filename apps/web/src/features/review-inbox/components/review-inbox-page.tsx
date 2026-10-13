@@ -47,7 +47,7 @@ export function ReviewInboxPage() {
   })
   const fetchNextPageVoid = useCallback(() => void fetchNextPage(), [fetchNextPage])
 
-  const { counts, openCollisions } = useInboxCounts({
+  const { counts, openCollisionSuites } = useInboxCounts({
     projectId: selectedProjectId,
     search,
   })
@@ -223,7 +223,7 @@ export function ReviewInboxPage() {
 
       <div className="shrink-0 space-y-4 empty:hidden">
         <InboxOriginSummary proposals={proposals} hasMore={hasNextPage} />
-        <InboxCollisionsNotice openCollisions={openCollisions} />
+        <InboxCollisionsNotice suites={openCollisionSuites} />
         <ReviewInboxErrorList errors={feedback.errors} onDismiss={feedback.dismissMany} />
         {notice ? (
           <ReviewInboxFeedback
