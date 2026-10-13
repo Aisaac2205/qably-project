@@ -188,7 +188,7 @@ describe('CommitRangeBlock range', () => {
 
     const link = screen.getByRole('link')
     expectFocusRing(link)
-    expect(link.className).toMatch(/min-h-(6|8|11)/)
+    expect(link).toHaveClass('min-h-6')
   })
 
   it('renders the short sha as plain text when the commit has no url', () => {
@@ -304,7 +304,6 @@ describe('CommitRangeBlock disclosure', () => {
 
     const button = screen.getByRole('button')
     expectFocusRing(button)
-    expect(button.className).toMatch(/min-h-(6|8|11)/)
 
     for (let presses = 0; presses < 20 && document.activeElement !== button; presses += 1) {
       await user.tab()
@@ -315,6 +314,57 @@ describe('CommitRangeBlock disclosure', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(7)
     await user.keyboard(' ')
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
+  })
+})
+
+describe('CommitRangeBlock disclosure interaction details', () => {
+  it('gives the toggle a touch-sized target below md and the compact size from md', () => {
+    render(<CommitRangeBlock attribution={range(commits(7))} />)
+
+    expect(screen.getByRole('button')).toHaveClass('min-h-11', 'md:min-h-8')
+  })
+
+  it('gives the toggle press feedback and transitions only the transform', () => {
+    render(<CommitRangeBlock attribution={range(commits(7))} />)
+
+    const button = screen.getByRole('button')
+    expect(button).toHaveClass('active:scale-97', 'transition-transform')
+    expect(button.className).not.toMatch(/transition-all|(^|\s)transition(\s|$)/)
+  })
+
+  it.each<[string, RunAttribution]>([
+    ['a range', range(commits(7))],
+    ['the same commit', { kind: 'same_commit', sha: fullSha(9) }],
+    ['an unknown result', { kind: 'unknown', reason: 'history_gap' }],
+  ])('uses no arbitrary Tailwind value or color literal for %s', (_name, attribution) => {
+    const { container } = render(<CommitRangeBlock attribution={attribution} />)
+
+    const classes = Array.from(container.querySelectorAll('[class]')).map(
+      (element) => element.getAttribute('class') ?? '',
+    )
+    expect(classes.length).toBeGreaterThan(0)
+    for (const value of classes) {
+      expect(value).not.toMatch(/\[|#[0-9a-f]{3,8}\b|oklch|rgb/i)
+    }
+    expect(container.querySelector('[style]')).toBeNull()
+  })
+
+  it('turns the toggle transitions off under reduced motion, caret included', () => {
+    render(<CommitRangeBlock attribution={range(commits(7))} />)
+
+    const button = screen.getByRole('button')
+    const caret = button.querySelector('svg')
+    expect(button).toHaveClass('motion-reduce:transition-none')
+    expect(caret).toHaveClass('transition-transform', 'motion-reduce:transition-none')
+    expect(caret).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('keeps the sha link at the 24px floor and gives it no movement on press', () => {
+    render(<CommitRangeBlock attribution={range([commit(1)])} />)
+
+    const link = screen.getByRole('link')
+    expect(link).toHaveClass('min-h-6')
+    expect(link.className).not.toMatch(/scale-|translate-/)
   })
 })
 

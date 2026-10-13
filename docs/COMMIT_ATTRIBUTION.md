@@ -132,6 +132,8 @@ The block always has the heading "Candidate commits" and a hint saying the range
 | `same_commit` | One neutral line: both runs ran the same commit, with its short sha. |
 | `unknown` | One neutral line chosen by `reason`. It is informational, not an error: no alarm colour and no alert role. Each reason has its own copy in `runs.attribution.unknown.*`; the mapping is a `Record` over `RunAttributionUnknownReason`, so a new reason does not compile until it has copy. |
 
+Interaction details of the "Show N more commits" toggle: it is a touch-sized target below `md` (`min-h-11`, `md:min-h-8`), scales to 0.97 on press and rotates its caret over 150ms (transform only, `ease-out-quart`), and both transitions are off under `prefers-reduced-motion`. The commit sha link stays at the 24px floor.
+
 Copy rule: the interface says "candidate", never "cause". The only place that mentions causes is the hint, and it denies it. Keep that when adding or translating strings under `runs.attribution`.
 
 Only `http` and `https` urls become links. A commit url comes from a webhook payload, so any other scheme is rendered as plain text.

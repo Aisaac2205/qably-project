@@ -181,13 +181,13 @@ function CommitList({ commits, label }: { commits: AttributedCommit[]; label: st
           aria-expanded={expanded}
           aria-controls={listId}
           onClick={() => setExpanded((open) => !open)}
-          className={`inline-flex min-h-8 items-center gap-1.5 rounded text-xs font-medium text-muted hover:text-default ${FOCUS_RING}`}
+          className={`inline-flex min-h-11 items-center gap-1.5 rounded text-xs font-medium text-muted transition-transform duration-150 ease-out-quart hover:text-default active:scale-97 motion-reduce:transition-none md:min-h-8 ${FOCUS_RING}`}
         >
           <CaretRight
             size={12}
             weight="bold"
             aria-hidden="true"
-            className={expanded ? 'shrink-0 rotate-90' : 'shrink-0'}
+            className={`shrink-0 transition-transform duration-150 ease-out-quart motion-reduce:transition-none ${expanded ? 'rotate-90' : ''}`}
           />
           {expanded
             ? t('runs.attribution.showLess')
