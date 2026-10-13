@@ -102,9 +102,9 @@ describe('Suite list (e2e)', () => {
       count: jest.fn(),
       groupBy: jest.fn(),
     },
-    extractedProposal: { findMany: jest.fn() },
+    extractedProposal: { findMany: jest.fn(), groupBy: jest.fn() },
     runCase: { findMany: jest.fn() },
-    caseIdentityCollision: { groupBy: jest.fn() },
+    caseIdentityCollision: { groupBy: jest.fn(), findMany: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
@@ -113,6 +113,8 @@ describe('Suite list (e2e)', () => {
     jest.clearAllMocks();
     read.mockResolvedValue(session);
     prisma.caseIdentityCollision.groupBy.mockResolvedValue([]);
+    prisma.caseIdentityCollision.findMany.mockResolvedValue([]);
+    prisma.extractedProposal.groupBy.mockResolvedValue([]);
     prisma.orgMember.findFirst.mockResolvedValue({
       organizationId: 'org-1',
       role: 'owner',

@@ -82,10 +82,10 @@ describe('Suites (e2e)', () => {
       findMany: jest.fn(),
       count: jest.fn(),
     },
-    extractedProposal: { findMany: jest.fn() },
+    extractedProposal: { findMany: jest.fn(), groupBy: jest.fn() },
     run: { findFirst: jest.fn() },
     runCase: { findMany: jest.fn() },
-    caseIdentityCollision: { groupBy: jest.fn() },
+    caseIdentityCollision: { groupBy: jest.fn(), findMany: jest.fn() },
     $transaction: jest.fn(),
     $queryRaw: jest.fn(),
   };
@@ -94,6 +94,8 @@ describe('Suites (e2e)', () => {
     jest.clearAllMocks();
     read.mockResolvedValue(session);
     prisma.caseIdentityCollision.groupBy.mockResolvedValue([]);
+    prisma.caseIdentityCollision.findMany.mockResolvedValue([]);
+    prisma.extractedProposal.groupBy.mockResolvedValue([]);
     prisma.$transaction.mockImplementation(
       (run: (tx: typeof prisma) => unknown) => run(prisma),
     );
