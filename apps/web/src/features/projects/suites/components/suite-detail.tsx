@@ -67,21 +67,37 @@ function watchedCount(
   return suite.undocumentedCount
 }
 
+function resumedMode(suite: Suite): DocumentFilesMode {
+  if (suite.undocumentedCount > 0) return 'undocumented'
+  if (incompleteUnitsCount(suite) > 0) return 'incomplete'
+  if (suite.staleLocaleCount > 0) return 'stale-locale'
+  return 'undocumented'
+}
+
 export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId: string }) {
   const router = useRouter()
   const goBack = useGoBack(projectSuitesPath(projectId))
   const { t } = useTranslation()
-  const [watchedMode, setWatchedMode] = useState<DocumentFilesMode>('undocumented')
-  const watch = useDocumentationWatch()
-  const { observe } = watch
+  const watch = useDocumentationWatch<DocumentFilesMode>()
+  const { observe, resume } = watch
+  const watchedMode = watch.mode ?? 'undocumented'
   const { suite, isLoading, dataUpdatedAt } = useSuite(suiteId, (current) =>
     watch.intervalFor(isDocumentationBusy(current)),
   )
 
   useEffect(() => {
     if (dataUpdatedAt === 0) return
-    observe(isDocumentationBusy(suite))
-  }, [dataUpdatedAt, suite, observe])
+    const busy = isDocumentationBusy(suite)
+
+    // The watch lives in this screen, so leaving mid-run loses it. A suite that
+    // comes back still documenting resumes it, so polling and the settle refresh
+    // run. resume() leaves a running watch untouched.
+    if (busy && suite !== undefined) {
+      const mode = resumedMode(suite)
+      resume(watchedCount(suite, mode) ?? 0, mode)
+    }
+    observe(busy)
+  }, [dataUpdatedAt, suite, observe, resume])
   const removeSuite = useDeleteSuite()
   const removeCase = useDeleteCase()
   const documentSuite = useDocumentSuite()
@@ -89,10 +105,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
     const baseline = watchedCount(suite, mode) ?? 0
     const result = await documentSuite.mutateAsync({ suiteId, projectId, mode })
 
-    if (result.casesTargeted > 0) {
-      setWatchedMode(mode)
-      watch.begin(baseline)
-    }
+    if (result.casesTargeted > 0) watch.begin(baseline, mode)
 
     return result
   })

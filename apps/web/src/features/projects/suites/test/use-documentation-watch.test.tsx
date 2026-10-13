@@ -95,4 +95,38 @@ describe('useDocumentationWatch', () => {
 
     expect(result.current.statusFor(true)).toBe('working')
   })
+
+  it('resumes polling for a run already in progress when the reader comes back to the suite', () => {
+    const { result } = renderHook(() => useDocumentationWatch(WINDOW_MS))
+
+    expect(result.current.statusFor(true)).toBe('idle')
+
+    act(() => result.current.resume(3, 'incomplete'))
+
+    expect(result.current.mode).toBe('incomplete')
+    expect(result.current.statusFor(true)).toBe('working')
+    expect(result.current.intervalFor(true)).toBe(DOCUMENTATION_POLL_INTERVAL_MS)
+
+    act(() => result.current.observe(false))
+
+    expect(result.current.statusFor(false)).toBe('settled')
+    expect(result.current.documentedCountSince(0)).toBe(3)
+  })
+
+  it('leaves an accepted run alone when asked to resume, keeping its window and baseline', () => {
+    const { result } = renderHook(() => useDocumentationWatch(WINDOW_MS))
+
+    act(() => result.current.begin(7, 'undocumented'))
+    act(() => {
+      vi.advanceTimersByTime(WINDOW_MS / 2)
+    })
+    act(() => result.current.resume(1, 'incomplete'))
+    act(() => {
+      vi.advanceTimersByTime(WINDOW_MS / 2)
+    })
+
+    expect(result.current.statusFor(true)).toBe('timed-out')
+    expect(result.current.documentedCountSince(0)).toBe(7)
+    expect(result.current.mode).toBe('undocumented')
+  })
 })

@@ -15,6 +15,12 @@ export function beginWatch(startedAt: number, baselineCount: number): Documentat
   return { startedAt, baselineCount, sawBusy: false, idlePolls: 0 }
 }
 
+// A run found already in progress (the reader left the suite mid-run and came
+// back) was observed busy by definition, so its first idle poll settles it.
+export function resumeWatch(startedAt: number, baselineCount: number): DocumentationWatch {
+  return { startedAt, baselineCount, sawBusy: true, idlePolls: 0 }
+}
+
 export function observeWatch(
   watch: DocumentationWatch,
   isDocumenting: boolean,
