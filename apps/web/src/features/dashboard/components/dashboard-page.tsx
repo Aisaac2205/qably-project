@@ -9,6 +9,7 @@ import { ProjectsTable } from '@/features/dashboard/components/projects-table'
 import { CasesGaugeCard } from '@/features/dashboard/components/cases-gauge-card'
 import { ChannelsCard } from '@/features/dashboard/components/channels-card'
 import { ActivityCard } from '@/features/dashboard/components/activity-card'
+import { DownloadStatisticsPdfButton } from '@/features/statistics-pdf/components/download-statistics-pdf-button'
 
 export function DashboardPage() {
   const [period, setPeriod] = useState<DashboardPeriod>(7)
@@ -18,7 +19,11 @@ export function DashboardPage() {
       aria-label="Dashboard"
       className="@container w-full space-y-5 px-5 py-6 text-default @md:space-y-6 sm:px-7 lg:px-9 lg:py-6"
     >
-      <DashboardHeader period={period} onPeriodChange={setPeriod} />
+      <DashboardHeader
+        period={period}
+        onPeriodChange={setPeriod}
+        actions={<DownloadStatisticsPdfButton period={period} />}
+      />
       <KpiStrip period={period} />
       <PassRateHero period={period} />
 

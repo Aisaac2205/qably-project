@@ -174,6 +174,19 @@ describe('QualityPage', () => {
     expect(await screen.findByText('Executed cases')).toBeInTheDocument()
   })
 
+  it('offers the project statistics PDF for the selected period in the page header', async () => {
+    await act(async () => {
+      renderPage()
+    })
+
+    const header = (await screen.findByRole('heading', { name: 'Ecommerce App' })).closest('header')
+    expect(header).not.toBeNull()
+    expect(
+      within(header as HTMLElement).getByRole('button', { name: 'Download PDF of the statistics for the last 30 days' }),
+    ).toBeInTheDocument()
+    expect(within(header as HTMLElement).getByRole('button', { name: 'Time period' })).toBeInTheDocument()
+  })
+
   describe('once loaded', () => {
     beforeEach(async () => {
       await act(async () => {

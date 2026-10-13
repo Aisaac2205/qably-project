@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import type { DashboardPeriod } from '@qably/types'
 import { DASHBOARD_PERIODS } from '@qably/types'
 import AnimatedDropdown from '@/components/ui/animated-dropdown'
@@ -8,9 +9,11 @@ import { useTranslation } from '@/lib/i18n'
 export interface DashboardHeaderProps {
   period: DashboardPeriod
   onPeriodChange: (period: DashboardPeriod) => void
+  /** Actions that act on the selected period, rendered after the period dropdown. */
+  actions?: ReactNode
 }
 
-export function DashboardHeader({ period, onPeriodChange }: DashboardHeaderProps) {
+export function DashboardHeader({ period, onPeriodChange, actions }: DashboardHeaderProps) {
   const { t } = useTranslation()
 
   return (
@@ -28,6 +31,7 @@ export function DashboardHeader({ period, onPeriodChange }: DashboardHeaderProps
             onClick: () => onPeriodChange(value),
           }))}
         />
+        {actions}
       </div>
     </div>
   )
