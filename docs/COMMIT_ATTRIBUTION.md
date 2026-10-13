@@ -128,11 +128,11 @@ The block always has the heading "Candidate commits" and a hint saying the range
 
 | Result | What is shown |
 |---|---|
-| `range` | A one-line summary with the commit count, then the commits **newest first**, like `git log`. The API still returns them oldest first; the block reverses a copy for display and never changes the payload. Each row has the short sha (7 characters, a link to `url` that opens in a new tab, plain text when there is no usable url), the first line of the message, the author, the branch and the commit date. The 5 newest are shown; when there are more, a "Show N more commits" button (`aria-expanded`, `aria-controls`) reveals the older ones below them. |
+| `range` | A one-line summary with the commit count, then the commits **newest first**, like `git log`. The API still returns them oldest first; the block reverses a copy for display and never changes the payload. Each row has the short sha (7 characters, a link to `url` that opens in a new tab, plain text when there is no usable url), the first line of the message, the author, the branch and the commit date. The 5 newest are shown; when there are more, a "Show N older commits" button (`aria-expanded`, `aria-controls`) reveals the older ones below them. |
 | `same_commit` | One neutral line: both runs ran the same commit, with its short sha. |
 | `unknown` | One neutral line chosen by `reason`. It is informational, not an error: no alarm colour and no alert role. Each reason has its own copy in `runs.attribution.unknown.*`; the mapping is a `Record` over `RunAttributionUnknownReason`, so a new reason does not compile until it has copy. |
 
-Interaction details of the "Show N more commits" toggle: it is a touch-sized target below `md` (`min-h-11`, `md:min-h-8`), scales to 0.97 on press and rotates its caret over 150ms (transform only, `ease-out-quart`), and both transitions are off under `prefers-reduced-motion`. The commit sha link stays at the 24px floor.
+Interaction details of the "Show N older commits" toggle: it is a touch-sized target below `md` (`min-h-11`, `md:min-h-8`), scales to 0.97 on press and rotates its caret over 150ms (transform only, `ease-out-quart`), and both transitions are off under `prefers-reduced-motion`. The commit sha link stays at the 24px floor.
 
 Copy rule: the interface says "candidate", never "cause". The only place that mentions causes is the hint, and it denies it. Keep that when adding or translating strings under `runs.attribution`.
 

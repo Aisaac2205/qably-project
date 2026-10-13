@@ -170,7 +170,7 @@ function CommitList({ commits, label }: { commits: AttributedCommit[]; label: st
 
   return (
     <div className="space-y-1">
-      <ul id={listId} aria-label={label} className="divide-y divide-border">
+      <ul id={listId} role="list" aria-label={label} className="divide-y divide-border">
         {visible.map((commit) => (
           <CommitItem key={commit.sha} commit={commit} />
         ))}

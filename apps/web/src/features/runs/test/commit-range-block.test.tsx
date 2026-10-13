@@ -114,6 +114,14 @@ describe('CommitRangeBlock range', () => {
     ).toBeInTheDocument()
   })
 
+  it('keeps the list semantics when list styles are removed, with the explicit role', () => {
+    render(<CommitRangeBlock attribution={range(commits(3))} />)
+
+    const list = screen.getByRole('list', { name: 'Candidate commits' })
+    expect(list.tagName).toBe('UL')
+    expect(list).toHaveAttribute('role', 'list')
+  })
+
   it('lists the commits newest first, reversing the oldest-first order the API gives', () => {
     render(<CommitRangeBlock attribution={range(commits(3))} />)
 
@@ -263,23 +271,33 @@ describe('CommitRangeBlock disclosure', () => {
     ])
     expect(screen.queryByText('Commit message 3')).not.toBeInTheDocument()
     expect(screen.queryByText('Commit message 1')).not.toBeInTheDocument()
-    const button = screen.getByRole('button', { name: 'Show 3 more commits' })
+    const button = screen.getByRole('button', { name: 'Show 3 older commits' })
     expect(button).toHaveAttribute('aria-expanded', 'false')
     expect(button).toHaveAttribute('aria-controls', screen.getByRole('list').id)
     expect(screen.getByRole('list').id).not.toBe('')
   })
 
+  it('names the hidden commits as older in both locales, singular and plural', () => {
+    const { unmount } = render(<CommitRangeBlock attribution={range(commits(7))} />)
+    expect(screen.getByRole('button', { name: 'Show 2 older commits' })).toBeInTheDocument()
+    unmount()
+
+    useI18nStore.setState({ locale: 'es' })
+    render(<CommitRangeBlock attribution={range(commits(6))} />)
+    expect(screen.getByRole('button', { name: 'Mostrar 1 commit más antiguo' })).toBeInTheDocument()
+  })
+
   it('uses the singular label when exactly one commit is hidden', () => {
     render(<CommitRangeBlock attribution={range(commits(6))} />)
 
-    expect(screen.getByRole('button', { name: 'Show 1 more commit' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show 1 older commit' })).toBeInTheDocument()
   })
 
   it('reveals the older commits after the newest ones and collapses them again', async () => {
     const user = userEvent.setup()
     render(<CommitRangeBlock attribution={range(commits(8))} />)
 
-    await user.click(screen.getByRole('button', { name: 'Show 3 more commits' }))
+    await user.click(screen.getByRole('button', { name: 'Show 3 older commits' }))
     const items = screen.getAllByRole('listitem')
     expect(items).toHaveLength(8)
     expect(items[0]).toHaveTextContent('Commit message 8')
@@ -292,7 +310,7 @@ describe('CommitRangeBlock disclosure', () => {
     await user.click(collapse)
     expect(screen.getAllByRole('listitem')).toHaveLength(5)
     expect(screen.queryByText('Commit message 3')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show 3 more commits' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Show 3 older commits' })).toHaveAttribute(
       'aria-expanded',
       'false',
     )
@@ -436,7 +454,7 @@ describe('CommitRangeBlock unknown', () => {
         ),
       ).toBeInTheDocument()
 
-      await user.click(screen.getByRole('button', { name: 'Mostrar 2 commits más' }))
+      await user.click(screen.getByRole('button', { name: 'Mostrar 2 commits más antiguos' }))
       expect(screen.getByRole('button', { name: 'Mostrar menos commits' })).toBeInTheDocument()
     })
   })
