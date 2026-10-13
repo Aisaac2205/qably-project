@@ -27,7 +27,12 @@ import {
   markProjectStale,
   patchSuiteList,
 } from '../lib/suite-cache'
-import { invalidateSuiteSummaries, removeFromSuiteSummaries } from '../lib/suite-summaries-cache'
+import {
+  invalidateSuiteSummaries,
+  markSuiteSummariesStale,
+  patchSuiteSummaries,
+  removeFromSuiteSummaries,
+} from '../lib/suite-summaries-cache'
 import { ApiError } from '@/lib/api-client'
 import { markCiRunsStale } from '@/features/runs/lib/mark-ci-runs-stale'
 import { markRunDetailsStale } from '@/features/runs/lib/mark-run-details-stale'
@@ -42,9 +47,15 @@ export function useRefreshSuiteLists() {
     async (projectId: string, suiteId: string) => {
       const fresh = queryClient.getQueryData<Suite>(suiteKeys.detail(suiteId))
 
-      if (fresh !== undefined) patchSuiteList(queryClient, fresh)
+      if (fresh !== undefined) {
+        patchSuiteList(queryClient, fresh)
+        patchSuiteSummaries(queryClient, fresh)
+      }
 
-      await invalidateSuiteList(queryClient, projectId)
+      await Promise.all([
+        invalidateSuiteList(queryClient, projectId),
+        invalidateSuiteSummaries(queryClient, projectId),
+      ])
     },
     [queryClient],
   )
@@ -168,6 +179,7 @@ export function useDocumentSuite() {
         queryKey: suiteKeys.list(projectId),
         refetchType: 'none',
       })
+      markSuiteSummariesStale(queryClient, projectId)
       await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
     },
   })
