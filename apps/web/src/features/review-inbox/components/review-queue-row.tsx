@@ -7,13 +7,64 @@ import {
   XCircle,
   Clock,
   CaretRight,
+  ChatCircleText,
   FileText,
+  GitCommit,
+  Sparkle,
 } from '@phosphor-icons/react'
+import type { ProposalOrigin } from '@qably/types'
 import type { ProposalListItem } from '../api/review.api'
 import { resolveClassification } from '../lib/classification-reason'
 import { extractionFailureReasonKey } from '@/lib/extraction-failure-reason'
 import { Badge } from '@/components/ui/badge'
 import { useTranslation } from '@/lib/i18n'
+
+const ORIGIN_LABEL_KEYS: Record<Exclude<ProposalOrigin['kind'], 'push'>, string> = {
+  documentation: 'reviewInbox.originDocumentation',
+  'case-documentation': 'reviewInbox.originCaseDocumentation',
+  chat: 'reviewInbox.originChat',
+}
+
+/** Says why the proposal is in the inbox: the push it came from, or the request that produced it. */
+function ProposalOriginLabel({ origin }: { origin: ProposalOrigin }) {
+  const { t } = useTranslation()
+
+  if (origin.kind !== 'push') {
+    const OriginIcon = origin.kind === 'chat' ? ChatCircleText : Sparkle
+    return (
+      <span data-testid="proposal-origin" className="inline-flex items-center gap-1 text-[11px] text-muted">
+        <OriginIcon size={12} className="shrink-0 text-muted" aria-hidden="true" />
+        <span>{t(ORIGIN_LABEL_KEYS[origin.kind])}</span>
+      </span>
+    )
+  }
+
+  return (
+    <span
+      data-testid="proposal-origin"
+      className="inline-flex min-w-0 items-center gap-1 text-[11px] text-muted"
+    >
+      <GitCommit size={12} className="shrink-0 text-muted" aria-hidden="true" />
+      <span>
+        {origin.pullRequestNumber === null
+          ? t('reviewInbox.originPush')
+          : t('reviewInbox.originPullRequest', { number: origin.pullRequestNumber })}
+      </span>
+      {origin.commitSha !== null && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="font-mono">{origin.commitSha.slice(0, 7)}</span>
+        </>
+      )}
+      {origin.author !== null && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span className="truncate">{origin.author}</span>
+        </>
+      )}
+    </span>
+  )
+}
 
 export interface ReviewQueueRowProps {
   proposal: ProposalListItem
@@ -139,6 +190,8 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRo
               <span className="truncate">{proposal.evidenceTitle}</span>
             </span>
           )}
+
+          {proposal.origin && <ProposalOriginLabel origin={proposal.origin} />}
 
           {formattedDate && (
             <span className="inline-flex items-center gap-1 text-[11px] text-muted">

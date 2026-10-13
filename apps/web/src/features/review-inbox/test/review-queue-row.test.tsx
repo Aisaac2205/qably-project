@@ -155,3 +155,77 @@ describe('ReviewQueueRow', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 })
+
+describe('ReviewQueueRow origin', () => {
+  function renderRow(overrides: Partial<ProposalListItem>) {
+    return render(
+      <ReviewQueueRow proposal={proposal(overrides)} isSelected={false} onSelect={vi.fn()} />,
+    )
+  }
+
+  it('names the push, its short commit and its author for a proposal extracted from a push', () => {
+    renderRow({
+      origin: {
+        kind: 'push',
+        commitSha: 'abc1234def5678',
+        commitTitle: 'Add cart tests',
+        author: 'ana',
+        branch: 'main',
+        pullRequestNumber: null,
+      },
+    })
+
+    const origin = screen.getByTestId('proposal-origin')
+    expect(origin).toHaveTextContent('Push')
+    expect(origin).toHaveTextContent('abc1234')
+    expect(origin).not.toHaveTextContent('abc1234def5678')
+    expect(origin).toHaveTextContent('ana')
+  })
+
+  it('sets only the commit sha in the mono face', () => {
+    renderRow({
+      origin: {
+        kind: 'push',
+        commitSha: 'abc1234def5678',
+        commitTitle: null,
+        author: 'ana',
+        branch: null,
+        pullRequestNumber: null,
+      },
+    })
+
+    expect(screen.getByText('abc1234').className).toContain('font-mono')
+    expect(screen.getByText('ana').className).not.toContain('font-mono')
+  })
+
+  it('names the pull request when the push came through one', () => {
+    renderRow({
+      origin: {
+        kind: 'push',
+        commitSha: 'abc1234def5678',
+        commitTitle: null,
+        author: null,
+        branch: null,
+        pullRequestNumber: 42,
+      },
+    })
+
+    expect(screen.getByTestId('proposal-origin')).toHaveTextContent('PR #42')
+  })
+
+  it.each([
+    ['documentation', 'Aeris documentation'],
+    ['case-documentation', 'Case documentation'],
+    ['chat', 'Aeris chat'],
+  ] as const)('names a %s origin in plain words', (kind, label) => {
+    renderRow({ origin: { kind } })
+
+    expect(screen.getByTestId('proposal-origin')).toHaveTextContent(label)
+  })
+
+  it('shows no origin line when the payload has none', () => {
+    renderRow({})
+
+    expect(screen.queryByTestId('proposal-origin')).not.toBeInTheDocument()
+  })
+})

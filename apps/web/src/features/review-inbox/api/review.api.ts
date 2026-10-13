@@ -2,6 +2,7 @@ import type {
   CaseStatus,
   Evidence,
   ExtractedProposal,
+  ProposalOrigin,
   ProposalStatus,
   TraceabilityLink,
 } from '@qably/types'
@@ -34,6 +35,7 @@ export interface ProposalListItem extends ExtractedProposal {
   evidenceTitle: string
   suite?: InboxSuite | null
   classification?: ProposalClassification
+  origin?: ProposalOrigin
 }
 
 export interface MatchedCaseView {
