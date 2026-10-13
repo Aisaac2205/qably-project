@@ -280,8 +280,14 @@ run upsert. It upserts a row for every collision the report carries: `claimantCo
 `lastRunId` follow the latest report, and an upsert reopens a row that had been closed. It sets
 `closedAt` on the open rows whose key the report resolved without a collision: for `identity`, a key
 the report matched or created; for `legacy_key`, a reported case name that is not a collision in that
-report. A row therefore closes only when a later report for the same suite carries that key or name
-again, so a collision whose tests were renamed away or deleted stays open. The open rows
+report. A row therefore closes on its own only when a later report for the same suite carries that key
+or name again; a collision whose tests were renamed away or deleted is closed by hand with
+`POST /suites/:id/collisions/:collisionId/dismiss`, which sets `closedAt` on that row when it belongs to
+the suite in the caller's organization (`404` otherwise, `204` on success, idempotent on a row already
+closed). Dismissing is safe: a later report that still collides upserts the row again and reopens it.
+The single-suite view (`GET /suites/:id`, and every endpoint that answers with one suite) also carries
+`collisions`, the open rows themselves (`id`, `kind`, `key`, `claimantCount`, `lastSeenAt`,
+`lastRunId`), newest first, which the suite page lists with a dismiss action per key. The open rows
 (`closedAt IS NULL`) are what the product shows: `openCollisions` on each suite view (`GET /suites`,
 `GET /suites/:id`), which counts colliding keys, and in the review inbox counts
 (`GET /review/inbox/counts`), where `openCollisions` counts the suites holding at least one open row

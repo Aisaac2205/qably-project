@@ -5,6 +5,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  dismissCollision,
   documentCase,
   documentProject,
   documentSuite,
@@ -167,6 +168,15 @@ describe('suites.api', () => {
 
     const [url, init] = lastCall()
     expect(url).toContain('/suites/suite-1/confirm-documentation')
+    expect(init.method).toBe('POST')
+    expect(init.body).toBeUndefined()
+  })
+
+  it('dismisses one open collision of a suite with a bodyless POST', async () => {
+    await dismissCollision('suite-1', 'collision-1')
+
+    const [url, init] = lastCall()
+    expect(url).toContain('/suites/suite-1/collisions/collision-1/dismiss')
     expect(init.method).toBe('POST')
     expect(init.body).toBeUndefined()
   })

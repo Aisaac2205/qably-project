@@ -9,6 +9,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  dismissCollision,
   documentCase,
   documentSuite,
   type DocumentFilesMode,
@@ -34,6 +35,7 @@ import {
   removeFromSuiteSummaries,
 } from '../lib/suite-summaries-cache'
 import { ApiError } from '@/lib/api-client'
+import { reviewKeys } from '@/features/review-inbox/lib/query-keys'
 import { markCiRunsStale } from '@/features/runs/lib/mark-ci-runs-stale'
 import { markRunDetailsStale } from '@/features/runs/lib/mark-run-details-stale'
 import { markRunPagesStale } from '@/features/runs/lib/mark-run-pages-stale'
@@ -203,6 +205,45 @@ export function useConfirmDocumentation() {
       void refreshSuiteLists(projectId, suiteId)
       markProjectStale(queryClient, projectId)
       markRunDetailsStale(queryClient)
+    },
+  })
+}
+
+function withoutCollision(suite: Suite, collisionId: string): Suite {
+  const collisions = suite.collisions?.filter((entry) => entry.id !== collisionId)
+  const removed = (suite.collisions?.length ?? 0) - (collisions?.length ?? 0)
+
+  return {
+    ...suite,
+    collisions,
+    openCollisions: Math.max(0, (suite.openCollisions ?? 0) - removed),
+  }
+}
+
+export function useDismissCollision() {
+  const { t } = useTranslation()
+  const refreshSuiteLists = useRefreshSuiteLists()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      suiteId,
+      collisionId,
+    }: {
+      suiteId: string
+      projectId: string
+      collisionId: string
+    }) => dismissCollision(suiteId, collisionId),
+    onSuccess: async (_result, { suiteId, projectId, collisionId }) => {
+      queryClient.setQueryData<Suite>(suiteKeys.detail(suiteId), (cached) =>
+        cached === undefined ? undefined : withoutCollision(cached, collisionId),
+      )
+      void queryClient.invalidateQueries({ queryKey: reviewKeys.allInboxCounts })
+      void refreshSuiteLists(projectId, suiteId)
+      await queryClient.invalidateQueries({ queryKey: suiteKeys.detail(suiteId) })
+    },
+    onError: () => {
+      notify.error(t('suites.dismissCollisionError'))
     },
   })
 }

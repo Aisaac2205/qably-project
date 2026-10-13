@@ -117,6 +117,12 @@ export function deleteSuite(id: string): Promise<void> {
   return apiRequest<void>(`/suites/${id}`, { method: 'DELETE' })
 }
 
+export function dismissCollision(suiteId: string, collisionId: string): Promise<void> {
+  return apiRequest<void>(`/suites/${suiteId}/collisions/${collisionId}/dismiss`, {
+    method: 'POST',
+  })
+}
+
 export function createCase(
   suiteId: string,
   payload: CreateCasePayload,

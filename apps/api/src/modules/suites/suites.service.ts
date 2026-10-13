@@ -178,6 +178,37 @@ export class SuitesService {
     return ok(undefined);
   }
 
+  /**
+   * Closes one open collision of the suite by hand, once its tests were
+   * renamed or deleted and no later run will ever resolve it. It is safe to
+   * close early: a later report that still collides reopens it.
+   */
+  async dismissCollision(
+    org: OrgContext,
+    suiteId: string,
+    collisionId: string,
+  ): Promise<Result<void, 'not-found'>> {
+    const collision = await this.prisma.caseIdentityCollision.findFirst({
+      where: {
+        id: collisionId,
+        suiteId,
+        suite: { organizationId: org.organizationId },
+      },
+      select: { id: true, closedAt: true },
+    });
+
+    if (collision === null) return err('not-found');
+
+    if (collision.closedAt === null) {
+      await this.prisma.caseIdentityCollision.update({
+        where: { id: collision.id },
+        data: { closedAt: new Date() },
+      });
+    }
+
+    return ok(undefined);
+  }
+
   async confirmDocumentation(
     org: OrgContext,
     suiteId: string,

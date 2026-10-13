@@ -229,6 +229,28 @@ export class SuitesController {
     return { queued: true, jobId: unwrapDocumentCase(result).jobId };
   }
 
+  /**
+   * Closes an open case identity collision by hand. A later report that still
+   * collides reopens it, so dismissing never hides a live ambiguity for long.
+   */
+  @Post(':id/collisions/:collisionId/dismiss')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async dismissCollision(
+    @CurrentOrg() org: OrgContext,
+    @Param('id') id: string,
+    @Param('collisionId') collisionId: string,
+  ): Promise<void> {
+    const result = await this.suites.dismissCollision(org, id, collisionId);
+
+    if (isErr(result)) {
+      throw new NotFoundException({
+        code: result.error,
+        message: 'Collision not found in this suite',
+      });
+    }
+  }
+
   @Post(':id/confirm-documentation')
   async confirmDocumentation(
     @CurrentOrg() org: OrgContext,

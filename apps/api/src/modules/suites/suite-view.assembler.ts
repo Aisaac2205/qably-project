@@ -5,6 +5,7 @@ import type {
   CaseHealthSummary,
   CaseLastResult,
   CaseStatus,
+  SuiteCollision,
 } from '@qably/types';
 import {
   deriveCaseHealth,
@@ -68,12 +69,35 @@ export class SuiteViewAssembler {
     row: SuiteRow,
     orgDefaultLocale: Locale,
   ): Promise<SuiteView> {
-    const [withResult] = await this.withLastResults(
-      [view],
-      [row],
-      orgDefaultLocale,
-    );
-    return withResult;
+    const [[withResult], collisions] = await Promise.all([
+      this.withLastResults([view], [row], orgDefaultLocale),
+      this.openCollisions(view.id),
+    ]);
+    return { ...withResult, collisions };
+  }
+
+  /**
+   * The open collisions of one suite, for the single-suite view: the list only
+   * carries the count, since nobody acts on a key from a list of suites.
+   */
+  private async openCollisions(suiteId: string): Promise<SuiteCollision[]> {
+    const rows = await this.prisma.caseIdentityCollision.findMany({
+      where: { suiteId, closedAt: null },
+      orderBy: [{ lastSeenAt: 'desc' }, { key: 'asc' }],
+      select: {
+        id: true,
+        kind: true,
+        key: true,
+        claimantCount: true,
+        lastSeenAt: true,
+        lastRunId: true,
+      },
+    });
+
+    return rows.map((collision) => ({
+      ...collision,
+      lastSeenAt: collision.lastSeenAt.toISOString(),
+    }));
   }
 
   async withLastResults(

@@ -331,7 +331,12 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
         )}
 
         <SuiteInReviewNotice projectId={projectId} pendingProposals={suite.pendingProposals} />
-        <SuiteCollisionsPanel openCollisions={suite.openCollisions} />
+        <SuiteCollisionsPanel
+          projectId={projectId}
+          suiteId={suite.id}
+          openCollisions={suite.openCollisions}
+          collisions={suite.collisions}
+        />
       </header>
 
       {/* Case list */}

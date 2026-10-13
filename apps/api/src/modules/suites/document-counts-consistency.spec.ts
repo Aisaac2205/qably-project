@@ -80,7 +80,10 @@ function buildSuitesService() {
     orgMember: {
       findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
     },
-    caseIdentityCollision: { groupBy: jest.fn().mockResolvedValue([]) },
+    caseIdentityCollision: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
 

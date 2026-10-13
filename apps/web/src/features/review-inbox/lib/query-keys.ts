@@ -15,6 +15,8 @@ export const reviewKeys = {
       filters.duplicatesOnly === true ? 'duplicates' : 'all',
       filters.search?.trim() || '',
     ] as const,
+  /** Every inbox counts query, whatever its filters: the prefix to invalidate. */
+  allInboxCounts: ['review', 'inbox-counts'] as const,
   inboxCounts: (filters: { projectId?: string; search?: string } = {}) =>
     ['review', 'inbox-counts', filters.projectId ?? 'all', filters.search?.trim() || ''] as const,
 }
