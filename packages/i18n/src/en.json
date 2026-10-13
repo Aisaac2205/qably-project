@@ -708,6 +708,7 @@
     "decisionPublishConflict": "Couldn't publish “{{title}}” because of a conflict with the official cases. Try again later, or reject the proposal.",
     "decisionIncompleteProposal": "This proposal has no steps — Aeris couldn't extract them. Reject it, or document the case by hand.",
     "decisionError": "Couldn't process this decision. Try again.",
+    "decisionRateLimited": "Too many decisions in a short time. Wait a few seconds and try again.",
     "noDuplicates": "No possible duplicates",
     "noCasesPending": "No AI cases pending review",
     "ariaReviewCases": "AI review cases",

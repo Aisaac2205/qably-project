@@ -25,6 +25,13 @@ describe('classifyDecisionError', () => {
     expect(classifyDecisionError(error)).toBe('error')
   })
 
+  it('maps a 429 to rate-limited, whatever code the body carries', () => {
+    expect(classifyDecisionError(new ApiError(429, 'Too Many Requests'))).toBe('rate-limited')
+    expect(classifyDecisionError(new ApiError(429, 'Too Many Requests', 'something-else'))).toBe(
+      'rate-limited',
+    )
+  })
+
   it('falls back to error for a non-ApiError value', () => {
     expect(classifyDecisionError(new Error('boom'))).toBe('error')
   })
@@ -53,6 +60,7 @@ describe('isApprovalConflictCode', () => {
     'missing-evidence',
     'missing-suite',
     'incomplete-proposal',
+    'rate-limited',
     'error',
   ] as const)('does not treat %s as an approval conflict', (code) => {
     expect(isApprovalConflictCode(code)).toBe(false)
@@ -66,6 +74,10 @@ describe('decisionErrorKey', () => {
 
   it('maps incomplete-proposal to its own i18n key', () => {
     expect(decisionErrorKey('incomplete-proposal')).toBe('decisionIncompleteProposal')
+  })
+
+  it('maps rate-limited to its own i18n key', () => {
+    expect(decisionErrorKey('rate-limited')).toBe('decisionRateLimited')
   })
 
   it('maps error to the generic i18n key', () => {
@@ -109,6 +121,7 @@ describe('decision error copy', () => {
     'automation-key-taken',
     'publish-conflict',
     'incomplete-proposal',
+    'rate-limited',
     'error',
   ]
 

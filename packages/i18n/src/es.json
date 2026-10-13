@@ -708,6 +708,7 @@
     "decisionPublishConflict": "No se pudo publicar “{{title}}” por un conflicto con los casos oficiales. Inténtalo más tarde o rechaza la propuesta.",
     "decisionIncompleteProposal": "Esta propuesta no tiene pasos — Aeris no logró extraerlos. Rechazala, o documentá el caso a mano.",
     "decisionError": "No se pudo procesar esta decisión. Intenta de nuevo.",
+    "decisionRateLimited": "Demasiadas decisiones en poco tiempo. Espera unos segundos e inténtalo de nuevo.",
     "noDuplicates": "Sin posibles duplicados",
     "noCasesPending": "Sin casos IA pendientes de revisión",
     "ariaReviewCases": "Casos de revisión IA",

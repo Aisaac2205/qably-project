@@ -112,11 +112,13 @@ export function useProposalDecision({
     )
   }
 
+  // Only the last decision of a burst refreshes the lists, so a reviewer
+  // clearing many cards costs one round of list refetches, not one per card.
   const settle = () => {
     if (queryClient.isMutating({ mutationKey: DECISION_MUTATION_KEY }) === 1) {
       invalidateReviewLists(queryClient)
+      invalidateSuiteAndProjectLists(queryClient)
     }
-    invalidateSuiteAndProjectLists(queryClient)
   }
 
   const release = (proposalId: string) => {
