@@ -823,6 +823,23 @@ export interface ExtractedProposal {
   observations?: string[]
   createdAt?: string
 }
+/**
+ * Why a proposal is in the review inbox. A push proposal was extracted by Aeris
+ * from a test file the push changed; the push fields are null when the event
+ * that delivered it is no longer stored.
+ */
+export type ProposalOrigin =
+  | {
+      kind: 'push'
+      commitSha: string | null
+      commitTitle: string | null
+      author: string | null
+      branch: string | null
+      pullRequestNumber: number | null
+    }
+  | { kind: 'documentation' }
+  | { kind: 'case-documentation' }
+  | { kind: 'chat' }
 export type DocumentFilesSkipReason =
   | 'no-source-file'
   | 'no-automation-key'

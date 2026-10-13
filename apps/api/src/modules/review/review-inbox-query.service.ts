@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import type { CaseStatus, ProposalStatus } from '@qably/types';
+import type { CaseStatus, ProposalOrigin, ProposalStatus } from '@qably/types';
 import { Prisma } from '../../../generated/prisma/client';
 import { err, ok, type Result } from '../../common/result';
 import type { OrgContext } from '../organizations/organizations.contracts';
@@ -176,7 +176,37 @@ const INBOX_ITEM_SELECT = {
   matchedCase: { select: { name: true } },
   duplicateScore: true,
   duplicateReasons: true,
+  codeChangeId: true,
+  chatCaseKey: true,
+  codeChange: {
+    select: {
+      commitSha: true,
+      pullRequestNumber: true,
+      batch: {
+        select: {
+          source: true,
+          scmEvent: {
+            select: { title: true, author: true, branch: true, kind: true },
+          },
+        },
+      },
+    },
+  },
 } as const;
+
+interface OriginCodeChangeRow {
+  commitSha: string;
+  pullRequestNumber: number | null;
+  batch: {
+    source: string;
+    scmEvent: {
+      title: string;
+      author: string;
+      branch: string;
+      kind: string;
+    } | null;
+  };
+}
 
 interface InboxItemRow extends ViewRow {
   suite: { id: string; name: string } | null;
@@ -185,6 +215,27 @@ interface InboxItemRow extends ViewRow {
   matchedCase: { name: string } | null;
   duplicateScore: number | null;
   duplicateReasons: unknown;
+  codeChangeId?: string | null;
+  chatCaseKey?: string | null;
+  codeChange?: OriginCodeChangeRow | null;
+}
+
+function toOrigin(row: InboxItemRow): ProposalOrigin {
+  const codeChange = row.codeChange ?? null;
+  if (codeChange !== null) {
+    const event = codeChange.batch.scmEvent;
+    return {
+      kind: 'push',
+      commitSha: codeChange.commitSha === '' ? null : codeChange.commitSha,
+      commitTitle: event?.title ?? null,
+      author: event?.author ?? null,
+      branch: event?.branch ?? null,
+      pullRequestNumber: codeChange.pullRequestNumber,
+    };
+  }
+  if ((row.chatCaseKey ?? null) !== null) return { kind: 'chat' };
+  if (row.targetTestCaseId !== null) return { kind: 'case-documentation' };
+  return { kind: 'documentation' };
 }
 
 function toClassification(row: InboxItemRow): InboxClassification {
@@ -214,6 +265,7 @@ function toInboxItem(row: InboxItemRow): InboxItem {
     ...toView(row),
     suite: row.suite,
     classification: toClassification(row),
+    origin: toOrigin(row),
   };
 }
 

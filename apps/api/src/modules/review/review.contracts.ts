@@ -3,6 +3,7 @@ import type {
   CaseStatus,
   Evidence,
   ExtractedProposal,
+  ProposalOrigin,
   ProposalStatus,
   ReviewApprovalConflictCode,
   ReviewConflictingCase,
@@ -26,6 +27,7 @@ export interface InboxClassification extends ProposalClassification {
 export interface InboxItem extends ProposalView {
   suite: InboxSuite | null;
   classification: InboxClassification;
+  origin: ProposalOrigin;
 }
 
 export interface MatchedCaseView {

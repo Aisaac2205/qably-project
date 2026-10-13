@@ -930,6 +930,126 @@ describe('ReviewInboxQueryService.page', () => {
   });
 });
 
+describe('ReviewInboxQueryService.page origin', () => {
+  async function originOf(overrides: Record<string, unknown>) {
+    const prisma = createPageFixture([pageRow(overrides)]);
+    const result = await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+    return result.items[0].origin;
+  }
+
+  const pushCodeChange = {
+    commitSha: 'abc1234def5678',
+    pullRequestNumber: null,
+    filePath: 'src/cart.spec.ts',
+    batch: {
+      source: 'WEBHOOK',
+      scmEvent: {
+        title: 'Add cart tests',
+        author: 'ana',
+        branch: 'main',
+        kind: 'PUSH',
+      },
+    },
+  };
+
+  it('explains a proposal extracted from a push with the commit, its title, author and branch', async () => {
+    const origin = await originOf({
+      codeChangeId: 'change-1',
+      codeChange: pushCodeChange,
+    });
+
+    expect(origin).toEqual({
+      kind: 'push',
+      commitSha: 'abc1234def5678',
+      commitTitle: 'Add cart tests',
+      author: 'ana',
+      branch: 'main',
+      pullRequestNumber: null,
+    });
+  });
+
+  it('keeps the commit of a code change whose push event is gone, without inventing its details', async () => {
+    const origin = await originOf({
+      codeChangeId: 'change-1',
+      codeChange: {
+        ...pushCodeChange,
+        pullRequestNumber: 12,
+        batch: { source: 'REPOSITORY', scmEvent: null },
+      },
+    });
+
+    expect(origin).toEqual({
+      kind: 'push',
+      commitSha: 'abc1234def5678',
+      commitTitle: null,
+      author: null,
+      branch: null,
+      pullRequestNumber: 12,
+    });
+  });
+
+  it('reports a null commit when the code change recorded an empty sha', async () => {
+    const origin = await originOf({
+      codeChangeId: 'change-1',
+      codeChange: { ...pushCodeChange, commitSha: '' },
+    });
+
+    expect(origin).toMatchObject({ kind: 'push', commitSha: null });
+  });
+
+  it('explains a proposal written in the Aeris chat', async () => {
+    const origin = await originOf({ chatCaseKey: 'message-1:0' });
+
+    expect(origin).toEqual({ kind: 'chat' });
+  });
+
+  it('explains a proposal from documenting one existing case', async () => {
+    const origin = await originOf({ targetTestCaseId: 'case-1' });
+
+    expect(origin).toEqual({ kind: 'case-documentation' });
+  });
+
+  it('falls back to Aeris documentation when nothing else names the origin', async () => {
+    const origin = await originOf({});
+
+    expect(origin).toEqual({ kind: 'documentation' });
+  });
+
+  it('selects the code change, batch and push event fields the origin needs', async () => {
+    const prisma = createPageFixture([pageRow()]);
+
+    await buildService(prisma).page(serviceOrg, {
+      status: 'in_review',
+      limit: 50,
+    });
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ select: Record<string, unknown> }],
+    ];
+    expect(call[0].select).toMatchObject({
+      codeChangeId: true,
+      chatCaseKey: true,
+      codeChange: {
+        select: {
+          commitSha: true,
+          pullRequestNumber: true,
+          batch: {
+            select: {
+              source: true,
+              scmEvent: {
+                select: { title: true, author: true, branch: true, kind: true },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+});
+
 describe('ReviewInboxQueryService.counts', () => {
   it('returns zero counts for every status when nothing matches', async () => {
     const prisma = createPageFixture([]);
