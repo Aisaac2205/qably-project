@@ -235,6 +235,91 @@ describe('SCM webhook ingestion (e2e)', () => {
     expect(prisma.scmEvent.create).not.toHaveBeenCalled();
   });
 
+  describe('commit of each code change', () => {
+    const sha = (n: number) => n.toString(16).padStart(40, '0');
+
+    it('attributes each file of a multi-commit push to the last commit that touched it', async () => {
+      const third = {
+        id: sha(3),
+        message: 'third',
+        added: ['c.spec.ts'],
+        modified: ['b.spec.ts'],
+      };
+      const body = JSON.stringify({
+        ref: 'refs/heads/main',
+        after: sha(3),
+        repository: { full_name: 'acme/shop' },
+        pusher: { name: 'ada' },
+        head_commit: third,
+        commits: [
+          { id: sha(1), message: 'first', added: ['a.spec.ts', 'b.spec.ts'] },
+          { id: sha(2), message: 'second', modified: ['b.spec.ts'] },
+          third,
+        ],
+      });
+
+      await request(app.getHttpServer())
+        .post('/webhooks/scm/github')
+        .set('content-type', 'application/json')
+        .set('x-github-event', 'push')
+        .set('x-github-delivery', 'delivery-files')
+        .set('x-hub-signature-256', signed(body))
+        .send(body)
+        .expect(202);
+
+      const [[stored]] = prisma.scmEvent.create.mock.calls as [
+        [
+          {
+            data: {
+              commitSha: string;
+              changedFiles: string[];
+              commits: { create: Array<{ sha: string; position: number }> };
+            };
+          },
+        ],
+      ];
+      const batchCreate = jest.fn().mockResolvedValue({ codeChanges: [] });
+      prisma.scmEvent.findUnique.mockResolvedValue({
+        id: 'event-1',
+        organizationId: 'org-1',
+        provider: 'GITHUB',
+        repo: 'acme/shop',
+        commitSha: stored.data.commitSha,
+        changedFiles: stored.data.changedFiles,
+        commits: stored.data.commits.create,
+        connection: { projects: [{ id: 'proj-1', testFilePatterns: [] }] },
+      });
+
+      await new IngestionProcessor(
+        { ...prisma, ingestionBatch: { create: batchCreate } } as never,
+        app.get(DomainEvents),
+        { enqueueCodeChanges: jest.fn() } as never,
+      ).process({ data: { scmEventId: 'event-1' } } as never);
+
+      const [[batch]] = batchCreate.mock.calls as [
+        [
+          {
+            data: {
+              codeChanges: {
+                create: Array<{ filePath: string; commitSha: string }>;
+              };
+            };
+          },
+        ],
+      ];
+      expect(
+        batch.data.codeChanges.create.map(({ filePath, commitSha }) => [
+          filePath,
+          commitSha,
+        ]),
+      ).toEqual([
+        ['a.spec.ts', sha(1)],
+        ['b.spec.ts', sha(3)],
+        ['c.spec.ts', sha(3)],
+      ]);
+    });
+  });
+
   describe('ingestion failure notification', () => {
     function notificationsQueue(): { add: jest.Mock } {
       return app.get(getQueueToken(NOTIFICATIONS_QUEUE));
@@ -281,6 +366,7 @@ describe('SCM webhook ingestion (e2e)', () => {
         repo: 'acme/shop',
         commitSha: 'a'.repeat(40),
         changedFiles: [],
+        commits: [],
         connection: { projects: [] },
       });
 

@@ -57,6 +57,7 @@ function toCommitRow(commit: NormalizedScmCommit) {
     author: commit.author,
     committedAt: toCommitTime(commit.committedAt),
     url: commit.url,
+    attributedFiles: commit.attributedFiles,
   };
 }
 

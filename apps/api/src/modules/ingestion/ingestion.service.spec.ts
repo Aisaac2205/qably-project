@@ -209,8 +209,15 @@ describe('IngestionService.ingest', () => {
           author: { username: 'ada', name: 'Ada Lovelace' },
           timestamp: '2026-03-01T10:00:00+02:00',
           url: 'https://github.com/acme/shop/commit/ccc',
+          added: ['src/cart.spec.ts'],
+          modified: ['src/cart.ts'],
+          removed: ['src/legacy.ts'],
         },
-        { id: 'a'.repeat(40), message: 'Add checkout guard' },
+        {
+          id: 'a'.repeat(40),
+          message: 'Add checkout guard',
+          modified: ['src/cart.ts'],
+        },
       ],
     });
 
@@ -240,6 +247,11 @@ describe('IngestionService.ingest', () => {
               author: 'ada',
               committedAt: new Date('2026-03-01T08:00:00.000Z'),
               url: 'https://github.com/acme/shop/commit/ccc',
+              attributedFiles: [
+                'src/cart.spec.ts',
+                'src/cart.ts',
+                'src/legacy.ts',
+              ],
             },
             {
               sha: 'a'.repeat(40),
@@ -248,6 +260,7 @@ describe('IngestionService.ingest', () => {
               author: 'unknown',
               committedAt: null,
               url: null,
+              attributedFiles: ['src/cart.ts'],
             },
           ],
         },
@@ -335,6 +348,7 @@ describe('IngestionService.ingest', () => {
             author: 'ada',
             committedAt: 'not-a-date',
             url: null,
+            attributedFiles: [],
           },
         ],
       }),

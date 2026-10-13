@@ -11,6 +11,10 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ExtractionService } from '../review/extraction.service';
 import type { ScmEventJob } from './ingestion.contracts';
 import { INGESTION_QUEUE } from './ingestion.tokens';
+import {
+  lastCommitPerFile,
+  type CommitWithAttributedFiles,
+} from './lib/last-commit-per-file';
 
 const BLOB_PATH: Record<
   RepoConnectionProvider,
@@ -29,6 +33,7 @@ interface PendingEvent {
   repo: string;
   commitSha: string;
   changedFiles: string[];
+  commits: CommitWithAttributedFiles[];
   connection: { projects: Array<{ id: string; testFilePatterns: string[] }> };
 }
 
@@ -106,6 +111,10 @@ export class IngestionProcessor extends WorkerHost {
         repo: true,
         commitSha: true,
         changedFiles: true,
+        commits: {
+          select: { sha: true, position: true, attributedFiles: true },
+          orderBy: { position: 'asc' },
+        },
         connection: {
           select: {
             projects: { select: { id: true, testFilePatterns: true } },
@@ -117,6 +126,11 @@ export class IngestionProcessor extends WorkerHost {
 
   private async recordBatches(event: PendingEvent): Promise<void> {
     if (event.changedFiles.length === 0) return;
+
+    // A file no stored commit is attributed keeps the tip of the push. That
+    // covers providers that report no commits, truncated pushes, an unverified
+    // push order and events stored before commits carried attributed files.
+    const lastCommitByFile = lastCommitPerFile(event.commits);
 
     for (const project of event.connection.projects) {
       const batch = await this.prisma.ingestionBatch.create({
@@ -139,7 +153,7 @@ export class IngestionProcessor extends WorkerHost {
           codeChanges: {
             create: event.changedFiles.map((filePath) => ({
               project: { connect: { id: project.id } },
-              commitSha: event.commitSha,
+              commitSha: lastCommitByFile.get(filePath) ?? event.commitSha,
               filePath,
               detectedPattern:
                 matchDeclaredTestPattern(filePath, project.testFilePatterns) ??

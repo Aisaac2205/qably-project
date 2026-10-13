@@ -73,6 +73,31 @@ When the walk from the later run's commit does not reach the baseline, the reaso
 - **No filtering.** A candidate is any commit in the chain, whether or not it touched the code a test covers.
 - **Run shas are not normalized upstream.** `Run.commitSha` may be a full sha, a short sha, mixed case, or null. SCM shas are expected to be lowercase 40-character hex, as the ingestion adapters store them.
 
+## The commit of a code change
+
+The same recorded commits also answer a different question: which commit of a push last touched a file. `CodeChange.commitSha` is that commit, not the tip of the push. It does not take part in the range above, which only reads `sha`, `position`, `message`, `author`, `committedAt` and `url`.
+
+Each `scm_commit` row carries `attributedFiles`: the paths a code change may be attributed to that commit for. **It is not the list of files the commit touched.** It can be partial or empty, and it must never be used to answer "which commits touched file X". The adapter fills it from the paths the commit added, modified or removed (distinct, in the order the payload lists them: added, modified, removed), keeping only the ones the commit can safely be named for:
+
+- at most 1000 paths per commit, so a commit that touched more has only its first 1000 here;
+- empty when the delivered order is not verified, because "later" is unknown;
+- without a path that a later commit touched but that no stored commit records (a commit without a valid sha, a repeated sha, or a path past the cap), so no earlier commit is named for an older version of the file;
+- empty on every commit stored before the column existed (`attributedFiles = []`).
+
+When the ingestion processor creates the code changes of a push event, the pure function `lastCommitPerFile` (`apps/api/src/modules/ingestion/lib/last-commit-per-file.ts`) maps every path to the stored commit with the highest `position` whose `attributedFiles` lists it, and the code change takes that sha. `attributedFiles` is the only thing that decides it: no run, no Git call.
+
+A code change keeps the tip of the push (`scm_event.commitSha`) when no stored commit is attributed its file:
+
+| Case | Why |
+|---|---|
+| The provider reports no commits (Bitbucket, or a push without a `commits` list) | There is no commit to name. |
+| The push was truncated and no kept commit is attributed the file | The commit that touched it was dropped. |
+| The delivered order is not verified (the last delivered commit is not the head of the push) | "Later" is unknown, so the adapter stores every commit with `attributedFiles = []`. |
+| The file is past the first 1000 paths of its last commit, or a later commit that could not be stored touched it (no valid sha, repeated sha) | The adapter leaves the path out of the earlier commits too, so none of them is named for an older version of the file. |
+| The event was stored before the `attributedFiles` column existed | Those commits read `attributedFiles = []`. The migration adds the column with a constant default and backfills nothing, so their code changes keep the tip sha, and code changes already written are not rewritten. |
+
+The fallback never names a wrong commit: the content of a file at the tip equals its content at the last commit that touched it, and the tip is always a commit of the push.
+
 ## API
 
 The runs API carries the range as an `attribution` field, so the client never recomputes it. The service behind it is `RunAttributionService` (`apps/api/src/modules/runs/run-attribution.service.ts`); the types are `RunAttribution`, `AttributedCommit` and `RunAttributionUnknownReason` in `@qably/types`.

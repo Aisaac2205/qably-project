@@ -362,15 +362,21 @@ model ScmEvent {
 }
 
 model ScmCommit {
-  id          String    @id @default(cuid())
-  scmEventId  String
-  scmEvent    ScmEvent  @relation(fields: [scmEventId], references: [id], onDelete: Cascade)
-  sha         String
-  position    Int
-  message     String
-  author      String
-  committedAt DateTime?
-  url         String?
+  id              String    @id @default(cuid())
+  scmEventId      String
+  scmEvent        ScmEvent  @relation(fields: [scmEventId], references: [id], onDelete: Cascade)
+  sha             String
+  position        Int
+  message         String
+  author          String
+  committedAt     DateTime?
+  url             String?
+  // NOT the files the commit touched. These are only the paths a code change may
+  // be attributed to this commit for: capped at 1000, empty when the push order
+  // was not verified, and without a path a later commit touched but could not be
+  // recorded. Empty on rows stored before the column existed. Never use it to
+  // answer "which commits touched file X".
+  attributedFiles String[]  @default([])
 
   @@unique([scmEventId, sha])
   @@index([sha])

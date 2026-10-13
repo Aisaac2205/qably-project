@@ -7,13 +7,22 @@ interface FakePrisma {
   ingestionBatch: { create: jest.Mock };
 }
 
+interface StoredCommit {
+  sha: string;
+  position: number;
+  attributedFiles: string[];
+}
+
+const TIP = 'a'.repeat(40);
+
 const defaultEvent = {
   id: 'event-1',
   organizationId: 'org-1',
   provider: 'GITHUB',
   repo: 'acme/shop',
-  commitSha: 'a'.repeat(40),
+  commitSha: TIP,
   changedFiles: ['src/cart.spec.ts', 'src/cart.ts'],
+  commits: [] as StoredCommit[],
   connection: {
     projects: [{ id: 'proj-1', testFilePatterns: ['*.spec.ts', '*.test.ts'] }],
   },
@@ -148,6 +157,203 @@ describe('IngestionProcessor', () => {
       kind: 'SOURCE_EXCERPT',
       title: 'src/cart.spec.ts',
       uri: `https://github.com/acme/shop/blob/${'a'.repeat(40)}/src/cart.spec.ts`,
+    });
+  });
+
+  describe('commit of each code change', () => {
+    const first = '1'.repeat(40);
+    const second = '2'.repeat(40);
+
+    async function recordedCommits(event: unknown) {
+      const prisma = createPrisma(event);
+
+      await new IngestionProcessor(
+        prisma as never,
+        createEvents() as never,
+        createExtraction() as never,
+      ).process(job('event-1'));
+
+      return batchCalls(prisma).map((call) =>
+        call.data.codeChanges.create.map(({ filePath, commitSha }) => [
+          filePath,
+          commitSha,
+        ]),
+      );
+    }
+
+    it('loads the stored commits of the event with only the columns it needs, oldest first', async () => {
+      const prisma = createPrisma();
+
+      await new IngestionProcessor(
+        prisma as never,
+        createEvents() as never,
+        createExtraction() as never,
+      ).process(job('event-1'));
+
+      const [[query]] = prisma.scmEvent.findUnique.mock.calls as [
+        [{ where: unknown; select: { commits: unknown } }],
+      ];
+
+      expect(query.where).toEqual({ id: 'event-1' });
+      expect(query.select.commits).toEqual({
+        select: { sha: true, position: true, attributedFiles: true },
+        orderBy: { position: 'asc' },
+      });
+    });
+
+    it('gives each code change the last commit of the push that touched its file', async () => {
+      const [calls] = await recordedCommits({
+        ...defaultEvent,
+        commits: [
+          { sha: first, position: 0, attributedFiles: ['src/cart.spec.ts'] },
+          { sha: second, position: 1, attributedFiles: ['src/cart.ts'] },
+        ],
+      });
+
+      expect(calls).toEqual([
+        ['src/cart.spec.ts', first],
+        ['src/cart.ts', second],
+      ]);
+    });
+
+    it('prefers the later commit when several commits touched the same file', async () => {
+      const [calls] = await recordedCommits({
+        ...defaultEvent,
+        commits: [
+          {
+            sha: first,
+            position: 0,
+            attributedFiles: ['src/cart.spec.ts', 'src/cart.ts'],
+          },
+          { sha: second, position: 1, attributedFiles: ['src/cart.spec.ts'] },
+        ],
+      });
+
+      expect(calls).toEqual([
+        ['src/cart.spec.ts', second],
+        ['src/cart.ts', first],
+      ]);
+    });
+
+    it('keeps the tip sha for a file no stored commit lists', async () => {
+      const [calls] = await recordedCommits({
+        ...defaultEvent,
+        commits: [
+          { sha: first, position: 0, attributedFiles: ['src/other.ts'] },
+        ],
+      });
+
+      expect(calls).toEqual([
+        ['src/cart.spec.ts', TIP],
+        ['src/cart.ts', TIP],
+      ]);
+    });
+
+    it('keeps the tip sha for events stored before commits carried attributed files', async () => {
+      const [calls] = await recordedCommits({
+        ...defaultEvent,
+        commits: [
+          { sha: first, position: 0, attributedFiles: [] },
+          { sha: second, position: 1, attributedFiles: [] },
+        ],
+      });
+
+      expect(calls).toEqual([
+        ['src/cart.spec.ts', TIP],
+        ['src/cart.ts', TIP],
+      ]);
+    });
+
+    it('keeps the tip sha when the provider reported no commits', async () => {
+      const [calls] = await recordedCommits({ ...defaultEvent, commits: [] });
+
+      expect(calls).toEqual([
+        ['src/cart.spec.ts', TIP],
+        ['src/cart.ts', TIP],
+      ]);
+    });
+
+    it('mixes both: attributed files get their commit and the rest keep the tip', async () => {
+      const [calls] = await recordedCommits({
+        ...defaultEvent,
+        changedFiles: ['src/a.spec.ts', 'src/b.spec.ts', 'src/c.spec.ts'],
+        commits: [
+          { sha: first, position: 0, attributedFiles: ['src/a.spec.ts'] },
+          { sha: second, position: 1, attributedFiles: ['src/c.spec.ts'] },
+        ],
+      });
+
+      expect(calls).toEqual([
+        ['src/a.spec.ts', first],
+        ['src/b.spec.ts', TIP],
+        ['src/c.spec.ts', second],
+      ]);
+    });
+
+    it('creates code changes only for the changed files, not for every file attributed to a commit', async () => {
+      const [calls] = await recordedCommits({
+        ...defaultEvent,
+        changedFiles: ['src/cart.spec.ts'],
+        commits: [
+          {
+            sha: first,
+            position: 0,
+            attributedFiles: ['src/cart.spec.ts', 'src/removed.spec.ts'],
+          },
+        ],
+      });
+
+      expect(calls).toEqual([['src/cart.spec.ts', first]]);
+    });
+
+    it('applies the same attribution to every project of the connection', async () => {
+      const calls = await recordedCommits({
+        ...defaultEvent,
+        commits: [
+          { sha: first, position: 0, attributedFiles: ['src/cart.ts'] },
+        ],
+        connection: {
+          projects: [
+            { id: 'proj-1', testFilePatterns: ['*.spec.ts'] },
+            { id: 'proj-2', testFilePatterns: ['*.spec.ts'] },
+          ],
+        },
+      });
+
+      expect(calls).toEqual([
+        [
+          ['src/cart.spec.ts', TIP],
+          ['src/cart.ts', first],
+        ],
+        [
+          ['src/cart.spec.ts', TIP],
+          ['src/cart.ts', first],
+        ],
+      ]);
+    });
+
+    it('keeps the source evidence on the pushed tip, which holds the same file content', async () => {
+      const prisma = createPrisma({
+        ...defaultEvent,
+        commits: [
+          { sha: first, position: 0, attributedFiles: ['src/cart.spec.ts'] },
+        ],
+      });
+
+      await new IngestionProcessor(
+        prisma as never,
+        createEvents() as never,
+        createExtraction() as never,
+      ).process(job('event-1'));
+
+      const [{ data }] = batchCalls(prisma);
+
+      expect(data.codeChanges.create[0].commitSha).toBe(first);
+      expect(data.codeChanges.create[0].evidence.create).toEqual(
+        expect.objectContaining({
+          uri: `https://github.com/acme/shop/blob/${TIP}/src/cart.spec.ts`,
+        }),
+      );
     });
   });
 

@@ -246,6 +246,12 @@ function changedFilesOf(commits: unknown[], extra: CommitFixture = {}) {
   return normalizePush(pushOf(commits, extra))?.changedFiles;
 }
 
+function attributedFilesOf(commits: unknown[], extra: CommitFixture = {}) {
+  return normalizePush(pushOf(commits, extra))?.commits.map(
+    (entry) => entry.attributedFiles,
+  );
+}
+
 describe('GithubAdapter.normalize pushed commits', () => {
   it('lists every commit of a multi-commit push in delivered order', () => {
     const event = normalizePush(
@@ -259,11 +265,13 @@ describe('GithubAdapter.normalize pushed commits', () => {
           },
           timestamp: '2026-03-01T10:00:00+02:00',
           url: 'https://github.com/acme/shop/commit/1',
+          added: ['src/cart.spec.ts'],
         }),
         commitOf(2, {
           message: '  fix: guard the checkout  \r\nbody',
           author: { name: 'Grace Hopper' },
           timestamp: '2026-03-01T11:00:00Z',
+          modified: ['src/cart.ts'],
         }),
         commitOf(3, { message: 'chore: bump' }),
       ]),
@@ -278,6 +286,7 @@ describe('GithubAdapter.normalize pushed commits', () => {
         author: 'ada',
         committedAt: '2026-03-01T10:00:00+02:00',
         url: 'https://github.com/acme/shop/commit/1',
+        attributedFiles: ['src/cart.spec.ts'],
       },
       {
         sha: sha(2),
@@ -286,6 +295,7 @@ describe('GithubAdapter.normalize pushed commits', () => {
         author: 'Grace Hopper',
         committedAt: '2026-03-01T11:00:00Z',
         url: null,
+        attributedFiles: ['src/cart.ts'],
       },
       {
         sha: sha(3),
@@ -294,6 +304,7 @@ describe('GithubAdapter.normalize pushed commits', () => {
         author: 'unknown',
         committedAt: null,
         url: null,
+        attributedFiles: [],
       },
     ]);
   });
@@ -424,6 +435,10 @@ describe('GithubAdapter.normalize pushed commits', () => {
       expect.objectContaining({ sha: sha(300), position: 249 }),
     );
     expect(event?.commitsTruncated).toBe(true);
+    expect(event?.commits[0].attributedFiles).toEqual(['src/file-51.spec.ts']);
+    expect(event?.commits[249].attributedFiles).toEqual([
+      'src/file-300.spec.ts',
+    ]);
     // The cap bounds the stored list only; extraction still sees every file.
     expect(event?.changedFiles).toHaveLength(300);
   });
@@ -706,5 +721,274 @@ describe('GithubAdapter.normalize net changed files', () => {
         },
       })?.changedFiles,
     ).toEqual(['x.spec.ts']);
+  });
+});
+
+describe('GithubAdapter.normalize attributed files per commit', () => {
+  it('lists the paths a commit added, modified and removed, in that order', () => {
+    expect(
+      attributedFilesOf([
+        commitOf(1, {
+          removed: ['gone.spec.ts'],
+          modified: ['changed.spec.ts'],
+          added: ['new.spec.ts'],
+        }),
+      ]),
+    ).toEqual([['new.spec.ts', 'changed.spec.ts', 'gone.spec.ts']]);
+  });
+
+  it('lists a path once even when the commit reports it under several lists', () => {
+    expect(
+      attributedFilesOf([
+        commitOf(1, {
+          added: ['a.spec.ts', 'a.spec.ts'],
+          modified: ['a.spec.ts', 'b.spec.ts'],
+          removed: ['b.spec.ts'],
+        }),
+      ]),
+    ).toEqual([['a.spec.ts', 'b.spec.ts']]);
+  });
+
+  it('keeps the attributed files of each commit apart', () => {
+    expect(
+      attributedFilesOf([
+        commitOf(1, { added: ['a.spec.ts'] }),
+        commitOf(2, { modified: ['a.spec.ts', 'b.spec.ts'] }),
+        commitOf(3, { removed: ['a.spec.ts'] }),
+      ]),
+    ).toEqual([['a.spec.ts'], ['a.spec.ts', 'b.spec.ts'], ['a.spec.ts']]);
+  });
+
+  it('attributes no files to a commit that reports none', () => {
+    expect(attributedFilesOf([commitOf(1)])).toEqual([[]]);
+  });
+
+  it('ignores lists that are not arrays and entries that are not strings', () => {
+    expect(
+      attributedFilesOf([
+        commitOf(1, {
+          added: ['a.spec.ts', 5, null, {}, ['nested.spec.ts']],
+          modified: 'b.spec.ts',
+          removed: { 0: 'c.spec.ts' },
+        }),
+        commitOf(2, { added: null, modified: 7, removed: undefined }),
+      ]),
+    ).toEqual([['a.spec.ts'], []]);
+  });
+
+  it('caps the attributed files of one commit at 1000 and keeps the first ones', () => {
+    const added = Array.from({ length: 1000 }, (_, index) => `a-${index}.ts`);
+    const modified = Array.from({ length: 5 }, (_, index) => `m-${index}.ts`);
+
+    const attributed = attributedFilesOf([
+      commitOf(1, { added, modified }),
+    ])?.[0];
+
+    expect(attributed).toHaveLength(1000);
+    expect(attributed?.[0]).toBe('a-0.ts');
+    expect(attributed?.[999]).toBe('a-999.ts');
+    expect(attributed).not.toContain('m-0.ts');
+  });
+
+  it('does not cap a commit of exactly 1000 files', () => {
+    const added = Array.from({ length: 1000 }, (_, index) => `a-${index}.ts`);
+
+    expect(attributedFilesOf([commitOf(1, { added })])?.[0]).toEqual(added);
+  });
+
+  it('still reports a path beyond the per-commit cap as changed', () => {
+    const added = Array.from({ length: 1001 }, (_, index) => `a-${index}.ts`);
+
+    const event = normalizePush(pushOf([commitOf(1, { added })]));
+
+    expect(event?.changedFiles).toHaveLength(1001);
+    expect(event?.commits[0].attributedFiles).toHaveLength(1000);
+  });
+
+  it('takes no file from an earlier commit when a later one touched it beyond the cap', () => {
+    const added = [
+      ...Array.from({ length: 1000 }, (_, index) => `a-${index}.ts`),
+      'late.spec.ts',
+    ];
+
+    const attributed = attributedFilesOf([
+      commitOf(1, { modified: ['late.spec.ts', 'early.spec.ts'] }),
+      commitOf(2, { added }),
+    ]);
+
+    // late.spec.ts is the 1001st path of the second commit, so no stored commit
+    // may claim it: the first commit's version of it would be stale.
+    expect(attributed?.[0]).toEqual(['early.spec.ts']);
+    expect(attributed?.[1]).toHaveLength(1000);
+    expect(attributed?.[1]).not.toContain('late.spec.ts');
+  });
+
+  it('attributes no files when the last delivered commit is not the head, because the order is unverified', () => {
+    const head = commitOf(3, { modified: ['c.spec.ts'] });
+
+    const event = normalizePush(
+      pushOf(
+        [
+          head,
+          commitOf(2, { added: ['b.spec.ts'] }),
+          commitOf(1, { added: ['a.spec.ts'] }),
+        ],
+        { after: sha(3), head_commit: head },
+      ),
+    );
+
+    expect(event?.commits.map((entry) => entry.sha)).toEqual([
+      sha(3),
+      sha(2),
+      sha(1),
+    ]);
+    expect(event?.commits.map((entry) => entry.attributedFiles)).toEqual([
+      [],
+      [],
+      [],
+    ]);
+    expect(event?.changedFiles).toEqual([
+      'c.spec.ts',
+      'b.spec.ts',
+      'a.spec.ts',
+    ]);
+  });
+
+  it('attributes no files when the head cannot be proven because after and head_commit carry no sha', () => {
+    const event = normalizePush(
+      pushOf([commitOf(1, { added: ['a.spec.ts'] })], {
+        after: undefined,
+        head_commit: { id: 'not-a-sha', added: ['h.spec.ts'] },
+      }),
+    );
+
+    expect(event?.commits.map((entry) => entry.attributedFiles)).toEqual([[]]);
+    expect(event?.changedFiles).toEqual(['a.spec.ts', 'h.spec.ts']);
+  });
+
+  it('does not let a repeated sha leave files attributed to the commits listed before it', () => {
+    const attributed = attributedFilesOf([
+      commitOf(1, { modified: ['a.spec.ts', 'x.spec.ts'] }),
+      commitOf(2, { modified: ['a.spec.ts'] }),
+      commitOf(1, { modified: ['a.spec.ts'] }),
+      commitOf(3, { modified: ['z.spec.ts'] }),
+    ]);
+
+    // The repeated entry is not stored, so a.spec.ts has no recorded last commit.
+    expect(attributed).toEqual([['x.spec.ts'], [], ['z.spec.ts']]);
+  });
+});
+
+describe('GithubAdapter.normalize commits without a valid id', () => {
+  const invalid = (extra: CommitFixture) => ({ id: 'abc123', ...extra });
+
+  it('keeps the files of a delivered commit whose id is not a 40-hex sha in the net changed files', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1, { added: ['a.spec.ts'] }),
+        invalid({ added: ['orphan.spec.ts'], modified: ['b.spec.ts'] }),
+        commitOf(3, { modified: ['c.spec.ts'] }),
+      ]),
+    );
+
+    expect(event?.changedFiles).toEqual([
+      'a.spec.ts',
+      'orphan.spec.ts',
+      'b.spec.ts',
+      'c.spec.ts',
+    ]);
+  });
+
+  it('keeps the files of a commit with a missing, numeric or non-hex id', () => {
+    expect(
+      changedFilesOf([
+        { added: ['no-id.spec.ts'] },
+        { id: 12345, added: ['numeric.spec.ts'] },
+        { id: 'g'.repeat(40), added: ['non-hex.spec.ts'] },
+        commitOf(4, { added: ['ok.spec.ts'] }),
+      ]),
+    ).toEqual([
+      'no-id.spec.ts',
+      'numeric.spec.ts',
+      'non-hex.spec.ts',
+      'ok.spec.ts',
+    ]);
+  });
+
+  it('replays the removals of such a commit in the delivered order', () => {
+    expect(
+      changedFilesOf([
+        commitOf(1, { added: ['tmp.spec.ts', 'keep.spec.ts'] }),
+        invalid({ removed: ['tmp.spec.ts'] }),
+        commitOf(3, { modified: ['other.spec.ts'] }),
+      ]),
+    ).toEqual(['keep.spec.ts', 'other.spec.ts']);
+  });
+
+  it('does not store the commit itself', () => {
+    const event = normalizePush(
+      pushOf([
+        commitOf(1, { added: ['a.spec.ts'] }),
+        invalid({ added: ['orphan.spec.ts'] }),
+        commitOf(3),
+      ]),
+    );
+
+    expect(event?.commits.map((entry) => entry.sha)).toEqual([sha(1), sha(3)]);
+    expect(event?.commits.map((entry) => entry.position)).toEqual([0, 1]);
+  });
+
+  it('keeps a stored commit from claiming a file the unstored commit changed after it', () => {
+    const attributed = attributedFilesOf([
+      commitOf(1, { modified: ['shared.spec.ts', 'early.spec.ts'] }),
+      invalid({ modified: ['shared.spec.ts'] }),
+      commitOf(3, { modified: ['late.spec.ts', 'shared.spec.ts'] }),
+    ]);
+
+    // The unstored commit sits between the two stored ones: it does not take
+    // shared.spec.ts away from the later stored commit, only from the earlier.
+    expect(attributed).toEqual([
+      ['early.spec.ts'],
+      ['late.spec.ts', 'shared.spec.ts'],
+    ]);
+  });
+
+  it('keeps the files of a last delivered commit without a valid id and treats the order as unverified', () => {
+    const event = normalizePush(
+      pushOf(
+        [
+          commitOf(1, { added: ['a.spec.ts'] }),
+          invalid({ added: ['orphan.spec.ts'] }),
+        ],
+        {
+          after: sha(9),
+          head_commit: commitOf(9, { modified: ['head.spec.ts'] }),
+        },
+      ),
+    );
+
+    expect(event?.commitSha).toBe(sha(9));
+    expect(event?.changedFiles).toEqual([
+      'a.spec.ts',
+      'orphan.spec.ts',
+      'head.spec.ts',
+    ]);
+    expect(event?.commits.map((entry) => entry.attributedFiles)).toEqual([[]]);
+  });
+
+  it('does not take an earlier valid commit for the head when the last delivered one has no valid id', () => {
+    const event = normalizePush(
+      pushOf(
+        [
+          commitOf(1, { added: ['a.spec.ts'] }),
+          invalid({ removed: ['a.spec.ts'] }),
+        ],
+        { after: sha(1), head_commit: commitOf(1, { added: ['a.spec.ts'] }) },
+      ),
+    );
+
+    // The removal is not replayed because the last entry is not provably the
+    // head, so the union minus the head removals applies.
+    expect(event?.changedFiles).toEqual(['a.spec.ts']);
   });
 });

@@ -15,6 +15,10 @@ const HANDLED_PR_ACTIONS = ['opened', 'synchronize'];
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const NULL_SHA = '0'.repeat(40);
 const MAX_KEPT_COMMITS = 250;
+// A commit that rewrites a whole tree can list thousands of paths. Only the
+// first ones are attributed to the commit; the net `changedFiles` of the event
+// is not capped.
+const MAX_ATTRIBUTED_FILES_PER_COMMIT = 1000;
 // GitHub documents "a maximum of 2048 commits" in a push payload, so a delivery
 // that long may have been cut by GitHub itself.
 const GITHUB_COMMIT_LIMIT = 2048;
@@ -45,10 +49,20 @@ interface PushPayload {
   commits?: unknown;
 }
 
-interface PushedCommit {
-  commit: Omit<NormalizedScmCommit, 'position'>;
-  files: FileChanges;
+// One entry of the delivered `commits` list. The id may be unusable, in which
+// case the commit cannot be stored but its files still count for the push.
+interface DeliveredCommit {
+  /** Lowercase sha; null when the delivered id is not a 40-hex sha. */
+  sha: string | null;
+  raw: Record<string, unknown>;
 }
+
+type StorableCommit = DeliveredCommit & { sha: string };
+
+type StoredCommitDetails = Omit<
+  NormalizedScmCommit,
+  'position' | 'attributedFiles'
+>;
 
 interface PullRequestPayload {
   action?: string;
@@ -107,39 +121,99 @@ function readTimestamp(value: unknown): string | null {
     : null;
 }
 
-function distinctBySha(commits: PushedCommit[]): PushedCommit[] {
+function hasSha(commit: DeliveredCommit): commit is StorableCommit {
+  return commit.sha !== null;
+}
+
+// A repeated sha would break the (event, sha) uniqueness of the stored list,
+// and that violation is indistinguishable from a replayed delivery.
+function distinctBySha(commits: StorableCommit[]): StorableCommit[] {
   const seen = new Set<string>();
 
-  return commits.filter(({ commit }) => {
-    if (seen.has(commit.sha)) return false;
+  return commits.filter(({ sha }) => {
+    if (seen.has(sha)) return false;
 
-    seen.add(commit.sha);
+    seen.add(sha);
 
     return true;
   });
 }
 
-function readPushedCommit(entry: unknown): PushedCommit[] {
+// Entries that are not objects carry no files and are skipped; an object with
+// an unusable id is kept so its files are not lost.
+function readDeliveredCommit(entry: unknown): DeliveredCommit[] {
   const raw = asRecord(entry);
-  const sha = readSha(raw?.id);
 
-  if (raw === null || sha === null) return [];
+  return raw === null ? [] : [{ sha: readSha(raw.id), raw }];
+}
 
+function describeCommit({ sha, raw }: StorableCommit): StoredCommitDetails {
   const author = asRecord(raw.author);
 
+  return {
+    sha,
+    message: readMessage(raw.message),
+    author: readText(author?.username) ?? readText(author?.name) ?? 'unknown',
+    committedAt: readTimestamp(raw.timestamp),
+    url: readText(raw.url),
+  };
+}
+
+// Added, modified, then removed, each path once.
+function distinctPaths(changes: FileChanges): string[] {
   return [
-    {
-      commit: {
-        sha,
-        message: readMessage(raw.message),
-        author:
-          readText(author?.username) ?? readText(author?.name) ?? 'unknown',
-        committedAt: readTimestamp(raw.timestamp),
-        url: readText(raw.url),
-      },
-      files: raw,
-    },
+    ...new Set([
+      ...readPaths(changes.added),
+      ...readPaths(changes.modified),
+      ...readPaths(changes.removed),
+    ]),
   ];
+}
+
+// The paths each stored commit may be named for, which is NOT the list of files
+// it touched. A path is withheld when a later delivered commit touched it but no
+// stored commit records it (a commit without a valid id, a repeated sha, or a
+// path past the per-commit cap): naming the earlier commit would point at a
+// stale version of the file, whereas leaving it out makes the code change fall
+// back to the tip of the push, which is always current. Without a verified
+// order "later" is unknown, so nothing is attributed.
+function attributedFilesByCommit(
+  pushed: DeliveredCommit[],
+  storable: StorableCommit[],
+  orderVerified: boolean,
+): Map<StorableCommit, string[]> {
+  const attributed = new Map<StorableCommit, string[]>();
+
+  if (!orderVerified) {
+    for (const commit of storable) attributed.set(commit, []);
+
+    return attributed;
+  }
+
+  const stored = new Set<DeliveredCommit>(storable);
+  const isStored = (commit: DeliveredCommit): commit is StorableCommit =>
+    stored.has(commit);
+  const unrecorded = new Set<string>();
+
+  // Newest first, so `unrecorded` holds what later commits left unrecorded.
+  for (const commit of [...pushed].reverse()) {
+    const paths = distinctPaths(commit.raw);
+    let recordedCount = 0;
+
+    if (isStored(commit)) {
+      const recorded = paths.slice(0, MAX_ATTRIBUTED_FILES_PER_COMMIT);
+
+      attributed.set(
+        commit,
+        recorded.filter((path) => !unrecorded.has(path)),
+      );
+      recordedCount = recorded.length;
+    }
+
+    for (const path of paths.slice(recordedCount)) unrecorded.add(path);
+  }
+
+  return attributed;
 }
 
 // Replays the commits in order against a set of present paths: an addition or
@@ -184,22 +258,35 @@ function readBeforeSha(value: unknown): string | null {
   return sha === NULL_SHA ? null : sha;
 }
 
-// The file list spans every delivered commit, not only the kept ones: the cap
-// bounds what is stored about the push, not what extraction can see.
-function resolveChangedFiles(
+// GitHub does not document the order of `commits`, so it is only trusted when
+// the last delivered commit is provably the head of the push. A last commit
+// without a valid id proves nothing.
+function isOrderVerified(
   payload: PushPayload,
   head: FileChanges & { id?: string },
-  pushed: PushedCommit[],
+  pushed: DeliveredCommit[],
+): boolean {
+  const lastSha = pushed.at(-1)?.sha ?? null;
+
+  return (
+    lastSha !== null &&
+    [readSha(payload.after), readSha(head.id)].includes(lastSha)
+  );
+}
+
+// The file list spans every delivered commit, including the ones that cannot be
+// stored: the caps bound what is stored about the push, not what extraction can
+// see, and a commit with an unusable id must not make its files vanish.
+function resolveChangedFiles(
+  head: FileChanges,
+  pushed: DeliveredCommit[],
+  orderVerified: boolean,
 ): string[] {
   if (pushed.length === 0) return netChangedFiles([head]);
 
-  const history = pushed.map(({ files }) => files);
-  const lastSha = pushed[pushed.length - 1].commit.sha;
-  const headShas = [readSha(payload.after), readSha(head.id)];
+  const history = pushed.map(({ raw }) => raw);
 
-  // GitHub does not document the order of `commits`, so it is only replayed
-  // when the last delivered commit is provably the head of the push.
-  return headShas.includes(lastSha)
+  return orderVerified
     ? netChangedFiles(history)
     : unorderedChangedFiles([...history, head], head);
 }
@@ -250,11 +337,11 @@ export class GithubAdapter implements ScmPayloadAdapter {
     if (!commit?.id || repo === undefined) return null;
 
     const delivered = Array.isArray(payload.commits) ? payload.commits : [];
-    const pushed = delivered.flatMap(readPushedCommit);
-    // A repeated sha would break the (event, sha) uniqueness of the stored list,
-    // and that violation is indistinguishable from a replayed delivery.
-    const distinct = distinctBySha(pushed);
+    const pushed = delivered.flatMap(readDeliveredCommit);
+    const distinct = distinctBySha(pushed.filter(hasSha));
     const kept = distinct.slice(-MAX_KEPT_COMMITS);
+    const orderVerified = isOrderVerified(payload, commit, pushed);
+    const attributed = attributedFilesByCommit(pushed, distinct, orderVerified);
 
     return {
       eventId,
@@ -266,12 +353,13 @@ export class GithubAdapter implements ScmPayloadAdapter {
       author: payload.pusher?.name ?? 'unknown',
       title: commit.message ?? '',
       url: commit.url ?? '',
-      changedFiles: resolveChangedFiles(payload, commit, pushed),
+      changedFiles: resolveChangedFiles(commit, pushed, orderVerified),
       beforeSha: readBeforeSha(payload.before),
       forced: payload.forced === true,
-      commits: kept.map(({ commit: entry }, position) => ({
-        ...entry,
+      commits: kept.map((entry, position) => ({
+        ...describeCommit(entry),
         position,
+        attributedFiles: attributed.get(entry) ?? [],
       })),
       commitsTruncated:
         distinct.length > MAX_KEPT_COMMITS ||
