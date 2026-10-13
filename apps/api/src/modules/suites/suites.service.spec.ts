@@ -60,7 +60,7 @@ interface FakePrisma {
   run: { findFirst: jest.Mock };
   runCase: { findMany: jest.Mock };
   project: { findFirst: jest.Mock };
-  extractedProposal: { findMany: jest.Mock };
+  extractedProposal: { findMany: jest.Mock; groupBy: jest.Mock };
   orgMember: { findFirst: jest.Mock };
   caseIdentityCollision: { groupBy: jest.Mock };
   $transaction: jest.Mock;
@@ -89,7 +89,10 @@ function createPrisma(): FakePrisma {
     run: { findFirst: jest.fn().mockResolvedValue(null) },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
     project: { findFirst: jest.fn().mockResolvedValue({ id: 'project-1' }) },
-    extractedProposal: { findMany: jest.fn().mockResolvedValue([]) },
+    extractedProposal: {
+      findMany: jest.fn().mockResolvedValue([]),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
     orgMember: {
       findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
     },
@@ -888,6 +891,56 @@ describe('SuitesService open case identity collisions', () => {
         where: { suiteId: { in: ['suite-1'] }, closedAt: null },
       }),
     );
+  });
+});
+
+describe('SuitesService proposals waiting for review', () => {
+  it('reports how many proposals of the suite are waiting in the review inbox', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+    prisma.extractedProposal.groupBy.mockResolvedValue([
+      { suiteId: 'suite-1', _count: { _all: 3 } },
+    ]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.pendingProposals).toBe(3);
+  });
+
+  it('reports zero for a suite with nothing waiting', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    const [suite] = await build(prisma).list(owner);
+
+    expect(suite.pendingProposals).toBe(0);
+  });
+
+  it('counts every in-review proposal of the visible suites, new cases included', async () => {
+    const prisma = createPrisma();
+    prisma.suite.findMany.mockResolvedValue([suiteRow]);
+
+    await build(prisma).list(owner);
+
+    expect(prisma.extractedProposal.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: ['suiteId'],
+        where: { suiteId: { in: ['suite-1'] }, status: 'in_review' },
+      }),
+    );
+  });
+
+  it('reports the count on the single-suite view too', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.groupBy.mockResolvedValue([
+      { suiteId: 'suite-1', _count: { _all: 5 } },
+    ]);
+
+    const result = await build(prisma).findOne(owner, 'suite-1');
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.pendingProposals).toBe(5);
   });
 });
 

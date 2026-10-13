@@ -54,6 +54,11 @@ interface OpenCollisionCountRow {
   _count: { _all: number };
 }
 
+interface PendingProposalCountRow {
+  suiteId: string | null;
+  _count: { _all: number };
+}
+
 @Injectable()
 export class SuiteViewAssembler {
   constructor(private readonly prisma: PrismaService) {}
@@ -116,6 +121,7 @@ export class SuiteViewAssembler {
       recentResultRows,
       duplicateKeyRows,
       openCollisionRows,
+      pendingProposalCountRows,
     ] = await Promise.all([
       automatedCaseIds.length === 0
         ? Promise.resolve([] as LastResultRow[])
@@ -183,6 +189,15 @@ export class SuiteViewAssembler {
             where: { suiteId: { in: suiteIds }, closedAt: null },
             _count: { _all: true },
           }) as unknown as Promise<OpenCollisionCountRow[]>),
+      // Every proposal waiting in the inbox for the suite, including the ones
+      // that would create a new case and so have no case to attach to.
+      suiteIds.length === 0
+        ? Promise.resolve([] as PendingProposalCountRow[])
+        : (this.prisma.extractedProposal.groupBy({
+            by: ['suiteId'],
+            where: { suiteId: { in: suiteIds }, status: PENDING_STATUS },
+            _count: { _all: true },
+          }) as unknown as Promise<PendingProposalCountRow[]>),
     ]);
 
     const lastResultByCaseId = new Map<string, CaseLastResult>();
@@ -237,6 +252,12 @@ export class SuiteViewAssembler {
     const openCollisionsBySuiteId = new Map<string, number>();
     for (const row of openCollisionRows) {
       openCollisionsBySuiteId.set(row.suiteId, row._count._all);
+    }
+
+    const pendingProposalsBySuiteId = new Map<string, number>();
+    for (const row of pendingProposalCountRows) {
+      if (row.suiteId === null) continue;
+      pendingProposalsBySuiteId.set(row.suiteId, row._count._all);
     }
 
     const visibleCaseIds = new Set(visibleInputs.map((input) => input.id));
@@ -327,6 +348,7 @@ export class SuiteViewAssembler {
         staleLocaleCount,
         incompleteCount,
         openCollisions: openCollisionsBySuiteId.get(view.id) ?? 0,
+        pendingProposals: pendingProposalsBySuiteId.get(view.id) ?? 0,
       };
     });
   }

@@ -234,6 +234,8 @@ export interface Suite {
   healthSummary?: CaseHealthSummary
   documentation?: SuiteDocumentationState
   openCollisions?: number
+  /** Proposals for this suite waiting in the review inbox, new cases included. */
+  pendingProposals?: number
 }
 
 /**

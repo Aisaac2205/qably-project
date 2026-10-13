@@ -43,6 +43,7 @@ import {
 import { SelectSimple } from '@/components/ui/select'
 import { HealthSignalChip } from './health-signal-chip'
 import { SuiteCollisionsPanel } from './suite-collisions-panel'
+import { SuiteInReviewNotice } from './suite-in-review-notice'
 import { DocumentWithAeris, useDocumentFiles } from './document-with-aeris'
 import { ConfirmDocumentation, useConfirmDocumentationState } from './confirm-documentation'
 import { casesAwaitingConfirmation } from '@/features/projects/suites/lib/confirmable-cases'
@@ -329,6 +330,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           </div>
         )}
 
+        <SuiteInReviewNotice projectId={projectId} pendingProposals={suite.pendingProposals} />
         <SuiteCollisionsPanel openCollisions={suite.openCollisions} />
       </header>
 

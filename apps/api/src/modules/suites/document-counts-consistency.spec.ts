@@ -74,6 +74,7 @@ function buildSuitesService() {
         .mockResolvedValue([
           { id: 'proposal-1', targetTestCaseId: 'pending-1' },
         ]),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
     orgMember: {
