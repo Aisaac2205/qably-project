@@ -26,6 +26,19 @@ import { CaseDocumentationAction } from './case-documentation-action'
 import { CaseDisclosureToggle, CaseDisclosurePanel } from './case-disclosure'
 import { formatRelative } from '@/features/projects/suites/lib/format-relative'
 
+/**
+ * A skip whose only reason is "already waiting in the review inbox" repeats the
+ * in-review link the card already shows, so it gives way to that link.
+ */
+function visibleDocumentationBadge(testCase: TestCase) {
+  const badge = deriveCaseDocumentationBadge(testCase)
+  const repeatsReviewLink =
+    badge?.kind === 'skipped' &&
+    badge.reason === 'already-pending' &&
+    testCase.pendingProposalId != null
+  return repeatsReviewLink ? null : badge
+}
+
 interface CaseCardProps {
   testCase: TestCase
   projectId?: string
@@ -45,7 +58,7 @@ export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, on
   const described = useMemo(() => describeCase(testCase), [testCase])
   const staleLocale = testCase.localeStale === true
   const attention = deriveCaseAttention(testCase)
-  const documentationBadge = deriveCaseDocumentationBadge(testCase)
+  const documentationBadge = visibleDocumentationBadge(testCase)
   const qualitySignals = CASE_HEALTH_SIGNAL_ORDER.filter(
     (signal) =>
       testCase.healthSignals?.includes(signal) === true &&
@@ -169,7 +182,6 @@ export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, on
           testCase={testCase}
           stepsOpen={stepsOpen}
           onToggleSteps={() => setStepsOpen(!stepsOpen)}
-          documentationBadge={documentationBadge}
           onEdit={onEdit}
         />
 

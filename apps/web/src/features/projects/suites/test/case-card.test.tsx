@@ -545,7 +545,7 @@ describe('CaseCard', () => {
         expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
       })
 
-      it('lets the Aeris documenting badge win over the review link', async () => {
+      it('keeps the review link visible next to the Aeris documenting badge', async () => {
         await act(async () => {
           renderWithQuery(
             <CaseCard
@@ -569,7 +569,10 @@ describe('CaseCard', () => {
 
         expect(screen.getByText('Documenting')).toBeInTheDocument()
         expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
-        expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+        expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+          'href',
+          '/review-inbox?proposal=proposal-7',
+        )
       })
     })
   })
@@ -746,7 +749,7 @@ describe('CaseCard', () => {
   })
 
   describe('Aeris documentation state badge', () => {
-    it('shows documenting while queued with no outcome yet, taking priority over the lifecycle state, with no competing "in review" link', async () => {
+    it('shows documenting while queued with no outcome yet, taking priority over the lifecycle state, and still links the pending review', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
@@ -769,10 +772,38 @@ describe('CaseCard', () => {
 
       expect(screen.getByText('Documenting')).toBeInTheDocument()
       expect(screen.queryByText(/^undocumented$/i)).not.toBeInTheDocument()
-      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-1',
+      )
     })
 
-    it('shows exactly one state, and no "in review" link, when a case was skipped because it is already pending review', async () => {
+    it('keeps a skipped badge with another reason next to the review link', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...automatedCase,
+              pendingProposalId: 'proposal-1',
+              documentation: {
+                outcome: 'skipped',
+                missing: [],
+                skipReason: 'no-source-file',
+                queuedAt: null,
+                outcomeAt: '2026-03-01T00:00:00Z',
+              },
+            }}
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByText(/skipped/i)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /in review/i })).toBeInTheDocument()
+    })
+
+    it('shows exactly one review state, the actionable link, when a case was skipped because it is already pending review', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
@@ -794,9 +825,12 @@ describe('CaseCard', () => {
       })
 
       expect(
-        screen.getByText(/already waiting in the review inbox/i),
-      ).toBeInTheDocument()
-      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+        screen.queryByText(/already waiting in the review inbox/i),
+      ).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-1',
+      )
     })
 
     it('shows the missing fields for an incomplete outcome', async () => {
