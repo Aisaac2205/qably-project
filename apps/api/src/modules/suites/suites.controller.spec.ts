@@ -33,6 +33,7 @@ function fakeSuites(result?: unknown) {
   return {
     confirmDocumentation: jest.fn().mockResolvedValue(result),
     remove: jest.fn().mockResolvedValue(result),
+    dismissCollision: jest.fn().mockResolvedValue(result),
   };
 }
 
@@ -271,5 +272,36 @@ describe('SuitesController.confirmDocumentation', () => {
         {},
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('SuitesController.dismissCollision', () => {
+  it('dismisses the collision of the suite and resolves with nothing', async () => {
+    const suites = fakeSuites({ ok: true, value: undefined });
+
+    await expect(
+      build(fakeExtraction(undefined), suites).dismissCollision(
+        org,
+        'suite-1',
+        'collision-1',
+      ),
+    ).resolves.toBeUndefined();
+    expect(suites.dismissCollision).toHaveBeenCalledWith(
+      org,
+      'suite-1',
+      'collision-1',
+    );
+  });
+
+  it('maps a collision outside the suite or the organization to NotFoundException', async () => {
+    const suites = fakeSuites({ ok: false, error: 'not-found' });
+
+    await expect(
+      build(fakeExtraction(undefined), suites).dismissCollision(
+        org,
+        'suite-1',
+        'collision-1',
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -1,4 +1,6 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { reviewThrottle } from '../../common/throttler/throttler.config';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
@@ -24,6 +26,7 @@ export class ReviewController {
   ) {}
 
   @Get(':id')
+  @Throttle(reviewThrottle)
   async findOne(
     @CurrentOrg() org: OrgContext,
     @Param('id') id: string,
@@ -32,6 +35,7 @@ export class ReviewController {
   }
 
   @Post(':id/approve')
+  @Throttle(reviewThrottle)
   async approve(
     @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
@@ -45,6 +49,7 @@ export class ReviewController {
   }
 
   @Post(':id/reject')
+  @Throttle(reviewThrottle)
   async reject(
     @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,

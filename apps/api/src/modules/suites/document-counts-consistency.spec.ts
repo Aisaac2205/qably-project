@@ -74,12 +74,16 @@ function buildSuitesService() {
         .mockResolvedValue([
           { id: 'proposal-1', targetTestCaseId: 'pending-1' },
         ]),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     testCase: { findMany: jest.fn().mockResolvedValue([]) },
     orgMember: {
       findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
     },
-    caseIdentityCollision: { groupBy: jest.fn().mockResolvedValue([]) },
+    caseIdentityCollision: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     $queryRaw: jest.fn().mockResolvedValue([]),
   };
 

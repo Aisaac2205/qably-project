@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getInboxCounts,
+  type OpenCollisionSuite,
   type ReviewInboxCountsFilters,
   type ReviewInboxStatusCounts,
 } from '../api/review.api'
@@ -12,6 +13,8 @@ import { reviewKeys } from '../lib/query-keys'
 const INBOX_LIST_KEY = ['review', 'inbox'] as const
 
 const POLL_INTERVAL_MS = 15000
+
+const NO_COLLISION_SUITES: OpenCollisionSuite[] = []
 
 const EMPTY_COUNTS: ReviewInboxStatusCounts = {
   in_review: 0,
@@ -48,7 +51,7 @@ export function useInboxCounts(filters: ReviewInboxCountsFilters) {
 
   return {
     counts: query.data?.byStatus ?? EMPTY_COUNTS,
-    openCollisions: query.data?.openCollisions ?? 0,
+    openCollisionSuites: query.data?.openCollisionSuites ?? NO_COLLISION_SUITES,
     version: query.data?.version,
     isLoading: query.isLoading,
     isError: query.isError,

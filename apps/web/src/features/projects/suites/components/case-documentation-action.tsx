@@ -3,7 +3,6 @@ import type { TestCase } from '@qably/types'
 import { Clock, PencilSimple, Sparkle } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import { extractionFailureReasonKey } from '@/lib/extraction-failure-reason'
-import type { CaseDocumentationBadge } from '@/features/projects/suites/lib/case-documentation-state'
 import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
 import { CaseDisclosureToggle } from './case-disclosure'
 
@@ -11,7 +10,6 @@ export interface CaseDocumentationActionProps {
   testCase: TestCase
   stepsOpen: boolean
   onToggleSteps: () => void
-  documentationBadge: CaseDocumentationBadge | null
   onEdit: (testCase: TestCase) => void
 }
 
@@ -33,14 +31,14 @@ export function CaseDocumentationAction({
   testCase,
   stepsOpen,
   onToggleSteps,
-  documentationBadge,
   onEdit,
 }: CaseDocumentationActionProps) {
   const { t } = useTranslation()
   const documentCase = useDocumentCase()
 
-  const reviewLink =
-    documentationBadge === null && testCase.pendingProposalId ? (
+  // A pending proposal is always surfaced, even next to an Aeris documentation
+  // badge: the badge describes the last attempt, the link is where the case waits.
+  const reviewLink = testCase.pendingProposalId ? (
       <CaseInReviewLink proposalId={testCase.pendingProposalId} />
     ) : null
 

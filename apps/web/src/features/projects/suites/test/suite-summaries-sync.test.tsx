@@ -4,18 +4,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Suite, SuiteSummary } from '@qably/types'
 import { projectKeys, suiteKeys } from '@/features/projects/lib/query-keys'
 import {
+  confirmDocumentation,
   createCase,
   createSuite,
   deleteCase,
   deleteSuite,
+  documentSuite,
   updateCase,
   updateSuite,
 } from '@/features/projects/suites/api/suites.api'
 import {
+  useConfirmDocumentation,
   useCreateCase,
   useCreateSuite,
   useDeleteCase,
   useDeleteSuite,
+  useDocumentSuite,
+  useRefreshSuiteLists,
   useUpdateCase,
   useUpdateSuite,
 } from '@/features/projects/suites/hooks/use-suite-mutations'
@@ -51,6 +56,8 @@ const deleteSuiteApi = vi.mocked(deleteSuite)
 const createCaseApi = vi.mocked(createCase)
 const updateCaseApi = vi.mocked(updateCase)
 const deleteCaseApi = vi.mocked(deleteCase)
+const documentSuiteApi = vi.mocked(documentSuite)
+const confirmDocumentationApi = vi.mocked(confirmDocumentation)
 
 const SUMMARIES_FILTER = JSON.stringify(suiteKeys.summaries('proj-1'))
 
@@ -341,5 +348,75 @@ describe('a review decision and the paged suite summaries', () => {
     expect(isInvalidated(client, SEARCH)).toBe(true)
     expect(isInvalidated(client, OTHER_PROJECT)).toBe(true)
     expect(isInvalidated(client, suiteKeys.tags('proj-1'))).toBe(true)
+  })
+})
+
+describe('documentation and the paged suite summaries', () => {
+  const documented = suite('c', {
+    projectId: 'proj-1',
+    description: 'documented by Aeris',
+    cases: casesOf(4),
+  })
+
+  function expectDocumentedSuiteSynced(client: QueryClient) {
+    for (const key of [RECENT, SEARCH]) {
+      expect(itemOf(client, key, 'c')).toMatchObject({
+        description: 'documented by Aeris',
+        caseCount: 4,
+      })
+      expect(isInvalidated(client, key)).toBe(true)
+    }
+    expect(isInvalidated(client, suiteKeys.tags('proj-1'))).toBe(true)
+    expect(isInvalidated(client, OTHER_PROJECT)).toBe(false)
+    expect(isInvalidated(client, suiteKeys.tags('proj-2'))).toBe(false)
+  }
+
+  it('patches and refreshes the summaries when a documentation watch settles', async () => {
+    const client = seededClient()
+    client.setQueryData(suiteKeys.detail('c'), documented)
+    const { result } = renderHook(() => useRefreshSuiteLists(), { wrapper: wrapperFor(client) })
+
+    await act(async () => {
+      await result.current('proj-1', 'c')
+    })
+
+    expectDocumentedSuiteSynced(client)
+  })
+
+  it('patches and refreshes the summaries after documentation is confirmed', async () => {
+    const client = seededClient()
+    client.setQueryData(suiteKeys.detail('c'), documented)
+    confirmDocumentationApi.mockResolvedValue({
+      suiteId: 'c',
+      confirmedCaseIds: [],
+      confirmedCount: 0,
+      skippedCaseIds: [],
+      skippedCount: 0,
+      documentationConfirmedAt: '2026-06-01T00:00:00.000Z',
+      documentationConfirmedById: 'user-1',
+    })
+    const { result } = renderHook(() => useConfirmDocumentation(), {
+      wrapper: wrapperFor(client),
+    })
+
+    await act(async () => {
+      await result.current.mutateAsync({ suiteId: 'c', projectId: 'proj-1' })
+    })
+
+    expectDocumentedSuiteSynced(client)
+  })
+
+  it('marks the summaries stale once documentation is queued', async () => {
+    const client = seededClient()
+    documentSuiteApi.mockResolvedValue({ filesEnqueued: 1, casesTargeted: 1, casesSkipped: [] })
+    const { result } = renderHook(() => useDocumentSuite(), { wrapper: wrapperFor(client) })
+
+    await act(async () => {
+      await result.current.mutateAsync({ suiteId: 'c', projectId: 'proj-1', mode: 'undocumented' })
+    })
+
+    expect(isInvalidated(client, RECENT)).toBe(true)
+    expect(isInvalidated(client, SEARCH)).toBe(true)
+    expect(isInvalidated(client, OTHER_PROJECT)).toBe(false)
   })
 })

@@ -5,6 +5,12 @@ import {
 } from '@nestjs/common';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
+import {
+  ADDRESS_THROTTLER_NAME,
+  DEFAULT_THROTTLER_NAME,
+  REVIEW_ADDRESS_LIMIT,
+  REVIEW_ROUTE_LIMIT,
+} from '../../common/throttler/throttler.config';
 import { ReviewController } from './review.controller';
 
 const org: OrgContext = {
@@ -108,4 +114,38 @@ describe('ReviewController error codes', () => {
     });
     expect(review.lastDecision).not.toHaveBeenCalled();
   });
+});
+
+describe('ReviewController throttling', () => {
+  const routes = ['findOne', 'approve', 'reject'] as const;
+
+  function handler(name: (typeof routes)[number]): object {
+    return (ReviewController.prototype as unknown as Record<string, object>)[
+      name
+    ];
+  }
+
+  it.each(routes)(
+    'raises the per route and per address limits on %s',
+    (route) => {
+      expect(
+        Reflect.getMetadata(
+          `THROTTLER:LIMIT${DEFAULT_THROTTLER_NAME}`,
+          handler(route),
+        ),
+      ).toBe(REVIEW_ROUTE_LIMIT);
+      expect(
+        Reflect.getMetadata(
+          `THROTTLER:LIMIT${ADDRESS_THROTTLER_NAME}`,
+          handler(route),
+        ),
+      ).toBe(REVIEW_ADDRESS_LIMIT);
+      expect(
+        Reflect.getMetadata(
+          `THROTTLER:KEY_GENERATOR${ADDRESS_THROTTLER_NAME}`,
+          handler(route),
+        ),
+      ).toEqual(expect.any(Function));
+    },
+  );
 });

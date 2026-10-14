@@ -215,6 +215,22 @@ export interface TestCase {
   documentation?: CaseDocumentationState
 }
 
+export type CaseCollisionKind = 'identity' | 'legacy_key'
+
+/**
+ * An open case identity collision of a suite. `identity`: two tests in one
+ * report resolve to the same key. `legacy_key`: an older case is keyed by a
+ * bare test name that several classes report.
+ */
+export interface SuiteCollision {
+  id: string
+  kind: CaseCollisionKind
+  key: string
+  claimantCount: number
+  lastSeenAt: string
+  lastRunId: string | null
+}
+
 export interface Suite {
   id: string
   projectId: string
@@ -234,6 +250,10 @@ export interface Suite {
   healthSummary?: CaseHealthSummary
   documentation?: SuiteDocumentationState
   openCollisions?: number
+  /** The open collisions themselves; only the single-suite view carries them. */
+  collisions?: SuiteCollision[]
+  /** Proposals for this suite waiting in the review inbox, new cases included. */
+  pendingProposals?: number
 }
 
 /**
@@ -821,6 +841,23 @@ export interface ExtractedProposal {
   observations?: string[]
   createdAt?: string
 }
+/**
+ * Why a proposal is in the review inbox. A push proposal was extracted by Aeris
+ * from a test file the push changed; the push fields are null when the event
+ * that delivered it is no longer stored.
+ */
+export type ProposalOrigin =
+  | {
+      kind: 'push'
+      commitSha: string | null
+      commitTitle: string | null
+      author: string | null
+      branch: string | null
+      pullRequestNumber: number | null
+    }
+  | { kind: 'documentation' }
+  | { kind: 'case-documentation' }
+  | { kind: 'chat' }
 export type DocumentFilesSkipReason =
   | 'no-source-file'
   | 'no-automation-key'

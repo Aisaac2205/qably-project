@@ -22,6 +22,7 @@
     "@qably/test-naming": "workspace:*",
     "@qably/types": "workspace:*",
     "@qably/ui": "workspace:*",
+    "@react-pdf/renderer": "4.9.0",
     "@tanstack/react-query": "^5.96.2",
     "@visx/curve": "4.0.1-alpha.0",
     "@visx/event": "4.0.1-alpha.0",

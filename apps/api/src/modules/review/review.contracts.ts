@@ -3,6 +3,7 @@ import type {
   CaseStatus,
   Evidence,
   ExtractedProposal,
+  ProposalOrigin,
   ProposalStatus,
   ReviewApprovalConflictCode,
   ReviewConflictingCase,
@@ -26,6 +27,7 @@ export interface InboxClassification extends ProposalClassification {
 export interface InboxItem extends ProposalView {
   suite: InboxSuite | null;
   classification: InboxClassification;
+  origin: ProposalOrigin;
 }
 
 export interface MatchedCaseView {
@@ -95,10 +97,21 @@ export type ReviewInboxDuplicateKindCounts = Record<
   number
 >;
 
+export interface OpenCollisionSuite {
+  suiteId: string;
+  suiteName: string;
+  projectId: string;
+  projectName: string;
+  /** Open collision rows (colliding keys) the suite holds. */
+  count: number;
+}
+
 export interface ReviewInboxCounts {
   byStatus: ReviewInboxStatusCounts;
   byDuplicateKind: ReviewInboxDuplicateKindCounts;
+  /** Suites with at least one open collision: `openCollisionSuites.length`. */
   openCollisions: number;
+  openCollisionSuites: OpenCollisionSuite[];
   version: string;
 }
 

@@ -60,6 +60,7 @@ function seedCounts(client: QueryClient, inReview: number) {
   const counts: ReviewInboxCountsResult = {
     byStatus: { in_review: inReview, approved: 0, rejected: 0, changes_requested: 0 },
     openCollisions: 0,
+    openCollisionSuites: [],
     version: 'v1',
   }
   client.setQueryData(reviewKeys.inboxCounts({}), counts)
@@ -407,7 +408,7 @@ describe('useProposalDecision', () => {
     expect(inboxData(client)?.pages[0].items.map((i) => i.id)).toEqual(['b'])
   })
 
-  it('does not invalidate the inbox lists until every concurrent decision has settled', async () => {
+  it('does not invalidate the inbox, suite or project lists until every concurrent decision has settled', async () => {
     const a = deferred<reviewApi.ApprovalResult>()
     const b = deferred<reviewApi.ApprovalResult>()
     vi.spyOn(reviewApi, 'approveProposal')
@@ -416,10 +417,13 @@ describe('useProposalDecision', () => {
     const client = makeClient()
     seedInboxPage(client, 'a', 'b')
     const invalidateSpy = vi.spyOn(client, 'invalidateQueries')
+    const onApproved = vi.fn()
     const { result } = renderHook(
-      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      () => useProposalDecision({ onApproved, onRejected: vi.fn() }),
       { wrapper: wrapperFor(client) },
     )
+    const invalidationsOf = (key: readonly unknown[]) =>
+      invalidateSpy.mock.calls.filter(([filters]) => filters?.queryKey === key)
 
     act(() => {
       result.current.approve('a')
@@ -427,21 +431,36 @@ describe('useProposalDecision', () => {
     })
 
     a.resolve(approvalResult)
-    await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ queryKey: suiteKeys.all }),
-      ),
-    )
-    expect(invalidateSpy).not.toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: reviewKeys.all }),
-    )
+    await waitFor(() => expect(onApproved).toHaveBeenCalledTimes(1))
+    expect(invalidationsOf(reviewKeys.all)).toHaveLength(0)
+    expect(invalidationsOf(suiteKeys.all)).toHaveLength(0)
+    expect(invalidationsOf(projectKeys.all)).toHaveLength(0)
 
     b.resolve(approvalResult)
-    await waitFor(() =>
-      expect(invalidateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ queryKey: reviewKeys.all }),
-      ),
+    await waitFor(() => expect(invalidationsOf(reviewKeys.all)).toHaveLength(1))
+    expect(invalidationsOf(suiteKeys.all)).toHaveLength(1)
+    expect(invalidationsOf(projectKeys.all)).toHaveLength(1)
+  })
+
+  it('reports a rate-limited decision as its own error and rolls back the optimistic removal', async () => {
+    vi.spyOn(reviewApi, 'approveProposal').mockRejectedValue(
+      new ApiError(429, 'ThrottlerException: Too Many Requests'),
     )
+    const client = makeClient()
+    seedInboxPage(client, 'a', 'b')
+    const onError = vi.fn()
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn(), onError }),
+      { wrapper: wrapperFor(client) },
+    )
+
+    act(() => {
+      result.current.approve('a')
+    })
+
+    await waitFor(() => expect(result.current.decisionError).toBe('rate-limited'))
+    expect(onError).toHaveBeenCalledWith('rate-limited', 'a', null, null)
+    expect(inboxData(client)?.pages[0].items.map((i) => i.id)).toEqual(['a', 'b'])
   })
 
   it('reports a late failure of an earlier decision to the callbacks of the latest render', async () => {

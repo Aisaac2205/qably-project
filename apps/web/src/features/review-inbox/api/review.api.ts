@@ -2,6 +2,7 @@ import type {
   CaseStatus,
   Evidence,
   ExtractedProposal,
+  ProposalOrigin,
   ProposalStatus,
   TraceabilityLink,
 } from '@qably/types'
@@ -34,6 +35,7 @@ export interface ProposalListItem extends ExtractedProposal {
   evidenceTitle: string
   suite?: InboxSuite | null
   classification?: ProposalClassification
+  origin?: ProposalOrigin
 }
 
 export interface MatchedCaseView {
@@ -121,9 +123,20 @@ export type ReviewInboxStatusCounts = Record<
   number
 >
 
+export interface OpenCollisionSuite {
+  suiteId: string
+  suiteName: string
+  projectId: string
+  projectName: string
+  /** Open collision keys the suite holds. */
+  count: number
+}
+
 export interface ReviewInboxCountsResult {
   byStatus: ReviewInboxStatusCounts
+  /** Suites with at least one open collision. */
   openCollisions: number
+  openCollisionSuites: OpenCollisionSuite[]
   version: string
 }
 

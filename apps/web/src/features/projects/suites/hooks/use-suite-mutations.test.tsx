@@ -9,6 +9,7 @@ import {
   useCreateSuite,
   useDeleteCase,
   useDeleteSuite,
+  useDismissCollision,
   useDocumentCase,
   useDocumentSuite,
   useUpdateCase,
@@ -22,6 +23,7 @@ import {
   createSuite,
   deleteCase,
   deleteSuite,
+  dismissCollision,
   documentCase,
   documentSuite,
   getSuite,
@@ -48,6 +50,7 @@ vi.mock('../api/suites.api', () => ({
   updateSuite: vi.fn(),
   deleteSuite: vi.fn(),
   documentSuite: vi.fn(),
+  dismissCollision: vi.fn(),
 }))
 
 vi.mock('../../api/projects.api', () => ({
@@ -75,6 +78,7 @@ const createSuiteApi = vi.mocked(createSuite)
 const updateSuiteApi = vi.mocked(updateSuite)
 const deleteSuiteApi = vi.mocked(deleteSuite)
 const documentSuiteApi = vi.mocked(documentSuite)
+const dismissCollisionApi = vi.mocked(dismissCollision)
 const getProjectApi = vi.mocked(getProject)
 
 const emptyDocumentation = {
@@ -285,6 +289,75 @@ beforeEach(() => {
     documentationConfirmedById: 'user-1',
   })
   document_.mockResolvedValue({ queued: true, jobId: 'job-1' })
+})
+
+describe('useDismissCollision', () => {
+  const collision = {
+    id: 'collision-1',
+    kind: 'legacy_key' as const,
+    key: 'test_create',
+    claimantCount: 2,
+    lastSeenAt: '2026-10-12T09:00:00.000Z',
+    lastRunId: 'run-9',
+  }
+
+  it('drops the dismissed key from the cached suite at once', async () => {
+    dismissCollisionApi.mockResolvedValueOnce(undefined)
+    const { client } = setup()
+    client.setQueryData(suiteKeys.detail('suite-1'), {
+      ...suite,
+      openCollisions: 1,
+      collisions: [collision],
+    })
+    const { result } = renderHook(() => useDismissCollision(), {
+      wrapper: wrapperFor(client),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1', collisionId: 'collision-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(dismissCollisionApi).toHaveBeenCalledWith('suite-1', 'collision-1')
+    expect(client.getQueryData<Suite>(suiteKeys.detail('suite-1'))).toMatchObject({
+      openCollisions: 0,
+      collisions: [],
+    })
+  })
+
+  it('refreshes the suite, its lists and the review inbox counts', async () => {
+    dismissCollisionApi.mockResolvedValueOnce(undefined)
+    const { client, invalidateSpy } = setup()
+    const { result } = renderHook(() => useDismissCollision(), {
+      wrapper: wrapperFor(client),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1', collisionId: 'collision-1' })
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true)
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: suiteKeys.detail('suite-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: suiteKeys.list('proj-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: suiteKeys.summaries('proj-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: suiteKeys.tags('proj-1') })
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['review', 'inbox-counts'] })
+  })
+
+  it('tells the user when the collision could not be dismissed', async () => {
+    dismissCollisionApi.mockRejectedValueOnce(new ApiError(500, 'boom'))
+    const { client } = setup()
+    const { result } = renderHook(() => useDismissCollision(), {
+      wrapper: wrapperFor(client),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', projectId: 'proj-1', collisionId: 'collision-1' })
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true)
+    })
+    expect(notify.error).toHaveBeenCalledWith('The collision could not be dismissed. Try again.')
+  })
 })
 
 describe('useConfirmDocumentation', () => {

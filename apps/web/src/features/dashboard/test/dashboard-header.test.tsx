@@ -36,6 +36,15 @@ describe('DashboardHeader', () => {
     expect(onPeriodChange).toHaveBeenCalledWith(30)
   })
 
+  it('renders period actions after the period dropdown', () => {
+    render(
+      <DashboardHeader period={7} onPeriodChange={vi.fn()} actions={<button type="button">Export</button>} />,
+    )
+    const period = screen.getByRole('button', { name: 'Time period' })
+    const action = screen.getByRole('button', { name: 'Export' })
+    expect(period.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('caps content width with the dashboard token, never an arbitrary value', () => {
     const { container } = render(<DashboardHeader period={30} onPeriodChange={vi.fn()} />)
     expect(container.querySelector('.max-w-dashboard')).toBeInTheDocument()

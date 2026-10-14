@@ -8,6 +8,7 @@ import {
   documentedSince,
   observeWatch,
   pollIntervalFor,
+  resumeWatch,
   type DocumentationWatch,
 } from '@/features/projects/suites/lib/documentation-watch'
 
@@ -107,5 +108,17 @@ describe('pollIntervalFor', () => {
     expect(pollIntervalFor('idle')).toBe(false)
     expect(pollIntervalFor('settled')).toBe(false)
     expect(pollIntervalFor('timed-out')).toBe(false)
+  })
+})
+
+describe('resumeWatch', () => {
+  it('treats a run found already in progress as observed busy, so the first idle poll settles it', () => {
+    let state = resumeWatch(startedAt, 3)
+
+    expect(deriveWatchStatus(state, true, startedAt)).toBe('working')
+
+    state = observeWatch(state, false)
+    expect(deriveWatchStatus(state, false, startedAt + 3_000)).toBe('settled')
+    expect(documentedSince(state, 0)).toBe(3)
   })
 })

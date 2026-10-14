@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { describe, it, expect, vi } from 'vitest'
 import type { TestCase } from '@qably/types'
 import { CaseDocumentationAction } from '@/features/projects/suites/components/case-documentation-action'
-import type { CaseDocumentationBadge } from '@/features/projects/suites/lib/case-documentation-state'
 import { renderWithQuery } from '@/lib/query-test-utils'
 import * as suitesApi from '@/test/suites-api-stub'
 
@@ -37,16 +36,12 @@ const documentedAutomatedCase: TestCase = {
   healthSignals: [],
 }
 
-function renderAction(
-  overrides: Partial<TestCase> = {},
-  documentationBadge: CaseDocumentationBadge | null = null,
-) {
+function renderAction(overrides: Partial<TestCase> = {}) {
   return renderWithQuery(
     <CaseDocumentationAction
       testCase={{ ...automatedCase, ...overrides }}
       stepsOpen={false}
       onToggleSteps={noop}
-      documentationBadge={documentationBadge}
       onEdit={noop}
     />,
   )
@@ -229,24 +224,49 @@ describe('CaseDocumentationAction', () => {
       expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
     })
 
-    it('lets an active Aeris documentation badge take precedence over the link, with steps', async () => {
+    it('keeps the link next to the steps toggle while Aeris is documenting the case', async () => {
       await act(async () => {
-        renderAction(
-          { ...documentedAutomatedCase, pendingProposalId: 'proposal-2' },
-          { kind: 'documenting' },
-        )
+        renderAction({
+          ...documentedAutomatedCase,
+          pendingProposalId: 'proposal-2',
+          documentation: {
+            outcome: null,
+            missing: [],
+            skipReason: null,
+            queuedAt: '2026-03-01T00:00:00Z',
+            outcomeAt: null,
+          },
+        })
       })
 
       expect(screen.getByRole('button', { name: /2 steps/i })).toBeInTheDocument()
-      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-2',
+      )
     })
 
-    it('lets an active Aeris documentation badge take precedence over the link, without steps', async () => {
+    it('shows the link instead of the retry action when a failed attempt left a proposal pending', async () => {
       await act(async () => {
-        renderAction({ pendingProposalId: 'proposal-1' }, { kind: 'documenting' })
+        renderAction({
+          pendingProposalId: 'proposal-1',
+          documentation: {
+            outcome: 'failed',
+            missing: [],
+            skipReason: 'rate-limited',
+            queuedAt: null,
+            outcomeAt: '2026-03-01T00:00:00Z',
+          },
+        })
       })
 
-      expect(screen.queryByRole('link', { name: /in review/i })).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-1',
+      )
+      expect(
+        screen.queryByRole('button', { name: /document again with aeris/i }),
+      ).not.toBeInTheDocument()
     })
 
     it('shows the link for a manual case with steps, next to its steps toggle', async () => {

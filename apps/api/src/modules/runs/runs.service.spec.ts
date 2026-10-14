@@ -2108,6 +2108,42 @@ describe('RunsService.ingest case identity collisions', () => {
     });
   });
 
+  it('closes an open legacy-key collision for a bare name two classes share when no suite case could be claimed by it', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'test_create',
+          className: 'tests.ClassA',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+        {
+          name: 'test_create',
+          className: 'tests.ClassB',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(prisma.caseIdentityCollision.upsert).not.toHaveBeenCalled();
+    expect(prisma.caseIdentityCollision.updateMany).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-1',
+        kind: 'legacy_key',
+        key: { in: ['test_create'] },
+        closedAt: null,
+      },
+      data: { closedAt: expect.any(Date) as Date },
+    });
+  });
+
   it('never writes a collision row when nothing collides and nothing needs closing', async () => {
     const prisma = createPrisma();
     prisma.testCase.findMany.mockResolvedValue([]);

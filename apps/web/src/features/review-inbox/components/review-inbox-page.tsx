@@ -23,6 +23,7 @@ import { ReviewProposalInspector } from './review-proposal-inspector'
 import { ReviewInboxFeedback } from './review-inbox-feedback'
 import { ReviewInboxErrorList } from './review-inbox-error-list'
 import { InboxCollisionsNotice } from './inbox-collisions-notice'
+import { InboxOriginSummary } from './inbox-origin-summary'
 
 interface DecidedProposal {
   projectId: string
@@ -46,7 +47,7 @@ export function ReviewInboxPage() {
   })
   const fetchNextPageVoid = useCallback(() => void fetchNextPage(), [fetchNextPage])
 
-  const { counts, openCollisions } = useInboxCounts({
+  const { counts, openCollisionSuites } = useInboxCounts({
     projectId: selectedProjectId,
     search,
   })
@@ -221,7 +222,8 @@ export function ReviewInboxPage() {
       <h1 id="page-title" className="sr-only">{t('sidebar.reviewInbox')}</h1>
 
       <div className="shrink-0 space-y-4 empty:hidden">
-        <InboxCollisionsNotice openCollisions={openCollisions} />
+        <InboxOriginSummary proposals={proposals} hasMore={hasNextPage} />
+        <InboxCollisionsNotice suites={openCollisionSuites} />
         <ReviewInboxErrorList errors={feedback.errors} onDismiss={feedback.dismissMany} />
         {notice ? (
           <ReviewInboxFeedback

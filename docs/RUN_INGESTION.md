@@ -236,6 +236,15 @@ new draft case under its own distinct composite key (safe — it cannot collide 
 name); a plain identity does not get drafted at all, because drafting under the exact bare name would
 just silently re-claim whichever row already holds it.
 
+Matching treats every shared bare name as ambiguous, but only a bare name something can actually reach
+is recorded as a `legacy_key` collision: the report carries a plain case keyed by that name, or the
+suite holds a row the legacy fallback would claim by it (a row whose `automationKey` is the bare name,
+or an unkeyed `automated` case with that name). Two classes that merely share a method name
+(`ClassA::test_create` and `ClassB::test_create`) in a suite with no such row are matched by their own
+composite keys and are not a collision; a run like that closes any `legacy_key` row still open for the
+name. `OfficialCaseReconciler.reconcile` answers the question by asking the matcher itself, with
+nothing marked ambiguous, whether the bare name would match a row.
+
 **This is not the same collision set as `caseIdentityCollisions`, and it never reaches the caller.**
 `findLegacyKeyCollisions` runs only inside `OfficialCaseReconciler.reconcile`, which executes inside
 the ingest transaction on the worker (`RunIngestProcessor`) — after `POST /runs/ingest/junit` has
@@ -271,11 +280,20 @@ run upsert. It upserts a row for every collision the report carries: `claimantCo
 `lastRunId` follow the latest report, and an upsert reopens a row that had been closed. It sets
 `closedAt` on the open rows whose key the report resolved without a collision: for `identity`, a key
 the report matched or created; for `legacy_key`, a reported case name that is not a collision in that
-report. A row therefore closes only when a later report for the same suite carries that key or name
-again, so a collision whose tests were renamed away or deleted stays open. The open rows
+report. A row therefore closes on its own only when a later report for the same suite carries that key
+or name again; a collision whose tests were renamed away or deleted is closed by hand with
+`POST /suites/:id/collisions/:collisionId/dismiss`, which sets `closedAt` on that row when it belongs to
+the suite in the caller's organization (`404` otherwise, `204` on success, idempotent on a row already
+closed). Dismissing is safe: a later report that still collides upserts the row again and reopens it.
+The single-suite view (`GET /suites/:id`, and every endpoint that answers with one suite) also carries
+`collisions`, the open rows themselves (`id`, `kind`, `key`, `claimantCount`, `lastSeenAt`,
+`lastRunId`), newest first, which the suite page lists with a dismiss action per key. The open rows
 (`closedAt IS NULL`) are what the product shows: `openCollisions` on each suite view (`GET /suites`,
-`GET /suites/:id`) and in the review inbox counts, which the web app renders as a notice on the suite
-and on the inbox.
+`GET /suites/:id`), which counts colliding keys, and in the review inbox counts
+(`GET /review/inbox/counts`), where `openCollisions` counts the suites holding at least one open row
+and `openCollisionSuites` lists them (`suiteId`, `suiteName`, `projectId`, `projectName`, and `count`,
+the suite's open keys, most first). The web app renders them as a notice on the suite and on the inbox,
+where each affected suite links to its page.
 
 ## Idempotency
 

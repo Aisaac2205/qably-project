@@ -306,6 +306,7 @@ describe('ReviewInboxPage', () => {
       client.setQueryData(reviewKeys.inboxCounts({ search: title }), {
         byStatus: proposalInboxCountsFixtures({ search: title }),
         openCollisions: 0,
+        openCollisionSuites: [],
         version: 'test-version',
       })
       return render(
@@ -898,3 +899,59 @@ describe('ReviewInboxPage', () => {
   })
 })
 
+
+describe('ReviewInboxPage origin summary', () => {
+  beforeEach(() => {
+    __resetStore()
+    useI18nStore.setState({ locale: 'en' })
+    isMobileViewport = false
+    window.history.replaceState(null, '', '/review-inbox')
+  })
+
+  it('explains above the queue which push brought the proposals in', async () => {
+    const search = 'cart'
+    searchParamsQuery = new URLSearchParams({ search }).toString()
+    const client = createTestQueryClient()
+    const filters = { status: 'in_review' as const, search }
+    const [template] = proposalInboxFixtures({ status: 'all' })
+    const pushOrigin = {
+      kind: 'push' as const,
+      commitSha: 'abc1234def5678',
+      commitTitle: 'Add cart tests',
+      author: 'ana',
+      branch: 'main',
+      pullRequestNumber: null,
+    }
+    client.setQueryData(reviewKeys.inbox(filters), {
+      pages: [
+        {
+          items: [
+            { ...template, id: 'origin-1', status: 'in_review', origin: pushOrigin },
+            { ...template, id: 'origin-2', status: 'in_review', origin: pushOrigin },
+          ],
+          nextCursor: null,
+        },
+      ],
+      pageParams: [null],
+    })
+    client.setQueryData(reviewKeys.inboxCounts({ search }), {
+      byStatus: proposalInboxCountsFixtures({ search }),
+      openCollisions: 0,
+      openCollisionSuites: [],
+      version: 'test-version',
+    })
+
+    render(
+      <QueryClientProvider client={client}>
+        <ReviewInboxPage />
+      </QueryClientProvider>,
+    )
+
+    const summary = await screen.findByRole('region', {
+      name: /where these proposals came from/i,
+    })
+    expect(within(summary).getByRole('listitem')).toHaveTextContent(
+      /2\s*from push abc1234 .Add cart tests. by ana on main/,
+    )
+  })
+})

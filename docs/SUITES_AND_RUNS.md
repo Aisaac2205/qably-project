@@ -315,6 +315,22 @@ a non-interactive "In review" state instead, linking straight to that proposal i
 409 branch stays as a safety net for the race between two tabs — it just stops being the primary way a
 user learns about a pending proposal.
 
+The link shows whenever `pendingProposalId` is set, next to any Aeris documentation badge; only the
+`skipped` badge whose reason is `already-pending` gives way to it, because it says the same thing.
+
+`pendingProposalId` only covers proposals that target an existing case. A proposal that would create a new
+case has no row to sit on, so `SuiteView.pendingProposals` counts every `in_review` proposal whose
+`suiteId` is the suite, new cases included: one `extractedProposal.groupBy` by `suiteId` in the same
+`Promise.all` as the open-collision count. The suite detail renders it as a quiet notice linking to
+`/review-inbox?projectId=…`, the narrowest filter the inbox reads from the URL, and hides it at zero.
+
+`SuiteView.openCollisions` counts the suite's open case identity collisions, one per colliding key. Only
+the single-suite view also carries `collisions`, the open rows themselves, so the suite page can list
+each key with what kind of ambiguity it is, how many tests claim it, when it was last seen and a link to
+the run that last reported it, plus a dismiss action for a key whose tests were renamed or deleted. A
+dismissed key comes back if a later run still collides. See "Collisions are persisted" in
+`RUN_INGESTION.md`.
+
 An ingested suite is named with the raw `<testsuite name>` the reporter emitted, truncated, exactly as
 `adoptSuiteByName` receives it. `humanizeSuiteName` exists in `@qably/test-naming` and is tested, but
 nothing in the API calls it: a suite that arrives as `setAccessTokenSchema` or `checkout.spec.ts` keeps

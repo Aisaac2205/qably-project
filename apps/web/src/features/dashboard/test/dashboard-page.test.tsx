@@ -90,6 +90,16 @@ describe('DashboardPage', () => {
     ])
   })
 
+  it('offers the statistics PDF for the selected period next to the period dropdown', async () => {
+    await act(async () => {
+      renderWithQuery(<DashboardPage />)
+    })
+
+    const period = screen.getByRole('button', { name: 'Time period' })
+    const download = screen.getByRole('button', { name: 'Download PDF of the statistics for the last 7 days' })
+    expect(download.parentElement).toContainElement(period)
+  })
+
   it('caps content width with the dashboard token everywhere, never an arbitrary value', async () => {
     const { container } = await act(async () => renderWithQuery(<DashboardPage />))
     expect(container.querySelectorAll('.max-w-dashboard').length).toBeGreaterThan(0)

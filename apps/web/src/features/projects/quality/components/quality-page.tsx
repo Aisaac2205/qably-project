@@ -9,6 +9,7 @@ import AnimatedDropdown from '@/components/ui/animated-dropdown'
 import { KpiStrip } from '@/features/dashboard/components/kpi-strip'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { projectRootPath } from '@/features/projects/lib/routes'
+import { DownloadStatisticsPdfButton } from '@/features/statistics-pdf/components/download-statistics-pdf-button'
 import { useTranslation } from '@/lib/i18n'
 import { PassRateDeltaTrend } from './pass-rate-delta-trend'
 import { DailyActivityBarChart } from './daily-activity-bar-chart'
@@ -34,17 +35,20 @@ export function QualityPage({ projectId }: { projectId: string }) {
       <PageHeader
         title={project?.name ?? t('quality.breadcrumb')}
         actions={
-          <AnimatedDropdown
-            align="right"
-            aria-label={t('dashboard.periodLabel')}
-            text={t(`dashboard.period${period}d`)}
-            items={DASHBOARD_PERIODS.map((value) => ({
-              name: t(`dashboard.period${value}d`),
-              value,
-              active: period === value,
-              onClick: () => setPeriod(value),
-            }))}
-          />
+          <>
+            <AnimatedDropdown
+              align="right"
+              aria-label={t('dashboard.periodLabel')}
+              text={t(`dashboard.period${period}d`)}
+              items={DASHBOARD_PERIODS.map((value) => ({
+                name: t(`dashboard.period${value}d`),
+                value,
+                active: period === value,
+                onClick: () => setPeriod(value),
+              }))}
+            />
+            <DownloadStatisticsPdfButton period={period} projectId={projectId} projectName={project?.name} />
+          </>
         }
       />
 

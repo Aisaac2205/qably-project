@@ -9,6 +9,7 @@ export type DecisionErrorCode =
   | 'automation-key-taken'
   | 'publish-conflict'
   | 'incomplete-proposal'
+  | 'rate-limited'
   | 'error'
 
 const DECISION_ERROR_KEYS: Record<DecisionErrorCode, string> = {
@@ -19,6 +20,7 @@ const DECISION_ERROR_KEYS: Record<DecisionErrorCode, string> = {
   'automation-key-taken': 'decisionAutomationKeyTaken',
   'publish-conflict': 'decisionPublishConflict',
   'incomplete-proposal': 'decisionIncompleteProposal',
+  'rate-limited': 'decisionRateLimited',
   error: 'decisionError',
 }
 
@@ -34,6 +36,7 @@ const APPROVAL_CONFLICT_CODES: ReadonlySet<DecisionErrorCode> = new Set([
 
 export function classifyDecisionError(error: unknown): DecisionErrorCode {
   if (error instanceof ApiError) {
+    if (error.status === 429) return 'rate-limited'
     switch (error.code) {
       case 'invalid-transition':
       case 'missing-evidence':

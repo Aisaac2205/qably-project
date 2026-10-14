@@ -51,9 +51,9 @@ interface FakePrisma {
     findMany: jest.Mock;
   };
   runCase: { findMany: jest.Mock };
-  extractedProposal: { findMany: jest.Mock };
+  extractedProposal: { findMany: jest.Mock; groupBy: jest.Mock };
   orgMember: { findFirst: jest.Mock };
-  caseIdentityCollision: { groupBy: jest.Mock };
+  caseIdentityCollision: { groupBy: jest.Mock; findMany: jest.Mock };
   $transaction: jest.Mock;
   $queryRaw: jest.Mock;
 }
@@ -71,11 +71,17 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
     },
     runCase: { findMany: jest.fn().mockResolvedValue([]) },
-    extractedProposal: { findMany: jest.fn().mockResolvedValue([]) },
+    extractedProposal: {
+      findMany: jest.fn().mockResolvedValue([]),
+      groupBy: jest.fn().mockResolvedValue([]),
+    },
     orgMember: {
       findFirst: jest.fn().mockResolvedValue({ user: { locale: 'en' } }),
     },
-    caseIdentityCollision: { groupBy: jest.fn().mockResolvedValue([]) },
+    caseIdentityCollision: {
+      groupBy: jest.fn().mockResolvedValue([]),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     $transaction: jest.fn(),
     $queryRaw: jest.fn().mockResolvedValue([]),
   };

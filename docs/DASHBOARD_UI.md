@@ -9,7 +9,8 @@ practice this redesign introduced.
 
 `dashboard-page.tsx` renders, in order, inside a single lifted `period` state (`useState<DashboardPeriod>(7)`):
 
-1. `DashboardHeader` — subtitle and a period dropdown (7, 30 or 90 days).
+1. `DashboardHeader` — subtitle, a period dropdown (7, 30 or 90 days) and, after it, the
+   "Download PDF" button (see "Statistics PDF export" below).
 2. `KpiStrip` — 4 `KpiStatCard`s (executed cases, runs, failed cases, failed runs), each with a
    mini area chart and a trend against the previous window.
 3. `PassRateHero` — full-width executed-cases comparison chart (see "The hero shows executed
@@ -28,6 +29,53 @@ without it.
 Every widget manages its own `isLoading`/`isError`/`retry` independently — a failed
 `GET /dashboard/channels` only degrades the channels card, never the KPI strip, the hero, the projects
 table, the gauge or the activity card, which all read from `GET /dashboard/overview`.
+
+## Statistics PDF export
+
+The thesis requires the central panel to present the key quality statistics (percentage of tests
+executed, defects detected and the historical trend of each project's state) and the system to
+provide automated reporting. The "Download PDF" button turns what the screen shows into a file the
+user can keep, print or attach.
+
+**Where it lives.** One `DownloadStatisticsPdfButton` (`apps/web/src/features/statistics-pdf`) sits
+right after the period dropdown in `DashboardHeader` (organization scope, through its `actions`
+slot) and in the `PageHeader` actions of `/projects/[id]/quality` (project scope).
+
+**It mirrors the screen.** The button reads the same cached `useDashboardOverview(period, projectId)`
+query as the page, so the PDF always carries the period currently selected and the page's scope. It
+stays disabled until the overview for exactly that period is loaded: while a new period loads, the
+query keeps the previous period as placeholder data, and exporting it would label old numbers with
+the new period.
+
+**What the PDF contains** (A4 portrait, English or Spanish following the interface language):
+
+- Title, scope (all projects or the project name), period with its date range, generation time and
+  time zone.
+- Key metrics with the selected period, the previous period and the change: pass rate, executed
+  cases, runs, failed cases and average run duration.
+- Pass-rate trend per day (per week for 90 days) as a table with a bar per bucket, the previous
+  period's rate, executed and failed cases.
+- Latest result of every suite: passed, failed, blocked, skipped and not executed cases with their
+  share, plus the executed percentage and the pass rate.
+- Active cases by priority.
+- Per-project table (organization scope only).
+- Notes defining the pass rate and "Not measured", and a page footer with page numbers.
+
+A `null` pass rate prints "Not measured", never `0%`, and a change that cannot be computed prints a
+dash, following `docs/DASHBOARD_METRICS.md`.
+
+**How it is built.** `buildStatisticsReport` is a pure mapper from `DashboardOverviewRecord` to a
+fully formatted view model (locale-aware numbers and dates, translated copy), unit-tested on its
+own. `@react-pdf/renderer` (pinned exact) is reached only through `lib/render-statistics-pdf.tsx`,
+which the hook loads with a dynamic `import()` on click, so the renderer never enters the initial
+bundle. The file downloads as `qably-statistics-<scope>-<period>d-<YYYY-MM-DD>.pdf`; a failure
+shows an error toast and leaves the button usable.
+
+**Type and colour.** The PDF embeds Geist Sans and Geist Mono from `apps/web/public/fonts/geist`
+(SIL OFL, licence beside the files), which cover every Spanish accent; numbers set in Geist Mono.
+A PDF cannot read CSS custom properties and react-pdf does not parse OKLCH, so `lib/pdf-theme.ts` is
+the PDF's own token file: each hex value is the sRGB conversion of the `globals.css` token named in
+its comment. Change the CSS token first, then re-derive the hex.
 
 ## Where the dashboard blocks come from
 

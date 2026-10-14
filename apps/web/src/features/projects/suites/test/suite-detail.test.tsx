@@ -12,6 +12,9 @@ import { notify } from '@/lib/notify'
 import { ApiError } from '@/lib/api-client'
 
 import { renderWithQuery } from '@/lib/query-test-utils'
+import { DOCUMENTATION_POLL_INTERVAL_MS } from '@/features/projects/suites/lib/documentation-watch'
+import { dataOf, itemOf } from './suite-summaries-cache-test-data'
+import { summary } from './suite-summaries-test-data'
 
 vi.mock('@/features/projects/suites/api/suites.api', async () =>
   await import('@/test/suites-api-stub'),
@@ -158,6 +161,32 @@ describe('SuiteDetail (redesigned)', () => {
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
 
     expect(screen.queryByRole('group', { name: /quality signals/i })).not.toBeInTheDocument()
+  })
+
+  it('tells how many proposals of the suite are waiting in the review inbox', async () => {
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
+      { ...createMockSuite({ id: 'suite-1', projectId: 'proj-1' }), pendingProposals: 4 },
+    )
+
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    expect(
+      await screen.findByText('4 proposals for this suite are waiting for review.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open review inbox/i })).toHaveAttribute(
+      'href',
+      '/review-inbox?projectId=proj-1',
+    )
+  })
+
+  it('shows no review notice when nothing of the suite is waiting', async () => {
+    vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
+      { ...createMockSuite({ id: 'suite-1', projectId: 'proj-1' }), pendingProposals: 0 },
+    )
+
+    await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
+
+    expect(screen.queryByRole('link', { name: /open review inbox/i })).not.toBeInTheDocument()
   })
 
   it('renders a health signal chip per non-zero suite signal, with its count', async () => {
@@ -963,6 +992,74 @@ describe('SuiteDetail (redesigned)', () => {
       })
       expect(client.getQueryState(suiteKeys.list('proj-1'))?.isInvalidated).toBe(true)
       expect(listSpy).toHaveBeenCalledTimes(1)
+    })
+
+    it('resumes the watch when the reader returns to a suite mid-run, then refreshes the paged summaries once it settles', async () => {
+      const busySuite = createMockSuite({
+        id: watchSuiteId,
+        projectId: 'proj-1',
+        name: 'Watched',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 1,
+        cases: [
+          createMockTestCase({
+            id: 'tc-watch-1',
+            executionMode: 'automated',
+            state: 'draft',
+            documentation: {
+              outcome: null,
+              missing: [],
+              skipReason: null,
+              queuedAt: '2026-06-01T00:00:00Z',
+              outcomeAt: null,
+            },
+          }),
+        ],
+      })
+      const documentedSuite = createMockSuite({
+        id: watchSuiteId,
+        projectId: 'proj-1',
+        name: 'Watched by Aeris',
+        manualCases: 0,
+        automatedCases: 1,
+        undocumentedCount: 0,
+        cases: [createMockTestCase({ id: 'tc-watch-1', executionMode: 'automated', state: 'active' })],
+      })
+      const summariesKey = suiteKeys.summaryPage('proj-1', { sort: 'recent' })
+
+      const client = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false, staleTime: Infinity, refetchOnMount: false },
+          mutations: { retry: false },
+        },
+      })
+      client.setQueryData(suiteKeys.detail(watchSuiteId), busySuite)
+      client.setQueryData(summariesKey, dataOf([summary(watchSuiteId, { name: 'Watched' })]))
+      vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(documentedSuite)
+
+      await act(async () => {
+        render(
+          <QueryClientProvider client={client}>
+            <SuiteDetail projectId="proj-1" suiteId={watchSuiteId} />
+          </QueryClientProvider>,
+        )
+      })
+
+      const detailQuery = client.getQueryCache().find({ queryKey: suiteKeys.detail(watchSuiteId) })
+      const refetchInterval = detailQuery?.observers[0]?.options.refetchInterval
+      expect(typeof refetchInterval === 'function' ? refetchInterval(detailQuery!) : refetchInterval)
+        .toBe(DOCUMENTATION_POLL_INTERVAL_MS)
+
+      await act(async () => {
+        await client.refetchQueries({ queryKey: suiteKeys.detail(watchSuiteId) })
+      })
+
+      await waitFor(() => {
+        expect(notify.success).toHaveBeenCalledWith('Aeris documented 1 case in this suite.')
+      })
+      expect(itemOf(client, summariesKey, watchSuiteId)?.name).toBe('Watched by Aeris')
+      expect(client.getQueryState(summariesKey)?.isInvalidated).toBe(true)
     })
   })
 })
