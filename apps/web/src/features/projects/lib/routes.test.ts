@@ -7,6 +7,7 @@ import {
   projectRunPath,
   projectRunsPath,
   projectSuitesPath,
+  reviewInboxPath,
   reviewInboxProposalPath,
   suiteEditCasePath,
   suiteEditNewCasePath,
@@ -49,6 +50,16 @@ describe('projectRunsPath', () => {
 describe('projectCiRunPath', () => {
   it('builds the CI run detail route for a project', () => {
     expect(projectCiRunPath('proj-1', 'ci-1')).toBe('/projects/proj-1/runs/ci/ci-1')
+  })
+})
+
+describe('reviewInboxPath', () => {
+  it('filters the review inbox by projectId, the parameter the inbox reads', () => {
+    expect(reviewInboxPath('proj-1')).toBe('/review-inbox?projectId=proj-1')
+  })
+
+  it('encodes a project id that is not URL-safe', () => {
+    expect(reviewInboxPath('a b&c')).toBe('/review-inbox?projectId=a%20b%26c')
   })
 })
 

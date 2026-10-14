@@ -99,21 +99,9 @@ export type ReviewInboxDuplicateKindCounts = Record<
   number
 >;
 
-export interface OpenCollisionSuite {
-  suiteId: string;
-  suiteName: string;
-  projectId: string;
-  projectName: string;
-  /** Open collision rows (colliding keys) the suite holds. */
-  count: number;
-}
-
 export interface ReviewInboxCounts {
   byStatus: ReviewInboxStatusCounts;
   byDuplicateKind: ReviewInboxDuplicateKindCounts;
-  /** Suites with at least one open collision: `openCollisionSuites.length`. */
-  openCollisions: number;
-  openCollisionSuites: OpenCollisionSuite[];
   version: string;
 }
 

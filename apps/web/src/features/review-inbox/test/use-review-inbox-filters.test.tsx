@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useReviewInboxFilters } from '@/features/review-inbox/hooks/use-review-inbox-filters'
+import { reviewInboxPath } from '@/features/projects/lib/routes'
 
 let searchParamsQuery = ''
 
@@ -48,6 +49,14 @@ describe('useReviewInboxFilters', () => {
     expect(result.current.duplicateOnly).toBe(true)
     expect(result.current.searchInput).toBe('cart')
     expect(result.current.searchQuery).toBe('cart')
+  })
+
+  it('opens on the project that a link built by reviewInboxPath points at', () => {
+    searchParamsQuery = new URL(reviewInboxPath('proj-1'), 'http://localhost').search
+
+    const { result } = renderHook(() => useReviewInboxFilters())
+
+    expect(result.current.selectedProjectId).toBe('proj-1')
   })
 
   it('updates the project filter immediately and syncs the URL', () => {

@@ -145,6 +145,13 @@ describe('ReviewInboxPage', () => {
     expect(screen.queryByRole('heading', { name: /Recent review decisions/i })).not.toBeInTheDocument()
   })
 
+  it('leaves the queue to the proposals: no origin summary and no collisions notice above it', () => {
+    renderWithQuery(<ReviewInboxPage />)
+
+    expect(screen.queryByText(/where these proposals came from/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/identity collision/i)).not.toBeInTheDocument()
+  })
+
   it('shows a count inline on each status filter tab', () => {
     renderWithQuery(<ReviewInboxPage />)
 
@@ -296,8 +303,6 @@ describe('ReviewInboxPage', () => {
       })
       client.setQueryData(reviewKeys.inboxCounts({ search: duplicate.title }), {
         byStatus: proposalInboxCountsFixtures({ search: duplicate.title }),
-        openCollisions: 0,
-        openCollisionSuites: [],
         version: 'test-version',
       })
       render(
@@ -371,8 +376,6 @@ describe('ReviewInboxPage', () => {
       })
       client.setQueryData(reviewKeys.inboxCounts({ search: title }), {
         byStatus: proposalInboxCountsFixtures({ search: title }),
-        openCollisions: 0,
-        openCollisionSuites: [],
         version: 'test-version',
       })
       return render(
@@ -966,7 +969,7 @@ describe('ReviewInboxPage', () => {
 })
 
 
-describe('ReviewInboxPage origin summary', () => {
+describe('ReviewInboxPage origin', () => {
   beforeEach(() => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
@@ -974,7 +977,7 @@ describe('ReviewInboxPage origin summary', () => {
     window.history.replaceState(null, '', '/review-inbox')
   })
 
-  it('explains above the queue which push brought the proposals in', async () => {
+  it('names the origin on each proposal row, with no summary of it above the queue', async () => {
     const search = 'cart'
     searchParamsQuery = new URLSearchParams({ search }).toString()
     const client = createTestQueryClient()
@@ -1002,8 +1005,6 @@ describe('ReviewInboxPage origin summary', () => {
     })
     client.setQueryData(reviewKeys.inboxCounts({ search }), {
       byStatus: proposalInboxCountsFixtures({ search }),
-      openCollisions: 0,
-      openCollisionSuites: [],
       version: 'test-version',
     })
 
@@ -1013,11 +1014,11 @@ describe('ReviewInboxPage origin summary', () => {
       </QueryClientProvider>,
     )
 
-    const summary = await screen.findByRole('region', {
-      name: /where these proposals came from/i,
-    })
-    expect(within(summary).getByRole('listitem')).toHaveTextContent(
-      /2\s*from push abc1234 .Add cart tests. by ana on main/,
-    )
+    const queue = await screen.findByRole('region', { name: 'Proposals queue' })
+    expect(within(queue).getAllByTestId('proposal-origin')).toHaveLength(2)
+    expect(
+      screen.queryByRole('region', { name: /where these proposals came from/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/Add cart tests/)).not.toBeInTheDocument()
   })
 })

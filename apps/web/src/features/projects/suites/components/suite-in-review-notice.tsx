@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight, Clock } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
+import { reviewInboxPath } from '@/features/projects/lib/routes'
 
 interface SuiteInReviewNoticeProps {
   projectId: string
@@ -29,7 +30,7 @@ export function SuiteInReviewNotice({ projectId, newCaseProposals }: SuiteInRevi
         {t('suites.newCaseProposals', { count: newCaseProposals })}
       </p>
       <Link
-        href={`/review-inbox?projectId=${encodeURIComponent(projectId)}`}
+        href={reviewInboxPath(projectId)}
         className="inline-flex shrink-0 items-center gap-1 self-start rounded-md py-1 text-sm font-semibold text-default transition-colors hover:underline outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary sm:self-auto"
       >
         {t('suites.openReviewInbox')}

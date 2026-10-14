@@ -19,7 +19,7 @@ export function projectAerisPath(projectId: string): string {
 }
 
 export function reviewInboxPath(projectId: string): string {
-  return `/review-inbox?project=${projectId}`
+  return `/review-inbox?projectId=${encodeURIComponent(projectId)}`
 }
 
 export function projectRunPath(projectId: string, runId: string): string {

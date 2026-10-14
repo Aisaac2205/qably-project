@@ -59,8 +59,6 @@ function seedInboxPage(client: QueryClient, ...ids: string[]) {
 function seedCounts(client: QueryClient, inReview: number) {
   const counts: ReviewInboxCountsResult = {
     byStatus: { in_review: inReview, approved: 0, rejected: 0, changes_requested: 0 },
-    openCollisions: 0,
-    openCollisionSuites: [],
     version: 'v1',
   }
   client.setQueryData(reviewKeys.inboxCounts({}), counts)

@@ -10,7 +10,6 @@ import type {
   InboxClassification,
   InboxItem,
   MatchedCaseView,
-  OpenCollisionSuite,
   ProposalDetailView,
   ProposalSourceView,
   PublishedVersionView,
@@ -169,10 +168,6 @@ function hashDuplicateKindCounts(
   return hashGroupedRows(rows, (row) => row.duplicateKind ?? 'none');
 }
 
-function hashCollisionSuites(suites: readonly OpenCollisionSuite[]): string {
-  return suites.map((suite) => `${suite.suiteId}:${suite.count}`).join(',');
-}
-
 const INBOX_ITEM_SELECT = {
   ...VIEW_SELECT,
   suite: { select: { id: true, name: true } },
@@ -225,6 +220,11 @@ interface InboxItemRow extends ViewRow {
   codeChange?: OriginCodeChangeRow | null;
 }
 
+/** A commit message is a title, a blank line and a body; only the title names the commit. */
+function firstLine(message: string): string {
+  return message.split(/\r?\n/, 1)[0].trim();
+}
+
 function toOrigin(row: InboxItemRow): ProposalOrigin {
   const codeChange = row.codeChange ?? null;
   if (codeChange !== null) {
@@ -232,7 +232,7 @@ function toOrigin(row: InboxItemRow): ProposalOrigin {
     return {
       kind: 'push',
       commitSha: codeChange.commitSha === '' ? null : codeChange.commitSha,
-      commitTitle: event?.title ?? null,
+      commitTitle: event === null ? null : firstLine(event.title),
       author: event?.author ?? null,
       branch: event?.branch ?? null,
       pullRequestNumber: codeChange.pullRequestNumber,
@@ -369,22 +369,20 @@ export class ReviewInboxQueryService {
   ): Promise<ReviewInboxCounts> {
     const where = this.baseWhere(org, filters);
 
-    const [groupedByStatus, groupedByDuplicateKind, openCollisionSuites] =
-      await Promise.all([
-        this.prisma.extractedProposal.groupBy({
-          by: ['status'],
-          where,
-          _count: { _all: true },
-          _max: { updatedAt: true },
-        }) as unknown as Promise<GroupedStatusRow[]>,
-        this.prisma.extractedProposal.groupBy({
-          by: ['duplicateKind'],
-          where,
-          _count: { _all: true },
-          _max: { updatedAt: true },
-        }) as unknown as Promise<GroupedDuplicateKindRow[]>,
-        this.openCollisionSuites(org, filters),
-      ]);
+    const [groupedByStatus, groupedByDuplicateKind] = await Promise.all([
+      this.prisma.extractedProposal.groupBy({
+        by: ['status'],
+        where,
+        _count: { _all: true },
+        _max: { updatedAt: true },
+      }) as unknown as Promise<GroupedStatusRow[]>,
+      this.prisma.extractedProposal.groupBy({
+        by: ['duplicateKind'],
+        where,
+        _count: { _all: true },
+        _max: { updatedAt: true },
+      }) as unknown as Promise<GroupedDuplicateKindRow[]>,
+    ]);
 
     const byStatus = emptyStatusCounts();
     for (const row of groupedByStatus) {
@@ -401,73 +399,11 @@ export class ReviewInboxQueryService {
 
     const version = createHash('sha1')
       .update(
-        `${hashCounts(groupedByStatus)}|${hashDuplicateKindCounts(groupedByDuplicateKind)}|collisions:${hashCollisionSuites(openCollisionSuites)}`,
+        `${hashCounts(groupedByStatus)}|${hashDuplicateKindCounts(groupedByDuplicateKind)}`,
       )
       .digest('hex');
 
-    return {
-      byStatus,
-      byDuplicateKind,
-      openCollisions: openCollisionSuites.length,
-      openCollisionSuites,
-      version,
-    };
-  }
-
-  /**
-   * The suites that hold at least one open case identity collision, most
-   * collisions first. The inbox notice talks about suites, so it counts and
-   * links suites rather than the colliding keys inside them.
-   */
-  private async openCollisionSuites(
-    org: OrgContext,
-    filters: ReviewInboxCountsFilters,
-  ): Promise<OpenCollisionSuite[]> {
-    const grouped = (await this.prisma.caseIdentityCollision.groupBy({
-      by: ['suiteId'],
-      where: {
-        closedAt: null,
-        project: { organizationId: org.organizationId },
-        ...(filters.projectId === undefined
-          ? {}
-          : { projectId: filters.projectId }),
-      },
-      _count: { _all: true },
-    })) as unknown as { suiteId: string; _count: { _all: number } }[];
-
-    if (grouped.length === 0) return [];
-
-    const suites = await this.prisma.suite.findMany({
-      where: { id: { in: grouped.map((row) => row.suiteId) } },
-      select: {
-        id: true,
-        name: true,
-        projectId: true,
-        project: { select: { name: true } },
-      },
-    });
-    const suiteById = new Map(suites.map((suite) => [suite.id, suite]));
-
-    return grouped
-      .flatMap((row) => {
-        const suite = suiteById.get(row.suiteId);
-        if (suite === undefined) return [];
-        return [
-          {
-            suiteId: suite.id,
-            suiteName: suite.name,
-            projectId: suite.projectId,
-            projectName: suite.project.name,
-            count: row._count._all,
-          },
-        ];
-      })
-      .sort(
-        (a, b) =>
-          b.count - a.count ||
-          a.suiteName.localeCompare(b.suiteName) ||
-          a.suiteId.localeCompare(b.suiteId),
-      );
+    return { byStatus, byDuplicateKind, version };
   }
 
   async findOne(
