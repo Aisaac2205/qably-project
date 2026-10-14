@@ -1,4 +1,3 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
@@ -28,6 +27,7 @@ import { SourceReader } from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
+import { OnDemandProcessor } from '../../common/queue/on-demand-processor.decorator';
 import {
   describeTruncatedSource,
   diagnoseNameCollision,
@@ -178,11 +178,11 @@ function mergeSuiteTags(
   return merged;
 }
 
-@Processor(EXTRACTION_QUEUE, {
+@OnDemandProcessor(EXTRACTION_QUEUE, {
   concurrency: 2,
   lockDuration: LOCK_DURATION_MS,
 })
-export class ExtractionProcessor extends WorkerHost {
+export class ExtractionProcessor {
   private readonly logger = new Logger(ExtractionProcessor.name);
 
   constructor(
@@ -195,9 +195,7 @@ export class ExtractionProcessor extends WorkerHost {
     private readonly testFileLocator: TestFileLocator,
     private readonly failureRecorder: ExtractionFailureRecorder,
     private readonly proposalWriter: ExtractedProposalWriter,
-  ) {
-    super();
-  }
+  ) {}
 
   async process(job: Job<ExtractionJobData>): Promise<void> {
     // job.attemptsStarted/job.opts may be absent on minimal job doubles in

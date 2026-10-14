@@ -1,6 +1,6 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import { OnDemandProcessor } from '../../common/queue/on-demand-processor.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   classifyProposal,
@@ -58,13 +58,11 @@ function toCandidate(row: CaseCandidateRow): ClassifyProposalCandidate {
   };
 }
 
-@Processor(PROPOSAL_CLASSIFICATION_QUEUE)
-export class ReclassifySuiteProcessor extends WorkerHost {
+@OnDemandProcessor(PROPOSAL_CLASSIFICATION_QUEUE)
+export class ReclassifySuiteProcessor {
   private readonly logger = new Logger(ReclassifySuiteProcessor.name);
 
-  constructor(private readonly prisma: PrismaService) {
-    super();
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async process(job: Job<ReclassifySuiteJobData>): Promise<void> {
     const { suiteId } = job.data;

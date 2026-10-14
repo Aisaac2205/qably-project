@@ -1,4 +1,3 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
@@ -12,6 +11,7 @@ import { InjectEnv } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
 import { resolveOrgDefaultLocale } from '../../common/locale/org-default-locale';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { OnDemandProcessor } from '../../common/queue/on-demand-processor.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailerService } from '../mailer/mailer.service';
 import { notificationDigestEmail } from '../mailer/templates/notification-digest';
@@ -40,8 +40,8 @@ interface NotificationWebhookRow {
   type: NotificationWebhookType;
 }
 
-@Processor(NOTIFICATIONS_QUEUE)
-export class NotificationsProcessor extends WorkerHost {
+@OnDemandProcessor(NOTIFICATIONS_QUEUE)
+export class NotificationsProcessor {
   private readonly logger = new Logger(NotificationsProcessor.name);
 
   constructor(
@@ -51,9 +51,7 @@ export class NotificationsProcessor extends WorkerHost {
     private readonly slack: SlackChannel,
     private readonly discord: DiscordChannel,
     @InjectEnv() private readonly env: Env,
-  ) {
-    super();
-  }
+  ) {}
 
   async process(job: Job<NotificationJobData>): Promise<void> {
     const event = job.data;

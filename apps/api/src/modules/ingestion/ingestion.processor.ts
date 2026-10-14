@@ -1,4 +1,3 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import {
@@ -7,6 +6,7 @@ import {
 } from '@qably/types';
 import { DOMAIN_EVENTS } from '../../common/events/domain-events';
 import { DomainEvents } from '../../common/events/domain-events.service';
+import { OnDemandProcessor } from '../../common/queue/on-demand-processor.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ExtractionService } from '../review/extraction.service';
 import type { ScmEventJob } from './ingestion.contracts';
@@ -37,17 +37,15 @@ interface PendingEvent {
   connection: { projects: Array<{ id: string; testFilePatterns: string[] }> };
 }
 
-@Processor(INGESTION_QUEUE)
-export class IngestionProcessor extends WorkerHost {
+@OnDemandProcessor(INGESTION_QUEUE)
+export class IngestionProcessor {
   private readonly logger = new Logger(IngestionProcessor.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: DomainEvents,
     private readonly extraction: ExtractionService,
-  ) {
-    super();
-  }
+  ) {}
 
   async process(job: Job<ScmEventJob>): Promise<void> {
     const { scmEventId } = job.data;
