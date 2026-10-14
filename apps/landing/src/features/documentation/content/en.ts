@@ -622,7 +622,7 @@ response.raise_for_status()`,
           type: 'table',
           headers: ['Case field', 'Required', 'Notes'],
           rows: [
-            ['name', 'yes', 'Up to 120 characters.'],
+            ['name', 'yes', 'Up to 372 characters.'],
             ['suiteName', 'no', 'Defaults to the resolved suite name; allows attaching auxiliary labels (such as Playwright project names) for audit trails.'],
             ['steps', 'no', 'Array of strings, up to 50 items (500 characters max each). Empty by default on JUnit imports; can be populated when posting JSON directly.'],
             ['expectedResult', 'no', 'Up to 1000 characters. Empty by default on JUnit imports.'],
