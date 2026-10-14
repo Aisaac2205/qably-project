@@ -1,4 +1,8 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { err, ok } from '../../../common/result';
 import type { LastDecisionView } from '../review.contracts';
 import { unwrap, unwrapDecision } from './review-error-http';
@@ -88,6 +92,21 @@ describe('unwrapDecision', () => {
         response: expect.objectContaining({ conflictingCase: null }) as unknown,
       }) as Error,
     );
+  });
+
+  it('throws a coded 422 when the chosen apply target is not valid for the proposal', () => {
+    let thrown: unknown;
+    try {
+      unwrap(err('invalid-apply-target'));
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(UnprocessableEntityException);
+    expect((thrown as UnprocessableEntityException).getResponse()).toEqual({
+      code: 'invalid-apply-target',
+      message: 'This proposal has no matching case to apply to',
+    });
   });
 
   it('delegates every other error to the plain unwrap mapping', async () => {

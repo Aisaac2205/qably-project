@@ -839,6 +839,7 @@ describe('ReviewInboxQueryService.page', () => {
       kind: 'none',
       matchedCaseId: null,
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: null,
       reasons: [],
     });
@@ -849,7 +850,7 @@ describe('ReviewInboxQueryService.page', () => {
       pageRow({
         duplicateKind: 'possible_duplicate',
         matchedCaseId: 'case-9',
-        matchedCase: { name: 'Empties the cart' },
+        matchedCase: { name: 'Empties the cart', suiteId: 'suite-4' },
         duplicateScore: 0.75,
         duplicateReasons: ['same-title', 'steps-overlap'],
       }),
@@ -864,6 +865,7 @@ describe('ReviewInboxQueryService.page', () => {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-9',
       matchedCaseName: 'Empties the cart',
+      matchedCaseSuiteId: 'suite-4',
       score: 0.75,
       reasons: ['same-title', 'steps-overlap'],
     });
@@ -884,6 +886,7 @@ describe('ReviewInboxQueryService.page', () => {
     });
 
     expect(result.items[0].classification.matchedCaseName).toBeNull();
+    expect(result.items[0].classification.matchedCaseSuiteId).toBeNull();
   });
 
   it('includes the suite id and name when the proposal has a suite', async () => {
@@ -925,7 +928,7 @@ describe('ReviewInboxQueryService.page', () => {
       suite: { select: { id: true, name: true } },
       duplicateKind: true,
       matchedCaseId: true,
-      matchedCase: { select: { name: true } },
+      matchedCase: { select: { name: true, suiteId: true } },
       duplicateScore: true,
       duplicateReasons: true,
     });

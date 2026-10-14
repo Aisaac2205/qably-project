@@ -41,6 +41,14 @@ const proposalRow = {
     suiteId: string;
   } | null,
   needsManualReview: false,
+  duplicateKind: null as 'none' | 'update' | 'possible_duplicate' | null,
+  matchedCaseId: null as string | null,
+  matchedCase: null as {
+    id: string;
+    projectId: string;
+    suiteId: string;
+    automationFilePath: string | null;
+  } | null,
 };
 
 interface FakePrisma {
@@ -668,6 +676,219 @@ describe('ReviewDecisionService.approve', () => {
     expect(prisma.testCaseVersion.create).not.toHaveBeenCalled();
     expect(prisma.traceabilityLink.createMany).not.toHaveBeenCalled();
     expect(prisma.reviewDecision.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewDecisionService.approve possible duplicates', () => {
+  const matchedCase = {
+    id: 'case-matched',
+    projectId: 'project-1',
+    suiteId: 'suite-matched',
+    automationFilePath: 'src/cart.spec.ts',
+  };
+
+  function possibleDuplicate(
+    overrides: Partial<typeof proposalRow> = {},
+  ): FakePrisma {
+    const prisma = createPrisma({
+      duplicateKind: 'possible_duplicate',
+      matchedCaseId: matchedCase.id,
+      matchedCase,
+      ...overrides,
+    });
+    prisma.testCaseVersion.count.mockResolvedValue(2);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-3',
+      version: 3,
+    });
+    return prisma;
+  }
+
+  it('applies the proposal as a new version of the matched case when asked to', async () => {
+    const prisma = possibleDuplicate();
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        createdNewCase: false,
+        testCaseId: 'case-matched',
+        testCaseName: 'Empties the cart',
+        suiteId: 'suite-matched',
+        versionId: 'version-3',
+        version: 3,
+        decisionId: 'decision-1',
+      },
+    });
+    expect(prisma.testCase.create).not.toHaveBeenCalled();
+    expect(prisma.testCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'case-matched' } }),
+    );
+  });
+
+  it('links the produced version to the matched case', async () => {
+    const prisma = possibleDuplicate();
+
+    await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(prisma.traceabilityLink.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            fromType: 'proposal',
+            toType: 'test_case',
+            toId: 'case-matched',
+          }),
+        ]) as unknown,
+      }),
+    );
+  });
+
+  it('carries the automation key and the matched case file path onto the case it updates', async () => {
+    const prisma = possibleDuplicate({ automationKey: 'Cart > empties' });
+
+    await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(prisma.testCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          executionMode: 'automated',
+          automationKey: 'Cart > empties',
+          automationFilePath: 'src/cart.spec.ts',
+        }) as unknown,
+      }),
+    );
+  });
+
+  it('publishes the approval event against the matched case suite', async () => {
+    const prisma = possibleDuplicate();
+    const publish = jest.fn();
+
+    await build(prisma, fakeEvents(publish)).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(publish).toHaveBeenCalledWith(
+      DOMAIN_EVENTS.proposalApproved,
+      expect.objectContaining({
+        suiteId: 'suite-matched',
+        testCaseId: 'case-matched',
+        createdNewCase: false,
+      }),
+    );
+  });
+
+  it('creates a new case when asked to, leaving the matched case alone', async () => {
+    const prisma = possibleDuplicate();
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'new-case',
+    });
+
+    expect(result.ok && result.value.createdNewCase).toBe(true);
+    expect(prisma.testCase.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps creating a new case when the reviewer chose nothing', async () => {
+    const prisma = possibleDuplicate();
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+    });
+
+    expect(result.ok && result.value.createdNewCase).toBe(true);
+    expect(prisma.testCase.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('looks for the colliding case in the matched case suite, excluding the matched case', async () => {
+    const prisma = possibleDuplicate();
+    prisma.testCase.update.mockRejectedValue(testCaseNameViolation());
+    prisma.testCase.findFirst.mockResolvedValue({
+      id: 'case-other',
+      name: 'Empties the cart',
+      suiteId: 'suite-matched',
+    });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'matched-case',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'name-taken',
+        conflictingCase: {
+          id: 'case-other',
+          name: 'Empties the cart',
+          suiteId: 'suite-matched',
+        },
+      },
+    });
+    expect(prisma.testCase.findFirst).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-matched',
+        project: { organizationId: 'org-1' },
+        id: { not: 'case-matched' },
+        name: 'Empties the cart',
+      },
+      select: { id: true, name: true, suiteId: true },
+    });
+  });
+
+  const unusableMatches: [string, Partial<typeof proposalRow>][] = [
+    ['the proposal is not a possible duplicate', { duplicateKind: 'none' }],
+    [
+      'the matched case no longer exists',
+      { matchedCaseId: null, matchedCase: null },
+    ],
+    [
+      'the matched case belongs to another project',
+      { matchedCase: { ...matchedCase, projectId: 'project-other' } },
+    ],
+    [
+      'the proposal already targets a case',
+      { duplicateKind: 'update', targetTestCaseId: 'case-existing' },
+    ],
+  ];
+
+  it.each(unusableMatches)(
+    'refuses to apply to the matched case when %s',
+    async (_name, overrides) => {
+      const prisma = possibleDuplicate(overrides);
+
+      const result = await build(prisma).approve(org, 'proposal-1', {
+        actorId: 'user-1',
+        applyTo: 'matched-case',
+      });
+
+      expect(result).toEqual({ ok: false, error: 'invalid-apply-target' });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses to create a new case for a proposal bound to a case', async () => {
+    const prisma = createPrisma({ targetTestCaseId: 'case-existing' });
+
+    const result = await build(prisma).approve(org, 'proposal-1', {
+      actorId: 'user-1',
+      applyTo: 'new-case',
+    });
+
+    expect(result).toEqual({ ok: false, error: 'invalid-apply-target' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
 

@@ -9,7 +9,11 @@ import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import { createTestQueryClient, renderWithQuery } from '@/lib/query-test-utils'
 import { ApiError } from '@/lib/api-client'
-import { approveProposal, rejectProposal } from '@/features/review-inbox/api/review.api'
+import {
+  approveProposal,
+  rejectProposal,
+  type ProposalListItem,
+} from '@/features/review-inbox/api/review.api'
 import { proposalInboxCountsFixtures, proposalInboxFixtures } from '@/test/review-api-stub'
 import { approvalConflictError, conflictingCaseFixture } from './approval-conflict-fixture'
 
@@ -267,6 +271,68 @@ describe('ReviewInboxPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /this proposal has no steps/i,
     )
+  })
+
+  describe('possible duplicates', () => {
+    function renderPossibleDuplicate() {
+      const [base] = proposalInboxFixtures({ status: 'in_review' })
+      const duplicate: ProposalListItem = {
+        ...base,
+        classification: {
+          kind: 'possible_duplicate',
+          matchedCaseId: 'case-9',
+          matchedCaseName: 'Checks the cart',
+          matchedCaseSuiteId: 'suite-1',
+          score: 0.72,
+          reasons: ['same-title'],
+        },
+      }
+      const filters = { status: 'in_review' as const, search: duplicate.title }
+      searchParamsQuery = new URLSearchParams({ search: duplicate.title }).toString()
+      const client = createTestQueryClient()
+      client.setQueryData(reviewKeys.inbox(filters), {
+        pages: [{ items: [duplicate], nextCursor: null }],
+        pageParams: [null],
+      })
+      client.setQueryData(reviewKeys.inboxCounts({ search: duplicate.title }), {
+        byStatus: proposalInboxCountsFixtures({ search: duplicate.title }),
+        openCollisions: 0,
+        openCollisionSuites: [],
+        version: 'test-version',
+      })
+      render(
+        <QueryClientProvider client={client}>
+          <ReviewInboxPage />
+        </QueryClientProvider>,
+      )
+      return duplicate
+    }
+
+    it('applies the proposal to the matched case when the reviewer chooses to update it', async () => {
+      vi.mocked(approveProposal).mockClear()
+      const user = userEvent.setup()
+      const duplicate = renderPossibleDuplicate()
+      await screen.findByRole('heading', { name: duplicate.title })
+
+      await user.click(screen.getByRole('button', { name: 'Update case Checks the cart' }))
+
+      expect(vi.mocked(approveProposal)).toHaveBeenCalledWith(duplicate.id, {
+        comment: undefined,
+        applyTo: 'matched-case',
+      })
+    })
+
+    it('never approves a possible duplicate from the keyboard without a choice, and moves focus to it instead', async () => {
+      vi.mocked(approveProposal).mockClear()
+      const user = userEvent.setup()
+      const duplicate = renderPossibleDuplicate()
+      await screen.findByRole('heading', { name: duplicate.title })
+
+      await user.keyboard('a')
+
+      expect(vi.mocked(approveProposal)).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Update case Checks the cart' })).toHaveFocus()
+    })
   })
 
   describe('approval conflicts', () => {

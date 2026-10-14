@@ -10,6 +10,9 @@ import { useInboxPage } from '../hooks/use-inbox-page'
 import { useInboxCounts } from '../hooks/use-inbox-counts'
 import { useProposalDecision, decisionErrorKey } from '../hooks/use-proposal-decision'
 import { decisionConflictMessageKey, isApprovalConflictCode } from '../lib/decision-error'
+import { needsApplyChoice, resolveClassification } from '../lib/classification-reason'
+import type { ApplyTarget } from '../api/review.api'
+import { APPROVE_UPDATE_BUTTON_ID } from './inspector/decision-toolbar'
 import { useReviewInboxFilters } from '../hooks/use-review-inbox-filters'
 import { useReviewInboxSelection } from '../hooks/use-review-inbox-selection'
 import { useInboxFeedback } from '../hooks/use-inbox-feedback'
@@ -159,9 +162,9 @@ export function ReviewInboxPage() {
   )
 
   const handleApprove = useCallback(
-    (proposalId: string) => {
+    (proposalId: string, applyTo?: ApplyTarget) => {
       if (!rememberDecidedProposal(proposalId)) return
-      approve(proposalId)
+      approve(proposalId, { applyTo })
       selectNextPending()
     },
     [rememberDecidedProposal, approve, selectNextPending],
@@ -204,7 +207,16 @@ export function ReviewInboxPage() {
 
   useKeyboardShortcuts({
     a: () => {
-      if (selectedProposal?.status === 'in_review') handleApprove(selectedProposal.id)
+      if (selectedProposal?.status !== 'in_review') return
+
+      // A possible duplicate needs its target chosen: approving it blindly
+      // would create the duplicate, so the shortcut hands over to the choice.
+      if (needsApplyChoice(resolveClassification(selectedProposal.classification))) {
+        document.getElementById(APPROVE_UPDATE_BUTTON_ID)?.focus()
+        return
+      }
+
+      handleApprove(selectedProposal.id)
     },
     r: () => {
       if (selectedProposal?.status === 'in_review') handleReject(selectedProposal.id)

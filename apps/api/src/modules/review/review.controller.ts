@@ -12,7 +12,12 @@ import type {
   ProposalDetailView,
   RejectionView,
 } from './review.contracts';
-import { decisionSchema, type DecisionBody } from './review.schemas';
+import {
+  approveSchema,
+  decisionSchema,
+  type ApproveBody,
+  type DecisionBody,
+} from './review.schemas';
 import { unwrap, unwrapDecision } from './lib/review-error-http';
 import { ReviewInboxQueryService } from './review-inbox-query.service';
 import { ReviewDecisionService } from './review-decision.service';
@@ -40,7 +45,7 @@ export class ReviewController {
     @CurrentOrg() org: OrgContext,
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-    @Body(new ZodValidationPipe(decisionSchema)) body: DecisionBody,
+    @Body(new ZodValidationPipe(approveSchema)) body: ApproveBody,
   ): Promise<ApprovalView> {
     return unwrapDecision(
       await this.review.approve(org, id, { actorId: user.id, ...body }),

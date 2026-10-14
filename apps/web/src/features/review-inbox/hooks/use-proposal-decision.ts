@@ -6,6 +6,7 @@ import {
   approveProposal,
   rejectProposal,
   type ApprovalResult,
+  type ApproveOptions,
   type RejectionResult,
   type ReviewInboxPageResult,
   type ReviewInboxCountsResult,
@@ -48,6 +49,10 @@ interface DecisionCallbacks {
 interface DecisionVariables {
   proposalId: string
   comment?: string
+}
+
+interface ApprovalVariables extends DecisionVariables {
+  applyTo?: ApproveOptions['applyTo']
 }
 
 interface MutationContext {
@@ -135,8 +140,8 @@ export function useProposalDecision({
 
   const approval = useMutation({
     mutationKey: [...DECISION_MUTATION_KEY, 'approve'],
-    mutationFn: ({ proposalId, comment }: DecisionVariables) =>
-      approveProposal(proposalId, comment),
+    mutationFn: ({ proposalId, comment, applyTo }: ApprovalVariables) =>
+      approveProposal(proposalId, { comment, applyTo }),
     onMutate: ({ proposalId }) => applyOptimisticRemoval(proposalId),
     onSuccess: (result, { proposalId }) => {
       callbacksRef.current.onApproved(proposalId, result)
@@ -173,11 +178,11 @@ export function useProposalDecision({
   })
 
   return {
-    approve: (proposalId: string, comment?: string) => {
+    approve: (proposalId: string, options: ApproveOptions = {}) => {
       if (inFlightRef.current.has(proposalId)) return
       inFlightRef.current.add(proposalId)
       setDecisionError(null)
-      approval.mutate({ proposalId, comment })
+      approval.mutate({ proposalId, ...options })
     },
     reject: (proposalId: string, comment?: string) => {
       if (inFlightRef.current.has(proposalId)) return

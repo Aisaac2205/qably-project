@@ -1,7 +1,8 @@
 'use client'
 
 import { useId } from 'react'
-import { ArrowsClockwise, CopySimple } from '@phosphor-icons/react'
+import Link from 'next/link'
+import { ArrowsClockwise, ArrowUpRight, CopySimple } from '@phosphor-icons/react'
 import type { ProposalClassification } from '../api/review.api'
 import {
   classificationReasonKey,
@@ -11,8 +12,11 @@ import { useTranslation } from '@/lib/i18n'
 
 export function DuplicateComparison({
   classification,
+  caseHref = null,
 }: {
   classification: ProposalClassification
+  /** Where the matched case can be opened; null when it cannot be located. */
+  caseHref?: string | null
 }) {
   const { t } = useTranslation()
   const reasonsHeadingId = useId()
@@ -25,6 +29,18 @@ export function DuplicateComparison({
   const displayedReasons = classification.reasons.filter(
     (reason) => reason !== 'cross-suite-key',
   )
+  const heading =
+    classification.matchedCaseName === null
+      ? isUpdate
+        ? t('reviewInbox.classificationUpdate')
+        : t('reviewInbox.classificationPossibleDuplicate')
+      : isUpdate
+        ? t('reviewInbox.classificationUpdateNamed', {
+            name: classification.matchedCaseName,
+          })
+        : t('reviewInbox.classificationPossibleDuplicateNamed', {
+            name: classification.matchedCaseName,
+          })
 
   return (
     <div className="rounded border border-warn/30 bg-warn-bg p-3.5 space-y-2">
@@ -34,17 +50,17 @@ export function DuplicateComparison({
         ) : (
           <CopySimple size={16} weight="bold" aria-hidden="true" />
         )}
-        {classification.matchedCaseName === null
-          ? isUpdate
-            ? t('reviewInbox.classificationUpdate')
-            : t('reviewInbox.classificationPossibleDuplicate')
-          : isUpdate
-            ? t('reviewInbox.classificationUpdateNamed', {
-                name: classification.matchedCaseName,
-              })
-            : t('reviewInbox.classificationPossibleDuplicateNamed', {
-                name: classification.matchedCaseName,
-              })}
+        {caseHref === null ? (
+          heading
+        ) : (
+          <Link
+            href={caseHref}
+            className="inline-flex min-w-0 items-center gap-1 rounded-sm underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <span className="truncate">{heading}</span>
+            <ArrowUpRight size={13} className="shrink-0" aria-hidden="true" />
+          </Link>
+        )}
       </div>
 
       {displayedReasons.length > 0 && (

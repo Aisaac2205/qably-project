@@ -178,7 +178,7 @@ const INBOX_ITEM_SELECT = {
   suite: { select: { id: true, name: true } },
   duplicateKind: true,
   matchedCaseId: true,
-  matchedCase: { select: { name: true } },
+  matchedCase: { select: { name: true, suiteId: true } },
   duplicateScore: true,
   duplicateReasons: true,
   codeChangeId: true,
@@ -217,7 +217,7 @@ interface InboxItemRow extends ViewRow {
   suite: { id: string; name: string } | null;
   duplicateKind: ProposalDuplicateKind | null;
   matchedCaseId: string | null;
-  matchedCase: { name: string } | null;
+  matchedCase: { name: string; suiteId: string } | null;
   duplicateScore: number | null;
   duplicateReasons: unknown;
   codeChangeId?: string | null;
@@ -249,6 +249,7 @@ function toClassification(row: InboxItemRow): InboxClassification {
       kind: 'none',
       matchedCaseId: null,
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: null,
       reasons: [],
     };
@@ -258,6 +259,8 @@ function toClassification(row: InboxItemRow): InboxClassification {
     kind: row.duplicateKind,
     matchedCaseId: row.matchedCaseId,
     matchedCaseName: row.matchedCase === null ? null : row.matchedCase.name,
+    matchedCaseSuiteId:
+      row.matchedCase === null ? null : row.matchedCase.suiteId,
     score: row.duplicateScore,
     reasons: Array.isArray(row.duplicateReasons)
       ? (row.duplicateReasons as InboxClassification['reasons'])

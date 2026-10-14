@@ -40,12 +40,26 @@ describe('review.api', () => {
   })
 
   it('approves a proposal with an optional comment', async () => {
-    await approveProposal('proposal-1', 'Matches the evidence')
+    await approveProposal('proposal-1', { comment: 'Matches the evidence' })
 
     const [url, init] = lastCall()
     expect(url).toMatch(/\/review\/proposals\/proposal-1\/approve$/)
     expect(init.method).toBe('POST')
     expect(init.body).toBe(JSON.stringify({ comment: 'Matches the evidence' }))
+  })
+
+  it('asks for the proposal to be applied to the matched case when told to', async () => {
+    await approveProposal('proposal-1', { applyTo: 'matched-case' })
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(JSON.stringify({ applyTo: 'matched-case' }))
+  })
+
+  it('sends the comment and the apply target together', async () => {
+    await approveProposal('proposal-1', { comment: 'Same flow', applyTo: 'new-case' })
+
+    const [, init] = lastCall()
+    expect(init.body).toBe(JSON.stringify({ comment: 'Same flow', applyTo: 'new-case' }))
   })
 
   it('approves without a comment when none was written', async () => {

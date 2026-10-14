@@ -78,5 +78,10 @@ export function unwrap<T>(result: Result<T, ApprovalError>): T {
         code: result.error,
         message: 'This project has no suite to publish the official case into',
       });
+    case 'invalid-apply-target':
+      throw new UnprocessableEntityException({
+        code: result.error,
+        message: 'This proposal has no matching case to apply to',
+      });
   }
 }

@@ -211,6 +211,25 @@ describe('useProposalDecision', () => {
     )
   })
 
+  it('sends the reviewer choice of where the proposal lands with the approval', async () => {
+    const approveSpy = vi.spyOn(reviewApi, 'approveProposal').mockResolvedValue(approvalResult)
+    const client = makeClient()
+    const { result } = renderHook(
+      () => useProposalDecision({ onApproved: vi.fn(), onRejected: vi.fn() }),
+      { wrapper: wrapperFor(client) },
+    )
+
+    act(() => {
+      result.current.approve('proposal-1', { applyTo: 'matched-case' })
+    })
+
+    await waitFor(() => expect(approveSpy).toHaveBeenCalled())
+    expect(approveSpy).toHaveBeenCalledWith('proposal-1', {
+      comment: undefined,
+      applyTo: 'matched-case',
+    })
+  })
+
   it('invalidates suite and project data after a successful reject', async () => {
     vi.spyOn(reviewApi, 'rejectProposal').mockResolvedValue({ decisionId: 'decision-1' })
     const client = makeClient()
