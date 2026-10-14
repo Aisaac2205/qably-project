@@ -1,8 +1,20 @@
 import {
   findCaseIdentityCollisions,
   findLegacyKeyCollisions,
+  findLegacyTruncatedClaims,
   resolveCaseIdentityKey,
 } from './case-identity';
+
+// The real it.each titles of suite-list-query.service.spec.ts: jest-junit
+// reports "<describe chain> <title>" as both the name and the classname, and the
+// rows only differ after character 120.
+const ROWS_PREFIX =
+  'SuiteListQueryService.page bounded reads reads the suites once, the case counts once and the run windows once for sort ';
+
+function eachRow(sort: string, status: string, suites: number) {
+  const name = `${ROWS_PREFIX}${sort} and status ${status} with ${suites} suites`;
+  return { name, className: name };
+}
 
 describe('resolveCaseIdentityKey', () => {
   it('uses the raw name alone when no classname is reported', () => {
@@ -87,6 +99,10 @@ describe('findCaseIdentityCollisions', () => {
       {
         key: 'tests.checkout.test_checkout::test_add_item',
         count: 2,
+        claimants: [
+          'tests.checkout.test_checkout::test_add_item',
+          'tests.checkout.test_checkout › test_add_item',
+        ],
       },
     ]);
   });
@@ -107,7 +123,41 @@ describe('findCaseIdentityCollisions', () => {
       { name: 'Adds to cart', className: 'Adds to' },
     ]);
 
-    expect(collisions).toEqual([{ key: 'Adds to cart', count: 3 }]);
+    expect(collisions).toEqual([
+      {
+        key: 'Adds to cart',
+        count: 3,
+        claimants: [
+          'Adds to cart',
+          'Adds › Adds to cart',
+          'Adds to › Adds to cart',
+        ],
+      },
+    ]);
+  });
+
+  it('keeps parametrized rows that differ only after character 120 apart', () => {
+    const rows = [
+      eachRow('createdAt', 'all', 1),
+      eachRow('cases', 'all', 1),
+      eachRow('createdAt', 'active', 100),
+    ];
+
+    expect(rows[0].name.slice(0, 120)).toBe(rows[1].name.slice(0, 120));
+    expect(findCaseIdentityCollisions(rows)).toEqual([]);
+    expect(new Set(rows.map(resolveCaseIdentityKey)).size).toBe(3);
+  });
+
+  it('lists at most ten claimants but counts every one', () => {
+    const cases = Array.from({ length: 14 }, (_, index) => ({
+      name: 'Adds to cart',
+      className: `Adds to cart ${'x'.repeat(index)}`,
+    }));
+
+    const [collision] = findCaseIdentityCollisions(cases);
+
+    expect(collision.count).toBe(14);
+    expect(collision.claimants).toHaveLength(10);
   });
 });
 
@@ -136,7 +186,16 @@ describe('findLegacyKeyCollisions', () => {
       { name: 'test_add_item', className: 'tests.checkout.b' },
     ]);
 
-    expect(collisions).toEqual([{ key: 'test_add_item', count: 2 }]);
+    expect(collisions).toEqual([
+      {
+        key: 'test_add_item',
+        count: 2,
+        claimants: [
+          'tests.checkout.a::test_add_item',
+          'tests.checkout.b::test_add_item',
+        ],
+      },
+    ]);
   });
 
   it('flags a plain case and a composite case that share the plain case bare name', () => {
@@ -145,7 +204,13 @@ describe('findLegacyKeyCollisions', () => {
       { name: 'test_add_item', className: 'tests.checkout.a' },
     ]);
 
-    expect(collisions).toEqual([{ key: 'test_add_item', count: 2 }]);
+    expect(collisions).toEqual([
+      {
+        key: 'test_add_item',
+        count: 2,
+        claimants: ['test_add_item', 'tests.checkout.a::test_add_item'],
+      },
+    ]);
   });
 
   it('excludes an identity that is already a case identity collision from counting as a legacy claimant', () => {
@@ -156,5 +221,47 @@ describe('findLegacyKeyCollisions', () => {
     ]);
 
     expect(collisions).toEqual([]);
+  });
+});
+
+describe('findLegacyTruncatedClaims', () => {
+  it('maps a long identity to the key the 120-character cut used to give it', () => {
+    const row = eachRow('createdAt', 'all', 1);
+
+    const claims = findLegacyTruncatedClaims([row]);
+
+    expect(claims.get(row.name)).toBe(row.name.slice(0, 120));
+  });
+
+  it('claims nothing for a name that was never cut', () => {
+    expect(findLegacyTruncatedClaims([{ name: 'Adds to cart' }]).size).toBe(0);
+  });
+
+  it('claims nothing when several identities share the old truncated key', () => {
+    const claims = findLegacyTruncatedClaims([
+      eachRow('createdAt', 'all', 1),
+      eachRow('cases', 'all', 1),
+    ]);
+
+    expect(claims.size).toBe(0);
+  });
+
+  it('claims nothing when another identity is exactly the old truncated key', () => {
+    const row = eachRow('createdAt', 'all', 1);
+    const exact = { name: row.name.slice(0, 120) };
+
+    expect(findLegacyTruncatedClaims([row, exact]).size).toBe(0);
+  });
+
+  it('builds the old key of a composite identity from the cut name', () => {
+    const name = `test_${'a'.repeat(200)}`;
+
+    const claims = findLegacyTruncatedClaims([
+      { name, className: 'tests.checkout' },
+    ]);
+
+    expect(claims.get(`tests.checkout::${name}`)).toBe(
+      `tests.checkout::${name.slice(0, 120)}`,
+    );
   });
 });

@@ -89,6 +89,7 @@ export class SuiteViewAssembler {
         kind: true,
         key: true,
         claimantCount: true,
+        claimants: true,
         lastSeenAt: true,
         lastRunId: true,
       },

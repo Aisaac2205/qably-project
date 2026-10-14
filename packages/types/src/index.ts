@@ -227,6 +227,8 @@ export interface SuiteCollision {
   kind: CaseCollisionKind
   key: string
   claimantCount: number
+  /** The first few claimants, named as a person would; `claimantCount` is the total. */
+  claimants: string[]
   lastSeenAt: string
   lastRunId: string | null
 }

@@ -9,6 +9,7 @@ import {
 import {
   findCaseIdentityCollisions,
   findLegacyKeyCollisions,
+  findLegacyTruncatedClaims,
   resolveCaseIdentityKey,
   type CaseIdentityCollision,
   type LegacyKeyCollision,
@@ -138,8 +139,10 @@ export class OfficialCaseReconciler {
     const reachableLegacyCollisions = legacyCollisions.filter((collision) =>
       isLegacyKeyReachable(collision.key, refByKey, index),
     );
+    const legacyTruncatedClaims = findLegacyTruncatedClaims(cases);
 
     const resultByKey = new Map<string, string>();
+    const claimedIds = new Set<string>();
     const safeBackfillById = new Map<string, SafeBackfillPatch>();
     const keyMigrationById = new Map<string, string>();
     const missingKeys: string[] = [];
@@ -150,12 +153,17 @@ export class OfficialCaseReconciler {
       const usesCompositeIdentity = key !== legacyKey;
       const legacyIsAmbiguous = ambiguousLegacyKeys.has(legacyKey);
 
-      const { match, needsKeyBackfill, claimsLegacyRow } = resolveCaseMatch(
-        key,
-        ref,
-        ambiguousLegacyKeys,
-        index,
-      );
+      const resolved = resolveCaseMatch(key, ref, ambiguousLegacyKeys, index);
+      const truncatedMatch =
+        resolved.match === undefined
+          ? this.matchLegacyTruncatedRow(
+              key,
+              legacyTruncatedClaims,
+              index,
+              claimedIds,
+            )
+          : undefined;
+      const match = resolved.match ?? truncatedMatch;
 
       if (match === undefined) {
         if (legacyIsAmbiguous && !usesCompositeIdentity) continue;
@@ -164,8 +172,13 @@ export class OfficialCaseReconciler {
       }
 
       resultByKey.set(key, match.id);
+      claimedIds.add(match.id);
 
-      if (needsKeyBackfill || claimsLegacyRow) {
+      if (
+        resolved.needsKeyBackfill ||
+        resolved.claimsLegacyRow ||
+        truncatedMatch !== undefined
+      ) {
         keyMigrationById.set(match.id, key);
       }
 
@@ -270,6 +283,24 @@ export class OfficialCaseReconciler {
   }
 
   /**
+   * A case created while names were still cut at 120 characters is keyed by the
+   * cut form. When this report holds exactly one test that cut form belongs to,
+   * that case is the test's, and the caller moves it to the full key.
+   */
+  private matchLegacyTruncatedRow(
+    key: string,
+    claims: ReadonlyMap<string, string>,
+    index: SuiteIndex,
+    claimedIds: ReadonlySet<string>,
+  ): SuiteCaseRow | undefined {
+    const oldKey = claims.get(key);
+    if (oldKey === undefined) return undefined;
+
+    const row = index.byExactKey.get(oldKey);
+    return row === undefined || claimedIds.has(row.id) ? undefined : row;
+  }
+
+  /**
    * One query for the content of exactly the cases this report resolved to, so
    * the suite-wide match above never has to carry steps or expected results.
    */
@@ -289,6 +320,14 @@ export class OfficialCaseReconciler {
     return new Map(rows.map((row) => [row.id, row]));
   }
 
+  /**
+   * Records what this report says about the suite's collisions: it upserts one
+   * open row per collision it carries, and closes every other open row of the
+   * suite, including keys it no longer carries at all (the tests were renamed
+   * or deleted), since nothing would ever resolve those. A report that merely
+   * omits a collision's tests, a filtered run, closes the row too; the next
+   * report that collides again reopens it, so nothing is lost for good.
+   */
   async syncCollisions(
     tx: CollisionTx,
     projectId: string,
@@ -296,94 +335,56 @@ export class OfficialCaseReconciler {
     runId: string,
     identityKeys: readonly CaseIdentityCollision[],
     legacyKeys: readonly LegacyKeyCollision[],
-    resolvedIdentityKeys: readonly string[],
-    resolvedLegacyKeys: readonly string[],
   ): Promise<void> {
     const now = new Date();
+    const collisionsByKind = [
+      ['identity', identityKeys],
+      ['legacy_key', legacyKeys],
+    ] as const;
 
     await Promise.all(
-      identityKeys.map((collision) =>
-        tx.caseIdentityCollision.upsert({
-          where: {
-            suiteId_kind_key: {
-              suiteId,
-              kind: 'identity',
-              key: collision.key,
+      collisionsByKind.flatMap(([kind, collisions]) =>
+        collisions.map((collision) =>
+          tx.caseIdentityCollision.upsert({
+            where: {
+              suiteId_kind_key: { suiteId, kind, key: collision.key },
             },
-          },
-          create: {
-            projectId,
-            suiteId,
-            kind: 'identity',
-            key: collision.key,
-            claimantCount: collision.count,
-            firstSeenAt: now,
-            lastSeenAt: now,
-            lastRunId: runId,
-          },
-          update: {
-            claimantCount: collision.count,
-            lastSeenAt: now,
-            lastRunId: runId,
-            closedAt: null,
-          },
-        }),
+            create: {
+              projectId,
+              suiteId,
+              kind,
+              key: collision.key,
+              claimantCount: collision.count,
+              claimants: collision.claimants,
+              firstSeenAt: now,
+              lastSeenAt: now,
+              lastRunId: runId,
+            },
+            update: {
+              claimantCount: collision.count,
+              claimants: collision.claimants,
+              lastSeenAt: now,
+              lastRunId: runId,
+              closedAt: null,
+            },
+          }),
+        ),
       ),
     );
 
     await Promise.all(
-      legacyKeys.map((collision) =>
-        tx.caseIdentityCollision.upsert({
+      collisionsByKind.map(([kind, collisions]) =>
+        tx.caseIdentityCollision.updateMany({
           where: {
-            suiteId_kind_key: {
-              suiteId,
-              kind: 'legacy_key',
-              key: collision.key,
-            },
-          },
-          create: {
-            projectId,
             suiteId,
-            kind: 'legacy_key',
-            key: collision.key,
-            claimantCount: collision.count,
-            firstSeenAt: now,
-            lastSeenAt: now,
-            lastRunId: runId,
-          },
-          update: {
-            claimantCount: collision.count,
-            lastSeenAt: now,
-            lastRunId: runId,
+            kind,
+            key: { notIn: collisions.map((collision) => collision.key) },
             closedAt: null,
           },
+          data: { closedAt: now },
         }),
       ),
     );
-
-    if (resolvedIdentityKeys.length > 0) {
-      await tx.caseIdentityCollision.updateMany({
-        where: {
-          suiteId,
-          kind: 'identity',
-          key: { in: [...resolvedIdentityKeys] },
-          closedAt: null,
-        },
-        data: { closedAt: now },
-      });
-    }
-
-    if (resolvedLegacyKeys.length > 0) {
-      await tx.caseIdentityCollision.updateMany({
-        where: {
-          suiteId,
-          kind: 'legacy_key',
-          key: { in: [...resolvedLegacyKeys] },
-          closedAt: null,
-        },
-        data: { closedAt: now },
-      });
-    }
   }
 
   private async migrateAutomationKeys(

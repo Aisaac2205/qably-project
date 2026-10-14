@@ -190,9 +190,10 @@ export class RunsController {
     }));
 
     const caseIdentityCollisions = groups.flatMap((group) =>
-      findCaseIdentityCollisions(group.cases).map((collision) => ({
+      findCaseIdentityCollisions(group.cases).map(({ key, count }) => ({
         suiteName: rejectedSuiteLabel(group),
-        ...collision,
+        key,
+        count,
       })),
     );
 

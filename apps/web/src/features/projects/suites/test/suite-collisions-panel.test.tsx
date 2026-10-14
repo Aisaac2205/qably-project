@@ -19,6 +19,7 @@ const legacyCollision: SuiteCollision = {
   kind: 'legacy_key',
   key: 'test_create',
   claimantCount: 2,
+  claimants: ['tests.ClassA::test_create', 'tests.ClassB::test_create'],
   lastSeenAt: '2026-10-12T09:00:00.000Z',
   lastRunId: 'run-9',
 }
@@ -28,6 +29,11 @@ const identityCollision: SuiteCollision = {
   kind: 'identity',
   key: 'tests.checkout::test_add_item',
   claimantCount: 3,
+  claimants: [
+    'tests.checkout::test_add_item',
+    'tests.checkout › test_add_item',
+    'tests.checkout.cart › test_add_item',
+  ],
   lastSeenAt: '2026-10-11T09:00:00.000Z',
   lastRunId: null,
 }

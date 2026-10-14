@@ -644,7 +644,7 @@ describe('RunsController.ingestJunit', () => {
 
   it('reports truncated field counts in the 202 body', async () => {
     const { controller } = build();
-    const longName = 'x'.repeat(200);
+    const longName = 'x'.repeat(400);
     const oversizedReport = `<testsuite name="Checkout"><testcase name="${longName}"/></testsuite>`;
 
     const result = await controller.ingestJunit(

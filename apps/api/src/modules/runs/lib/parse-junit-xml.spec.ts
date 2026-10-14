@@ -114,13 +114,30 @@ describe('parseJunitXml', () => {
   });
 
   it('truncates names to the ingestion limit', () => {
-    const long = 'x'.repeat(200);
+    const long = 'x'.repeat(500);
     const report = parseJunitXml(
       `<testsuite name="${long}"><testcase name="${long}"/></testsuite>`,
     );
 
     expect(report.suiteName).toHaveLength(120);
-    expect(report.cases[0].name).toHaveLength(120);
+    expect(report.cases[0].name).toHaveLength(372);
+  });
+
+  it('keeps a long parametrized title whole so rows that differ late stay distinct', () => {
+    const prefix =
+      'SuiteListQueryService.page bounded reads reads the suites once, the case counts once and the run windows once for sort ';
+    const report = parseJunitXml(
+      `<testsuite name="S">
+        <testcase name="${prefix}createdAt and status all with 1 suites"/>
+        <testcase name="${prefix}cases and status all with 1 suites"/>
+      </testsuite>`,
+    );
+
+    expect(report.cases.map((testCase) => testCase.name)).toEqual([
+      `${prefix}createdAt and status all with 1 suites`,
+      `${prefix}cases and status all with 1 suites`,
+    ]);
+    expect(report.truncatedFieldCounts.name).toBeUndefined();
   });
 
   it('keeps the untruncated suite name as the grouping key', () => {
@@ -136,7 +153,7 @@ describe('parseJunitXml', () => {
 
   it('truncates on code points so a surrogate pair is never split', () => {
     const emoji = String.fromCodePoint(0x1f600);
-    const name = `${'a'.repeat(119)}${emoji}${emoji}`;
+    const name = `${'a'.repeat(371)}${emoji}${emoji}`;
     const details = `${'b'.repeat(3999)}${emoji}${emoji}`;
     const report = parseJunitXml(
       `<testsuite name="S"><testcase name="${name}"><failure message="m">${details}</failure></testcase></testsuite>`,
@@ -144,7 +161,7 @@ describe('parseJunitXml', () => {
 
     const parsed = report.cases[0];
     expect(hasLoneSurrogate(parsed.name)).toBe(false);
-    expect(Array.from(parsed.name)).toHaveLength(120);
+    expect(Array.from(parsed.name)).toHaveLength(372);
     expect(hasLoneSurrogate(parsed.failureDetails ?? '')).toBe(false);
     expect(Array.from(parsed.failureDetails ?? '')).toHaveLength(4000);
   });
@@ -156,7 +173,7 @@ describe('parseJunitXml', () => {
   });
 
   it('counts a truncated case name', () => {
-    const long = 'x'.repeat(200);
+    const long = 'x'.repeat(400);
     const report = parseJunitXml(
       `<testsuite name="S"><testcase name="${long}"/></testsuite>`,
     );
@@ -165,7 +182,7 @@ describe('parseJunitXml', () => {
   });
 
   it('counts each truncated case name independently', () => {
-    const long = 'x'.repeat(200);
+    const long = 'x'.repeat(400);
     const report = parseJunitXml(
       `<testsuite name="S"><testcase name="${long}a"/><testcase name="${long}b"/></testsuite>`,
     );
@@ -174,7 +191,7 @@ describe('parseJunitXml', () => {
   });
 
   it('counts a truncated classname separately from a truncated name', () => {
-    const longName = 'x'.repeat(200);
+    const longName = 'x'.repeat(400);
     const longClass = 'y'.repeat(300);
     const report = parseJunitXml(
       `<testsuite name="S"><testcase name="${longName}" classname="${longClass}"/></testsuite>`,

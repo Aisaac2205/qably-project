@@ -164,12 +164,6 @@ export class RunsService {
         select: RUN_SELECT,
       });
 
-      const resolvedLegacyKeys = [
-        ...new Set(input.cases.map((testCase) => testCase.name)),
-      ].filter(
-        (name) => !legacyKeys.some((collision) => collision.key === name),
-      );
-
       await this.officialCaseReconciler.syncCollisions(
         tx,
         apiKey.projectId,
@@ -177,8 +171,6 @@ export class RunsService {
         run.id,
         identityKeys,
         legacyKeys,
-        [...testCaseIdByIdentity.keys()],
-        resolvedLegacyKeys,
       );
 
       // A re-report replaces every row, so the catalog content the run already

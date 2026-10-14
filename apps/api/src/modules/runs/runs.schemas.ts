@@ -1,10 +1,11 @@
 import { z } from 'zod';
+import { MAX_CASE_NAME_LENGTH } from './lib/case-identity';
 
 const externalId = z.string().trim().min(1);
 const runSource = z.enum(['api', 'github_actions']);
 const runName = z.string().trim().min(1).max(200);
 const suiteName = z.string().trim().min(1).max(120);
-const caseName = z.string().trim().min(1).max(120);
+const caseName = z.string().trim().min(1).max(MAX_CASE_NAME_LENGTH);
 const steps = z.array(z.string().trim().min(1).max(500)).max(50);
 const expectedResult = z.string().trim().max(1000);
 const caseStatus = z.enum([
