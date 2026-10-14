@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DomainEventsModule } from './common/events/domain-events.module';
+import { QueueWorkersModule } from './common/queue/queue-workers.module';
 import { ThrottlingModule } from './common/throttler/throttling.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -42,6 +43,7 @@ import { SuitesModule } from './modules/suites/suites.module';
     ChatModule,
     DashboardModule,
     ReporterModule,
+    QueueWorkersModule,
   ],
 })
 export class AppModule {}

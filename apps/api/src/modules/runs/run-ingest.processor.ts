@@ -1,6 +1,6 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { UnrecoverableError, type Job } from 'bullmq';
+import { OnDemandProcessor } from '../../common/queue/on-demand-processor.decorator';
 import { isErr } from '../../common/result';
 import { ReportBatchService } from './report-batch.service';
 import {
@@ -12,16 +12,14 @@ import {
 } from './runs.contracts';
 import { RunsService } from './runs.service';
 
-@Processor(RUN_INGEST_QUEUE, { concurrency: 4 })
-export class RunIngestProcessor extends WorkerHost {
+@OnDemandProcessor(RUN_INGEST_QUEUE, { concurrency: 4 })
+export class RunIngestProcessor {
   private readonly logger = new Logger(RunIngestProcessor.name);
 
   constructor(
     private readonly runs: RunsService,
     private readonly reportBatch: ReportBatchService,
-  ) {
-    super();
-  }
+  ) {}
 
   async process(job: Job<RunQueueJobData>): Promise<void> {
     if (job.name === REPORT_BATCH_TIMEOUT_JOB) {

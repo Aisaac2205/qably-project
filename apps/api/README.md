@@ -40,6 +40,14 @@ Asynchronous workflows run on BullMQ backed by Redis. There is one queue per wor
 
 The JUnit XML body is parsed and validated in the HTTP handler with `fast-xml-parser`, and the endpoint answers `202 Accepted` once the parsed suite groups are queued. `POST /runs/ingest` runs the ingest synchronously and answers `200`.
 
+Workers run on demand, so an idle API sends no periodic commands to Redis and both services can sleep. Processors are declared with `@OnDemandProcessor` (`src/common/queue/`) instead of `@Processor` from `@nestjs/bullmq`, and `OnDemandWorkers` manages one worker per queue:
+
+- **Start**: a worker starts when the API process adds a job to its queue (`add` or `addBulk`), and at boot when the queue already holds waiting, active, delayed, prioritized, or waiting-children jobs.
+- **Stop**: once the worker is drained and those counts are all zero for a 30 second idle grace, it closes. Delayed jobs, such as backoff retries and the report batch timeout, keep it running until they are processed.
+- **Shutdown**: running workers close with the application.
+
+Jobs enqueued from outside the API process, for example by `scripts/reclassify-pending-proposals.ts`, are only picked up at the next API boot or the next in-process enqueue on the same queue.
+
 ## Database and Persistence
 
 The service uses PostgreSQL managed through Prisma ORM with the `@prisma/adapter-pg` driver. Schema definitions, indexes, and migrations reside under `prisma/`.
