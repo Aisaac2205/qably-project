@@ -14,11 +14,11 @@ interface SuiteCollisionsPanelProps {
   projectId: string
   suiteId: string
   openCollisions: number | undefined
-  /** The open keys; only the single-suite view carries them. */
+  /** The open collisions; only the single-suite view carries them. */
   collisions?: SuiteCollision[]
 }
 
-const KIND_EXPLANATION_KEY = {
+const KIND_LEAD_IN_KEY = {
   identity: 'suites.collisionKindIdentity',
   legacy_key: 'suites.collisionKindLegacyKey',
 } as const
@@ -37,6 +37,10 @@ export function SuiteCollisionsPanel({
   if (openCollisions === undefined || openCollisions === 0) return null
 
   const pendingId = dismiss.isPending ? dismiss.variables?.collisionId : undefined
+  const hasList = collisions !== undefined && collisions.length > 0
+  const unlinkedTests = hasList
+    ? collisions.reduce((total, collision) => total + collision.claimantCount, 0)
+    : 0
 
   const handleDismiss = (collisionId: string) => {
     dismiss.mutate(
@@ -49,36 +53,65 @@ export function SuiteCollisionsPanel({
 
   return (
     <div className="space-y-3 rounded-lg border border-warn/40 bg-warn-bg/60 p-4">
-      <div className="space-y-1">
-        <div className="flex items-center gap-1.5">
-          <Warning size={14} weight="bold" className="shrink-0 text-warn" aria-hidden="true" />
+      <div role="status" className="space-y-1">
+        <div className="flex items-start gap-2">
+          <Warning size={16} weight="bold" className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
           <h3
             ref={titleRef}
             tabIndex={-1}
-            className="rounded-sm text-xs font-semibold text-warn outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="rounded-sm text-sm font-semibold text-default outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
-            {t('suites.openCollisionsTitle')}
+            {hasList
+              ? t('suites.openCollisionsTitle', { count: unlinkedTests })
+              : t('suites.openCollisionsTitleUnknown')}
           </h3>
         </div>
-        <p role="status" className="text-sm text-default leading-relaxed">
-          {t('suites.openCollisions', { count: openCollisions })}
+        <p className="text-sm text-default leading-relaxed text-wrap-pretty">
+          {t('suites.openCollisionsEffect')}
         </p>
       </div>
 
-      {collisions !== undefined && collisions.length > 0 ? (
+      {hasList ? (
         <ul className="divide-y divide-warn/20 border-y border-warn/20">
-          {collisions.map((collision) => (
-            <li key={collision.id} className="flex items-start gap-3 py-2.5">
-              <div className="min-w-0 flex-1 space-y-0.5">
-                <code className="block font-mono text-xs text-default break-all">
-                  {collision.key}
-                </code>
-                <p className="text-xs text-muted leading-relaxed">
-                  {t(KIND_EXPLANATION_KEY[collision.kind])}
-                </p>
+          {collisions.map((collision) => {
+            const listed = collision.claimants.length > 0 ? collision.claimants : [collision.key]
+            const unlisted =
+              collision.claimants.length > 0 ? collision.claimantCount - collision.claimants.length : 0
+
+            return (
+              <li key={collision.id} className="space-y-2 py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <p className="text-sm text-default leading-relaxed text-wrap-pretty">
+                    {t(KIND_LEAD_IN_KEY[collision.kind])}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    aria-label={t('suites.dismissCollisionLabel', { key: collision.key })}
+                    aria-describedby={hintId}
+                    disabled={pendingId === collision.id}
+                    onClick={() => handleDismiss(collision.id)}
+                    className="shrink-0 self-start"
+                  >
+                    {t('suites.dismissCollision')}
+                  </Button>
+                </div>
+                <ul aria-label={t('suites.collisionClaimantsLabel')} className="space-y-1">
+                  {listed.map((name, index) => (
+                    <li key={`${index}-${name}`}>
+                      <code className="inline-block max-w-full rounded-sm bg-surface px-1.5 py-0.5 font-mono text-xs text-default break-words">
+                        {name}
+                      </code>
+                    </li>
+                  ))}
+                </ul>
+                {unlisted > 0 ? (
+                  <p className="text-xs text-muted">
+                    {t('suites.collisionClaimantsMore', { count: unlisted })}
+                  </p>
+                ) : null}
                 <p className="text-xs text-muted tabular-nums">
-                  {t('suites.collisionClaimants', { count: collision.claimantCount })}
-                  {' · '}
                   {t('suites.collisionLastSeen', {
                     when: formatRelative(collision.lastSeenAt, locale, t('suites.never')),
                   })}
@@ -94,27 +127,15 @@ export function SuiteCollisionsPanel({
                     </>
                   )}
                 </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                aria-label={t('suites.dismissCollisionLabel', { key: collision.key })}
-                aria-describedby={hintId}
-                disabled={pendingId === collision.id}
-                onClick={() => handleDismiss(collision.id)}
-                className="shrink-0"
-              >
-                {t('suites.dismissCollision')}
-              </Button>
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       ) : null}
 
       <div className="space-y-0.5">
         <p className="text-xs text-muted leading-relaxed">{t('suites.openCollisionsHint')}</p>
-        {collisions !== undefined && collisions.length > 0 ? (
+        {hasList ? (
           <p id={hintId} className="text-xs text-muted leading-relaxed">
             {t('suites.dismissCollisionHint')}
           </p>
