@@ -8,7 +8,9 @@ import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ApprovalConflictDiagnoser } from './approval-conflict-diagnoser';
 import type {
+  ApplyTo,
   ApprovalError,
+  ApprovalInput,
   ApprovalView,
   DecisionInput,
   LastDecisionView,
@@ -43,6 +45,15 @@ const PROPOSAL_SELECT = {
   evidence: { select: { id: true } },
   codeChange: { select: { filePath: true } },
   targetTestCase: { select: { automationFilePath: true, suiteId: true } },
+  duplicateKind: true,
+  matchedCase: {
+    select: {
+      id: true,
+      projectId: true,
+      suiteId: true,
+      automationFilePath: true,
+    },
+  },
 } as const;
 
 interface ProposalRow {
@@ -66,11 +77,53 @@ interface ProposalRow {
     automationFilePath: string | null;
     suiteId: string;
   } | null;
+  duplicateKind: string | null;
+  matchedCase: {
+    id: string;
+    projectId: string;
+    suiteId: string;
+    automationFilePath: string | null;
+  } | null;
 }
 
 function toDecidedAction(action: string): 'approved' | 'rejected' {
   if (action === 'approved' || action === 'rejected') return action;
   throw new Error(`Unexpected review decision action: ${action}`);
+}
+
+/**
+ * Resolves the reviewer's choice into the proposal the rest of the approval
+ * works on. Applying a possible duplicate to its matched case is the same as
+ * approving an update, so the proposal is pointed at that case. Anything the
+ * proposal cannot honour is refused instead of silently creating a case.
+ */
+function applyChoice(
+  proposal: ProposalRow,
+  applyTo: ApplyTo | undefined,
+): Result<ProposalRow, 'invalid-apply-target'> {
+  if (applyTo === undefined) return ok(proposal);
+  if (proposal.targetTestCaseId !== null) return err('invalid-apply-target');
+  if (applyTo === 'new-case') return ok(proposal);
+
+  const matched = proposal.matchedCase;
+
+  if (
+    proposal.duplicateKind !== 'possible_duplicate' ||
+    matched === null ||
+    matched.projectId !== proposal.projectId
+  ) {
+    return err('invalid-apply-target');
+  }
+
+  return ok({
+    ...proposal,
+    targetTestCaseId: matched.id,
+    suiteId: matched.suiteId,
+    targetTestCase: {
+      automationFilePath: matched.automationFilePath,
+      suiteId: matched.suiteId,
+    },
+  });
 }
 
 function automationFieldsFor(proposal: ProposalRow): Record<string, string> {
@@ -123,13 +176,17 @@ export class ReviewDecisionService {
   async approve(
     org: OrgContext,
     proposalId: string,
-    input: DecisionInput,
+    input: ApprovalInput,
   ): Promise<Result<ApprovalView, ApprovalError>> {
-    const proposal = await this.pending(org, proposalId);
+    const pending = await this.pending(org, proposalId);
+
+    if (!pending.ok) return pending;
+    if (pending.value.evidence === null) return err('missing-evidence');
+    if (pending.value.steps.length === 0) return err('incomplete-proposal');
+
+    const proposal = applyChoice(pending.value, input.applyTo);
 
     if (!proposal.ok) return proposal;
-    if (proposal.value.evidence === null) return err('missing-evidence');
-    if (proposal.value.steps.length === 0) return err('incomplete-proposal');
 
     const target = proposal.value.targetTestCaseId;
     const suiteId =

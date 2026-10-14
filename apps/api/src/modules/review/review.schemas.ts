@@ -5,6 +5,10 @@ export const decisionSchema = z.object({
   comment: z.string().trim().min(1).max(1000).optional(),
 });
 
+export const approveSchema = decisionSchema.extend({
+  applyTo: z.enum(['matched-case', 'new-case']).optional(),
+});
+
 export const documentFilesBodySchema = z
   .object({
     mode: z
@@ -42,6 +46,7 @@ export const reviewInboxCountsQuerySchema = z.object({
 });
 
 export type DecisionBody = z.infer<typeof decisionSchema>;
+export type ApproveBody = z.infer<typeof approveSchema>;
 export type ReviewInboxQuery = z.infer<typeof reviewInboxQuerySchema>;
 export type ReviewInboxCountsQuery = z.infer<
   typeof reviewInboxCountsQuerySchema

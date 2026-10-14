@@ -22,6 +22,8 @@ export interface InboxSuite {
 
 export interface InboxClassification extends ProposalClassification {
   matchedCaseName: string | null;
+  /** Where the matched case lives, so the inbox can link straight to it. */
+  matchedCaseSuiteId: string | null;
 }
 
 export interface InboxItem extends ProposalView {
@@ -97,21 +99,9 @@ export type ReviewInboxDuplicateKindCounts = Record<
   number
 >;
 
-export interface OpenCollisionSuite {
-  suiteId: string;
-  suiteName: string;
-  projectId: string;
-  projectName: string;
-  /** Open collision rows (colliding keys) the suite holds. */
-  count: number;
-}
-
 export interface ReviewInboxCounts {
   byStatus: ReviewInboxStatusCounts;
   byDuplicateKind: ReviewInboxDuplicateKindCounts;
-  /** Suites with at least one open collision: `openCollisionSuites.length`. */
-  openCollisions: number;
-  openCollisionSuites: OpenCollisionSuite[];
   version: string;
 }
 
@@ -163,11 +153,25 @@ export interface ApprovalConflict {
   readonly conflictingCase: ReviewConflictingCase | null;
 }
 
-export type ApprovalError = ReviewError | ApprovalConflict;
+export type ApprovalError =
+  | ReviewError
+  | 'invalid-apply-target'
+  | ApprovalConflict;
 
 export interface DecisionInput {
   actorId: string;
   comment?: string;
+}
+
+/**
+ * Where an approved proposal lands. `matched-case` publishes it as a new
+ * version of the case a possible duplicate was matched to; `new-case` keeps
+ * the default of creating a case of its own.
+ */
+export type ApplyTo = 'matched-case' | 'new-case';
+
+export interface ApprovalInput extends DecisionInput {
+  applyTo?: ApplyTo;
 }
 
 export interface ApprovalView {

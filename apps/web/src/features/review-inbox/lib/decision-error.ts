@@ -9,6 +9,7 @@ export type DecisionErrorCode =
   | 'automation-key-taken'
   | 'publish-conflict'
   | 'incomplete-proposal'
+  | 'invalid-apply-target'
   | 'rate-limited'
   | 'error'
 
@@ -20,6 +21,7 @@ const DECISION_ERROR_KEYS: Record<DecisionErrorCode, string> = {
   'automation-key-taken': 'decisionAutomationKeyTaken',
   'publish-conflict': 'decisionPublishConflict',
   'incomplete-proposal': 'decisionIncompleteProposal',
+  'invalid-apply-target': 'decisionNoMatchedCase',
   'rate-limited': 'decisionRateLimited',
   error: 'decisionError',
 }
@@ -45,6 +47,7 @@ export function classifyDecisionError(error: unknown): DecisionErrorCode {
       case 'automation-key-taken':
       case 'publish-conflict':
       case 'incomplete-proposal':
+      case 'invalid-apply-target':
         return error.code
     }
   }

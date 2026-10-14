@@ -734,6 +734,9 @@ model CaseIdentityCollision {
   kind          CaseCollisionKind
   key           String
   claimantCount Int
+  // The first few claimants, named as a person would, so the suite page can say
+  // which tests were left unlinked. `claimantCount` stays the true total.
+  claimants     String[]          @default([])
   firstSeenAt   DateTime          @default(now())
   lastSeenAt    DateTime          @default(now())
   lastRunId     String?

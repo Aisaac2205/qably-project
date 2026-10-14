@@ -163,15 +163,15 @@ describe('SuiteDetail (redesigned)', () => {
     expect(screen.queryByRole('group', { name: /quality signals/i })).not.toBeInTheDocument()
   })
 
-  it('tells how many proposals of the suite are waiting in the review inbox', async () => {
+  it('tells how many proposed new cases of the suite are waiting in the review inbox', async () => {
     vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
-      { ...createMockSuite({ id: 'suite-1', projectId: 'proj-1' }), pendingProposals: 4 },
+      { ...createMockSuite({ id: 'suite-1', projectId: 'proj-1' }), newCaseProposals: 4 },
     )
 
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })
 
     expect(
-      await screen.findByText('4 proposals for this suite are waiting for review.'),
+      await screen.findByText('4 proposed new cases are waiting for review.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /open review inbox/i })).toHaveAttribute(
       'href',
@@ -179,9 +179,9 @@ describe('SuiteDetail (redesigned)', () => {
     )
   })
 
-  it('shows no review notice when nothing of the suite is waiting', async () => {
+  it('shows no review notice when no new case of the suite is waiting', async () => {
     vi.spyOn(suitesApiStub, 'getSuite').mockResolvedValue(
-      { ...createMockSuite({ id: 'suite-1', projectId: 'proj-1' }), pendingProposals: 0 },
+      { ...createMockSuite({ id: 'suite-1', projectId: 'proj-1' }), newCaseProposals: 0 },
     )
 
     await act(async () => { renderWithQuery(<SuiteDetail projectId="proj-1" suiteId="suite-1" />) })

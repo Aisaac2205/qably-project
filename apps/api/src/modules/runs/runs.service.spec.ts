@@ -2092,7 +2092,7 @@ describe('RunsService.ingest case identity collisions', () => {
     expect(call.create.lastRunId).toBe('run-1');
   });
 
-  it('closes a previously open collision for a key that resolves unambiguously on this ingest', async () => {
+  it('closes the open collisions of the suite that this report no longer produces', async () => {
     const prisma = createPrisma();
 
     await build(prisma).ingest(apiKey, baseInput);
@@ -2101,7 +2101,41 @@ describe('RunsService.ingest case identity collisions', () => {
       where: {
         suiteId: 'suite-1',
         kind: 'identity',
-        key: { in: ['Adds to cart'] },
+        key: { notIn: [] },
+        closedAt: null,
+      },
+      data: { closedAt: expect.any(Date) as Date },
+    });
+  });
+
+  it('keeps a collision open while the report still carries it', async () => {
+    const prisma = createPrisma();
+    prisma.testCase.findMany.mockResolvedValue([]);
+
+    await build(prisma).ingest(apiKey, {
+      ...baseInput,
+      cases: [
+        {
+          name: 'tests.checkout.test_checkout::test_add_item',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+        {
+          name: 'test_add_item',
+          className: 'tests.checkout.test_checkout',
+          steps: [],
+          expectedResult: '',
+          status: 'pass',
+        },
+      ],
+    });
+
+    expect(prisma.caseIdentityCollision.updateMany).toHaveBeenCalledWith({
+      where: {
+        suiteId: 'suite-1',
+        kind: 'identity',
+        key: { notIn: ['tests.checkout.test_checkout::test_add_item'] },
         closedAt: null,
       },
       data: { closedAt: expect.any(Date) as Date },
@@ -2137,7 +2171,7 @@ describe('RunsService.ingest case identity collisions', () => {
       where: {
         suiteId: 'suite-1',
         kind: 'legacy_key',
-        key: { in: ['test_create'] },
+        key: { notIn: [] },
         closedAt: null,
       },
       data: { closedAt: expect.any(Date) as Date },

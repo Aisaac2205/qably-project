@@ -26,6 +26,6 @@ describe('project routes', () => {
   })
 
   it('scopes the review inbox to a project with a query filter', () => {
-    expect(reviewInboxPath('proj-1')).toBe('/review-inbox?project=proj-1')
+    expect(reviewInboxPath('proj-1')).toBe('/review-inbox?projectId=proj-1')
   })
 })

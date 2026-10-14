@@ -1,8 +1,9 @@
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { normalizeAutomationFilePath } from '../../../common/paths/normalize-automation-file-path';
 import { truncateTo } from '../../../common/text/truncate-to';
+import { MAX_CASE_NAME_LENGTH } from './case-identity';
 
-const MAX_NAME_LENGTH = 120;
+const MAX_SUITE_NAME_LENGTH = 120;
 const MAX_CLASS_NAME_LENGTH = 250;
 const MAX_FILE_PATH_LENGTH = 500;
 const MAX_FAILURE_MESSAGE_LENGTH = 1000;
@@ -50,7 +51,7 @@ class TruncationCounter {
   trackSuiteName(rawSuiteKey: string): void {
     if (this.seenSuiteKeys.has(rawSuiteKey)) return;
     this.seenSuiteKeys.add(rawSuiteKey);
-    this.track('suiteName', rawSuiteKey, MAX_NAME_LENGTH);
+    this.track('suiteName', rawSuiteKey, MAX_SUITE_NAME_LENGTH);
   }
 
   toRecord(): Record<string, number> {
@@ -116,8 +117,8 @@ function readAttribute(node: RawNode, attribute: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-function truncate(value: string): string {
-  return truncateTo(value, MAX_NAME_LENGTH);
+function truncateSuiteName(value: string): string {
+  return truncateTo(value, MAX_SUITE_NAME_LENGTH);
 }
 
 function firstChild(node: RawNode, tag: string): RawNode | string | undefined {
@@ -268,7 +269,7 @@ function collectCases(
   const ownName = readAttribute(node, 'name');
   const suiteKey =
     ownName === '' ? parentSuiteKey : truncateTo(ownName, MAX_SUITE_KEY_LENGTH);
-  const suiteName = truncate(suiteKey);
+  const suiteName = truncateSuiteName(suiteKey);
 
   if (ownName !== '') counter.trackSuiteName(suiteKey);
 
@@ -332,7 +333,7 @@ export function parseJunitXml(xml: string): JunitReport {
     const filePath = normalizeAutomationFilePath(readAttribute(raw, 'file'));
     const durationMs = parseDurationMs(readAttribute(raw, 'time'));
 
-    counter.track('name', name, MAX_NAME_LENGTH);
+    counter.track('name', name, MAX_CASE_NAME_LENGTH);
     if (className !== '') {
       counter.track('className', className, MAX_CLASS_NAME_LENGTH);
     }
@@ -341,7 +342,7 @@ export function parseJunitXml(xml: string): JunitReport {
     }
 
     cases.push({
-      name: truncate(name),
+      name: truncateTo(name, MAX_CASE_NAME_LENGTH),
       suiteName,
       suiteKey,
       status: outcome.status,
@@ -368,7 +369,7 @@ export function parseJunitXml(xml: string): JunitReport {
     cases[0].suiteKey;
 
   return {
-    suiteName: truncate(suiteKey),
+    suiteName: truncateSuiteName(suiteKey),
     suiteKey,
     cases,
     truncatedFieldCounts: counter.toRecord(),

@@ -19,6 +19,12 @@ describe('classifyDecisionError', () => {
     expect(classifyDecisionError(error)).toBe('invalid-transition')
   })
 
+  it('maps a refused apply target to its own code', () => {
+    const error = new ApiError(422, 'Unprocessable', 'invalid-apply-target')
+
+    expect(classifyDecisionError(error)).toBe('invalid-apply-target')
+  })
+
   it('falls back to error for an ApiError with an unrecognized code', () => {
     const error = new ApiError(500, 'Server error', 'something-else')
 
@@ -60,6 +66,7 @@ describe('isApprovalConflictCode', () => {
     'missing-evidence',
     'missing-suite',
     'incomplete-proposal',
+    'invalid-apply-target',
     'rate-limited',
     'error',
   ] as const)('does not treat %s as an approval conflict', (code) => {
@@ -74,6 +81,10 @@ describe('decisionErrorKey', () => {
 
   it('maps incomplete-proposal to its own i18n key', () => {
     expect(decisionErrorKey('incomplete-proposal')).toBe('decisionIncompleteProposal')
+  })
+
+  it('maps invalid-apply-target to its own i18n key', () => {
+    expect(decisionErrorKey('invalid-apply-target')).toBe('decisionNoMatchedCase')
   })
 
   it('maps rate-limited to its own i18n key', () => {
@@ -121,6 +132,7 @@ describe('decision error copy', () => {
     'automation-key-taken',
     'publish-conflict',
     'incomplete-proposal',
+    'invalid-apply-target',
     'rate-limited',
     'error',
   ]

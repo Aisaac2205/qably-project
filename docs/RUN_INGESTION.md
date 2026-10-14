@@ -212,9 +212,29 @@ and Maven surefire reports — where `classname` is a separate, meaningful packa
 one official case per file, not one shared case for every file that happens to have a
 `test_add_item`. jest-junit and vitest, which already report `classname` equal to (or a prefix of)
 `name`, are unaffected: the identity stays the plain `name`, exactly as before this changed. The prefix
-comparison is truncation-aware — `name` truncates at 120 characters and `classname` at 250, so a title
-over 120 characters where both fields were originally identical is still recognized as the same case,
+comparison is truncation-aware — `name` truncates at 372 characters and `classname` at 250, so a title
+over 250 characters where both fields were originally identical is still recognized as the same case,
 not misread as a composite.
+
+**A long parametrized title keeps its own identity.** `name` used to truncate at 120 characters, so the
+rows of an `it.each` whose varying part sits past that point (jest-junit reports
+`<describe chain> <title>`, which is easily over 120) all cut to the same key and were reported as a
+collision, with their results left unlinked, though nothing in the code was wrong. The cap is now 372
+characters (`MAX_CASE_NAME_LENGTH` in `case-identity.ts`, also the case `name` limit of
+`POST /runs/ingest`): the key the extraction reads back stops at 372, and the longest composite key
+(250 + `::` + 372) stays under the btree entry limit of the unique `(suiteId, automationKey)` index. A
+name past 372 characters is still cut, and `truncatedFields.name` in the `202` body counts it.
+
+**Cases created under the old cut are claimed once, and only when that is unambiguous.** A catalog case
+created while names were still cut at 120 characters is keyed by the cut form
+(`findLegacyTruncatedClaims`). When exactly one test in the report would have been cut to a case's
+`automationKey`, the reconciler matches that case and moves its `automationKey` to the full key in the
+same transaction, the same migration the legacy bare-name rows get, so its history and results carry
+over. When several tests in the report share the cut form (the `it.each` rows), nothing says which one
+the old case was: the case is left untouched, no collision is raised, and each row is matched or
+created under its own full key. The old case then stays in the catalog without new results and can be
+deleted by hand. A test whose full name is exactly the old cut key keeps that case, and a longer test
+never takes it from it.
 
 **Legacy rows are durably migrated on an unambiguous claim.** Matching tries the composite identity
 first, then falls back to the legacy (name-only) key — the same two-step migration pattern
@@ -277,16 +297,23 @@ the colliding cases are left unlinked until a human renames one of them.
 `identity` for an in-batch collision and `legacy_key` for a legacy-row collision.
 `OfficialCaseReconciler.syncCollisions` writes them in the ingest transaction on the worker, after the
 run upsert. It upserts a row for every collision the report carries: `claimantCount`, `lastSeenAt` and
-`lastRunId` follow the latest report, and an upsert reopens a row that had been closed. It sets
-`closedAt` on the open rows whose key the report resolved without a collision: for `identity`, a key
-the report matched or created; for `legacy_key`, a reported case name that is not a collision in that
-report. A row therefore closes on its own only when a later report for the same suite carries that key
-or name again; a collision whose tests were renamed away or deleted is closed by hand with
-`POST /suites/:id/collisions/:collisionId/dismiss`, which sets `closedAt` on that row when it belongs to
-the suite in the caller's organization (`404` otherwise, `204` on success, idempotent on a row already
-closed). Dismissing is safe: a later report that still collides upserts the row again and reopens it.
+`lastRunId` follow the latest report, and an upsert reopens a row that had been closed. A row also
+records `claimants`, the first ten colliding tests named as a person would (`<className> › <name>`, or
+the identity keys for a `legacy_key` row), while `claimantCount` stays the true total.
+
+**A report is the suite's current state, so it closes every collision it no longer carries.** After the
+upserts, `syncCollisions` sets `closedAt` on every other open row of the suite, per kind: the keys the
+report resolved, and the keys it does not mention at all (the tests were renamed or deleted, which no
+later report could ever "resolve"). Without that, a rename left the old row open forever. The rule is
+safe to apply because it is reversible: a report that still collides on the key upserts the row again
+and clears `closedAt`. The cost is a report that merely omits the colliding tests (a filtered local run,
+a shard reporting into the same suite) hides the row until the next report that carries them. A
+collision can also be closed by hand with `POST /suites/:id/collisions/:collisionId/dismiss`, which
+sets `closedAt` on that row when it belongs to the suite in the caller's organization (`404`
+otherwise, `204` on success, idempotent on a row already closed); a later report that still collides
+reopens it.
 The single-suite view (`GET /suites/:id`, and every endpoint that answers with one suite) also carries
-`collisions`, the open rows themselves (`id`, `kind`, `key`, `claimantCount`, `lastSeenAt`,
+`collisions`, the open rows themselves (`id`, `kind`, `key`, `claimantCount`, `claimants`, `lastSeenAt`,
 `lastRunId`), newest first, which the suite page lists with a dismiss action per key. The open rows
 (`closedAt IS NULL`) are what the product shows: `openCollisions` on each suite view (`GET /suites`,
 `GET /suites/:id`), which counts colliding keys, and in the review inbox counts

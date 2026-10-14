@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { ProposalListItem } from '../api/review.api'
 import { ReviewQueueRow } from '../components/review-queue-row'
@@ -49,6 +50,7 @@ describe('ReviewQueueRow', () => {
             kind: 'update',
             matchedCaseId: 'case-1',
             matchedCaseName: null,
+            matchedCaseSuiteId: null,
             score: 1,
             reasons: ['same-automation-key'],
           },
@@ -70,6 +72,7 @@ describe('ReviewQueueRow', () => {
             kind: 'possible_duplicate',
             matchedCaseId: 'case-2',
             matchedCaseName: null,
+            matchedCaseSuiteId: null,
             score: 0.72,
             reasons: ['same-title'],
           },
@@ -92,6 +95,7 @@ describe('ReviewQueueRow', () => {
             kind: 'update',
             matchedCaseId: 'case-1',
             matchedCaseName: 'Empties the cart',
+            matchedCaseSuiteId: null,
             score: 1,
             reasons: ['same-automation-key'],
           },
@@ -112,6 +116,7 @@ describe('ReviewQueueRow', () => {
             kind: 'possible_duplicate',
             matchedCaseId: 'case-2',
             matchedCaseName: 'Checks the login flow',
+            matchedCaseSuiteId: null,
             score: 0.72,
             reasons: ['same-title'],
           },
@@ -153,6 +158,75 @@ describe('ReviewQueueRow', () => {
     )
 
     expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
+})
+
+describe('ReviewQueueRow matched case link', () => {
+  const matched = {
+    matchedCaseId: 'case-2',
+    matchedCaseName: 'Checks the login flow',
+    matchedCaseSuiteId: 'suite-7',
+    score: 0.72,
+    reasons: ['same-title'],
+  } as const
+
+  function renderRow(kind: 'update' | 'possible_duplicate', overrides = {}) {
+    const onSelect = vi.fn()
+    render(
+      <ReviewQueueRow
+        proposal={proposal({
+          classification: { kind, ...matched, reasons: ['same-title'], ...overrides },
+        })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    )
+    return onSelect
+  }
+
+  it.each([
+    ['possible_duplicate', 'Possible duplicate of Checks the login flow'],
+    ['update', 'Updates Checks the login flow'],
+  ] as const)('links the %s badge to the matched case in its suite', (kind, label) => {
+    renderRow(kind)
+
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute(
+      'href',
+      '/projects/project-1/suites/suite-7/edit?case=case-2',
+    )
+  })
+
+  it('keeps the link outside the selection button, since a link cannot live inside a button', () => {
+    renderRow('possible_duplicate')
+
+    const link = screen.getByRole('link', { name: /Possible duplicate of/ })
+
+    expect(link.closest('button')).toBeNull()
+  })
+
+  it('does not select the row when the badge is used', async () => {
+    const user = userEvent.setup()
+    const onSelect = renderRow('possible_duplicate')
+
+    await user.click(screen.getByRole('link', { name: /Possible duplicate of/ }))
+
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('still selects the row from its button', async () => {
+    const user = userEvent.setup()
+    const onSelect = renderRow('possible_duplicate')
+
+    await user.click(screen.getByRole('button', { name: /Empties the cart/ }))
+
+    expect(onSelect).toHaveBeenCalledWith('proposal-1')
+  })
+
+  it('shows the badge as plain text when the matched case cannot be located', () => {
+    renderRow('possible_duplicate', { matchedCaseSuiteId: null })
+
+    expect(screen.getByText('Possible duplicate of Checks the login flow')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 })
 

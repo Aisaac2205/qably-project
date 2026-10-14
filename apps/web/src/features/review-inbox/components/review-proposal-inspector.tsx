@@ -9,8 +9,8 @@ import { ProposalContentSections } from './inspector/proposal-content-sections'
 import { InspectorEvidence } from './inspector/inspector-evidence'
 import { InspectorPublication } from './inspector/inspector-publication'
 import { DecisionToolbar } from './inspector/decision-toolbar'
-import type { InboxSuite, ProposalClassification } from '../api/review.api'
-import { resolveClassification } from '../lib/classification-reason'
+import type { ApplyTarget, InboxSuite, ProposalClassification } from '../api/review.api'
+import { matchedCaseHref, resolveClassification } from '../lib/classification-reason'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProposal } from '../hooks/use-proposals'
 
@@ -19,7 +19,7 @@ interface ReviewProposalInspectorProps {
     suite?: InboxSuite | null
     classification?: ProposalClassification
   }
-  onApprove: (id: string) => void
+  onApprove: (id: string, applyTo?: ApplyTarget) => void
   onReject: (id: string) => void
   isSubmitting?: boolean
   headingRef?: RefObject<HTMLHeadingElement | null>
@@ -61,7 +61,10 @@ export function ReviewProposalInspector({
         />
 
         {classification.kind !== 'none' && (
-          <DuplicateComparison classification={classification} />
+          <DuplicateComparison
+            classification={classification}
+            caseHref={matchedCaseHref(proposal.projectId, classification)}
+          />
         )}
 
         {needsManualReview && <ManualReviewNotice proposal={proposal} />}
@@ -91,6 +94,7 @@ export function ReviewProposalInspector({
       <DecisionToolbar
         proposal={proposal}
         project={project}
+        classification={classification}
         onApprove={onApprove}
         onReject={onReject}
         isSubmitting={isSubmitting}

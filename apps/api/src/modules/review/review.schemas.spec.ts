@@ -1,9 +1,33 @@
 import { encodeInboxCursor } from './lib/inbox-cursor';
 import {
+  approveSchema,
   documentFilesBodySchema,
   reviewInboxCountsQuerySchema,
   reviewInboxQuerySchema,
 } from './review.schemas';
+
+describe('approveSchema', () => {
+  it('leaves applyTo unset when the reviewer chose nothing', () => {
+    expect(approveSchema.parse({})).toEqual({});
+  });
+
+  it.each(['matched-case', 'new-case'] as const)(
+    'accepts applyTo %s',
+    (applyTo) => {
+      expect(approveSchema.parse({ applyTo }).applyTo).toBe(applyTo);
+    },
+  );
+
+  it('rejects any other target, including a raw case id', () => {
+    expect(() => approveSchema.parse({ applyTo: 'case-1' })).toThrow();
+  });
+
+  it('still takes the optional comment', () => {
+    expect(approveSchema.parse({ comment: ' Looks right ' })).toEqual({
+      comment: 'Looks right',
+    });
+  });
+});
 
 describe('documentFilesBodySchema', () => {
   it('defaults to undocumented mode when the body is omitted', () => {

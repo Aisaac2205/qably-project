@@ -22,6 +22,7 @@ export interface ProposalClassification {
   kind: ProposalDuplicateKind
   matchedCaseId: string | null
   matchedCaseName: string | null
+  matchedCaseSuiteId: string | null
   score: number | null
   reasons: DuplicateReason[]
 }
@@ -85,6 +86,17 @@ export interface ProposalDetail extends ProposalListItem {
   decision: LastDecisionView | null
 }
 
+/**
+ * Where an approved proposal lands: a new version of the case it was matched
+ * to, or a case of its own. Unset keeps the server default, a new case.
+ */
+export type ApplyTarget = 'matched-case' | 'new-case'
+
+export interface ApproveOptions {
+  comment?: string
+  applyTo?: ApplyTarget
+}
+
 export interface ApprovalResult {
   createdNewCase: boolean
   testCaseId: string
@@ -123,20 +135,8 @@ export type ReviewInboxStatusCounts = Record<
   number
 >
 
-export interface OpenCollisionSuite {
-  suiteId: string
-  suiteName: string
-  projectId: string
-  projectName: string
-  /** Open collision keys the suite holds. */
-  count: number
-}
-
 export interface ReviewInboxCountsResult {
   byStatus: ReviewInboxStatusCounts
-  /** Suites with at least one open collision. */
-  openCollisions: number
-  openCollisionSuites: OpenCollisionSuite[]
   version: string
 }
 
@@ -181,11 +181,14 @@ export function getProposal(
 
 export function approveProposal(
   id: string,
-  comment?: string,
+  { comment, applyTo }: ApproveOptions = {},
 ): Promise<ApprovalResult> {
   return apiRequest<ApprovalResult>(`/review/proposals/${id}/approve`, {
     method: 'POST',
-    body: comment === undefined ? {} : { comment },
+    body: {
+      ...(comment === undefined ? {} : { comment }),
+      ...(applyTo === undefined ? {} : { applyTo }),
+    },
   })
 }
 

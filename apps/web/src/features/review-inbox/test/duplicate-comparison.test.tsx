@@ -9,6 +9,7 @@ describe('DuplicateComparison', () => {
       kind: 'none',
       matchedCaseId: null,
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: null,
       reasons: [],
     }
@@ -23,6 +24,7 @@ describe('DuplicateComparison', () => {
       kind: 'update',
       matchedCaseId: 'case-1',
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: 1,
       reasons: ['same-automation-key'],
     }
@@ -39,6 +41,7 @@ describe('DuplicateComparison', () => {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-2',
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: 0.72,
       reasons: ['same-title', 'steps-overlap'],
     }
@@ -60,6 +63,7 @@ describe('DuplicateComparison', () => {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-2',
       matchedCaseName: 'Checks the login flow',
+      matchedCaseSuiteId: null,
       score: 0.72,
       reasons: ['same-title'],
     }
@@ -69,11 +73,49 @@ describe('DuplicateComparison', () => {
     expect(screen.getByText('Possible duplicate of Checks the login flow')).toBeInTheDocument()
   })
 
+  it('links the classification to the matched case when it can be located', () => {
+    const classification: ProposalClassification = {
+      kind: 'possible_duplicate',
+      matchedCaseId: 'case-2',
+      matchedCaseName: 'Checks the login flow',
+      matchedCaseSuiteId: 'suite-7',
+      score: 0.72,
+      reasons: ['same-title'],
+    }
+
+    render(
+      <DuplicateComparison
+        classification={classification}
+        caseHref="/projects/project-1/suites/suite-7/edit?case=case-2"
+      />,
+    )
+
+    expect(
+      screen.getByRole('link', { name: 'Possible duplicate of Checks the login flow' }),
+    ).toHaveAttribute('href', '/projects/project-1/suites/suite-7/edit?case=case-2')
+  })
+
+  it('shows plain text, never a dead link, when there is no case to open', () => {
+    const classification: ProposalClassification = {
+      kind: 'possible_duplicate',
+      matchedCaseId: null,
+      matchedCaseName: null,
+      matchedCaseSuiteId: null,
+      score: 0.72,
+      reasons: ['same-title'],
+    }
+
+    render(<DuplicateComparison classification={classification} caseHref={null} />)
+
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
+  })
+
   it('labels the reasons list with an accessible heading', () => {
     const classification: ProposalClassification = {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-2',
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: 0.72,
       reasons: ['same-title', 'steps-overlap'],
     }
@@ -88,6 +130,7 @@ describe('DuplicateComparison', () => {
       kind: 'update',
       matchedCaseId: 'case-1',
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: 1,
       reasons: ['same-automation-key', 'cross-suite-key'],
     }
@@ -105,6 +148,7 @@ describe('DuplicateComparison', () => {
       kind: 'update',
       matchedCaseId: 'case-1',
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: 1,
       reasons: ['same-automation-key'],
     }

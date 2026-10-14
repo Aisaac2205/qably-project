@@ -60,7 +60,14 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
     );
 
     expect(result.identityKeys).toEqual([
-      { key: 'tests.checkout.test_checkout::test_add_item', count: 2 },
+      {
+        key: 'tests.checkout.test_checkout::test_add_item',
+        count: 2,
+        claimants: [
+          'tests.checkout.test_checkout::test_add_item',
+          'tests.checkout.test_checkout › test_add_item',
+        ],
+      },
     ]);
   });
 
@@ -85,7 +92,16 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
       ],
     );
 
-    expect(result.legacyKeys).toEqual([{ key: 'test_add_item', count: 2 }]);
+    expect(result.legacyKeys).toEqual([
+      {
+        key: 'test_add_item',
+        count: 2,
+        claimants: [
+          'tests.checkout.a::test_add_item',
+          'tests.checkout.b::test_add_item',
+        ],
+      },
+    ]);
   });
 
   it('reports a legacy-key collision when the suite holds an unkeyed automated case named by that bare name', async () => {
@@ -109,7 +125,16 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
       ],
     );
 
-    expect(result.legacyKeys).toEqual([{ key: 'test_add_item', count: 2 }]);
+    expect(result.legacyKeys).toEqual([
+      {
+        key: 'test_add_item',
+        count: 2,
+        claimants: [
+          'tests.checkout.a::test_add_item',
+          'tests.checkout.b::test_add_item',
+        ],
+      },
+    ]);
   });
 
   it('reports no legacy-key collision when two composites share a bare name but no suite row could be claimed by it', async () => {
@@ -155,7 +180,13 @@ describe('OfficialCaseReconciler.reconcile collision signals', () => {
       ],
     );
 
-    expect(result.legacyKeys).toEqual([{ key: 'test_add_item', count: 2 }]);
+    expect(result.legacyKeys).toEqual([
+      {
+        key: 'test_add_item',
+        count: 2,
+        claimants: ['test_add_item', 'tests.checkout.a::test_add_item'],
+      },
+    ]);
   });
 
   it('keeps the composites off an unreachable bare name while still drafting each under its own key', async () => {
@@ -335,6 +366,159 @@ describe('OfficialCaseReconciler.reconcile catalog content', () => {
   });
 });
 
+// The real it.each titles of suite-list-query.service.spec.ts: the rows only
+// differ after character 120, where the ingestion used to cut every name.
+const ROWS_PREFIX =
+  'SuiteListQueryService.page bounded reads reads the suites once, the case counts once and the run windows once for sort ';
+
+function eachRow(sort: string) {
+  const name = `${ROWS_PREFIX}${sort} and status all with 1 suites`;
+  return { name, className: name };
+}
+
+function truncatedKey(name: string): string {
+  return name.slice(0, 120);
+}
+
+describe('OfficialCaseReconciler.reconcile parametrized names past character 120', () => {
+  it('matches and creates each row under its own full key, with no collision', async () => {
+    const tx = createReconcileTx();
+    const createdAt = eachRow('createdAt');
+    const cases = eachRow('cases');
+    tx.testCase.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'draft-1', automationKey: createdAt.name },
+        { id: 'draft-2', automationKey: cases.name },
+      ])
+      .mockResolvedValue([]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [createdAt, cases],
+    );
+
+    expect(result.identityKeys).toEqual([]);
+    expect(result.legacyKeys).toEqual([]);
+    expect(result.caseIdByKey.get(createdAt.name)).toBe('draft-1');
+    expect(result.caseIdByKey.get(cases.name)).toBe('draft-2');
+    expect(tx.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({ automationKey: createdAt.name }),
+        expect.objectContaining({ automationKey: cases.name }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('claims the catalog case keyed by the old truncated form and moves it to the full key', async () => {
+    const tx = createReconcileTx();
+    const row = eachRow('createdAt');
+    tx.testCase.findMany
+      .mockResolvedValueOnce([suiteRow('case-1', truncatedKey(row.name))])
+      .mockResolvedValue([catalogRow('case-1')]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [row],
+    );
+
+    expect(result.caseIdByKey.get(row.name)).toBe('case-1');
+    expect(tx.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { automationKey: row.name },
+    });
+    expect(tx.testCase.createMany).not.toHaveBeenCalled();
+    expect(result.createdCaseIds).toEqual([]);
+  });
+
+  it('claims the old truncated composite key of a pytest-style test', async () => {
+    const tx = createReconcileTx();
+    const name = `test_${'a'.repeat(200)}`;
+    const ref = { name, className: 'tests.checkout' };
+    tx.testCase.findMany
+      .mockResolvedValueOnce([
+        suiteRow('case-1', `tests.checkout::${name.slice(0, 120)}`),
+      ])
+      .mockResolvedValue([catalogRow('case-1')]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [ref],
+    );
+
+    expect(result.caseIdByKey.get(`tests.checkout::${name}`)).toBe('case-1');
+    expect(tx.testCase.update).toHaveBeenCalledWith({
+      where: { id: 'case-1' },
+      data: { automationKey: `tests.checkout::${name}` },
+    });
+  });
+
+  it('leaves the old truncated case untouched when several rows share it, and creates each row on its own', async () => {
+    const tx = createReconcileTx();
+    const createdAt = eachRow('createdAt');
+    const cases = eachRow('cases');
+    tx.testCase.findMany
+      .mockResolvedValueOnce([
+        suiteRow('legacy-1', truncatedKey(createdAt.name)),
+      ])
+      .mockResolvedValueOnce([
+        { id: 'draft-1', automationKey: createdAt.name },
+        { id: 'draft-2', automationKey: cases.name },
+      ])
+      .mockResolvedValue([]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [createdAt, cases],
+    );
+
+    expect(result.identityKeys).toEqual([]);
+    expect(result.legacyKeys).toEqual([]);
+    expect([...result.caseIdByKey.values()].sort()).toEqual([
+      'draft-1',
+      'draft-2',
+    ]);
+    expect(tx.testCase.update).not.toHaveBeenCalled();
+    expect(tx.testCase.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({ automationKey: createdAt.name }),
+        expect.objectContaining({ automationKey: cases.name }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
+  it('does not take a case that is exactly the truncated key away from its own test', async () => {
+    const tx = createReconcileTx();
+    const long = eachRow('createdAt');
+    const exact = { name: truncatedKey(long.name) };
+    tx.testCase.findMany
+      .mockResolvedValueOnce([suiteRow('case-exact', exact.name)])
+      .mockResolvedValueOnce([{ id: 'draft-1', automationKey: long.name }])
+      .mockResolvedValue([]);
+
+    const result = await new OfficialCaseReconciler().reconcile(
+      tx as never,
+      'suite-1',
+      'project-1',
+      [long, exact],
+    );
+
+    expect(result.caseIdByKey.get(exact.name)).toBe('case-exact');
+    expect(result.caseIdByKey.get(long.name)).toBe('draft-1');
+    expect(tx.testCase.update).not.toHaveBeenCalled();
+  });
+});
+
 interface UpsertCallArg {
   where: { suiteId_kind_key: { suiteId: string; kind: string; key: string } };
   create: {
@@ -343,12 +527,14 @@ interface UpsertCallArg {
     kind: string;
     key: string;
     claimantCount: number;
+    claimants: string[];
     firstSeenAt: Date;
     lastSeenAt: Date;
     lastRunId: string;
   };
   update: {
     claimantCount: number;
+    claimants: string[];
     lastSeenAt: Date;
     lastRunId: string;
     closedAt: null;
@@ -359,7 +545,7 @@ interface UpdateManyCallArg {
   where: {
     suiteId: string;
     kind: string;
-    key: { in: string[] };
+    key: { notIn: string[] };
     closedAt: null;
   };
   data: { closedAt: Date };
@@ -370,10 +556,12 @@ function lastUpsertCall(tx: FakeCollisionTx): UpsertCallArg {
   return calls[calls.length - 1][0];
 }
 
-function lastUpdateManyCall(tx: FakeCollisionTx): UpdateManyCallArg {
+function updateManyCall(tx: FakeCollisionTx, kind: string): UpdateManyCallArg {
   const calls = tx.caseIdentityCollision.updateMany.mock
     .calls as UpdateManyCallArg[][];
-  return calls[calls.length - 1][0];
+  const call = calls.find(([arg]) => arg.where.kind === kind);
+  if (call === undefined) throw new Error(`no updateMany for kind ${kind}`);
+  return call[0];
 }
 
 describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
@@ -385,9 +573,13 @@ describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
       'project-1',
       'suite-1',
       'run-1',
-      [{ key: 'checkout::test_add_item', count: 2 }],
-      [],
-      [],
+      [
+        {
+          key: 'checkout::test_add_item',
+          count: 2,
+          claimants: ['checkout::test_add_item', 'checkout › test_add_item'],
+        },
+      ],
       [],
     );
 
@@ -404,8 +596,16 @@ describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
     expect(call.create.kind).toBe('identity');
     expect(call.create.key).toBe('checkout::test_add_item');
     expect(call.create.claimantCount).toBe(2);
+    expect(call.create.claimants).toEqual([
+      'checkout::test_add_item',
+      'checkout › test_add_item',
+    ]);
     expect(call.create.lastRunId).toBe('run-1');
     expect(call.update.claimantCount).toBe(2);
+    expect(call.update.claimants).toEqual([
+      'checkout::test_add_item',
+      'checkout › test_add_item',
+    ]);
     expect(call.update.lastRunId).toBe('run-1');
     expect(call.update.closedAt).toBeNull();
   });
@@ -419,9 +619,7 @@ describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
       'suite-1',
       'run-1',
       [],
-      [{ key: 'test_add_item', count: 3 }],
-      [],
-      [],
+      [{ key: 'test_add_item', count: 3, claimants: ['a::t', 'b::t', 'c::t'] }],
     );
 
     const call = lastUpsertCall(tx);
@@ -433,6 +631,7 @@ describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
       },
     });
     expect(call.create.claimantCount).toBe(3);
+    expect(call.create.claimants).toEqual(['a::t', 'b::t', 'c::t']);
     expect(call.update.claimantCount).toBe(3);
     expect(call.update.closedAt).toBeNull();
   });
@@ -445,9 +644,7 @@ describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
       'project-1',
       'suite-1',
       'run-2',
-      [{ key: 'checkout::test_add_item', count: 2 }],
-      [],
-      [],
+      [{ key: 'checkout::test_add_item', count: 2, claimants: [] }],
       [],
     );
 
@@ -455,8 +652,8 @@ describe('OfficialCaseReconciler.syncCollisions upsert-open', () => {
   });
 });
 
-describe('OfficialCaseReconciler.syncCollisions auto-close on unambiguous ingest', () => {
-  it('closes an open identity collision whose key resolved to a real case this ingest', async () => {
+describe('OfficialCaseReconciler.syncCollisions auto-close', () => {
+  it('closes every open identity collision when this report collides on nothing, including keys it no longer carries', async () => {
     const tx = createCollisionTx();
 
     await new OfficialCaseReconciler().syncCollisions(
@@ -466,21 +663,19 @@ describe('OfficialCaseReconciler.syncCollisions auto-close on unambiguous ingest
       'run-3',
       [],
       [],
-      ['checkout::test_add_item'],
-      [],
     );
 
-    const call = lastUpdateManyCall(tx);
+    const call = updateManyCall(tx, 'identity');
     expect(call.where).toEqual({
       suiteId: 'suite-1',
       kind: 'identity',
-      key: { in: ['checkout::test_add_item'] },
+      key: { notIn: [] },
       closedAt: null,
     });
     expect(call.data.closedAt).toBeInstanceOf(Date);
   });
 
-  it('closes an open legacy-key collision whose key resolved unambiguously this ingest', async () => {
+  it('closes every open legacy-key collision when this report collides on none', async () => {
     const tx = createCollisionTx();
 
     await new OfficialCaseReconciler().syncCollisions(
@@ -490,21 +685,19 @@ describe('OfficialCaseReconciler.syncCollisions auto-close on unambiguous ingest
       'run-3',
       [],
       [],
-      [],
-      ['test_add_item'],
     );
 
-    const call = lastUpdateManyCall(tx);
+    const call = updateManyCall(tx, 'legacy_key');
     expect(call.where).toEqual({
       suiteId: 'suite-1',
       kind: 'legacy_key',
-      key: { in: ['test_add_item'] },
+      key: { notIn: [] },
       closedAt: null,
     });
     expect(call.data.closedAt).toBeInstanceOf(Date);
   });
 
-  it('never closes a key that is absent from this report — it stays open untouched', async () => {
+  it('keeps open the keys this report still collides on, and closes only the others', async () => {
     const tx = createCollisionTx();
 
     await new OfficialCaseReconciler().syncCollisions(
@@ -512,12 +705,15 @@ describe('OfficialCaseReconciler.syncCollisions auto-close on unambiguous ingest
       'project-1',
       'suite-1',
       'run-3',
-      [],
-      [],
-      [],
-      [],
+      [{ key: 'checkout::test_add_item', count: 2, claimants: [] }],
+      [{ key: 'test_create', count: 2, claimants: [] }],
     );
 
-    expect(tx.caseIdentityCollision.updateMany).not.toHaveBeenCalled();
+    expect(updateManyCall(tx, 'identity').where.key).toEqual({
+      notIn: ['checkout::test_add_item'],
+    });
+    expect(updateManyCall(tx, 'legacy_key').where.key).toEqual({
+      notIn: ['test_create'],
+    });
   });
 });

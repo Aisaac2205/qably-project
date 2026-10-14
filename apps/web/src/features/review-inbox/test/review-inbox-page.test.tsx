@@ -9,7 +9,11 @@ import { __resetStore } from '@/lib/mock-store'
 import { useI18nStore } from '@/lib/i18n'
 import { createTestQueryClient, renderWithQuery } from '@/lib/query-test-utils'
 import { ApiError } from '@/lib/api-client'
-import { approveProposal, rejectProposal } from '@/features/review-inbox/api/review.api'
+import {
+  approveProposal,
+  rejectProposal,
+  type ProposalListItem,
+} from '@/features/review-inbox/api/review.api'
 import { proposalInboxCountsFixtures, proposalInboxFixtures } from '@/test/review-api-stub'
 import { approvalConflictError, conflictingCaseFixture } from './approval-conflict-fixture'
 
@@ -141,6 +145,13 @@ describe('ReviewInboxPage', () => {
     expect(screen.queryByRole('heading', { name: /Recent review decisions/i })).not.toBeInTheDocument()
   })
 
+  it('leaves the queue to the proposals: no origin summary and no collisions notice above it', () => {
+    renderWithQuery(<ReviewInboxPage />)
+
+    expect(screen.queryByText(/where these proposals came from/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/identity collision/i)).not.toBeInTheDocument()
+  })
+
   it('shows a count inline on each status filter tab', () => {
     renderWithQuery(<ReviewInboxPage />)
 
@@ -269,6 +280,66 @@ describe('ReviewInboxPage', () => {
     )
   })
 
+  describe('possible duplicates', () => {
+    function renderPossibleDuplicate() {
+      const [base] = proposalInboxFixtures({ status: 'in_review' })
+      const duplicate: ProposalListItem = {
+        ...base,
+        classification: {
+          kind: 'possible_duplicate',
+          matchedCaseId: 'case-9',
+          matchedCaseName: 'Checks the cart',
+          matchedCaseSuiteId: 'suite-1',
+          score: 0.72,
+          reasons: ['same-title'],
+        },
+      }
+      const filters = { status: 'in_review' as const, search: duplicate.title }
+      searchParamsQuery = new URLSearchParams({ search: duplicate.title }).toString()
+      const client = createTestQueryClient()
+      client.setQueryData(reviewKeys.inbox(filters), {
+        pages: [{ items: [duplicate], nextCursor: null }],
+        pageParams: [null],
+      })
+      client.setQueryData(reviewKeys.inboxCounts({ search: duplicate.title }), {
+        byStatus: proposalInboxCountsFixtures({ search: duplicate.title }),
+        version: 'test-version',
+      })
+      render(
+        <QueryClientProvider client={client}>
+          <ReviewInboxPage />
+        </QueryClientProvider>,
+      )
+      return duplicate
+    }
+
+    it('applies the proposal to the matched case when the reviewer chooses to update it', async () => {
+      vi.mocked(approveProposal).mockClear()
+      const user = userEvent.setup()
+      const duplicate = renderPossibleDuplicate()
+      await screen.findByRole('heading', { name: duplicate.title })
+
+      await user.click(screen.getByRole('button', { name: 'Update case Checks the cart' }))
+
+      expect(vi.mocked(approveProposal)).toHaveBeenCalledWith(duplicate.id, {
+        comment: undefined,
+        applyTo: 'matched-case',
+      })
+    })
+
+    it('never approves a possible duplicate from the keyboard without a choice, and moves focus to it instead', async () => {
+      vi.mocked(approveProposal).mockClear()
+      const user = userEvent.setup()
+      const duplicate = renderPossibleDuplicate()
+      await screen.findByRole('heading', { name: duplicate.title })
+
+      await user.keyboard('a')
+
+      expect(vi.mocked(approveProposal)).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Update case Checks the cart' })).toHaveFocus()
+    })
+  })
+
   describe('approval conflicts', () => {
     function inReviewQueue() {
       return proposalInboxFixtures({ status: 'in_review' })
@@ -305,8 +376,6 @@ describe('ReviewInboxPage', () => {
       })
       client.setQueryData(reviewKeys.inboxCounts({ search: title }), {
         byStatus: proposalInboxCountsFixtures({ search: title }),
-        openCollisions: 0,
-        openCollisionSuites: [],
         version: 'test-version',
       })
       return render(
@@ -900,7 +969,7 @@ describe('ReviewInboxPage', () => {
 })
 
 
-describe('ReviewInboxPage origin summary', () => {
+describe('ReviewInboxPage origin', () => {
   beforeEach(() => {
     __resetStore()
     useI18nStore.setState({ locale: 'en' })
@@ -908,7 +977,7 @@ describe('ReviewInboxPage origin summary', () => {
     window.history.replaceState(null, '', '/review-inbox')
   })
 
-  it('explains above the queue which push brought the proposals in', async () => {
+  it('names the origin on each proposal row, with no summary of it above the queue', async () => {
     const search = 'cart'
     searchParamsQuery = new URLSearchParams({ search }).toString()
     const client = createTestQueryClient()
@@ -936,8 +1005,6 @@ describe('ReviewInboxPage origin summary', () => {
     })
     client.setQueryData(reviewKeys.inboxCounts({ search }), {
       byStatus: proposalInboxCountsFixtures({ search }),
-      openCollisions: 0,
-      openCollisionSuites: [],
       version: 'test-version',
     })
 
@@ -947,11 +1014,11 @@ describe('ReviewInboxPage origin summary', () => {
       </QueryClientProvider>,
     )
 
-    const summary = await screen.findByRole('region', {
-      name: /where these proposals came from/i,
-    })
-    expect(within(summary).getByRole('listitem')).toHaveTextContent(
-      /2\s*from push abc1234 .Add cart tests. by ana on main/,
-    )
+    const queue = await screen.findByRole('region', { name: 'Proposals queue' })
+    expect(within(queue).getAllByTestId('proposal-origin')).toHaveLength(2)
+    expect(
+      screen.queryByRole('region', { name: /where these proposals came from/i }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/Add cart tests/)).not.toBeInTheDocument()
   })
 })

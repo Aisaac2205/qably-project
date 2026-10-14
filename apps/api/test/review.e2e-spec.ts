@@ -398,6 +398,55 @@ describe('Review (e2e)', () => {
     expect(call[0].data.actorId).toBe('user-1');
   });
 
+  it('applies a possible duplicate to its matched case when the reviewer asks for it', async () => {
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      ...proposalRow,
+      duplicateKind: 'possible_duplicate',
+      matchedCaseId: 'case-matched',
+      matchedCase: {
+        id: 'case-matched',
+        projectId: 'project-1',
+        suiteId: 'suite-2',
+        automationFilePath: null,
+      },
+    });
+    prisma.testCaseVersion.count.mockResolvedValue(1);
+    prisma.testCaseVersion.create.mockResolvedValue({
+      id: 'version-2',
+      version: 2,
+    });
+
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({ applyTo: 'matched-case' })
+      .expect(201);
+
+    expect(response.body).toMatchObject({
+      createdNewCase: false,
+      testCaseId: 'case-matched',
+      suiteId: 'suite-2',
+      version: 2,
+    });
+    expect(prisma.testCase.create).not.toHaveBeenCalled();
+  });
+
+  it('answers 422 when the proposal has no matching case to apply to', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({ applyTo: 'matched-case' })
+      .expect(422);
+
+    expect(response.body).toMatchObject({ code: 'invalid-apply-target' });
+    expect(prisma.testCase.create).not.toHaveBeenCalled();
+  });
+
+  it('answers 400 for an apply target outside the allowed values', async () => {
+    await request(app.getHttpServer())
+      .post('/review/proposals/proposal-1/approve')
+      .send({ applyTo: 'case-matched' })
+      .expect(400);
+  });
+
   it('answers 409 with who decided, what, and when when the proposal was already decided', async () => {
     prisma.extractedProposal.findFirst.mockResolvedValue({
       ...proposalRow,

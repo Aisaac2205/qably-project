@@ -105,6 +105,17 @@ describe('ingestRunSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('accepts a case name up to the 372 characters the identity key keeps, and no more', () => {
+    const parse = (name: string) =>
+      ingestRunSchema.safeParse({
+        ...baseInput,
+        cases: [{ ...baseCase, name }],
+      });
+
+    expect(parse('a'.repeat(372)).success).toBe(true);
+    expect(parse('a'.repeat(373)).success).toBe(false);
+  });
+
   it('defaults case steps and expectedResult', () => {
     const result = ingestRunSchema.safeParse(baseInput);
 

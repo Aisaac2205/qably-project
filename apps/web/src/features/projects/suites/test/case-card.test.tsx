@@ -437,7 +437,7 @@ describe('CaseCard', () => {
   })
 
   describe('pending review state', () => {
-    it('shows a non-interactive in-review link instead of the AI button when a proposal is pending', async () => {
+    it('replaces the undocumented chip with an in-review link to the waiting proposal', async () => {
       await act(async () => {
         renderWithQuery(
           <CaseCard
@@ -452,6 +452,99 @@ describe('CaseCard', () => {
       expect(screen.queryByText(/^undocumented$/i)).not.toBeInTheDocument()
       const link = screen.getByRole('link', { name: /in review/i })
       expect(link).toHaveAttribute('href', '/review-inbox?proposal=proposal-1')
+    })
+
+    it('puts the in-review link in the badge cluster, beside the priority and the case actions', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, pendingProposalId: 'proposal-1' }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const link = screen.getByRole('link', { name: /in review/i })
+      const cluster = link.parentElement as HTMLElement
+
+      expect(within(cluster).getByText(/medium/i)).toBeInTheDocument()
+      expect(within(cluster).getByRole('button', { name: 'Case actions' })).toBeInTheDocument()
+    })
+
+    it('says where the link goes in its accessible name, which still contains the visible label', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, pendingProposalId: 'proposal-1' }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const link = screen.getByRole('link', { name: 'In review: View in review inbox' })
+
+      expect(link).toHaveTextContent('In review')
+    })
+
+    it('draws a visible ring on keyboard focus, since the global rule removes the outline', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, pendingProposalId: 'proposal-1' }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      const link = screen.getByRole('link', { name: /in review/i })
+
+      expect(link.className).toContain('focus-visible:ring-2')
+      expect(link.className).toContain('focus-visible:ring-primary')
+    })
+
+    it('shows exactly one in-review link, not a second one in the documentation column', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{ ...automatedCase, pendingProposalId: 'proposal-1' }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getAllByRole('link', { name: /in review/i })).toHaveLength(1)
+    })
+
+    it('offers no documentation action for a manual case that is already waiting for review', async () => {
+      await act(async () => {
+        renderWithQuery(
+          <CaseCard
+            testCase={{
+              ...mockCase,
+              steps: [],
+              expectedResult: '',
+              pendingProposalId: 'proposal-3',
+            }}
+            projectId="proj-1"
+            onEdit={noop}
+            onDelete={noop}
+          />,
+        )
+      })
+
+      expect(screen.getByRole('link', { name: /in review/i })).toHaveAttribute(
+        'href',
+        '/review-inbox?proposal=proposal-3',
+      )
+      expect(screen.queryByRole('button', { name: /document this case/i })).not.toBeInTheDocument()
     })
 
     it('shows a state-only undocumented chip, never a button, when no proposal is pending', async () => {
@@ -480,7 +573,7 @@ describe('CaseCard', () => {
         healthSignals: [],
       }
 
-      it('keeps the review state visible next to the steps toggle', async () => {
+      it('keeps the steps toggle and shows the review state in the badge cluster instead', async () => {
         await act(async () => {
           renderWithQuery(
             <CaseCard
@@ -496,13 +589,13 @@ describe('CaseCard', () => {
         const link = screen.getByRole('link', { name: /in review/i })
 
         expect(link).toHaveAttribute('href', '/review-inbox?proposal=proposal-7')
-        expect(link.parentElement).toBe(toggle.parentElement)
+        expect(link.parentElement).not.toBe(toggle.parentElement)
         expect(
-          toggle.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING,
-        ).toBeTruthy()
+          within(link.parentElement as HTMLElement).getByRole('button', { name: 'Case actions' }),
+        ).toBeInTheDocument()
       })
 
-      it('adds no chip to the meta cluster and leaves the execution result untouched', async () => {
+      it('shows the review state once and leaves the execution result untouched', async () => {
         await act(async () => {
           renderWithQuery(
             <CaseCard

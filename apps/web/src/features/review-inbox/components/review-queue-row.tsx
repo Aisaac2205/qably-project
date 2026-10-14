@@ -12,11 +12,13 @@ import {
   GitCommit,
   Sparkle,
 } from '@phosphor-icons/react'
+import Link from 'next/link'
 import type { ProposalOrigin } from '@qably/types'
-import type { ProposalListItem } from '../api/review.api'
-import { resolveClassification } from '../lib/classification-reason'
+import type { ProposalClassification, ProposalListItem } from '../api/review.api'
+import { matchedCaseHref, resolveClassification } from '../lib/classification-reason'
 import { extractionFailureReasonKey } from '@/lib/extraction-failure-reason'
-import { Badge } from '@/components/ui/badge'
+import { Badge, badgeVariants } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
 const ORIGIN_LABEL_KEYS: Record<Exclude<ProposalOrigin['kind'], 'push'>, string> = {
@@ -72,6 +74,63 @@ export interface ReviewQueueRowProps {
   onSelect: (id: string) => void
 }
 
+/**
+ * Says what the proposal does to an existing case. It links to that case, so it
+ * sits beside the row's select button rather than inside it: a link cannot live
+ * in a button, and opening the case must not select the row.
+ */
+function ClassificationBadge({
+  projectId,
+  classification,
+}: {
+  projectId: string
+  classification: ProposalClassification
+}) {
+  const { t } = useTranslation()
+
+  const isUpdate = classification.kind === 'update'
+  const Icon = isUpdate ? ArrowsClockwise : CopySimple
+  const label =
+    classification.matchedCaseName === null
+      ? t(isUpdate ? 'reviewInbox.classificationUpdate' : 'reviewInbox.classificationPossibleDuplicate')
+      : t(
+          isUpdate
+            ? 'reviewInbox.classificationUpdateNamed'
+            : 'reviewInbox.classificationPossibleDuplicateNamed',
+          { name: classification.matchedCaseName },
+        )
+  const href = matchedCaseHref(projectId, classification)
+  const badgeClassName = cn(
+    badgeVariants({ variant: isUpdate ? 'default' : 'warn' }),
+    'max-w-full min-h-6 text-[10px] px-1.5 py-0.5 font-medium rounded-full',
+  )
+
+  const content = (
+    <>
+      <Icon size={10} weight="bold" className="shrink-0" aria-hidden="true" />
+      <span className="truncate">{label}</span>
+    </>
+  )
+
+  return (
+    <div className="px-3.5 pb-3 sm:px-4 sm:pb-3.5">
+      {href === null ? (
+        <span className={badgeClassName}>{content}</span>
+      ) : (
+        <Link
+          href={href}
+          className={cn(
+            badgeClassName,
+            'outline-none hover:underline focus-visible:ring-2 focus-visible:ring-primary',
+          )}
+        >
+          {content}
+        </Link>
+      )}
+    </div>
+  )
+}
+
 export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRowProps) {
   const { t } = useTranslation()
 
@@ -81,6 +140,7 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRo
 
   const needsManualReview = proposal.needsManualReview || proposal.steps.length === 0
   const classification = resolveClassification(proposal.classification)
+  const hasClassification = classification.kind !== 'none'
   const manualReviewReason = needsManualReview ? extractionFailureReasonKey(proposal.objective) : null
   const subtitle = !needsManualReview
     ? proposal.objective
@@ -96,17 +156,21 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRo
     : null
 
   return (
-    <li className="flex items-stretch">
+    <li
+      className={cn(
+        'group border-b border-l-4 border-border/70 transition-colors duration-150 hover:bg-surface-hover/70',
+        isSelected ? 'bg-surface-hover/90 border-l-primary' : 'border-l-transparent',
+      )}
+    >
       <button
         type="button"
         id={`review-queue-row-${proposal.id}`}
         aria-current={isSelected ? 'true' : undefined}
         onClick={() => onSelect(proposal.id)}
-        className={`group flex-1 min-w-0 text-left p-3.5 sm:p-4 transition-all duration-150 hover:bg-surface-hover/70 outline-none focus-visible:ring-2 focus-visible:ring-primary border-b border-border/70 ${
-          isSelected
-            ? 'bg-surface-hover/90 border-l-4 border-l-primary'
-            : 'border-l-4 border-l-transparent'
-        }`}
+        className={cn(
+          'block w-full min-w-0 text-left p-3.5 sm:p-4 outline-none focus-visible:ring-2 focus-visible:ring-primary',
+          hasClassification && 'pb-2 sm:pb-2',
+        )}
       >
         <div className="flex items-center gap-2 mb-2">
           {proposal.priority === 'critical' ? (
@@ -141,29 +205,6 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRo
             </span>
           )}
 
-          {classification.kind === 'update' && (
-            <Badge
-              variant="default"
-              className="text-[10px] px-1.5 py-0.5 font-medium rounded-full ml-auto"
-            >
-              <ArrowsClockwise size={10} weight="bold" aria-hidden="true" />
-              {classification.matchedCaseName === null
-                ? t('reviewInbox.classificationUpdate')
-                : t('reviewInbox.classificationUpdateNamed', {
-                    name: classification.matchedCaseName,
-                  })}
-            </Badge>
-          )}
-          {classification.kind === 'possible_duplicate' && (
-            <Badge variant="warn" className="text-[10px] px-1.5 py-0.5 font-medium rounded-full ml-auto">
-              <CopySimple size={10} weight="bold" aria-hidden="true" />
-              {classification.matchedCaseName === null
-                ? t('reviewInbox.classificationPossibleDuplicate')
-                : t('reviewInbox.classificationPossibleDuplicateNamed', {
-                    name: classification.matchedCaseName,
-                  })}
-            </Badge>
-          )}
         </div>
 
         <div className="flex items-start justify-between gap-2 mb-1">
@@ -201,6 +242,10 @@ export function ReviewQueueRow({ proposal, isSelected, onSelect }: ReviewQueueRo
           )}
         </div>
       </button>
+
+      {hasClassification && (
+        <ClassificationBadge projectId={proposal.projectId} classification={classification} />
+      )}
     </li>
   )
 }

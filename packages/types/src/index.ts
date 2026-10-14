@@ -227,6 +227,8 @@ export interface SuiteCollision {
   kind: CaseCollisionKind
   key: string
   claimantCount: number
+  /** The first few claimants, named as a person would; `claimantCount` is the total. */
+  claimants: string[]
   lastSeenAt: string
   lastRunId: string | null
 }
@@ -252,8 +254,8 @@ export interface Suite {
   openCollisions?: number
   /** The open collisions themselves; only the single-suite view carries them. */
   collisions?: SuiteCollision[]
-  /** Proposals for this suite waiting in the review inbox, new cases included. */
-  pendingProposals?: number
+  /** Proposals of this suite waiting in the review inbox that would create a new case. */
+  newCaseProposals?: number
 }
 
 /**

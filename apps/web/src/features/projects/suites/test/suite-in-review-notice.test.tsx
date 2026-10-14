@@ -13,44 +13,50 @@ describe('SuiteInReviewNotice', () => {
     useI18nStore.setState({ locale: 'en' })
   })
 
-  it('renders nothing when no proposal of the suite is waiting', () => {
-    const { container } = render(<SuiteInReviewNotice projectId="proj-1" pendingProposals={0} />)
+  it('renders nothing when no new case of the suite is waiting', () => {
+    const { container } = render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={0} />)
 
     expect(container).toBeEmptyDOMElement()
   })
 
   it('renders nothing when the count is absent from the payload', () => {
     const { container } = render(
-      <SuiteInReviewNotice projectId="proj-1" pendingProposals={undefined} />,
+      <SuiteInReviewNotice projectId="proj-1" newCaseProposals={undefined} />,
     )
 
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('says how many proposals wait, in the singular for one', () => {
-    render(<SuiteInReviewNotice projectId="proj-1" pendingProposals={1} />)
+  it('says how many new cases wait, in the singular for one', () => {
+    render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={1} />)
+
+    expect(screen.getByText('1 proposed new case is waiting for review.')).toBeInTheDocument()
+  })
+
+  it('says how many new cases wait, in the plural for several', () => {
+    render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={12} />)
+
+    expect(screen.getByText('12 proposed new cases are waiting for review.')).toBeInTheDocument()
+  })
+
+  it('says it in Spanish too', () => {
+    useI18nStore.setState({ locale: 'es' })
+
+    render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={2} />)
 
     expect(
-      screen.getByText('1 proposal for this suite is waiting for review.'),
+      screen.getByText('2 casos nuevos propuestos están esperando revisión.'),
     ).toBeInTheDocument()
   })
 
-  it('says how many proposals wait, in the plural for several', () => {
-    render(<SuiteInReviewNotice projectId="proj-1" pendingProposals={12} />)
+  it('stays minimal: a sentence and a link, no explanatory hint', () => {
+    render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={3} />)
 
-    expect(
-      screen.getByText('12 proposals for this suite are waiting for review.'),
-    ).toBeInTheDocument()
-  })
-
-  it('explains that new cases are part of the count, since they are not listed below yet', () => {
-    render(<SuiteInReviewNotice projectId="proj-1" pendingProposals={3} />)
-
-    expect(screen.getByText(/new cases appear here once approved/i)).toBeInTheDocument()
+    expect(screen.getByRole('status').querySelectorAll('p')).toHaveLength(1)
   })
 
   it('links to the review inbox filtered to the suite project', () => {
-    render(<SuiteInReviewNotice projectId="proj-1" pendingProposals={3} />)
+    render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={3} />)
 
     expect(screen.getByRole('link', { name: /open review inbox/i })).toHaveAttribute(
       'href',
@@ -59,7 +65,7 @@ describe('SuiteInReviewNotice', () => {
   })
 
   it('draws a visible ring on keyboard focus of the link', () => {
-    render(<SuiteInReviewNotice projectId="proj-1" pendingProposals={3} />)
+    render(<SuiteInReviewNotice projectId="proj-1" newCaseProposals={3} />)
 
     expect(screen.getByRole('link', { name: /open review inbox/i }).className).toContain(
       'focus-visible:ring-2',

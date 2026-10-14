@@ -330,7 +330,7 @@ export function SuiteDetail({ projectId, suiteId }: { projectId: string; suiteId
           </div>
         )}
 
-        <SuiteInReviewNotice projectId={projectId} pendingProposals={suite.pendingProposals} />
+        <SuiteInReviewNotice projectId={projectId} newCaseProposals={suite.newCaseProposals} />
         <SuiteCollisionsPanel
           projectId={projectId}
           suiteId={suite.id}

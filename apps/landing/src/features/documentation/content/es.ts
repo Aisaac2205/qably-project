@@ -622,7 +622,7 @@ response.raise_for_status()`,
           type: 'table',
           headers: ['Campo del caso', 'Obligatorio', 'Notas'],
           rows: [
-            ['name', 'sí', 'Hasta 120 caracteres.'],
+            ['name', 'sí', 'Hasta 372 caracteres.'],
             ['suiteName', 'no', 'Hereda el nombre de la suite resuelta; permite conservar etiquetas adicionales (como proyectos de Playwright) para trazabilidad.'],
             ['steps', 'no', 'Arreglo de texto de hasta 50 elementos (máximo 500 caracteres por elemento). JUnit XML no incluye este campo, por lo que llega vacío por defecto salvo cuando se envía JSON directamente.'],
             ['expectedResult', 'no', 'Hasta 1000 caracteres. Llega vacío por defecto al importar desde JUnit XML.'],

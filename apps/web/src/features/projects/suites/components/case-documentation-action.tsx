@@ -1,6 +1,5 @@
-import Link from 'next/link'
 import type { TestCase } from '@qably/types'
-import { Clock, PencilSimple, Sparkle } from '@phosphor-icons/react'
+import { PencilSimple, Sparkle } from '@phosphor-icons/react'
 import { useTranslation } from '@/lib/i18n'
 import { extractionFailureReasonKey } from '@/lib/extraction-failure-reason'
 import { useDocumentCase } from '@/features/projects/suites/hooks/use-suite-mutations'
@@ -13,20 +12,6 @@ export interface CaseDocumentationActionProps {
   onEdit: (testCase: TestCase) => void
 }
 
-function CaseInReviewLink({ proposalId }: { proposalId: string }) {
-  const { t } = useTranslation()
-
-  return (
-    <Link
-      href={`/review-inbox?proposal=${proposalId}`}
-      className="inline-flex items-center gap-1.5 text-xs font-semibold text-ai hover:text-ai transition-colors outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md py-1 px-2.5 bg-ai-bg/40 border border-dashed border-ai/40"
-    >
-      <Clock size={13} weight="bold" aria-hidden="true" />
-      {t('suites.caseInReview')}
-    </Link>
-  )
-}
-
 export function CaseDocumentationAction({
   testCase,
   stepsOpen,
@@ -36,26 +21,19 @@ export function CaseDocumentationAction({
   const { t } = useTranslation()
   const documentCase = useDocumentCase()
 
-  // A pending proposal is always surfaced, even next to an Aeris documentation
-  // badge: the badge describes the last attempt, the link is where the case waits.
-  const reviewLink = testCase.pendingProposalId ? (
-      <CaseInReviewLink proposalId={testCase.pendingProposalId} />
-    ) : null
-
   if (testCase.steps.length > 0) {
     return (
-      <>
-        <CaseDisclosureToggle
-          label={t('suites.stepsCount', { count: testCase.steps.length })}
-          isOpen={stepsOpen}
-          onToggle={onToggleSteps}
-        />
-        {reviewLink}
-      </>
+      <CaseDisclosureToggle
+        label={t('suites.stepsCount', { count: testCase.steps.length })}
+        isOpen={stepsOpen}
+        onToggle={onToggleSteps}
+      />
     )
   }
 
-  if (reviewLink !== null) return reviewLink
+  // The case already waits for a reviewer: the card's in-review chip says where,
+  // and documenting it again would only queue a second proposal.
+  if (testCase.pendingProposalId) return null
 
   if (testCase.executionMode === 'automated') {
     if (testCase.documentation?.outcome === 'failed') {

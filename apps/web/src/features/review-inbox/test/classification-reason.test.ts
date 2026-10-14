@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   classificationReasonKey,
   classificationScorePercent,
+  matchedCaseHref,
+  needsApplyChoice,
   resolveClassification,
 } from '@/features/review-inbox/lib/classification-reason'
 
@@ -53,6 +55,7 @@ describe('resolveClassification', () => {
       kind: 'none',
       matchedCaseId: null,
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: null,
       reasons: [],
     })
@@ -63,10 +66,63 @@ describe('resolveClassification', () => {
       kind: 'possible_duplicate' as const,
       matchedCaseId: 'case-1',
       matchedCaseName: 'Empties the cart',
+      matchedCaseSuiteId: null,
       score: 0.72,
       reasons: ['same-title' as const],
     }
 
     expect(resolveClassification(classification)).toBe(classification)
+  })
+})
+
+describe('needsApplyChoice', () => {
+  const base = {
+    matchedCaseId: 'case-1',
+    matchedCaseName: 'Empties the cart',
+    matchedCaseSuiteId: 'suite-1',
+    score: 0.72,
+    reasons: [],
+  }
+
+  it('asks for a choice only for a possible duplicate that still has a case to update', () => {
+    expect(needsApplyChoice({ ...base, kind: 'possible_duplicate' })).toBe(true)
+  })
+
+  it('needs no choice for an update, which already targets its case', () => {
+    expect(needsApplyChoice({ ...base, kind: 'update' })).toBe(false)
+  })
+
+  it('needs no choice when the matched case no longer exists', () => {
+    expect(
+      needsApplyChoice({ ...base, kind: 'possible_duplicate', matchedCaseId: null }),
+    ).toBe(false)
+  })
+
+  it('needs no choice for an unclassified proposal', () => {
+    expect(needsApplyChoice(resolveClassification(undefined))).toBe(false)
+  })
+})
+
+describe('matchedCaseHref', () => {
+  const classification = {
+    kind: 'update' as const,
+    matchedCaseId: 'case 1',
+    matchedCaseName: null,
+    matchedCaseSuiteId: 'suite-1',
+    score: 1,
+    reasons: [],
+  }
+
+  it('opens the matched case inside its suite', () => {
+    expect(matchedCaseHref('project-1', classification)).toBe(
+      '/projects/project-1/suites/suite-1/edit?case=case%201',
+    )
+  })
+
+  it.each([
+    ['case', { matchedCaseId: null }],
+    ['suite', { matchedCaseSuiteId: null }],
+  ])('has nowhere to link when the %s is unknown', (_name, overrides) => {
+    expect(matchedCaseHref('project-1', { ...classification, ...overrides })).toBeNull()
   })
 })

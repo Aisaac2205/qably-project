@@ -839,6 +839,7 @@ describe('ReviewInboxQueryService.page', () => {
       kind: 'none',
       matchedCaseId: null,
       matchedCaseName: null,
+      matchedCaseSuiteId: null,
       score: null,
       reasons: [],
     });
@@ -849,7 +850,7 @@ describe('ReviewInboxQueryService.page', () => {
       pageRow({
         duplicateKind: 'possible_duplicate',
         matchedCaseId: 'case-9',
-        matchedCase: { name: 'Empties the cart' },
+        matchedCase: { name: 'Empties the cart', suiteId: 'suite-4' },
         duplicateScore: 0.75,
         duplicateReasons: ['same-title', 'steps-overlap'],
       }),
@@ -864,6 +865,7 @@ describe('ReviewInboxQueryService.page', () => {
       kind: 'possible_duplicate',
       matchedCaseId: 'case-9',
       matchedCaseName: 'Empties the cart',
+      matchedCaseSuiteId: 'suite-4',
       score: 0.75,
       reasons: ['same-title', 'steps-overlap'],
     });
@@ -884,6 +886,7 @@ describe('ReviewInboxQueryService.page', () => {
     });
 
     expect(result.items[0].classification.matchedCaseName).toBeNull();
+    expect(result.items[0].classification.matchedCaseSuiteId).toBeNull();
   });
 
   it('includes the suite id and name when the proposal has a suite', async () => {
@@ -925,7 +928,7 @@ describe('ReviewInboxQueryService.page', () => {
       suite: { select: { id: true, name: true } },
       duplicateKind: true,
       matchedCaseId: true,
-      matchedCase: { select: { name: true } },
+      matchedCase: { select: { name: true, suiteId: true } },
       duplicateScore: true,
       duplicateReasons: true,
     });
@@ -971,6 +974,25 @@ describe('ReviewInboxQueryService.page origin', () => {
       branch: 'main',
       pullRequestNumber: null,
     });
+  });
+
+  it('keeps only the first line of a multi-line commit message as the title', async () => {
+    const origin = await originOf({
+      codeChangeId: 'change-1',
+      codeChange: {
+        ...pushCodeChange,
+        batch: {
+          source: 'WEBHOOK',
+          scmEvent: {
+            ...pushCodeChange.batch.scmEvent,
+            title:
+              'Add cart tests\n\nCovers the empty cart and the coupon flow.\nCo-authored by ana',
+          },
+        },
+      },
+    });
+
+    expect(origin).toMatchObject({ commitTitle: 'Add cart tests' });
   });
 
   it('keeps the commit of a code change whose push event is gone, without inventing its details', async () => {
@@ -1225,99 +1247,14 @@ describe('ReviewInboxQueryService.counts', () => {
     expect(first.version).not.toBe(second.version);
   });
 
-  it('counts the suites with open collisions, not the colliding keys, and names each suite', async () => {
-    const prisma = createPageFixture([]);
-    prisma.caseIdentityCollision.groupBy.mockResolvedValue([
-      { suiteId: 'suite-a', _count: { _all: 1 } },
-      { suiteId: 'suite-b', _count: { _all: 4 } },
-    ]);
-    prisma.suite.findMany.mockResolvedValue([
-      {
-        id: 'suite-a',
-        name: 'Checkout',
-        projectId: 'project-1',
-        project: { name: 'Storefront' },
-      },
-      {
-        id: 'suite-b',
-        name: 'Billing',
-        projectId: 'project-2',
-        project: { name: 'Back office' },
-      },
-    ]);
-
-    const result = await buildService(prisma).counts(serviceOrg, {});
-
-    expect(result.openCollisions).toBe(2);
-    expect(result.openCollisionSuites).toEqual([
-      {
-        suiteId: 'suite-b',
-        suiteName: 'Billing',
-        projectId: 'project-2',
-        projectName: 'Back office',
-        count: 4,
-      },
-      {
-        suiteId: 'suite-a',
-        suiteName: 'Checkout',
-        projectId: 'project-1',
-        projectName: 'Storefront',
-        count: 1,
-      },
-    ]);
-  });
-
-  it('scopes the open collisions to the organization and, when given, the project', async () => {
-    const prisma = createPageFixture([]);
-
-    await buildService(prisma).counts(serviceOrg, { projectId: 'project-1' });
-
-    expect(prisma.caseIdentityCollision.groupBy).toHaveBeenCalledWith({
-      by: ['suiteId'],
-      where: {
-        closedAt: null,
-        project: { organizationId: serviceOrg.organizationId },
-        projectId: 'project-1',
-      },
-      _count: { _all: true },
-    });
-  });
-
-  it('never looks suites up when no collision is open', async () => {
+  it('leaves collisions out: the inbox only counts proposals', async () => {
     const prisma = createPageFixture([]);
 
     const result = await buildService(prisma).counts(serviceOrg, {});
 
+    expect(result).not.toHaveProperty('openCollisions');
+    expect(result).not.toHaveProperty('openCollisionSuites');
+    expect(prisma.caseIdentityCollision.groupBy).not.toHaveBeenCalled();
     expect(prisma.suite.findMany).not.toHaveBeenCalled();
-    expect(result.openCollisionSuites).toEqual([]);
-  });
-
-  it('changes the version hash when a different suite holds the open collisions', async () => {
-    const prisma = createPageFixture([]);
-    prisma.caseIdentityCollision.groupBy.mockResolvedValueOnce([
-      { suiteId: 'suite-a', _count: { _all: 1 } },
-    ]);
-    prisma.suite.findMany.mockResolvedValueOnce([
-      { id: 'suite-a', name: 'A', projectId: 'p', project: { name: 'P' } },
-    ]);
-    const first = await buildService(prisma).counts(serviceOrg, {});
-
-    prisma.caseIdentityCollision.groupBy.mockResolvedValueOnce([
-      { suiteId: 'suite-b', _count: { _all: 1 } },
-    ]);
-    prisma.suite.findMany.mockResolvedValueOnce([
-      { id: 'suite-b', name: 'B', projectId: 'p', project: { name: 'P' } },
-    ]);
-    const second = await buildService(prisma).counts(serviceOrg, {});
-
-    expect(first.version).not.toBe(second.version);
-  });
-
-  it('defaults open collisions to zero when nothing is open', async () => {
-    const prisma = createPageFixture([]);
-
-    const result = await buildService(prisma).counts(serviceOrg, {});
-
-    expect(result.openCollisions).toBe(0);
   });
 });
