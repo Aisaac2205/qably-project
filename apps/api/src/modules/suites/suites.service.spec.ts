@@ -209,7 +209,7 @@ describe('SuitesService pending proposals', () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([suiteRow]);
     prisma.extractedProposal.findMany.mockResolvedValue([
-      { id: 'proposal-1', targetTestCaseId: 'case-1' },
+      { id: 'proposal-1', targetTestCaseId: 'case-1', matchedCaseId: null },
     ]);
 
     const [suite] = await build(prisma).list(owner);
@@ -217,12 +217,15 @@ describe('SuitesService pending proposals', () => {
     expect(suite.cases[0].pendingProposalId).toBe('proposal-1');
     expect(prisma.extractedProposal.findMany).toHaveBeenCalledWith({
       where: {
-        targetTestCaseId: { in: ['case-1'] },
         status: 'in_review',
         needsManualReview: false,
+        OR: [
+          { targetTestCaseId: { in: ['case-1'] } },
+          { matchedCaseId: { in: ['case-1'] } },
+        ],
       },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, targetTestCaseId: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      select: { id: true, targetTestCaseId: true, matchedCaseId: true },
     });
   });
 
@@ -1020,8 +1023,8 @@ describe('SuitesService.dismissCollision', () => {
   });
 });
 
-describe('SuitesService proposals waiting for review', () => {
-  it('reports how many proposals of the suite are waiting in the review inbox', async () => {
+describe('SuitesService proposals that would create new cases', () => {
+  it('reports how many proposals of the suite would create a new case', async () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([suiteRow]);
     prisma.extractedProposal.groupBy.mockResolvedValue([
@@ -1030,7 +1033,7 @@ describe('SuitesService proposals waiting for review', () => {
 
     const [suite] = await build(prisma).list(owner);
 
-    expect(suite.pendingProposals).toBe(3);
+    expect(suite.newCaseProposals).toBe(3);
   });
 
   it('reports zero for a suite with nothing waiting', async () => {
@@ -1039,10 +1042,10 @@ describe('SuitesService proposals waiting for review', () => {
 
     const [suite] = await build(prisma).list(owner);
 
-    expect(suite.pendingProposals).toBe(0);
+    expect(suite.newCaseProposals).toBe(0);
   });
 
-  it('counts every in-review proposal of the visible suites, new cases included', async () => {
+  it('counts only the in-review proposals no existing case carries', async () => {
     const prisma = createPrisma();
     prisma.suite.findMany.mockResolvedValue([suiteRow]);
 
@@ -1051,7 +1054,13 @@ describe('SuitesService proposals waiting for review', () => {
     expect(prisma.extractedProposal.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({
         by: ['suiteId'],
-        where: { suiteId: { in: ['suite-1'] }, status: 'in_review' },
+        where: {
+          suiteId: { in: ['suite-1'] },
+          status: 'in_review',
+          needsManualReview: false,
+          targetTestCaseId: null,
+          matchedCaseId: null,
+        },
       }),
     );
   });
@@ -1066,7 +1075,7 @@ describe('SuitesService proposals waiting for review', () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.pendingProposals).toBe(5);
+    expect(result.value.newCaseProposals).toBe(5);
   });
 });
 

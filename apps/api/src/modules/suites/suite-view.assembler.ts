@@ -29,6 +29,7 @@ const RESULT_STATUSES = new Set<CaseHealthResult>([
 interface PendingProposalRow {
   id: string;
   targetTestCaseId: string | null;
+  matchedCaseId: string | null;
 }
 
 interface LastResultRow {
@@ -163,16 +164,22 @@ export class SuiteViewAssembler {
               },
             },
           }) as Promise<LastResultRow[]>),
+      // A case waits for a proposal that targets it (an update) and for a
+      // possible duplicate matched to it. `needsManualReview` rows are
+      // placeholders for a failed extraction: they hold nothing to approve.
       allCaseIds.length === 0
         ? Promise.resolve([] as PendingProposalRow[])
         : (this.prisma.extractedProposal.findMany({
             where: {
-              targetTestCaseId: { in: allCaseIds },
               status: PENDING_STATUS,
               needsManualReview: false,
+              OR: [
+                { targetTestCaseId: { in: allCaseIds } },
+                { matchedCaseId: { in: allCaseIds } },
+              ],
             },
-            orderBy: { createdAt: 'asc' },
-            select: { id: true, targetTestCaseId: true },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            select: { id: true, targetTestCaseId: true, matchedCaseId: true },
           }) as Promise<PendingProposalRow[]>),
       automatedCaseIds.length === 0
         ? Promise.resolve([] as RecentResultRow[])
@@ -214,13 +221,19 @@ export class SuiteViewAssembler {
             where: { suiteId: { in: suiteIds }, closedAt: null },
             _count: { _all: true },
           }) as unknown as Promise<OpenCollisionCountRow[]>),
-      // Every proposal waiting in the inbox for the suite, including the ones
-      // that would create a new case and so have no case to attach to.
+      // The proposals waiting in the inbox that would create a new case: with
+      // no target and no matched case there is no case row to carry them.
       suiteIds.length === 0
         ? Promise.resolve([] as PendingProposalCountRow[])
         : (this.prisma.extractedProposal.groupBy({
             by: ['suiteId'],
-            where: { suiteId: { in: suiteIds }, status: PENDING_STATUS },
+            where: {
+              suiteId: { in: suiteIds },
+              status: PENDING_STATUS,
+              needsManualReview: false,
+              targetTestCaseId: null,
+              matchedCaseId: null,
+            },
             _count: { _all: true },
           }) as unknown as Promise<PendingProposalCountRow[]>),
     ]);
@@ -237,10 +250,14 @@ export class SuiteViewAssembler {
       });
     }
 
+    // Rows arrive oldest first, so the first proposal seen for a case is the
+    // one that has waited the longest.
     const pendingProposalByCaseId = new Map<string, string>();
     for (const row of pendingProposalRows) {
-      if (row.targetTestCaseId === null) continue;
-      pendingProposalByCaseId.set(row.targetTestCaseId, row.id);
+      for (const caseId of [row.targetTestCaseId, row.matchedCaseId]) {
+        if (caseId === null || pendingProposalByCaseId.has(caseId)) continue;
+        pendingProposalByCaseId.set(caseId, row.id);
+      }
     }
 
     const recentResultsByCaseId = new Map<
@@ -279,10 +296,10 @@ export class SuiteViewAssembler {
       openCollisionsBySuiteId.set(row.suiteId, row._count._all);
     }
 
-    const pendingProposalsBySuiteId = new Map<string, number>();
+    const newCaseProposalsBySuiteId = new Map<string, number>();
     for (const row of pendingProposalCountRows) {
       if (row.suiteId === null) continue;
-      pendingProposalsBySuiteId.set(row.suiteId, row._count._all);
+      newCaseProposalsBySuiteId.set(row.suiteId, row._count._all);
     }
 
     const visibleCaseIds = new Set(visibleInputs.map((input) => input.id));
@@ -373,7 +390,7 @@ export class SuiteViewAssembler {
         staleLocaleCount,
         incompleteCount,
         openCollisions: openCollisionsBySuiteId.get(view.id) ?? 0,
-        pendingProposals: pendingProposalsBySuiteId.get(view.id) ?? 0,
+        newCaseProposals: newCaseProposalsBySuiteId.get(view.id) ?? 0,
       };
     });
   }

@@ -16,7 +16,7 @@ import {
   deriveCaseAttention,
   WORKFLOW_HEALTH_SIGNALS,
 } from '@/features/projects/suites/lib/case-attention'
-import { CaseAttentionChip } from './case-attention-chip'
+import { CaseAttentionChip, CaseInReviewChip } from './case-attention-chip'
 import { HealthSignalChip } from './health-signal-chip'
 import { localeNameKey } from '@/features/projects/suites/lib/documentable-cases'
 import { deriveCaseDocumentationBadge } from '@/features/projects/suites/lib/case-documentation-state'
@@ -139,6 +139,9 @@ export function CaseCard({ testCase, projectId, githubRepo, onEdit, onDelete, on
                 </span>
               )}
             </span>
+          )}
+          {attention === 'in-review' && testCase.pendingProposalId != null && (
+            <CaseInReviewChip proposalId={testCase.pendingProposalId} />
           )}
           {documentationBadge !== null ? (
             <CaseDocumentationBadge badge={documentationBadge} />
