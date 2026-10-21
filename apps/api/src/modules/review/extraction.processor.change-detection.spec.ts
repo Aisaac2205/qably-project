@@ -319,6 +319,7 @@ function harness() {
         { publish: jest.fn() } as never,
       ),
       { GEMINI_MODEL: options.model ?? 'gemini-test' } as Env,
+      { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
     ).process({
       data: options.data ?? {
         kind: 'code-change',
@@ -1102,6 +1103,35 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
       expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(40);
       expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
       expect(store.snapshotOf('change-1')?.complete).toBe(true);
+    });
+
+    it('clears a stale stamp when it records an incomplete snapshot, so the next identical push is not skipped', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(THREE));
+      quietLogs();
+      await store.run('change-1', { model: 'gemini-a', answer: answerTargets });
+      expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+
+      // Delivered again under another model while the gate cannot read the
+      // table: nothing clears the old stamp before the job runs.
+      store.prisma.codeChange.findFirst.mockRejectedValueOnce(
+        new Error('db gone'),
+      );
+      await store.run('change-1', {
+        model: 'gemini-b',
+        answer: withoutCase('case 3'),
+      });
+      expect(store.changes.get('change-1')?.extractedAt).toBeNull();
+      expect(store.snapshotOf('change-1')?.complete).toBe(false);
+
+      store.extract.mockClear();
+      store.push('change-2', 2, testFile(THREE));
+      await store.run('change-2', {
+        model: 'gemini-b',
+        answer: answerTargets,
+      });
+
+      expect(requestedTitles(store)).toEqual([['case 3']]);
     });
 
     it('does not let a stamp of the push run when its retry still misses a test', async () => {

@@ -1988,9 +1988,10 @@ export class ExtractionProcessor {
   }
 
   /**
-   * Records an incomplete snapshot on the push, without the stamp, so the
-   * fingerprint gate still treats it as not extracted. Written with the hash
-   * it belongs to. A failure here only costs the next attempt or push the
+   * Records an incomplete snapshot on the push and clears its stamp, so the
+   * fingerprint gate treats it as not extracted even when a stamp from an
+   * earlier run of the same hash is still there. Written with the hash it
+   * belongs to. A failure here only costs the next attempt or push the
    * requests it could have avoided.
    */
   private async recordProgress(
@@ -2002,6 +2003,7 @@ export class ExtractionProcessor {
         where: { id: fingerprint.codeChangeId },
         data: {
           sourceHash: fingerprint.sourceHash,
+          extractedAt: null,
           declarationSnapshot: snapshotColumn(snapshot),
         },
       });
