@@ -1552,10 +1552,5 @@
       "cta": "Accept invitation",
       "disclaimer": "If you were not expecting this invitation, you can safely ignore this email."
     }
-  },
-  "auth": {
-    "bitbucketLoginLabel": "Login with Bitbucket",
-    "bitbucketSignupLabel": "Sign up with Bitbucket",
-    "comingSoon": "Coming soon"
   }
 }
