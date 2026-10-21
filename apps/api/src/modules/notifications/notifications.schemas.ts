@@ -6,6 +6,7 @@ const notificationEventType = z.enum([
   'case_regressed',
   'ingestion_failed',
   'connection_security',
+  'proposals_ready',
 ]);
 
 const notificationChannel = z.enum(['in_app', 'email']);

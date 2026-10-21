@@ -26,6 +26,7 @@ const eventType = z.enum([
   'case_regressed',
   'ingestion_failed',
   'connection_security',
+  'proposals_ready',
 ]);
 const eventTypes = z.array(eventType).min(1);
 

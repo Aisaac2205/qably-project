@@ -98,6 +98,39 @@ describe('renderNotificationMessage', () => {
     expect(message).toBe('Se creó la conexión Primary.');
   });
 
+  it('renders the plural proposals_ready message with the batch count', () => {
+    const message = renderNotificationMessage('en', 'proposals_ready', {
+      count: 12,
+      source: 'push',
+    });
+
+    expect(message).toBe('12 proposals are ready for review.');
+  });
+
+  it('renders the singular proposals_ready message when the batch holds one proposal', () => {
+    const message = renderNotificationMessage('en', 'proposals_ready', {
+      count: 1,
+      source: 'documentation',
+    });
+
+    expect(message).toBe('1 proposal is ready for review.');
+  });
+
+  it('renders proposals_ready in Spanish, with no English leaking in', () => {
+    const plural = renderNotificationMessage('es', 'proposals_ready', {
+      count: 3,
+      source: 'chat',
+    });
+    const singular = renderNotificationMessage('es', 'proposals_ready', {
+      count: 1,
+      source: 'chat',
+    });
+
+    expect(plural).toBe('Hay 3 propuestas listas para revisar.');
+    expect(singular).toBe('Hay 1 propuesta lista para revisar.');
+    expect(plural).not.toMatch(/proposal|ready/i);
+  });
+
   it('falls back to the generic template for an unrecognized action value', () => {
     const message = renderNotificationMessage('en', 'connection_security', {
       action: 'Something else',
@@ -160,6 +193,27 @@ describe('renderNotificationSubject', () => {
     });
 
     expect(subject).toBe('Se eliminó la conexión Primary');
+  });
+
+  it('renders the proposals_ready subject with the batch count', () => {
+    const subject = renderNotificationSubject('en', 'proposals_ready', {
+      count: 12,
+      source: 'push',
+    });
+
+    expect(subject).toBe('12 proposals ready for review');
+  });
+
+  it('renders the singular proposals_ready subject in English and Spanish', () => {
+    expect(
+      renderNotificationSubject('en', 'proposals_ready', { count: 1 }),
+    ).toBe('1 proposal ready for review');
+    expect(
+      renderNotificationSubject('es', 'proposals_ready', { count: 1 }),
+    ).toBe('1 propuesta lista para revisar');
+    expect(
+      renderNotificationSubject('es', 'proposals_ready', { count: 4 }),
+    ).toBe('4 propuestas listas para revisar');
   });
 
   it('falls back to the raw event type when the subject catalog is missing an entry', () => {

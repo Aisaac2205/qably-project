@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  SidebarMenuBadge,
   useSidebar,
 } from '@/components/ui/sidebar'
 import {
@@ -36,6 +37,7 @@ import { useCurrentUser } from '@/features/auth/hooks/use-current-user'
 import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
 import { useProject } from '@/features/projects/hooks/use-project'
 import { useProjectRouteId } from '@/features/projects/hooks/use-project-route-id'
+import { useInboxPendingCount } from '@/features/review-inbox/hooks/use-inbox-pending-count'
 import {
   projectAerisPath,
   projectQualityPath,
@@ -49,7 +51,12 @@ interface NavItem {
   href: string
   icon: Icon
   exact?: boolean
+  /** Items waiting on this destination; no badge when absent or zero. */
+  pending?: number
 }
+
+/** The badge is a few characters wide: past this it reads "99+". */
+const BADGE_MAX = 99
 
 const ROLE_LABEL_KEYS: Record<OrgRole, string> = {
   owner: 'settings.members.roleOwner',
@@ -64,6 +71,8 @@ export function Sidebar() {
   const currentUser = useCurrentUser()
   const { organization: currentOrganization } = useCurrentOrganization()
   const isCollapsed = state === 'collapsed'
+
+  const inReviewCount = useInboxPendingCount()
 
   const projectId = useProjectRouteId()
   const { project } = useProject(projectId ?? '')
@@ -80,7 +89,7 @@ export function Sidebar() {
   const navItems: NavItem[] = [
     { label: t('sidebar.portfolio'), href: '/dashboard', icon: SquaresFour },
     { label: t('sidebar.projects'), href: '/projects', icon: FolderSimple },
-    { label: t('sidebar.reviewInbox'), href: '/review-inbox', icon: Tray },
+    { label: t('sidebar.reviewInbox'), href: '/review-inbox', icon: Tray, pending: inReviewCount },
     { label: t('sidebar.notifications'), href: '/notifications', icon: BellSimple },
     { label: t('sidebar.settings'), href: '/settings', icon: GearSix },
   ]
@@ -179,16 +188,47 @@ export function Sidebar() {
             <SidebarMenu>
               {navItems.map(item => {
                 const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
+                const pending = item.pending ?? 0
+                const badgeText = pending > BADGE_MAX ? `${BADGE_MAX}+` : String(pending)
                 return (
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton
-                      render={<Link href={item.href} aria-current={isActive ? 'page' : undefined} />}
+                      render={
+                        <Link
+                          href={item.href}
+                          aria-current={isActive ? 'page' : undefined}
+                          // The badge sits beside the link, outside it, so the count
+                          // joins the name here for screen readers (exact, not capped).
+                          aria-label={
+                            pending > 0
+                              ? `${item.label}, ${t('sidebar.reviewInboxPending', { count: pending })}`
+                              : undefined
+                          }
+                        />
+                      }
                       isActive={isActive}
-                      tooltip={isCollapsed ? item.label : undefined}
+                      // Keep the label clear of the badge: room for two characters,
+                      // a little more for "99+" (the label then truncates, never overlaps).
+                      className={pending > 0 ? (badgeText.length > 2 ? 'pr-10' : 'pr-8') : undefined}
+                      tooltip={
+                        isCollapsed
+                          ? pending > 0
+                            ? `${item.label} (${badgeText})`
+                            : item.label
+                          : undefined
+                      }
                     >
                       <item.icon aria-hidden="true" />
                       <span>{item.label}</span>
                     </SidebarMenuButton>
+                    {pending > 0 && (
+                      <SidebarMenuBadge
+                        aria-hidden="true"
+                        className="right-1 rounded-full bg-primary px-1 text-primary-fg peer-hover/menu-button:text-primary-fg peer-data-active/menu-button:text-primary-fg peer-data-[size=default]/menu-button:top-2"
+                      >
+                        {badgeText}
+                      </SidebarMenuBadge>
+                    )}
                   </SidebarMenuItem>
                 )
               })}

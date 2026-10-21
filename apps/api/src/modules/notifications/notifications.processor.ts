@@ -5,6 +5,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationChannel,
   type NotificationDeliveryStatus,
+  type NotificationEventType,
   type NotificationWebhookType,
 } from '@qably/types';
 import { InjectEnv } from '../../config/config.tokens';
@@ -40,6 +41,15 @@ interface NotificationWebhookRow {
   type: NotificationWebhookType;
 }
 
+/**
+ * Events whose dedupeKey names something that keeps growing, so a repeat is
+ * news: it rewrites the payload of the existing notification instead of being
+ * dropped. The row stays where it is, and a read notification stays read.
+ */
+const REFRESHED_ON_REPEAT: ReadonlySet<NotificationEventType> = new Set([
+  'proposals_ready',
+]);
+
 @OnDemandProcessor(NOTIFICATIONS_QUEUE)
 export class NotificationsProcessor {
   private readonly logger = new Logger(NotificationsProcessor.name);
@@ -54,7 +64,9 @@ export class NotificationsProcessor {
   ) {}
 
   async process(job: Job<NotificationJobData>): Promise<void> {
-    const event = job.data;
+    const event = await this.withCurrentProposalCount(job.data);
+    if (event === null) return;
+
     const recipients = await this.resolveRecipients(event);
 
     for (const recipient of recipients) {
@@ -62,6 +74,39 @@ export class NotificationsProcessor {
     }
 
     await this.notifyWebhooks(event);
+  }
+
+  /**
+   * A push with several test files runs one extraction job per file, and each
+   * announces the same batch. What a job carries is only its own share, so the
+   * number is read again here, from the proposals that wait in the batch right
+   * now. A retried job reads the same number, and the last job to run settles
+   * on the full one. A batch with nothing left to review is not announced.
+   *
+   * Only a push has an ingestion batch to recount. Every other source announces
+   * a single proposal and keeps the count it carried.
+   */
+  private async withCurrentProposalCount(
+    event: NotificationJobData,
+  ): Promise<NotificationJobData | null> {
+    if (
+      event.eventType !== 'proposals_ready' ||
+      event.ingestionBatchId === undefined
+    ) {
+      return event;
+    }
+
+    const count = await this.prisma.extractedProposal.count({
+      where: {
+        status: 'in_review',
+        project: { organizationId: event.organizationId },
+        codeChange: { batchId: event.ingestionBatchId },
+      },
+    });
+
+    if (count === 0) return null;
+
+    return { ...event, payload: { ...event.payload, count } };
   }
 
   private async notifyWebhooks(event: NotificationJobData): Promise<void> {
@@ -146,6 +191,10 @@ export class NotificationsProcessor {
   }
 
   private deepLink(event: NotificationJobData): string | undefined {
+    if (event.eventType === 'proposals_ready') {
+      return this.reviewInboxLink(event);
+    }
+
     if (event.projectId === undefined || event.runId === undefined) {
       return undefined;
     }
@@ -154,6 +203,20 @@ export class NotificationsProcessor {
       `/projects/${event.projectId}/runs/${event.runId}`,
       this.env.WEB_APP_URL,
     ).toString();
+  }
+
+  private reviewInboxLink(event: NotificationJobData): string | undefined {
+    const batchId = event.payload.batchId;
+
+    if (event.projectId === undefined || batchId === undefined) {
+      return undefined;
+    }
+
+    const url = new URL('/review-inbox', this.env.WEB_APP_URL);
+    url.searchParams.set('projectId', event.projectId);
+    url.searchParams.set('batch', String(batchId));
+
+    return url.toString();
   }
 
   private resolveWebhookChannel(type: NotificationWebhookType): WebhookChannel {
@@ -218,11 +281,13 @@ export class NotificationsProcessor {
             ? {}
             : { connectionId: event.connectionId }),
         },
-        update: {},
+        update: REFRESHED_ON_REPEAT.has(event.eventType)
+          ? { payload: event.payload }
+          : {},
       });
     }
 
-    if (emailEnabled) {
+    if (emailEnabled && !(await this.wasEmailSent(event, recipient.userId))) {
       const locale = resolveLocale(recipient.user.locale);
       const message = renderNotificationMessage(
         locale,
@@ -259,6 +324,28 @@ export class NotificationsProcessor {
 
       await this.recordEmailDelivery(event, recipient.userId, 'sent');
     }
+  }
+
+  /**
+   * Only a confirmed send counts, as with webhooks: a failed delivery is retried.
+   * Without this, every job that shares a dedupeKey would email the recipient again.
+   */
+  private async wasEmailSent(
+    event: NotificationJobData,
+    userId: string,
+  ): Promise<boolean> {
+    const existing = await this.prisma.notificationDelivery.findUnique({
+      where: {
+        userId_dedupeKey_channel: {
+          userId,
+          dedupeKey: event.dedupeKey,
+          channel: 'email',
+        },
+      },
+      select: { status: true },
+    });
+
+    return existing?.status === 'sent';
   }
 
   private async recordEmailDelivery(

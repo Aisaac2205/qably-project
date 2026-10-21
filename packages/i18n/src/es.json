@@ -47,6 +47,8 @@
     "portfolio": "Dashboard",
     "projects": "Proyectos",
     "reviewInbox": "Bandeja de revisión",
+    "reviewInboxPending_one": "{{count}} propuesta esperando revisión",
+    "reviewInboxPending_other": "{{count}} propuestas esperando revisión",
     "notifications": "Notificaciones",
     "settings": "Configuración",
     "integrations": "Integraciones",
@@ -79,6 +81,8 @@
     "filterDuplicates": "Solo duplicados",
     "duplicateFilterEnabled": "Mostrando solo duplicados",
     "duplicateFilterDisabled": "Mostrando todas las propuestas",
+    "batchFilter": "Lote",
+    "clearBatchFilter": "Quitar el filtro de lote",
     "originPush": "Push",
     "originPullRequest": "PR #{{number}}",
     "originDocumentation": "Documentación de Aeris",
@@ -216,6 +220,8 @@
     "unreadBadge": "{{count}} sin leer",
     "emptyTitle": "No hay notificaciones",
     "emptyDescription": "Estás al día. Las alertas y eventos críticos aparecerán aquí.",
+    "emptyRead": "No hay notificaciones leídas",
+    "unreadState": "Sin leer",
     "viewRun": "Ver ejecución",
     "viewDetails": "Ver detalles",
     "markAsRead": "Marcar como leída",
@@ -241,7 +247,10 @@
       "connection_security": "{{action}} en la conexión {{connectionName}}.",
       "connection_security_created": "Se creó la conexión {{connectionName}}.",
       "connection_security_rotated": "Se rotó el secreto del webhook de la conexión {{connectionName}}.",
-      "connection_security_removed": "Se eliminó la conexión {{connectionName}}."
+      "connection_security_removed": "Se eliminó la conexión {{connectionName}}.",
+      "proposals_ready": "Hay {{count}} propuestas listas para revisar.",
+      "proposals_ready_one": "Hay {{count}} propuesta lista para revisar.",
+      "proposals_ready_other": "Hay {{count}} propuestas listas para revisar."
     },
     "emailSubject": {
       "run_failed": "La ejecución \"{{runName}}\" falló",
@@ -255,11 +264,23 @@
       "connection_security": "{{action}} en la conexión {{connectionName}}",
       "connection_security_created": "Se creó la conexión {{connectionName}}",
       "connection_security_rotated": "Se rotó el secreto del webhook de {{connectionName}}",
-      "connection_security_removed": "Se eliminó la conexión {{connectionName}}"
+      "connection_security_removed": "Se eliminó la conexión {{connectionName}}",
+      "proposals_ready": "{{count}} propuestas listas para revisar",
+      "proposals_ready_one": "{{count}} propuesta lista para revisar",
+      "proposals_ready_other": "{{count}} propuestas listas para revisar"
     },
     "delivery": {
       "sentTo": "Se envió a {{channel}}",
       "failedTo": "No se pudo enviar a {{channel}}"
+    },
+    "toast": {
+      "proposalsPush_one": "{{count}} propuesta nueva del push {{sha}}",
+      "proposalsPush_other": "{{count}} propuestas nuevas del push {{sha}}",
+      "proposalsDocumentation_one": "{{count}} propuesta nueva de la documentación",
+      "proposalsDocumentation_other": "{{count}} propuestas nuevas de la documentación",
+      "proposalsChat_one": "{{count}} propuesta nueva del chat",
+      "proposalsChat_other": "{{count}} propuestas nuevas del chat",
+      "view": "Ver"
     }
   },
   "repository": {
@@ -1345,6 +1366,10 @@
           "title": "Ingesta",
           "description": "Alertas cuando falla el procesamiento de una ingesta del repositorio."
         },
+        "review": {
+          "title": "Revisión",
+          "description": "Alertas cuando hay propuestas nuevas esperando en la bandeja de revisión."
+        },
         "security": {
           "title": "Seguridad",
           "description": "Alertas sobre cambios en las credenciales de tus conexiones."
@@ -1355,7 +1380,8 @@
         "run_completed": "Ejecución completada",
         "case_regressed": "Caso con regresión",
         "ingestion_failed": "Ingesta fallida",
-        "connection_security": "Seguridad de la conexión"
+        "connection_security": "Seguridad de la conexión",
+        "proposals_ready": "Propuestas listas para revisar"
       }
     },
     "webhooks": {

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { DomainEventsModule } from '../../common/events/domain-events.module';
 import { ConfigModule } from '../../config/config.module';
 import { ENV } from '../../config/config.tokens';
 import type { Env } from '../../config/env';
@@ -19,7 +20,13 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 
 @Module({
-  imports: [PrismaModule, ConfigModule, AiModule, OrganizationsModule],
+  imports: [
+    PrismaModule,
+    ConfigModule,
+    AiModule,
+    OrganizationsModule,
+    DomainEventsModule,
+  ],
   controllers: [ChatController],
   providers: [
     ChatService,

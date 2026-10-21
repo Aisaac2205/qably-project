@@ -25,6 +25,38 @@ const legacyConnectionSecurityEvent: NotificationJobData = {
   payload: { action: 'Created', connectionName: 'Primary' },
 };
 
+const proposalsReadyEvent: NotificationJobData = {
+  eventType: 'proposals_ready',
+  organizationId: 'org-1',
+  severity: 'medium',
+  payload: {
+    source: 'push',
+    count: 2,
+    projectId: 'project-1',
+    batchId: 'batch-1',
+    commitSha: 'abc1234def',
+    author: 'ada',
+    branch: 'main',
+  },
+  dedupeKey: 'proposals:push:batch-1',
+  projectId: 'project-1',
+  ingestionBatchId: 'batch-1',
+};
+
+const singleProposalEvent: NotificationJobData = {
+  eventType: 'proposals_ready',
+  organizationId: 'org-1',
+  severity: 'medium',
+  payload: {
+    source: 'chat',
+    count: 1,
+    projectId: 'project-1',
+    batchId: 'proposal-9',
+  },
+  dedupeKey: 'proposals:chat:proposal-9',
+  projectId: 'project-1',
+};
+
 interface FakeMember {
   userId: string;
   role: 'owner' | 'admin' | 'member';
@@ -55,6 +87,7 @@ interface FakePrisma {
   notification: { upsert: jest.Mock };
   notificationWebhook: { findMany: jest.Mock };
   notificationDelivery: { findUnique: jest.Mock; upsert: jest.Mock };
+  extractedProposal: { count: jest.Mock };
 }
 
 function createPrisma(
@@ -76,6 +109,7 @@ function createPrisma(
       findUnique: jest.fn().mockResolvedValue(null),
       upsert: jest.fn().mockResolvedValue({}),
     },
+    extractedProposal: { count: jest.fn().mockResolvedValue(0) },
   };
 }
 
@@ -713,5 +747,320 @@ describe('NotificationsProcessor email delivery recording', () => {
       expect.arrayContaining(['user-owner', 'user-member']),
     );
     expect(new Set(userIds).size).toBe(2);
+  });
+});
+
+interface UpsertArgs {
+  where: {
+    userId_organizationId_dedupeKey: { userId: string; dedupeKey: string };
+  };
+  create: { payload: Record<string, unknown>; ingestionBatchId?: string };
+  update: { payload?: Record<string, unknown>; readAt?: unknown };
+}
+
+function upsertCalls(prisma: FakePrisma): UpsertArgs[] {
+  return (prisma.notification.upsert.mock.calls as [UpsertArgs][]).map(
+    ([call]) => call,
+  );
+}
+
+describe('NotificationsProcessor proposals_ready batches', () => {
+  it('recounts the in-review proposals of the batch, scoped to the organization', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.extractedProposal.count.mockResolvedValue(18);
+
+    await build(prisma, createMailer()).process(job(proposalsReadyEvent));
+
+    expect(prisma.extractedProposal.count).toHaveBeenCalledTimes(1);
+    expect(prisma.extractedProposal.count).toHaveBeenCalledWith({
+      where: {
+        status: 'in_review',
+        project: { organizationId: 'org-1' },
+        codeChange: { batchId: 'batch-1' },
+      },
+    });
+  });
+
+  it('writes the recounted number, not the number the job carried', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.extractedProposal.count.mockResolvedValue(18);
+
+    await build(prisma, createMailer()).process(job(proposalsReadyEvent));
+
+    const [call] = upsertCalls(prisma);
+    expect(call.create.payload).toEqual({
+      ...proposalsReadyEvent.payload,
+      count: 18,
+    });
+    expect(call.create.ingestionBatchId).toBe('batch-1');
+  });
+
+  it('refreshes only the payload of an existing notification, so a read notification stays read', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.extractedProposal.count.mockResolvedValue(18);
+
+    await build(prisma, createMailer()).process(job(proposalsReadyEvent));
+
+    const [call] = upsertCalls(prisma);
+    expect(call.where.userId_organizationId_dedupeKey).toEqual({
+      userId: 'user-owner',
+      organizationId: 'org-1',
+      dedupeKey: 'proposals:push:batch-1',
+    });
+    expect(call.update).toEqual({
+      payload: { ...proposalsReadyEvent.payload, count: 18 },
+    });
+    expect(call.update).not.toHaveProperty('readAt');
+  });
+
+  it('writes the same number when the same job runs again, so a retry never inflates the count', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.extractedProposal.count.mockResolvedValue(7);
+    const processor = build(prisma, createMailer());
+
+    await processor.process(job(proposalsReadyEvent));
+    await processor.process(job(proposalsReadyEvent));
+
+    const [first, second] = upsertCalls(prisma);
+    expect(first.update).toEqual(second.update);
+    expect(first.create.payload.count).toBe(7);
+    expect(second.create.payload.count).toBe(7);
+  });
+
+  it('lets the last of several jobs of one batch settle on the full count', async () => {
+    const prisma = createPrisma([ownerMember]);
+    const processor = build(prisma, createMailer());
+
+    prisma.extractedProposal.count.mockResolvedValueOnce(3);
+    await processor.process(
+      job({
+        ...proposalsReadyEvent,
+        payload: { ...proposalsReadyEvent.payload, count: 3 },
+      }),
+    );
+    prisma.extractedProposal.count.mockResolvedValueOnce(18);
+    await processor.process(
+      job({
+        ...proposalsReadyEvent,
+        payload: { ...proposalsReadyEvent.payload, count: 15 },
+      }),
+    );
+
+    const counts = upsertCalls(prisma).map(
+      (call) => call.update.payload?.count as number,
+    );
+    expect(counts).toEqual([3, 18]);
+    const keys = new Set(
+      upsertCalls(prisma).map(
+        (call) => call.where.userId_organizationId_dedupeKey.dedupeKey,
+      ),
+    );
+    expect(keys.size).toBe(1);
+  });
+
+  it('notifies nobody when every proposal of the batch has already been decided', async () => {
+    const prisma = createPrisma([ownerMember]);
+    prisma.extractedProposal.count.mockResolvedValue(0);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-slack-empty',
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const slack = createWebhookChannel();
+
+    await build(prisma, createMailer(), createEncryption(), slack).process(
+      job(proposalsReadyEvent),
+    );
+
+    expect(prisma.notification.upsert).not.toHaveBeenCalled();
+    expect(slack.send).not.toHaveBeenCalled();
+  });
+
+  it('does not recount a source that has no ingestion batch', async () => {
+    const prisma = createPrisma([ownerMember]);
+
+    await build(prisma, createMailer()).process(job(singleProposalEvent));
+
+    expect(prisma.extractedProposal.count).not.toHaveBeenCalled();
+    const [call] = upsertCalls(prisma);
+    expect(call.create.payload).toEqual(singleProposalEvent.payload);
+    expect(call.create).not.toHaveProperty('ingestionBatchId');
+  });
+
+  it('still refreshes the payload of a single-proposal notification on a repeat', async () => {
+    const prisma = createPrisma([ownerMember]);
+
+    await build(prisma, createMailer()).process(job(singleProposalEvent));
+
+    const [call] = upsertCalls(prisma);
+    expect(call.update).toEqual({ payload: singleProposalEvent.payload });
+  });
+
+  it('keeps the first-write-wins behaviour of every other event', async () => {
+    const prisma = createPrisma([ownerMember]);
+
+    await build(prisma, createMailer()).process(job(runFailedEvent));
+
+    const [call] = upsertCalls(prisma);
+    expect(call.update).toEqual({});
+    expect(prisma.extractedProposal.count).not.toHaveBeenCalled();
+  });
+
+  it('renders the webhook message with the recounted number', async () => {
+    const prisma = createPrisma([]);
+    prisma.extractedProposal.count.mockResolvedValue(18);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-slack-count',
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const slack = createWebhookChannel();
+
+    await build(prisma, createMailer(), createEncryption(), slack).process(
+      job(proposalsReadyEvent),
+    );
+
+    const [, notification] = slack.send.mock.calls[0] as [
+      string,
+      { message: string },
+    ];
+    expect(notification.message).toBe('18 proposals are ready for review.');
+  });
+});
+
+describe('NotificationsProcessor proposals_ready deep link', () => {
+  async function webhookUrl(
+    event: NotificationJobData,
+  ): Promise<string | undefined> {
+    const prisma = createPrisma([]);
+    prisma.extractedProposal.count.mockResolvedValue(2);
+    prisma.notificationWebhook.findMany.mockResolvedValue([
+      {
+        id: 'webhook-slack-link',
+        encryptedUrl: 'enc(https://hooks.slack.com/services/x)',
+        type: 'slack',
+      },
+    ]);
+    const slack = createWebhookChannel();
+
+    await build(prisma, createMailer(), createEncryption(), slack).process(
+      job(event),
+    );
+
+    const [, notification] = slack.send.mock.calls[0] as [
+      string,
+      { url?: string },
+    ];
+    return notification.url;
+  }
+
+  it('links the webhook to the review inbox filtered by project and batch', async () => {
+    await expect(webhookUrl(proposalsReadyEvent)).resolves.toBe(
+      'https://app.qably.dev/review-inbox?projectId=project-1&batch=batch-1',
+    );
+  });
+
+  it('links a single-proposal batch the same way', async () => {
+    await expect(webhookUrl(singleProposalEvent)).resolves.toBe(
+      'https://app.qably.dev/review-inbox?projectId=project-1&batch=proposal-9',
+    );
+  });
+
+  it('encodes ids so a hostile batch id cannot add query parameters', async () => {
+    const url = await webhookUrl({
+      ...singleProposalEvent,
+      payload: { ...singleProposalEvent.payload, batchId: 'a&status=all' },
+    });
+
+    expect(new URL(url as string).searchParams.get('batch')).toBe(
+      'a&status=all',
+    );
+  });
+
+  it('omits the url when the event carries no batch to link to', async () => {
+    await expect(
+      webhookUrl({
+        ...singleProposalEvent,
+        payload: { source: 'chat', count: 1, projectId: 'project-1' },
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it('omits the url when the event carries no project to link to', async () => {
+    await expect(
+      webhookUrl({ ...singleProposalEvent, projectId: undefined }),
+    ).resolves.toBeUndefined();
+  });
+});
+
+describe('NotificationsProcessor email re-delivery', () => {
+  function optedInPrisma(): FakePrisma {
+    const prisma = createPrisma([ownerMember]);
+    prisma.notificationPreference.findUnique.mockResolvedValue({
+      enabled: true,
+    });
+    prisma.extractedProposal.count.mockResolvedValue(5);
+    return prisma;
+  }
+
+  it('does not email a recipient again for a dedupeKey that was already emailed, since every job of one batch shares it', async () => {
+    const prisma = optedInPrisma();
+    prisma.notificationDelivery.findUnique.mockResolvedValue({
+      status: 'sent',
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(proposalsReadyEvent));
+
+    expect(mailer.send).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId_dedupeKey_channel: {
+            userId: 'user-owner',
+            dedupeKey: 'proposals:push:batch-1',
+            channel: 'email',
+          },
+        },
+      }),
+    );
+  });
+
+  it('still refreshes the in-app notification when the email was already sent', async () => {
+    const prisma = optedInPrisma();
+    prisma.notificationDelivery.findUnique.mockResolvedValue({
+      status: 'sent',
+    });
+
+    await build(prisma, createMailer()).process(job(proposalsReadyEvent));
+
+    expect(prisma.notification.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries an email whose earlier delivery failed', async () => {
+    const prisma = optedInPrisma();
+    prisma.notificationDelivery.findUnique.mockResolvedValue({
+      status: 'failed',
+    });
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(proposalsReadyEvent));
+
+    expect(mailer.send).toHaveBeenCalledTimes(1);
+  });
+
+  it('emails a recipient that has no earlier delivery', async () => {
+    const prisma = optedInPrisma();
+    const mailer = createMailer();
+
+    await build(prisma, mailer).process(job(proposalsReadyEvent));
+
+    expect(mailer.send).toHaveBeenCalledTimes(1);
+    const [call] = mailer.send.mock.calls as [[{ subject: string }]];
+    expect(call[0].subject).toBe('5 proposals ready for review');
   });
 });

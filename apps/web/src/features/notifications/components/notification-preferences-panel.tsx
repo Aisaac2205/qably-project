@@ -37,6 +37,12 @@ const GROUPS: {
     events: ['ingestion_failed'],
   },
   {
+    key: 'review',
+    titleKey: 'settings.notifications.groups.review.title',
+    descriptionKey: 'settings.notifications.groups.review.description',
+    events: ['proposals_ready'],
+  },
+  {
     key: 'security',
     titleKey: 'settings.notifications.groups.security.title',
     descriptionKey: 'settings.notifications.groups.security.description',

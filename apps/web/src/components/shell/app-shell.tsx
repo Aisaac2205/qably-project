@@ -4,6 +4,7 @@ import { useRef } from 'react'
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { Sidebar } from './sidebar'
 import { TopBar } from './top-bar'
+import { useProposalBatchToasts } from '@/features/notifications/hooks/use-proposal-batch-toasts'
 import { useTranslation } from '@/lib/i18n'
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration'
 
@@ -20,6 +21,8 @@ export function AppShell({ children }: AppShellProps) {
   const mainRef = useRef<HTMLElement>(null)
 
   useScrollRestoration(mainRef)
+  // Once for the whole shell: the toast for a new batch must not repeat per bell.
+  useProposalBatchToasts()
 
   return (
     <SidebarProvider defaultOpen={true} className="h-dvh w-full overflow-hidden bg-surface">

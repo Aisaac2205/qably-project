@@ -8,6 +8,7 @@ const COLOR_BY_EVENT: Record<NotificationEventType, string> = {
   case_regressed: '#F1C40F',
   ingestion_failed: '#E74C3C',
   connection_security: NOTIFICATION_NEUTRAL_COLOR,
+  proposals_ready: NOTIFICATION_NEUTRAL_COLOR,
 };
 
 export function notificationColor(eventType: NotificationEventType): string {

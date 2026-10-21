@@ -107,6 +107,20 @@ describe('review.api', () => {
     expect(url).toContain('search=cart')
   })
 
+  it('sends the batch on the inbox page request when one is filtered', async () => {
+    await getInboxPage({ status: 'in_review', batch: 'batch-7' }, null, 50)
+
+    const [url] = lastCall()
+    expect(url).toContain('batch=batch-7')
+  })
+
+  it('omits the batch from the inbox page request when none is filtered', async () => {
+    await getInboxPage({ status: 'in_review' }, null, 50)
+
+    const [url] = lastCall()
+    expect(url).not.toContain('batch')
+  })
+
   it('requests inbox counts scoped by project and search', async () => {
     await getInboxCounts({ projectId: 'proj-1', search: 'cart' })
 

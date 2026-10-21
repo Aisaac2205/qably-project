@@ -35,6 +35,32 @@ describe('ReviewInboxController', () => {
     expect(response).toBe(page);
   });
 
+  it('forwards the batch filter of the page query untouched', async () => {
+    const queries = fakeQueries({ items: [], nextCursor: null }, null);
+
+    await build(queries).page(org, {
+      status: 'in_review',
+      limit: 50,
+      projectId: 'project-1',
+      batch: 'batch-1',
+    });
+
+    expect(queries.page).toHaveBeenCalledWith(org, {
+      status: 'in_review',
+      limit: 50,
+      projectId: 'project-1',
+      batch: 'batch-1',
+    });
+  });
+
+  it('forwards the batch filter of the counts query untouched', async () => {
+    const queries = fakeQueries(null, { byStatus: {}, version: 'abc' });
+
+    await build(queries).counts(org, { batch: 'batch-1' });
+
+    expect(queries.counts).toHaveBeenCalledWith(org, { batch: 'batch-1' });
+  });
+
   it('forwards the counts query to ReviewInboxQueryService.counts', async () => {
     const counts = { byStatus: { in_review: 1 }, version: 'abc' };
     const queries = fakeQueries(null, counts);

@@ -122,6 +122,57 @@ describe('ReviewInboxPage', () => {
     })
   })
 
+  describe('?batch= filter', () => {
+    function renderBatchQueue() {
+      const [base] = proposalInboxFixtures({ status: 'in_review' })
+      const inBatch: ProposalListItem = { ...base, id: 'proposal-in-batch', title: 'Pushed with the batch' }
+      searchParamsQuery = 'batch=518952c4e1a7'
+      window.history.replaceState(null, '', '/review-inbox?batch=518952c4e1a7')
+      const client = createTestQueryClient()
+      client.setQueryData(reviewKeys.inbox({ status: 'in_review', batch: '518952c4e1a7' }), {
+        pages: [{ items: [inBatch], nextCursor: null }],
+        pageParams: [null],
+      })
+      render(
+        <QueryClientProvider client={client}>
+          <ReviewInboxPage />
+        </QueryClientProvider>,
+      )
+      return inBatch
+    }
+
+    it('lists only the batch the link names and says so with a chip', async () => {
+      const inBatch = renderBatchQueue()
+
+      const list = await screen.findByRole('list', { name: 'Proposals queue' })
+      expect(within(list).getAllByRole('listitem')).toHaveLength(1)
+      expect(within(list).getByText(inBatch.title)).toBeInTheDocument()
+      expect(screen.getByText('518952c4')).toBeInTheDocument()
+    })
+
+    it('drops the status counts, which cover the whole queue and not the batch', async () => {
+      renderBatchQueue()
+      await screen.findByRole('list', { name: 'Proposals queue' })
+
+      const statusGroup = screen.getByRole('group', { name: 'Status' })
+      expect(within(statusGroup).queryByText(/^\d+$/)).not.toBeInTheDocument()
+    })
+
+    it('goes back to the whole queue when the chip is dismissed', async () => {
+      const user = userEvent.setup()
+      renderBatchQueue()
+      await screen.findByRole('list', { name: 'Proposals queue' })
+
+      await user.click(screen.getByRole('button', { name: 'Clear batch filter' }))
+
+      expect(screen.queryByText('518952c4')).not.toBeInTheDocument()
+      expect(window.location.search).not.toContain('batch')
+      const list = screen.getByRole('list', { name: 'Proposals queue' })
+      expect(within(list).queryByText('Pushed with the batch')).not.toBeInTheDocument()
+      expect(within(list).getAllByRole('listitem').length).toBeGreaterThan(1)
+    })
+  })
+
   it('renders the governance statement, queue, and inspector with a single, visually hidden page heading', () => {
     const { container } = renderWithQuery(<ReviewInboxPage />)
 

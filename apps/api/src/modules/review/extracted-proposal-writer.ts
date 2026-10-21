@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import { DomainEvents } from '../../common/events/domain-events.service';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
@@ -24,6 +26,7 @@ export class ExtractedProposalWriter {
     private readonly prisma: PrismaService,
     private readonly entitlement: AiEntitlementService,
     private readonly reclassifier: ProposalReclassifier,
+    private readonly events: DomainEvents,
   ) {}
 
   async persistExtracted(
@@ -34,8 +37,15 @@ export class ExtractedProposalWriter {
     const automationKeys = cases.map((testCase) => testCase.automationKey);
 
     let resolvedSuiteId: string | null = null;
+    // What this call created, counted inside the transaction and announced only
+    // once it has committed. A refreshed or skipped proposal is not a new one.
+    let createdForCodeChange = 0;
+    const createdProposalIds: string[] = [];
 
     const persisted = await this.prisma.$transaction(async (tx: TxClient) => {
+      createdForCodeChange = 0;
+      createdProposalIds.length = 0;
+
       const spent = await this.entitlement.spendCredit(ctx.organizationId, tx);
       if (!spent) return false;
 
@@ -102,7 +112,7 @@ export class ExtractedProposalWriter {
         };
 
         if (ctx.codeChangeId !== null) {
-          await this.upsertCodeChangeProposal(
+          const created = await this.upsertCodeChangeProposal(
             tx,
             ctx,
             testCase,
@@ -111,6 +121,7 @@ export class ExtractedProposalWriter {
             uri,
             shared,
           );
+          if (created) createdForCodeChange += 1;
           continue;
         }
 
@@ -125,7 +136,7 @@ export class ExtractedProposalWriter {
           select: { id: true },
         });
 
-        await tx.extractedProposal.create({
+        const proposal = await tx.extractedProposal.create({
           data: {
             ...shared,
             evidenceId: evidence.id,
@@ -133,7 +144,9 @@ export class ExtractedProposalWriter {
             automationKey: testCase.automationKey,
             targetTestCaseId: ctx.targetTestCaseId,
           },
+          select: { id: true },
         });
+        createdProposalIds.push(proposal.id);
 
         if (ctx.targetTestCaseId !== null) {
           await tx.extractedProposal.deleteMany({
@@ -150,10 +163,83 @@ export class ExtractedProposalWriter {
     });
 
     if (persisted) {
+      await this.announceCreated(ctx, createdForCodeChange, createdProposalIds);
       await this.reclassifier.enqueue(resolvedSuiteId);
     }
 
     return persisted;
+  }
+
+  /**
+   * Tells the notifications that proposals are waiting, after the commit and
+   * never when this call created none. The proposals are already saved, so a
+   * failure here is logged and must not fail, and so retry, the job.
+   *
+   * A push groups its proposals by ingestion batch: the file jobs of one push
+   * all announce the same batch. Every other source creates a single proposal
+   * per request, which is its own batch and is identified by its proposal id.
+   */
+  private async announceCreated(
+    ctx: JobContext,
+    createdForCodeChange: number,
+    createdProposalIds: readonly string[],
+  ): Promise<void> {
+    try {
+      if (ctx.codeChangeId !== null) {
+        if (createdForCodeChange > 0) {
+          await this.announcePush(ctx, ctx.codeChangeId, createdForCodeChange);
+        }
+        return;
+      }
+
+      for (const proposalId of createdProposalIds) {
+        this.events.publish(DOMAIN_EVENTS.proposalsCreated, {
+          source: 'documentation',
+          organizationId: ctx.organizationId,
+          projectId: ctx.projectId,
+          batchId: proposalId,
+          count: 1,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to announce the new proposals of ${ctx.filePath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  private async announcePush(
+    ctx: JobContext,
+    codeChangeId: string,
+    count: number,
+  ): Promise<void> {
+    const change = await this.prisma.codeChange.findUnique({
+      where: { id: codeChangeId },
+      select: {
+        batchId: true,
+        commitSha: true,
+        batch: {
+          select: { scmEvent: { select: { author: true, branch: true } } },
+        },
+      },
+    });
+    if (change === null) return;
+
+    const scmEvent = change.batch.scmEvent;
+
+    this.events.publish(DOMAIN_EVENTS.proposalsCreated, {
+      source: 'push',
+      organizationId: ctx.organizationId,
+      projectId: ctx.projectId,
+      batchId: change.batchId,
+      count,
+      ...(change.commitSha === '' ? {} : { commitSha: change.commitSha }),
+      ...(scmEvent === null
+        ? {}
+        : { author: scmEvent.author, branch: scmEvent.branch }),
+    });
   }
 
   async matchCasesByAutomationKey(
@@ -204,7 +290,7 @@ export class ExtractedProposalWriter {
     matchedCaseId: string | null,
     uri: string,
     shared: SharedProposalFields,
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (existing !== null) {
       await this.applyDecidedProposalGuard(
         tx,
@@ -215,7 +301,7 @@ export class ExtractedProposalWriter {
         uri,
         shared,
       );
-      return;
+      return false;
     }
 
     await tx.$executeRawUnsafe(`SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
@@ -243,6 +329,7 @@ export class ExtractedProposalWriter {
       });
 
       await tx.$executeRawUnsafe(`RELEASE SAVEPOINT ${PROPOSAL_SAVEPOINT}`);
+      return true;
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
 
@@ -268,6 +355,7 @@ export class ExtractedProposalWriter {
         uri,
         shared,
       );
+      return false;
     }
   }
 

@@ -83,6 +83,35 @@ describe('reviewInboxQuerySchema', () => {
   it('accepts status "all" to request every status', () => {
     expect(reviewInboxQuerySchema.parse({ status: 'all' }).status).toBe('all');
   });
+
+  it('accepts a batch id and keeps it with the other filters', () => {
+    expect(
+      reviewInboxQuerySchema.parse({
+        projectId: 'project-1',
+        batch: 'batch-1',
+      }),
+    ).toMatchObject({ projectId: 'project-1', batch: 'batch-1' });
+  });
+
+  it('trims the batch id', () => {
+    expect(reviewInboxQuerySchema.parse({ batch: ' batch-1 ' }).batch).toBe(
+      'batch-1',
+    );
+  });
+
+  it('leaves the batch unset when the query does not name one', () => {
+    expect(reviewInboxQuerySchema.parse({})).not.toHaveProperty('batch');
+  });
+
+  it.each(['', '   '])('rejects the blank batch id %j', (batch) => {
+    expect(() => reviewInboxQuerySchema.parse({ batch })).toThrow();
+  });
+
+  it('rejects a batch id longer than any id the API issues', () => {
+    expect(() =>
+      reviewInboxQuerySchema.parse({ batch: 'a'.repeat(65) }),
+    ).toThrow();
+  });
 });
 
 describe('reviewInboxCountsQuerySchema', () => {
@@ -97,5 +126,15 @@ describe('reviewInboxCountsQuerySchema', () => {
         search: 'cart',
       }),
     ).toEqual({ projectId: 'project-1', search: 'cart' });
+  });
+
+  it('accepts a batch id, so the status tabs can count the same batch the list shows', () => {
+    expect(reviewInboxCountsQuerySchema.parse({ batch: ' batch-1 ' })).toEqual({
+      batch: 'batch-1',
+    });
+  });
+
+  it('rejects a blank batch id', () => {
+    expect(() => reviewInboxCountsQuerySchema.parse({ batch: '' })).toThrow();
   });
 });

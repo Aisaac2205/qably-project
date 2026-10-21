@@ -86,6 +86,63 @@ describe('ReviewInboxQueue', () => {
     expect(within(list).queryByText('Ecommerce App')).not.toBeInTheDocument()
   })
 
+  it('shows the filtered batch as a chip the reviewer can dismiss', async () => {
+    const onClearBatch = vi.fn()
+    const user = userEvent.setup()
+
+    await act(async () => {
+      renderQueue([proposal()], { batchId: '518952c4e1a7', onClearBatch })
+    })
+
+    expect(screen.getByText('Batch')).toBeInTheDocument()
+    expect(screen.getByText('518952c4')).toHaveAttribute('title', '518952c4e1a7')
+
+    await user.click(screen.getByRole('button', { name: 'Clear batch filter' }))
+
+    expect(onClearBatch).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no batch chip while the queue is not narrowed to a batch', async () => {
+    await act(async () => {
+      renderQueue([proposal()])
+    })
+
+    expect(screen.queryByRole('button', { name: 'Clear batch filter' })).not.toBeInTheDocument()
+  })
+
+  it('shows the status counts, and drops them when they would describe a different set than the list', async () => {
+    const counts = { in_review: 42, approved: 7, rejected: 3, all: 52 }
+    let result: ReturnType<typeof renderQueue>
+
+    await act(async () => {
+      result = renderQueue([proposal()], { statusCounts: counts })
+    })
+    expect(screen.getByText('42')).toBeInTheDocument()
+
+    await act(async () => {
+      result.rerender(
+        withQueryClient(
+          <ReviewInboxQueue
+            proposals={[proposal()]}
+            selectedId={undefined}
+            onSelect={vi.fn()}
+            selectedProjectId="all"
+            onSelectProject={vi.fn()}
+            statusFilter="all"
+            onStatusFilterChange={vi.fn()}
+            duplicateOnly={false}
+            onToggleDuplicateOnly={vi.fn()}
+            searchQuery=""
+            onSearchQueryChange={vi.fn()}
+            statusCounts={counts}
+            showStatusCounts={false}
+          />,
+        ),
+      )
+    })
+    expect(screen.queryByText('42')).not.toBeInTheDocument()
+  })
+
   it('renders no load-more control when there is no next page', async () => {
     await act(async () => {
       renderQueue([proposal()])

@@ -4,6 +4,7 @@ import {
   DOMAIN_EVENTS,
   type ProposalApprovedEvent,
   type ProposalRejectedEvent,
+  type ProposalsCreatedEvent,
   type ScmEventFailedEvent,
 } from './domain-events';
 import { DomainEvents } from './domain-events.service';
@@ -70,6 +71,22 @@ describe('DomainEvents.publish', () => {
 
     expect(emit).toHaveBeenCalledTimes(1);
     expect(emit).toHaveBeenCalledWith('scm_event.failed', scmEventFailed);
+  });
+
+  it('emits the new proposals under the proposals.created name', () => {
+    const { events, emit } = build();
+    const created: ProposalsCreatedEvent = {
+      source: 'push',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'batch-1',
+      count: 4,
+    };
+
+    events.publish(DOMAIN_EVENTS.proposalsCreated, created);
+
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit).toHaveBeenCalledWith('proposals.created', created);
   });
 
   it('delivers the payload to a listener registered on the real emitter', () => {

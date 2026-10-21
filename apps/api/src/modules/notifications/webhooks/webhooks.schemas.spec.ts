@@ -117,6 +117,14 @@ describe('updateNotificationWebhookSchema', () => {
     ).toBe(true);
   });
 
+  it('accepts proposals_ready as a subscribed event type', () => {
+    expect(
+      updateNotificationWebhookSchema.safeParse({
+        eventTypes: ['proposals_ready'],
+      }).success,
+    ).toBe(true);
+  });
+
   it('has no field for the url, so a webhook url can never be changed after creation', () => {
     const parsed = updateNotificationWebhookSchema.parse({ enabled: true });
     expect(parsed).not.toHaveProperty('url');

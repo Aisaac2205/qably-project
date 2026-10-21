@@ -1,6 +1,6 @@
 # Domain events
 
-The API publishes a domain fact after it is committed, and the modules that care about it subscribe. The code that publishes does not know who listens, and the code that listens does not know who published. Today the bus carries the review decision events and the ingestion failure event. Two subscribers listen: one reclassifies a suite after a proposal is approved, the other turns an ingestion failure into a notification.
+The API publishes a domain fact after it is committed, and the modules that care about it subscribe. The code that publishes does not know who listens, and the code that listens does not know who published. Today the bus carries the review decision events, the proposal creation event and the ingestion failure event. Three subscribers listen: one reclassifies a suite after a proposal is approved, the others turn an ingestion failure or a batch of new proposals into a notification.
 
 Before this bus, `ReviewDecisionService.approve` called `ProposalReclassifier.enqueue` itself, and `reject` told nobody. Now `approve` and `reject` publish an event and stop there. In the same way, `IngestionProcessor` used to call `NotificationsPublisher.publish` when an SCM event failed, so ingestion knew its recipient. Now it publishes `scm_event.failed` and stops there.
 
@@ -44,6 +44,21 @@ Published by `ReviewDecisionService.reject` once the rejection transaction has r
 | `suiteId` | string or null | The suite of the proposal, else the suite of the case it targets, else null. |
 | `decisionId` | string | The recorded review decision. |
 | `actorId` | string | The reviewer who rejected. |
+
+### `proposals.created`
+
+Published after the transaction that created the proposals has committed, and only when it created at least one: by `ExtractedProposalWriter.persistExtracted` for a push (code-change job) and for a document-case job, and by `ChatService` when a chat suggestion is sent to review. A repeated send or the loser of a double submit returns the existing proposal and publishes nothing.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `source` | `push`, `documentation` or `chat` | Where the proposals came from. |
+| `organizationId` | string | Organization that owns the project. |
+| `projectId` | string | Project of the proposals. |
+| `batchId` | string | What the review inbox `batch` filter matches: the ingestion batch id for a push, the proposal id for documentation and chat. |
+| `count` | number | Proposals this occurrence created. A push can announce the same batch again with a larger number. |
+| `commitSha`, `author`, `branch` | string, optional | Push only, when the SCM event is still on record. |
+
+Subscriber: `NotificationsSubscriber` queues one `proposals_ready` notification with severity `medium` and the dedupe key `proposals:push:<ingestionBatchId>`, `proposals:documentation:<proposalId>` or `proposals:chat:<proposalId>`. For a push the processor recounts the `in_review` proposals of the batch, so several jobs of one push update one notification in place. See [PROPOSAL_NOTIFICATIONS.md](PROPOSAL_NOTIFICATIONS.md). `ChatModule` imports `DomainEventsModule`.
 
 ### `scm_event.failed`
 

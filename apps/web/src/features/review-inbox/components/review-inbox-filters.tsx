@@ -1,10 +1,13 @@
 'use client'
 
-import { MagnifyingGlass, CopySimple } from '@phosphor-icons/react'
+import { MagnifyingGlass, CopySimple, X } from '@phosphor-icons/react'
 import type { ReviewQueueStatusFilter } from './review-inbox-queue'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { SelectSimple } from '@/components/ui/select'
 import { useTranslation } from '@/lib/i18n'
+
+/** Long enough to tell two batches apart, short enough for a chip: a full id is on hover. */
+const BATCH_ID_DISPLAY_LENGTH = 8
 
 export interface ReviewInboxFiltersProps {
   searchQuery: string
@@ -17,6 +20,10 @@ export interface ReviewInboxFiltersProps {
   statusFilter: ReviewQueueStatusFilter
   onStatusFilterChange: (status: ReviewQueueStatusFilter) => void
   statusCounts: Record<ReviewQueueStatusFilter, number>
+  /** False when the counts describe a wider set than the list, for example under a batch filter. */
+  showStatusCounts?: boolean
+  batchId?: string
+  onClearBatch?: () => void
 }
 
 export function ReviewInboxFilters({
@@ -30,6 +37,9 @@ export function ReviewInboxFilters({
   statusFilter,
   onStatusFilterChange,
   statusCounts,
+  showStatusCounts = true,
+  batchId,
+  onClearBatch,
 }: ReviewInboxFiltersProps) {
   const { t } = useTranslation()
 
@@ -79,6 +89,25 @@ export function ReviewInboxFilters({
         </button>
       </div>
 
+      {batchId !== undefined && (
+        <div className="flex items-center">
+          <span className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg border border-border bg-surface pl-2.5 pr-1 text-xs text-muted">
+            <span>{t('reviewInbox.batchFilter')}</span>
+            <span className="truncate font-mono text-default" title={batchId}>
+              {batchId.slice(0, BATCH_ID_DISPLAY_LENGTH)}
+            </span>
+            <button
+              type="button"
+              onClick={onClearBatch}
+              aria-label={t('reviewInbox.clearBatchFilter')}
+              className="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-hover hover:text-default focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <X size={12} weight="bold" aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+      )}
+
       <div className="flex items-center overflow-x-auto pt-0.5">
         <SegmentedControl
           size="sm"
@@ -96,9 +125,11 @@ export function ReviewInboxFilters({
                         ? t('reviewInbox.filterRejected')
                         : t('reviewInbox.filterAll')}
                 </span>
-                <span className="font-mono tabular-nums text-[10px] font-normal opacity-70">
-                  {statusCounts[status]}
-                </span>
+                {showStatusCounts && (
+                  <span className="font-mono tabular-nums text-[10px] font-normal opacity-70">
+                    {statusCounts[status]}
+                  </span>
+                )}
               </>
             ),
           }))}
