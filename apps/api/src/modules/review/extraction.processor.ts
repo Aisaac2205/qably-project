@@ -1637,6 +1637,7 @@ export class ExtractionProcessor {
       await this.extractChangedDeclarations(ctx, {
         fingerprint,
         declared,
+        own: comparison?.own ?? null,
         previous: comparison?.previous ?? null,
         content: source.content,
         locale,
@@ -1780,19 +1781,28 @@ export class ExtractionProcessor {
    * ones go to the model, as explicit targets (see `chunkTargets` for how many
    * per call), and every other test of the file produces nothing.
    *
-   * Cost: one unit of the daily budget per model call (on the first attempt
-   * only, like every other job), and one credit for the job, spent when its
-   * proposals are saved. A file with no change spends neither and is stamped.
+   * Cost: one unit of the daily budget per model call, and one credit for each
+   * save of proposals, which is once per job unless a retry finishes it. A
+   * file with no change spends neither and is stamped.
    *
-   * The push is stamped, with its snapshot, only when every target came back
-   * described. Otherwise what matched is still saved, and the next push of the
-   * file, finding no stamped baseline, sends every declaration again.
+   * The push is stamped, with a complete snapshot, only when every target came
+   * back described. Otherwise what matched is saved and the push keeps an
+   * incomplete snapshot without the stamp: a retry or a redelivery of this
+   * push, and the next push of the branch, send only what is still
+   * undescribed.
+   *
+   * A retryable provider failure saves what the earlier calls matched before
+   * it rethrows, so the retry resends only the rest. The unit charged for the
+   * call that failed pays for the retry's first call; every later call is
+   * charged. The budget therefore counts each call that answers, once.
    */
   private async extractChangedDeclarations(
     ctx: JobContext,
     job: {
       fingerprint: SourceFingerprint;
       declared: DeclaredFile;
+      /** This push's own row, from the fingerprint gate. */
+      own: PushStamp | null;
       /** The push it is compared with, from the fingerprint gate. */
       previous: PushStamp | null;
       content: string;
@@ -1800,34 +1810,49 @@ export class ExtractionProcessor {
       readAt: (ref: string) => Promise<SourceReadResult>;
     },
   ): Promise<void> {
-    const baseline = await this.resolveBaseline(ctx, job.previous, job.readAt);
+    // An earlier attempt at this same file version left an incomplete
+    // snapshot: carry on from it, keeping what it found removed.
+    const resumed =
+      job.own !== null && job.own.sourceHash === job.fingerprint.sourceHash
+        ? readDeclarationSnapshot(job.own.declarationSnapshot)
+        : null;
+    const resuming = resumed !== null && !resumed.complete;
+    const baseline = resuming
+      ? resumed
+      : await this.resolveBaseline(ctx, job.previous, job.readAt);
     const diff = diffDeclarations(job.declared, baseline);
-    const snapshot = buildDeclarationSnapshot(job.declared, diff.removed);
+    const removedRefs = resuming ? resumed.removed : diff.removed;
     const total = job.declared.declarations.length;
-    const removed = diff.removed?.length ?? 0;
+    const removed = removedRefs?.length ?? 0;
 
     if (diff.changed.length === 0) {
       this.logger.log(
         `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: none of its ${String(total)} test declarations changed since the previous push (${String(removed)} removed)`,
       );
-      await this.stampExtraction(job.fingerprint, snapshot);
+      await this.stampExtraction(
+        job.fingerprint,
+        buildDeclarationSnapshot(job.declared, removedRefs),
+      );
       return;
     }
 
     const chunks = chunkTargets(diff.changed);
     this.logger.log(
-      `Extracting ${String(diff.changed.length)} of ${String(total)} test declarations of ${ctx.filePath} at ${ctx.ref} in ${String(chunks.length)} model call(s) (${diff.wholeFile ?? 'changed only'}, ${String(removed)} removed)`,
+      `Extracting ${String(diff.changed.length)} of ${String(total)} test declarations of ${ctx.filePath} at ${ctx.ref} in ${String(chunks.length)} model call(s) (${resuming ? 'resumed' : (diff.wholeFile ?? 'changed only')}, ${String(removed)} removed)`,
     );
 
     const matched: ExtractedCase[] = [];
-    let described = 0;
+    const described = new Set<string>();
     let answered = false;
     let stopReason: string | null = null;
+    let retryReason: string | null = null;
+    // A retry's first call reuses the unit charged for the call that failed.
+    let prepaid = ctx.isFirstAttempt ? 0 : 1;
 
     for (const targets of chunks) {
-      const withinBudget = ctx.isFirstAttempt
-        ? await this.dailyBudget.tryConsume(NOT_BYOK)
-        : true;
+      const withinBudget =
+        prepaid > 0 || (await this.dailyBudget.tryConsume(NOT_BYOK));
+      prepaid = 0;
       if (!withinBudget) {
         stopReason = QUOTA_EXHAUSTED_REASON;
         break;
@@ -1843,9 +1868,10 @@ export class ExtractionProcessor {
 
       if (outcome.kind === 'provider-unavailable') {
         if (outcome.retryable && !ctx.isFinalAttempt) {
-          throw new RetryableProviderError(outcome.reason);
+          retryReason = outcome.reason;
+        } else {
+          stopReason = outcome.reason;
         }
-        stopReason = outcome.reason;
         break;
       }
 
@@ -1866,7 +1892,7 @@ export class ExtractionProcessor {
           `A model call for ${ctx.filePath} reached the ${String(MAX_EXTRACTED_CASES)}-case cap: its ${String(targets.length)} declaration(s) count as not described`,
         );
       } else {
-        described += targets.length - round.missing.length;
+        for (const { target } of round.matched) described.add(target.id);
       }
       if (round.dropped > 0) {
         this.logger.log(
@@ -1875,26 +1901,78 @@ export class ExtractionProcessor {
       }
     }
 
-    const complete = stopReason === null && described === diff.changed.length;
+    const saved = await this.saveTargetedCases(ctx, {
+      matched,
+      described,
+      requested: diff.changed.length,
+      locale: job.locale,
+      // Spent once the job ends; a retry pays when it answers.
+      chargeEmptyAnswer: answered && retryReason === null,
+    });
+    if (saved !== 'saved') described.clear();
 
-    if (matched.length === 0) {
-      // A call that answered was paid for even when nothing in it was usable.
-      if (answered && !(await this.spendCreditOrFallback(ctx))) return;
-      await this.failureRecorder.recordExtractionFailure(
-        ctx,
-        stopReason ?? EXTRACTION_INCOMPLETE_REASON,
-      );
+    const undescribed = diff.changed
+      .map(({ id }) => id)
+      .filter((id) => !described.has(id));
+    const snapshot = buildDeclarationSnapshot(
+      job.declared,
+      removedRefs,
+      undescribed,
+    );
+
+    if (undescribed.length === 0) {
+      await this.stampExtraction(job.fingerprint, snapshot);
       return;
     }
 
+    await this.recordProgress(job.fingerprint, snapshot);
+
+    if (retryReason !== null) throw new RetryableProviderError(retryReason);
+
+    const reason = stopReason ?? EXTRACTION_INCOMPLETE_REASON;
+    this.logger.log(
+      `Extraction of ${ctx.filePath} described ${String(diff.changed.length - undescribed.length)} of ${String(diff.changed.length)} requested test declarations (${reason}): leaving it unstamped so the rest is requested again`,
+    );
+    if (saved === 'nothing') {
+      await this.failureRecorder.recordExtractionFailure(ctx, reason);
+    }
+  }
+
+  /**
+   * Saves the matched cases of a targeted extraction, with the incomplete
+   * note when some requested declarations did not come back. `nothing` when
+   * no case matched; `refused` when the credit was refused, which is already
+   * recorded.
+   */
+  private async saveTargetedCases(
+    ctx: JobContext,
+    result: {
+      matched: readonly ExtractedCase[];
+      described: ReadonlySet<string>;
+      requested: number;
+      locale: 'es' | 'en';
+      chargeEmptyAnswer: boolean;
+    },
+  ): Promise<'saved' | 'nothing' | 'refused'> {
+    if (result.matched.length === 0) {
+      // A call that answered was paid for even when nothing in it was usable.
+      if (
+        result.chargeEmptyAnswer &&
+        !(await this.spendCreditOrFallback(ctx))
+      ) {
+        return 'refused';
+      }
+      return 'nothing';
+    }
+
     const cases = dedupeByAutomationKey(
-      complete
-        ? matched
+      result.described.size === result.requested
+        ? result.matched
         : withIncompleteTargetNote(
-            matched,
-            described,
-            diff.changed.length,
-            job.locale,
+            result.matched,
+            result.described.size,
+            result.requested,
+            result.locale,
           ),
     );
 
@@ -1904,17 +1982,36 @@ export class ExtractionProcessor {
         ctx,
         NOT_ENTITLED_REASON,
       );
-      return;
+      return 'refused';
     }
+    return 'saved';
+  }
 
-    if (!complete) {
-      this.logger.log(
-        `Extraction of ${ctx.filePath} described ${String(described)} of ${String(diff.changed.length)} requested test declarations (${stopReason ?? EXTRACTION_INCOMPLETE_REASON}): leaving it unstamped so the next push extracts it again`,
+  /**
+   * Records an incomplete snapshot on the push, without the stamp, so the
+   * fingerprint gate still treats it as not extracted. Written with the hash
+   * it belongs to. A failure here only costs the next attempt or push the
+   * requests it could have avoided.
+   */
+  private async recordProgress(
+    fingerprint: SourceFingerprint,
+    snapshot: DeclarationSnapshot,
+  ): Promise<void> {
+    try {
+      await this.prisma.codeChange.updateMany({
+        where: { id: fingerprint.codeChangeId },
+        data: {
+          sourceHash: fingerprint.sourceHash,
+          declarationSnapshot: snapshotColumn(snapshot),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not record the progress of code change ${fingerprint.codeChangeId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
-      return;
     }
-
-    await this.stampExtraction(job.fingerprint, snapshot);
   }
 
   /**
@@ -1922,7 +2019,9 @@ export class ExtractionProcessor {
    * `findBaselinePush`), or null, so every declaration counts as changed:
    *
    * - no such push, or the lookup failed;
-   * - that push is not stamped (in flight, waiting out a retry, failed);
+   * - that push is not stamped and left no incomplete snapshot (in flight);
+   *   an incomplete snapshot is a baseline whose undescribed declarations
+   *   count as changed;
    * - it is stamped without a snapshot (extracted before snapshots existed, or
    *   through the whole-file path) and its file cannot be rebuilt safely: the
    *   file is read again at its commit and parsed, one extra read, but only
@@ -1935,9 +2034,12 @@ export class ExtractionProcessor {
     previous: PushStamp | null,
     readAt: (ref: string) => Promise<SourceReadResult>,
   ): Promise<DeclaredFile | null> {
-    if (previous === null || previous.extractedAt === null) return null;
+    if (previous === null) return null;
 
     const stored = readDeclarationSnapshot(previous.declarationSnapshot);
+    if (previous.extractedAt === null) {
+      return stored !== null && !stored.complete ? stored : null;
+    }
     if (stored !== null) return stored;
 
     try {
@@ -2040,15 +2142,19 @@ export class ExtractionProcessor {
       // The stamp goes with the old hash. A push delivered again under another
       // prompt, model, locale or limit would otherwise keep it next to the new
       // hash even if this extraction fails, finds nothing or hits the cap, and
-      // the next identical push would skip a version never extracted.
-      await this.prisma.codeChange.updateMany({
-        where: { id: codeChangeId },
-        data: {
-          sourceHash,
-          extractedAt: null,
-          declarationSnapshot: Prisma.DbNull,
-        },
-      });
+      // the next identical push would skip a version never extracted. A row
+      // that already holds this hash, unstamped, is a retry or a redelivery of
+      // this same version: its incomplete snapshot stays, for it to resume.
+      if (own?.sourceHash !== sourceHash) {
+        await this.prisma.codeChange.updateMany({
+          where: { id: codeChangeId },
+          data: {
+            sourceHash,
+            extractedAt: null,
+            declarationSnapshot: Prisma.DbNull,
+          },
+        });
+      }
       return { skipped: false, own, previous };
     } catch (error) {
       this.logger.warn(

@@ -56,40 +56,40 @@ function removedNames(
 
 /**
  * Which declarations of `current` need describing again since `baseline`. A
- * declaration changed when its id is new or its body or context hash differs;
+ * declaration changed when its id is new, its body or context hash differs,
+ * or the baseline lists it as not yet described (an incomplete extraction);
  * when the file context hash differs, every declaration changed, because a
  * top-level helper, hook or mock can change what any test does and the parser
  * does not know which tests use it.
+ *
+ * A `todo` declaration is never changed: it has no body to describe, and a
+ * model asked about it would answer nothing, forever.
  */
 export function diffDeclarations(
   current: DeclaredFile,
   baseline: DeclaredFile | null,
 ): DeclarationDiff {
+  const describable = current.declarations.filter(({ todo }) => !todo);
+
   if (baseline === null) {
-    return {
-      changed: [...current.declarations],
-      removed: null,
-      wholeFile: 'no-baseline',
-    };
+    return { changed: describable, removed: null, wholeFile: 'no-baseline' };
   }
 
   const removed = removedNames(current, baseline);
 
   if (baseline.fileContextHash !== current.fileContextHash) {
-    return {
-      changed: [...current.declarations],
-      removed,
-      wholeFile: 'file-context',
-    };
+    return { changed: describable, removed, wholeFile: 'file-context' };
   }
 
   const before = new Map(
     baseline.declarations.map((declaration) => [declaration.id, declaration]),
   );
-  const changed = current.declarations.filter((declaration) => {
+  const pending = new Set(baseline.undescribed ?? []);
+  const changed = describable.filter((declaration) => {
     const previous = before.get(declaration.id);
     return (
       previous === undefined ||
+      pending.has(declaration.id) ||
       previous.bodyHash !== declaration.bodyHash ||
       previous.contextHash !== declaration.contextHash
     );

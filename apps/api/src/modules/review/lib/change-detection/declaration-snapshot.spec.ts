@@ -110,6 +110,44 @@ describe('declaration snapshots', () => {
     expect(snapshot.version).toBe(DECLARATION_SNAPSHOT_VERSION);
   });
 
+  it('is complete exactly when nothing is left undescribed', () => {
+    const [declaration] = file().declarations;
+
+    expect(buildDeclarationSnapshot(file(), null)).toMatchObject({
+      complete: true,
+      undescribed: [],
+    });
+    const incomplete = buildDeclarationSnapshot(file(), null, [declaration.id]);
+    expect(incomplete).toMatchObject({
+      complete: false,
+      undescribed: [declaration.id],
+    });
+    expect(
+      readDeclarationSnapshot(JSON.parse(JSON.stringify(incomplete))),
+    ).toEqual(incomplete);
+  });
+
+  it('reads a snapshot whose complete flag contradicts its undescribed list as missing', () => {
+    const [declaration] = file().declarations;
+    const contradicting = {
+      ...buildDeclarationSnapshot(file(), null, [declaration.id]),
+      complete: true,
+    };
+
+    expect(readDeclarationSnapshot(contradicting)).toBeNull();
+  });
+
+  it('marks a todo declaration', () => {
+    const todo = declared(
+      "describe('Cart', () => {\n  it('adds', () => {});\n  it.todo('refunds');\n});",
+    );
+
+    expect(todo.declarations.map(({ todo: isTodo }) => isTodo)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
   it('keeps an unknown removed list apart from an empty one', () => {
     expect(buildDeclarationSnapshot(file(), null).removed).toBeNull();
     expect(buildDeclarationSnapshot(file(), []).removed).toEqual([]);

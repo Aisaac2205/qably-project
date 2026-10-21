@@ -719,18 +719,20 @@ The fingerprint above only answers "did any byte of the file change". A push tha
 |---|---|
 | `version` | `1`. A snapshot of another version reads as missing. |
 | `fileContextHash` | The parser's per-file context hash. |
-| `declarations` | One entry per declaration, in source order: `id`, `title`, `describePath`, `bodyHash`, `contextHash`, `startLine`, `endLine`, `parametrized`. |
+| `declarations` | One entry per declaration, in source order: `id`, `title`, `describePath`, `bodyHash`, `contextHash`, `startLine`, `endLine`, `parametrized`, `todo` (`it.todo`/`test.todo`). |
 | `removed` | `id`, `title` and `describePath` of the tests the file's baseline had and this version no longer has, once per describe path and title: a name that still has a declaration (one of two duplicate titles deleted) is not removed, since the reporter still reports it. `null` when the job compared the file with nothing; `[]` when it compared and nothing was removed. |
+| `undescribed` | Ids of the declarations the job was asked to describe and did not: the model skipped them, an answer reached the cap, the daily budget ran out, the provider failed, or the credit was refused. |
+| `complete` | `true` exactly when `undescribed` is empty. A stored value where the two disagree reads as missing. |
 
 The `id` is local to the file: the describe path, the title (the raw source text of a title computed at runtime) and the position among the declarations that share that path and title, in source order. Line numbers are not part of it, so a test that only moved keeps its id and both of its hashes.
 
-It is written and cleared together with `extractedAt`, under the same rules: when an extraction is stamped, when a push is skipped as identical to the previous one (with `removed: []`, since nothing differs from the push it matched), and cleared when a push is about to be extracted again under a new fingerprint. A file the parser cannot read gets no snapshot: another language, a syntax error, a source cut at the plan limit (declarations past the cut would read as removed), or a file where the parser sees no test at all (a test function bound to another name, `const myTest = base.extend(...)`, is only visible to the model). Reading a stored value never fails: anything that is not a snapshot of the current version reads as missing.
+A **complete** snapshot is written together with `extractedAt`, under the same rules: when an extraction is stamped, and when a push is skipped as identical to the previous one (with `removed: []`, since nothing differs from the push it matched). An **incomplete** snapshot is written without `extractedAt`, so the fingerprint gate still treats the push as not extracted (see "When the push is stamped"). Either is cleared when a push is about to be extracted again under a new fingerprint; a row that already holds the same hash, unstamped, keeps its incomplete snapshot, since it is a retry or a redelivery of the same version. A file the parser cannot read gets no snapshot: another language, a syntax error, a source cut at the plan limit (declarations past the cut would read as removed), or a file where the parser sees no test at all (a test function bound to another name, `const myTest = base.extend(...)`, is only visible to the model). Reading a stored value never fails: anything that is not a snapshot of the current version reads as missing.
 
 #### What goes to the model
 
 A `code-change` job whose file passed the gate above and that the parser reads (`readDeclaredFile` returns `declared`) no longer sends the whole file for a whole-file answer (`ExtractionProcessor.extractChangedDeclarations`):
 
-1. It finds the baseline (below) and compares (`diffDeclarations`). A declaration is **changed** when its id is new or its `bodyHash` or `contextHash` differs. When the file's `fileContextHash` differs, **every** declaration is changed: a top-level helper, hook or mock can change what any test does, and the parser does not know which tests use it. **Removed** declarations (in the baseline, gone now) are recorded in the snapshot and nothing is extracted for them; turning them into deprecation proposals is a separate task.
+1. It finds the baseline (below) and compares (`diffDeclarations`). A declaration is **changed** when its id is new, its `bodyHash` or `contextHash` differs, or the baseline lists it as undescribed. A `todo` declaration is never changed: it has no body to describe, and a model asked about it would answer nothing on every push. When the file's `fileContextHash` differs, **every** declaration is changed: a top-level helper, hook or mock can change what any test does, and the parser does not know which tests use it. **Removed** declarations (in the baseline, gone now) are recorded in the snapshot and nothing is extracted for them; turning them into deprecation proposals is a separate task.
 2. **Nothing changed:** the job spends no daily budget, makes no model call, spends no credit and writes no proposal. It logs one line with the counts and stamps the push with its snapshot.
 3. **Something changed:** the changed declarations, in source order, are split into chunks (`chunkTargets`): plain tests in groups of at most 15, below the 20-case cap so a model that answers a few extra cases cannot push a requested one past it, and every table (`.each`/`.for`) alone, since it is answered with one case per literal row. Each chunk is one model call in the target-declarations mode (see "Request shape"): the whole file as context, plus the chunk's declarations. A file with 45 changed tests makes 3 calls and is complete, where the whole-file request stopped at 20. An answer that reaches the cap may have lost cases the extractor cut: its matched cases are saved, but none of its declarations counts as described.
 4. The answers are mapped back to their declarations (`matchTargetedCases`) and the matched cases go through `ExtractedProposalWriter.persistExtracted` in one call, so the rules of "One open proposal per test case across pushes" apply unchanged.
@@ -745,7 +747,8 @@ The baseline comes from the push the fingerprint gate compares with (see "What i
 |---|---|
 | Stamped, with a snapshot | The snapshot. |
 | Stamped, without a snapshot (extracted before this column existed, or through the whole-file path) | The file read again at that push's `commitSha` through the same `SourceReader` path and limit, then parsed: one extra read. There is no baseline when the read fails, comes back truncated, does not parse, or is at least as long as the smallest plan's source limit (60,000 characters today): a file that long may have been extracted cut under a smaller limit than the current one, and the tests past that cut were never described. |
-| Not stamped (in flight, waiting out a retry, failed) or absent | None: every declaration counts as changed, and `removed` is `null`. |
+| Not stamped, with an incomplete snapshot (a job that ended or paused without describing everything) | The snapshot, its undescribed declarations counted as changed: only what is still missing is sent again. Only the previous push of the same branch can be in this state; the fallback push is always stamped. |
+| Not stamped, without a snapshot (in flight, before it wrote anything) or absent | None: every declaration counts as changed, and `removed` is `null`. |
 
 Any lookup error also means no baseline, with a warning; it never blocks the extraction.
 
@@ -771,18 +774,26 @@ The `automationKey` stays the one the model derives, as before: existing catalog
 
 #### Cost
 
-- **Daily budget:** one unit per model call, checked before each chunk, and only on the job's first attempt, like every other job. A retry after a retryable provider error re-runs every chunk without charging; the budget protects the platform key's quota per call, and a retry was already charged once.
-- **Credit:** one per job, spent when its proposals are saved, as before. A file with 45 changed tests costs one credit and three budget units; a file with no change costs neither. When at least one call answered but nothing in the answers matched a declaration, the credit is still spent (the call was paid for) and nothing is stamped.
+- **Daily budget:** one unit per model call, reserved before each chunk. A retryable provider failure saves what the earlier calls matched (below), so the retry resends only the rest; its first call reuses the unit already charged for the call that failed, and every later call is charged. Each call that answers is therefore counted once, a call that keeps failing during an outage costs a single unit however many attempts it takes, and chunks a failed attempt never reached are no longer free on the retry.
+- **Credit:** one per save of proposals. A job that runs through costs one credit, as before: a file with 45 changed tests costs one credit and three budget units, a file with no change costs neither. A job interrupted by a retryable failure after a chunk matched costs two, one for what it saved before the retry and one for the rest. When at least one call answered but nothing in the answers matched a declaration, the credit is still spent (the call was paid for) and nothing is stamped.
 
 #### When the push is stamped
 
-Only when every changed declaration came back described. Otherwise what matched is saved, each saved case gets the observation "Aeris documented X of Y test cases requested in this run", and the push stays unstamped, so the next push of the file finds no stamped baseline and sends every declaration again. That covers a declaration the model skipped, a daily budget that ran out between chunks, and a provider failure on the final attempt. A retryable provider failure before the final attempt saves nothing and retries the whole job. There is no second round within the job for the declarations that did not come back.
+Only when every changed declaration came back described. Otherwise what matched is saved, each saved case gets the observation "Aeris documented X of Y test cases requested in this run", and the push keeps an **incomplete snapshot without `extractedAt`**. That covers a declaration the model skipped, an answer at the cap, a daily budget that ran out between chunks, a provider failure, and a refused credit (then nothing counts as described).
+
+What reads that snapshot sends only the undescribed declarations:
+
+- **A retry or a redelivery of the same push** (same hash) carries on from its own snapshot. A retryable provider failure before the final attempt records it, saves what matched, and rethrows.
+- **The next push of the same branch** uses it as its baseline: its own changes plus whatever is still undescribed.
+
+The fingerprint gate never skips a push whose comparison push is unstamped, so an incomplete push is never taken for done.
 
 #### Trade-offs and limits
 
 - **Prompt, model and locale do not re-describe unchanged tests.** The fingerprint gate includes them, so a new prompt version (such as the move to `extraction-v13`) makes the next push of every file pass the gate once; for a file the parser reads, the comparison is on code only, so its unchanged tests stay as they are. A file the parser does not read is extracted whole again once.
 - **The file context is coarse.** A change to any top-level helper, hook, mock or constant sends every test of the file.
-- **A table with more than 20 literal rows never completes.** It goes alone to the model, but the extractor keeps at most 20 cases per call, so its answer always reaches the cap and the table is never counted as described; the push stays unstamped and the table is requested again by later pushes.
+- **A table with more than 20 literal rows never completes.** It goes alone to the model, but the extractor keeps at most 20 cases per call, so its answer always reaches the cap and the table is never counted as described; the push stays unstamped and later pushes request that table again, alone.
+- **A test the model never describes is requested on every push.** Only that test, one call per push, never the whole file, and the file is never stamped, so the fingerprint gate never skips it.
 - **Removals across branches.** A push skipped as identical to an extracted push of another branch records `removed: []`, relative to that push, not to its own branch's baseline.
 - **Unit tests use in-memory stores.** `extraction.processor.change-detection.spec.ts` applies the real filters and order of the queries above and runs the real parser, with a fake extractor; it cannot show the behaviour of the real model on the target-declarations prompt. The manual integration spec does not cover that mode yet.
 

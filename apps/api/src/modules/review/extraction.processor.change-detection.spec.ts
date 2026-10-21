@@ -10,6 +10,7 @@ import type {
   ExtractionOutcome,
   TestCaseExtractor,
 } from '../ai/extraction.contracts';
+import { targetTagAt } from '../ai/target-reference';
 import type { SourceReader } from '../repository/source-reader';
 import type { TestFileLocator } from '../repository/test-file-locator';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
@@ -409,7 +410,7 @@ describe('ExtractionProcessor — declaration snapshot of a code change', () => 
     expect(store.snapshotOf('change-2')?.removed).toEqual([]);
   });
 
-  it('clears the snapshot with the stamp when a push delivered again under another model is not extracted', async () => {
+  it('replaces a complete snapshot with an incomplete one when a push delivered again under another model is not extracted', async () => {
     const store = harness();
     store.push('change-1', 1, SOURCE);
     quietLogs();
@@ -418,7 +419,7 @@ describe('ExtractionProcessor — declaration snapshot of a code change', () => 
       model: 'gemini-a',
       answer: describeEveryTest(TITLES),
     });
-    expect(store.snapshotOf('change-1')).not.toBeNull();
+    expect(store.snapshotOf('change-1')?.complete).toBe(true);
 
     await store.run('change-1', {
       model: 'gemini-b',
@@ -430,10 +431,11 @@ describe('ExtractionProcessor — declaration snapshot of a code change', () => 
     });
 
     expect(store.changes.get('change-1')?.extractedAt).toBeNull();
-    expect(store.changes.get('change-1')?.declarationSnapshot).toBeNull();
+    expect(store.snapshotOf('change-1')?.complete).toBe(false);
+    expect(store.snapshotOf('change-1')?.undescribed).toHaveLength(3);
   });
 
-  it('stamps no snapshot on an extraction that is not stamped', async () => {
+  it('records an incomplete snapshot, without the stamp, when nothing came back', async () => {
     const store = harness();
     store.push('change-1', 1, SOURCE);
     quietLogs();
@@ -441,7 +443,10 @@ describe('ExtractionProcessor — declaration snapshot of a code change', () => 
     await store.run('change-1', { answer: () => ({ kind: 'no-tests-found' }) });
 
     expect(store.changes.get('change-1')?.extractedAt).toBeNull();
-    expect(store.changes.get('change-1')?.declarationSnapshot).toBeNull();
+    expect(store.snapshotOf('change-1')).toMatchObject({
+      complete: false,
+      undescribed: declarationsOf(SOURCE).map(({ id }) => id),
+    });
   });
 
   it.each([
@@ -475,10 +480,24 @@ function answerTargets(input: ExtractionInput): ExtractionOutcome {
   return extracted(
     targets.map((target, index) => ({
       ...extractedCase([...target.describePath, target.title].join(' ')),
-      targetRef: `T${index + 1}`,
+      targetRef: targetTagAt(index),
     })),
   );
 }
+
+/** Like `answerTargets`, but never describes the test with that title. */
+const withoutCase =
+  (title: string) =>
+  (input: ExtractionInput): ExtractionOutcome => {
+    const full = answerTargets(input);
+    if (full.kind !== 'extracted') return full;
+    return {
+      ...full,
+      cases: full.cases.filter(
+        (testCase) => testCase.automationKey !== `Cart ${title}`,
+      ),
+    };
+  };
 
 /** The titles each model call asked for, one list per call. */
 function requestedTitles(store: ReturnType<typeof harness>): string[][] {
@@ -579,7 +598,7 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
       (input: ExtractionInput): ExtractionOutcome =>
         extracted(
           (input.targetDeclarations ?? []).flatMap((target, index) => {
-            const tag = `T${index + 1}`;
+            const tag = targetTagAt(index);
             if (!target.parametrized) {
               return [
                 {
@@ -913,7 +932,67 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
 
       expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
       expect(store.changes.get('change-1')?.extractedAt).toBeNull();
-      expect(store.changes.get('change-1')?.declarationSnapshot).toBeNull();
+      expect(store.snapshotOf('change-1')).toMatchObject({
+        complete: false,
+        undescribed: [JSON.stringify([['Cart'], 'case 3', 0])],
+      });
+    });
+
+    it('sends only the missing tests on the next push', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(THREE));
+      quietLogs();
+      await store.run('change-1', { answer: withoutCase('case 3') });
+      store.extract.mockClear();
+      store.push('change-2', 2, testFile(THREE, { body: changedSecond }));
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['case 2', 'case 3']]);
+      expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('keeps requesting only a test the model never describes, never the whole file', async () => {
+      const store = harness();
+      quietLogs();
+      store.push('change-1', 1, testFile(FORTY));
+      await store.run('change-1', { answer: withoutCase('case 40') });
+      for (const [id, order] of [
+        ['change-2', 2],
+        ['change-3', 3],
+      ] as const) {
+        store.extract.mockClear();
+        store.push(id, order, testFile(FORTY));
+
+        await store.run(id, { answer: withoutCase('case 40') });
+
+        expect(requestedTitles(store)).toEqual([['case 40']]);
+        expect(store.changes.get(id)?.extractedAt).toBeNull();
+      }
+    });
+
+    it('never requests an it.todo declaration, and stamps the file without it', async () => {
+      const store = harness();
+      store.push(
+        'change-1',
+        1,
+        [
+          "import { describe, expect, it } from '@jest/globals';",
+          "describe('Cart', () => {",
+          "  it('adds', () => { expect(1).toBe(1); });",
+          "  it.todo('refunds');",
+          '});',
+        ].join('\n'),
+      );
+      quietLogs();
+
+      await store.run('change-1', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['adds']]);
+      expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+      expect(
+        store.snapshotOf('change-1')?.declarations.map(({ todo }) => todo),
+      ).toEqual([false, true]);
     });
 
     it('drops a case for a test it was not asked about', async () => {
@@ -989,9 +1068,9 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
       );
     });
 
-    it('retries the whole job on a retryable failure, charging the budget only on the first attempt', async () => {
+    it('saves what came back before a retryable failure, retries only the rest and charges each call once', async () => {
       const store = harness();
-      store.push('change-1', 1, testFile(numbered(25)));
+      store.push('change-1', 1, testFile(FORTY));
       quietLogs();
       let call = 0;
       const flaky = (input: ExtractionInput): ExtractionOutcome => {
@@ -1008,14 +1087,46 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
       await expect(store.run('change-1', { answer: flaky })).rejects.toThrow(
         'provider-unavailable:rate-limited',
       );
-      expect(store.prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(15);
       expect(store.tryConsume).toHaveBeenCalledTimes(2);
+      store.extract.mockClear();
 
       await store.run('change-1', { answer: flaky, attemptsStarted: 2 });
 
-      expect(store.tryConsume).toHaveBeenCalledTimes(2);
-      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(25);
+      // Calls 1, 2 (failed) and 3 were new; the retry of call 2 reused its unit.
+      expect(requestedTitles(store)).toEqual([
+        FORTY.slice(15, 30),
+        FORTY.slice(30),
+      ]);
+      expect(store.tryConsume).toHaveBeenCalledTimes(3);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(40);
       expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+      expect(store.snapshotOf('change-1')?.complete).toBe(true);
+    });
+
+    it('does not let a stamp of the push run when its retry still misses a test', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(THREE));
+      quietLogs();
+
+      await expect(
+        store.run('change-1', {
+          answer: () => ({
+            kind: 'provider-unavailable',
+            reason: 'provider-overloaded',
+            retryable: true,
+          }),
+        }),
+      ).rejects.toThrow('provider-unavailable:provider-overloaded');
+      await store.run('change-1', {
+        answer: withoutCase('case 3'),
+        attemptsStarted: 2,
+      });
+
+      expect(store.changes.get('change-1')?.extractedAt).toBeNull();
+      expect(store.snapshotOf('change-1')?.undescribed).toEqual([
+        JSON.stringify([['Cart'], 'case 3', 0]),
+      ]);
     });
   });
 

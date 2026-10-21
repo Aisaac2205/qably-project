@@ -20,14 +20,22 @@ const snapshotDeclarationSchema = declarationRefSchema.extend({
   startLine: z.number().int(),
   endLine: z.number().int(),
   parametrized: z.boolean(),
+  /** `it.todo`/`test.todo`: nothing to describe, never sent to the model. */
+  todo: z.boolean(),
 });
 
-const declarationSnapshotSchema = z.object({
-  version: z.literal(DECLARATION_SNAPSHOT_VERSION),
-  fileContextHash: z.string(),
-  declarations: z.array(snapshotDeclarationSchema),
-  removed: z.array(declarationRefSchema).nullable(),
-});
+const declarationSnapshotSchema = z
+  .object({
+    version: z.literal(DECLARATION_SNAPSHOT_VERSION),
+    fileContextHash: z.string(),
+    declarations: z.array(snapshotDeclarationSchema),
+    removed: z.array(declarationRefSchema).nullable(),
+    complete: z.boolean(),
+    undescribed: z.array(z.string()),
+  })
+  .refine(
+    (snapshot) => snapshot.complete === (snapshot.undescribed.length === 0),
+  );
 
 /** Names a declaration without its hashes: what a removed test is recorded as. */
 export type DeclarationRef = z.infer<typeof declarationRefSchema>;
@@ -36,11 +44,16 @@ export type DeclarationRef = z.infer<typeof declarationRefSchema>;
 export type SnapshotDeclaration = z.infer<typeof snapshotDeclarationSchema>;
 
 /**
- * What `CodeChange.declarationSnapshot` holds: the file's declarations when
- * its extraction was accounted for, and the declarations its baseline had that
- * it no longer has. `removed` is null when the job compared the file with
- * nothing (no usable baseline), and an empty list when it compared and found
- * no removal.
+ * What `CodeChange.declarationSnapshot` holds: the file's declarations, the
+ * tests its baseline had that it no longer has, and which declarations are
+ * still to be described.
+ *
+ * - `removed` is null when the job compared the file with nothing (no usable
+ *   baseline), and an empty list when it compared and found no removal.
+ * - `undescribed` lists the ids the job was asked to describe and did not
+ *   (the model skipped them, the budget ran out, the provider failed).
+ *   `complete` is true exactly when it is empty: only a complete snapshot
+ *   goes with `extractedAt`.
  */
 export type DeclarationSnapshot = z.infer<typeof declarationSnapshotSchema>;
 
@@ -48,6 +61,8 @@ export type DeclarationSnapshot = z.infer<typeof declarationSnapshotSchema>;
 export interface DeclaredFile {
   readonly fileContextHash: string;
   readonly declarations: readonly SnapshotDeclaration[];
+  /** Ids still to describe, when the file comes from an incomplete snapshot. */
+  readonly undescribed?: readonly string[];
 }
 
 /**
@@ -94,14 +109,20 @@ export function toDeclaredFile(
         startLine: declaration.startLine,
         endLine: declaration.endLine,
         parametrized: declaration.parametrized,
+        todo: declaration.modifiers.includes('todo'),
       };
     }),
   };
 }
 
+/**
+ * The snapshot of a parsed file. With `undescribed` it is incomplete: those
+ * declarations are sent again by the next attempt or push.
+ */
 export function buildDeclarationSnapshot(
   file: DeclaredFile,
   removed: readonly DeclarationRef[] | null,
+  undescribed: readonly string[] = [],
 ): DeclarationSnapshot {
   return {
     version: DECLARATION_SNAPSHOT_VERSION,
@@ -118,6 +139,8 @@ export function buildDeclarationSnapshot(
             title: ref.title,
             describePath: [...ref.describePath],
           })),
+    complete: undescribed.length === 0,
+    undescribed: [...undescribed],
   };
 }
 

@@ -148,6 +148,29 @@ describe('diffDeclarations', () => {
     ]);
   });
 
+  it('sends again what an incomplete baseline left undescribed', () => {
+    const before = declared(source());
+    const [, a2] = before.declarations;
+
+    const diff = diffDeclarations(declared(source()), {
+      ...before,
+      undescribed: [a2.id],
+    });
+
+    expect(titles(diff)).toEqual(['a2']);
+  });
+
+  it('never counts a todo declaration as changed', () => {
+    const withTodo = [
+      "describe('B', () => {",
+      "  it('b1', () => { expect(1).toBe(1); });",
+      "  it.todo('later');",
+      '});',
+    ].join('\n');
+
+    expect(titles(diffDeclarations(declared(withTodo), null))).toEqual(['b1']);
+  });
+
   it('records removals even when the file context changed', () => {
     const diff = diffDeclarations(
       declared(source({ helper: '2', titlesB: ['b1'] })),
