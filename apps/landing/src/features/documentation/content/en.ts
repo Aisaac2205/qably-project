@@ -81,7 +81,7 @@ export const en: DocContent = {
           type: 'list',
           items: [
             'A Qably account with at least one active organization.',
-            'A repository hosted on GitHub or Bitbucket (the two currently supported providers).',
+            'A repository hosted on GitHub (the supported repository provider).',
             'A CI pipeline capable of running tests and making HTTP requests upon completion.',
           ],
         },
@@ -158,7 +158,7 @@ export const en: DocContent = {
         },
         {
           type: 'paragraph',
-          text: 'Bitbucket connections operate identically, using Bitbucket-specific signature headers. GitHub and Bitbucket are the two supported repository providers.',
+          text: 'GitHub is the supported repository provider. Repository connections for other providers are not available.',
         },
         {
           type: 'callout',
@@ -687,16 +687,16 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'The :provider route parameter accepts github or bitbucket (case-insensitive). This route does not use API keys: incoming payloads are authenticated against the HMAC secret configured for the repository connection.',
+          text: 'The :provider route parameter takes github, the supported repository provider (case-insensitive). This route does not use API keys: incoming payloads are authenticated against the HMAC secret configured for the repository connection.',
         },
         {
           type: 'table',
-          headers: ['', 'GitHub', 'Bitbucket'],
+          headers: ['', 'GitHub'],
           rows: [
-            ['Signature header', 'x-hub-signature-256 (format sha256=<hex>)', 'x-hub-signature (format sha256=<hex>)'],
-            ['Event header', 'x-github-event: push or pull_request', 'x-event-key: repo:push, pullrequest:created, or pullrequest:updated'],
-            ['Delivery id header', 'x-github-delivery', 'x-request-uuid'],
-            ['Pull request actions handled', 'opened, synchronize', 'created, updated'],
+            ['Signature header', 'x-hub-signature-256 (format sha256=<hex>)'],
+            ['Event header', 'x-github-event: push or pull_request'],
+            ['Delivery id header', 'x-github-delivery'],
+            ['Pull request actions handled', 'opened, synchronize'],
           ],
         },
         {
@@ -916,7 +916,7 @@ response.raise_for_status()`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'The Repository view relies exclusively on the SCM webhook configured for your repository provider (GitHub or Bitbucket). Submitting test reports from CI populates execution history, but does not synchronize commit activity or branch metadata.',
+                  text: 'The Repository view relies exclusively on the SCM webhook configured for your GitHub repository. Submitting test reports from CI populates execution history, but does not synchronize commit activity or branch metadata.',
                 },
                 {
                   type: 'paragraph',
