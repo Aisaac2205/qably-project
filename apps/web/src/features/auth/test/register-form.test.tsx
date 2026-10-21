@@ -31,9 +31,11 @@ beforeEach(() => {
 })
 
 async function renderForm() {
+  let view: ReturnType<typeof render> | undefined
   await act(async () => {
-    render(<RegisterForm />)
+    view = render(<RegisterForm />)
   })
+  return view as ReturnType<typeof render>
 }
 
 describe('RegisterForm', () => {
@@ -64,14 +66,36 @@ describe('RegisterForm', () => {
     expect(screen.getByText('Or continue with')).toBeInTheDocument()
   })
 
-  it('shows a disabled Bitbucket button labeled coming soon', async () => {
+  it('keeps GitHub as the only social sign-up, with no Bitbucket option', async () => {
+    const { container } = await renderForm()
+
+    expect(screen.queryByRole('button', { name: /Bitbucket/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Coming soon')).not.toBeInTheDocument()
+    expect(container.innerHTML).not.toMatch(/bitbucket/i)
+    expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
+      'Create account',
+      'Sign up with GitHub',
+    ])
+  })
+
+  it('tabs through the fields, the submit button, GitHub and the sign in link in reading order', async () => {
+    const user = userEvent.setup()
     await renderForm()
 
-    const bitbucketButton = screen.getByRole('button', {
-      name: /Sign up with Bitbucket/,
-    })
-    expect(bitbucketButton).toBeDisabled()
-    expect(screen.getByText('Coming soon')).toBeInTheDocument()
+    const stops = [
+      screen.getByLabelText('Name'),
+      screen.getByLabelText('Email'),
+      screen.getByLabelText('Password'),
+      screen.getByLabelText('Confirm password'),
+      screen.getByRole('button', { name: 'Create account' }),
+      screen.getByRole('button', { name: 'Sign up with GitHub' }),
+      screen.getByRole('link', { name: 'Sign in' }),
+    ]
+
+    for (const stop of stops) {
+      await user.tab()
+      expect(stop).toHaveFocus()
+    }
   })
 
   it('links back to login', async () => {
