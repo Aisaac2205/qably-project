@@ -846,7 +846,21 @@
     "chatRemoveFile": "Quitar {{path}}",
     "chatFileUnreadable": "No se pudo leer ese archivo. Verifica la ruta e intenta de nuevo.",
     "chatNoCodeEvidence": "Esta propuesta todavía no tiene evidencia de código. Adjunta un caso o referencia un archivo en el chat para enviarla a revisión.",
-    "chatGroundingInsufficient": "Respondió sin citar datos específicos de este proyecto."
+    "chatGroundingInsufficient": "Respondió sin citar datos específicos de este proyecto.",
+    "chatCopyReply": "Copiar respuesta",
+    "chatReplyCopied": "Copiado",
+    "chatStopReply": "Detener la respuesta",
+    "chatScrollToLatest": "Ir al último mensaje",
+    "chatSuggestionsLabel": "Preguntas sugeridas",
+    "chatSuggestionThinSuiteTitle": "Suite con menos casos",
+    "chatSuggestionThinSuiteLabel": "Encuentra la suite con menos casos",
+    "chatSuggestionThinSuitePrompt": "¿Qué suite tiene menos casos de prueba y cuántos tiene?",
+    "chatSuggestionRecentRunsTitle": "Ejecuciones recientes",
+    "chatSuggestionRecentRunsLabel": "Resume los últimos resultados",
+    "chatSuggestionRecentRunsPrompt": "Resume las ejecuciones de prueba más recientes e indica cuáles no pasaron.",
+    "chatSuggestionCoverageGapsTitle": "Huecos de cobertura",
+    "chatSuggestionCoverageGapsLabel": "Detecta áreas con poca o ninguna cobertura",
+    "chatSuggestionCoverageGapsPrompt": "Según las suites y los títulos de los casos, ¿qué áreas de este proyecto parecen menos cubiertas?"
   },
   "reviewFlow": {
     "provenance": "Procedencia",
