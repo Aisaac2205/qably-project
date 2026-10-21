@@ -46,7 +46,7 @@ export const es: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Qably centraliza la gestión de calidad para equipos de ingeniería. La plataforma no ejecuta pruebas directamente: los resultados se generan en pipelines externos de integración continua y se envían a Qably vía HTTP. El sistema almacena las ejecuciones y consolida el historial de cambios, suites y cobertura.',
+          text: 'Qably centraliza la gestión de calidad para equipos de ingeniería. La plataforma no ejecuta pruebas directamente: los resultados se generan en pipelines externos de integración continua y se envían a Qably vía HTTP. El sistema almacena las ejecuciones y consolida el historial de pruebas, las suites y los cambios del repositorio.',
         },
         { type: 'subheading', text: 'Dos flujos independientes' },
         {
@@ -81,7 +81,7 @@ export const es: DocContent = {
           type: 'list',
           items: [
             'Una cuenta en Qably con al menos una organización activa.',
-            'Un repositorio alojado en GitHub (el proveedor de repositorios compatible).',
+            'Un repositorio alojado en GitHub, el único proveedor de repositorios compatible actualmente.',
             'Un pipeline de CI con capacidad de ejecutar pruebas y enviar peticiones HTTP al concluir.',
           ],
         },
@@ -157,10 +157,6 @@ export const es: DocContent = {
           text: 'Qably valida cada entrega entrante contra el secreto registrado mediante una firma HMAC-SHA256 (encabezado x-hub-signature-256 en formato sha256=<hex>). Las peticiones sin firma o con firmas inválidas se rechazan con código HTTP 401.',
         },
         {
-          type: 'paragraph',
-          text: 'GitHub es el proveedor de repositorios compatible. Las conexiones de repositorio con otros proveedores no están disponibles.',
-        },
-        {
           type: 'callout',
           tone: 'info',
           text: 'Las entregas exitosas se reflejan de inmediato en el historial de webhooks del proveedor. En la vista Repository de Qably, el lote de ingesta y los cambios de código aparecerán tras el siguiente push o pull request.',
@@ -206,7 +202,7 @@ export const es: DocContent = {
         },
         {
           type: 'paragraph',
-          text: 'En Jest, instale jest-junit y defina JEST_JUNIT_ADD_FILE_ATTRIBUTE como "true" para que el XML incluya la ruta de archivo de cada caso de prueba, lo que permite a Qably vincular las pruebas con el código fuente. En Vitest, el reporte JUnit se genera de forma nativa indicando el reporter correspondiente en la línea de comandos.',
+          text: 'En Jest, instale jest-junit y defina JEST_JUNIT_ADD_FILE_ATTRIBUTE como "true" para que el XML incluya la ruta de archivo de cada caso de prueba, lo que permite a Qably vincular las pruebas con el código fuente. Vitest incluye un reporter JUnit propio: actívelo con --reporter=junit e indique el archivo de salida con --outputFile, como en el flujo siguiente.',
         },
         {
           type: 'codeGroup',
@@ -351,7 +347,7 @@ jobs:
         { type: 'subheading', text: 'JavaScript y TypeScript' },
         {
           type: 'paragraph',
-          text: 'Jest y Vitest se detallaron en el paso anterior y mantienen la misma configuración.',
+          text: 'Jest y Vitest se detallaron en el paso anterior.',
         },
         {
           type: 'codeGroup',
@@ -381,23 +377,20 @@ jobs:
             },
             {
               language: 'shell',
-              label: 'PHPUnit 9 y anteriores',
+              label: 'PHPUnit',
               code: 'phpunit --log-junit junit.xml',
             },
             {
               language: 'shell',
-              label: 'PHPUnit 10+',
-              code: 'phpunit -c phpunit.xml',
-            },
-            {
-              language: 'shell',
               label: '.NET',
-              code: 'dotnet test --logger:"junit;LogFilePath=test-result.xml"',
+              code: `dotnet add package JUnitXml.TestLogger
+dotnet test --logger:"junit;LogFilePath=test-result.xml"`,
             },
             {
               language: 'shell',
               label: 'Go',
-              code: 'go test -v ./... 2>&1 | go-junit-report > report.xml',
+              code: `go install github.com/jstemmer/go-junit-report/v2@latest
+go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
             },
           ],
         },
@@ -415,26 +408,25 @@ jobs:
         },
         {
           type: 'paragraph',
-          text: 'PHPUnit 9 y anteriores aceptan una bandera directa por línea de comandos. PHPUnit 10 en adelante la eliminó, por lo que el archivo de salida se configura en phpunit.xml.',
+          text: 'PHPUnit escribe el reporte JUnit XML en el archivo indicado a --log-junit.',
         },
         {
           type: 'paragraph',
-          text: 'El paquete NuGet JunitXml.TestLogger se agrega como dependencia, y el logger se pasa por línea de comandos.',
+          text: 'Agregue el paquete NuGet JUnitXml.TestLogger al proyecto de pruebas y pase el logger por línea de comandos.',
+        },
+        {
+          type: 'paragraph',
+          text: 'go-junit-report lee la salida de go test. Su bandera -set-exit-code hace que termine con estado 1 cuando una prueba falla, de modo que una prueba fallida sigue haciendo fallar el paso de CI.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'El comando sugerido para go-junit-report debe validarse con la documentación oficial de la herramienta antes de integrarlo en entornos productivos.',
+          text: 'Un caso se identifica por su classname y su name en conjunto, por lo que dos pruebas llamadas test_login en clases distintas siguen siendo casos separados. Cuando el name ya comienza con el classname, la identidad es solo el name. Si dos pruebas distintas de una suite resuelven a la misma identidad, Qably no las fusiona en un solo caso: informa la colisión en la respuesta de ingesta (caseIdentityCollisions) para que pueda renombrar una de ellas.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'En Qably, la identidad de un caso dentro de una suite se define exclusivamente por el atributo name del elemento <testcase>; el atributo classname se descarta. Por lo tanto, dos pruebas denominadas test_login en clases distintas se consolidarán bajo el mismo caso.',
-        },
-        {
-          type: 'callout',
-          tone: 'warning',
-          text: 'pytest genera de forma predeterminada un único elemento <testsuite name="pytest"> para toda la sesión de pruebas, a diferencia de Jest o Vitest, que generan uno por archivo. En consecuencia, todas las pruebas de pytest se agrupan en una única suite en Qably. Para obtener una granularidad por archivo, defina junit_suite_name en la configuración de pytest o divida la ejecución en varios comandos.',
+          text: 'pytest escribe todas las pruebas en un único <testsuite name="pytest">, por lo que Qably agrupa todos los casos de pytest en una sola suite llamada pytest. La opción junit_suite_name solo cambia el nombre de esa suite raíz; no la divide. Para mantener suites separadas, ejecute pytest una vez por grupo de pruebas (por ejemplo, una ejecución por archivo) y envíe cada reporte por separado, cada uno con su propio externalId.',
         },
       ],
     },
@@ -676,7 +668,7 @@ response.raise_for_status()`,
         },
         {
           type: 'paragraph',
-          text: 'El título de cada caso se extrae del atributo name en <testcase>. El atributo classname solo se utiliza como valor de respaldo si name está ausente. Los archivos con sintaxis XML inválida o cuerpos vacíos reciben una respuesta HTTP 400.',
+          text: 'El título de cada caso se extrae del atributo name en <testcase>, y se usa classname como valor de respaldo si name está ausente. Juntos, classname y name forman la identidad del caso. Los archivos con sintaxis XML inválida o cuerpos vacíos reciben una respuesta HTTP 400.',
         },
       ],
     },
@@ -687,7 +679,7 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'El parámetro :provider toma el valor github, el proveedor de repositorios compatible (indistinto de mayúsculas). Este endpoint no utiliza API keys: cada entrega se valida mediante el secreto HMAC configurado para la conexión del repositorio.',
+          text: 'GitHub es el único proveedor de repositorios compatible actualmente, por lo que el parámetro :provider es github. Este endpoint no utiliza API keys: cada entrega se valida mediante el secreto HMAC configurado para la conexión del repositorio.',
         },
         {
           type: 'table',
@@ -779,7 +771,7 @@ response.raise_for_status()`,
           headers: ['Variable', 'Obligatoria', 'Notas'],
           rows: [
             ['QABLY_API_KEY', 'sí (para reportar datos)', 'Clave de autenticación del proyecto en CI. Si no está configurada, las peticiones sin autenticar se rechazan con código 401.'],
-            ['QABLY_API_BASE_URL', 'no', `Por defecto apunta a ${API_BASE_URL_TOKEN}. Puede configurarse para instancias privadas o pruebas locales contra http://localhost:3001.`],
+            ['QABLY_API_BASE_URL', 'no', `Por defecto apunta a ${API_BASE_URL_TOKEN}. Puede configurarse para probar contra una API local, por ejemplo http://localhost:3001.`],
           ],
         },
       ],
@@ -916,7 +908,7 @@ response.raise_for_status()`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'La vista Repository se alimenta exclusivamente mediante el webhook de su repositorio de GitHub. El envío de reportes de pruebas desde CI registra ejecuciones en el historial, pero no transmite el contenido de los commits ni la actividad del repositorio.',
+                  text: 'La vista Repository se alimenta exclusivamente mediante el webhook del sistema de control de versiones configurado para su repositorio de GitHub. El envío de reportes de pruebas desde CI registra ejecuciones en el historial, pero no transmite el contenido de los commits ni la actividad del repositorio.',
                 },
                 {
                   type: 'paragraph',

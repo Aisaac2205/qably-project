@@ -46,7 +46,7 @@ export const en: DocContent = {
       blocks: [
         {
           type: 'paragraph',
-          text: 'Qably centralizes QA tracking for engineering teams. The platform does not execute tests directly. Instead, external CI pipelines run the test suites and push results to Qably over HTTP. Qably stores the incoming data and provides a single view of test history, repository changes, and coverage status.',
+          text: 'Qably centralizes QA tracking for engineering teams. The platform does not execute tests directly. Instead, external CI pipelines run the test suites and push results to Qably over HTTP. Qably stores the incoming data and provides a single view of test history, suites, and repository changes.',
         },
         { type: 'subheading', text: 'Two independent pipelines' },
         {
@@ -81,7 +81,7 @@ export const en: DocContent = {
           type: 'list',
           items: [
             'A Qably account with at least one active organization.',
-            'A repository hosted on GitHub (the supported repository provider).',
+            'A repository hosted on GitHub, the only repository provider supported today.',
             'A CI pipeline capable of running tests and making HTTP requests upon completion.',
           ],
         },
@@ -157,10 +157,6 @@ export const en: DocContent = {
           text: 'Qably validates every incoming payload against the secret using HMAC-SHA256 signatures (x-hub-signature-256 header in sha256=<hex> format). Missing or mismatched signatures are rejected with HTTP 401.',
         },
         {
-          type: 'paragraph',
-          text: 'GitHub is the supported repository provider. Repository connections for other providers are not available.',
-        },
-        {
           type: 'callout',
           tone: 'info',
           text: 'Successful deliveries appear in your provider webhook delivery logs. In Qably, the updated ingestion batch, commits, and file diffs populate after the next push or pull request.',
@@ -206,7 +202,7 @@ export const en: DocContent = {
         },
         {
           type: 'paragraph',
-          text: 'For Jest, add jest-junit and set JEST_JUNIT_ADD_FILE_ATTRIBUTE to "true" so the XML includes source file paths for each test case, enabling Qably to map tests to code. In Vitest, JUnit reports are generated natively by specifying the reporter flag on the command line.',
+          text: 'For Jest, add jest-junit and set JEST_JUNIT_ADD_FILE_ATTRIBUTE to "true" so the XML includes source file paths for each test case, enabling Qably to map tests to code. Vitest has a built-in JUnit reporter: select it with --reporter=junit and set the file it writes with --outputFile, as in the workflow below.',
         },
         {
           type: 'codeGroup',
@@ -351,7 +347,7 @@ jobs:
         { type: 'subheading', text: 'JavaScript and TypeScript' },
         {
           type: 'paragraph',
-          text: 'Jest and Vitest are covered in the previous step and share the same configuration.',
+          text: 'Jest and Vitest are covered in the previous step.',
         },
         {
           type: 'codeGroup',
@@ -381,23 +377,20 @@ jobs:
             },
             {
               language: 'shell',
-              label: 'PHPUnit 9 and earlier',
+              label: 'PHPUnit',
               code: 'phpunit --log-junit junit.xml',
             },
             {
               language: 'shell',
-              label: 'PHPUnit 10+',
-              code: 'phpunit -c phpunit.xml',
-            },
-            {
-              language: 'shell',
               label: '.NET',
-              code: 'dotnet test --logger:"junit;LogFilePath=test-result.xml"',
+              code: `dotnet add package JUnitXml.TestLogger
+dotnet test --logger:"junit;LogFilePath=test-result.xml"`,
             },
             {
               language: 'shell',
               label: 'Go',
-              code: 'go test -v ./... 2>&1 | go-junit-report > report.xml',
+              code: `go install github.com/jstemmer/go-junit-report/v2@latest
+go test -v ./... 2>&1 | go-junit-report -set-exit-code > report.xml`,
             },
           ],
         },
@@ -415,26 +408,25 @@ jobs:
         },
         {
           type: 'paragraph',
-          text: 'PHPUnit 9 and earlier accept a direct CLI flag. PHPUnit 10 and later removed it, so the output file is configured in phpunit.xml instead.',
+          text: 'PHPUnit writes the JUnit XML report to the file passed to --log-junit.',
         },
         {
           type: 'paragraph',
-          text: 'The JunitXml.TestLogger NuGet package is added as a dependency, and the logger is passed on the command line.',
+          text: 'Add the JUnitXml.TestLogger NuGet package to the test project, then pass the logger on the command line.',
+        },
+        {
+          type: 'paragraph',
+          text: 'go-junit-report reads the output of go test. Its -set-exit-code flag makes it exit with status 1 when a test fails, so a failing test still fails the CI step.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'Verify the suggested go-junit-report command against the tool official repository before running it in production workflows.',
+          text: 'A case is identified by its classname and name together, so two tests named test_login in different classes stay separate cases. When the name already starts with the classname, the name alone is the identity. If two different tests in a suite resolve to the same identity, Qably does not merge them into one case: it reports the collision in the ingest response (caseIdentityCollisions) so you can rename one of them.',
         },
         {
           type: 'callout',
           tone: 'warning',
-          text: 'Case identity within a suite is determined strictly by the name attribute of the <testcase> element; classname is ignored. Two tests named test_login across different classes will resolve to the same test case in Qably.',
-        },
-        {
-          type: 'callout',
-          tone: 'warning',
-          text: 'pytest generates a single <testsuite name="pytest"> block for the entire test session, unlike Jest and Vitest, which emit one suite per file. As a result, all pytest executions map to a single suite in Qably by default. To achieve per-file granularity, configure junit_suite_name in your pytest settings or split the run across multiple commands.',
+          text: 'pytest writes every test into a single <testsuite name="pytest">, so Qably groups all pytest cases in one suite named pytest. The junit_suite_name option only renames that root suite; it does not split it. To keep suites apart, run pytest once per group of tests (for example, one run per file) and send each report separately, each with its own externalId.',
         },
       ],
     },
@@ -676,7 +668,7 @@ response.raise_for_status()`,
         },
         {
           type: 'paragraph',
-          text: 'Case titles are extracted from the <testcase name="..."> attribute; classname is consulted only as a fallback when name is omitted. Malformed XML or empty bodies return HTTP 400.',
+          text: 'Case titles are extracted from the <testcase name="..."> attribute, falling back to classname when name is omitted. Together, classname and name form the case identity. Malformed XML or empty bodies return HTTP 400.',
         },
       ],
     },
@@ -687,7 +679,7 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'The :provider route parameter takes github, the supported repository provider (case-insensitive). This route does not use API keys: incoming payloads are authenticated against the HMAC secret configured for the repository connection.',
+          text: 'GitHub is the only repository provider supported today, so the :provider route parameter is github. This route does not use API keys: incoming payloads are authenticated against the HMAC secret configured for the repository connection.',
         },
         {
           type: 'table',
@@ -779,7 +771,7 @@ response.raise_for_status()`,
           headers: ['Variable', 'Required', 'Notes'],
           rows: [
             ['QABLY_API_KEY', 'yes (to submit data)', 'Project authentication key in CI. Unauthenticated requests return HTTP 401.'],
-            ['QABLY_API_BASE_URL', 'no', `Defaults to ${API_BASE_URL_TOKEN}. Override for self-hosted instances or local testing against http://localhost:3001.`],
+            ['QABLY_API_BASE_URL', 'no', `Defaults to ${API_BASE_URL_TOKEN}. Override it to test against a local API, for example http://localhost:3001.`],
           ],
         },
       ],
