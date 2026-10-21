@@ -36,4 +36,42 @@ describe('CodeSnippet', () => {
     const pre = document.querySelector('pre')
     expect(pre?.className).toContain('whitespace-pre')
   })
+
+  it('wraps keywords and strings in token spans colored by the syntax tokens', async () => {
+    await act(async () => {
+      render(<CodeSnippet code={'const greeting = "hello"'} language="TypeScript" />)
+    })
+    const code = document.querySelector('code')
+    const keyword = code?.querySelector('.sh__token--keyword')
+    // The lexer emits the quotes and the string body as separate string tokens.
+    const stringTokens = Array.from(code?.querySelectorAll('.sh__token--string') ?? [])
+
+    expect(keyword).toHaveTextContent('const')
+    expect(keyword?.getAttribute('style')).toContain('var(--sh-keyword)')
+    expect(stringTokens.map((token) => token.textContent).join('')).toBe('"hello"')
+    for (const token of stringTokens) {
+      expect(token.getAttribute('style')).toContain('var(--sh-string)')
+    }
+  })
+
+  it('keeps the exact source text, line breaks included', async () => {
+    const source = 'function sum(a: number, b: number) {\n  // add both\n  return a + b\n}\n'
+    await act(async () => {
+      render(<CodeSnippet code={source} language="TypeScript" />)
+    })
+    expect(document.querySelector('code')?.textContent).toBe(source)
+  })
+
+  it('renders markup inside the code as text instead of injecting elements', async () => {
+    const source = 'const html = "<script>alert(1)</script>"\n</code></pre><img src="x" onerror="alert(1)">'
+    await act(async () => {
+      render(<CodeSnippet code={source} language="TypeScript" />)
+    })
+
+    expect(document.querySelector('script')).toBeNull()
+    expect(document.querySelector('img')).toBeNull()
+    expect(document.querySelectorAll('pre')).toHaveLength(1)
+    expect(document.querySelectorAll('code')).toHaveLength(1)
+    expect(document.querySelector('code')?.textContent).toBe(source)
+  })
 })

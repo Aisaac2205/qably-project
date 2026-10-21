@@ -22,7 +22,9 @@ describe('EvidenceExcerpt', () => {
 
     expect(screen.getByText('Source snippet')).toBeInTheDocument()
     expect(screen.getByText('TypeScript')).toBeInTheDocument()
-    expect(screen.getByText(/await expect\(checkoutButton\)\.toBeDisabled\(\)/)).toBeInTheDocument()
+    expect(document.querySelector('code')?.textContent).toContain(
+      '+  await expect(checkoutButton).toBeDisabled()',
+    )
     expect(screen.getByRole('button', { name: /copiar/i })).toBeInTheDocument()
   })
 
