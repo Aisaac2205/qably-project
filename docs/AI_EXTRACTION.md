@@ -577,7 +577,7 @@ On the last attempt both record `extraction-failed` as before. A code-change job
 
 ### Attempt tracking on the job context
 
-`JobContext`/`DocumentFileJobContext` (`extraction.types.ts`) carry `isFinalAttempt` and `isFirstAttempt`. `isFinalAttempt` is true once BullMQ won't retry the job again after this run, which is what lets the failure path decide between rethrowing a `RetryableProviderError` (more attempts remain) and recording the failure on the case (this was the last one). `isFirstAttempt` is true only on the job's very first execution; a retry means the daily AI budget was already spent once for this logical extraction, so budget checks only charge on the first attempt.
+`JobContext`/`DocumentFileJobContext` (`extraction.types.ts`) carry `isFinalAttempt` and `isFirstAttempt`. `isFinalAttempt` is true once BullMQ won't retry the job again after this run, which is what lets the failure path decide between rethrowing a `RetryableProviderError` (more attempts remain) and recording the failure on the case (this was the last one). `isFirstAttempt` is true only on the job's very first execution; a retry means the daily AI budget was already spent once for this logical extraction, so budget checks only charge on the first attempt. The targeted extraction of a code change is the exception, since one job makes several calls: a retry resends only what was not saved and charges every call but its first, which reuses the unit of the call that failed (see "Cost" under "Which tests of a file changed").
 
 ### Decided-proposal guard (redelivery safety)
 
@@ -754,7 +754,7 @@ Any lookup error also means no baseline, with a warning; it never blocks the ext
 
 Comparing within the branch is what makes the merge case work. With the gate in place, the push right before a merge is usually a branch push that was never stamped: comparing with it would send the whole file on every merge, the scenario this feature exists for. A merge compares with what the catalog last saw on its own branch, even when the branch push was extracted (default branch unknown), so a change already described on the branch is described again for the default branch. The revert rule still holds within a branch: a push in flight on the same branch leaves the next one without a baseline.
 
-Code changes recorded before the fingerprint columns existed have no `extractedAt`, so the first push of each file after the deploy finds no stamped baseline and makes one full targeted pass: every declaration, in chunks, with no cap. Its snapshot is the baseline from then on.
+Code changes recorded before the fingerprint columns existed have no `extractedAt`, so the first push of each file after the deploy finds no stamped baseline and makes one full targeted pass: every declaration, in as many calls as it needs, so no test is lost to the 20-case cap. Its snapshot is the baseline from then on.
 
 #### Mapping the answer back
 
