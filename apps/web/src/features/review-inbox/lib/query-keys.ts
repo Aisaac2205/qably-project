@@ -6,6 +6,7 @@ export const reviewKeys = {
     status: string
     duplicatesOnly?: boolean
     search?: string
+    batch?: string
   }) =>
     [
       'review',
@@ -14,6 +15,7 @@ export const reviewKeys = {
       filters.status,
       filters.duplicatesOnly === true ? 'duplicates' : 'all',
       filters.search?.trim() || '',
+      filters.batch || '',
     ] as const,
   /** Every inbox counts query, whatever its filters: the prefix to invalidate. */
   allInboxCounts: ['review', 'inbox-counts'] as const,

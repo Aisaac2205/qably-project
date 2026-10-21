@@ -79,6 +79,8 @@
     "filterDuplicates": "Duplicates only",
     "duplicateFilterEnabled": "Showing duplicates only",
     "duplicateFilterDisabled": "Showing all proposals",
+    "batchFilter": "Batch",
+    "clearBatchFilter": "Clear batch filter",
     "originPush": "Push",
     "originPullRequest": "PR #{{number}}",
     "originDocumentation": "Aeris documentation",

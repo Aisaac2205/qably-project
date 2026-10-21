@@ -118,6 +118,8 @@ export interface ReviewInboxFilters {
   status: ReviewInboxStatusFilter
   duplicatesOnly?: boolean
   search?: string
+  /** Only the proposals extracted together: one push, one documentation run, one chat send. */
+  batch?: string
 }
 
 export interface ReviewInboxPageResult {
@@ -153,6 +155,7 @@ function buildInboxPageQuery(
   if (filters.search !== undefined && filters.search.trim() !== '') {
     params.set('search', filters.search)
   }
+  if (filters.batch !== undefined && filters.batch !== '') params.set('batch', filters.batch)
   if (cursor !== null) params.set('cursor', cursor)
   params.set('limit', String(limit))
 

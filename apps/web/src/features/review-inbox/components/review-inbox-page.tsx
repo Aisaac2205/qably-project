@@ -45,6 +45,7 @@ export function ReviewInboxPage() {
     status: filters.statusFilter,
     duplicatesOnly: filters.duplicateOnly || undefined,
     search,
+    batch: filters.batchId,
   })
   const fetchNextPageVoid = useCallback(() => void fetchNextPage(), [fetchNextPage])
 
@@ -272,6 +273,11 @@ export function ReviewInboxPage() {
                 searchQuery={filters.searchInput}
                 onSearchQueryChange={filters.setSearchQuery}
                 statusCounts={statusCounts}
+                // The counts endpoint knows nothing of batches, so under a batch
+                // filter its totals would describe more than the list shows.
+                showStatusCounts={filters.batchId === undefined}
+                batchId={filters.batchId}
+                onClearBatch={filters.clearBatch}
                 hasNextPage={hasNextPage}
                 isFetchingNextPage={isFetchingNextPage}
                 onLoadMore={fetchNextPageVoid}

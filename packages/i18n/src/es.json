@@ -79,6 +79,8 @@
     "filterDuplicates": "Solo duplicados",
     "duplicateFilterEnabled": "Mostrando solo duplicados",
     "duplicateFilterDisabled": "Mostrando todas las propuestas",
+    "batchFilter": "Lote",
+    "clearBatchFilter": "Quitar el filtro de lote",
     "originPush": "Push",
     "originPullRequest": "PR #{{number}}",
     "originDocumentation": "Documentación de Aeris",

@@ -41,6 +41,9 @@ export interface ReviewInboxQueueProps {
   searchQuery: string
   onSearchQueryChange: (query: string) => void
   statusCounts?: ReviewInboxStatusCounts
+  showStatusCounts?: boolean
+  batchId?: string
+  onClearBatch?: () => void
   hasNextPage?: boolean
   isFetchingNextPage?: boolean
   onLoadMore?: () => void
@@ -59,6 +62,9 @@ export function ReviewInboxQueue({
   searchQuery,
   onSearchQueryChange,
   statusCounts = EMPTY_STATUS_COUNTS,
+  showStatusCounts = true,
+  batchId,
+  onClearBatch,
   hasNextPage = false,
   isFetchingNextPage = false,
   onLoadMore,
@@ -118,6 +124,9 @@ export function ReviewInboxQueue({
         statusFilter={statusFilter}
         onStatusFilterChange={onStatusFilterChange}
         statusCounts={statusCounts}
+        showStatusCounts={showStatusCounts}
+        batchId={batchId}
+        onClearBatch={onClearBatch}
       />
 
       <CardContent className="p-0 flex-1 overflow-y-auto">
