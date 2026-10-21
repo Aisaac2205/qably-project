@@ -171,7 +171,7 @@
     "temporaryDescription": "Review items will appear here when the review workflow is introduced.",
     "manualReviewTitle": "Automatic documentation produced no case",
     "manualReviewHint": "There is nothing to publish from this proposal. Document the file by hand, or reject it.",
-    "caseDocumentingNotice": "Aeris is documenting this case right now, so approving may conflict with its result. Wait for it to finish, then compare again.",
+    "caseDocumentingNotice": "Aeris is documenting this case. If you approve now, your approval wins and Aeris skips this case.",
     "manualReviewReasonExtractionFailed": "The AI provider could not be reached, or returned a response the schema rejected.",
     "manualReviewReasonNoTestsFound": "No test declarations were found in this file.",
     "manualReviewReasonExtractionIncomplete": "Aeris detected test declarations in this file but could not document them. Try again, or document it by hand.",

@@ -13,7 +13,7 @@ import { DecisionToolbar } from './inspector/decision-toolbar'
 import type { ApplyTarget, InboxSuite, ProposalClassification } from '../api/review.api'
 import { matchedCaseHref, resolveClassification } from '../lib/classification-reason'
 import { useProject } from '@/features/projects/hooks/use-project'
-import { isDocumenting } from '@/features/projects/suites/lib/documentation-state'
+import { isCaseBeingDocumented } from '../lib/case-documenting'
 import { useProposal } from '../hooks/use-proposals'
 
 interface ReviewProposalInspectorProps {
@@ -41,8 +41,7 @@ export function ReviewProposalInspector({
 
   const needsManualReview = proposal.needsManualReview || proposal.steps.length === 0
   const classification = resolveClassification(proposal.classification)
-  const isCaseBeingDocumented =
-    proposal.status === 'in_review' && isDocumenting(detail?.matchedCase?.documentation)
+  const showDocumentingNotice = isCaseBeingDocumented(detail)
 
   const formattedDate = proposal.createdAt
     ? new Date(proposal.createdAt).toLocaleDateString(undefined, {
@@ -71,7 +70,7 @@ export function ReviewProposalInspector({
           />
         )}
 
-        {isCaseBeingDocumented && <CaseDocumentingNotice />}
+        {showDocumentingNotice && <CaseDocumentingNotice />}
 
         {needsManualReview && <ManualReviewNotice proposal={proposal} />}
 

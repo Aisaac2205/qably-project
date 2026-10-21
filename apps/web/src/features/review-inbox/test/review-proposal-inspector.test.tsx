@@ -246,7 +246,7 @@ describe('ReviewProposalInspector', () => {
 
   describe('documentation in progress on the case', () => {
     const notice =
-      'Aeris is documenting this case right now, so approving may conflict with its result. Wait for it to finish, then compare again.'
+      'Aeris is documenting this case. If you approve now, your approval wins and Aeris skips this case.'
 
     function caseWith(documentation: { queuedAt: string | null; outcomeAt: string | null }) {
       return {
@@ -301,7 +301,7 @@ describe('ReviewProposalInspector', () => {
       })
 
       expect(screen.getByRole('note')).toHaveTextContent(
-        'Aeris está documentando este caso en este momento, así que aprobar ahora puede entrar en conflicto con su resultado. Espera a que termine y vuelve a comparar.',
+        'Aeris está documentando este caso. Si apruebas ahora, tu aprobación prevalece y Aeris omite este caso.',
       )
     })
   })

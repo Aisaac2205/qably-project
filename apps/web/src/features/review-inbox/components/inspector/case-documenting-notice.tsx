@@ -5,8 +5,9 @@ import { useTranslation } from '@/lib/i18n'
 
 /**
  * Shown while Aeris documents the case this proposal would update. Approving
- * then races that run: whichever publishes second either replaces the other's
- * version or is refused as stale, so the reviewer is told before deciding.
+ * now wins: the queued run sees its claim on the case cleared and skips it.
+ * The inspector refetches the detail while this shows, so it clears when the
+ * run finishes.
  */
 export function CaseDocumentingNotice() {
   const { t } = useTranslation()

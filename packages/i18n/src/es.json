@@ -171,7 +171,7 @@
     "temporaryDescription": "Los elementos de revisión aparecerán aquí cuando se incorpore el flujo de revisión.",
     "manualReviewTitle": "La documentación automática no produjo ningún caso",
     "manualReviewHint": "No hay nada que publicar desde esta propuesta. Documentar el archivo a mano, o rechazarla.",
-    "caseDocumentingNotice": "Aeris está documentando este caso en este momento, así que aprobar ahora puede entrar en conflicto con su resultado. Espera a que termine y vuelve a comparar.",
+    "caseDocumentingNotice": "Aeris está documentando este caso. Si apruebas ahora, tu aprobación prevalece y Aeris omite este caso.",
     "manualReviewReasonExtractionFailed": "No fue posible contactar al proveedor de IA, o su respuesta fue rechazada por el esquema.",
     "manualReviewReasonNoTestsFound": "No se encontraron declaraciones de prueba en este archivo.",
     "manualReviewReasonExtractionIncomplete": "Aeris detectó declaraciones de prueba en este archivo pero no logró documentarlas. Vuelve a intentarlo o documéntalo a mano.",
