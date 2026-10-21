@@ -124,7 +124,8 @@ extraction.
 
 `diffDeclarations` applies the rule of *The hashes* against the file's baseline push: a new id or a
 different `bodyHash` or `contextHash` marks one declaration changed, a different `fileContextHash`
-marks all of them, and ids only the baseline has are returned as removed. Only the changed
+marks all of them, and a describe path and title the baseline had and no current declaration has
+is returned as removed, once. Only the changed
 declarations are sent to the model, by describe path, title and line span, and
 `matchTargetedCases` maps the answer back by the cited tag, then the automation key, then the line
 span of the quoted excerpt.

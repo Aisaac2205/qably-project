@@ -720,7 +720,7 @@ The fingerprint above only answers "did any byte of the file change". A push tha
 | `version` | `1`. A snapshot of another version reads as missing. |
 | `fileContextHash` | The parser's per-file context hash. |
 | `declarations` | One entry per declaration, in source order: `id`, `title`, `describePath`, `bodyHash`, `contextHash`, `startLine`, `endLine`, `parametrized`. |
-| `removed` | `id`, `title` and `describePath` of the declarations the file's baseline had and this version no longer has. `null` when the job compared the file with nothing; `[]` when it compared and nothing was removed. |
+| `removed` | `id`, `title` and `describePath` of the tests the file's baseline had and this version no longer has, once per describe path and title: a name that still has a declaration (one of two duplicate titles deleted) is not removed, since the reporter still reports it. `null` when the job compared the file with nothing; `[]` when it compared and nothing was removed. |
 
 The `id` is local to the file: the describe path, the title (the raw source text of a title computed at runtime) and the position among the declarations that share that path and title, in source order. Line numbers are not part of it, so a test that only moved keeps its id and both of its hashes.
 

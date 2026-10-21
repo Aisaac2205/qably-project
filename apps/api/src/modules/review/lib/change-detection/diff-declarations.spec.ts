@@ -104,6 +104,50 @@ describe('diffDeclarations', () => {
     ]);
   });
 
+  it('does not report a removal while a test with the same name remains', () => {
+    const twice = [
+      "describe('B', () => {",
+      "  it('b1', () => { expect(1).toBe(1); });",
+      "  it('b1', () => { expect(2).toBe(2); });",
+      '});',
+    ].join('\n');
+    const once = [
+      "describe('B', () => {",
+      "  it('b1', () => { expect(2).toBe(2); });",
+      '});',
+    ].join('\n');
+
+    const diff = diffDeclarations(declared(once), declared(twice));
+
+    expect(diff.removed).toEqual([]);
+    expect(titles(diff)).toEqual(['b1']);
+  });
+
+  it('reports a name once when every copy of it is gone', () => {
+    const twice = [
+      "describe('B', () => {",
+      "  it('b1', () => { expect(1).toBe(1); });",
+      "  it('b1', () => { expect(2).toBe(2); });",
+      "  it('b2', () => { expect(3).toBe(3); });",
+      '});',
+    ].join('\n');
+    const none = [
+      "describe('B', () => {",
+      "  it('b2', () => { expect(3).toBe(3); });",
+      '});',
+    ].join('\n');
+
+    const diff = diffDeclarations(declared(none), declared(twice));
+
+    expect(diff.removed).toEqual([
+      {
+        id: JSON.stringify([['B'], 'b1', 0]),
+        title: 'b1',
+        describePath: ['B'],
+      },
+    ]);
+  });
+
   it('records removals even when the file context changed', () => {
     const diff = diffDeclarations(
       declared(source({ helper: '2', titlesB: ['b1'] })),

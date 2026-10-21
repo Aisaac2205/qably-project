@@ -27,6 +27,33 @@ function toRef(declaration: SnapshotDeclaration): DeclarationRef {
   };
 }
 
+function nameOf(declaration: DeclarationRef): string {
+  return JSON.stringify([declaration.describePath, declaration.title]);
+}
+
+/**
+ * The tests the baseline had and the file no longer has, once per describe
+ * path and title. A name that still has a declaration is not removed: with
+ * duplicate titles, deleting one copy shifts the occurrence index of the
+ * others, but the reporter still reports that name, and the catalog keys
+ * cases by it.
+ */
+function removedNames(
+  current: DeclaredFile,
+  baseline: DeclaredFile,
+): DeclarationRef[] {
+  const remaining = new Set(current.declarations.map(nameOf));
+  const removed = new Map<string, DeclarationRef>();
+
+  for (const declaration of baseline.declarations) {
+    const name = nameOf(declaration);
+    if (remaining.has(name) || removed.has(name)) continue;
+    removed.set(name, toRef(declaration));
+  }
+
+  return [...removed.values()];
+}
+
 /**
  * Which declarations of `current` need describing again since `baseline`. A
  * declaration changed when its id is new or its body or context hash differs;
@@ -46,10 +73,7 @@ export function diffDeclarations(
     };
   }
 
-  const currentIds = new Set(current.declarations.map(({ id }) => id));
-  const removed = baseline.declarations
-    .filter(({ id }) => !currentIds.has(id))
-    .map(toRef);
+  const removed = removedNames(current, baseline);
 
   if (baseline.fileContextHash !== current.fileContextHash) {
     return {
