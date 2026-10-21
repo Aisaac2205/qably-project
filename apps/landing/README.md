@@ -9,11 +9,21 @@ The landing application is the public-facing marketing website and interactive t
   - `DashboardWindowFrame`: Desktop browser-window replica of the product dashboard (KPI strip, executed-cases chart, projects table, case-priority donut, notification channels, recent activity) fed by mock data, with a 7, 30 and 90-day period selector.
   - `MobileDashboardIphone`: Vector iPhone 16 Pro mockup rendering the same dashboard preview at phone width.
   - `PricingSection`: Three-tier pricing comparison built from `src/features/pricing/data/tiers.ts`. A test checks the tiers against `PLAN_LIMITS` in `@qably/types`.
-- **Interactive Documentation Engine:** Available at `/docs` and `/en/docs`, featuring:
-  - Topic navigation across setup steps, CI integration, SCM webhooks, and API references.
+- **Interactive Documentation Engine:** One page per topic, served at `/docs/<slug>` and `/en/docs/<slug>` (the overview is the docs root, `/docs` and `/en/docs`), featuring:
+  - A grouped left sidebar, a right "On this page" table of contents that follows the reader, previous and next links, and a collapsible menu below the `lg` breakpoint.
+  - Topic pages for the setup steps, CI integration, SCM webhooks, and API references.
   - Code blocks with syntax highlighting and instant clipboard copying.
   - Multi-tab code snippets displaying reporting commands across languages and test frameworks.
 - **Compliance and Legal Pages:** Dedicated layouts for terms of service, privacy policies, and security posture.
+
+## Documentation Pages
+
+The docs content is a page model per locale: `src/features/documentation/content/{es,en}.ts` each export a `DocContent` with `pages` (slug, nav label, title, description, sections) and `navGroups` (the sidebar groups, in reading order). Slugs are stable English slugs shared by both locales, and each section keeps its `id` as the anchor of its `h2`.
+
+- To add a page, add a `DocPage` to `pages` in both locales and list its slug in one `navGroups` entry. `src/pages/docs/[...slug].astro` and `src/pages/en/docs/[...slug].astro` build one route per page through `getStaticPaths`; `content.test.ts` fails when the locales or the nav disagree.
+- A page whose only section repeats the page title shows the title once, as the `h1`. A page shows the right table of contents when it has at least two entries (its sections plus its `subheading` blocks, which get stable anchors from their text).
+- Links that predate the split (`/docs#step-4-report-ci`) are still alive: the overview page maps every old section id to its new page in `lib/legacy-targets.ts` and redirects in the browser, because a server never sees a fragment. Keep that map when a page is renamed or removed.
+- `lib/docs-links.test.ts` checks that every `/docs...` link written in the landing source resolves to a page and an anchor of the page model.
 
 ## Project Structure
 

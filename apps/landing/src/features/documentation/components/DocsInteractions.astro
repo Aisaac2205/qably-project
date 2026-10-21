@@ -2,6 +2,8 @@
 ---
 
 <script>
+  import { pickActiveTocId } from '../lib/toc';
+
   function setCopied(button: HTMLElement, copied: boolean): void {
     const iconCopy = button.querySelector<HTMLElement>('[data-icon-copy]');
     const iconCheck = button.querySelector<HTMLElement>('[data-icon-check]');
@@ -60,19 +62,23 @@
     }
   }
 
+  // Distance from the top of the viewport at which a heading counts as reached:
+  // the 4rem fixed header plus a little air, matching the scroll-mt-24 of the
+  // headings so that following a link makes its target the active entry.
   const TOC_OFFSET = 96;
 
+  // Both contents lists (the right rail and the collapsible one below xl) carry
+  // the same data-toc-link ids, so one pass marks the entry in each of them.
   function initTocSpy(): void {
     const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
     if (links.length === 0) return;
 
-    const sections = links
-      .map((link) => (link.dataset.tocLink ? document.getElementById(link.dataset.tocLink) : null))
-      .filter((section): section is HTMLElement => section !== null)
-      .sort((a, b) =>
-        a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
-      );
-    if (sections.length === 0) return;
+    const ids = new Set(links.map((link) => link.dataset.tocLink ?? '').filter((id) => id !== ''));
+    const targets = Array.from(ids)
+      .map((id) => document.getElementById(id))
+      .filter((target): target is HTMLElement => target !== null)
+      .sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    if (targets.length === 0) return;
 
     let activeId = '';
 
@@ -81,42 +87,66 @@
       activeId = id;
 
       for (const link of links) {
-        const current = link.dataset.tocLink === id;
-        link.classList.toggle('text-fg', current);
-        if (current) link.setAttribute('aria-current', 'true');
-        else link.removeAttribute('aria-current');
+        if (link.dataset.tocLink === id) {
+          link.setAttribute('data-active', '');
+          link.setAttribute('aria-current', 'location');
+        } else {
+          link.removeAttribute('data-active');
+          link.removeAttribute('aria-current');
+        }
       }
     }
 
-    function resolveActive(): void {
+    function update(): void {
       const doc = document.documentElement;
-      const atBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 2;
-      if (atBottom) {
-        setActive(sections[sections.length - 1].id);
-        return;
-      }
+      // A page shorter than the viewport is "at the bottom" from the start, which
+      // must not light up its last entry before the reader has moved.
+      const scrolls = doc.scrollHeight > window.innerHeight + 2;
+      const atBottom = scrolls && window.innerHeight + window.scrollY >= doc.scrollHeight - 2;
+      const id = pickActiveTocId(
+        targets.map((target) => ({ id: target.id, top: target.getBoundingClientRect().top })),
+        TOC_OFFSET,
+        atBottom,
+      );
 
-      let current = sections[0];
-      for (const section of sections) {
-        if (section.getBoundingClientRect().top - TOC_OFFSET > 1) break;
-        current = section;
-      }
-      setActive(current.id);
+      if (id !== null) setActive(id);
     }
 
-    const observer = new IntersectionObserver(resolveActive, {
-      rootMargin: `-${TOC_OFFSET}px 0px -85% 0px`,
-    });
-    for (const section of sections) observer.observe(section);
+    let frame = 0;
+    function schedule(): void {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        update();
+      });
+    }
 
-    resolveActive();
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    window.addEventListener('hashchange', schedule);
+    window.addEventListener('load', schedule);
+
+    update();
   }
 
   initTocSpy();
 
+  function closeDisclosure(details: HTMLDetailsElement): void {
+    details.open = false;
+  }
+
   document.addEventListener('click', (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
+    // A link inside the collapsible menu or contents list closes it before the
+    // browser follows the link: closing after the jump would shift the page
+    // under the target the reader just chose.
+    const disclosureLink = target.closest<HTMLAnchorElement>('[data-docs-disclosure] a');
+    if (disclosureLink) {
+      const details = disclosureLink.closest<HTMLDetailsElement>('details');
+      if (details) closeDisclosure(details);
+    }
 
     const copyButton = target.closest<HTMLElement>('[data-copy-button]');
     if (copyButton) {
@@ -129,6 +159,19 @@
       const group = tab.closest<HTMLElement>('[data-code-group]');
       if (group) activateTab(group, tab);
     }
+  });
+
+  // Escape closes the open menu or contents list and hands focus back to its summary.
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const details = target.closest<HTMLDetailsElement>('[data-docs-disclosure][open]');
+    if (!details) return;
+
+    closeDisclosure(details);
+    details.querySelector<HTMLElement>('summary')?.focus();
   });
 
   document.addEventListener('keydown', (event) => {

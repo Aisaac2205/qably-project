@@ -1,36 +1,77 @@
 ---
-import type { DocContent } from '../content/types';
+import type { Locale } from '../../i18n/types';
+import type { DocContent, DocPage } from '../content/types';
+import { docsBasePath, getPrevNext, isSectionHeadingVisible } from '../lib/pages';
 import DocsBlocks from './DocsBlocks.astro';
 import DocsInteractions from './DocsInteractions.astro';
+import DocsPager from './DocsPager.astro';
 
 interface Props {
   content: DocContent;
+  locale: Locale;
+  page: DocPage;
+  /** Label of the nav group that holds the page, shown in the breadcrumb. */
+  groupLabel?: string;
 }
 
-const { content } = Astro.props;
+const { content, locale, page, groupLabel } = Astro.props;
+const { previous, next } = getPrevNext(content, locale, page.slug);
 ---
 
 <DocsInteractions />
 
-<article class="space-y-14 max-w-3xl text-fg-muted">
-  <section class="space-y-3 pb-8 border-b border-border">
-    <div class="inline-flex items-center gap-2 text-sm text-fg-muted">
-      <span>Docs</span>
-      <span>/</span>
-      <span class="text-fg">{content.breadcrumbLabel}</span>
-    </div>
-    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-fg">{content.heroTitle}</h1>
-    <p class="text-base sm:text-lg text-fg-muted leading-relaxed">{content.heroSubtitle}</p>
-  </section>
+<article class="text-fg-muted" data-docs-article data-docs-page={page.slug}>
+  <header class="space-y-3 border-b border-border pb-8">
+    <nav aria-label={content.breadcrumbAriaLabel}>
+      <ol class="flex flex-wrap items-center gap-x-2 text-sm text-fg-muted">
+        <li>
+          <a href={docsBasePath(locale)} class="transition-colors hover:text-fg">{content.docsLabel}</a>
+        </li>
+        {
+          groupLabel !== undefined && (
+            <>
+              <li aria-hidden="true">/</li>
+              <li class="text-fg">{groupLabel}</li>
+            </>
+          )
+        }
+      </ol>
+    </nav>
+    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-fg">{page.title}</h1>
+    <p class="text-base sm:text-lg text-fg-muted leading-relaxed">{page.description}</p>
+  </header>
 
-  {
-    content.sections.map((section) => (
-      <section id={section.id} class="space-y-4 scroll-mt-24">
-        <h2 class="text-2xl font-semibold tracking-tight text-fg">{section.title}</h2>
-        <div class="space-y-4">
-          <DocsBlocks blocks={section.blocks} copyLabel={content.copyCodeLabel} copiedLabel={content.copiedLabel} />
-        </div>
-      </section>
-    ))
-  }
+  <div class="mt-12 space-y-14">
+    {
+      page.sections.map((section) =>
+        isSectionHeadingVisible(page, section) ? (
+          <section id={section.id} aria-labelledby={`${section.id}-heading`} class="space-y-4 scroll-mt-24">
+            <h2 id={`${section.id}-heading`} class="text-2xl font-semibold tracking-tight text-fg">
+              {section.title}
+            </h2>
+            <div class="space-y-4">
+              <DocsBlocks
+                blocks={section.blocks}
+                sectionId={section.id}
+                copyLabel={content.copyCodeLabel}
+                copiedLabel={content.copiedLabel}
+              />
+            </div>
+          </section>
+        ) : (
+          <div id={section.id} class="space-y-4 scroll-mt-24">
+            <DocsBlocks
+              blocks={section.blocks}
+              sectionId={section.id}
+              subheadingLevel={2}
+              copyLabel={content.copyCodeLabel}
+              copiedLabel={content.copiedLabel}
+            />
+          </div>
+        ),
+      )
+    }
+  </div>
+
+  <DocsPager content={content} previous={previous} next={next} />
 </article>

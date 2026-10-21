@@ -2,15 +2,21 @@
 import type { DocBlock } from '../content/types';
 import CodeBlock from './CodeBlock.astro';
 import CodeGroup from './CodeGroup.astro';
+import { subheadingId } from '../lib/toc';
 import DocsBlocks from './DocsBlocks.astro';
 
 interface Props {
   blocks: DocBlock[];
   copyLabel: string;
   copiedLabel: string;
+  /** Section the blocks belong to: subheadings derive their anchor from it. */
+  sectionId?: string;
+  /** h3 under a visible section heading; h2 when the section heading is not rendered. */
+  subheadingLevel?: 2 | 3;
 }
 
-const { blocks, copyLabel, copiedLabel } = Astro.props;
+const { blocks, copyLabel, copiedLabel, sectionId, subheadingLevel = 3 } = Astro.props;
+const Subheading = subheadingLevel === 2 ? 'h2' : 'h3';
 
 const calloutClasses = {
   info: 'border-border bg-bg-elevated text-fg-muted',
@@ -26,7 +32,12 @@ const calloutClasses = {
       )}
 
       {block.type === 'subheading' && (
-        <h3 class="text-base sm:text-lg font-semibold text-fg pt-2">{block.text}</h3>
+        <Subheading
+          id={sectionId === undefined ? undefined : subheadingId(sectionId, block.text)}
+          class="scroll-mt-24 text-base sm:text-lg font-semibold text-fg pt-2"
+        >
+          {block.text}
+        </Subheading>
       )}
 
       {block.type === 'list' && !block.ordered && (

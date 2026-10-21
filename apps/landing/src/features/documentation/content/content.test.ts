@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { getAllSections } from '../lib/pages';
 import { en } from './en';
 import { es } from './es';
 import type { CodeGroupBlock, DocBlock, DocContent } from './types';
@@ -53,28 +54,38 @@ function collectCodeGroups(block: DocBlock, groups: CodeGroupBlock[]): void {
 function collectAllCodeGroups(content: DocContent): CodeGroupBlock[] {
   const groups: CodeGroupBlock[] = [];
 
-  for (const section of content.sections) {
+  for (const section of getAllSections(content)) {
     for (const block of section.blocks) collectCodeGroups(block, groups);
   }
 
   return groups;
 }
 
+// Every text the reader can see, on every page: the page chrome, the nav, each
+// page's metadata and every block of every section.
 function flattenContent(content: DocContent): string {
   const parts: string[] = [
-    content.pageTitle,
-    content.pageDescription,
-    content.breadcrumbLabel,
-    content.heroTitle,
-    content.heroSubtitle,
+    content.docsLabel,
+    content.breadcrumbAriaLabel,
+    content.navAriaLabel,
+    content.menuLabel,
     content.tocLabel,
+    content.pagerAriaLabel,
+    content.previousLabel,
+    content.nextLabel,
+    content.copyCodeLabel,
+    content.copiedLabel,
   ];
 
   for (const group of content.navGroups) parts.push(group.label);
 
-  for (const section of content.sections) {
-    parts.push(section.navLabel, section.title);
-    for (const block of section.blocks) collectBlockText(block, parts);
+  for (const page of content.pages) {
+    parts.push(page.navLabel, page.title, page.description);
+
+    for (const section of page.sections) {
+      parts.push(section.navLabel, section.title);
+      for (const block of section.blocks) collectBlockText(block, parts);
+    }
   }
 
   return parts.join('\n');
@@ -158,43 +169,78 @@ function findAsciiWordMatch(haystack: string, word: string): string | undefined 
   return match?.[0];
 }
 
+const MAX_DESCRIPTION_LENGTH = 160;
+
 describe('documentation content', () => {
-  it.each(locales)(
-    'every sidebar anchor in $name resolves to a real section id',
-    ({ content }) => {
-      const sectionIds = new Set(content.sections.map((section) => section.id));
-      const anchorIds = content.navGroups.flatMap((group) => group.sectionIds);
+  it.each(locales)('$name has at least one page', ({ content }) => {
+    expect(content.pages.length).toBeGreaterThan(0);
+  });
 
-      expect(anchorIds.length).toBeGreaterThan(0);
+  it.each(locales)('$name has no duplicated page slug', ({ content }) => {
+    const slugs = content.pages.map((page) => page.slug);
 
-      for (const id of anchorIds) {
-        expect(sectionIds.has(id)).toBe(true);
-      }
-    },
-  );
+    expect(new Set(slugs).size).toBe(slugs.length);
+  });
 
-  it.each(locales)('$name has no duplicated section id', ({ content }) => {
-    const ids = content.sections.map((section) => section.id);
+  it.each(locales)('$name page slugs are lowercase english slugs', ({ content }) => {
+    for (const page of content.pages) {
+      expect(page.slug, `slug "${page.slug}"`).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    }
+  });
+
+  it.each(locales)('$name has an overview page for /docs', ({ content }) => {
+    expect(content.pages.some((page) => page.slug === 'overview')).toBe(true);
+  });
+
+  it.each(locales)('$name every nav group slug resolves to a real page', ({ content }) => {
+    const slugs = new Set(content.pages.map((page) => page.slug));
+    const navSlugs = content.navGroups.flatMap((group) => group.pageSlugs);
+
+    expect(navSlugs.length).toBeGreaterThan(0);
+
+    for (const slug of navSlugs) {
+      expect(slugs.has(slug), `nav slug "${slug}"`).toBe(true);
+    }
+  });
+
+  it.each(locales)('$name puts every page in exactly one nav group', ({ content }) => {
+    const navSlugs = content.navGroups.flatMap((group) => group.pageSlugs);
+
+    expect(new Set(navSlugs).size).toBe(navSlugs.length);
+    expect([...navSlugs].sort()).toEqual(content.pages.map((page) => page.slug).sort());
+  });
+
+  it.each(locales)('$name has no empty nav group', ({ content }) => {
+    for (const group of content.navGroups) {
+      expect(group.label.length).toBeGreaterThan(0);
+      expect(group.pageSlugs.length).toBeGreaterThan(0);
+    }
+  });
+
+  it.each(locales)('$name has no duplicated section id anywhere in the docs', ({ content }) => {
+    const ids = getAllSections(content).map((section) => section.id);
 
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it.each(locales)('$name has no duplicated anchor within a nav group', ({ content }) => {
-    for (const group of content.navGroups) {
-      expect(new Set(group.sectionIds).size).toBe(group.sectionIds.length);
+  it('en and es expose the same page slugs, in the same order', () => {
+    expect(es.pages.map((page) => page.slug)).toEqual(en.pages.map((page) => page.slug));
+  });
+
+  it('en and es expose the same section ids in every page, in the same order', () => {
+    for (const enPage of en.pages) {
+      const esPage = es.pages.find((candidate) => candidate.slug === enPage.slug);
+
+      expect(esPage, `es page "${enPage.slug}"`).toBeDefined();
+      expect(esPage!.sections.map((section) => section.id)).toEqual(
+        enPage.sections.map((section) => section.id),
+      );
     }
   });
 
-  it('en and es expose the same section ids, in the same order', () => {
-    const enIds = en.sections.map((section) => section.id);
-    const esIds = es.sections.map((section) => section.id);
-
-    expect(esIds).toEqual(enIds);
-  });
-
-  it('en and es nav groups reference the same section ids, in the same order', () => {
-    const enNav = en.navGroups.flatMap((group) => group.sectionIds);
-    const esNav = es.navGroups.flatMap((group) => group.sectionIds);
+  it('en and es nav groups reference the same page slugs, in the same order', () => {
+    const enNav = en.navGroups.map((group) => group.pageSlugs);
+    const esNav = es.navGroups.map((group) => group.pageSlugs);
 
     expect(esNav).toEqual(enNav);
   });
@@ -203,13 +249,46 @@ describe('documentation content', () => {
     expect(es.navGroups.length).toBe(en.navGroups.length);
   });
 
-  it.each(locales)('$name sections all carry non-empty content', ({ content }) => {
-    for (const section of content.sections) {
-      expect(section.id.length).toBeGreaterThan(0);
-      expect(section.navLabel.length).toBeGreaterThan(0);
-      expect(section.title.length).toBeGreaterThan(0);
-      expect(section.blocks.length).toBeGreaterThan(0);
+  it.each(locales)('$name pages and sections all carry non-empty content', ({ content }) => {
+    for (const page of content.pages) {
+      expect(page.navLabel.length, `navLabel of "${page.slug}"`).toBeGreaterThan(0);
+      expect(page.title.length, `title of "${page.slug}"`).toBeGreaterThan(0);
+      expect(page.sections.length, `sections of "${page.slug}"`).toBeGreaterThan(0);
+
+      for (const section of page.sections) {
+        expect(section.id.length).toBeGreaterThan(0);
+        expect(section.navLabel.length).toBeGreaterThan(0);
+        expect(section.title.length).toBeGreaterThan(0);
+        expect(section.blocks.length).toBeGreaterThan(0);
+      }
     }
+  });
+
+  it.each(locales)(
+    '$name page descriptions are one plain sentence of at most 160 characters',
+    ({ content }) => {
+      for (const page of content.pages) {
+        expect(page.description.length, `description of "${page.slug}"`).toBeGreaterThan(0);
+        expect(page.description.length, `description of "${page.slug}"`).toBeLessThanOrEqual(
+          MAX_DESCRIPTION_LENGTH,
+        );
+        expect(page.description, `description of "${page.slug}"`).not.toMatch(/\n/);
+      }
+    },
+  );
+
+  it.each(locales)('$name page descriptions are unique', ({ content }) => {
+    const descriptions = content.pages.map((page) => page.description);
+
+    expect(new Set(descriptions).size).toBe(descriptions.length);
+  });
+
+  it.each(locales)('$name page titles and nav labels are unique', ({ content }) => {
+    const titles = content.pages.map((page) => page.title);
+    const labels = content.pages.map((page) => page.navLabel);
+
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(new Set(labels).size).toBe(labels.length);
   });
 
   it.each(locales)(
@@ -257,7 +336,7 @@ describe('documentation content', () => {
   it.each(locales)(
     '$name other-languages section never stacks a standalone code block directly after a framework subheading',
     ({ content }) => {
-      const section = content.sections.find((candidate) => candidate.id === 'other-languages');
+      const section = getAllSections(content).find((candidate) => candidate.id === 'other-languages');
       expect(section).toBeDefined();
 
       const blocks = section!.blocks;

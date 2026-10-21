@@ -4,41 +4,65 @@ import { resolveDocContent } from './resolve-content';
 
 function buildContent(): DocContent {
   return {
-    pageTitle: 'Docs',
-    pageDescription: 'Desc',
-    breadcrumbLabel: 'Guide',
-    heroTitle: 'Docs',
-    heroSubtitle: 'Subtitle',
-    tocLabel: 'Contents',
+    docsLabel: 'Docs',
+    breadcrumbAriaLabel: 'Breadcrumb',
+    navAriaLabel: 'Documentation navigation',
+    menuLabel: 'Documentation menu',
+    tocLabel: 'On this page',
+    pagerAriaLabel: 'Previous and next pages',
+    previousLabel: 'Previous',
+    nextLabel: 'Next',
     copyCodeLabel: 'Copy code',
     copiedLabel: 'Copied!',
-    navGroups: [],
-    sections: [
+    navGroups: [{ label: 'Reference', pageSlugs: ['reference', 'guide'] }],
+    pages: [
       {
-        id: 'reference',
+        slug: 'reference',
         navLabel: 'Reference',
         title: 'Reference',
-        blocks: [
-          { type: 'paragraph', text: `Call ${API_BASE_URL_TOKEN}/runs/ingest` },
-          { type: 'list', items: [`See ${API_BASE_URL_TOKEN}/health`] },
-          { type: 'code', language: 'shell', code: `curl ${API_BASE_URL_TOKEN}/runs/ingest` },
+        description: 'The reference page.',
+        sections: [
           {
-            type: 'codeGroup',
-            label: `POST ${API_BASE_URL_TOKEN}/runs/ingest`,
-            variants: [
-              { language: 'shell', label: 'cURL', code: `curl ${API_BASE_URL_TOKEN}/runs/ingest` },
-              { language: 'python', label: 'Python', code: `requests.post("${API_BASE_URL_TOKEN}/runs/ingest")` },
-            ],
-          },
-          { type: 'table', headers: [API_BASE_URL_TOKEN], rows: [[`${API_BASE_URL_TOKEN}/runs/ingest`]] },
-          {
-            type: 'faq',
-            items: [
+            id: 'reference',
+            navLabel: 'Reference',
+            title: 'Reference',
+            blocks: [
+              { type: 'paragraph', text: `Call ${API_BASE_URL_TOKEN}/runs/ingest` },
+              { type: 'list', items: [`See ${API_BASE_URL_TOKEN}/health`] },
+              { type: 'code', language: 'shell', code: `curl ${API_BASE_URL_TOKEN}/runs/ingest` },
               {
-                question: 'Where do I send results?',
-                answer: [{ type: 'paragraph', text: `${API_BASE_URL_TOKEN}/runs/ingest` }],
+                type: 'codeGroup',
+                label: `POST ${API_BASE_URL_TOKEN}/runs/ingest`,
+                variants: [
+                  { language: 'shell', label: 'cURL', code: `curl ${API_BASE_URL_TOKEN}/runs/ingest` },
+                  { language: 'python', label: 'Python', code: `requests.post("${API_BASE_URL_TOKEN}/runs/ingest")` },
+                ],
+              },
+              { type: 'table', headers: [API_BASE_URL_TOKEN], rows: [[`${API_BASE_URL_TOKEN}/runs/ingest`]] },
+              {
+                type: 'faq',
+                items: [
+                  {
+                    question: 'Where do I send results?',
+                    answer: [{ type: 'paragraph', text: `${API_BASE_URL_TOKEN}/runs/ingest` }],
+                  },
+                ],
               },
             ],
+          },
+        ],
+      },
+      {
+        slug: 'guide',
+        navLabel: 'Guide',
+        title: 'Guide',
+        description: 'The guide page.',
+        sections: [
+          {
+            id: 'guide',
+            navLabel: 'Guide',
+            title: 'Guide',
+            blocks: [{ type: 'paragraph', text: `Send it to ${API_BASE_URL_TOKEN}` }],
           },
         ],
       },
@@ -49,7 +73,7 @@ function buildContent(): DocContent {
 describe('resolveDocContent', () => {
   it('replaces every occurrence of the API base URL token', () => {
     const resolved = resolveDocContent(buildContent(), 'https://api.qably.dev');
-    const [paragraph, list, code, codeGroup, table, faq] = resolved.sections[0]!.blocks;
+    const [paragraph, list, code, codeGroup, table, faq] = resolved.pages[0]!.sections[0]!.blocks;
 
     expect(paragraph).toMatchObject({ text: 'Call https://api.qably.dev/runs/ingest' });
     expect(list).toMatchObject({ items: ['See https://api.qably.dev/health'] });
@@ -70,15 +94,41 @@ describe('resolveDocContent', () => {
     });
   });
 
+  it('resolves the token in every page, not only the first', () => {
+    const resolved = resolveDocContent(buildContent(), 'https://api.qably.dev');
+
+    expect(resolved.pages[1]!.sections[0]!.blocks[0]).toMatchObject({
+      text: 'Send it to https://api.qably.dev',
+    });
+  });
+
+  it('keeps the page model (slugs, titles, nav) untouched', () => {
+    const content = buildContent();
+    const resolved = resolveDocContent(content, 'https://api.qably.dev');
+
+    expect(resolved.navGroups).toEqual(content.navGroups);
+    expect(resolved.pages.map((page) => [page.slug, page.title, page.description])).toEqual(
+      content.pages.map((page) => [page.slug, page.title, page.description]),
+    );
+  });
+
   it('leaves content untouched when the token never appears', () => {
     const content = buildContent();
     const withoutToken: DocContent = {
       ...content,
-      sections: [{ ...content.sections[0]!, blocks: [{ type: 'paragraph', text: 'No token here.' }] }],
+      pages: [
+        {
+          ...content.pages[0]!,
+          sections: [
+            { ...content.pages[0]!.sections[0]!, blocks: [{ type: 'paragraph', text: 'No token here.' }] },
+          ],
+        },
+      ],
+      navGroups: [{ label: 'Reference', pageSlugs: ['reference'] }],
     };
 
     const resolved = resolveDocContent(withoutToken, 'https://api.qably.dev');
 
-    expect(resolved.sections[0]!.blocks[0]).toMatchObject({ text: 'No token here.' });
+    expect(resolved.pages[0]!.sections[0]!.blocks[0]).toMatchObject({ text: 'No token here.' });
   });
 });

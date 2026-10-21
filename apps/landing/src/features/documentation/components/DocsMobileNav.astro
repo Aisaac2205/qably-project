@@ -1,0 +1,60 @@
+---
+import { CaretDown } from '@phosphor-icons/react';
+import type { Locale } from '../../i18n/types';
+import type { DocContent } from '../content/types';
+import type { TocEntry } from '../lib/toc';
+import DocsNavList from './DocsNavList.astro';
+import DocsTocList from './DocsTocList.astro';
+
+interface Props {
+  content: DocContent;
+  locale: Locale;
+  currentSlug: string;
+  entries: TocEntry[];
+  showToc: boolean;
+}
+
+const { content, locale, currentSlug, entries, showToc } = Astro.props;
+
+const summary =
+  'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl px-4 py-2.5 text-sm font-medium text-fg transition-colors hover:bg-bg-elevated';
+---
+
+{
+  /*
+    Menu for the widths where a rail does not fit. Native <details>: it opens
+    with Enter or Space, works without JavaScript, and DocsInteractions only
+    adds closing on a link click and on Escape.
+    The menu shows below lg (the left rail takes over at lg); the contents
+    list shows below xl (the right rail takes over at xl).
+  */
+}
+<div class="mb-8 space-y-3 xl:hidden">
+  <details data-docs-disclosure class="docs-disclosure group rounded-xl border border-border bg-bg lg:hidden">
+    <summary class={summary}>
+      <span>{content.menuLabel}</span>
+      <span aria-hidden="true" class="shrink-0 transition-transform group-open:rotate-180">
+        <CaretDown size={16} />
+      </span>
+    </summary>
+    <nav aria-label={content.navAriaLabel} class="border-t border-border p-3">
+      <DocsNavList content={content} locale={locale} currentSlug={currentSlug} idPrefix="menu" />
+    </nav>
+  </details>
+
+  {
+    showToc && (
+      <details data-docs-disclosure class="docs-disclosure group rounded-xl border border-border bg-bg">
+        <summary class={summary}>
+          <span>{content.tocLabel}</span>
+          <span aria-hidden="true" class="shrink-0 transition-transform group-open:rotate-180">
+            <CaretDown size={16} />
+          </span>
+        </summary>
+        <nav aria-label={content.tocLabel} class="border-t border-border p-3">
+          <DocsTocList entries={entries} />
+        </nav>
+      </details>
+    )
+  }
+</div>

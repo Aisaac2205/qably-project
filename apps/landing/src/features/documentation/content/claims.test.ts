@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SNIPPETS } from '../components/snippets';
+import { getAllSections } from '../lib/pages';
 import { en } from './en';
 import { es } from './es';
 import type { DocContent } from './types';
@@ -32,8 +33,8 @@ const locales: Locale[] = [
   },
 ];
 
-// Every string reachable from the content, whatever the block type, so a new
-// block kind cannot hide a claim from this guard.
+// Every string reachable from the content, whatever the page, section or block
+// type, so a new page or block kind cannot hide a claim from this guard.
 function collectStrings(value: unknown, parts: string[] = []): string[] {
   if (typeof value === 'string') {
     parts.push(value);
@@ -89,10 +90,16 @@ const FORBIDDEN_CLAIMS: ForbiddenClaim[] = [
     reason: 'junit_suite_name only renames the root suite, it does not split it per file',
     pattern: /per-file granularity|granularidad por archivo/i,
   },
+  {
+    reason:
+      'the docs are split in pages: a cross-reference names its page instead of saying "below" or "previous step"',
+    pattern:
+      /FAQ section below|sección de preguntas frecuentes|covered in the previous step|se detallaron en el paso anterior|described in step 2\.|de esta guía/i,
+  },
 ];
 
 function sectionText(content: DocContent, id: string): string {
-  const section = content.sections.find((candidate) => candidate.id === id);
+  const section = getAllSections(content).find((candidate) => candidate.id === id);
 
   if (section === undefined) throw new Error(`missing docs section ${id}`);
 

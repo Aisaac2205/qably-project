@@ -1,0 +1,35 @@
+---
+import type { TocEntry } from '../lib/toc';
+
+interface Props {
+  entries: TocEntry[];
+}
+
+const { entries } = Astro.props;
+---
+
+{/*
+  data-toc-link carries the id of the heading it points to; the script in
+  DocsInteractions marks the link of the section being read with data-active
+  and aria-current="location".
+*/}
+<ul class="space-y-0.5">
+  {
+    entries.map((entry) => (
+      <li>
+        <a
+          href={`#${entry.id}`}
+          data-toc-link={entry.id}
+          data-toc-level={entry.level}
+          class:list={[
+            'block rounded-md py-1.5 pr-2 text-sm leading-snug text-fg-muted transition-colors',
+            'hover:text-fg data-active:font-medium data-active:text-fg',
+            entry.level === 3 ? 'pl-5' : 'pl-2',
+          ]}
+        >
+          {entry.label}
+        </a>
+      </li>
+    ))
+  }
+</ul>

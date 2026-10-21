@@ -1,0 +1,34 @@
+---
+import type { DocContent } from '../content/types';
+import type { TocEntry } from '../lib/toc';
+import DocsTocList from './DocsTocList.astro';
+
+interface Props {
+  content: DocContent;
+  entries: TocEntry[];
+  /** False when the page has too few headings for a contents list to be useful. */
+  show: boolean;
+}
+
+const { content, entries, show } = Astro.props;
+---
+
+{/*
+  Right rail: xl and up. The column is reserved even when the page has no
+  contents list, so the article keeps the same width from page to page.
+  Below xl the same entries live in DocsMobileNav.
+*/}
+<div class="hidden w-56 shrink-0 xl:block">
+  {
+    show && (
+      <div class="docs-rail p-1">
+        <nav aria-labelledby="docs-toc-title" data-docs-toc>
+          <p id="docs-toc-title" class="px-2 pb-1.5 text-sm font-semibold text-fg">
+            {content.tocLabel}
+          </p>
+          <DocsTocList entries={entries} />
+        </nav>
+      </div>
+    )
+  }
+</div>

@@ -1,0 +1,41 @@
+---
+import { ArrowLeft, ArrowRight } from '@phosphor-icons/react';
+import type { DocContent } from '../content/types';
+import type { PageLink } from '../lib/pages';
+
+interface Props {
+  content: DocContent;
+  previous: PageLink | null;
+  next: PageLink | null;
+}
+
+const { content, previous, next } = Astro.props;
+
+const card =
+  'flex flex-col gap-1 rounded-xl border border-border p-4 transition-colors hover:bg-bg-elevated';
+---
+
+{
+  (previous !== null || next !== null) && (
+    <nav aria-label={content.pagerAriaLabel} class="mt-16 grid gap-3 border-t border-border pt-8 sm:grid-cols-2">
+      {previous !== null && (
+        <a href={previous.path} rel="prev" class={card}>
+          <span class="flex items-center gap-1.5 text-sm text-fg-muted">
+            <ArrowLeft size={14} aria-hidden="true" />
+            {content.previousLabel}
+          </span>
+          <span class="text-base font-medium text-fg">{previous.navLabel}</span>
+        </a>
+      )}
+      {next !== null && (
+        <a href={next.path} rel="next" class:list={[card, 'items-end text-right sm:col-start-2']}>
+          <span class="flex items-center gap-1.5 text-sm text-fg-muted">
+            {content.nextLabel}
+            <ArrowRight size={14} aria-hidden="true" />
+          </span>
+          <span class="text-base font-medium text-fg">{next.navLabel}</span>
+        </a>
+      )}
+    </nav>
+  )
+}

@@ -1,0 +1,83 @@
+---
+import Landing from '../../../layouts/Landing.astro';
+import Footer from '../../navigation/components/Footer.astro';
+import SiteHeader from '../../navigation/components/SiteHeader.astro';
+import { getApiBaseUrl } from '../../../lib/api-config';
+import type { Locale } from '../../i18n/types';
+import type { DocContent } from '../content/types';
+import { resolveDocContent } from '../lib/resolve-content';
+import { OVERVIEW_SLUG, docsPagePath, findPage, getPageGroup } from '../lib/pages';
+import { buildPageToc, hasPageToc } from '../lib/toc';
+import DocsArticle from './DocsArticle.astro';
+import DocsMobileNav from './DocsMobileNav.astro';
+import DocsSidebar from './DocsSidebar.astro';
+import DocsToc from './DocsToc.astro';
+import LegacyAnchorRedirect from './LegacyAnchorRedirect.astro';
+
+interface Props {
+  locale: Locale;
+  /** Raw content of the locale: the API base URL token is resolved here. */
+  content: DocContent;
+  slug: string;
+}
+
+const { locale, content: rawContent, slug } = Astro.props;
+
+const content = resolveDocContent(rawContent, getApiBaseUrl());
+const page = findPage(content, slug);
+
+if (page === undefined) {
+  throw new Error(`Unknown docs page "${slug}" for locale "${locale}"`);
+}
+
+const group = getPageGroup(content, slug);
+const tocEntries = buildPageToc(page);
+const showToc = hasPageToc(tocEntries);
+const alternateLocale: Locale = locale === 'en' ? 'es' : 'en';
+---
+
+<Landing locale={locale} title={`${page.title} | Qably`} description={page.description} hideDefaultHeading>
+  <SiteHeader locale={locale} altHref={docsPagePath(alternateLocale, slug)} />
+
+  <main
+    id="main-content"
+    class="mx-auto flex w-full max-w-7xl flex-grow items-start gap-x-8 px-4 pb-16 pt-24 sm:px-6 lg:pt-28"
+  >
+    <DocsSidebar content={content} locale={locale} currentSlug={slug} />
+
+    <div class="min-w-0 max-w-3xl flex-1">
+      <DocsMobileNav content={content} locale={locale} currentSlug={slug} entries={tocEntries} showToc={showToc} />
+      <DocsArticle content={content} locale={locale} page={page} groupLabel={group?.label} />
+    </div>
+
+    <DocsToc content={content} entries={tocEntries} show={showToc} />
+  </main>
+
+  {slug === OVERVIEW_SLUG && <LegacyAnchorRedirect locale={locale} slug={slug} />}
+
+  <Footer locale={locale} />
+</Landing>
+
+<style is:global>
+  /*
+    Side rails stay in view while the article scrolls: pinned 6rem from the top
+    (below the 4rem fixed header, with 2rem of air) and never taller than what
+    is left of the viewport, scrolling on their own when the list is longer.
+  */
+  .docs-rail {
+    position: sticky;
+    top: 6rem;
+    max-height: calc(100dvh - 7rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Safari still draws its own marker on a <summary> that is not display: list-item. */
+  .docs-disclosure > summary {
+    list-style: none;
+  }
+
+  .docs-disclosure > summary::-webkit-details-marker {
+    display: none;
+  }
+</style>

@@ -46,9 +46,12 @@ function resolveBlock(block: DocBlock, apiBaseUrl: string): DocBlock {
 export function resolveDocContent(content: DocContent, apiBaseUrl: string): DocContent {
   return {
     ...content,
-    sections: content.sections.map((section) => ({
-      ...section,
-      blocks: section.blocks.map((block) => resolveBlock(block, apiBaseUrl)),
+    pages: content.pages.map((page) => ({
+      ...page,
+      sections: page.sections.map((section) => ({
+        ...section,
+        blocks: section.blocks.map((block) => resolveBlock(block, apiBaseUrl)),
+      })),
     })),
   };
 }

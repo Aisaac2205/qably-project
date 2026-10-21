@@ -7,9 +7,11 @@ interface Props {
   title?: string;
   description?: string;
   locale?: Locale;
+  /** The page renders its own visible h1: skip the screen-reader-only one. */
+  hideDefaultHeading?: boolean;
 }
 
-const { locale = "es", title = "Qably", description: descriptionProp } = Astro.props;
+const { locale = "es", title = "Qably", description: descriptionProp, hideDefaultHeading = false } = Astro.props;
 
 const meta = getDictionary(locale).meta;
 const description = descriptionProp ?? meta.description;
@@ -106,9 +108,13 @@ const siteUrl = site.toString();
     </a>
 
     <!-- Screen reader & search engine hidden headline -->
-    <h1 class="sr-only">
-      {title === "Qably" ? meta.heading : title}
-    </h1>
+    {
+      !hideDefaultHeading && (
+        <h1 class="sr-only">
+          {title === "Qably" ? meta.heading : title}
+        </h1>
+      )
+    }
 
     <div class="relative min-h-screen flex flex-col justify-between">
       <slot />

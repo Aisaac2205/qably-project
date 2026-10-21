@@ -1,0 +1,16 @@
+---
+import type { InferGetStaticPropsType } from "astro";
+import DocsPage from "../../features/documentation/components/DocsPage.astro";
+import { es } from "../../features/documentation/content/es";
+import { getDocsStaticPaths } from "../../features/documentation/lib/pages";
+
+export function getStaticPaths() {
+  return getDocsStaticPaths(es);
+}
+
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { slug } = Astro.props as Props;
+---
+
+<DocsPage locale="es" content={es} slug={slug} />

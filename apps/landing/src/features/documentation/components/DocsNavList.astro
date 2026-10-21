@@ -1,0 +1,59 @@
+---
+import type { Locale } from '../../i18n/types';
+import type { DocContent } from '../content/types';
+import { docsPagePath, findPage } from '../lib/pages';
+
+interface Props {
+  content: DocContent;
+  locale: Locale;
+  currentSlug: string;
+  /** Keeps the heading ids unique when the list is rendered more than once. */
+  idPrefix: string;
+}
+
+const { content, locale, currentSlug, idPrefix } = Astro.props;
+
+const groups = content.navGroups.map((group, index) => ({
+  headingId: `${idPrefix}-group-${index}`,
+  label: group.label,
+  pages: group.pageSlugs.flatMap((slug) => {
+    const page = findPage(content, slug);
+
+    return page === undefined ? [] : [page];
+  }),
+}));
+---
+
+<ul class="space-y-6">
+  {
+    groups.map((group) => (
+      <li>
+        <p id={group.headingId} class="px-2 text-sm font-semibold text-fg">
+          {group.label}
+        </p>
+        <ul aria-labelledby={group.headingId} class="mt-1.5 space-y-0.5">
+          {group.pages.map((page) => {
+            const isCurrent = page.slug === currentSlug;
+
+            return (
+              <li>
+                <a
+                  href={docsPagePath(locale, page.slug)}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  class:list={[
+                    'block rounded-md px-2 py-1.5 text-sm leading-snug transition-colors',
+                    isCurrent
+                      ? 'bg-bg-elevated font-medium text-fg'
+                      : 'text-fg-muted hover:bg-bg-elevated hover:text-fg',
+                  ]}
+                >
+                  {page.navLabel}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </li>
+    ))
+  }
+</ul>
