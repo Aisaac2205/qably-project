@@ -184,7 +184,7 @@ export interface ApprovalInput extends DecisionInput {
   /**
    * The published version of the case the reviewer saw, `null` when it had
    * none. The approval is refused with `stale-proposal` when the case has
-   * moved past it. Left out, the proposal's own recorded base applies.
+   * moved past it. Left out, the check is skipped.
    */
   baseVersionId?: string | null;
 }

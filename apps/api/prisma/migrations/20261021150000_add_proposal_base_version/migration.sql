@@ -1,4 +1,4 @@
 -- AlterTable
--- The published version a proposal was reviewed against. Nullable, with no
--- default: existing rows stay null, and approval skips the stale check for them.
-ALTER TABLE "extracted_proposal" ADD COLUMN "baseVersionId" TEXT;
+-- The published version of the target case an approval replaced. Nullable,
+-- with no default: existing rows stay null, and it is written only on approval.
+ALTER TABLE "extracted_proposal" ADD COLUMN "supersededVersionId" TEXT;

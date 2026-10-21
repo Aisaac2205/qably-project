@@ -36,19 +36,6 @@ class StaleProposal extends Error {
   }
 }
 
-/**
- * The version the approval must find the case at: the one the reviewer saw
- * when the request says, otherwise the one the proposal recorded. `undefined`
- * means nobody knows (a legacy request and row), and the check is skipped.
- */
-function expectedBaseVersion(
-  proposal: ProposalRow,
-  input: ApprovalInput,
-): string | null | undefined {
-  if (input.baseVersionId !== undefined) return input.baseVersionId;
-  return proposal.baseVersionId ?? undefined;
-}
-
 const PROPOSAL_SELECT = {
   id: true,
   projectId: true,
@@ -76,7 +63,6 @@ const PROPOSAL_SELECT = {
       automationFilePath: true,
     },
   },
-  baseVersionId: true,
 } as const;
 
 interface ProposalRow {
@@ -107,7 +93,6 @@ interface ProposalRow {
     suiteId: string;
     automationFilePath: string | null;
   } | null;
-  baseVersionId?: string | null;
 }
 
 function toDecidedAction(action: string): 'approved' | 'rejected' {
@@ -375,16 +360,17 @@ export class ReviewDecisionService {
           : await lockTestCaseForUpdate(tx, proposal.targetTestCaseId);
 
       // Checked under the lock, so no writer can publish between the check
-      // and this approval's own version.
-      const expected = expectedBaseVersion(proposal, input);
+      // and this approval's own version. A request without a base (a legacy
+      // caller, or a reviewer who never saw the comparison) skips the check.
       if (
         superseded !== null &&
-        expected !== undefined &&
-        superseded.currentVersionId !== expected
+        input.baseVersionId !== undefined &&
+        superseded.currentVersionId !== input.baseVersionId
       ) {
         throw new StaleProposal();
       }
 
+      // The version this approval replaces, kept on the proposal.
       const claim = await tx.extractedProposal.updateMany({
         where: { id: proposal.id, status: PENDING_STATUS },
         data:
@@ -392,7 +378,7 @@ export class ReviewDecisionService {
             ? { status: 'approved' }
             : {
                 status: 'approved',
-                baseVersionId: superseded.currentVersionId,
+                supersededVersionId: superseded.currentVersionId,
               },
       });
       if (claim.count === 0) throw new DecisionConflict();

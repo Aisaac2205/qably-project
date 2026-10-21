@@ -154,31 +154,32 @@ The web client (`apps/web/src/features/review-inbox`) turns each conflict into a
 
 ## Approving over a newer version (`stale-proposal`)
 
-A proposal for an existing case is reviewed against the case's published version, which the inspector shows as "Changes from published version N". The case can get a newer version while the proposal waits: a document-file job (the suite's **Document** action), another approval, or a person editing the case. Approving would then publish over a version the reviewer never compared against, and the last writer would win without anyone noticing.
+A proposal for an existing case is reviewed against the case's published version, which the inspector shows as "Changes from published version N". The case can get a newer version while the proposal waits: a document-file job (the suite's **Document** action) or another approval publishes one. Approving would then publish over a version the reviewer never compared against, and the last writer would win without anyone noticing.
+
+A person editing the case in the suite is not one of them. `SuiteCasesService.updateCase` (`apps/api/src/modules/suites/suite-cases.service.ts`) writes the case fields, and marks the documentation `human` when a documented field changed, but publishes no version, so `currentVersionId` does not move and this check cannot see the edit: approving still overwrites it. This is a known limitation, listed under "Follow-ups".
 
 The approval carries the version the reviewer saw, and the API refuses when the case has moved past it:
 
 1. `GET /review/proposals/:id` returns `publishedVersion.id`.
 2. The web client sends it back as `baseVersionId` on `POST /review/proposals/:id/approve` (`useProposalDecision`, read from the cached proposal detail). It sends `null` when the inspector showed no published version, and leaves the field out when the detail never loaded.
 3. Inside the approval transaction, after locking the case row, `ReviewDecisionService.publish` compares the case's `currentVersionId` with that base. A mismatch rolls back with `409 stale-proposal`: nothing is claimed or published, and the proposal stays `in_review`.
-4. A successful approval records the version it superseded in `ExtractedProposal.baseVersionId` (migration `20261021150000_add_proposal_base_version`).
+4. A successful approval records the version it replaced in `ExtractedProposal.supersededVersionId` (migration `20261021150000_add_proposal_base_version`). That column is written only on approval and is never read back as a base.
 
-| Request `baseVersionId` | Proposal `baseVersionId` | Check |
-|---|---|---|
-| A version id | any | The case must still be at that version |
-| `null` | any | The case must still have no published version |
-| left out | a version id | The case must still be at the proposal's base |
-| left out | `null` (every row created before this change) | Skipped, the legacy behaviour |
+| Request `baseVersionId` | Check |
+|---|---|
+| A version id | The case must still be at that version |
+| `null` | The case must still have no published version |
+| left out (a legacy caller, or a detail that never loaded) | Skipped |
 
 The check only applies when the approval updates an existing case, the proposal's target or the matched case of `applyTo: 'matched-case'`. A new case has no version to be stale against.
 
-**Why the base comes from the request.** Proposals for existing cases are written by `ExtractedProposalWriter`, and recording the base when the proposal is created would mean changing that writer. The request variant needs no writer change and checks what matters: the version the reviewer actually compared against, including a refetch of the detail after they opened it. The column still lets a writer record the base at creation later; approval already honours it when the request sends none.
+**Why the base comes from the request.** Proposals for existing cases are written by `ExtractedProposalWriter`, and recording the base when the proposal is created would mean changing that writer. The request variant needs no writer change and checks what matters: the version the reviewer actually compared against, including a refetch of the detail after they opened it.
 
 **Before deciding.** `GET /review/proposals/:id` also returns `matchedCase.documentation` (`queuedAt`, `outcomeAt`) for the case the proposal would update. While a documentation run is queued with no later outcome, the inspector shows `CaseDocumentingNotice` (`reviewInbox.caseDocumentingNotice`): Aeris is documenting this case, approving may conflict with its result, wait and compare again. It is a `role="note"` with a Phosphor icon and the AI accent tokens, and only shows on a proposal still in review.
 
 **Approving while a documentation run is queued.** The approval wins. Publishing clears the case's `documentationQueuedAt`, which is the queued run's claim on the case, and the document-file job checks that claim under the case lock: it skips a case whose marker is gone without writing anything, so the approved version and its documentation outcome stay. The run documents the case only if someone queues it again after the approval (see "A run only writes the cases it still owns" in `docs/AI_EXTRACTION.md`). The other order, the run publishing first, is the `stale-proposal` case above.
 
-**What the reviewer sees.** `aiReview.decisionStaleProposal` names the proposal and says the case got a newer version from Aeris or a teammate. Like the other approval conflicts, the proposal goes back into the queue and the inspector, and the lists refetch, so the comparison now shows the new version. Approving again sends the new base and goes through.
+**What the reviewer sees.** `aiReview.decisionStaleProposal` names the proposal and says the case got a newer version from Aeris or a teammate (another approval). Like the other approval conflicts, the proposal goes back into the queue and the inspector, and the lists refetch, so the comparison now shows the new version. Approving again sends the new base and goes through.
 
 ## Follow-ups
 
@@ -192,3 +193,4 @@ The API slice only makes the 409 precise. The web now shows each conflict; the p
 | API and web | Give reviewers a way out of `name-taken` besides rejecting: an optional title override on approve, validated like extraction titles (1 to 120 characters) | Proposed: `POST /review/proposals/:id/approve` body `{ comment?: string, title?: string }` | Not implemented. The approve body accepts no `title` today |
 | API and web | Let the reviewer resolve `name-taken` or `automation-key-taken` by publishing the proposal as a new version of `conflictingCase`, as an explicit human choice made after seeing that case | Not designed | Not implemented |
 | API | Include proposals with a null `suiteId` in reclassification, or backfill their suite | None | Not implemented |
+| API | Let the `stale-proposal` check see a person's edit: today `SuiteCasesService.updateCase` publishes no version, so approving a proposal overwrites a manual edit made after the reviewer opened it. Either publish a version on a documented-field edit, or compare a case edit timestamp as well | Not designed | Known limitation, not implemented |
