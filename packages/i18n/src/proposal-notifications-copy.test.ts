@@ -41,11 +41,55 @@ describe.each(Object.entries(LOCALES))('review inbox batch filter copy (%s)', (_
   })
 })
 
+describe.each(Object.entries(LOCALES))('proposal batch toast copy (%s)', (_name, dictionary) => {
+  const { toast } = dictionary.notifications
+
+  it('has a singular and a plural title for every source, each carrying the count', () => {
+    for (const title of [
+      toast.proposalsPush_one,
+      toast.proposalsPush_other,
+      toast.proposalsDocumentation_one,
+      toast.proposalsDocumentation_other,
+      toast.proposalsChat_one,
+      toast.proposalsChat_other,
+    ]) {
+      expect(title).toContain('{{count}}')
+    }
+    expect(toast.proposalsPush_one).not.toBe(toast.proposalsPush_other)
+  })
+
+  it('names the commit in the push title and nowhere else', () => {
+    expect(toast.proposalsPush_one).toContain('{{sha}}')
+    expect(toast.proposalsPush_other).toContain('{{sha}}')
+    expect(toast.proposalsDocumentation_other).not.toContain('{{sha}}')
+    expect(toast.proposalsChat_other).not.toContain('{{sha}}')
+  })
+
+  it('labels the action that opens the batch', () => {
+    expect(toast.view.trim()).not.toBe('')
+  })
+})
+
+describe.each(Object.entries(LOCALES))('review inbox badge copy (%s)', (_name, dictionary) => {
+  it('has a singular and a plural phrase for the link name, each carrying the count', () => {
+    const { sidebar } = dictionary
+
+    expect(sidebar.reviewInboxPending_one).toContain('{{count}}')
+    expect(sidebar.reviewInboxPending_other).toContain('{{count}}')
+    expect(sidebar.reviewInboxPending_one).not.toBe(sidebar.reviewInboxPending_other)
+  })
+})
+
 describe('proposal notifications copy across languages', () => {
   it('translates the new labels instead of repeating the English ones', () => {
     expect(es.notifications.emptyRead).not.toBe(en.notifications.emptyRead)
     expect(es.notifications.unreadState).not.toBe(en.notifications.unreadState)
     expect(es.reviewInbox.batchFilter).not.toBe(en.reviewInbox.batchFilter)
     expect(es.reviewInbox.clearBatchFilter).not.toBe(en.reviewInbox.clearBatchFilter)
+    expect(es.notifications.toast.view).not.toBe(en.notifications.toast.view)
+    expect(es.notifications.toast.proposalsPush_other).not.toBe(
+      en.notifications.toast.proposalsPush_other,
+    )
+    expect(es.sidebar.reviewInboxPending_other).not.toBe(en.sidebar.reviewInboxPending_other)
   })
 })

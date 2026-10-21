@@ -1,9 +1,11 @@
 import { render, screen, act, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import type { OrganizationSummary, ProjectSummary } from '@qably/types'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
+vi.mock('@/features/review-inbox/api/review.api', () => ({ getInboxCounts: vi.fn() }))
 vi.mock('@/features/organizations/hooks/use-organizations', () => ({ useOrganizations: vi.fn() }))
 vi.mock('@/features/organizations/hooks/use-current-organization', () => ({
   useCurrentOrganization: vi.fn(),
@@ -93,6 +95,17 @@ vi.mock('@/lib/use-mock-store', () => ({
 import { Sidebar } from '@/components/shell/sidebar'
 import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
 import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
+import { getInboxCounts } from '@/features/review-inbox/api/review.api'
+import { useI18nStore } from '@/lib/i18n/store'
+
+const inboxCountsMock = vi.mocked(getInboxCounts)
+
+function inboxCounts(inReview: number) {
+  return {
+    byStatus: { in_review: inReview, approved: 3, rejected: 1, changes_requested: 0 },
+    version: 'test-version',
+  }
+}
 
 const useOrganizationsMock = vi.mocked(useOrganizations)
 const useCurrentOrganizationMock = vi.mocked(useCurrentOrganization)
@@ -130,6 +143,7 @@ function renderSidebar({ defaultOpen = true, includeTrigger = false } = {}) {
 }
 
 beforeEach(() => {
+  inboxCountsMock.mockResolvedValue(inboxCounts(0))
   useOrganizationsMock.mockReturnValue({
     organizations: [singleOrganization],
     isLoading: false,
@@ -298,7 +312,17 @@ describe('Sidebar — mobile navigation', () => {
   it('closes the mobile sheet when the route changes', async () => {
     isMobileViewport = true
     mockPathname.mockReturnValue('/dashboard')
-    const { rerender } = await act(async () => renderSidebar({ includeTrigger: true }))
+    const queryClient = new QueryClient()
+    const { rerender } = await act(async () =>
+      render(
+        <QueryClientProvider client={queryClient}>
+          <SidebarProvider defaultOpen>
+            <SidebarTrigger />
+            <Sidebar />
+          </SidebarProvider>
+        </QueryClientProvider>,
+      ),
+    )
 
     await act(async () => { screen.getByRole('button', { name: 'Toggle Sidebar' }).click() })
     expect(screen.getByRole('dialog', { name: 'Sidebar' })).toBeInTheDocument()
@@ -306,10 +330,12 @@ describe('Sidebar — mobile navigation', () => {
     mockPathname.mockReturnValue('/projects')
     await act(async () => {
       rerender(
-        <SidebarProvider defaultOpen>
-          <SidebarTrigger />
-          <Sidebar />
-        </SidebarProvider>,
+        <QueryClientProvider client={queryClient}>
+          <SidebarProvider defaultOpen>
+            <SidebarTrigger />
+            <Sidebar />
+          </SidebarProvider>
+        </QueryClientProvider>,
       )
     })
 
@@ -345,5 +371,99 @@ describe('Sidebar — static sibling routes under /projects', () => {
     await act(async () => { renderSidebar() })
 
     expect(useProjectSpy).toHaveBeenCalledWith('proj-1')
+  })
+})
+
+describe('Sidebar — review inbox badge', () => {
+  function badges(container: HTMLElement) {
+    return container.querySelectorAll('[data-slot="sidebar-menu-badge"]')
+  }
+
+  it('shows no badge while nothing waits in review', async () => {
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+
+    expect(screen.getByRole('link', { name: 'Review Inbox' })).toHaveAttribute('href', '/review-inbox')
+    expect(badges(container)).toHaveLength(0)
+  })
+
+  it('badges the review inbox with the proposals waiting and puts the count in the link name', async () => {
+    inboxCountsMock.mockResolvedValue(inboxCounts(18))
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+
+    const link = await screen.findByRole('link', {
+      name: 'Review Inbox, 18 proposals waiting for review',
+    })
+    expect(link).toHaveAttribute('href', '/review-inbox')
+    expect(badges(container)).toHaveLength(1)
+    expect(badges(container)[0]).toHaveTextContent('18')
+    expect(badges(container)[0]).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('caps the visible count at 99+ but keeps the exact count in the link name', async () => {
+    inboxCountsMock.mockResolvedValue(inboxCounts(240))
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+
+    await screen.findByRole('link', { name: 'Review Inbox, 240 proposals waiting for review' })
+    expect(badges(container)[0]).toHaveTextContent('99+')
+  })
+
+  it('shows the count itself up to ninety-nine', async () => {
+    inboxCountsMock.mockResolvedValue(inboxCounts(99))
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+
+    await screen.findByRole('link', { name: 'Review Inbox, 99 proposals waiting for review' })
+    expect(badges(container)[0]).toHaveTextContent(/^99$/)
+  })
+
+  it('uses the singular for a single proposal', async () => {
+    inboxCountsMock.mockResolvedValue(inboxCounts(1))
+    mockPathname.mockReturnValue('/dashboard')
+    await act(async () => renderSidebar())
+
+    expect(
+      await screen.findByRole('link', { name: 'Review Inbox, 1 proposal waiting for review' }),
+    ).toBeInTheDocument()
+  })
+
+  it('leaves every other destination without a badge', async () => {
+    inboxCountsMock.mockResolvedValue(inboxCounts(18))
+    mockPathname.mockReturnValue('/dashboard')
+    const { container } = await act(async () => renderSidebar())
+    await screen.findByRole('link', { name: /Review Inbox, 18/ })
+
+    expect(screen.getByRole('link', { name: 'Notifications' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Projects' })).toBeInTheDocument()
+    expect(badges(container)).toHaveLength(1)
+  })
+
+  it('keeps the count in the tooltip of the collapsed rail, where the badge itself is hidden', async () => {
+    inboxCountsMock.mockResolvedValue(inboxCounts(18))
+    mockPathname.mockReturnValue('/dashboard')
+    const user = userEvent.setup()
+    await act(async () => renderSidebar({ defaultOpen: false }))
+
+    const link = await screen.findByRole('link', {
+      name: 'Review Inbox, 18 proposals waiting for review',
+    })
+    await user.hover(link)
+
+    expect(await screen.findByText('Review Inbox (18)', {}, { timeout: 3000 })).toBeInTheDocument()
+  })
+
+  it('words the link name in Spanish', async () => {
+    useI18nStore.setState({ locale: 'es' })
+    inboxCountsMock.mockResolvedValue(inboxCounts(18))
+    mockPathname.mockReturnValue('/dashboard')
+    await act(async () => renderSidebar())
+
+    expect(
+      await screen.findByRole('link', {
+        name: 'Bandeja de revisión, 18 propuestas esperando revisión',
+      }),
+    ).toBeInTheDocument()
   })
 })

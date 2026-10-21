@@ -1,11 +1,15 @@
-import { render as rtlRender, screen, act } from '@testing-library/react'
+import { render as rtlRender, screen, act, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, it, expect, vi } from 'vitest'
-import type { OrganizationSummary } from '@qably/types'
+import type { Notification, OrganizationSummary } from '@qably/types'
 import { AppShell } from '@/components/shell/app-shell'
 import { QueryProvider } from '@/providers/query-provider'
 import { useOrganizations } from '@/features/organizations/hooks/use-organizations'
 import { useCurrentOrganization } from '@/features/organizations/hooks/use-current-organization'
+import { listNotifications } from '@/features/notifications/api/notifications.api'
+import { notificationKeys } from '@/features/notifications/lib/query-keys'
+import { getRegisteredQueryClient } from '@/lib/query-client-registry'
+import { notify } from '@/lib/notify'
 
 function render(ui: React.ReactElement) {
   return rtlRender(ui, { wrapper: QueryProvider })
@@ -22,6 +26,18 @@ vi.mock('@/features/projects/hooks/use-project', async () => {
   }
 })
 
+vi.mock('@/lib/notify', () => ({ notify: { info: vi.fn() } }))
+vi.mock('@/features/review-inbox/api/review.api', () => ({
+  getInboxCounts: vi.fn(async () => ({
+    byStatus: { in_review: 0, approved: 0, rejected: 0, changes_requested: 0 },
+    version: 'test-version',
+  })),
+}))
+vi.mock('@/features/notifications/api/notifications.api', () => ({
+  listNotifications: vi.fn(async () => []),
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+}))
 vi.mock('@/features/organizations/hooks/use-organizations', () => ({ useOrganizations: vi.fn() }))
 vi.mock('@/features/organizations/hooks/use-current-organization', () => ({
   useCurrentOrganization: vi.fn(),
@@ -196,5 +212,46 @@ describe('AppShell', () => {
     await user.keyboard('{Enter}')
 
     expect(screen.getByRole('main')).toHaveFocus()
+  })
+
+  it('announces a new proposal batch with exactly one toast, however many bells the shell holds', async () => {
+    const newBatch: Notification = {
+      id: 'notification-1',
+      organizationId: 'org-1',
+      userId: 'user-1',
+      eventType: 'proposals_ready',
+      severity: 'medium',
+      payload: { source: 'push', count: 18, projectId: 'proj-1', batchId: 'batch-1', commitSha: '518952c4e1' },
+      createdAt: '2026-06-16T10:42:00Z',
+      deliveries: [],
+    }
+    vi.mocked(notify.info).mockClear()
+    vi.mocked(listNotifications).mockResolvedValue([])
+
+    await act(async () => {
+      render(
+        <AppShell>
+          <div>Content</div>
+        </AppShell>,
+      )
+    })
+    await waitFor(() =>
+      expect(getRegisteredQueryClient()?.getQueryData(notificationKeys.all)).toEqual([]),
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    vi.mocked(listNotifications).mockResolvedValue([newBatch])
+    await act(async () => {
+      await getRegisteredQueryClient()?.refetchQueries({ queryKey: notificationKeys.all })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    await waitFor(() => expect(notify.info).toHaveBeenCalledTimes(1))
+    expect(notify.info).toHaveBeenCalledWith(
+      '18 new proposals from push 518952c',
+      expect.objectContaining({ id: 'notification-1' }),
+    )
   })
 })

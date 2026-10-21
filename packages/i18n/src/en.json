@@ -47,6 +47,8 @@
     "portfolio": "Dashboard",
     "projects": "Projects",
     "reviewInbox": "Review Inbox",
+    "reviewInboxPending_one": "{{count}} proposal waiting for review",
+    "reviewInboxPending_other": "{{count}} proposals waiting for review",
     "notifications": "Notifications",
     "settings": "Settings",
     "integrations": "Integrations",
@@ -270,6 +272,15 @@
     "delivery": {
       "sentTo": "Sent to {{channel}}",
       "failedTo": "Failed to send to {{channel}}"
+    },
+    "toast": {
+      "proposalsPush_one": "{{count}} new proposal from push {{sha}}",
+      "proposalsPush_other": "{{count}} new proposals from push {{sha}}",
+      "proposalsDocumentation_one": "{{count}} new proposal from documentation",
+      "proposalsDocumentation_other": "{{count}} new proposals from documentation",
+      "proposalsChat_one": "{{count}} new proposal from chat",
+      "proposalsChat_other": "{{count}} new proposals from chat",
+      "view": "View"
     }
   },
   "repository": {
