@@ -44,6 +44,8 @@ export interface MatchedCaseView {
   name: string
   suiteId: string
   suiteName: string
+  /** A queued time with no later outcome means Aeris is documenting the case now. */
+  documentation: { queuedAt: string | null; outcomeAt: string | null }
 }
 
 export interface PublishedVersionView {

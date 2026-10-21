@@ -15,6 +15,7 @@ const matchedCase: MatchedCaseView = {
   name: 'Empties the cart',
   suiteId: 'suite-1',
   suiteName: 'Checkout',
+  documentation: { queuedAt: null, outcomeAt: null },
 }
 
 const source: ProposalSourceView = {

@@ -268,6 +268,10 @@ export function useDocumentCase() {
         notify.error(t('reviewInbox.manualReviewReasonAiNotEnabled'))
         return
       }
+      if (error instanceof ApiError && error.code === 'already-pending') {
+        notify.error(t('suites.documentCaseAlreadyPending'))
+        return
+      }
       notify.error(t('suites.documentFilesError'))
     },
   })

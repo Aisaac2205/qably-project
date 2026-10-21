@@ -732,6 +732,22 @@ describe('useDocumentCase', () => {
     })
   })
 
+  it('explains that a proposal for the case already waits in the review inbox for a 409 already-pending', async () => {
+    document_.mockRejectedValueOnce(new ApiError(409, 'nope', 'already-pending'))
+    const { client } = setup()
+    const { result } = renderHook(() => useDocumentCase(), {
+      wrapper: wrapperFor(client),
+    })
+
+    result.current.mutate({ suiteId: 'suite-1', caseId: 'case-1' })
+
+    await waitFor(() => {
+      expect(notify.error).toHaveBeenCalledWith(
+        'This case already has a proposal waiting in the review inbox. Approve or reject it there, then document the case again.',
+      )
+    })
+  })
+
   it('shows a generic error message for any other failure', async () => {
     document_.mockRejectedValueOnce(new Error('boom'))
     const { client } = setup()

@@ -172,6 +172,8 @@ The check only applies when the approval updates an existing case, the proposal'
 
 **Why the base comes from the request.** Proposals for existing cases are written by `ExtractedProposalWriter`, and recording the base when the proposal is created would mean changing that writer. The request variant needs no writer change and checks what matters: the version the reviewer actually compared against, including a refetch of the detail after they opened it. The column still lets a writer record the base at creation later; approval already honours it when the request sends none.
 
+**Before deciding.** `GET /review/proposals/:id` also returns `matchedCase.documentation` (`queuedAt`, `outcomeAt`) for the case the proposal would update. While a documentation run is queued with no later outcome, the inspector shows `CaseDocumentingNotice` (`reviewInbox.caseDocumentingNotice`): Aeris is documenting this case, approving may conflict with its result, wait and compare again. It is a `role="note"` with a Phosphor icon and the AI accent tokens, and only shows on a proposal still in review.
+
 **What the reviewer sees.** `aiReview.decisionStaleProposal` names the proposal and says the case got a newer version from Aeris or a teammate. Like the other approval conflicts, the proposal goes back into the queue and the inspector, and the lists refetch, so the comparison now shows the new version. Approving again sends the new base and goes through.
 
 ## Follow-ups

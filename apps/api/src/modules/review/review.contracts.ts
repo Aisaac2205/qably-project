@@ -37,6 +37,12 @@ export interface MatchedCaseView {
   name: string;
   suiteId: string;
   suiteName: string;
+  /**
+   * When Aeris was last asked to document the case and when that ended. A
+   * queued time with no later outcome means a run is in progress, and
+   * approving may conflict with what it publishes.
+   */
+  documentation: { queuedAt: string | null; outcomeAt: string | null };
 }
 
 export interface PublishedVersionView {

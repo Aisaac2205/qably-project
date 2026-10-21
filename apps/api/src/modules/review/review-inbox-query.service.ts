@@ -42,6 +42,8 @@ interface CaseRefRow {
   suiteId: string;
   suite: { name: string };
   currentVersion: VersionRow | null;
+  documentationQueuedAt?: Date | null;
+  documentationOutcomeAt?: Date | null;
 }
 
 interface VersionRow {
@@ -60,6 +62,8 @@ const CASE_REF_SELECT = {
   name: true,
   suiteId: true,
   suite: { select: { name: true } },
+  documentationQueuedAt: true,
+  documentationOutcomeAt: true,
   currentVersion: {
     select: {
       id: true,
@@ -98,6 +102,10 @@ function toMatchedCase(ref: CaseRefRow | null): MatchedCaseView | null {
     name: ref.name,
     suiteId: ref.suiteId,
     suiteName: ref.suite.name,
+    documentation: {
+      queuedAt: ref.documentationQueuedAt?.toISOString() ?? null,
+      outcomeAt: ref.documentationOutcomeAt?.toISOString() ?? null,
+    },
   };
 }
 
