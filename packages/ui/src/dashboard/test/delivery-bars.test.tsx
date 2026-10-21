@@ -1,5 +1,5 @@
-import { render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { DeliveryBars } from '../delivery-bars'
 
 const points = Array.from({ length: 14 }, (_, index) => ({
@@ -63,5 +63,56 @@ describe('DeliveryBars', () => {
     render(<DeliveryBars points={[]} label="Deliveries" emptyLabel="No delivery data" />)
 
     expect(screen.getByText('No delivery data')).toBeInTheDocument()
+  })
+
+  describe('tooltip date', () => {
+    function hoverDay(
+      day: string,
+      props: { locale?: string } = {},
+    ): HTMLElement {
+      const { container } = render(
+        <DeliveryBars
+          points={[{ date: day, sent: 3, failed: 0 }]}
+          label="Deliveries"
+          {...props}
+        />,
+      )
+      fireEvent.mouseEnter(container.querySelector('[data-slot="delivery-bar"]') as Element)
+      return screen.getByRole('tooltip')
+    }
+
+    afterEach(() => {
+      document.documentElement.lang = ''
+    })
+
+    it('writes the month in the locale it is given', () => {
+      expect(hoverDay('2026-09-04', { locale: 'en' })).toHaveTextContent('Sep 4')
+    })
+
+    it('writes the month in Spanish for a Spanish locale', () => {
+      expect(hoverDay('2026-09-04', { locale: 'es' })).toHaveTextContent(/4 sep/i)
+    })
+
+    it('follows the language of the page when no locale is passed', () => {
+      document.documentElement.lang = 'es'
+
+      expect(hoverDay('2026-09-04')).toHaveTextContent(/4 sep/i)
+    })
+
+    it('does not shift a date-only string to the neighbouring day', () => {
+      expect(hoverDay('2026-09-01', { locale: 'en' })).toHaveTextContent('Sep 1')
+      cleanup()
+      expect(hoverDay('2026-12-31', { locale: 'en' })).toHaveTextContent('Dec 31')
+    })
+
+    it('shows a date it cannot read exactly as it came', () => {
+      expect(hoverDay('last week', { locale: 'en' })).toHaveTextContent('last week')
+      cleanup()
+      expect(hoverDay('2026-02-31', { locale: 'en' })).toHaveTextContent('2026-02-31')
+    })
+
+    it('falls back to the default locale instead of throwing on a malformed one', () => {
+      expect(hoverDay('2026-09-04', { locale: 'not a locale' })).toHaveTextContent(/4/)
+    })
   })
 })

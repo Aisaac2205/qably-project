@@ -17,6 +17,11 @@ export interface DeliveryBarsProps {
   emptyLabel?: string
   sentLabel?: string
   failedLabel?: string
+  /**
+   * BCP 47 tag for the tooltip date. Without one the tooltip follows the
+   * language of the page (`<html lang>`), then the browser's.
+   */
+  locale?: string
   className?: string
 }
 
@@ -29,21 +34,38 @@ function barTone(point: DeliveryBarPoint): string {
   return 'bg-qb-border'
 }
 
-function formatDateShort(dateStr: string): string {
+function pageLocale(): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  return document.documentElement.lang || undefined
+}
+
+function formatShortDate(date: Date, locale: string | undefined): string {
+  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', timeZone: 'UTC' }
+
   try {
-    const parts = dateStr.split('-')
-    if (parts.length === 3) {
-      const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-      const monthIdx = Number(parts[1]) - 1
-      const day = Number(parts[2])
-      if (monthIdx >= 0 && monthIdx < 12 && !Number.isNaN(day)) {
-        return `${day} ${months[monthIdx]}`
-      }
-    }
+    return new Intl.DateTimeFormat(locale, options).format(date)
   } catch {
-    // fallback
+    // A malformed tag throws a RangeError: show the date in the runtime default.
+    return new Intl.DateTimeFormat(undefined, options).format(date)
   }
-  return dateStr
+}
+
+/**
+ * "4 Sep" / "Sep 4" for a `YYYY-MM-DD` day, in the active language. A day is a
+ * calendar date, not an instant: it is built and printed in UTC so a viewer west
+ * of Greenwich never sees the day before. Anything else is shown as it came,
+ * rather than guessed at.
+ */
+function formatDateShort(dateStr: string, locale: string | undefined): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr)
+  if (match === null) return dateStr
+
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])]
+  const date = new Date(Date.UTC(year, month - 1, day))
+  const isRealDay =
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+
+  return isRealDay ? formatShortDate(date, locale) : dateStr
 }
 
 export function DeliveryBars({
@@ -52,6 +74,7 @@ export function DeliveryBars({
   emptyLabel = label,
   sentLabel = 'Sent',
   failedLabel = 'Failed',
+  locale,
   className,
 }: DeliveryBarsProps) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
@@ -106,7 +129,7 @@ export function DeliveryBars({
           className="pointer-events-none absolute -top-8 z-30 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-0.5 text-[10px] font-medium text-background shadow-md transition-all duration-150 ease-out animate-in fade-in-0 zoom-in-95"
           style={{ left: `${tooltipLeftPercent}%` }}
         >
-          <span className="font-mono opacity-80">{formatDateShort(activePoint.date)}</span>
+          <span className="font-mono opacity-80">{formatDateShort(activePoint.date, locale ?? pageLocale())}</span>
           <span className="inline-flex items-center gap-0.5 text-status-pass font-semibold">
             <PaperPlaneTilt size={10} weight="bold" aria-hidden="true" />
             <span className="font-mono tabular-nums">{activePoint.sent}</span>
