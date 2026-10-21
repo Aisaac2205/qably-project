@@ -682,3 +682,62 @@ describe('documentation structure', () => {
     expect(overview.sections.map((section) => section.id)).toContain('getting-started');
   });
 });
+
+describe('overview diagrams', () => {
+  const MAX_NODE_LABEL = 36;
+  const MAX_NODE_DETAIL = 60;
+
+  const overviewDiagrams = (content: DocContent) =>
+    collectDiagrams(content).filter(({ where }) => where.startsWith('overview#'));
+
+  it.each(locales)('$name draws the two pipelines as two diagrams on the overview, and nowhere else', ({ content }) => {
+    expect(collectDiagrams(content)).toHaveLength(2);
+    expect(overviewDiagrams(content).map(({ diagram }) => diagram.nodes.map((node) => node.id))).toEqual([
+      ['tests', 'report', 'ingest', 'runs', 'views'],
+      ['push', 'webhook', 'batches', 'repository'],
+    ]);
+  });
+
+  it.each(locales)('$name places both diagrams under the heading of the two pipelines', ({ content }) => {
+    const overview = content.pages.find((page) => page.slug === 'overview')!;
+    const blocks = overview.sections[0]!.blocks;
+    const headings = blocks.flatMap((block, index) => (block.type === 'subheading' ? [index] : []));
+    const diagramAt = blocks.flatMap((block, index) => (block.type === 'diagram' ? [index] : []));
+
+    expect(diagramAt).toHaveLength(2);
+
+    for (const index of diagramAt) {
+      expect(index, 'after the first heading').toBeGreaterThan(headings[0]!);
+      expect(index, 'before the second heading').toBeLessThan(headings[1]!);
+    }
+  });
+
+  it.each(locales)('$name keeps the test run in the CI lane: Qably only receives the report', ({ content }) => {
+    const [results] = overviewDiagrams(content).map(({ diagram }) => diagram);
+    const lanes = new Map((results!.groups ?? []).map((group) => [group.id, group.tone ?? 'external']));
+    const runTests = results!.nodes.find((node) => node.id === 'tests')!;
+
+    expect(lanes.get(runTests.group!)).toBe('external');
+    expect(results!.nodes.filter((node) => lanes.get(node.group!) === 'qably').map((node) => node.id)).not.toContain(
+      'tests',
+    );
+  });
+
+  it.each(locales)('$name names the credential on the edge that crosses into Qably', ({ content }) => {
+    const [results, changes] = overviewDiagrams(content).map(({ diagram }) => diagram);
+
+    expect(results!.edges).toEqual([expect.objectContaining({ from: 'report', to: 'ingest', label: 'API key' })]);
+    expect(changes!.edges).toEqual([
+      expect.objectContaining({ from: 'push', to: 'webhook', label: expect.stringMatching(/HMAC/) }),
+    ]);
+  });
+
+  it.each(locales)('$name keeps node text short enough for a phone', ({ content }) => {
+    for (const { diagram } of overviewDiagrams(content)) {
+      for (const node of diagram.nodes) {
+        expect(node.label.length, `label of "${node.id}"`).toBeLessThanOrEqual(MAX_NODE_LABEL);
+        expect(stripInline(node.detail ?? '').length, `detail of "${node.id}"`).toBeLessThanOrEqual(MAX_NODE_DETAIL);
+      }
+    }
+  });
+});

@@ -68,6 +68,43 @@ export const en: DocContent = {
               ],
             },
             {
+              type: 'diagram',
+              title: 'Test results pipeline',
+              description:
+                'Your CI runs the tests and produces a JUnit XML or JSON report. It sends the report to the Qably ingest API with a project API key. Qably stores the runs and their cases and shows them on the dashboard and in notifications. Qably never runs the tests.',
+              caption: 'Qably does not run the tests: it receives the report your CI produces.',
+              groups: [
+                { id: 'ci', label: 'Your CI', tone: 'external' },
+                { id: 'qably', label: 'Qably', tone: 'qably' },
+              ],
+              nodes: [
+                { id: 'tests', label: 'Runs the tests', group: 'ci' },
+                { id: 'report', label: 'JUnit XML or JSON report', group: 'ci' },
+                { id: 'ingest', label: 'Ingest API', detail: '`POST /runs/ingest` and `/runs/ingest/junit`', group: 'qably' },
+                { id: 'runs', label: 'Runs and cases', group: 'qably' },
+                { id: 'views', label: 'Dashboard and notifications', group: 'qably' },
+              ],
+              edges: [{ from: 'report', to: 'ingest', label: 'API key' }],
+            },
+            {
+              type: 'diagram',
+              title: 'Code changes pipeline',
+              description:
+                'A push or pull request on GitHub sends a webhook signed with HMAC to the Qably webhook endpoint. Qably stores the delivery as an ingestion batch with its commits and changed files, and shows it in the Repository view and as candidate commits on run comparisons.',
+              caption: 'Candidate commits also need the compared runs to report their [`commitSha`](/docs/api-ingest).',
+              groups: [
+                { id: 'repo', label: 'Your repository', tone: 'external' },
+                { id: 'qably', label: 'Qably', tone: 'qably' },
+              ],
+              nodes: [
+                { id: 'push', label: 'Push or pull request on GitHub', group: 'repo' },
+                { id: 'webhook', label: 'Webhook endpoint', detail: '`POST /webhooks/scm/:provider`', group: 'qably' },
+                { id: 'batches', label: 'Ingestion batches', detail: 'Commits and changed files', group: 'qably' },
+                { id: 'repository', label: 'Repository view', detail: 'And the candidate commit range on run comparisons', group: 'qably' },
+              ],
+              edges: [{ from: 'push', to: 'webhook', label: 'HMAC signature' }],
+            },
+            {
               type: 'callout',
               tone: 'warning',
               text: 'A [CI reporter](/docs/quickstart#step-4-report-ci) sending test results never populates the Repository page, and [connecting a repository](/docs/quickstart#step-2-connect-repository) never records test runs. If a screen shows no data, verify which pipeline feeds that specific view.',

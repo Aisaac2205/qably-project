@@ -68,6 +68,43 @@ export const es: DocContent = {
               ],
             },
             {
+              type: 'diagram',
+              title: 'Flujo de resultados de pruebas',
+              description:
+                'El CI ejecuta las pruebas y genera un reporte JUnit XML o JSON. Envía el reporte a la API de ingesta de Qably con una API key del proyecto. Qably guarda las ejecuciones y sus casos y los muestra en el panel y en las notificaciones. Qably nunca ejecuta las pruebas.',
+              caption: 'Qably no ejecuta las pruebas: recibe el reporte que genera el CI.',
+              groups: [
+                { id: 'ci', label: 'Tu CI', tone: 'external' },
+                { id: 'qably', label: 'Qably', tone: 'qably' },
+              ],
+              nodes: [
+                { id: 'tests', label: 'Ejecuta las pruebas', group: 'ci' },
+                { id: 'report', label: 'Reporte JUnit XML o JSON', group: 'ci' },
+                { id: 'ingest', label: 'API de ingesta', detail: '`POST /runs/ingest` y `/runs/ingest/junit`', group: 'qably' },
+                { id: 'runs', label: 'Ejecuciones y casos', group: 'qably' },
+                { id: 'views', label: 'Panel y notificaciones', group: 'qably' },
+              ],
+              edges: [{ from: 'report', to: 'ingest', label: 'API key' }],
+            },
+            {
+              type: 'diagram',
+              title: 'Flujo de cambios de código',
+              description:
+                'Un push o pull request en GitHub envía un webhook firmado con HMAC al endpoint de webhooks de Qably. Qably guarda la entrega como un lote de ingesta con sus commits y archivos cambiados, y la muestra en la vista Repository y como commits candidatos al comparar ejecuciones.',
+              caption: 'Los commits candidatos también requieren que las ejecuciones comparadas informen su [`commitSha`](/docs/api-ingest).',
+              groups: [
+                { id: 'repo', label: 'Tu repositorio', tone: 'external' },
+                { id: 'qably', label: 'Qably', tone: 'qably' },
+              ],
+              nodes: [
+                { id: 'push', label: 'Push o pull request en GitHub', group: 'repo' },
+                { id: 'webhook', label: 'Endpoint del webhook', detail: '`POST /webhooks/scm/:provider`', group: 'qably' },
+                { id: 'batches', label: 'Lotes de ingesta', detail: 'Commits y archivos cambiados', group: 'qably' },
+                { id: 'repository', label: 'Vista Repository', detail: 'Y el rango de commits candidatos al comparar ejecuciones', group: 'qably' },
+              ],
+              edges: [{ from: 'push', to: 'webhook', label: 'Firma HMAC' }],
+            },
+            {
               type: 'callout',
               tone: 'warning',
               text: 'El [envío de resultados de pruebas desde CI](/docs/quickstart#step-4-report-ci) no alimenta la vista Repository, y [conectar un repositorio](/docs/quickstart#step-2-connect-repository) no registra ejecuciones de prueba. Si una pantalla no muestra información, verifique cuál de los dos flujos debe suministrarla.',
