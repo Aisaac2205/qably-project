@@ -7,6 +7,12 @@ describe('isTestFilePath', () => {
     expect(isTestFilePath('src/cart/cart.test.mjs')).toBe(true);
   });
 
+  it('accepts e2e spec files written with a hyphenated e2e-spec suffix', () => {
+    expect(isTestFilePath('test/app.e2e-spec.ts')).toBe(true);
+    expect(isTestFilePath('test/auth/login.e2e-spec.js')).toBe(true);
+    expect(isTestFilePath('test/auth/login.e2e.spec.ts')).toBe(true);
+  });
+
   it('accepts Python test files in either naming convention', () => {
     expect(isTestFilePath('tests/cart/test_cart.py')).toBe(true);
     expect(isTestFilePath('tests/cart/cart_test.py')).toBe(true);
