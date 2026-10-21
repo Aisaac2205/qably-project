@@ -49,6 +49,7 @@ This package keeps type consistency across the application boundary. The record 
 - `PLAN_LIMITS`, `publicPlanLimits`, `monthStartUtc`, `nextMonthStartUtc`, and `creditsUsedAt`: Per-plan limits and the monthly AI credit period helpers.
 - `DASHBOARD_PERIODS` (`7`, `30`, `90`) and `isDashboardPeriod`: The dashboard period selector values.
 - `matchDeclaredTestPattern(filePath, patterns)` and `isSafeRepoRelativePath(path)`: Test file pattern matching and repository-relative path validation.
+- `DEFAULT_TEST_FILE_PATTERNS`: The patterns a new project is created with (`*.spec.ts`, `*.test.ts`, `*.spec.tsx`, `*.test.tsx`, `*.e2e-spec.ts`). It mirrors the Prisma column default of `Project.testFilePatterns`, which a spec in the API keeps in step. Existing projects keep the patterns they already have.
 - `DEFAULT_NOTIFICATION_PREFERENCES`, `MAX_ATTACHED_CASES`, and `ASSISTANT_MODEL_NAME`: Shared constants.
 
 ## Available Scripts

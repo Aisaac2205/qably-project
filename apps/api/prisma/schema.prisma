@@ -186,7 +186,7 @@ model Project {
   connectionId      String?
   connection        Connection?         @relation(fields: [connectionId], references: [id], onDelete: SetNull)
   technologies      String[]            @default([])
-  testFilePatterns  String[]            @default(["*.spec.ts", "*.test.ts"])
+  testFilePatterns  String[]            @default(["*.spec.ts", "*.test.ts", "*.spec.tsx", "*.test.tsx", "*.e2e-spec.ts"])
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   suites            Suite[]
