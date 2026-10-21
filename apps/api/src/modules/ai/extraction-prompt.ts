@@ -6,6 +6,7 @@ import {
   CASE_LIMITS,
   MAX_EXTRACTED_CASES,
   SUITE_LIMITS,
+  type ExtractionTargetDeclaration,
 } from './extraction.contracts';
 import {
   renderTargetLines,
@@ -14,19 +15,27 @@ import {
   type TargetTag,
 } from './target-reference';
 
-export const EXTRACTION_PROMPT_VERSION = 'extraction-v12';
+export const EXTRACTION_PROMPT_VERSION = 'extraction-v13';
 
 export const FILE_CONTENT_OPEN = '<<<FILE_CONTENT>>>';
 export const FILE_CONTENT_CLOSE = '<<<END_FILE_CONTENT>>>';
 export const TARGET_CASES_OPEN = '<<<TARGET_CASES>>>';
 export const TARGET_CASES_CLOSE = '<<<END_TARGET_CASES>>>';
+export const TARGET_DECLARATIONS_OPEN = '<<<TARGET_DECLARATIONS>>>';
+export const TARGET_DECLARATIONS_CLOSE = '<<<END_TARGET_DECLARATIONS>>>';
 
 const ALL_DELIMITERS = [
   FILE_CONTENT_OPEN,
   FILE_CONTENT_CLOSE,
   TARGET_CASES_OPEN,
   TARGET_CASES_CLOSE,
+  TARGET_DECLARATIONS_OPEN,
+  TARGET_DECLARATIONS_CLOSE,
 ];
+
+// A describe path and title as long as a composite automation key can be (see
+// target-reference.ts) plus room for the separators.
+const DECLARATION_NAME_MAX_LENGTH = 400;
 
 const AUTOMATION_KEY_RULES = `- vitest (JUnit reporter): the reporter's classname is the test file's own relative path, which is never a prefix of the describe/it chain, so the real key joins that file path to the enclosing describe chain and the it/test title (themselves joined by " > ") with "::" (e.g. "src/features/cart/cart.test.ts::Cart > adds an item" for a test file at "src/features/cart/cart.test.ts").
 - jest with jest-junit (default templates): the enclosing describe chain and the it/test title joined by a single space (e.g. "Cart adds an item").
@@ -59,6 +68,11 @@ const DECLARATION_RULE_ALL: Record<'es' | 'en', string> = {
 const DECLARATION_RULE_TARGETED: Record<'es' | 'en', string> = {
   es: `Extrae únicamente las declaraciones de prueba que corresponden a las entradas listadas en el bloque ${TARGET_CASES_OPEN} que sigue a este mensaje; ignora cualquier otra declaración de prueba que el archivo contenga, aunque haya más. La regla de "una entrada por cada declaración" solo aplica cuando el mensaje no incluye ese bloque.`,
   en: `Extract only the test declarations that correspond to the entries listed in the ${TARGET_CASES_OPEN} block that follows this message; ignore any other test declaration the file contains, even if there are more. The "one entry per declaration" rule applies only when the message does not include that block.`,
+};
+
+const DECLARATION_RULE_TARGET_DECLARATIONS: Record<'es' | 'en', string> = {
+  es: `Extrae únicamente las declaraciones de prueba listadas en el bloque ${TARGET_DECLARATIONS_OPEN} que sigue al archivo. Las demás declaraciones de prueba del archivo ya están documentadas: ignóralas, aunque estén en el archivo. Lee el resto del archivo (imports, funciones auxiliares, hooks y los bloques describe que las contienen) solo como contexto de las declaraciones listadas.`,
+  en: `Extract only the test declarations listed in the ${TARGET_DECLARATIONS_OPEN} block that follows the file. Every other test declaration in the file is already documented: ignore it, even though it is in the file. Read the rest of the file (imports, helpers, hooks and the describe blocks around them) only as context for the listed declarations.`,
 };
 
 const TITLE_DIFFERS_SENTENCE: Record<'es' | 'en', string> = {
@@ -133,6 +147,16 @@ const TARGET_REF_SENTENCE: Record<'es' | 'en', string> = {
   en: `Each line in the block starts with a tag like "T1" or "T2": copy that tag exactly, without translating or altering it, into that case's "targetRef" field. When the file has no test for a line, simply omit "targetRef" on the other cases.`,
 };
 
+const TARGET_DECLARATIONS_SENTENCE: Record<'es' | 'en', string> = {
+  es: `Cada línea del bloque dice "T{n}: lines A-B: nombre": las líneas (contadas desde 1) que ocupa la llamada de la declaración en el archivo, y luego los títulos de los describe que la contienen y su propio título tal como están escritos, unidos por " > " (un título calculado aparece como su código fuente). Devuelve exactamente una entrada por línea. Una línea marcada "(table)" es una declaración it.each/test.each/describe.each: devuelve una entrada por fila cuando los valores de la fila son literales, o una única entrada que describa la tabla en sus steps cuando no lo son. Deriva cada "automationKey" del archivo con las reglas de "automationKey" de arriba, nunca del bloque.`,
+  en: `Each line of the block reads "T{n}: lines A-B: name": the 1-based lines the declaration's call spans in the file, then its enclosing describe titles and its own title as written, joined by " > " (a computed title appears as its source code). Return exactly one entry per line. A line marked "(table)" is an it.each/test.each/describe.each declaration: return one entry per row when the row values are literal, or a single entry describing the table in its steps when they are not. Derive each "automationKey" from the file with the "automationKey" rules above, never from the block.`,
+};
+
+const TARGET_REF_DECLARATION_SENTENCE: Record<'es' | 'en', string> = {
+  es: `Copia la etiqueta del inicio de cada línea ("T1", "T2", ...) tal cual, sin traducirla ni modificarla, en el campo "targetRef" de cada entrada que devuelvas para esa línea.`,
+  en: `Copy the tag at the start of each line ("T1", "T2", ...) exactly, without translating or altering it, into the "targetRef" field of every entry you return for that line.`,
+};
+
 const DECLARATION_COUNT_SENTENCE: Record<
   'es' | 'en',
   (count: number) => string
@@ -184,6 +208,24 @@ export function buildSystemInstruction(
   return `${base}\n\n${countSentence[locale](declarationCountHint)}`;
 }
 
+/**
+ * The instruction of a code-change extraction that names the declarations to
+ * describe (`ExtractionInput.targetDeclarations`): only those, the rest of the
+ * file is context. The automation key, rubric, limits and language rules are
+ * the same as in every other mode; no suite summary is asked for.
+ */
+export function buildTargetedDeclarationInstruction(
+  locale: 'es' | 'en',
+): string {
+  return [
+    PREFIX_INSTRUCTION[locale],
+    DECLARATION_RULE_TARGET_DECLARATIONS[locale],
+    SUFFIX_INSTRUCTION[locale],
+    TARGET_DECLARATIONS_SENTENCE[locale],
+    TARGET_REF_DECLARATION_SENTENCE[locale],
+  ].join('\n\n');
+}
+
 // Tags are positional: T{i+1} is the tag for index i of the exact
 // targetAutomationKeys array the caller sends. This module has no
 // testCaseId to sort by (only bare automationKey strings), so it never
@@ -220,16 +262,55 @@ function buildTargetCasesBlock(
   return `\n\n${TARGET_CASES_OPEN}\n${lines}\n${TARGET_CASES_CLOSE}`;
 }
 
+/**
+ * Titles come from the file, so they are untrusted: delimiters are removed and
+ * the name is flattened to one line before it reaches the block.
+ */
+function renderDeclarationName(
+  declaration: ExtractionTargetDeclaration,
+): string {
+  const name = [...declaration.describePath, declaration.title].join(' > ');
+  return sanitizeUntrustedText(
+    stripBlockDelimiters(name, ALL_DELIMITERS),
+    DECLARATION_NAME_MAX_LENGTH,
+  );
+}
+
+// Tags are positional, like the target-cases block: T{i+1} names index i of the
+// exact array the caller sends, which is how the caller maps an answer back.
+function buildTargetDeclarationsBlock(
+  declarations: readonly ExtractionTargetDeclaration[],
+): string {
+  const lines = declarations.map((declaration, index) => {
+    const table = declaration.parametrized ? ' (table)' : '';
+    return `${targetTagAt(index)}: lines ${declaration.startLine}-${declaration.endLine}${table}: ${renderDeclarationName(declaration)}`;
+  });
+
+  return `\n\n${TARGET_DECLARATIONS_OPEN}\n${lines.join('\n')}\n${TARGET_DECLARATIONS_CLOSE}`;
+}
+
 export function buildFileContentTurn(input: {
   filePath: string;
   language: string;
   content: string;
   targetAutomationKeys?: readonly string[];
+  targetDeclarations?: readonly ExtractionTargetDeclaration[];
 }): string {
+  const declarations = input.targetDeclarations ?? [];
+  const targets =
+    declarations.length > 0
+      ? buildTargetDeclarationsBlock(declarations)
+      : buildTargetCasesBlock(input.targetAutomationKeys ?? []);
+
   return `File: ${sanitizeUntrustedText(input.filePath)}
 Language: ${sanitizeUntrustedText(input.language)}
 
 ${FILE_CONTENT_OPEN}
-${stripBlockDelimiters(input.content, [FILE_CONTENT_OPEN, FILE_CONTENT_CLOSE])}
-${FILE_CONTENT_CLOSE}${buildTargetCasesBlock(input.targetAutomationKeys ?? [])}`;
+${stripBlockDelimiters(input.content, [
+  FILE_CONTENT_OPEN,
+  FILE_CONTENT_CLOSE,
+  TARGET_DECLARATIONS_OPEN,
+  TARGET_DECLARATIONS_CLOSE,
+])}
+${FILE_CONTENT_CLOSE}${targets}`;
 }

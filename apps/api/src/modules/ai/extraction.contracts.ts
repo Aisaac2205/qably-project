@@ -165,12 +165,34 @@ export type ExtractionLanguage =
   | 'csharp'
   | 'other';
 
+/**
+ * A test declaration a targeted extraction asks the model to describe, named
+ * the way the parser read it from the file.
+ */
+export interface ExtractionTargetDeclaration {
+  /** Enclosing describe titles, outermost first, as written. */
+  readonly describePath: readonly string[];
+  /** The title as written, or its raw source text when computed at runtime. */
+  readonly title: string;
+  /** 1-based lines of the declaration's call. */
+  readonly startLine: number;
+  readonly endLine: number;
+  /** An `.each`/`.for` table: the model returns one entry per literal row. */
+  readonly parametrized: boolean;
+}
+
 export interface ExtractionInput {
   readonly filePath: string;
   readonly language: ExtractionLanguage;
   readonly content: string;
   readonly automationKey?: string;
   readonly targetAutomationKeys?: readonly string[];
+  /**
+   * The only declarations to describe, tagged `T1`, `T2`, ... by position.
+   * When non-empty it replaces `targetAutomationKeys`, `declarationCountHint`
+   * and `requestSuiteSummary`: the rest of the file is context only.
+   */
+  readonly targetDeclarations?: readonly ExtractionTargetDeclaration[];
   readonly locale: 'es' | 'en';
   readonly declarationCountHint?: number;
   readonly requestSuiteSummary?: boolean;

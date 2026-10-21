@@ -36,6 +36,16 @@ Set `GEMINI_MODEL` to any model id Gemini's `models.list()` reports as available
 
 A `401`/`403` from the API (invalid key) is never retried and immediately resolves to `provider-unavailable: 'invalid-credentials'`.
 
+The request has three modes, chosen from the `ExtractionInput`:
+
+| Mode | Input | Block after the file | Instruction |
+|---|---|---|---|
+| Whole file | neither list | none | `buildSystemInstruction`: one entry per test declaration of the file. |
+| Target cases (`document-file`) | `targetAutomationKeys` | `<<<TARGET_CASES>>>`, one `T{n}: automationKey` line per key | `buildSystemInstruction(locale, true, ...)`: only those cases, the key copied from the block. |
+| Target declarations (`code-change`) | `targetDeclarations` | `<<<TARGET_DECLARATIONS>>>`, one `T{n}: lines A-B: Describe > title` line per declaration, `(table)` after the span of an `.each`/`.for` declaration | `buildTargetedDeclarationInstruction`: only those declarations, the rest of the file is context; one entry per line (per literal row for a table); the key derived from the file with the usual rules, never from the block; no suite summary. |
+
+Both target modes answer with `TARGETED_RESPONSE_JSON_SCHEMA` and cite the line tag in `targetRef`. Tags are positional: `T{i+1}` is index `i` of the array the caller sent. A non-empty `targetDeclarations` wins over `targetAutomationKeys`, `declarationCountHint` and `requestSuiteSummary`. The names in the block come from the file, so they are flattened with `sanitizeUntrustedText` and stripped of every block delimiter; the target-declarations delimiters are also stripped from the file content. `extraction-v13` added this mode; the whole-file and target-cases prompts did not change.
+
 ## Limits
 
 - Source content is capped per file (`SourceReader`, `apps/api/src/modules/repository/source-reader.ts`) at a size that depends on the organization's plan: **60,000 characters** on `gratuito` and `equipo`, **1,000,000** on `empresa`. Anything longer is truncated before it reaches the model. See "Source size is a plan limit" below.
