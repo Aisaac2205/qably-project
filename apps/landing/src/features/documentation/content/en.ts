@@ -129,7 +129,7 @@ export const en: DocContent = {
           type: 'list',
           ordered: true,
           items: [
-            'Sign in with GitHub or Bitbucket if you have not done so already. Qably uses this OAuth token to query accessible repositories across personal accounts and organizations.',
+            'Sign in with GitHub if you have not done so already. Qably uses this OAuth token to query accessible repositories across personal accounts and organizations.',
             'In project settings under Integrations, select the target repository from the list, sorted by most recent push.',
             'Selecting an unlinked repository creates an organization connection and generates a webhook secret. Selecting an already connected repository reuses its existing connection.',
           ],

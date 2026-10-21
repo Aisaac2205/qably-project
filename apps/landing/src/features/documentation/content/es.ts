@@ -129,7 +129,7 @@ export const es: DocContent = {
           type: 'list',
           ordered: true,
           items: [
-            'Inicie sesión con GitHub o Bitbucket si aún no lo ha hecho. Qably utiliza este token de OAuth para listar los repositorios accesibles en su cuenta personal y organizaciones asociadas.',
+            'Inicie sesión con GitHub si aún no lo ha hecho. Qably utiliza este token de OAuth para listar los repositorios accesibles en su cuenta personal y organizaciones asociadas.',
             'En la sección Integraciones del proyecto, seleccione el repositorio deseado de la lista disponible, ordenada por fecha de push reciente.',
             'Al seleccionar un repositorio no vinculado, se crea una conexión dentro de la organización y se genera su secreto de webhook. Seleccionar un repositorio previamente vinculado reutiliza la conexión existente.',
           ],
