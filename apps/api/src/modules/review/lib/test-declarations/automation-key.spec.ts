@@ -1,9 +1,14 @@
+import { realpathSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { resolve } from 'node:path';
 import { resolveCaseIdentityKey } from '../../../runs/lib/case-identity';
 import { parseJunitXml } from '../../../runs/lib/parse-junit-xml';
+import { ingestRunSchema } from '../../../runs/runs.schemas';
 import {
   deriveAutomationKey,
   type AutomationKeyDeclaration,
 } from './automation-key';
+import { storedIdentityKey } from './stored-identity';
 
 function declaration(
   overrides: Partial<AutomationKeyDeclaration> = {},
@@ -24,6 +29,82 @@ const VITEST_AT_ROOT = {
   pathBase: '',
 } as const;
 
+/**
+ * The key POST /runs/ingest/junit stores for the first testcase of a report:
+ * the XML goes through `parseJunitXml`, the controller's `ingestRunSchema`
+ * and `resolveCaseIdentityKey`, as it does in production. Undefined when the
+ * schema rejects the report.
+ */
+function ingestedIdentity(xml: string): string | undefined {
+  const parsed = ingestRunSchema.safeParse({
+    externalId: 'run-1',
+    source: 'github_actions',
+    suiteName: 'suite',
+    name: 'run',
+    cases: parseJunitXml(xml).cases,
+  });
+  if (!parsed.success) return undefined;
+
+  const [reported] = parsed.data.cases;
+  return resolveCaseIdentityKey({
+    name: reported.name,
+    className: reported.className,
+  });
+}
+
+// The real jest-junit reporter (a devDependency of this package), driven with
+// its default options, so its template filling is what produces the XML.
+const requireFromJestJunit = createRequire(
+  realpathSync(require.resolve('jest-junit')),
+);
+const buildJsonResults = requireFromJestJunit('./utils/buildJsonResults') as (
+  report: unknown,
+  appDirectory: string,
+  options: Record<string, string>,
+) => unknown;
+const { DEFAULT_OPTIONS } = requireFromJestJunit('./constants/index') as {
+  DEFAULT_OPTIONS: Record<string, string>;
+};
+const toXml = requireFromJestJunit('xml') as (
+  data: unknown,
+  options: { declaration: boolean },
+) => string;
+
+function jestJunitXml(
+  describePath: readonly string[],
+  title: string,
+  displayName?: string,
+): string {
+  const appDirectory = process.cwd();
+  const report = {
+    startTime: 0,
+    testResults: [
+      {
+        testFilePath: resolve(appDirectory, 'src/cart.spec.ts'),
+        displayName,
+        numFailingTests: 0,
+        numPassingTests: 1,
+        numPendingTests: 0,
+        perfStats: { start: 0, end: 1 },
+        testExecError: null,
+        testResults: [
+          {
+            ancestorTitles: [...describePath],
+            title,
+            duration: 1,
+            status: 'passed',
+            failureMessages: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  return toXml(buildJsonResults(report, appDirectory, { ...DEFAULT_OPTIONS }), {
+    declaration: true,
+  });
+}
+
 function escapeXml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -33,44 +114,31 @@ function escapeXml(value: string): string {
     .replace(/'/g, '&apos;');
 }
 
-// The identity the runs side stores for one reported testcase: the XML goes
-// through the same parser and identity rule as POST /runs/ingest/junit.
-function ingestedIdentity(testcase: {
-  classname: string;
-  name: string;
-}): string {
-  const xml = `<?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="tests">
-  <testsuite name="suite" tests="1">
-    <testcase classname="${escapeXml(testcase.classname)}" name="${escapeXml(testcase.name)}" time="0.001"/>
-  </testsuite>
-</testsuites>`;
-  const [reported] = parseJunitXml(xml).cases;
-  return resolveCaseIdentityKey({
-    name: reported.name,
-    className: reported.className,
-  });
-}
-
-// vitest 4 junit reporter: classname is the file path relative to the vitest
-// root, name is the describe chain and the title joined by " > ".
-function vitestTestcase(
+// vitest 4 junit reporter (dist/chunks/index.*.js, JUnitReporter): classname
+// is the file path relative to the vitest root, name is the describe chain and
+// the title joined by " > ", both escaped with escapeXML.
+function vitestXml(
   relativePath: string,
   describePath: readonly string[],
   title: string,
-) {
-  return {
-    classname: relativePath,
-    name: [...describePath, title].join(' > '),
-  };
+): string {
+  const name = [...describePath, title].join(' > ');
+  return `<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests">
+  <testsuite name="${escapeXml(relativePath)}" tests="1">
+    <testcase classname="${escapeXml(relativePath)}" name="${escapeXml(name)}" time="0.001"/>
+  </testsuite>
+</testsuites>`;
 }
 
-// jest-junit 17 default templates: "{classname} {title}" for both attributes,
-// where {classname} is the describe chain joined by a single space.
-function jestJunitTestcase(describePath: readonly string[], title: string) {
-  const name = `${describePath.join(' ')} ${title}`;
-  return { classname: name, name };
-}
+const LONG_TITLE = `handles ${'a very long parametrized title '.repeat(15)}end`;
+const LONG_PATH = `${'nested/'.repeat(40)}cart.test.ts`;
+// "Cart " plus 366 characters puts a space at character 372, where the cut
+// falls, so the stored name is trimmed again after it.
+const CUT_ON_A_SPACE = `${'a'.repeat(366)} rest of the title`;
+// 300 code points, under the 372-code-point cut, but 600 UTF-16 code units,
+// past the schema maximum: the ingestion rejects the report.
+const ASTRAL_TITLE = '\u{1F600}'.repeat(300);
 
 describe('deriveAutomationKey', () => {
   describe('vitest', () => {
@@ -149,6 +217,17 @@ describe('deriveAutomationKey', () => {
         }),
       ).toEqual({ kind: 'unavailable', reason: 'outside-path-base' });
     });
+
+    it('drops the characters vitest strips from XML attributes', () => {
+      expect(
+        deriveAutomationKey(
+          declaration({ title: 'adds\u0001 an\u001f item�\u0080' }),
+          VITEST_AT_ROOT,
+        ),
+      ).toMatchObject({
+        key: 'src/features/cart/cart.test.ts::Cart > adds an item',
+      });
+    });
   });
 
   describe('jest', () => {
@@ -183,6 +262,20 @@ describe('deriveAutomationKey', () => {
         }),
       ).toMatchObject({ key: 'Cart costs $5 more' });
     });
+
+    it('fills a literal {displayName} in a title with the display name, as jest-junit does last', () => {
+      const title = 'reports {displayName}';
+
+      expect(
+        deriveAutomationKey(declaration({ title }), {
+          runner: 'jest',
+          displayName: 'api',
+        }),
+      ).toMatchObject({ key: 'Cart reports api' });
+      expect(
+        deriveAutomationKey(declaration({ title }), { runner: 'jest' }),
+      ).toMatchObject({ key: 'Cart reports undefined' });
+    });
   });
 
   describe('keys that cannot be derived', () => {
@@ -209,6 +302,32 @@ describe('deriveAutomationKey', () => {
         ),
       ).toEqual({ kind: 'unavailable', reason: 'dynamic-title' });
     });
+
+    it.each([[''], ['   ']])(
+      'reports the empty title %j as unavailable',
+      (title) => {
+        expect(
+          deriveAutomationKey(declaration({ title }), { runner: 'jest' }),
+        ).toEqual({ kind: 'unavailable', reason: 'empty-title' });
+        expect(
+          deriveAutomationKey(declaration({ title }), VITEST_AT_ROOT),
+        ).toEqual({ kind: 'unavailable', reason: 'empty-title' });
+      },
+    );
+
+    it('reports a name the ingestion schema rejects as not ingestible', () => {
+      expect(
+        deriveAutomationKey(declaration({ title: ASTRAL_TITLE }), {
+          runner: 'jest',
+        }),
+      ).toEqual({ kind: 'unavailable', reason: 'not-ingestible' });
+      expect(
+        deriveAutomationKey(
+          declaration({ title: ASTRAL_TITLE }),
+          VITEST_AT_ROOT,
+        ),
+      ).toEqual({ kind: 'unavailable', reason: 'not-ingestible' });
+    });
   });
 
   describe('parametrized declarations', () => {
@@ -226,10 +345,7 @@ describe('deriveAutomationKey', () => {
     });
   });
 
-  describe('parity with the identity the runs side stores', () => {
-    const LONG_TITLE = `handles ${'a very long parametrized title '.repeat(15)}end`;
-    const LONG_PATH = `${'nested/'.repeat(40)}cart.test.ts`;
-
+  describe('parity with the key POST /runs/ingest/junit stores', () => {
     it.each([
       ['nested describes', ['Cart', 'totals'], 'sums the lines'],
       ['no describe', [], 'adds an item'],
@@ -240,6 +356,7 @@ describe('deriveAutomationKey', () => {
       ],
       ['padded titles', ['  Cart '], ' adds an item  '],
       ['a name past the 372-character cap', ['Cart'], LONG_TITLE],
+      ['a cut that ends on a space', ['Cart'], CUT_ON_A_SPACE],
     ])('matches vitest for %s', (_label, describePath, title) => {
       const derived = deriveAutomationKey(
         declaration({ describePath, title }),
@@ -248,7 +365,7 @@ describe('deriveAutomationKey', () => {
 
       expect(derived).toMatchObject({
         key: ingestedIdentity(
-          vitestTestcase(VITEST_AT_ROOT.filePath, describePath, title),
+          vitestXml(VITEST_AT_ROOT.filePath, describePath, title),
         ),
       });
     });
@@ -261,9 +378,7 @@ describe('deriveAutomationKey', () => {
       });
 
       expect(derived).toMatchObject({
-        key: ingestedIdentity(
-          vitestTestcase(LONG_PATH, ['Cart'], 'adds an item'),
-        ),
+        key: ingestedIdentity(vitestXml(LONG_PATH, ['Cart'], 'adds an item')),
       });
     });
 
@@ -275,18 +390,77 @@ describe('deriveAutomationKey', () => {
         ['Cart <beta>'],
         'keeps "quotes" & \'apostrophes\'',
       ],
+      [
+        '"$" patterns in the chain and the title',
+        ['Cart $&'],
+        "costs $$5 $' more",
+      ],
+      ['a literal {title} in the describe chain', ['Cart {title}'], 'adds'],
       ['a name past the 372-character cap', ['Cart'], LONG_TITLE],
-    ])('matches jest-junit for %s', (_label, describePath, title) => {
-      const derived = deriveAutomationKey(
-        declaration({ describePath, title }),
-        {
-          runner: 'jest',
-        },
-      );
+      ['a cut that ends on a space', ['Cart'], CUT_ON_A_SPACE],
+    ])(
+      'matches the real jest-junit reporter for %s',
+      (_label, describePath, title) => {
+        const derived = deriveAutomationKey(
+          declaration({ describePath, title }),
+          { runner: 'jest' },
+        );
 
-      expect(derived).toMatchObject({
-        key: ingestedIdentity(jestJunitTestcase(describePath, title)),
+        expect(derived).toEqual({
+          kind: 'key',
+          key: ingestedIdentity(jestJunitXml(describePath, title)),
+          parametrized: false,
+        });
+      },
+    );
+
+    it('matches the real jest-junit reporter for a {displayName} in a title', () => {
+      const title = 'reports {displayName}';
+
+      expect(
+        deriveAutomationKey(declaration({ title }), {
+          runner: 'jest',
+          displayName: 'api',
+        }),
+      ).toMatchObject({
+        key: ingestedIdentity(jestJunitXml(['Cart'], title, 'api')),
       });
+      expect(
+        deriveAutomationKey(declaration({ title }), { runner: 'jest' }),
+      ).toMatchObject({ key: ingestedIdentity(jestJunitXml(['Cart'], title)) });
     });
+
+    it('agrees with the ingestion that a name past the schema maximum stores no key', () => {
+      expect(ingestedIdentity(jestJunitXml(['Cart'], ASTRAL_TITLE))).toBe(
+        undefined,
+      );
+      expect(
+        ingestedIdentity(
+          vitestXml(VITEST_AT_ROOT.filePath, ['Cart'], ASTRAL_TITLE),
+        ),
+      ).toBe(undefined);
+    });
+  });
+});
+
+describe('storedIdentityKey', () => {
+  it('names a testcase without a name by its classname, as parseJunitXml does', () => {
+    expect(storedIdentityKey({ name: '  ', className: 'Cart adds' })).toBe(
+      'Cart adds',
+    );
+  });
+
+  it('returns undefined when neither attribute has text', () => {
+    expect(storedIdentityKey({ name: '', className: ' ' })).toBe(undefined);
+  });
+
+  it('drops an empty classname instead of composing with it', () => {
+    expect(storedIdentityKey({ name: 'adds', className: '' })).toBe('adds');
+  });
+
+  it('returns undefined for a classname past the schema maximum', () => {
+    expect(
+      storedIdentityKey({ name: 'adds', className: '\u{1F600}'.repeat(200) }),
+    ).toBe(undefined);
   });
 });

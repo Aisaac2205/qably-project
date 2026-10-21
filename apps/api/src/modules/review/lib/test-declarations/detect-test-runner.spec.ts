@@ -19,6 +19,7 @@ describe('test runner detection', () => {
     ["import type { Mock } from 'vitest';"],
     ["import * as vitest from 'vitest';"],
     ["const { it } = require('vitest');"],
+    ["export { it } from 'vitest';"],
   ])('detects vitest from an import of vitest: %s', (source) => {
     expect(runnerOf(`${source}\nit('a', () => {});`)).toEqual({
       runner: 'vitest',
@@ -34,6 +35,29 @@ describe('test runner detection', () => {
       runner: 'jest',
       evidence: 'import',
     });
+  });
+
+  it.each([
+    ["import { test, expect } from '@playwright/test';"],
+    ["import { describe, it } from 'node:test';"],
+    ["import { describe, it } from 'bun:test';"],
+    ["const { describe, it } = require('mocha');"],
+  ])(
+    'reports an import of another test framework as unknown, above the hint: %s',
+    (source) => {
+      expect(runnerOf(`${source}\nit('a', () => {});`, 'jest')).toEqual({
+        runner: 'unknown',
+        evidence: 'import',
+      });
+    },
+  );
+
+  it('reports unknown when vitest is imported beside another test framework', () => {
+    expect(
+      runnerOf(
+        "import { it } from 'vitest';\nimport { test } from '@playwright/test';",
+      ),
+    ).toEqual({ runner: 'unknown', evidence: 'import' });
   });
 
   it('detects vitest from a vi API call when the file relies on globals', () => {

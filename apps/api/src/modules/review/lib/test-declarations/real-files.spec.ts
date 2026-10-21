@@ -7,15 +7,18 @@ import {
   type TestDeclaration,
 } from './parse-test-declarations';
 
-// Real spec files of this repository, parsed as the extraction would read
-// them. The counts were taken by hand from each file; a change to one of these
-// files that adds or removes a declaration has to update its count here.
-const REPO_ROOT = resolve(__dirname, '../../../../../../..');
+// Copies of real spec files of this repository, taken on 2026-10-20 and kept
+// as .txt under __fixtures__ so jest, tsc and eslint never run or lint them,
+// and so an edit to the originals cannot break these counts. Each one is
+// parsed under its original path, as the extraction would read it. The counts
+// were taken by hand from each file.
+const FIXTURES = resolve(__dirname, '__fixtures__');
 
 function parseRepoFile(repoPath: string, runnerHint?: TestRunner) {
+  const fixture = `${repoPath.slice(repoPath.lastIndexOf('/') + 1)}.txt`;
   const result = parseTestDeclarations({
     filePath: repoPath,
-    content: readFileSync(resolve(REPO_ROOT, repoPath), 'utf8'),
+    content: readFileSync(resolve(FIXTURES, fixture), 'utf8'),
     runnerHint,
   });
   if (result.kind !== 'parsed') {
@@ -80,6 +83,23 @@ describe('parsing real spec files of this repository', () => {
         startLine: 166,
         endLine: 171,
       });
+    });
+
+    it('gives the declarations of each describe the context of that describe', () => {
+      const { declarations } = parseRepoFile(FILE);
+      const contextOf = (scope: string) =>
+        new Set(
+          declarations
+            .filter((d) => d.describePath[0] === scope)
+            .map((d) => d.contextHash),
+        );
+
+      // "StatusChip (global)" runs a beforeEach that "ci-run scope" does not.
+      const global = contextOf('StatusChip (global)');
+      const ciRun = contextOf('StatusChip (ci-run scope)');
+      expect(global.size).toBeGreaterThan(0);
+      expect(ciRun.size).toBeGreaterThan(0);
+      expect([...global].some((hash) => ciRun.has(hash))).toBe(false);
     });
 
     it('derives the key vitest reports from apps/web, relative to its vitest root', () => {

@@ -1,10 +1,11 @@
-import * as ts from 'typescript';
-import { hashDeclarationText } from './body-hash';
+import type * as Ts from 'typescript';
+import { hashDeclarationText, hashSourceGroups } from './body-hash';
 import {
   detectTestRunner,
   type RunnerDetection,
   type TestRunner,
 } from './detect-test-runner';
+import { loadTypescript } from './load-typescript';
 
 export type DeclarationKind = 'it' | 'test';
 
@@ -43,8 +44,16 @@ export interface TestDeclaration {
   /** 1-based lines of the whole call expression, table included. */
   readonly startLine: number;
   readonly endLine: number;
-  /** See `hashDeclarationText`. */
+  /** sha256 of the call expression's text (see `hashDeclarationText`). */
   readonly bodyHash: string;
+  /**
+   * sha256 of what the declaration runs under inside its describes: for each
+   * enclosing describe, outermost first, its `.each` table or other factory
+   * arguments and every statement directly in its body that is not a nested
+   * describe or test (hooks, helpers, fixtures, constants), then the
+   * declaration's own factory arguments.
+   */
+  readonly contextHash: string;
 }
 
 export interface ParseTestDeclarationsInput {
@@ -53,6 +62,8 @@ export interface ParseTestDeclarationsInput {
   readonly content: string;
   /** The runner of the file's package, used when the file names none. */
   readonly runnerHint?: TestRunner;
+  /** Longest content read, in UTF-16 code units. */
+  readonly maxContentLength?: number;
 }
 
 export type ParseTestDeclarationsResult =
@@ -60,23 +71,36 @@ export type ParseTestDeclarationsResult =
       readonly kind: 'parsed';
       readonly runner: RunnerDetection;
       readonly declarations: readonly TestDeclaration[];
+      /**
+       * sha256 of the file's top-level statements that are neither imports
+       * nor describe/test calls: top-level hooks, helpers, fixtures, mocks
+       * and constants every declaration may depend on.
+       */
+      readonly fileContextHash: string;
     }
-  | { readonly kind: 'unsupported'; readonly reason: 'unsupported-extension' }
+  | {
+      readonly kind: 'unsupported';
+      readonly reason: 'unsupported-extension' | 'too-large';
+    }
   | {
       readonly kind: 'error';
       readonly reason: 'syntax-error' | 'parser-failure';
       readonly message: string;
     };
 
-const SCRIPT_KIND_BY_EXTENSION: ReadonlyMap<string, ts.ScriptKind> = new Map([
-  ['.ts', ts.ScriptKind.TS],
-  ['.mts', ts.ScriptKind.TS],
-  ['.cts', ts.ScriptKind.TS],
-  ['.tsx', ts.ScriptKind.TSX],
-  ['.js', ts.ScriptKind.JS],
-  ['.mjs', ts.ScriptKind.JS],
-  ['.cjs', ts.ScriptKind.JS],
-  ['.jsx', ts.ScriptKind.JSX],
+export const DEFAULT_MAX_CONTENT_LENGTH = 1_000_000;
+
+type ScriptKindName = 'TS' | 'TSX' | 'JS' | 'JSX';
+
+const SCRIPT_KIND_BY_EXTENSION: ReadonlyMap<string, ScriptKindName> = new Map([
+  ['.ts', 'TS'],
+  ['.mts', 'TS'],
+  ['.cts', 'TS'],
+  ['.tsx', 'TSX'],
+  ['.js', 'JS'],
+  ['.mjs', 'JS'],
+  ['.cjs', 'JS'],
+  ['.jsx', 'JSX'],
 ]);
 
 interface BaseCallee<K> {
@@ -98,6 +122,13 @@ const DESCRIBE_BASES: ReadonlyMap<string, readonly TestModifier[]> = new Map([
   ['suite', []],
   ['xdescribe', ['skip']],
   ['fdescribe', ['only']],
+]);
+
+const HOOKS: ReadonlySet<string> = new Set([
+  'beforeAll',
+  'beforeEach',
+  'afterAll',
+  'afterEach',
 ]);
 
 const PLAIN_MODIFIERS: ReadonlySet<string> = new Set<TestModifier>([
@@ -126,11 +157,20 @@ interface CalleeChain {
   readonly modifiers: readonly TestModifier[];
   /** Still a factory such as `it.each([...])`'s `it.each`, not a test function. */
   readonly awaitingInvocation: boolean;
+  /** What the factories were invoked with: `.each` tables, `skipIf` conditions. */
+  readonly factoryArguments: readonly Ts.Node[];
 }
 
-function readCallee(expression: ts.Expression): CalleeChain | undefined {
+function readCallee(expression: Ts.Expression): CalleeChain | undefined {
+  const ts = loadTypescript();
+
   if (ts.isIdentifier(expression)) {
-    return { base: expression.text, modifiers: [], awaitingInvocation: false };
+    return {
+      base: expression.text,
+      modifiers: [],
+      awaitingInvocation: false,
+      factoryArguments: [],
+    };
   }
 
   if (ts.isPropertyAccessExpression(expression)) {
@@ -143,25 +183,64 @@ function readCallee(expression: ts.Expression): CalleeChain | undefined {
     }
 
     return {
-      base: inner.base,
+      ...inner,
       modifiers: [...inner.modifiers, name as TestModifier],
       awaitingInvocation: FACTORY_MODIFIERS.has(name),
     };
   }
 
-  if (
-    ts.isCallExpression(expression) ||
-    ts.isTaggedTemplateExpression(expression)
-  ) {
-    const inner = readCallee(
-      ts.isCallExpression(expression) ? expression.expression : expression.tag,
-    );
+  if (ts.isCallExpression(expression)) {
+    const inner = readCallee(expression.expression);
     if (inner === undefined || !inner.awaitingInvocation) return undefined;
 
-    return { ...inner, awaitingInvocation: false };
+    return {
+      ...inner,
+      awaitingInvocation: false,
+      factoryArguments: [...inner.factoryArguments, ...expression.arguments],
+    };
+  }
+
+  if (ts.isTaggedTemplateExpression(expression)) {
+    const inner = readCallee(expression.tag);
+    if (inner === undefined || !inner.awaitingInvocation) return undefined;
+
+    return {
+      ...inner,
+      awaitingInvocation: false,
+      factoryArguments: [...inner.factoryArguments, expression.template],
+    };
   }
 
   return undefined;
+}
+
+/**
+ * A function, or an expression that can evaluate to one (`handler`,
+ * `fakeAsync(() => ...)`). A literal cannot, which is what tells Playwright's
+ * `test.skip(condition, 'reason')` apart from a declaration.
+ */
+function isTestFunction(node: Ts.Node | undefined): boolean {
+  const ts = loadTypescript();
+  return (
+    node !== undefined &&
+    (ts.isArrowFunction(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isIdentifier(node) ||
+      ts.isPropertyAccessExpression(node) ||
+      ts.isCallExpression(node))
+  );
+}
+
+function hasTestFunction(call: Ts.CallExpression): boolean {
+  const ts = loadTypescript();
+  const [, second, third] = call.arguments;
+
+  return (
+    isTestFunction(second) ||
+    (second !== undefined &&
+      ts.isObjectLiteralExpression(second) &&
+      isTestFunction(third))
+  );
 }
 
 type CallRole =
@@ -169,10 +248,15 @@ type CallRole =
       readonly role: 'test';
       readonly kind: DeclarationKind;
       readonly modifiers: readonly TestModifier[];
+      readonly factoryArguments: readonly Ts.Node[];
     }
-  | { readonly role: 'describe'; readonly modifiers: readonly TestModifier[] };
+  | {
+      readonly role: 'describe';
+      readonly modifiers: readonly TestModifier[];
+      readonly factoryArguments: readonly Ts.Node[];
+    };
 
-function classifyCall(call: ts.CallExpression): CallRole | undefined {
+function classifyCall(call: Ts.CallExpression): CallRole | undefined {
   if (call.arguments.length === 0) return undefined;
 
   const callee = readCallee(call.expression);
@@ -180,19 +264,41 @@ function classifyCall(call: ts.CallExpression): CallRole | undefined {
 
   const test = TEST_BASES.get(callee.base);
   if (test !== undefined) {
+    const modifiers = [...test.modifiers, ...callee.modifiers];
+    if (!modifiers.includes('todo') && !hasTestFunction(call)) return undefined;
+
     return {
       role: 'test',
       kind: test.kind,
-      modifiers: [...test.modifiers, ...callee.modifiers],
+      modifiers,
+      factoryArguments: callee.factoryArguments,
     };
   }
 
   const describe = DESCRIBE_BASES.get(callee.base);
   if (describe !== undefined) {
-    return { role: 'describe', modifiers: [...describe, ...callee.modifiers] };
+    return {
+      role: 'describe',
+      modifiers: [...describe, ...callee.modifiers],
+      factoryArguments: callee.factoryArguments,
+    };
   }
 
   return undefined;
+}
+
+function isHookCall(call: Ts.CallExpression): boolean {
+  const ts = loadTypescript();
+  return ts.isIdentifier(call.expression) && HOOKS.has(call.expression.text);
+}
+
+function isDeclarationStatement(statement: Ts.Statement): boolean {
+  const ts = loadTypescript();
+  return (
+    ts.isExpressionStatement(statement) &&
+    ts.isCallExpression(statement.expression) &&
+    classifyCall(statement.expression) !== undefined
+  );
 }
 
 interface Title {
@@ -200,7 +306,9 @@ interface Title {
   readonly dynamic: boolean;
 }
 
-function readTitle(node: ts.Expression, sourceFile: ts.SourceFile): Title {
+function readTitle(node: Ts.Expression, sourceFile: Ts.SourceFile): Title {
+  const ts = loadTypescript();
+
   if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
     return { text: node.text, dynamic: false };
   }
@@ -208,24 +316,60 @@ function readTitle(node: ts.Expression, sourceFile: ts.SourceFile): Title {
   return { text: node.getText(sourceFile), dynamic: true };
 }
 
+/**
+ * The statements a describe body runs besides its nested describes and tests.
+ * A body that is not a function literal (`describe('x', sharedSuite)`) counts
+ * as its own source text.
+ */
+function describeBodyContext(
+  argument: Ts.Expression,
+  sourceFile: Ts.SourceFile,
+): string[] {
+  const ts = loadTypescript();
+
+  if (!ts.isArrowFunction(argument) && !ts.isFunctionExpression(argument)) {
+    return [argument.getText(sourceFile)];
+  }
+
+  const { body } = argument;
+  if (ts.isBlock(body)) {
+    return body.statements
+      .filter((statement) => !isDeclarationStatement(statement))
+      .map((statement) => statement.getText(sourceFile));
+  }
+
+  const isDeclaration =
+    ts.isCallExpression(body) && classifyCall(body) !== undefined;
+  return isDeclaration ? [] : [body.getText(sourceFile)];
+}
+
 interface DescribeScope {
   readonly title: Title;
   readonly parametrized: boolean;
+  /** Factory arguments first, then the body statements. */
+  readonly context: readonly string[];
 }
 
 function isParametrized(modifiers: readonly TestModifier[]): boolean {
   return modifiers.some((modifier) => TABLE_MODIFIERS.has(modifier));
 }
 
-function lineOf(sourceFile: ts.SourceFile, position: number): number {
+function lineOf(sourceFile: Ts.SourceFile, position: number): number {
   return sourceFile.getLineAndCharacterOfPosition(position).line + 1;
 }
 
+function textsOf(
+  nodes: readonly Ts.Node[],
+  sourceFile: Ts.SourceFile,
+): string[] {
+  return nodes.map((node) => node.getText(sourceFile));
+}
+
 function toDeclaration(
-  call: ts.CallExpression,
+  call: Ts.CallExpression,
   role: Extract<CallRole, { role: 'test' }>,
   scopes: readonly DescribeScope[],
-  sourceFile: ts.SourceFile,
+  sourceFile: Ts.SourceFile,
 ): TestDeclaration {
   const title = readTitle(call.arguments[0], sourceFile);
 
@@ -242,19 +386,27 @@ function toDeclaration(
     startLine: lineOf(sourceFile, call.getStart(sourceFile)),
     endLine: lineOf(sourceFile, call.getEnd()),
     bodyHash: hashDeclarationText(call.getText(sourceFile)),
+    contextHash: hashSourceGroups([
+      ...scopes.map((scope) => scope.context),
+      textsOf(role.factoryArguments, sourceFile),
+    ]),
   };
 }
 
 /**
  * Walks the whole file, not only top-level statements, so a declaration
  * nested in any expression is found with the describe scopes it is written
- * in. A test body is not searched: runners reject a declaration inside one.
+ * in. Test bodies and hooks are not searched: runners reject a declaration
+ * inside either.
  */
-function collectDeclarations(sourceFile: ts.SourceFile): TestDeclaration[] {
+function collectDeclarations(sourceFile: Ts.SourceFile): TestDeclaration[] {
+  const ts = loadTypescript();
   const declarations: TestDeclaration[] = [];
 
-  const visit = (node: ts.Node, scopes: readonly DescribeScope[]): void => {
+  const visit = (node: Ts.Node, scopes: readonly DescribeScope[]): void => {
     if (ts.isCallExpression(node)) {
+      if (isHookCall(node)) return;
+
       const role = classifyCall(node);
 
       if (role?.role === 'test') {
@@ -269,6 +421,12 @@ function collectDeclarations(sourceFile: ts.SourceFile): TestDeclaration[] {
           {
             title: readTitle(title, sourceFile),
             parametrized: isParametrized(role.modifiers),
+            context: [
+              ...textsOf(role.factoryArguments, sourceFile),
+              ...body.flatMap((argument) =>
+                describeBodyContext(argument, sourceFile),
+              ),
+            ],
           },
         ];
         for (const argument of body) visit(argument, inner);
@@ -284,8 +442,47 @@ function collectDeclarations(sourceFile: ts.SourceFile): TestDeclaration[] {
   return declarations;
 }
 
+function isRequireCall(node: Ts.Expression): boolean {
+  const ts = loadTypescript();
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === 'require'
+  );
+}
+
+function isImportStatement(statement: Ts.Statement): boolean {
+  const ts = loadTypescript();
+
+  if (ts.isImportDeclaration(statement)) return true;
+  if (ts.isImportEqualsDeclaration(statement)) {
+    return ts.isExternalModuleReference(statement.moduleReference);
+  }
+  if (ts.isExportDeclaration(statement)) {
+    return statement.moduleSpecifier !== undefined;
+  }
+  if (ts.isVariableStatement(statement)) {
+    return statement.declarationList.declarations.every(
+      (declaration) =>
+        declaration.initializer !== undefined &&
+        isRequireCall(declaration.initializer),
+    );
+  }
+
+  return false;
+}
+
+function fileContextHash(sourceFile: Ts.SourceFile): string {
+  const statements = sourceFile.statements.filter(
+    (statement) =>
+      !isImportStatement(statement) && !isDeclarationStatement(statement),
+  );
+
+  return hashSourceGroups([textsOf(statements, sourceFile)]);
+}
+
 interface SourceFileWithParseDiagnostics {
-  readonly parseDiagnostics?: readonly ts.DiagnosticWithLocation[];
+  readonly parseDiagnostics?: readonly Ts.DiagnosticWithLocation[];
 }
 
 /**
@@ -293,7 +490,8 @@ interface SourceFileWithParseDiagnostics {
  * to read the parser's own errors without building a Program around a single
  * file. If a TypeScript upgrade ever drops it, the syntax error spec fails.
  */
-function firstSyntaxError(sourceFile: ts.SourceFile): string | undefined {
+function firstSyntaxError(sourceFile: Ts.SourceFile): string | undefined {
+  const ts = loadTypescript();
   const diagnostics =
     (sourceFile as unknown as SourceFileWithParseDiagnostics)
       .parseDiagnostics ?? [];
@@ -316,7 +514,7 @@ function extensionOf(filePath: string): string {
  * Enumerates the it/test declarations of one JavaScript or TypeScript test
  * file from its syntax alone. Pure: it reads nothing but its input and never
  * throws, an unsupported file or one that does not parse comes back as a
- * typed result.
+ * typed result. The compiler is loaded on the first call.
  */
 export function parseTestDeclarations(
   input: ParseTestDeclarationsInput,
@@ -326,13 +524,19 @@ export function parseTestDeclarations(
     return { kind: 'unsupported', reason: 'unsupported-extension' };
   }
 
+  const maxContentLength = input.maxContentLength ?? DEFAULT_MAX_CONTENT_LENGTH;
+  if (input.content.length > maxContentLength) {
+    return { kind: 'unsupported', reason: 'too-large' };
+  }
+
   try {
+    const ts = loadTypescript();
     const sourceFile = ts.createSourceFile(
       input.filePath,
       input.content,
       ts.ScriptTarget.Latest,
       true,
-      scriptKind,
+      ts.ScriptKind[scriptKind],
     );
 
     const syntaxError = firstSyntaxError(sourceFile);
@@ -344,6 +548,7 @@ export function parseTestDeclarations(
       kind: 'parsed',
       runner: detectTestRunner(sourceFile, input.runnerHint),
       declarations: collectDeclarations(sourceFile),
+      fileContextHash: fileContextHash(sourceFile),
     };
   } catch (error) {
     return {

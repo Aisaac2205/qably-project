@@ -1,4 +1,5 @@
 import {
+  DEFAULT_MAX_CONTENT_LENGTH,
   parseTestDeclarations,
   type ParseTestDeclarationsInput,
   type TestDeclaration,
@@ -290,6 +291,67 @@ runner.test('w', () => {});
       expect(parse('it();\ntest.skip();\n')).toEqual([]);
     });
 
+    it('ignores a call whose second argument cannot be the test function, such as Playwright conditional skips', () => {
+      expect(
+        parse(`
+test.skip(isMobile, 'not on mobile');
+test.skip(({ browserName }) => browserName === 'webkit', 'not on webkit');
+it.skip('a title', 'not a function');
+it('a title without a body');
+test.only('another', 42);
+`),
+      ).toEqual([]);
+    });
+
+    it('counts a todo without a function', () => {
+      expect(parse("it.todo('write it later');").map((d) => d.title)).toEqual([
+        'write it later',
+      ]);
+    });
+
+    it('counts a test whose function is a reference, a wrapper call or follows an options object', () => {
+      const declarations = parse(`
+it('by reference', handler);
+it('by member', helpers.handler);
+it('wrapped', fakeAsync(() => {}));
+test('with options', { timeout: 500 }, () => {});
+test('with options and a reference', { retry: 2 }, handler);
+`);
+
+      expect(declarations.map((declaration) => declaration.title)).toEqual([
+        'by reference',
+        'by member',
+        'wrapped',
+        'with options',
+        'with options and a reference',
+      ]);
+    });
+
+    it('does not look for declarations inside hooks, where runners reject them', () => {
+      expect(
+        parse(`
+describe('Cart', () => {
+  beforeEach(() => {
+    it('inside a hook', () => {});
+  });
+  afterAll(() => test('inside another hook', () => {}));
+  it('counted', () => {});
+});
+`).map((declaration) => declaration.title),
+      ).toEqual(['counted']);
+    });
+
+    it('does not treat test.describe as a describe scope', () => {
+      const declarations = parse(`
+test.describe('Checkout', () => {
+  test('pays', async () => {});
+});
+`);
+
+      expect(declarations).toHaveLength(1);
+      expect(declarations[0].describePath).toEqual([]);
+    });
+
     it('ignores an it/test mentioned inside a comment or a string', () => {
       expect(
         parse(`
@@ -482,6 +544,198 @@ describe('Cart', () => {
       const table = "it.each([[1]])('row %i', () => {});";
       expect(hashOf(table.replace('[[1]]', '[[2]]'))).not.toBe(hashOf(table));
     });
+
+    it('does not see trailing spaces inside a multi-line template literal, a known blind spot of the normalization', () => {
+      const literal = "it('a', () => {\n  check(`line one\nline two`);\n});";
+      expect(hashOf(literal.replace('line one', 'line one   '))).toBe(
+        hashOf(literal),
+      );
+    });
+  });
+
+  describe('context hashes', () => {
+    function parseFile(content: string) {
+      const result = parseTestDeclarations({
+        filePath: 'src/cart.test.ts',
+        content,
+      });
+      if (result.kind !== 'parsed') throw new Error(result.kind);
+      return result;
+    }
+
+    function contextOf(content: string, title: string): string {
+      const match = parse(content).find((d) => d.title === title);
+      if (match === undefined) throw new Error(`no declaration ${title}`);
+      return match.contextHash;
+    }
+
+    const SUITE = [
+      "import { cart } from './cart';",
+      '',
+      'const PRICE = 10;',
+      '',
+      "describe('Cart', () => {",
+      '  const item = { price: PRICE };',
+      '',
+      '  beforeEach(() => {',
+      '    cart.clear();',
+      '  });',
+      '',
+      "  it('adds an item', () => {",
+      '    cart.add(item);',
+      '  });',
+      '',
+      "  describe('totals', () => {",
+      '    afterEach(() => cart.reset());',
+      '',
+      "    it('sums the lines', () => {});",
+      '  });',
+      '',
+      "  describe('removal', () => {",
+      "    it('removes an item', () => {});",
+      '  });',
+      '});',
+      '',
+      "it('runs outside any describe', () => {});",
+    ].join('\n');
+
+    it('is a sha256 hex digest, the same for CRLF and LF line endings', () => {
+      const hash = contextOf(SUITE, 'adds an item');
+      expect(hash).toMatch(/^[0-9a-f]{64}$/);
+      expect(contextOf(SUITE.replace(/\n/g, '\r\n'), 'adds an item')).toBe(
+        hash,
+      );
+    });
+
+    it('changes for every declaration under a describe whose hook changes, and only for those', () => {
+      const changed = SUITE.replace('cart.clear();', 'cart.empty();');
+
+      for (const title of [
+        'adds an item',
+        'sums the lines',
+        'removes an item',
+      ]) {
+        expect(contextOf(changed, title)).not.toBe(contextOf(SUITE, title));
+        expect(parse(changed).find((d) => d.title === title)?.bodyHash).toBe(
+          parse(SUITE).find((d) => d.title === title)?.bodyHash,
+        );
+      }
+      expect(contextOf(changed, 'runs outside any describe')).toBe(
+        contextOf(SUITE, 'runs outside any describe'),
+      );
+    });
+
+    it('changes when a helper declared in the describe body changes', () => {
+      const changed = SUITE.replace(
+        'const item = { price: PRICE };',
+        'const item = { price: PRICE * 2 };',
+      );
+      expect(contextOf(changed, 'adds an item')).not.toBe(
+        contextOf(SUITE, 'adds an item'),
+      );
+    });
+
+    it('keeps a nested describe hook to the declarations under that describe', () => {
+      const changed = SUITE.replace(
+        'afterEach(() => cart.reset());',
+        'afterEach(() => cart.restore());',
+      );
+
+      expect(contextOf(changed, 'sums the lines')).not.toBe(
+        contextOf(SUITE, 'sums the lines'),
+      );
+      expect(contextOf(changed, 'removes an item')).toBe(
+        contextOf(SUITE, 'removes an item'),
+      );
+      expect(contextOf(changed, 'adds an item')).toBe(
+        contextOf(SUITE, 'adds an item'),
+      );
+    });
+
+    it('does not change when a sibling declaration changes', () => {
+      const changed = SUITE.replace(
+        "it('removes an item', () => {});",
+        "it('removes an item', () => { cart.remove(0); });",
+      );
+      expect(contextOf(changed, 'adds an item')).toBe(
+        contextOf(SUITE, 'adds an item'),
+      );
+    });
+
+    it('changes when the table of an enclosing describe.each changes', () => {
+      const table = [
+        "describe.each([['EUR'], ['USD']])('prices in %s', (currency) => {",
+        "  it('rounds', () => {});",
+        '});',
+      ].join('\n');
+      const changed = table.replace("['USD']", "['GBP']");
+
+      expect(contextOf(changed, 'rounds')).not.toBe(contextOf(table, 'rounds'));
+      expect(parse(changed)[0].bodyHash).toBe(parse(table)[0].bodyHash);
+    });
+
+    it('changes when an it.each table kept in the describe body changes', () => {
+      const external = [
+        "describe('Pricing', () => {",
+        '  const cases = [[1, 2]];',
+        "  it.each(cases)('doubles %i', (n, doubled) => {});",
+        '});',
+      ].join('\n');
+      const changed = external.replace('[[1, 2]]', '[[2, 4]]');
+
+      expect(parse(changed)[0].bodyHash).toBe(parse(external)[0].bodyHash);
+      expect(contextOf(changed, 'doubles %i')).not.toBe(
+        contextOf(external, 'doubles %i'),
+      );
+    });
+
+    describe('fileContextHash', () => {
+      it('changes when a top-level helper, constant, hook or mock changes', () => {
+        const base = parseFile(SUITE).fileContextHash;
+
+        expect(base).toMatch(/^[0-9a-f]{64}$/);
+        expect(
+          parseFile(SUITE.replace('const PRICE = 10;', 'const PRICE = 12;'))
+            .fileContextHash,
+        ).not.toBe(base);
+        expect(
+          parseFile(`${SUITE}\nbeforeAll(() => cart.open());`).fileContextHash,
+        ).not.toBe(base);
+        expect(
+          parseFile(`${SUITE}\nvi.mock('./cart', () => ({}));`).fileContextHash,
+        ).not.toBe(base);
+      });
+
+      it('does not change when only imports change', () => {
+        expect(
+          parseFile(
+            SUITE.replace(
+              "import { cart } from './cart';",
+              "import { cart } from './basket';\nimport type { Item } from './item';\nconst legacy = require('./legacy');\nexport { cart } from './cart';",
+            ),
+          ).fileContextHash,
+        ).toBe(parseFile(SUITE).fileContextHash);
+      });
+
+      it('does not change when a declaration or a describe body changes', () => {
+        const changed = SUITE.replace('cart.add(item);', 'cart.add(item, 2);')
+          .replace('cart.clear();', 'cart.empty();')
+          .replace(
+            "it('runs outside any describe', () => {});",
+            "it('runs outside any describe', () => { cart.open(); });",
+          );
+
+        expect(parseFile(changed).fileContextHash).toBe(
+          parseFile(SUITE).fileContextHash,
+        );
+      });
+
+      it('is the same for CRLF and LF line endings', () => {
+        expect(parseFile(SUITE.replace(/\n/g, '\r\n')).fileContextHash).toBe(
+          parseFile(SUITE).fileContextHash,
+        );
+      });
+    });
   });
 
   describe('file kinds', () => {
@@ -512,6 +766,45 @@ describe('Cart', () => {
       expect(
         parseTestDeclarations({ filePath, content: "it('a', () => {});" }),
       ).toEqual({ kind: 'unsupported', reason: 'unsupported-extension' });
+    });
+
+    it('returns too-large for content past the limit without parsing it', () => {
+      const content = "it('a', () => {});";
+
+      expect(
+        parseTestDeclarations({
+          filePath: 'src/cart.test.ts',
+          content,
+          maxContentLength: content.length - 1,
+        }),
+      ).toEqual({ kind: 'unsupported', reason: 'too-large' });
+      expect(
+        parseTestDeclarations({
+          filePath: 'src/cart.test.ts',
+          content,
+          maxContentLength: content.length,
+        }).kind,
+      ).toBe('parsed');
+    });
+
+    it('applies a default limit of a million characters', () => {
+      expect(DEFAULT_MAX_CONTENT_LENGTH).toBe(1_000_000);
+      expect(
+        parseTestDeclarations({
+          filePath: 'src/cart.test.ts',
+          content: ' '.repeat(DEFAULT_MAX_CONTENT_LENGTH + 1),
+        }),
+      ).toEqual({ kind: 'unsupported', reason: 'too-large' });
+    });
+
+    it('returns a parser failure instead of throwing when parsing itself fails', () => {
+      const depth = 200_000;
+      const result = parseTestDeclarations({
+        filePath: 'src/cart.test.ts',
+        content: `const deep = ${'['.repeat(depth)}${']'.repeat(depth)};`,
+      });
+
+      expect(result).toMatchObject({ kind: 'error', reason: 'parser-failure' });
     });
 
     it('returns a syntax error result instead of throwing on a file that does not parse', () => {

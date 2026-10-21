@@ -1,13 +1,5 @@
-import { truncateTo } from '../../../../common/text/truncate-to';
-import {
-  MAX_CASE_NAME_LENGTH,
-  resolveCaseIdentityKey,
-} from '../../../runs/lib/case-identity';
 import type { TestDeclaration } from './parse-test-declarations';
-
-// The classname cap of runs/lib/parse-junit-xml.ts (MAX_CLASS_NAME_LENGTH),
-// applied before the identity is built. The parity spec fails if they drift.
-const JUNIT_CLASS_NAME_LENGTH = 250;
+import { storedIdentityKey } from './stored-identity';
 
 const VITEST_NAME_SEPARATOR = ' > ';
 const JEST_JUNIT_ANCESTOR_SEPARATOR = ' ';
@@ -23,7 +15,11 @@ export type AutomationKeyDeclaration = Pick<
 >;
 
 export type AutomationKeyOptions =
-  | { readonly runner: 'jest' }
+  | {
+      readonly runner: 'jest';
+      /** The jest project's `displayName`, when the config sets one. */
+      readonly displayName?: string;
+    }
   | {
       readonly runner: 'vitest';
       /** Repository-relative path of the test file, as CodeChange stores it. */
@@ -37,6 +33,16 @@ export type AutomationKeyOptions =
       readonly pathBase: string;
     };
 
+export type AutomationKeyUnavailableReason =
+  /** A title in the chain is computed at runtime. */
+  | 'dynamic-title'
+  /** The declaration's own title is empty or only whitespace. */
+  | 'empty-title'
+  /** The vitest file is not under `pathBase`. */
+  | 'outside-path-base'
+  /** The ingestion would store no key for it (see `storedIdentityKey`). */
+  | 'not-ingestible';
+
 export type AutomationKeyResult =
   | {
       readonly kind: 'key';
@@ -46,7 +52,7 @@ export type AutomationKeyResult =
     }
   | {
       readonly kind: 'unavailable';
-      readonly reason: 'dynamic-title' | 'outside-path-base';
+      readonly reason: AutomationKeyUnavailableReason;
     };
 
 function normalizePath(path: string): string {
@@ -68,24 +74,58 @@ function pathRelativeToBase(filePath: string, pathBase: string): string | null {
 }
 
 /**
- * The key the runs side stores for this testcase: the XML parser trims both
- * attributes, the ingestion cuts them at its caps, and the identity rule
- * composes classname and name only when one is not a prefix of the other.
+ * The characters vitest's escapeXML drops from every attribute: C0 controls
+ * other than tab, line feed and carriage return, the discouraged C1 range,
+ * U+FDD0-U+FDEF, U+FFFD, U+FFFE and U+FFFF. Its handling of lone surrogates
+ * and of astral noncharacters is not mirrored.
  */
-function ingestedKey(className: string, name: string): string {
-  return resolveCaseIdentityKey({
-    name: truncateTo(name.trim(), MAX_CASE_NAME_LENGTH),
-    className: truncateTo(className.trim(), JUNIT_CLASS_NAME_LENGTH),
-  });
+function isDroppedByVitest(codePoint: number): boolean {
+  return (
+    codePoint <= 0x08 ||
+    codePoint === 0x0b ||
+    codePoint === 0x0c ||
+    (codePoint >= 0x0e && codePoint <= 0x1f) ||
+    (codePoint >= 0x7f && codePoint <= 0x84) ||
+    (codePoint >= 0x86 && codePoint <= 0x9f) ||
+    (codePoint >= 0xfdd0 && codePoint <= 0xfdef) ||
+    (codePoint >= 0xfffd && codePoint <= 0xffff)
+  );
 }
 
-// jest-junit fills its templates with String.prototype.replace, so a "$"
-// pattern in a title renders the way it does here, not as written.
-function jestJunitName(describePath: readonly string[], title: string): string {
+function vitestAttribute(value: string): string {
+  return Array.from(value)
+    .filter((character) => !isDroppedByVitest(character.codePointAt(0) ?? 0))
+    .join('');
+}
+
+/**
+ * jest-junit fills its templates with String.prototype.replace, one variable
+ * at a time in the order filepath, filename, suitename, classname, title,
+ * displayName. Only the last three can touch the default template, so a "$"
+ * pattern in a title renders the way the reporter renders it, and a literal
+ * "{displayName}" in a title becomes the display name ("undefined" without
+ * one), exactly as in the report.
+ */
+function jestJunitName(
+  describePath: readonly string[],
+  title: string,
+  displayName: string | undefined,
+): string {
   return JEST_JUNIT_TEMPLATE.replace(
     '{classname}',
     describePath.join(JEST_JUNIT_ANCESTOR_SEPARATOR),
-  ).replace('{title}', title);
+  )
+    .replace('{title}', title)
+    .replace('{displayName}', String(displayName));
+}
+
+function toResult(
+  key: string | undefined,
+  parametrized: boolean,
+): AutomationKeyResult {
+  return key === undefined
+    ? { kind: 'unavailable', reason: 'not-ingestible' }
+    : { kind: 'key', key, parametrized };
 }
 
 /**
@@ -95,6 +135,7 @@ function jestJunitName(describePath: readonly string[], title: string): string {
  *   chain and title joined by " > ">`;
  * - jest-junit with its default templates: the describe chain and the title
  *   joined by a single space.
+ * Both go through `storedIdentityKey`, the steps the ingestion applies.
  */
 export function deriveAutomationKey(
   declaration: AutomationKeyDeclaration,
@@ -103,14 +144,20 @@ export function deriveAutomationKey(
   if (declaration.dynamicTitle || declaration.dynamicDescribePath) {
     return { kind: 'unavailable', reason: 'dynamic-title' };
   }
+  if (declaration.title.trim() === '') {
+    return { kind: 'unavailable', reason: 'empty-title' };
+  }
 
   if (options.runner === 'jest') {
-    const name = jestJunitName(declaration.describePath, declaration.title);
-    return {
-      kind: 'key',
-      key: ingestedKey(name, name),
-      parametrized: declaration.parametrized,
-    };
+    const name = jestJunitName(
+      declaration.describePath,
+      declaration.title,
+      options.displayName,
+    );
+    return toResult(
+      storedIdentityKey({ name, className: name }),
+      declaration.parametrized,
+    );
   }
 
   const relativePath = pathRelativeToBase(options.filePath, options.pathBase);
@@ -122,9 +169,11 @@ export function deriveAutomationKey(
     VITEST_NAME_SEPARATOR,
   );
 
-  return {
-    kind: 'key',
-    key: ingestedKey(relativePath, name),
-    parametrized: declaration.parametrized,
-  };
+  return toResult(
+    storedIdentityKey({
+      name: vitestAttribute(name),
+      className: vitestAttribute(relativePath),
+    }),
+    declaration.parametrized,
+  );
 }
