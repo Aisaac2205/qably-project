@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { DEFAULT_LOCALE } from '@qably/i18n';
+import type { DomainEvents } from '../../common/events/domain-events.service';
 import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
@@ -211,12 +212,17 @@ function fakeCaseContextBuilder(
   return { build, locateForEvidence } as never;
 }
 
+function fakeEvents(publish: jest.Mock = jest.fn()): DomainEvents {
+  return { publish } as unknown as DomainEvents;
+}
+
 function build(
   prisma: FakePrisma,
   assistant: ChatAssistant,
   entitlement: AiEntitlementService = fakeEntitlement(),
   caseContextBuilder: CaseContextBuilder = fakeCaseContextBuilder(),
   dailyBudget: AiDailyBudget = fakeDailyBudget(),
+  events: DomainEvents = fakeEvents(),
 ): ChatService {
   return new ChatService(
     prisma as never,
@@ -224,6 +230,7 @@ function build(
     entitlement,
     caseContextBuilder,
     dailyBudget,
+    events,
   );
 }
 
@@ -2272,5 +2279,163 @@ describe('ChatService', () => {
         containing({ data: containing({ suggestedCases: [enSuggestedCase] }) }),
       );
     });
+  });
+});
+
+describe('ChatService — notifying that a chat proposal is ready', () => {
+  const targetedAssistantRow = {
+    ...assistantRow,
+    suggestedCases: [{ ...suggestedCase, targetTestCaseId: 'case-1' }],
+  };
+
+  const githubProject = {
+    id: 'project-1',
+    name: 'Shop',
+    connection: {
+      provider: 'GITHUB',
+      repo: 'acme/shop',
+      encryptedAccessToken: null,
+    },
+  };
+
+  function untargetedPrisma(): FakePrisma {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: 'src/checkout.spec.ts' });
+    prisma.project.findFirst.mockResolvedValue(githubProject);
+    return prisma;
+  }
+
+  function targetedPrisma(): FakePrisma {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(targetedAssistantRow)
+      .mockResolvedValueOnce({ content: userRow.content });
+    prisma.project.findFirst.mockResolvedValue(githubProject);
+    return prisma;
+  }
+
+  function fileHeadBuilder() {
+    return fakeCaseContextBuilder(
+      undefined,
+      jest.fn().mockResolvedValue({
+        ref: 'sha123',
+        excerpt: {
+          kind: 'file-head',
+          excerpt: 'export function checkout() {}',
+        },
+      }),
+    );
+  }
+
+  function send(prisma: FakePrisma, publish: jest.Mock) {
+    return build(
+      prisma,
+      createAssistant({ kind: 'provider-unavailable', reason: 'x' }),
+      undefined,
+      fileHeadBuilder(),
+      undefined,
+      { publish } as never,
+    ).sendToReview(org, user, 'project-1', 'thread-1', 'message-2', {
+      caseIndex: 0,
+    });
+  }
+
+  it('announces an untargeted proposal by its own id, once it is saved', async () => {
+    const publish = jest.fn();
+
+    const result = await send(untargetedPrisma(), publish);
+
+    expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith('proposals.created', {
+      source: 'chat',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'proposal-9',
+      count: 1,
+    });
+  });
+
+  it('announces a targeted proposal the same way', async () => {
+    const publish = jest.fn();
+
+    const result = await send(targetedPrisma(), publish);
+
+    expect(result).toEqual({ ok: true, value: { proposalId: 'proposal-9' } });
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith('proposals.created', {
+      source: 'chat',
+      organizationId: 'org-1',
+      projectId: 'project-1',
+      batchId: 'proposal-9',
+      count: 1,
+    });
+  });
+
+  it('publishes after the proposal transaction has committed', async () => {
+    const prisma = untargetedPrisma();
+    let committed = false;
+    prisma.$transaction.mockImplementation(
+      async (run: (tx: FakePrisma) => Promise<unknown>) => {
+        const result = await run(prisma);
+        committed = true;
+        return result;
+      },
+    );
+    const publish = jest.fn(() => {
+      expect(committed).toBe(true);
+    });
+
+    await send(prisma, publish);
+
+    expect(publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces nothing when the case was already sent', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.findFirst.mockResolvedValue({
+      id: 'already-sent-proposal',
+    });
+    const publish = jest.fn();
+
+    await send(prisma, publish);
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('announces nothing for the loser of a double submit, since the winner already did', async () => {
+    const prisma = untargetedPrisma();
+    prisma.extractedProposal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'winner-new-proposal' });
+    prisma.extractedProposal.create.mockRejectedValue({ code: 'P2002' });
+    const publish = jest.fn();
+
+    const result = await send(prisma, publish);
+
+    expect(result).toEqual({
+      ok: true,
+      value: { proposalId: 'winner-new-proposal', alreadySent: true },
+    });
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('announces nothing when the send is refused for lack of code evidence', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findFirst.mockReset();
+    prisma.chatMessage.findFirst
+      .mockResolvedValueOnce(assistantRow)
+      .mockResolvedValueOnce({ attachedFilePath: null });
+    const publish = jest.fn();
+
+    const result = await send(prisma, publish);
+
+    expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
+    expect(publish).not.toHaveBeenCalled();
   });
 });

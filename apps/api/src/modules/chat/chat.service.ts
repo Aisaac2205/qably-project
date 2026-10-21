@@ -7,6 +7,8 @@ import {
 } from '@qably/types';
 import { err, ok, type Result } from '../../common/result';
 import type { Prisma } from '../../../generated/prisma/client';
+import { DOMAIN_EVENTS } from '../../common/events/domain-events';
+import { DomainEvents } from '../../common/events/domain-events.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
@@ -287,6 +289,7 @@ export class ChatService {
     private readonly entitlement: AiEntitlementService,
     private readonly caseContextBuilder: CaseContextBuilder,
     private readonly dailyBudget: AiDailyBudget,
+    private readonly events: DomainEvents,
   ) {}
 
   async listThreads(
@@ -541,6 +544,7 @@ export class ChatService {
 
     if (suggested.targetTestCaseId !== undefined) {
       return this.sendTargetedToReview(
+        org.organizationId,
         projectId,
         thread,
         messageId,
@@ -630,6 +634,8 @@ export class ChatService {
         });
       });
 
+      this.announceProposal(org.organizationId, projectId, proposal.id);
+
       return ok({ proposalId: proposal.id });
     } catch (error) {
       if (!isUniqueViolation(error)) throw error;
@@ -644,7 +650,27 @@ export class ChatService {
     }
   }
 
+  /**
+   * One chat proposal is its own batch, identified by its proposal id. It is
+   * announced after the commit, and only by the request that created it: a
+   * repeated send and the loser of a double submit return the existing proposal.
+   */
+  private announceProposal(
+    organizationId: string,
+    projectId: string,
+    proposalId: string,
+  ): void {
+    this.events.publish(DOMAIN_EVENTS.proposalsCreated, {
+      source: 'chat',
+      organizationId,
+      projectId,
+      batchId: proposalId,
+      count: 1,
+    });
+  }
+
   private async sendTargetedToReview(
+    organizationId: string,
     projectId: string,
     thread: ThreadRow,
     messageId: string,
@@ -715,6 +741,8 @@ export class ChatService {
           select: { id: true },
         });
       });
+
+      this.announceProposal(organizationId, projectId, proposal.id);
 
       return ok({ proposalId: proposal.id });
     } catch (error) {
