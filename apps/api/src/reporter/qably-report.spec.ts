@@ -830,6 +830,184 @@ describe('buildContext CI metadata', () => {
   });
 });
 
+const MERGE_SHA = '1111111111111111111111111111111111111111';
+const HEAD_SHA = '2222222222222222222222222222222222222222';
+
+interface CommitRead {
+  commit: {
+    commitSha?: string;
+    commitMessage?: string;
+    commitAuthor?: string;
+  };
+  gitCalls: string[][];
+}
+
+/**
+ * Runs readCommitMetadata in a child process with a fake file reader and a
+ * fake git, so no real repository or event payload is involved. The fake git
+ * answers "<field> of <ref>", which shows which commit the reporter asked about.
+ */
+function readCommit(options: {
+  env: Record<string, string>;
+  files?: Record<string, string>;
+  gitFails?: boolean;
+}): CommitRead {
+  const result = runNodeEval(`
+    const mod = await import(${JSON.stringify(REPORTER_MODULE_URL)});
+    const files = ${JSON.stringify(options.files ?? {})};
+    const gitCalls = [];
+    const deps = {
+      readFileSync: (path) => {
+        if (Object.hasOwn(files, path)) return files[path];
+        throw new Error('ENOENT: ' + path);
+      },
+      execFileSync: (command, args) => {
+        gitCalls.push(args);
+        if (${JSON.stringify(options.gitFails ?? false)}) {
+          throw new Error('fatal: bad object');
+        }
+        const ref = args[3] ?? 'HEAD';
+        return (args[2] === '--pretty=%s' ? ' subject of ' : ' author of ') + ref + '\\n';
+      },
+    };
+    const commit = mod.readCommitMetadata(${JSON.stringify(options.env)}, deps);
+    process.stdout.write(JSON.stringify({ commit, gitCalls }));
+  `);
+
+  if (result.exitCode !== 0) {
+    throw new Error(`harness script failed: ${result.stderr}`);
+  }
+
+  return JSON.parse(result.stdout) as CommitRead;
+}
+
+const eventPayload = (headSha: string) =>
+  JSON.stringify({ pull_request: { head: { sha: headSha } } });
+
+describe('readCommitMetadata', () => {
+  it.each(['pull_request', 'pull_request_target'])(
+    'reports the pull request head commit on a %s event instead of the temporary merge commit',
+    (eventName) => {
+      const { commit, gitCalls } = readCommit({
+        env: {
+          GITHUB_SHA: MERGE_SHA,
+          GITHUB_EVENT_NAME: eventName,
+          GITHUB_EVENT_PATH: '/github/event.json',
+        },
+        files: { '/github/event.json': eventPayload(HEAD_SHA) },
+      });
+
+      expect(commit.commitSha).toBe(HEAD_SHA);
+      expect(commit.commitMessage).toBe(`subject of ${HEAD_SHA}`);
+      expect(commit.commitAuthor).toBe(`author of ${HEAD_SHA}`);
+      expect(gitCalls).toHaveLength(2);
+      for (const args of gitCalls) expect(args).toContain(HEAD_SHA);
+    },
+  );
+
+  it('keeps GITHUB_SHA and the checked-out commit on a push event, without reading the event file', () => {
+    const { commit, gitCalls } = readCommit({
+      env: {
+        GITHUB_SHA: MERGE_SHA,
+        GITHUB_EVENT_NAME: 'push',
+        GITHUB_EVENT_PATH: '/github/event.json',
+      },
+      files: { '/github/event.json': eventPayload(HEAD_SHA) },
+    });
+
+    expect(commit.commitSha).toBe(MERGE_SHA);
+    expect(commit.commitMessage).toBe('subject of HEAD');
+    expect(commit.commitAuthor).toBe('author of HEAD');
+    expect(gitCalls).toEqual([
+      ['log', '-1', '--pretty=%s'],
+      ['log', '-1', '--pretty=%an'],
+    ]);
+  });
+
+  it('keeps GITHUB_SHA when there is no event name at all', () => {
+    const { commit } = readCommit({ env: { GITHUB_SHA: MERGE_SHA } });
+
+    expect(commit.commitSha).toBe(MERGE_SHA);
+  });
+
+  it('falls back to GITHUB_SHA on a pull request event whose event file is missing', () => {
+    const { commit, gitCalls } = readCommit({
+      env: {
+        GITHUB_SHA: MERGE_SHA,
+        GITHUB_EVENT_NAME: 'pull_request',
+        GITHUB_EVENT_PATH: '/github/missing.json',
+      },
+    });
+
+    expect(commit.commitSha).toBe(MERGE_SHA);
+    expect(gitCalls).toEqual([
+      ['log', '-1', '--pretty=%s'],
+      ['log', '-1', '--pretty=%an'],
+    ]);
+  });
+
+  it('falls back to GITHUB_SHA when GITHUB_EVENT_PATH is not set', () => {
+    const { commit } = readCommit({
+      env: { GITHUB_SHA: MERGE_SHA, GITHUB_EVENT_NAME: 'pull_request' },
+    });
+
+    expect(commit.commitSha).toBe(MERGE_SHA);
+  });
+
+  it.each([
+    ['is not valid JSON', 'not json {'],
+    ['has no pull_request', JSON.stringify({ action: 'opened' })],
+    ['has a null pull_request', JSON.stringify({ pull_request: null })],
+    [
+      'has a head sha that is not a string',
+      JSON.stringify({ pull_request: { head: { sha: 7 } } }),
+    ],
+    ['has a head sha that is too short', eventPayload('abc123')],
+    ['has a head sha that is not hexadecimal', eventPayload('z'.repeat(40))],
+  ])(
+    'falls back to GITHUB_SHA when the event file %s',
+    (_description, content) => {
+      const { commit } = readCommit({
+        env: {
+          GITHUB_SHA: MERGE_SHA,
+          GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_EVENT_PATH: '/github/event.json',
+        },
+        files: { '/github/event.json': content },
+      });
+
+      expect(commit.commitSha).toBe(MERGE_SHA);
+    },
+  );
+
+  it('sends no message or author when git cannot read the head commit, rather than the merge commit', () => {
+    const { commit } = readCommit({
+      env: {
+        GITHUB_SHA: MERGE_SHA,
+        GITHUB_EVENT_NAME: 'pull_request',
+        GITHUB_EVENT_PATH: '/github/event.json',
+      },
+      files: { '/github/event.json': eventPayload(HEAD_SHA) },
+      gitFails: true,
+    });
+
+    expect(commit.commitSha).toBe(HEAD_SHA);
+    expect(commit.commitMessage).toBeUndefined();
+    expect(commit.commitAuthor).toBeUndefined();
+  });
+
+  it('sends no message or author on a push event when git fails', () => {
+    const { commit } = readCommit({
+      env: { GITHUB_SHA: MERGE_SHA, GITHUB_EVENT_NAME: 'push' },
+      gitFails: true,
+    });
+
+    expect(commit.commitSha).toBe(MERGE_SHA);
+    expect(commit.commitMessage).toBeUndefined();
+    expect(commit.commitAuthor).toBeUndefined();
+  });
+});
+
 describe('resolveInputPaths', () => {
   let dir: string;
 
