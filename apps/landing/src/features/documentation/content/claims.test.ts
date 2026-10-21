@@ -8,14 +8,27 @@ interface Locale {
   name: string;
   content: DocContent;
   onlyGithub: RegExp;
+  junitAccepted: RegExp;
+  perSuiteRuns: RegExp;
+  staleProviderRow: RegExp;
 }
 
 const locales: Locale[] = [
-  { name: 'en', content: en, onlyGithub: /the only repository provider supported today/i },
+  {
+    name: 'en',
+    content: en,
+    onlyGithub: /the only repository provider supported today/i,
+    junitAccepted: /answers 202 Accepted/,
+    perSuiteRuns: /one run per distinct suite name/i,
+    staleProviderRow: /Unsupported provider in route/i,
+  },
   {
     name: 'es',
     content: es,
     onlyGithub: /el único proveedor de repositorios compatible actualmente/i,
+    junitAccepted: /responde 202 Accepted/,
+    perSuiteRuns: /una ejecución por cada nombre de suite distinto/i,
+    staleProviderRow: /Proveedor no reconocido en la ruta/i,
   },
 ];
 
@@ -78,8 +91,16 @@ const FORBIDDEN_CLAIMS: ForbiddenClaim[] = [
   },
 ];
 
+function sectionText(content: DocContent, id: string): string {
+  const section = content.sections.find((candidate) => candidate.id === id);
+
+  if (section === undefined) throw new Error(`missing docs section ${id}`);
+
+  return collectStrings(section).join('\n');
+}
+
 describe('documentation claims', () => {
-  describe.each(locales)('$name', ({ content, onlyGithub }) => {
+  describe.each(locales)('$name', ({ content, onlyGithub, junitAccepted, perSuiteRuns, staleProviderRow }) => {
     const strings = collectStrings(content);
     const text = strings.join('\n');
 
@@ -124,6 +145,26 @@ describe('documentation claims', () => {
 
     it('shows a single PHPUnit command that writes the JUnit file', () => {
       expect(text).toContain('phpunit --log-junit junit.xml');
+    });
+
+    describe('the JUnit and webhook reference', () => {
+      const junit = sectionText(content, 'reference-runs-ingest-junit');
+      const webhook = sectionText(content, 'reference-webhook');
+
+      it('says the JUnit endpoint answers 202 Accepted because the runs are queued', () => {
+        expect(junit).toMatch(junitAccepted);
+        expect(junit).not.toMatch(/\b200\b/);
+      });
+
+      it('documents one run per suite name and its derived externalId', () => {
+        expect(junit).toMatch(perSuiteRuns);
+        expect(junit).toContain('<externalId>-<slug>-<hash>');
+      });
+
+      it('describes the 404 the route really returns for an unknown provider name', () => {
+        expect(webhook).not.toMatch(staleProviderRow);
+        expect(webhook).toContain('Unsupported provider "<value>"');
+      });
     });
   });
 

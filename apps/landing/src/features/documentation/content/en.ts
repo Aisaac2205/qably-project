@@ -668,6 +668,14 @@ response.raise_for_status()`,
         },
         {
           type: 'paragraph',
+          text: 'The endpoint answers 202 Accepted, unlike POST /runs/ingest, which saves the run before it responds: the report is parsed on arrival, and each run is queued and created in the background, so a run can take a moment to appear. The response body lists accepted (the number of queued runs), runs (the externalId, suiteName and jobId of each one), rejected (the suites that failed validation, with the reason), caseIdentityCollisions and truncatedFields.',
+        },
+        {
+          type: 'paragraph',
+          text: 'When the XML holds several <testsuite name="..."> values and the request has neither suiteId nor suiteName, Qably creates one run per distinct suite name, and each run goes to the suite with that name. Every run gets its own externalId, derived as <externalId>-<slug>-<hash> (the suite name as a slug plus a short hash), so resending the same report updates the same runs. With a single suite name, the run keeps the externalId you sent. To keep the whole report in one run, pass suiteId or suiteName.',
+        },
+        {
+          type: 'paragraph',
           text: 'Case titles are extracted from the <testcase name="..."> attribute, falling back to classname when name is omitted. Together, classname and name form the case identity. Malformed XML or empty bodies return HTTP 400.',
         },
       ],
@@ -698,7 +706,7 @@ response.raise_for_status()`,
             ['202, { "status": "accepted" }', 'Valid signature. Event stored and queued for processing.'],
             ['202, { "status": "duplicate" }', 'The (provider, delivery id) tuple was already processed. Replays are idempotent.'],
             ['202, { "status": "ignored" }', 'Valid signature for an event type Qably does not ingest.'],
-            ['404', 'Unsupported provider in route.'],
+            ['404, Unsupported provider "<value>"', 'The :provider value in the route is not a provider name Qably recognizes. Use github.'],
             ['401', 'HMAC verification failed against all configured repository connections.'],
             ['400', 'Malformed request body or invalid JSON.']
           ],
