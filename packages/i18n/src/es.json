@@ -1421,7 +1421,12 @@
       "testError": "Falló el mensaje de prueba",
       "toggleAria": "Activar {{name}}",
       "deleteTitle": "¿Quitar “{{name}}”?",
-      "deleteDescription": "Qably deja de enviar alertas a este canal de inmediato. Esta acción no se puede deshacer."
+      "deleteDescription": "Qably deja de enviar alertas a este canal de inmediato. Esta acción no se puede deshacer.",
+      "editAction": "Editar {{name}}",
+      "editTitle": "Editar canal de notificación",
+      "editDescription": "El nombre y los eventos de este canal se pueden cambiar. Para usar otra URL de webhook, es necesario agregar un canal nuevo.",
+      "saving": "Guardando…",
+      "updateError": "No se pudieron guardar los cambios. Volver a intentar."
     },
     "members": {
       "email": "Correo electrónico",

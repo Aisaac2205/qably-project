@@ -19,6 +19,7 @@ import {
 } from '../hooks/use-notification-webhook-mutations'
 import { useNotificationWebhooks } from '../hooks/use-notification-webhooks'
 import { CreateNotificationWebhookDialog } from './create-notification-webhook-dialog'
+import { EditNotificationWebhookDialog } from './edit-notification-webhook-dialog'
 import { NotificationWebhookRow } from './notification-webhook-row'
 
 export function NotificationWebhooksPanel() {
@@ -39,9 +40,29 @@ export function NotificationWebhooksPanel() {
   const [deleteTarget, setDeleteTarget] = useState<NotificationWebhook | undefined>(
     undefined,
   )
+  const [editTarget, setEditTarget] = useState<NotificationWebhook | undefined>(undefined)
+  // Tracked locally rather than from updateMutation.isError, which the enable switch shares.
+  const [editFailed, setEditFailed] = useState(false)
 
   function handleCreate(input: Parameters<typeof createMutation.mutate>[0]) {
     createMutation.mutate(input, { onSuccess: () => setCreateOpen(false) })
+  }
+
+  function openEdit(target: NotificationWebhook) {
+    setEditFailed(false)
+    setEditTarget(target)
+  }
+
+  function handleEdit(payload: { name: string; eventTypes: NotificationWebhook['eventTypes'] }) {
+    if (!editTarget) return
+    setEditFailed(false)
+    updateMutation.mutate(
+      { id: editTarget.id, payload },
+      {
+        onSuccess: () => setEditTarget(undefined),
+        onError: () => setEditFailed(true),
+      },
+    )
   }
 
   return (
@@ -96,6 +117,7 @@ export function NotificationWebhooksPanel() {
                     onToggleEnabled={(target, enabled) =>
                       updateMutation.mutate({ id: target.id, payload: { enabled } })
                     }
+                    onEdit={openEdit}
                     onDelete={(target) => setDeleteTarget(target)}
                     onTest={(target) => testMutation.mutateAsync(target.id)}
                   />
@@ -120,6 +142,16 @@ export function NotificationWebhooksPanel() {
               )
             : undefined
         }
+      />
+
+      <EditNotificationWebhookDialog
+        webhook={editTarget}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(undefined)
+        }}
+        onSubmit={handleEdit}
+        isSubmitting={updateMutation.isPending}
+        error={editFailed ? t('settings.webhooks.updateError') : undefined}
       />
 
       <ConfirmDialog

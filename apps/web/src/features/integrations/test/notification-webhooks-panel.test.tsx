@@ -84,6 +84,7 @@ beforeEach(() => {
   } as never)
   useUpdateNotificationWebhookMock.mockReturnValue({
     mutate: updateMutate,
+    isPending: false,
   } as never)
   useDeleteNotificationWebhookMock.mockReturnValue({
     mutate: deleteMutate,
@@ -219,6 +220,99 @@ describe('NotificationWebhooksPanel', () => {
     })
 
     expect(screen.getByText('Team alerts')).toBeInTheDocument()
+  })
+
+  describe('editing a channel', () => {
+    async function openEditDialog() {
+      setWebhooks([webhook])
+      const user = userEvent.setup()
+      await act(async () => {
+        render(<NotificationWebhooksPanel />)
+      })
+      await user.click(screen.getByRole('button', { name: 'Edit Team alerts' }))
+      const dialog = await screen.findByRole('dialog')
+      return { user, dialog }
+    }
+
+    it('opens a dialog prefilled with the name and events, showing channel and url as read-only', async () => {
+      const { dialog } = await openEditDialog()
+
+      expect(within(dialog).getByText('Edit notification channel')).toBeInTheDocument()
+      expect(within(dialog).getByLabelText('Name')).toHaveValue('Team alerts')
+      expect(within(dialog).getByRole('checkbox', { name: 'Run failed' })).toBeChecked()
+      expect(within(dialog).getByRole('checkbox', { name: 'Run completed' })).not.toBeChecked()
+      expect(within(dialog).getByText('Slack')).toBeInTheDocument()
+      expect(within(dialog).getByText('hooks.slack.com/••••wxyz')).toBeInTheDocument()
+      expect(within(dialog).getAllByRole('textbox')).toHaveLength(1)
+    })
+
+    it('saves the edited name and events through the update mutation', async () => {
+      const { user, dialog } = await openEditDialog()
+
+      const nameInput = within(dialog).getByLabelText('Name')
+      await user.clear(nameInput)
+      await user.type(nameInput, '  QA alerts  ')
+      await user.click(within(dialog).getByRole('checkbox', { name: 'Run completed' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+      expect(updateMutate).toHaveBeenCalledWith(
+        {
+          id: 'webhook-1',
+          payload: { name: 'QA alerts', eventTypes: ['run_failed', 'run_completed'] },
+        },
+        expect.objectContaining({ onSuccess: expect.any(Function) }),
+      )
+    })
+
+    it('keeps save disabled until something changes', async () => {
+      const { user, dialog } = await openEditDialog()
+
+      expect(within(dialog).getByRole('button', { name: 'Save' })).toBeDisabled()
+      await user.type(within(dialog).getByLabelText('Name'), ' 2')
+      expect(within(dialog).getByRole('button', { name: 'Save' })).toBeEnabled()
+    })
+
+    it('requires a name and does not call the mutation', async () => {
+      const { user, dialog } = await openEditDialog()
+
+      await user.clear(within(dialog).getByLabelText('Name'))
+      await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('A channel name is required')
+      expect(updateMutate).not.toHaveBeenCalled()
+    })
+
+    it('requires at least one event and does not call the mutation', async () => {
+      const { user, dialog } = await openEditDialog()
+
+      await user.click(within(dialog).getByRole('checkbox', { name: 'Run failed' }))
+      await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+      expect(within(dialog).getByRole('alert')).toHaveTextContent('Choose at least one event')
+      expect(updateMutate).not.toHaveBeenCalled()
+    })
+
+    it('shows an inline error when the update fails', async () => {
+      updateMutate.mockImplementation((_input, options?: { onError?: () => void }) => {
+        options?.onError?.()
+      })
+      const { user, dialog } = await openEditDialog()
+
+      await user.type(within(dialog).getByLabelText('Name'), ' 2')
+      await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+
+      expect(within(dialog).getByRole('alert')).toHaveTextContent("Couldn't save the changes. Try again.")
+    })
+
+    it('hides the edit action for a plain member', async () => {
+      setWebhooks([webhook])
+      setRole('member')
+      await act(async () => {
+        render(<NotificationWebhooksPanel />)
+      })
+
+      expect(screen.queryByRole('button', { name: 'Edit Team alerts' })).not.toBeInTheDocument()
+    })
   })
 
   it('maps a plan-limit-reached create error to the same plan explanation', async () => {
