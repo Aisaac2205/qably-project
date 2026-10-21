@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { DEFAULT_LOCALE } from '@qably/i18n';
 import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
@@ -9,6 +10,10 @@ import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
 import { ExtractionProcessor } from './extraction.processor';
+import {
+  fingerprintSource,
+  type SourceFingerprintParts,
+} from './lib/source-fingerprint';
 
 function extractedCase(overrides: Record<string, unknown> = {}) {
   return {
@@ -25,7 +30,11 @@ function extractedCase(overrides: Record<string, unknown> = {}) {
 }
 
 interface FakePrisma {
-  codeChange: { findUnique: jest.Mock; findFirst: jest.Mock };
+  codeChange: {
+    findUnique: jest.Mock;
+    findFirst: jest.Mock;
+    updateMany: jest.Mock;
+  };
   testCase: {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
@@ -69,6 +78,7 @@ function createPrisma(): FakePrisma {
     codeChange: {
       findUnique: jest.fn().mockResolvedValue(codeChangeRow),
       findFirst: jest.fn().mockResolvedValue(null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     testCase: {
       findUnique: jest.fn(),
@@ -965,6 +975,457 @@ describe('ExtractionProcessor — code-change job', () => {
 
     const [extractArgs] = extractSpy.mock.calls[0] as [{ locale: string }];
     expect(extractArgs.locale).toBe(DEFAULT_LOCALE);
+  });
+});
+
+describe('ExtractionProcessor — code-change job skips a test file that did not change', () => {
+  const SOURCE = 'file body';
+  const FILE_PATH = 'src/cart.spec.ts';
+
+  function hashOf(overrides: Partial<SourceFingerprintParts> = {}): string {
+    return fingerprintSource({
+      promptVersion: EXTRACTION_PROMPT_VERSION,
+      locale: DEFAULT_LOCALE,
+      sourceLimit: 60_000,
+      content: SOURCE,
+      ...overrides,
+    });
+  }
+
+  function codeChangeJob(locale?: string) {
+    return {
+      data: {
+        kind: 'code-change',
+        codeChangeId: 'change-1',
+        ...(locale === undefined ? {} : { locale }),
+      },
+    } as never;
+  }
+
+  function lastSuccessful(sourceHash: string | null, id = 'change-0') {
+    return { id, sourceHash };
+  }
+
+  function recorded(prisma: FakePrisma): Record<string, unknown>[] {
+    return (prisma.codeChange.updateMany.mock.calls as [CallArgs][]).map(
+      ([args]) => args.data ?? {},
+    );
+  }
+
+  function quietLog() {
+    return jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
+  }
+
+  it('skips the daily budget, the model and the credit when the file is identical to the last successful extraction', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
+    const extract = jest.fn();
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const log = quietLog();
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(extract),
+      fakeEncryption(),
+      fakeEntitlement(undefined, spendCredit),
+      fakeDailyBudget(tryConsume),
+    ).process(codeChangeJob());
+
+    expect(extract).not.toHaveBeenCalled();
+    expect(tryConsume).not.toHaveBeenCalled();
+    expect(spendCredit).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.evidence.create).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining(FILE_PATH));
+    log.mockRestore();
+  });
+
+  it('compares with the newest successful extraction of the same file in the same project', async () => {
+    const prisma = createPrisma();
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(
+        jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+      ),
+    ).process(codeChangeJob());
+
+    expect(prisma.codeChange.findFirst).toHaveBeenCalledWith({
+      where: {
+        projectId: 'project-1',
+        filePath: FILE_PATH,
+        extractedAt: { not: null },
+      },
+      orderBy: { extractedAt: 'desc' },
+      select: { id: true, sourceHash: true },
+    });
+  });
+
+  it('records the skip on the current code change, so later pushes compare with it', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
+    const log = quietLog();
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(jest.fn())).process(
+      codeChangeJob(),
+    );
+
+    expect(prisma.codeChange.updateMany).toHaveBeenCalledTimes(1);
+    expect(lastCall(prisma.codeChange.updateMany).where).toEqual({
+      id: 'change-1',
+    });
+    expect(recorded(prisma)).toEqual([
+      { sourceHash: hashOf(), extractedAt: expect.any(Date) as Date },
+    ]);
+    log.mockRestore();
+  });
+
+  it('does not rewrite the record when the same job is delivered again after it finished', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockResolvedValue(
+      lastSuccessful(hashOf(), 'change-1'),
+    );
+    const extract = jest.fn();
+    const log = quietLog();
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+      codeChangeJob(),
+    );
+
+    expect(extract).not.toHaveBeenCalled();
+    expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
+    log.mockRestore();
+  });
+
+  it('runs normally when the content changed, and stamps the extraction only after the proposals are saved', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockResolvedValue(
+      lastSuccessful(hashOf({ content: 'the previous body' })),
+    );
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
+    const tryConsume = jest.fn().mockResolvedValue(true);
+
+    await build(
+      prisma,
+      fakeSourceReader(),
+      fakeExtractor(extract),
+      fakeEncryption(),
+      fakeEntitlement(),
+      fakeDailyBudget(tryConsume),
+    ).process(codeChangeJob());
+
+    expect(tryConsume).toHaveBeenCalledTimes(1);
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    expect(recorded(prisma)).toEqual([
+      { sourceHash: hashOf() },
+      { sourceHash: hashOf(), extractedAt: expect.any(Date) as Date },
+    ]);
+
+    const [hashOrder, stampOrder] =
+      prisma.codeChange.updateMany.mock.invocationCallOrder;
+    const extractOrder = extract.mock.invocationCallOrder[0];
+    const createOrder =
+      prisma.extractedProposal.create.mock.invocationCallOrder[0];
+    expect(hashOrder).toBeLessThan(extractOrder);
+    expect(createOrder).toBeLessThan(stampOrder);
+  });
+
+  it('runs normally when the file has never been extracted', async () => {
+    const prisma = createPrisma();
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+      codeChangeJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs normally when the last successful extraction predates the fingerprint', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(null));
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+      codeChangeJob(),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(1);
+  });
+
+  it.each<[string, Partial<SourceFingerprintParts>]>([
+    ['prompt version', { promptVersion: 'extraction-v11' }],
+    ['locale', { locale: 'es' }],
+    ['source character limit', { sourceLimit: 1_000_000 }],
+  ])(
+    'runs normally when the last extraction used another %s',
+    async (_label, previous) => {
+      const prisma = createPrisma();
+      prisma.codeChange.findFirst.mockResolvedValue(
+        lastSuccessful(hashOf(previous)),
+      );
+      const extract = jest
+        .fn()
+        .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+        codeChangeJob(),
+      );
+
+      expect(extract).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('re-extracts when the job asks for another locale than the last extraction used', async () => {
+    const prisma = createPrisma();
+    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+      codeChangeJob('es'),
+    );
+
+    expect(extract).toHaveBeenCalledTimes(1);
+    expect(recorded(prisma)[0]).toEqual({
+      sourceHash: hashOf({ locale: 'es' }),
+    });
+  });
+
+  it('fingerprints the content the plan let through, not the full file', async () => {
+    const prisma = createPrisma();
+    const read = jest.fn().mockResolvedValue({
+      kind: 'content',
+      content: 'only the first part',
+      truncated: true,
+    });
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+    await build(prisma, fakeSourceReader(read), fakeExtractor(extract)).process(
+      codeChangeJob(),
+    );
+
+    expect(recorded(prisma)[0]).toEqual({
+      sourceHash: hashOf({ content: 'only the first part' }),
+    });
+  });
+
+  describe('a failed extraction is never taken for a success', () => {
+    it('leaves the extraction unstamped when the provider is unavailable', async () => {
+      const prisma = createPrisma();
+      const extract = jest.fn().mockResolvedValue({
+        kind: 'provider-unavailable',
+        reason: 'rate-limited',
+        retryable: false,
+      });
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+        codeChangeJob(),
+      );
+
+      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+    });
+
+    it('leaves the extraction unstamped when the model finds no tests', async () => {
+      const prisma = createPrisma();
+      const extract = jest.fn().mockResolvedValue({ kind: 'no-tests-found' });
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+        codeChangeJob(),
+      );
+
+      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+    });
+
+    it('leaves the extraction unstamped when no extracted case matches the request', async () => {
+      const prisma = createPrisma();
+      const extract = jest.fn().mockResolvedValue(extractedOutcome([]));
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+        codeChangeJob(),
+      );
+
+      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+    });
+
+    it('leaves the extraction unstamped when the credit cannot be spent', async () => {
+      const prisma = createPrisma();
+      const extract = jest
+        .fn()
+        .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+      await build(
+        prisma,
+        fakeSourceReader(),
+        fakeExtractor(extract),
+        fakeEncryption(),
+        fakeEntitlement(undefined, jest.fn().mockResolvedValue(false)),
+      ).process(codeChangeJob());
+
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+    });
+
+    it('leaves the extraction unstamped when the daily budget is exhausted', async () => {
+      const prisma = createPrisma();
+      const extract = jest.fn();
+
+      await build(
+        prisma,
+        fakeSourceReader(),
+        fakeExtractor(extract),
+        fakeEncryption(),
+        fakeEntitlement(),
+        fakeDailyBudget(jest.fn().mockResolvedValue(false)),
+      ).process(codeChangeJob());
+
+      expect(extract).not.toHaveBeenCalled();
+      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+    });
+
+    it('does not fingerprint a source that could not be read', async () => {
+      const prisma = createPrisma();
+      const read = jest
+        .fn()
+        .mockResolvedValue({ kind: 'unavailable', reason: 'timeout' });
+
+      await build(
+        prisma,
+        fakeSourceReader(read),
+        fakeExtractor(jest.fn()),
+      ).process(codeChangeJob());
+
+      expect(prisma.codeChange.findFirst).not.toHaveBeenCalled();
+      expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the fingerprint never blocks an extraction', () => {
+    it('extracts anyway when the previous extraction cannot be looked up', async () => {
+      const prisma = createPrisma();
+      prisma.codeChange.findFirst.mockRejectedValue(new Error('db gone'));
+      const extract = jest
+        .fn()
+        .mockResolvedValue(extractedOutcome([extractedCase()]));
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => {});
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+        codeChangeJob(),
+      );
+
+      expect(extract).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('db gone'));
+      warn.mockRestore();
+    });
+
+    it('keeps the job successful when stamping the extraction fails after the proposals were saved', async () => {
+      const prisma = createPrisma();
+      prisma.codeChange.updateMany
+        .mockResolvedValueOnce({ count: 1 })
+        .mockRejectedValueOnce(new Error('db gone'));
+      const extract = jest
+        .fn()
+        .mockResolvedValue(extractedOutcome([extractedCase()]));
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => {});
+      const error = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => {});
+
+      await expect(
+        build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
+          codeChangeJob(),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('db gone'));
+      expect(error).not.toHaveBeenCalled();
+      warn.mockRestore();
+      error.mockRestore();
+    });
+  });
+
+  describe('explicit documentation requests are not fingerprinted', () => {
+    const testCaseRow = {
+      id: 'case-1',
+      projectId: 'project-1',
+      suiteId: 'suite-1',
+      automationKey: 'Cart > adds an item',
+      automationFilePath: FILE_PATH,
+      project: { organizationId: 'org-1', connection },
+    };
+
+    it('still extracts a document-case request for an unchanged file', async () => {
+      const prisma = createPrisma();
+      prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
+      prisma.codeChange.findFirst.mockResolvedValue({
+        ...lastSuccessful(hashOf()),
+        commitSha: 'sha-1',
+      });
+      const extract = jest
+        .fn()
+        .mockResolvedValue(extractedOutcome([extractedCase()]));
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process({
+        data: { kind: 'document-case', testCaseId: 'case-1' },
+      } as never);
+
+      expect(extract).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('still extracts a document-file request for an unchanged file', async () => {
+      const prisma = createPrisma();
+      prisma.testCase.findUnique.mockResolvedValue({
+        projectId: 'project-1',
+        project: { organizationId: 'org-1', connection },
+      });
+      prisma.testCase.findMany.mockResolvedValue([
+        { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
+      ]);
+      prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
+      const extract = jest
+        .fn()
+        .mockResolvedValue(
+          extractedOutcome([
+            extractedCase({ automationKey: 'Cart > adds an item' }),
+          ]),
+        );
+
+      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process({
+        data: {
+          kind: 'document-file',
+          filePath: FILE_PATH,
+          targets: [
+            { testCaseId: 'case-1', automationKey: 'Cart > adds an item' },
+          ],
+        },
+      } as never);
+
+      expect(extract).toHaveBeenCalledTimes(1);
+      expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
+    });
   });
 });
 

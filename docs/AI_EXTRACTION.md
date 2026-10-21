@@ -615,6 +615,40 @@ SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
 
 The unit suite mocks Prisma, so it asserts the lock statement, its parameter and its position before the reads; it cannot show that two real connections serialize. A Postgres integration test with two racing connections remains a recommended follow-up.
 
+### A test file that did not change is not extracted again
+
+A push re-reads every test file it touches, and the model is charged for each one: one credit and one unit of the daily budget per file job, spent after the call. A byte-identical file produced the same proposals again, for nothing. A `code-change` job now compares the file with the last one it extracted before it spends anything.
+
+After the source is read and before the daily budget and the model call, `ExtractionProcessor.runExtractionUnsafe` computes `fingerprintSource` (`apps/api/src/modules/review/lib/source-fingerprint.ts`), a SHA-256 over:
+
+| Part | Why it is in the hash |
+|---|---|
+| `EXTRACTION_PROMPT_VERSION` | A new prompt must re-extract every file. |
+| Resolved locale | The proposals are written in that language. |
+| Source character limit of the plan | A plan change decides how much of the file reaches the model, so it must re-extract. |
+| The content the reader returned | What the model would actually see, truncated or not. |
+
+`CodeChange` carries two nullable columns for this (migration `20261021110000_add_code_change_source_fingerprint`, with an index on `(projectId, filePath)`):
+
+- `sourceHash`: the fingerprint of the file as this job read it. Written as soon as the job knows it will extract, and again together with `extractedAt`.
+- `extractedAt`: set only when the file version is accounted for by a successful extraction. Rows from before the migration have both columns empty, so the first push after the deploy extracts each file once.
+
+The job looks up the **newest** code change of the same project and `filePath` with a non-null `extractedAt` and compares hashes:
+
+- **Same hash:** the job ends. It spends no daily budget, makes no model call, spends no credit and writes no proposals. It logs one line and stamps `sourceHash` and `extractedAt` on the current code change.
+- **Different hash, or no earlier extraction:** the job runs as before.
+
+What counts as a success is narrow. `extractedAt` is set only after `persistExtracted` returned `true`. A provider error, a missing entitlement, an exhausted budget, a source that could not be read, a model that found no tests, and a result with no matching case all leave it empty, so a failed attempt never causes a later skip. An extraction cut short by the case cap still saves its proposals and counts.
+
+Design choices:
+
+- **Only the newest successful extraction is compared.** A file that changes and then goes back (A, B, A) is extracted again on the third push, because its proposals were refreshed from version B. Comparing against any earlier match would leave them describing B.
+- **A skip stamps `extractedAt` too.** Its proposals are exactly those of the extraction it matched, so the stamp is true, and the next comparison stays correct if the matched row is ever removed. No separate column was added. A redelivery of a job that already finished matches its own row and writes nothing.
+- **It never blocks an extraction.** If the lookup or a write fails, the job logs a warning and extracts anyway; a failure to stamp after the proposals are saved is logged and does not fail or retry the job.
+- **Only `code-change` jobs.** `document-case` and `document-file` are explicit requests from a person ("Document again with Aeris") and always run.
+
+Two jobs for the same new file can run at the same time. Neither sees a successful extraction, so both extract; the per-case lock above keeps their proposals from doubling.
+
 ### Deduplication within a batch
 
 A single extraction can return multiple cases sharing the same `automationKey` (a model quirk, or two declarations that stringify to the same reporter name). `ExtractionProcessor` deduplicates by `automationKey` before persisting, keeping only the first occurrence.

@@ -58,6 +58,7 @@ function createPrisma() {
         project: { organizationId: 'org-1', connection },
       }),
       findFirst: jest.fn().mockResolvedValue(null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     testCase: {
       findUnique: jest.fn().mockResolvedValue({
