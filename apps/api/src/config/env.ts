@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
-const optionalSecret = z.preprocess(
-  (value) => (value === '' ? undefined : value),
-  z.string().min(1).optional(),
-);
+/**
+ * An empty variable counts as unset, so a blank value in the hosting
+ * dashboard or a bare `KEY=` line in `.env` keeps the default (or stays
+ * absent) instead of failing the schema and aborting startup.
+ */
+const blankAsUnset = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema);
+
+const optionalSecret = blankAsUnset(z.string().min(1).optional());
 
 const httpUrl = z
   .url()
@@ -33,13 +38,11 @@ const httpUrl = z
 
 /**
  * Test files one ingestion batch (one push, for one project) may send to AI
- * extraction before the whole batch is skipped. An empty variable counts as
- * unset, so a blank value in the hosting dashboard keeps the default.
+ * extraction before the whole batch is skipped.
  */
 const DEFAULT_EXTRACTION_MAX_FILES_PER_BATCH = 50;
 
-const extractionMaxFilesPerBatch = z.preprocess(
-  (value) => (value === '' ? undefined : value),
+const extractionMaxFilesPerBatch = blankAsUnset(
   z.coerce
     .number()
     .int()
@@ -48,10 +51,10 @@ const extractionMaxFilesPerBatch = z.preprocess(
 );
 
 const envSchema = z.object({
-  NODE_ENV: z
-    .enum(['development', 'test', 'production'])
-    .default('development'),
-  PORT: z.coerce.number().int().positive().default(3001),
+  NODE_ENV: blankAsUnset(
+    z.enum(['development', 'test', 'production']).default('development'),
+  ),
+  PORT: blankAsUnset(z.coerce.number().int().positive().default(3001)),
   DATABASE_URL: z.url(),
   REDIS_URL: z.url(),
   BETTER_AUTH_SECRET: z.string().min(32),
@@ -61,11 +64,15 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
   GEMINI_API_KEY: optionalSecret,
-  GEMINI_MODEL: z.string().min(1).default('gemini-3.1-flash-lite'),
-  AERIS_DAILY_BUDGET: z.coerce.number().int().positive().optional(),
+  GEMINI_MODEL: blankAsUnset(
+    z.string().min(1).default('gemini-3.1-flash-lite'),
+  ),
+  AERIS_DAILY_BUDGET: blankAsUnset(
+    z.coerce.number().int().positive().optional(),
+  ),
   EXTRACTION_MAX_FILES_PER_BATCH: extractionMaxFilesPerBatch,
   RESEND_API_KEY: optionalSecret,
-  RESEND_FROM_EMAIL: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL: blankAsUnset(z.string().min(1).optional()),
 });
 
 export type Env = z.infer<typeof envSchema>;
