@@ -41,6 +41,7 @@ interface FakePrisma {
     findMany: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
     deleteMany: jest.Mock;
   };
   $transaction: jest.Mock;
@@ -101,6 +102,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: 'proposal-new' }),
       update: jest.fn().mockResolvedValue({ id: 'proposal-updated' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: jest.fn(),
@@ -201,6 +203,20 @@ interface CallArgs {
 function lastCall(mock: jest.Mock): CallArgs {
   const calls = mock.mock.calls as [CallArgs][];
   return calls[calls.length - 1][0];
+}
+
+// A push takes an advisory lock per case before it writes; the savepoint
+// choreography around each proposal is what these tests pin, so the locks are
+// left out of the raw statements they read back.
+function savepointStatements(
+  prisma: FakePrisma,
+): { sql: string; order: number }[] {
+  const calls = prisma.$executeRawUnsafe.mock.calls as [string][];
+  const orders = prisma.$executeRawUnsafe.mock.invocationCallOrder;
+
+  return calls
+    .map(([sql], index) => ({ sql, order: orders[index] }))
+    .filter(({ sql }) => !sql.includes('pg_advisory_xact_lock'));
 }
 
 function extractedOutcome(
@@ -398,19 +414,17 @@ describe('ExtractionProcessor — code-change job', () => {
       promptVersion: EXTRACTION_PROMPT_VERSION,
     });
 
-    const savepointCalls = prisma.$executeRawUnsafe.mock.calls.map(
-      ([sql]: [string]) => sql,
-    );
-    expect(savepointCalls).toEqual([
+    const statements = savepointStatements(prisma);
+    expect(statements.map(({ sql }) => sql)).toEqual([
       'SAVEPOINT extraction_proposal',
       'RELEASE SAVEPOINT extraction_proposal',
     ]);
-    const savepointOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+    const savepointOrder = statements[0].order;
     const evidenceCreateOrder =
       prisma.evidence.create.mock.invocationCallOrder[0];
     const proposalCreateOrder =
       prisma.extractedProposal.create.mock.invocationCallOrder[0];
-    const releaseOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
+    const releaseOrder = statements[1].order;
     expect(savepointOrder).toBeLessThan(evidenceCreateOrder);
     expect(evidenceCreateOrder).toBeLessThan(proposalCreateOrder);
     expect(proposalCreateOrder).toBeLessThan(releaseOrder);
@@ -435,6 +449,49 @@ describe('ExtractionProcessor — code-change job', () => {
     });
   });
 
+  it('hands the creation time of the code change to the writer, so an older push cannot undo a newer one', async () => {
+    const prisma = createPrisma();
+    const createdAt = new Date('2026-10-20T12:00:00.000Z');
+    prisma.codeChange.findUnique.mockResolvedValue({
+      ...codeChangeRow,
+      createdAt,
+    });
+    prisma.extractedProposal.findMany.mockImplementation(
+      (args: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          typeof args.where.codeChangeId === 'object'
+            ? [
+                {
+                  id: 'newer-owner',
+                  status: 'in_review',
+                  evidenceId: 'evidence-newer',
+                  automationKey: 'Cart > adds an item',
+                  codeChange: {
+                    id: 'change-9',
+                    createdAt: new Date('2026-10-20T14:00:00.000Z'),
+                  },
+                },
+              ]
+            : [],
+        ),
+    );
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(prisma.codeChange.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ createdAt: true }) as unknown,
+      }),
+    );
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+  });
+
   it('does nothing when the model reports no tests found', async () => {
     const prisma = createPrisma();
     const extractor = fakeExtractor(
@@ -446,7 +503,7 @@ describe('ExtractionProcessor — code-change job', () => {
     } as never);
 
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates no manual-review proposal when the project has no connection', async () => {
@@ -704,8 +761,11 @@ describe('ExtractionProcessor — code-change job', () => {
     } as never);
 
     expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
-    const updateCall = lastCall(prisma.extractedProposal.update);
-    expect(updateCall.where).toEqual({ id: 'winner-proposal' });
+    const updateCall = lastCall(prisma.extractedProposal.updateMany);
+    expect(updateCall.where).toEqual({
+      id: 'winner-proposal',
+      status: 'in_review',
+    });
     expect(updateCall.data).toMatchObject({ title: 'First' });
     const secondCreateCall = lastCall(prisma.extractedProposal.create);
     expect(secondCreateCall.data).toMatchObject({
@@ -731,15 +791,14 @@ describe('ExtractionProcessor — code-change job', () => {
       ),
     ).toHaveLength(2);
 
-    const firstSavepointOrder =
-      prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+    const statements = savepointStatements(prisma);
+    const firstSavepointOrder = statements[0].order;
     const firstEvidenceCreateOrder =
       prisma.evidence.create.mock.invocationCallOrder[0];
     const firstProposalCreateOrder =
       prisma.extractedProposal.create.mock.invocationCallOrder[0];
-    const rollbackOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
-    const releaseAfterRollbackOrder =
-      prisma.$executeRawUnsafe.mock.invocationCallOrder[2];
+    const rollbackOrder = statements[1].order;
+    const releaseAfterRollbackOrder = statements[2].order;
     const findFirstOrder =
       prisma.extractedProposal.findFirst.mock.invocationCallOrder[0];
 
@@ -770,7 +829,7 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
     expect(prisma.evidence.update).not.toHaveBeenCalled();
   });
 
@@ -818,7 +877,7 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     expect(prisma.evidence.update).not.toHaveBeenCalled();
   });
@@ -844,8 +903,11 @@ describe('ExtractionProcessor — code-change job', () => {
     expect(prisma.evidence.create).not.toHaveBeenCalled();
     const evidenceUpdateCall = lastCall(prisma.evidence.update);
     expect(evidenceUpdateCall.where).toEqual({ id: 'evidence-existing' });
-    const proposalUpdateCall = lastCall(prisma.extractedProposal.update);
-    expect(proposalUpdateCall.where).toEqual({ id: 'pending-proposal' });
+    const proposalUpdateCall = lastCall(prisma.extractedProposal.updateMany);
+    expect(proposalUpdateCall.where).toEqual({
+      id: 'pending-proposal',
+      status: 'in_review',
+    });
     expect(proposalUpdateCall.data).toMatchObject({
       title: 'Adds an item to the cart',
     });

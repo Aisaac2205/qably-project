@@ -55,6 +55,7 @@ interface FakePrisma {
     findMany: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
     deleteMany: jest.Mock;
   };
   $transaction: jest.Mock;
@@ -86,6 +87,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: 'proposal-new' }),
       update: jest.fn().mockResolvedValue({ id: 'proposal-updated' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: jest.fn(),
@@ -235,7 +237,7 @@ describe('ExtractedProposalWriter.applyDecidedProposalGuard (via upsertCodeChang
     );
 
     expect(prisma.evidence.update).not.toHaveBeenCalled();
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
   });
 
   it('updates the evidence and proposal fields when the existing proposal is still pending', async () => {
@@ -270,12 +272,73 @@ describe('ExtractedProposalWriter.applyDecidedProposalGuard (via upsertCodeChang
     expect(lastCall(prisma.evidence.update).data?.title).toBe(
       'src/cart.spec.ts',
     );
-    expect(lastCall(prisma.extractedProposal.update).where).toEqual({
+    expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
       id: 'pending-1',
+      status: 'in_review',
     });
     expect(
-      lastCall(prisma.extractedProposal.update).data?.targetTestCaseId,
+      lastCall(prisma.extractedProposal.updateMany).data?.targetTestCaseId,
     ).toBe('case-matched');
+  });
+
+  it('leaves the evidence alone when the proposal was decided between the read and the update', async () => {
+    const prisma = createPrisma();
+    prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+    const writer = build(prisma, fakeEntitlement());
+
+    await writer.applyDecidedProposalGuard(
+      prisma as never,
+      jobContext(),
+      extractedCase(),
+      { id: 'pending-1', status: 'in_review', evidenceId: 'evidence-1' },
+      null,
+      'https://example.com/blob',
+      {
+        projectId: 'project-1',
+        suiteId: null,
+        status: 'in_review',
+        title: 'Adds an item to the cart',
+        objective: 'Verify the cart total updates',
+        preconditions: [],
+        steps: [],
+        expectedResult: 'The total reflects the item price',
+        priority: 'medium',
+        promptVersion: 'v1',
+      },
+    );
+
+    expect(prisma.evidence.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+  });
+
+  it('never writes the status, so a refresh cannot reopen a proposal', async () => {
+    const prisma = createPrisma();
+    const writer = build(prisma, fakeEntitlement());
+
+    await writer.applyDecidedProposalGuard(
+      prisma as never,
+      jobContext(),
+      extractedCase(),
+      { id: 'pending-1', status: 'in_review', evidenceId: 'evidence-1' },
+      null,
+      'https://example.com/blob',
+      {
+        projectId: 'project-1',
+        suiteId: null,
+        status: 'in_review',
+        title: 'Adds an item to the cart',
+        objective: 'Verify the cart total updates',
+        preconditions: [],
+        steps: [],
+        expectedResult: 'The total reflects the item price',
+        priority: 'medium',
+        promptVersion: 'v1',
+      },
+    );
+
+    expect(
+      lastCall(prisma.extractedProposal.updateMany).data,
+    ).not.toHaveProperty('status');
   });
 });
 
@@ -315,11 +378,12 @@ describe('ExtractedProposalWriter.upsertCodeChangeProposal — P2002 race', () =
     expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('ROLLBACK TO SAVEPOINT'),
     );
-    expect(lastCall(prisma.extractedProposal.update).where).toEqual({
+    expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
       id: 'winner-1',
+      status: 'in_review',
     });
     expect(
-      lastCall(prisma.extractedProposal.update).data?.targetTestCaseId,
+      lastCall(prisma.extractedProposal.updateMany).data?.targetTestCaseId,
     ).toBeNull();
   });
 
@@ -794,5 +858,866 @@ describe('ExtractedProposalWriter.persistExtracted — proposals created event',
       ([, event]: [string, { batchId: string }]) => event.batchId,
     );
     expect(batches).toEqual(['proposal-a', 'proposal-b']);
+  });
+});
+
+describe('ExtractedProposalWriter.persistExtracted — one open proposal per test case across pushes', () => {
+  const OLDER = new Date('2026-10-20T10:00:00.000Z');
+  const CURRENT = new Date('2026-10-20T12:00:00.000Z');
+  const NEWER = new Date('2026-10-20T14:00:00.000Z');
+
+  interface StoredProposal {
+    id: string;
+    projectId: string;
+    status: string;
+    evidenceId: string;
+    automationKey: string;
+    createdAt: Date;
+    codeChangeId: string;
+    codeChange: { id: string; filePath: string; createdAt: Date };
+  }
+
+  type StoredFields = Partial<
+    Omit<StoredProposal, 'codeChangeId' | 'codeChange'>
+  > & { change?: Partial<StoredProposal['codeChange']> };
+
+  // By default a proposal of the same project and file, still in review, owned
+  // by a push that is older than the one the tests persist.
+  function storedProposal({
+    change = {},
+    ...fields
+  }: StoredFields = {}): StoredProposal {
+    const owner = {
+      id: 'change-1',
+      filePath: 'src/cart.spec.ts',
+      createdAt: OLDER,
+      ...change,
+    };
+
+    return {
+      id: 'older-1',
+      projectId: 'project-1',
+      status: 'in_review',
+      evidenceId: 'evidence-older',
+      automationKey: 'Cart > adds an item',
+      createdAt: OLDER,
+      ...fields,
+      codeChangeId: owner.id,
+      codeChange: owner,
+    };
+  }
+
+  function compareValues(a: unknown, b: unknown): number {
+    const left = a instanceof Date ? a.getTime() : (a as string | number);
+    const right = b instanceof Date ? b.getTime() : (b as string | number);
+    if (left === right) return 0;
+    return left < right ? -1 : 1;
+  }
+
+  function matchesWhere(
+    row: StoredProposal,
+    where: Record<string, unknown>,
+  ): boolean {
+    return Object.entries(where).every(([field, condition]) => {
+      switch (field) {
+        case 'projectId':
+        case 'status':
+          return row[field] === condition;
+        case 'automationKey':
+          return (condition as { in: string[] }).in.includes(row.automationKey);
+        case 'codeChangeId':
+          return typeof condition === 'string'
+            ? row.codeChangeId === condition
+            : row.codeChangeId !== (condition as { not: string }).not;
+        case 'codeChange':
+          return (
+            row.codeChange.filePath ===
+            (condition as { filePath: string }).filePath
+          );
+        default:
+          throw new Error(`the fake store does not understand "${field}"`);
+      }
+    });
+  }
+
+  // The proposals table, as far as the writer reads it. It applies the filter
+  // and the order the writer asks for, so a test fails when the query is too
+  // wide, not merely when a mock was told to return nothing.
+  function seedProposals(prisma: FakePrisma, rows: StoredProposal[]): void {
+    prisma.extractedProposal.findMany.mockImplementation(
+      (args: {
+        where?: Record<string, unknown>;
+        orderBy?: Record<string, 'asc' | 'desc'>[];
+      }) => {
+        const found = rows.filter((row) => matchesWhere(row, args.where ?? {}));
+        const order = (args.orderBy ?? []).map(
+          (clause) => Object.entries(clause)[0],
+        );
+
+        return Promise.resolve(
+          [...found].sort((a, b) => {
+            for (const [field, direction] of order) {
+              const rowA = a as unknown as Record<string, unknown>;
+              const rowB = b as unknown as Record<string, unknown>;
+              const result = compareValues(rowA[field], rowB[field]);
+              if (result !== 0) return direction === 'desc' ? -result : result;
+            }
+            return 0;
+          }),
+        );
+      },
+    );
+  }
+
+  const secondPush = (overrides: Partial<JobContext> = {}) =>
+    jobContext({
+      codeChangeId: 'change-2',
+      codeChangeCreatedAt: CURRENT,
+      ...overrides,
+    });
+
+  // The lookup of proposals owned by other code changes: `codeChangeId` is a
+  // `not` filter there, a plain id in the lookup of the current change.
+  function crossPushLookups(prisma: FakePrisma): Record<string, unknown>[] {
+    const calls = prisma.extractedProposal.findMany.mock.calls as [
+      { where: Record<string, unknown> },
+    ][];
+
+    return calls
+      .map(([args]) => args)
+      .filter(({ where }) => typeof where.codeChangeId === 'object');
+  }
+
+  function advisoryLocks(prisma: FakePrisma): string[] {
+    const calls = prisma.$executeRawUnsafe.mock.calls as [string, string][];
+    return calls
+      .filter(([sql]) => sql.includes('pg_advisory_xact_lock'))
+      .map(([, lockKey]) => lockKey);
+  }
+
+  const fileLockKey = (filePath = 'src/cart.spec.ts') =>
+    JSON.stringify(['project-1', filePath]);
+
+  describe('refreshing the open proposal of an earlier push', () => {
+    it('refreshes it instead of creating a second one', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      const writer = build(prisma, fakeEntitlement());
+
+      const persisted = await writer.persistExtracted(
+        [extractedCase({ title: 'Adds an item, reworded' })],
+        secondPush(),
+      );
+
+      expect(persisted).toBe(true);
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.updateMany).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.updateMany).data).toMatchObject({
+        title: 'Adds an item, reworded',
+        targetTestCaseId: null,
+      });
+      expect(lastCall(prisma.evidence.update).where).toEqual({
+        id: 'evidence-older',
+      });
+      expect(lastCall(prisma.evidence.update).data).toEqual({
+        title: 'src/cart.spec.ts',
+        uri: 'https://github.com/qably/qably/blob/sha-1/src/cart.spec.ts',
+        excerpt: "it('adds an item', () => {})",
+      });
+    });
+
+    it('only updates a proposal that is still in review, and never writes the status', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      const update = lastCall(prisma.extractedProposal.updateMany);
+      expect(update.where).toEqual({ id: 'older-1', status: 'in_review' });
+      expect(update.data).not.toHaveProperty('status');
+      expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    });
+
+    it('moves it to the current code change so the newest push owns it', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).data).toMatchObject({
+        codeChangeId: 'change-2',
+      });
+    });
+
+    it('points it at the catalog case the key now matches', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      prisma.testCase.findMany.mockResolvedValue([
+        { id: 'case-existing', automationKey: 'Cart > adds an item' },
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [extractedCase()],
+        secondPush({ knownSuiteId: 'suite-1' }),
+      );
+
+      expect(lastCall(prisma.extractedProposal.updateMany).data).toMatchObject({
+        suiteId: 'suite-1',
+        targetTestCaseId: 'case-existing',
+      });
+    });
+
+    it('looks among the proposals of the same project, key and file in any status, so a decided newer one is seen', async () => {
+      const prisma = createPrisma();
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(crossPushLookups(prisma)).toHaveLength(1);
+      expect(crossPushLookups(prisma)[0]).toMatchObject({
+        where: {
+          projectId: 'project-1',
+          automationKey: {
+            in: ['Cart > adds an item', 'Cart > removes an item'],
+          },
+          codeChangeId: { not: 'change-2' },
+          codeChange: { filePath: 'src/cart.spec.ts' },
+        },
+      });
+      expect(crossPushLookups(prisma)[0].where).not.toHaveProperty('status');
+    });
+
+    it('creates a new proposal when the same key only exists in another file', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({ change: { filePath: 'src/other.spec.ts' } }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('creates a new proposal when the same key and file belong to another project', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal({ projectId: 'project-2' })]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each(['approved', 'rejected', 'changes_requested'])(
+      'leaves a %s proposal of an earlier push alone and opens a new one',
+      async (status) => {
+        const prisma = createPrisma();
+        seedProposals(prisma, [storedProposal({ status })]);
+        const writer = build(prisma, fakeEntitlement());
+
+        await writer.persistExtracted([extractedCase()], secondPush());
+
+        expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+        expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+        expect(prisma.evidence.update).not.toHaveBeenCalled();
+      },
+    );
+
+    // Duplicates: the one owned by the newest push is the live one. The
+    // proposals' own creation times are set the other way round on purpose, so
+    // ordering by them would pick the wrong one.
+    it('refreshes only the proposal of the newest owning push when duplicates are open, leaving the others untouched', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'oldest-owner',
+          evidenceId: 'evidence-oldest-owner',
+          createdAt: new Date('2026-10-20T11:00:00.000Z'),
+          change: {
+            id: 'change-0',
+            createdAt: new Date('2026-10-20T08:00:00.000Z'),
+          },
+        }),
+        storedProposal({
+          id: 'newest-owner',
+          evidenceId: 'evidence-newest-owner',
+          createdAt: new Date('2026-10-20T09:00:00.000Z'),
+          change: {
+            id: 'change-1',
+            createdAt: new Date('2026-10-20T10:00:00.000Z'),
+          },
+        }),
+        storedProposal({
+          id: 'middle-owner',
+          evidenceId: 'evidence-middle-owner',
+          createdAt: new Date('2026-10-20T10:30:00.000Z'),
+          change: {
+            id: 'change-0b',
+            createdAt: new Date('2026-10-20T09:00:00.000Z'),
+          },
+        }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.updateMany).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'newest-owner',
+        status: 'in_review',
+      });
+      expect(prisma.evidence.update).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.evidence.update).where).toEqual({
+        id: 'evidence-newest-owner',
+      });
+      expect(prisma.extractedProposal.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('breaks a tie between the owning pushes of duplicates by the code change id', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({ id: 'owner-a', change: { id: 'change-a' } }),
+        storedProposal({ id: 'owner-b', change: { id: 'change-b' } }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'owner-b',
+        status: 'in_review',
+      });
+    });
+
+    it('skips a decided duplicate of an older push and refreshes the open one', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'older-decided',
+          status: 'approved',
+          change: { id: 'change-0b', createdAt: new Date(OLDER.getTime() + 1) },
+        }),
+        storedProposal({
+          id: 'older-open',
+          change: { id: 'change-0', createdAt: OLDER },
+        }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'older-open',
+        status: 'in_review',
+      });
+    });
+
+    it('does not announce a push whose proposals were all refreshed', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      const persisted = await writer.persistExtracted(
+        [extractedCase()],
+        secondPush(),
+      );
+
+      expect(persisted).toBe(true);
+      expect(publish).not.toHaveBeenCalled();
+      expect(prisma.codeChange.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('announces only the proposals it created when a push mixes new and refreshed cases', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledTimes(1);
+      expect(publish).toHaveBeenCalledWith(
+        DOMAIN_EVENTS.proposalsCreated,
+        expect.objectContaining({ batchId: 'batch-1', count: 1 }),
+      );
+    });
+
+    it('creates the proposal instead when it was decided after it was read, without touching the evidence', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.evidence.update).not.toHaveBeenCalled();
+      expect(prisma.evidence.create).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
+        codeChangeId: 'change-2',
+        automationKey: 'Cart > adds an item',
+      });
+      expect(publish).toHaveBeenCalledWith(
+        DOMAIN_EVENTS.proposalsCreated,
+        expect.objectContaining({ count: 1 }),
+      );
+    });
+  });
+
+  describe('a push that was already refreshed by itself', () => {
+    it('keeps refreshing the proposal of the same push in place on a redelivery, without moving it', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'same-push',
+          change: { id: 'change-2', createdAt: CURRENT },
+        }),
+        storedProposal({ id: 'earlier-push' }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.updateMany).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'same-push',
+        status: 'in_review',
+      });
+      expect(
+        lastCall(prisma.extractedProposal.updateMany).data,
+      ).not.toHaveProperty('codeChangeId');
+    });
+
+    it('leaves everything alone when the same push already has the proposal decided', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'decided',
+          status: 'approved',
+          change: { id: 'change-2', createdAt: CURRENT },
+        }),
+        storedProposal({ id: 'earlier-push' }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a redelivery that races a decision', () => {
+    const samePush = (overrides: StoredFields = {}) =>
+      storedProposal({
+        id: 'same-push',
+        evidenceId: 'evidence-same-push',
+        change: { id: 'change-2', createdAt: CURRENT },
+        ...overrides,
+      });
+
+    it('does not put a proposal back in the inbox when it was approved between the read and the update', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [samePush()]);
+      // The read saw it in review; the approval commits before the update.
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      const persisted = await writer.persistExtracted(
+        [extractedCase()],
+        secondPush(),
+      );
+
+      expect(persisted).toBe(true);
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'same-push',
+        status: 'in_review',
+      });
+      expect(
+        lastCall(prisma.extractedProposal.updateMany).data,
+      ).not.toHaveProperty('status');
+      expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+      expect(prisma.evidence.update).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('opens no duplicate for the same code change and key when the update matches nothing', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [samePush()]);
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+    });
+
+    it('still refreshes the other cases of the redelivered push', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        samePush(),
+        samePush({
+          id: 'same-push-2',
+          evidenceId: 'evidence-same-push-2',
+          automationKey: 'Cart > removes an item',
+        }),
+      ]);
+      prisma.extractedProposal.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(prisma.evidence.update).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.evidence.update).where).toEqual({
+        id: 'evidence-same-push-2',
+      });
+    });
+
+    it('leaves the winner of a lost create race alone when it was decided in the meantime', async () => {
+      const prisma = createPrisma();
+      prisma.extractedProposal.create.mockRejectedValueOnce(
+        Object.assign(new Error('duplicate'), { code: 'P2002' }),
+      );
+      prisma.extractedProposal.findFirst.mockResolvedValueOnce({
+        id: 'winner-1',
+        status: 'in_review',
+        evidenceId: 'evidence-winner',
+      });
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'winner-1',
+        status: 'in_review',
+      });
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.evidence.update).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('a push that is older than the one that owns the proposal', () => {
+    const newerOwner = { id: 'change-3', createdAt: NEWER };
+
+    it('does not overwrite or move a proposal a newer push already owns', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal({ change: newerOwner })]);
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      const persisted = await writer.persistExtracted(
+        [extractedCase()],
+        secondPush(),
+      );
+
+      expect(persisted).toBe(true);
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+      expect(prisma.evidence.update).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('still handles the other cases of the same file', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal({ change: newerOwner })]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
+        automationKey: 'Cart > removes an item',
+      });
+    });
+
+    it('does not refresh an even older duplicate in its place', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({ id: 'newer-owner', change: newerOwner }),
+        storedProposal({ id: 'older-duplicate' }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    // A late job holds older content than a proposal a human already decided.
+    // Opening a new proposal from it could roll the case back on approval.
+    it.each(['approved', 'rejected', 'changes_requested'])(
+      'opens nothing when the newer push proposal was already %s',
+      async (status) => {
+        const prisma = createPrisma();
+        seedProposals(prisma, [
+          storedProposal({
+            id: 'newer-decided',
+            status,
+            change: newerOwner,
+          }),
+        ]);
+        const publish = jest.fn();
+        const writer = build(
+          prisma,
+          fakeEntitlement(),
+          fakeReclassifier(),
+          fakeEvents(publish),
+        );
+
+        await writer.persistExtracted([extractedCase()], secondPush());
+
+        expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+        expect(prisma.evidence.create).not.toHaveBeenCalled();
+        expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+        expect(prisma.evidence.update).not.toHaveBeenCalled();
+        expect(publish).not.toHaveBeenCalled();
+      },
+    );
+
+    it('does not refresh an older open proposal either when a newer push holds a decided one', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'newer-decided',
+          status: 'approved',
+          change: newerOwner,
+        }),
+        storedProposal({ id: 'older-open' }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('still handles the other cases when a newer push holds a decided one for one of them', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({
+          id: 'newer-decided',
+          status: 'rejected',
+          change: newerOwner,
+        }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.extractedProposal.create).data).toMatchObject({
+        automationKey: 'Cart > removes an item',
+      });
+    });
+
+    it('breaks a tie on the creation time by the code change id, skipping when the owner is the later one', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({ change: { id: 'change-3', createdAt: CURRENT } }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    });
+
+    it('breaks a tie on the creation time by the code change id, refreshing when the owner is the earlier one', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        storedProposal({ change: { id: 'change-1', createdAt: CURRENT } }),
+      ]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'older-1',
+        status: 'in_review',
+      });
+    });
+
+    it('makes no cross-push lookup when the creation time of the push is unknown', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [storedProposal()]);
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [extractedCase()],
+        jobContext({ codeChangeId: 'change-2' }),
+      );
+
+      expect(crossPushLookups(prisma)).toEqual([]);
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the lock that serializes writers of a file', () => {
+    it('takes a single advisory lock for the file, however many cases it holds, before reading any proposal', async () => {
+      const prisma = createPrisma();
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase({ automationKey: 'Cart > b' }),
+          extractedCase({ automationKey: 'Cart > a' }),
+          extractedCase({ automationKey: 'Cart > c' }),
+        ],
+        secondPush(),
+      );
+
+      expect(advisoryLocks(prisma)).toEqual([fileLockKey()]);
+
+      const [lockOrder] = prisma.$executeRawUnsafe.mock.invocationCallOrder;
+      const firstRead = Math.min(
+        ...prisma.extractedProposal.findMany.mock.invocationCallOrder,
+      );
+      expect(lockOrder).toBeLessThan(firstRead);
+    });
+
+    it('hashes the lock key to 64 bits inside the database and parametrizes it', async () => {
+      const prisma = createPrisma();
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.$executeRawUnsafe.mock.calls[0]).toEqual([
+        'SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))',
+        fileLockKey(),
+      ]);
+    });
+
+    it('scopes the lock to the project and the file, so two files never wait for each other', async () => {
+      const prisma = createPrisma();
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [extractedCase()],
+        secondPush({ filePath: 'src/other.spec.ts' }),
+      );
+
+      expect(advisoryLocks(prisma)).toEqual([fileLockKey('src/other.spec.ts')]);
+    });
+
+    it('takes no lock and writes nothing for an empty list of cases', async () => {
+      const prisma = createPrisma();
+      const writer = build(prisma, fakeEntitlement());
+
+      const persisted = await writer.persistExtracted([], secondPush());
+
+      expect(persisted).toBe(true);
+      expect(advisoryLocks(prisma)).toEqual([]);
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+      expect(crossPushLookups(prisma)).toEqual([]);
+    });
+
+    it('takes no lock and makes no cross-push lookup for sources that are not a push', async () => {
+      const prisma = createPrisma();
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [extractedCase()],
+        jobContext({ targetTestCaseId: 'case-1' }),
+      );
+
+      expect(advisoryLocks(prisma)).toEqual([]);
+      expect(prisma.extractedProposal.findMany).not.toHaveBeenCalled();
+    });
+
+    it('takes no lock when the credit spend is rejected', async () => {
+      const prisma = createPrisma();
+      const writer = build(
+        prisma,
+        fakeEntitlement(jest.fn().mockResolvedValue(false)),
+      );
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(advisoryLocks(prisma)).toEqual([]);
+    });
   });
 });

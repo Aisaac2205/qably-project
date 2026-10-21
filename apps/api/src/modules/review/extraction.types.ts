@@ -24,6 +24,10 @@ export interface JobContext {
   ref: string;
   connection: ConnectionInfo | null;
   codeChangeId: string | null;
+  // When the code change was recorded. A push persists out of order (two jobs
+  // at a time, retries with backoff), so this is what tells an older push from
+  // a newer one. Set for code-change jobs.
+  codeChangeCreatedAt?: Date;
   targetTestCaseId: string | null;
   knownSuiteId: string | null;
   onlyAutomationKey: string | null;
@@ -84,6 +88,7 @@ export interface TxClient extends PublishTestCaseVersionTx {
     findMany: PrismaService['extractedProposal']['findMany'];
     create: PrismaService['extractedProposal']['create'];
     update: PrismaService['extractedProposal']['update'];
+    updateMany: PrismaService['extractedProposal']['updateMany'];
     deleteMany: PrismaService['extractedProposal']['deleteMany'];
   };
   organization: {

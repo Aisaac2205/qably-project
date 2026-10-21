@@ -261,6 +261,7 @@ export class ExtractionProcessor {
         filePath: true,
         commitSha: true,
         evidenceId: true,
+        createdAt: true,
         project: {
           select: {
             organizationId: true,
@@ -288,6 +289,7 @@ export class ExtractionProcessor {
       ref: codeChange.commitSha,
       connection: codeChange.project.connection,
       codeChangeId: codeChange.id,
+      codeChangeCreatedAt: codeChange.createdAt,
       targetTestCaseId: null,
       knownSuiteId: null,
       onlyAutomationKey: null,
