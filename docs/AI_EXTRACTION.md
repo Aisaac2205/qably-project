@@ -557,7 +557,7 @@ The unit suite mocks Prisma, so it cannot exercise real Postgres transaction-abo
 
 The guard above only looks inside one code change (`codeChangeId + automationKey`), so it stops a redelivery and nothing else. Every push that touches a test file runs `code-change` extraction of the whole file again, and the model paraphrases the same tests a little differently each time. Without a second rule, a byte-identical re-push opened a second proposal for every case that was still waiting in the inbox.
 
-Before it creates anything, `ExtractedProposalWriter.persistExtracted` looks for an open proposal of the same case from an **earlier** code change (`findOpenProposalsFromEarlierPushes`, one `findMany` for the whole batch):
+Before it creates anything, `ExtractedProposalWriter.persistExtracted` looks for the open proposals of the same cases in **other** code changes (`findOpenProposalsOfOtherPushes`, one `findMany` for the whole batch):
 
 | Match | Value |
 |---|---|
@@ -568,26 +568,52 @@ Before it creates anything, `ExtractedProposalWriter.persistExtracted` looks for
 
 The file is part of the match on purpose. jest keys are `"describe it"` and can repeat in two files, so project and key alone could merge two different tests.
 
-When one is found the writer refreshes it instead of creating a new proposal. It writes the same fields the redelivery guard refreshes (title, steps, expected result, priority, locale, `targetTestCaseId`, and the evidence title, URI and excerpt) and also sets `codeChangeId` to the current code change, so the newest push owns the proposal. The inbox `batch` filter follows `codeChange.batchId`, so a refreshed proposal moves to the batch of the latest push. A refresh creates nothing, so it is not counted and `proposals.created` is not published for it; see [Proposal notifications](./PROPOSAL_NOTIFICATIONS.md).
+Each match is then sorted by the push that owns it, using `CodeChange.createdAt` (carried into the job as `JobContext.codeChangeCreatedAt`) and the code change `id` as the tie-break:
+
+- **Owned by an older push:** the newest such proposal is refreshed instead of creating a new one (below).
+- **Owned by a newer push:** the case is skipped. No proposal is created, refreshed or moved. The queue runs two jobs at a time and retries with an exponential backoff, so pushes persist out of order; without this, a late job for an older push would overwrite what the newer push wrote and move the proposal back.
+
+#### What a refresh writes
+
+A refresh is a conditional update, `updateMany({ where: { id, status: 'in_review' } })`, followed by the evidence update only when exactly one row matched. The read that found the proposal takes no row lock, and approving or rejecting a proposal does not take the file lock below, so a decision can commit between the read and the update. Matching on the id alone and writing `status` would put a decided proposal back in the inbox. If no row matches, the proposal was decided in the meantime: the case falls through to the normal path and opens a new proposal, the evidence is left alone, and a redelivery of the same push just skips it.
+
+It writes:
+
+| Where | Fields |
+|---|---|
+| Proposal | `projectId`, `suiteId`, `title`, `objective`, `preconditions`, `steps`, `expectedResult`, `priority`, `promptVersion`, `locale`, `targetTestCaseId`, and `observations` only when the new extraction has some |
+| Proposal (carry-over only) | `codeChangeId`, set to the current code change, so the newest push owns the proposal |
+| Evidence | `title`, `uri`, `excerpt` |
+
+It **never writes `status`**, `createdAt`, or the review decisions. A refresh creates nothing, so it is not counted and `proposals.created` is not published for it; see [Proposal notifications](./PROPOSAL_NOTIFICATIONS.md).
+
+#### Consequences to know about
+
+- **The detail shows the latest commit only.** The refresh overwrites the evidence, so the excerpt, the link and the text a reviewer sees are those of the newest push. The earlier text is not kept.
+- **The proposal moves to the newest batch.** The inbox `batch` filter follows `codeChange.batchId`, so a refreshed proposal is listed under the batch of the latest push. The `?batch=` link of an older push can show fewer proposals than its notification announced. The `proposals_ready` count of the newest push includes the proposals it carried over, because the processor recounts every proposal still in review in that batch.
+- **Classification stays stale until the reclassify job runs.** `duplicateKind`, `matchedCaseId`, `duplicateScore`, `duplicateReasons` and `classifiedAt` are not touched by a refresh. The reclassify job is queued after every persist and brings them up to date.
+- **A renamed or moved file opens a new proposal.** The file path is part of the match, so the same test in a new path is a new case, and the proposal of the old path stays open until someone rejects it.
 
 What the rule leaves alone:
 
 - **Decided proposals.** `approved`, `rejected` and `changes_requested` proposals of earlier pushes are not refreshed. A later push that still extracts the case opens a new one, as before.
 - **Duplicates that already exist.** Production holds pairs of open proposals for the same case. Only the newest (by `createdAt`, then `id`) is refreshed; the others stay as they are and need a manual clean-up.
-- **The same push.** A proposal that already belongs to the current code change keeps the redelivery behaviour above and is not moved.
+- **The same push.** A proposal that already belongs to the current code change keeps the redelivery behaviour above and is not moved. It is refreshed with the same conditional update.
 - **Other sources.** `document-case` proposals have no code change and are untouched.
 
 #### Why a lock instead of a unique index
 
-Two jobs for the same file can run at the same moment (the queue runs two at once), and each would read "no open proposal" before either wrote. A unique index on `(projectId, automationKey)` would close that, but the duplicate pairs already in production would make its migration fail. So the writer takes a transaction-scoped advisory lock per case before it reads:
+Two jobs for the same file could each read "no open proposal" before either wrote. In practice the persists of one organization already queue up: `AiEntitlementService.spendCredit` runs inside the persist transaction, and its `UPDATE` of the organization row holds that row lock until the transaction ends. The advisory lock is a safeguard on top of that, for the case where a persist path stops spending a credit or the work moves to a different transaction.
+
+A unique index would be the other way to close the gap, but it would have to be partial on `status = 'in_review'` and include the file path, and the file path lives on `code_change`, not on the proposal. The duplicate pairs already in production would also make its migration fail. So the writer takes a transaction-scoped advisory lock per file before it reads:
 
 ```sql
 SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
 ```
 
-`$1` is `JSON.stringify([projectId, filePath, automationKey])`. The keys of one batch are de-duplicated and locked in sorted order, so two jobs that share keys always take them in the same order and cannot deadlock. The lock is released when the persist transaction ends. It is taken only for code-change jobs, after the credit spend and before the first proposal read. A 64-bit hash collision would only make two unrelated cases wait for each other.
+`$1` is `JSON.stringify([projectId, filePath])`. A job extracts the whole file and writes all its cases together, so one lock per file serializes the same writers as one lock per case, in a single statement instead of one round trip per case. Because a transaction takes at most this one advisory lock, two jobs cannot wait on each other in a cycle. The lock is released when the persist transaction ends. It is taken only for code-change jobs that have cases to write, after the credit spend and before the first proposal read. A 64-bit hash collision would only make two unrelated files wait for each other.
 
-The unit suite mocks Prisma, so it asserts the lock statements, their order and their position before the reads; it cannot show that two real connections serialize. A Postgres integration test with two racing connections remains a recommended follow-up.
+The unit suite mocks Prisma, so it asserts the lock statement, its parameter and its position before the reads; it cannot show that two real connections serialize. A Postgres integration test with two racing connections remains a recommended follow-up.
 
 ### Deduplication within a batch
 

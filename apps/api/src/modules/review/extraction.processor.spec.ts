@@ -41,6 +41,7 @@ interface FakePrisma {
     findMany: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
     deleteMany: jest.Mock;
   };
   $transaction: jest.Mock;
@@ -101,6 +102,7 @@ function createPrisma(): FakePrisma {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: 'proposal-new' }),
       update: jest.fn().mockResolvedValue({ id: 'proposal-updated' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $transaction: jest.fn(),
@@ -447,6 +449,49 @@ describe('ExtractionProcessor — code-change job', () => {
     });
   });
 
+  it('hands the creation time of the code change to the writer, so an older push cannot undo a newer one', async () => {
+    const prisma = createPrisma();
+    const createdAt = new Date('2026-10-20T12:00:00.000Z');
+    prisma.codeChange.findUnique.mockResolvedValue({
+      ...codeChangeRow,
+      createdAt,
+    });
+    prisma.extractedProposal.findMany.mockImplementation(
+      (args: { where: Record<string, unknown> }) =>
+        Promise.resolve(
+          typeof args.where.codeChangeId === 'object'
+            ? [
+                {
+                  id: 'newer-owner',
+                  status: 'in_review',
+                  evidenceId: 'evidence-newer',
+                  automationKey: 'Cart > adds an item',
+                  codeChange: {
+                    id: 'change-9',
+                    createdAt: new Date('2026-10-20T14:00:00.000Z'),
+                  },
+                },
+              ]
+            : [],
+        ),
+    );
+    const extractor = fakeExtractor(
+      jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
+    );
+
+    await build(prisma, fakeSourceReader(), extractor).process({
+      data: { kind: 'code-change', codeChangeId: 'change-1' },
+    } as never);
+
+    expect(prisma.codeChange.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ createdAt: true }) as unknown,
+      }),
+    );
+    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
+  });
+
   it('does nothing when the model reports no tests found', async () => {
     const prisma = createPrisma();
     const extractor = fakeExtractor(
@@ -458,7 +503,7 @@ describe('ExtractionProcessor — code-change job', () => {
     } as never);
 
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
   });
 
   it('creates no manual-review proposal when the project has no connection', async () => {
@@ -716,8 +761,11 @@ describe('ExtractionProcessor — code-change job', () => {
     } as never);
 
     expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
-    const updateCall = lastCall(prisma.extractedProposal.update);
-    expect(updateCall.where).toEqual({ id: 'winner-proposal' });
+    const updateCall = lastCall(prisma.extractedProposal.updateMany);
+    expect(updateCall.where).toEqual({
+      id: 'winner-proposal',
+      status: 'in_review',
+    });
     expect(updateCall.data).toMatchObject({ title: 'First' });
     const secondCreateCall = lastCall(prisma.extractedProposal.create);
     expect(secondCreateCall.data).toMatchObject({
@@ -781,7 +829,7 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
     expect(prisma.evidence.update).not.toHaveBeenCalled();
   });
 
@@ -829,7 +877,7 @@ describe('ExtractionProcessor — code-change job', () => {
       data: { kind: 'code-change', codeChangeId: 'change-1' },
     } as never);
 
-    expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+    expect(prisma.extractedProposal.updateMany).not.toHaveBeenCalled();
     expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
     expect(prisma.evidence.update).not.toHaveBeenCalled();
   });
@@ -855,8 +903,11 @@ describe('ExtractionProcessor — code-change job', () => {
     expect(prisma.evidence.create).not.toHaveBeenCalled();
     const evidenceUpdateCall = lastCall(prisma.evidence.update);
     expect(evidenceUpdateCall.where).toEqual({ id: 'evidence-existing' });
-    const proposalUpdateCall = lastCall(prisma.extractedProposal.update);
-    expect(proposalUpdateCall.where).toEqual({ id: 'pending-proposal' });
+    const proposalUpdateCall = lastCall(prisma.extractedProposal.updateMany);
+    expect(proposalUpdateCall.where).toEqual({
+      id: 'pending-proposal',
+      status: 'in_review',
+    });
     expect(proposalUpdateCall.data).toMatchObject({
       title: 'Adds an item to the cart',
     });

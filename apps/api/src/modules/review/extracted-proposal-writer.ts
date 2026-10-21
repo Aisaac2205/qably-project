@@ -18,14 +18,33 @@ import type {
 
 const PROPOSAL_SAVEPOINT = 'extraction_proposal';
 
-// One lock per (project, file, key). The file is part of the key because jest
-// keys ("describe it") can repeat across files and must not serialize, or merge.
-function proposalLockKey(
-  projectId: string,
-  filePath: string,
-  automationKey: string,
-): string {
-  return JSON.stringify([projectId, filePath, automationKey]);
+// One lock per (project, file): a job writes the whole file's cases at once, so
+// a single statement serializes every writer of it. Two files never share one,
+// which matters because jest keys ("describe it") can repeat across files.
+function fileLockKey(projectId: string, filePath: string): string {
+  return JSON.stringify([projectId, filePath]);
+}
+
+// The open proposals other code changes of the same file own, split by whether
+// the push that owns them is older or newer than the one being persisted.
+interface OpenProposalsOfOtherPushes {
+  olderByKey: Map<string, ExistingProposal>;
+  newerKeys: Set<string>;
+}
+
+interface OtherPushProposalRow extends ExistingProposal {
+  automationKey: string | null;
+  codeChange: { id: string; createdAt: Date } | null;
+}
+
+function isNewerPush(
+  other: { id: string; createdAt: Date },
+  current: { id: string; createdAt: Date },
+): boolean {
+  const byTime = other.createdAt.getTime() - current.createdAt.getTime();
+  if (byTime !== 0) return byTime > 0;
+
+  return other.id > current.id;
 }
 
 @Injectable()
@@ -72,8 +91,8 @@ export class ExtractedProposalWriter {
         if (pending !== null) return true;
       }
 
-      if (ctx.codeChangeId !== null) {
-        await this.lockProposalKeys(tx, ctx, automationKeys);
+      if (ctx.codeChangeId !== null && cases.length > 0) {
+        await this.lockFile(tx, ctx);
       }
 
       const suiteId =
@@ -95,13 +114,17 @@ export class ExtractedProposalWriter {
               automationKeys,
             );
 
-      const openProposalByKey =
-        ctx.codeChangeId === null
-          ? new Map<string, ExistingProposal>()
-          : await this.findOpenProposalsFromEarlierPushes(
+      // Without the creation time of this push there is no telling an older
+      // push from a newer one, so nothing is carried over.
+      const otherPushes =
+        ctx.codeChangeId === null ||
+        ctx.codeChangeCreatedAt === undefined ||
+        cases.length === 0
+          ? null
+          : await this.findOpenProposalsOfOtherPushes(
               tx,
               ctx,
-              ctx.codeChangeId,
+              { id: ctx.codeChangeId, createdAt: ctx.codeChangeCreatedAt },
               automationKeys,
             );
 
@@ -139,22 +162,29 @@ export class ExtractedProposalWriter {
           const inThisChange = existingProposalByKey.get(
             testCase.automationKey,
           );
-          const fromEarlierPush =
-            inThisChange === undefined
-              ? openProposalByKey.get(testCase.automationKey)
-              : undefined;
 
-          if (fromEarlierPush !== undefined) {
-            await this.carryOverOpenProposal(
-              tx,
-              ctx,
-              testCase,
-              fromEarlierPush,
-              matchedCaseId,
-              uri,
-              shared,
+          if (inThisChange === undefined && otherPushes !== null) {
+            // A newer push already owns an open proposal for this case: this
+            // job ran late and has nothing to add. Writing would undo it.
+            if (otherPushes.newerKeys.has(testCase.automationKey)) continue;
+
+            const fromEarlierPush = otherPushes.olderByKey.get(
+              testCase.automationKey,
             );
-            continue;
+            if (
+              fromEarlierPush !== undefined &&
+              (await this.carryOverOpenProposal(
+                tx,
+                ctx,
+                testCase,
+                fromEarlierPush,
+                matchedCaseId,
+                uri,
+                shared,
+              ))
+            ) {
+              continue;
+            }
           }
 
           const created = await this.upsertCodeChangeProposal(
@@ -328,75 +358,85 @@ export class ExtractedProposalWriter {
   }
 
   /**
-   * Serializes concurrent writers of the same test case. Two pushes that touch
-   * one file run two jobs that would each read "no open proposal" and each
-   * create one, and no unique index can stop that: production already holds
-   * duplicate pairs, so the index would not build.
+   * Serializes the writers of one file. Two pushes that touch it run two jobs
+   * that would each read "no open proposal" and each create one, and a unique
+   * index cannot stop that: it would have to be partial on `in_review` and
+   * include the file path, which lives on `code_change`, and production already
+   * holds duplicate pairs it could not be built over.
    *
-   * The lock lives for the rest of the transaction. Keys are taken in sorted
-   * order, so two jobs that share keys can never wait on each other in a cycle.
-   * Postgres hashes each key to 64 bits; a collision only makes two unrelated
-   * cases wait for one another.
+   * Persists of one organization already queue up behind the row lock that
+   * `spendCredit` takes, so this is a safeguard on top of it, not the only
+   * thing standing between two jobs. Approvals and rejections take neither.
+   *
+   * The lock lives for the rest of the transaction. Postgres hashes the key to
+   * 64 bits; a collision only makes two unrelated files wait for one another.
    */
-  private async lockProposalKeys(
-    tx: TxClient,
-    ctx: JobContext,
-    automationKeys: readonly string[],
-  ): Promise<void> {
-    const lockKeys = [
-      ...new Set(
-        automationKeys.map((automationKey) =>
-          proposalLockKey(ctx.projectId, ctx.filePath, automationKey),
-        ),
-      ),
-    ].sort();
-
-    for (const lockKey of lockKeys) {
-      await tx.$executeRawUnsafe(
-        'SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))',
-        lockKey,
-      );
-    }
+  private async lockFile(tx: TxClient, ctx: JobContext): Promise<void> {
+    await tx.$executeRawUnsafe(
+      'SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))',
+      fileLockKey(ctx.projectId, ctx.filePath),
+    );
   }
 
   /**
-   * The newest proposal still in review for each key, from any earlier code
-   * change of the same project and source file. When duplicates exist the older
-   * ones are not returned, so they stay as they are for the owner to clean up.
+   * The proposals still in review that other code changes of the same project
+   * and file own, for these keys.
+   *
+   * `olderByKey` holds, per key, the newest proposal owned by a push older than
+   * this one: the one to refresh. When duplicates exist the others stay as they
+   * are for the owner to clean up. `newerKeys` holds the keys a newer push owns
+   * already. The queue runs two jobs at a time and retries with a backoff, so
+   * pushes persist out of order, and this job must not undo a newer one.
    */
-  async findOpenProposalsFromEarlierPushes(
+  async findOpenProposalsOfOtherPushes(
     tx: TxClient,
     ctx: JobContext,
-    codeChangeId: string,
+    current: { id: string; createdAt: Date },
     automationKeys: readonly string[],
-  ): Promise<Map<string, ExistingProposal>> {
+  ): Promise<OpenProposalsOfOtherPushes> {
     const rows = (await tx.extractedProposal.findMany({
       where: {
         projectId: ctx.projectId,
         automationKey: { in: [...automationKeys] },
         status: 'in_review',
-        codeChangeId: { not: codeChangeId },
+        codeChangeId: { not: current.id },
         codeChange: { filePath: ctx.filePath },
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      select: { id: true, status: true, evidenceId: true, automationKey: true },
-    })) as (ExistingProposal & { automationKey: string | null })[];
+      select: {
+        id: true,
+        status: true,
+        evidenceId: true,
+        automationKey: true,
+        codeChange: { select: { id: true, createdAt: true } },
+      },
+    })) as OtherPushProposalRow[];
 
-    const newestByKey = new Map<string, ExistingProposal>();
+    const found: OpenProposalsOfOtherPushes = {
+      olderByKey: new Map(),
+      newerKeys: new Set(),
+    };
+
     for (const row of rows) {
-      if (row.automationKey === null || newestByKey.has(row.automationKey)) {
-        continue;
+      if (row.automationKey === null || row.codeChange === null) continue;
+
+      if (isNewerPush(row.codeChange, current)) {
+        found.newerKeys.add(row.automationKey);
+      } else if (!found.olderByKey.has(row.automationKey)) {
+        found.olderByKey.set(row.automationKey, row);
       }
-      newestByKey.set(row.automationKey, row);
     }
 
-    return newestByKey;
+    return found;
   }
 
   /**
    * Refreshes the open proposal of an earlier push and hands it to this code
    * change, so the newest push owns it (the inbox batch filter follows
    * `codeChange.batchId`). Nothing is created, so nothing is announced.
+   *
+   * Returns false when the proposal is no longer in review: someone decided it
+   * after it was read, and the caller opens a new one instead.
    */
   async carryOverOpenProposal(
     tx: TxClient,
@@ -406,8 +446,8 @@ export class ExtractedProposalWriter {
     matchedCaseId: string | null,
     uri: string,
     shared: SharedProposalFields,
-  ): Promise<void> {
-    await this.refreshOpenProposal(
+  ): Promise<boolean> {
+    return this.refreshOpenProposal(
       tx,
       ctx,
       testCase,
@@ -512,7 +552,7 @@ export class ExtractedProposalWriter {
       return;
     }
 
-    await this.refreshOpenProposal(
+    const refreshed = await this.refreshOpenProposal(
       tx,
       ctx,
       testCase,
@@ -522,8 +562,24 @@ export class ExtractedProposalWriter {
       shared,
       {},
     );
+
+    if (!refreshed) {
+      this.logger.log(
+        `Skipping redelivered extraction for proposal ${existing.id}: it was decided in the meantime`,
+      );
+    }
   }
 
+  /**
+   * Writes the extraction onto a proposal that is still in review, and only
+   * then onto its evidence. The update is conditional on `in_review` because
+   * the read that found the proposal took no row lock, and an approval or a
+   * rejection can commit before this runs; matching on the id alone, and
+   * writing the status, would put a decided proposal back in the inbox.
+   *
+   * The status is never written. Returns false, and touches nothing else, when
+   * the proposal is no longer in review.
+   */
   private async refreshOpenProposal(
     tx: TxClient,
     ctx: JobContext,
@@ -533,16 +589,22 @@ export class ExtractedProposalWriter {
     uri: string,
     shared: SharedProposalFields,
     ownership: { codeChangeId?: string | null },
-  ): Promise<void> {
+  ): Promise<boolean> {
+    const fields: Partial<SharedProposalFields> = { ...shared };
+    delete fields.status;
+
+    const updated = await tx.extractedProposal.updateMany({
+      where: { id: existing.id, status: 'in_review' },
+      data: { ...fields, targetTestCaseId: matchedCaseId, ...ownership },
+    });
+    if (updated.count !== 1) return false;
+
     await tx.evidence.update({
       where: { id: existing.evidenceId },
       data: { title: ctx.filePath, uri, excerpt: testCase.sourceExcerpt },
     });
 
-    await tx.extractedProposal.update({
-      where: { id: existing.id },
-      data: { ...shared, targetTestCaseId: matchedCaseId, ...ownership },
-    });
+    return true;
   }
 
   async resolveSuiteId(
