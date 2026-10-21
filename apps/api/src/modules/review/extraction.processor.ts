@@ -7,13 +7,17 @@ import {
 } from '@qably/types';
 import { assertNever } from '../../common/assert-never';
 import { EncryptionService } from '../../common/crypto/encryption.service';
+import { InjectEnv } from '../../config/config.tokens';
+import type { Env } from '../../config/env';
 import { isUniqueViolation } from '../../prisma/is-unique-violation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import { AiEntitlementService } from '../ai/ai-entitlement.service';
 import { TEST_CASE_EXTRACTOR } from '../ai/ai.tokens';
+import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import {
   CASE_LIMITS,
+  MAX_EXTRACTED_CASES,
   SUITE_LIMITS,
   type ExtractedCase,
   type ExtractedSuite,
@@ -34,6 +38,7 @@ import {
   summarizeUnmatchedTargets,
 } from './document-file-diagnostics';
 import { detectLanguage } from './lib/detect-language';
+import { fingerprintSource } from './lib/source-fingerprint';
 import {
   isSameDocumentation,
   type DocumentationStateWrite,
@@ -86,6 +91,17 @@ const SUITE_SUMMARY_SAVEPOINT = 'suite_summary_metadata';
 const SUITE_SUMMARY_MAX_CASES = 60;
 const SUITE_TAG_CAP = SUITE_LIMITS.tags;
 const SUITE_STATES_FOR_SUMMARY = ['active', 'draft'] as const;
+
+interface SourceFingerprint {
+  codeChangeId: string;
+  sourceHash: string;
+}
+
+interface PushStamp {
+  id: string;
+  sourceHash: string | null;
+  extractedAt: Date | null;
+}
 
 function unmatchedReasonFor(sourceTruncated: boolean): string {
   return sourceTruncated ? SOURCE_TRUNCATED_REASON : NO_MATCHING_CASE_REASON;
@@ -195,6 +211,7 @@ export class ExtractionProcessor {
     private readonly testFileLocator: TestFileLocator,
     private readonly failureRecorder: ExtractionFailureRecorder,
     private readonly proposalWriter: ExtractedProposalWriter,
+    @InjectEnv() private readonly env: Env,
   ) {}
 
   async process(job: Job<ExtractionJobData>): Promise<void> {
@@ -1275,6 +1292,9 @@ export class ExtractionProcessor {
         ? undefined
         : this.encryption.decrypt(ctx.connection.encryptedAccessToken);
 
+    const sourceLimit = await this.entitlement.maxSourceCharacters(
+      ctx.organizationId,
+    );
     const source = await this.sourceReader.read({
       provider: ctx.connection.provider,
       owner,
@@ -1282,9 +1302,7 @@ export class ExtractionProcessor {
       ref: ctx.ref,
       path: normalizeAutomationFilePath(ctx.filePath, repo),
       accessToken,
-      maxContentLength: await this.entitlement.maxSourceCharacters(
-        ctx.organizationId,
-      ),
+      maxContentLength: sourceLimit,
     });
 
     if (source.kind === 'unavailable') {
@@ -1296,6 +1314,33 @@ export class ExtractionProcessor {
       this.logger.warn(
         describeTruncatedSource(ctx.filePath, source.content.length),
       );
+    }
+
+    const locale = resolveLocale(ctx.locale);
+
+    // A push re-reads every test file it touches, changed or not. When the push
+    // recorded right before this one extracted exactly the same text, with the
+    // same prompt, model, locale and truncation, the model has nothing new to
+    // say, so the job ends before it spends the daily budget, a model call or a
+    // credit. Document requests are explicit and always run.
+    const fingerprint: SourceFingerprint | null =
+      ctx.codeChangeId === null
+        ? null
+        : {
+            codeChangeId: ctx.codeChangeId,
+            sourceHash: fingerprintSource({
+              promptVersion: EXTRACTION_PROMPT_VERSION,
+              model: this.extractorIdentity(),
+              locale,
+              truncationLimit: source.truncated ? sourceLimit : null,
+              content: source.content,
+            }),
+          };
+    if (
+      fingerprint !== null &&
+      (await this.skipUnchangedSource(ctx, fingerprint))
+    ) {
+      return;
     }
 
     // See the equivalent guard in runDocumentFileExtractionUnsafe: don't
@@ -1310,8 +1355,6 @@ export class ExtractionProcessor {
       );
       return;
     }
-
-    const locale = resolveLocale(ctx.locale);
 
     const { outcome, incomplete, declarationCount } =
       await this.extractWithDeclarationRetry(
@@ -1374,6 +1417,166 @@ export class ExtractionProcessor {
       await this.failureRecorder.recordExtractionFailure(
         ctx,
         NOT_ENTITLED_REASON,
+      );
+      return;
+    }
+
+    if (fingerprint === null) return;
+
+    // A file that hit the case cap lost cases the model could not return, so
+    // it must be extracted again next time instead of being taken for done.
+    // The count that matters is the model's own, before duplicates are merged.
+    // (Targeted extraction removes the cap; until then this is the only signal
+    // that is exact: a regex count of declarations overcounts.)
+    if (outcome.cases.length >= MAX_EXTRACTED_CASES) {
+      this.logger.log(
+        `Extraction of ${ctx.filePath} reached the ${String(MAX_EXTRACTED_CASES)}-case cap: leaving it unstamped so the next push extracts it again`,
+      );
+      return;
+    }
+
+    await this.stampExtraction(fingerprint);
+  }
+
+  /**
+   * Ends a code-change job whose file is identical to what the push recorded
+   * right before it extracted, under the same prompt, model, locale and
+   * truncation.
+   *
+   * Only the previous push of this file counts, never "the newest extraction
+   * overall": pushes persist out of order, so a revert (A, B, A) must not be
+   * matched with the first A while B is still in flight or in its retry
+   * backoff. That push holds its hash but no `extractedAt`, which is enough to
+   * stop the skip. Comparing by `createdAt`, which the database wrote, also
+   * keeps the order off the worker clocks.
+   *
+   * A skipped push is stamped as extracted too, because its proposals are
+   * exactly those of the push it matched. A job delivered again after its own
+   * extraction finished finds its own stamp and ends without writing.
+   *
+   * The check never blocks an extraction. If the lookup or the write fails,
+   * the job carries on and pays for the call it could have skipped.
+   */
+  private async skipUnchangedSource(
+    ctx: JobContext,
+    fingerprint: SourceFingerprint,
+  ): Promise<boolean> {
+    const { codeChangeId, sourceHash } = fingerprint;
+
+    try {
+      const { own, previous } = await this.findPreviousPush(ctx, codeChangeId);
+
+      if (
+        own !== null &&
+        own.extractedAt !== null &&
+        own.sourceHash === sourceHash
+      ) {
+        this.logger.log(
+          `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: this push was already extracted`,
+        );
+        return true;
+      }
+
+      if (
+        previous !== null &&
+        previous.extractedAt !== null &&
+        previous.sourceHash === sourceHash
+      ) {
+        await this.prisma.codeChange.updateMany({
+          where: { id: codeChangeId },
+          data: { sourceHash, extractedAt: new Date() },
+        });
+        this.logger.log(
+          `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: unchanged since the previous push`,
+        );
+        return true;
+      }
+
+      // The stamp goes with the old hash. A push delivered again under another
+      // prompt, model, locale or limit would otherwise keep it next to the new
+      // hash even if this extraction fails, finds nothing or hits the cap, and
+      // the next identical push would skip a version never extracted.
+      await this.prisma.codeChange.updateMany({
+        where: { id: codeChangeId },
+        data: { sourceHash, extractedAt: null },
+      });
+      return false;
+    } catch (error) {
+      this.logger.warn(
+        `Could not compare ${ctx.filePath} with its last extraction, extracting anyway: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * This push's own row and the one recorded right before it for the same file.
+   * One query: the own row sorts first, since everything else is older. When
+   * the job does not know when its push was recorded there is no telling what
+   * came before it, so only its own row is read.
+   */
+  private async findPreviousPush(
+    ctx: JobContext,
+    codeChangeId: string,
+  ): Promise<{ own: PushStamp | null; previous: PushStamp | null }> {
+    const createdAt = ctx.codeChangeCreatedAt;
+
+    const rows: PushStamp[] = await this.prisma.codeChange.findMany({
+      where: {
+        projectId: ctx.projectId,
+        filePath: ctx.filePath,
+        ...(createdAt === undefined
+          ? { id: codeChangeId }
+          : {
+              OR: [
+                { id: codeChangeId },
+                { createdAt: { lt: createdAt } },
+                { createdAt, id: { lt: codeChangeId } },
+              ],
+            }),
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 2,
+      select: { id: true, sourceHash: true, extractedAt: true },
+    });
+
+    return {
+      own: rows.find((row) => row.id === codeChangeId) ?? null,
+      previous: rows.find((row) => row.id !== codeChangeId) ?? null,
+    };
+  }
+
+  /**
+   * What answers, for the fingerprint. The class name stands in for the model
+   * when the bound extractor is not the Gemini one (disabled, or a fake), so a
+   * swap of extractor re-extracts too.
+   */
+  private extractorIdentity(): string {
+    return `${this.extractor.constructor.name}:${this.env.GEMINI_MODEL}`;
+  }
+
+  /**
+   * Marks the file version as extracted, once its proposals are saved. Written
+   * with the hash so a row never carries one without the other. The proposals
+   * are already committed, so a failure here only costs the next identical push
+   * one repeated extraction and must not fail, and so retry, the job.
+   */
+  private async stampExtraction(fingerprint: SourceFingerprint): Promise<void> {
+    try {
+      await this.prisma.codeChange.updateMany({
+        where: { id: fingerprint.codeChangeId },
+        data: {
+          sourceHash: fingerprint.sourceHash,
+          extractedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not record the extraction of code change ${fingerprint.codeChangeId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
     }
   }

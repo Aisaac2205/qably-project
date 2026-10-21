@@ -452,9 +452,17 @@ model CodeChange {
   createdAt         DateTime            @default(now())
   proposals         ExtractedProposal[]
 
+  // Fingerprint of what the extraction read (see source-fingerprint.ts), and
+  // when this file version was last accounted for by a successful extraction.
+  // `extractedAt` is also set on a change whose extraction was skipped because
+  // the previous successful one had the same fingerprint.
+  sourceHash  String?
+  extractedAt DateTime?
+
   @@unique([batchId, filePath])
   @@index([projectId])
   @@index([batchId])
+  @@index([projectId, filePath])
   @@map("code_change")
 }
 
