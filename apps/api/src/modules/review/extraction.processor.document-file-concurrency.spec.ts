@@ -8,6 +8,7 @@ import type { TestFileLocator } from '../repository/test-file-locator';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
 import { ExtractionProcessor } from './extraction.processor';
+import { RetryableTransactionConflictError } from './lib/transient-transaction-conflict';
 
 /**
  * How a document-file job behaves next to the other writers of a test case:
@@ -246,6 +247,29 @@ describe('ExtractionProcessor — document-file lock order', () => {
     });
   });
 
+  it('looks for pending proposals inside the transaction, after the lock, with the rule the suite shows', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    expect(tx.extractedProposal.findMany).toHaveBeenCalledWith({
+      where: {
+        status: 'in_review',
+        needsManualReview: false,
+        OR: [
+          { targetTestCaseId: { in: ['case-1', 'case-2'] } },
+          { matchedCaseId: { in: ['case-1', 'case-2'] } },
+        ],
+      },
+      select: { targetTestCaseId: true, matchedCaseId: true },
+    });
+    const [pendingOrder] =
+      tx.extractedProposal.findMany.mock.invocationCallOrder;
+    expect(pendingOrder).toBeGreaterThan(lockCallOrder(tx));
+  });
+
   it('does not lock or read the cases when the organization has no credit left', async () => {
     const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
     const prisma = createPrisma(tx);
@@ -259,5 +283,177 @@ describe('ExtractionProcessor — document-file lock order', () => {
     expect(tx.$executeRawUnsafe).not.toHaveBeenCalled();
     expect(tx.testCase.findMany).not.toHaveBeenCalled();
     expect(tx.testCaseVersion.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExtractionProcessor — document-file write-time pending check', () => {
+  it('skips a case that got a proposal in review after the job was queued', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: 'case-1', matchedCaseId: null },
+    ]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    expect(publishedCaseIds(tx)).toEqual(['case-2']);
+    expect(caseWrite(tx, 'case-1')).toMatchObject({
+      documentationOutcome: 'skipped',
+      documentationSkipReason: 'already-pending',
+      documentationQueuedAt: null,
+    });
+  });
+
+  it('skips a case a possible duplicate in review was matched to', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.extractedProposal.findMany.mockResolvedValue([
+      { targetTestCaseId: null, matchedCaseId: 'case-2' },
+    ]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    expect(publishedCaseIds(tx)).toEqual(['case-1']);
+    expect(caseWrite(tx, 'case-2')).toMatchObject({
+      documentationOutcome: 'skipped',
+      documentationSkipReason: 'already-pending',
+    });
+  });
+
+  it('still documents every case when nothing is waiting for review', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await processor.process(documentFileJob());
+
+    expect(publishedCaseIds(tx)).toEqual(['case-1', 'case-2']);
+  });
+});
+
+describe('ExtractionProcessor — documentation jobs that lose a transaction conflict', () => {
+  function deadlock(): Error {
+    return Object.assign(new Error('deadlock detected'), {
+      name: 'DriverAdapterError',
+      cause: {
+        kind: 'postgres',
+        code: '40P01',
+        originalCode: '40P01',
+        originalMessage: 'deadlock detected',
+      },
+    });
+  }
+
+  function failureWrites(prisma: FakePrisma): Record<string, unknown>[] {
+    return (
+      prisma.testCase.updateMany.mock.calls as [
+        { data: Record<string, unknown> },
+      ][]
+    )
+      .map(([call]) => call.data)
+      .filter((data) => data.documentationOutcome === 'failed');
+  }
+
+  it('throws a retryable error so the queue runs a deadlocked document-file job again', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.testCase.update.mockRejectedValue(deadlock());
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await expect(processor.process(documentFileJob())).rejects.toBeInstanceOf(
+      RetryableTransactionConflictError,
+    );
+    expect(failureWrites(prisma)).toEqual([]);
+  });
+
+  it('retries a serialization failure the same way', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.$executeRawUnsafe.mockRejectedValue(
+      Object.assign(new Error('write conflict'), { code: 'P2034' }),
+    );
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await expect(processor.process(documentFileJob())).rejects.toBeInstanceOf(
+      RetryableTransactionConflictError,
+    );
+  });
+
+  it('records the failure on the last attempt instead of retrying forever', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.testCase.update.mockRejectedValue(deadlock());
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await expect(
+      processor.process(documentFileJob({ attemptsStarted: 3, attempts: 3 })),
+    ).resolves.toBeUndefined();
+    expect(failureWrites(prisma)).toEqual([
+      expect.objectContaining({ documentationSkipReason: 'extraction-failed' }),
+    ]);
+  });
+
+  it('keeps recording any other unexpected error as a failure', async () => {
+    const tx = createTx([caseRow('case-1'), caseRow('case-2')]);
+    tx.testCase.update.mockRejectedValue(new Error('boom'));
+    const prisma = createPrisma(tx);
+    const { processor } = build(prisma);
+
+    await expect(processor.process(documentFileJob())).resolves.toBeUndefined();
+    expect(failureWrites(prisma)).toHaveLength(1);
+  });
+
+  describe('document-case', () => {
+    function documentCaseJob(attempt = { attemptsStarted: 1, attempts: 3 }) {
+      return {
+        data: { kind: 'document-case', testCaseId: 'case-1' },
+        attemptsStarted: attempt.attemptsStarted,
+        opts: { attempts: attempt.attempts },
+      } as never;
+    }
+
+    function documentCasePrisma() {
+      const prisma = createPrisma(createTx([]));
+      prisma.testCase.findUnique.mockResolvedValue({
+        id: 'case-1',
+        projectId: 'project-1',
+        suiteId: 'suite-1',
+        name: 'Old case-1',
+        automationKey: 'Cart > adds an item',
+        automationFilePath: FILE_PATH,
+        automationClassName: null,
+        suite: { name: 'Cart' },
+        project: { organizationId: 'org-1', connection },
+      });
+      return prisma;
+    }
+
+    it('throws a retryable error when persisting its proposal deadlocks', async () => {
+      const prisma = documentCasePrisma();
+      const { processor } = build(prisma);
+      jest
+        .spyOn(processor['proposalWriter'], 'persistExtracted')
+        .mockRejectedValue(deadlock());
+
+      await expect(processor.process(documentCaseJob())).rejects.toBeInstanceOf(
+        RetryableTransactionConflictError,
+      );
+      expect(failureWrites(prisma)).toEqual([]);
+    });
+
+    it('records the failure on the last attempt', async () => {
+      const prisma = documentCasePrisma();
+      const { processor } = build(prisma);
+      jest
+        .spyOn(processor['proposalWriter'], 'persistExtracted')
+        .mockRejectedValue(deadlock());
+
+      await expect(
+        processor.process(documentCaseJob({ attemptsStarted: 3, attempts: 3 })),
+      ).resolves.toBeUndefined();
+      expect(failureWrites(prisma)).toHaveLength(1);
+    });
   });
 });

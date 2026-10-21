@@ -45,6 +45,15 @@ import {
   type PublishTestCaseVersionFields,
 } from './lib/publish-test-case-version';
 import { publishWithNameFallback } from './lib/publish-with-name-fallback';
+import {
+  PENDING_PROPOSAL_CASES_SELECT,
+  casesWithPendingProposal,
+  pendingProposalsWhere,
+} from './lib/pending-proposals';
+import {
+  RetryableTransactionConflictError,
+  isTransientTransactionConflict,
+} from './lib/transient-transaction-conflict';
 import { normalizeAutomationKey } from './lib/normalize-automation-key';
 import { testCaseUniqueConstraint } from './lib/test-case-unique-constraint';
 import {
@@ -685,6 +694,15 @@ export class ExtractionProcessor {
       await this.runDocumentFileExtractionUnsafe(ctx);
     } catch (error) {
       if (error instanceof RetryableProviderError) throw error;
+      if (!ctx.isFinalAttempt && isTransientTransactionConflict(error)) {
+        this.logger.warn(
+          `Document-file extraction for ${ctx.filePath} lost a transaction conflict; the queue will retry it`,
+        );
+        throw new RetryableTransactionConflictError(
+          `documenting ${ctx.filePath}`,
+          error,
+        );
+      }
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Document-file extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,
@@ -1086,7 +1104,19 @@ export class ExtractionProcessor {
       });
       const caseInfoById = new Map(caseRows.map((row) => [row.id, row]));
 
+      // The enqueue already left out cases waiting for review, but a push or
+      // a document-case job can create a proposal while this job is queued.
+      // Rechecked under the lock: documenting now would publish over a
+      // version the reviewer is about to compare against.
+      const pendingCaseIds = casesWithPendingProposal(
+        await tx.extractedProposal.findMany({
+          where: pendingProposalsWhere(caseIds),
+          select: PENDING_PROPOSAL_CASES_SELECT,
+        }),
+      );
+
       let skippedForHumanEdit = 0;
+      let skippedForPendingProposal = 0;
       let skippedForIdenticalRedelivery = 0;
       const suiteIds = new Set<string>();
 
@@ -1108,6 +1138,21 @@ export class ExtractionProcessor {
             data: humanSkipState,
           });
           skippedForHumanEdit += 1;
+          continue;
+        }
+
+        if (pendingCaseIds.has(target.testCaseId)) {
+          const pendingSkipState: DocumentationStateWrite = {
+            documentationOutcome: 'skipped',
+            documentationSkipReason: 'already-pending',
+            documentationOutcomeAt: new Date(),
+            documentationQueuedAt: null,
+          };
+          await tx.testCase.update({
+            where: { id: target.testCaseId },
+            data: pendingSkipState,
+          });
+          skippedForPendingProposal += 1;
           continue;
         }
 
@@ -1177,6 +1222,12 @@ export class ExtractionProcessor {
       if (skippedForHumanEdit > 0) {
         this.logger.log(
           `Skipped documenting ${skippedForHumanEdit} case(s) in ${ctx.filePath}: a human already edited their documentation`,
+        );
+      }
+
+      if (skippedForPendingProposal > 0) {
+        this.logger.log(
+          `Skipped documenting ${skippedForPendingProposal} case(s) in ${ctx.filePath}: a proposal for them is waiting for review`,
         );
       }
 
@@ -1265,6 +1316,21 @@ export class ExtractionProcessor {
       await this.runExtractionUnsafe(ctx);
     } catch (error) {
       if (error instanceof RetryableProviderError) throw error;
+      // Only a document-case job (the one with a target case) is retried
+      // here; a code-change job keeps its own failure handling.
+      if (
+        ctx.targetTestCaseId !== null &&
+        !ctx.isFinalAttempt &&
+        isTransientTransactionConflict(error)
+      ) {
+        this.logger.warn(
+          `Documenting case ${ctx.targetTestCaseId} lost a transaction conflict; the queue will retry it`,
+        );
+        throw new RetryableTransactionConflictError(
+          `documenting case ${ctx.targetTestCaseId}`,
+          error,
+        );
+      }
       const reason = error instanceof Error ? error.message : 'unknown-error';
       this.logger.error(
         `Extraction for ${ctx.filePath} failed unexpectedly: ${reason}`,

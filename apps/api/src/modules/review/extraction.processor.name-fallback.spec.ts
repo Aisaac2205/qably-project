@@ -113,8 +113,12 @@ function createPrisma(store: CaseNameStore) {
     $transaction: jest.fn(store.transaction),
   };
 
-  // The job reads its targets inside the transaction, once they are locked.
+  // The job reads its targets inside the transaction, once they are locked,
+  // and rechecks there that no proposal for them is waiting for review.
   Object.assign(store.tx.testCase, { findMany: prisma.testCase.findMany });
+  Object.assign(store.tx.extractedProposal, {
+    findMany: jest.fn().mockResolvedValue([]),
+  });
 
   return prisma;
 }
