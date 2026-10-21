@@ -50,7 +50,7 @@ Both target modes answer with `TARGETED_RESPONSE_JSON_SCHEMA` and cite the line 
 
 - Source content is capped per file (`SourceReader`, `apps/api/src/modules/repository/source-reader.ts`) at a size that depends on the organization's plan: **60,000 characters** on `gratuito` and `equipo`, **1,000,000** on `empresa`. Anything longer is truncated before it reaches the model. See "Source size is a plan limit" below.
 - `SourceReader` percent-encodes owner, repo, ref and each path segment when it builds the fetch URL, and `buildBlobUrl` does the same for the human-facing `Evidence.uri` shown to reviewers — a file path or branch name containing a space, `#` or other reserved character never breaks either link.
-- The model may return at most **20 cases** per file (`MAX_EXTRACTED_CASES`, `apps/api/src/modules/ai/extraction.contracts.ts`). The cap is enforced in code, not in the schema: `GeminiExtractor.toOutcome` keeps only the first `MAX_EXTRACTED_CASES` schema-valid cases and drops the rest with a `this.logger.warn` naming the file path and the number dropped — a warning distinct from the one it already logs for individually invalid cases. The Zod `extractionOutputSchema` (`z.array(extractedCaseSchema).max(MAX_EXTRACTED_CASES)`) carries the same bound, but it runs only in the integration and contract specs, never inside `toOutcome`; the live cap is the slice.
+- The model may return at most **20 cases** per call (`MAX_EXTRACTED_CASES`, `apps/api/src/modules/ai/extraction.contracts.ts`); a code-change job of a file the parser reads asks for at most 20 declarations per call and makes as many calls as it needs (see "Which tests of a file changed"). The cap is enforced in code, not in the schema: `GeminiExtractor.toOutcome` keeps only the first `MAX_EXTRACTED_CASES` schema-valid cases and drops the rest with a `this.logger.warn` naming the file path and the number dropped — a warning distinct from the one it already logs for individually invalid cases. The Zod `extractionOutputSchema` (`z.array(extractedCaseSchema).max(MAX_EXTRACTED_CASES)`) carries the same bound, but it runs only in the integration and contract specs, never inside `toOutcome`; the live cap is the slice.
 - Each case field is length-bounded (title ≤120, objective/expectedResult ≤500, steps 1–20 × ≤300, preconditions ≤10 × ≤300, sourceExcerpt ≤600, observations ≤5 × ≤200) and validated with Zod (`extractedCaseSchema`) before it is persisted. Over-long free text and over-long lists are repaired instead of dropped; see "Fields over the limit: repaired, not dropped" below. A case that still violates the schema is dropped, and the warning names the failing fields; it never fails the rest of the batch.
 - Those bounds live **only** in Zod and in `GeminiExtractor.toOutcome`, never in the JSON schema sent to the provider. `RESPONSE_JSON_SCHEMA` and `TARGETED_RESPONSE_JSON_SCHEMA` name the fields, the enum and the required list, and carry no array or string bounds at all — no `maxLength`, no `minLength`, no `maxItems`, no `minItems`, anywhere, including the top-level `cases` array — because Gemini compiles the response schema into a constrained-decoding automaton and rejects a bounded one as "too many states for serving" (HTTP 400; `gemini-3.1-flash-lite` reports it only as a generic `INVALID_ARGUMENT`). **Incident, 2026-09-26**: `TARGETED_RESPONSE_JSON_SCHEMA` added one optional property (`targetRef`) to the case item while `RESPONSE_JSON_SCHEMA.properties.cases` still carried a top-level `maxItems: 20` — that combination alone was enough to cross the state limit, so every targeted extraction (document-file jobs, "Volver a documentar con Aeris") returned HTTP 400 before generating a token, while the unit suite stayed green because it mocks the client and never calls the provider. The fix removed `maxItems` entirely and moved the cap into `GeminiExtractor.toOutcome`; the rule going forward is that a provider schema carries no bounds anywhere, and every bound lives in code. `gemini.response-schema.spec.ts`, `chat.response-schema.spec.ts` and `gemini.suite-summary-response-schema.spec.ts` each pin the same invariant for their own response schema, so a future "tighten the schema" change on any of the three cannot silently reintroduce it. The manual integration spec (`gemini.extractor.integration.spec.ts`) is the only check that validates schema acceptance against the real model — run it after any schema or prompt change, with a real `GEMINI_API_KEY` (see "Manual integration check" below).
 - `extractedCaseSchema` also rejects a case whose `title`, once trimmed, equals its `automationKey`: a model that falls back to echoing the reporter's runtime name as the human-facing title produces a case that `assessCaseDocumentation` (`packages/types/src/documentation-completeness.ts`) already treats as an undocumented title, so extraction now refuses to persist that shape in the first place instead of writing a "documented" case that the completeness rule would immediately flag as incomplete. `extractedCaseObjectSchema` (the same fields, without that cross-field check) is what `chat.contracts.ts`'s `suggestedCaseSchema` derives from via `.omit({ automationKey: true, sourceExcerpt: true })`, since a chat suggestion that carries no `automationKey` has nothing to compare the title against. `extractedCaseObjectSchema` stays strict: it applies the same limits but repairs nothing, so chat suggestions keep their previous behavior.
@@ -690,7 +690,7 @@ The previous push alone is compared, not "the newest successful extraction", bec
 
 - **A persist that created nothing still stamps.** When every case was refreshed or skipped (see "One open proposal per test case across pushes"), the push is accounted for.
 - **A truncated source still stamps.** Extracting it again cannot see more of the file.
-- **An extraction that hit the case cap does not stamp.** When the model returned `MAX_EXTRACTED_CASES` (20) cases, the file very likely holds more tests than the cap allowed, so the next push extracts it again. The signal is the model's own case count before duplicates are merged. A regex count of declarations is not used: it overcounts and would switch the skip off. Targeted extraction, which removes the cap, is the follow-up.
+- **An extraction that hit the case cap does not stamp.** When the model returned `MAX_EXTRACTED_CASES` (20) cases, the file very likely holds more tests than the cap allowed, so the next push extracts it again. The signal is the model's own case count before duplicates are merged. A regex count of declarations is not used: it overcounts and would switch the skip off. This applies to the whole-file extraction only: a file the parser reads is extracted in chunks of targets and stamped when every target came back (see "Which tests of a file changed").
 - **A job delivered again after its proposals were saved but the stamp failed** runs again and stamps this time.
 
 Design choices:
@@ -720,6 +720,60 @@ The fingerprint above only answers "did any byte of the file change". A push tha
 The `id` is local to the file: the describe path, the title (the raw source text of a title computed at runtime) and the position among the declarations that share that path and title, in source order. Line numbers are not part of it, so a test that only moved keeps its id and both of its hashes.
 
 It is written and cleared together with `extractedAt`, under the same rules: when an extraction is stamped, when a push is skipped as identical to the previous one (with `removed: []`, since nothing differs from the push it matched), and cleared when a push is about to be extracted again under a new fingerprint. A file the parser cannot read gets no snapshot: another language, a syntax error, a source cut at the plan limit (declarations past the cut would read as removed), or a file where the parser sees no test at all (a test function bound to another name, `const myTest = base.extend(...)`, is only visible to the model). Reading a stored value never fails: anything that is not a snapshot of the current version reads as missing.
+
+#### What goes to the model
+
+A `code-change` job whose file passed the gate above and that the parser reads (`readDeclaredFile` returns `declared`) no longer sends the whole file for a whole-file answer (`ExtractionProcessor.extractChangedDeclarations`):
+
+1. It finds the baseline (below) and compares (`diffDeclarations`). A declaration is **changed** when its id is new or its `bodyHash` or `contextHash` differs. When the file's `fileContextHash` differs, **every** declaration is changed: a top-level helper, hook or mock can change what any test does, and the parser does not know which tests use it. **Removed** declarations (in the baseline, gone now) are recorded in the snapshot and nothing is extracted for them; turning them into deprecation proposals is a separate task.
+2. **Nothing changed:** the job spends no daily budget, makes no model call, spends no credit and writes no proposal. It logs one line with the counts and stamps the push with its snapshot.
+3. **Something changed:** the changed declarations, in source order, are split into chunks of at most `MAX_EXTRACTED_CASES` (20). Each chunk is one model call in the target-declarations mode (see "Request shape"): the whole file as context, plus the chunk's declarations. A file with 45 changed tests makes 3 calls and is complete, where the whole-file request stopped at 20.
+4. The answers are mapped back to their declarations (`matchTargetedCases`) and the matched cases go through `ExtractedProposalWriter.persistExtracted` in one call, so the rules of "One open proposal per test case across pushes" apply unchanged.
+
+Files the parser does not read keep the whole-file extraction with its 20-case cap rule.
+
+#### The baseline
+
+The baseline is the code change of the same project, file **and branch** recorded right before this one (greatest `(createdAt, id)` strictly before it, the order of `findPreviousPush`):
+
+| That push | Baseline |
+|---|---|
+| Stamped, with a snapshot | The snapshot. |
+| Stamped, without a snapshot (extracted before this column existed, or through the whole-file path) | The file read again at that push's `commitSha` through the same `SourceReader` path and limit, then parsed: one extra read. If the read fails, is truncated or does not parse, there is no baseline. |
+| Not stamped (in flight, waiting out a retry, failed, incomplete) or absent | None: every declaration counts as changed, and `removed` is `null`. |
+
+Any lookup error also means no baseline, with a warning; it never blocks the extraction.
+
+The branch is the deliberate difference with the fingerprint gate. Pushes to a branch other than the default one are recorded but never extracted (`IngestionProcessor` only enqueues extraction for the default branch, or when it is unknown), so the push right before a merge is usually the branch push, never stamped: comparing with it would send the whole file on every merge, the scenario this feature exists for. Comparing with the previous push of the merge's own branch compares with what the catalog last saw there. The revert rule still holds within a branch: a push in flight on the same branch leaves the next one without a baseline. A push whose batch has no SCM event, and so no known branch, compares with the previous push of any branch. The branch comes from `CodeChange.batch.scmEvent.branch` and travels in `JobContext.codeChangeBranch`.
+
+#### Mapping the answer back
+
+The model's `title` is its own wording, so it cannot identify a test. Each returned case is tried in turn against the chunk's declarations:
+
+1. the `T{n}` tag it cites in `targetRef`, when no other case cites the same tag for a plain test (a table, `.each`/`.for`, takes one case per row);
+2. its `automationKey`, when it is exactly one declaration's describe chain and title (jest: joined by spaces; vitest: by `" > "`, after the file path and `"::"`), compared through `normalizeAutomationKey`;
+3. its `sourceExcerpt`, when the excerpt's longest line (8 characters or more) falls inside exactly one declaration's line span.
+
+A plain test takes one case. A case that matches no declaration (an unchanged test the model described anyway, or an invented one) is dropped and counted in a log line.
+
+The `automationKey` stays the one the model derives, as before: existing catalog keys were generated that way, and the parser's own key (`deriveAutomationKey`) needs a vitest `pathBase` the job does not know. Keys of existing cases do not change.
+
+#### Cost
+
+- **Daily budget:** one unit per model call, checked before each chunk, and only on the job's first attempt, like every other job. A retry after a retryable provider error re-runs every chunk without charging; the budget protects the platform key's quota per call, and a retry was already charged once.
+- **Credit:** one per job, spent when its proposals are saved, as before. A file with 45 changed tests costs one credit and three budget units; a file with no change costs neither. When at least one call answered but nothing in the answers matched a declaration, the credit is still spent (the call was paid for) and nothing is stamped.
+
+#### When the push is stamped
+
+Only when every changed declaration came back described. Otherwise what matched is saved, each saved case gets the observation "Aeris documented X of Y test cases requested in this run", and the push stays unstamped, so the next push of the file finds no stamped baseline and sends every declaration again. That covers a declaration the model skipped, a daily budget that ran out between chunks, and a provider failure on the final attempt. A retryable provider failure before the final attempt saves nothing and retries the whole job. There is no second round within the job for the declarations that did not come back.
+
+#### Trade-offs and limits
+
+- **Prompt, model and locale do not re-describe unchanged tests.** The fingerprint gate includes them, so a new prompt version (such as the move to `extraction-v13`) makes the next push of every file pass the gate once; for a file the parser reads, the comparison is on code only, so its unchanged tests stay as they are. A file the parser does not read is extracted whole again once.
+- **The file context is coarse.** A change to any top-level helper, hook, mock or constant sends every test of the file.
+- **A table can exceed a chunk.** The chunk holds at most 20 declarations, but a parametrized one is answered with one case per literal row, and the extractor keeps at most 20 cases per call. A chunk whose rows overflow loses cases, comes back incomplete and leaves the push unstamped.
+- **Removals across branches.** A push skipped as identical to an extracted push of another branch records `removed: []`, relative to that push, not to its own branch's baseline.
+- **Unit tests use in-memory stores.** `extraction.processor.change-detection.spec.ts` applies the real filters and order of the queries above and runs the real parser, with a fake extractor; it cannot show the behaviour of the real model on the target-declarations prompt. The manual integration spec does not cover that mode yet.
 
 ### Deduplication within a batch
 

@@ -24,11 +24,15 @@ import {
   type ExtractedSuite,
   type ExtractionInput,
   type ExtractionOutcome,
+  type ExtractionTargetDeclaration,
   type TestCaseExtractor,
 } from '../ai/extraction.contracts';
 import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildTargetManifest } from '../ai/target-reference';
-import { SourceReader } from '../repository/source-reader';
+import {
+  SourceReader,
+  type SourceReadResult,
+} from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
@@ -40,9 +44,13 @@ import {
 } from './document-file-diagnostics';
 import {
   buildDeclarationSnapshot,
+  diffDeclarations,
+  matchTargetedCases,
+  readDeclarationSnapshot,
   readDeclaredFile,
   type DeclarationSnapshot,
   type DeclaredFile,
+  type SnapshotDeclaration,
 } from './lib/change-detection';
 import { detectLanguage } from './lib/detect-language';
 import { fingerprintSource } from './lib/source-fingerprint';
@@ -133,6 +141,53 @@ function snapshotColumn(
   snapshot: DeclarationSnapshot | null,
 ): Prisma.InputJsonValue | typeof Prisma.DbNull {
   return snapshot === null ? Prisma.DbNull : snapshot;
+}
+
+/** The changed declarations, in source order, one model call's worth each. */
+function chunkTargets(
+  declarations: readonly SnapshotDeclaration[],
+): SnapshotDeclaration[][] {
+  const chunks: SnapshotDeclaration[][] = [];
+  for (
+    let start = 0;
+    start < declarations.length;
+    start += MAX_EXTRACTED_CASES
+  ) {
+    chunks.push(declarations.slice(start, start + MAX_EXTRACTED_CASES));
+  }
+  return chunks;
+}
+
+/** What the model is told about a declaration: its name and where it is. */
+function toTargetDeclaration(
+  declaration: SnapshotDeclaration,
+): ExtractionTargetDeclaration {
+  return {
+    describePath: declaration.describePath,
+    title: declaration.title,
+    startLine: declaration.startLine,
+    endLine: declaration.endLine,
+    parametrized: declaration.parametrized,
+  };
+}
+
+/**
+ * Tells the reviewer that the push's other requested tests did not come back,
+ * like the document-file note, on every case that has room for it.
+ */
+function withIncompleteTargetNote(
+  cases: readonly ExtractedCase[],
+  described: number,
+  requested: number,
+  locale: 'es' | 'en',
+): ExtractedCase[] {
+  const note = incompleteTargetNote(described, requested, locale);
+
+  return cases.map((testCase) => {
+    const observations = testCase.observations ?? [];
+    if (observations.length >= MAX_CASE_OBSERVATIONS) return testCase;
+    return { ...testCase, observations: [...observations, note] };
+  });
 }
 
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
@@ -317,6 +372,7 @@ export class ExtractionProcessor {
         commitSha: true,
         evidenceId: true,
         createdAt: true,
+        batch: { select: { scmEvent: { select: { branch: true } } } },
         project: {
           select: {
             organizationId: true,
@@ -337,6 +393,10 @@ export class ExtractionProcessor {
       return;
     }
 
+    // Optional chaining on purpose: the batch is required in the schema, but a
+    // missing branch must only cost the branch filter, never fail the job.
+    const branch = codeChange.batch?.scmEvent?.branch ?? null;
+
     await this.runExtraction({
       projectId: codeChange.projectId,
       organizationId: codeChange.project.organizationId,
@@ -345,6 +405,7 @@ export class ExtractionProcessor {
       connection: codeChange.project.connection,
       codeChangeId: codeChange.id,
       codeChangeCreatedAt: codeChange.createdAt,
+      codeChangeBranch: branch,
       targetTestCaseId: null,
       knownSuiteId: null,
       onlyAutomationKey: null,
@@ -1522,6 +1583,30 @@ export class ExtractionProcessor {
       return;
     }
 
+    // For a file the parser reads, only the declarations that are new or
+    // changed since the baseline push go to the model, as explicit targets.
+    // Every other file keeps the whole-file extraction below.
+    if (fingerprint !== null && declared !== null) {
+      const connection = ctx.connection;
+      await this.extractChangedDeclarations(ctx, {
+        fingerprint,
+        declared,
+        content: source.content,
+        locale,
+        readAt: (ref) =>
+          this.sourceReader.read({
+            provider: connection.provider,
+            owner,
+            repo,
+            ref,
+            path: normalizeAutomationFilePath(ctx.filePath, repo),
+            accessToken,
+            maxContentLength: sourceLimit,
+          }),
+      });
+      return;
+    }
+
     // See the equivalent guard in runDocumentFileExtractionUnsafe: don't
     // re-charge the daily budget for a retry of the same logical extraction.
     const withinBudget = ctx.isFirstAttempt
@@ -1605,8 +1690,9 @@ export class ExtractionProcessor {
     // A file that hit the case cap lost cases the model could not return, so
     // it must be extracted again next time instead of being taken for done.
     // The count that matters is the model's own, before duplicates are merged.
-    // (Targeted extraction removes the cap; until then this is the only signal
-    // that is exact: a regex count of declarations overcounts.)
+    // (A file the parser reads takes the targeted extraction, which has no
+    // cap. For the rest this is the only signal that is exact: a regex count
+    // of declarations overcounts.)
     if (outcome.cases.length >= MAX_EXTRACTED_CASES) {
       this.logger.log(
         `Extraction of ${ctx.filePath} reached the ${String(MAX_EXTRACTED_CASES)}-case cap: leaving it unstamped so the next push extracts it again`,
@@ -1640,6 +1726,208 @@ export class ExtractionProcessor {
       `No declaration snapshot for ${ctx.filePath} at ${ctx.ref}: ${result.reason}`,
     );
     return null;
+  }
+
+  /**
+   * The code-change extraction of a file the parser reads. The declarations
+   * are compared with the baseline push of the file; only the new and changed
+   * ones go to the model, as explicit targets, at most `MAX_EXTRACTED_CASES`
+   * per call, and every other test of the file produces nothing.
+   *
+   * Cost: one unit of the daily budget per model call (on the first attempt
+   * only, like every other job), and one credit for the job, spent when its
+   * proposals are saved. A file with no change spends neither and is stamped.
+   *
+   * The push is stamped, with its snapshot, only when every target came back
+   * described. Otherwise what matched is still saved, and the next push of the
+   * file, finding no stamped baseline, sends every declaration again.
+   */
+  private async extractChangedDeclarations(
+    ctx: JobContext,
+    job: {
+      fingerprint: SourceFingerprint;
+      declared: DeclaredFile;
+      content: string;
+      locale: 'es' | 'en';
+      readAt: (ref: string) => Promise<SourceReadResult>;
+    },
+  ): Promise<void> {
+    const baseline = await this.findDeclarationBaseline(ctx, job.readAt);
+    const diff = diffDeclarations(job.declared, baseline);
+    const snapshot = buildDeclarationSnapshot(job.declared, diff.removed);
+    const total = job.declared.declarations.length;
+    const removed = diff.removed?.length ?? 0;
+
+    if (diff.changed.length === 0) {
+      this.logger.log(
+        `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: none of its ${String(total)} test declarations changed since the previous push (${String(removed)} removed)`,
+      );
+      await this.stampExtraction(job.fingerprint, snapshot);
+      return;
+    }
+
+    const chunks = chunkTargets(diff.changed);
+    this.logger.log(
+      `Extracting ${String(diff.changed.length)} of ${String(total)} test declarations of ${ctx.filePath} at ${ctx.ref} in ${String(chunks.length)} model call(s) (${diff.wholeFile ?? 'changed only'}, ${String(removed)} removed)`,
+    );
+
+    const matched: ExtractedCase[] = [];
+    let described = 0;
+    let answered = false;
+    let stopReason: string | null = null;
+
+    for (const targets of chunks) {
+      const withinBudget = ctx.isFirstAttempt
+        ? await this.dailyBudget.tryConsume(NOT_BYOK)
+        : true;
+      if (!withinBudget) {
+        stopReason = QUOTA_EXHAUSTED_REASON;
+        break;
+      }
+
+      const outcome = await this.extractor.extract({
+        filePath: ctx.filePath,
+        language: detectLanguage(ctx.filePath),
+        content: job.content,
+        locale: job.locale,
+        targetDeclarations: targets.map(toTargetDeclaration),
+      });
+
+      if (outcome.kind === 'provider-unavailable') {
+        if (outcome.retryable && !ctx.isFinalAttempt) {
+          throw new RetryableProviderError(outcome.reason);
+        }
+        stopReason = outcome.reason;
+        break;
+      }
+
+      answered = true;
+      const round = matchTargetedCases(
+        targets,
+        outcome.kind === 'extracted' ? outcome.cases : [],
+        job.content,
+      );
+      matched.push(...round.matched.map(({ testCase }) => testCase));
+      described += targets.length - round.missing.length;
+      if (round.dropped > 0) {
+        this.logger.log(
+          `Dropped ${String(round.dropped)} case(s) of ${ctx.filePath} that describe no requested declaration`,
+        );
+      }
+    }
+
+    const complete = stopReason === null && described === diff.changed.length;
+
+    if (matched.length === 0) {
+      // A call that answered was paid for even when nothing in it was usable.
+      if (answered && !(await this.spendCreditOrFallback(ctx))) return;
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        stopReason ?? EXTRACTION_INCOMPLETE_REASON,
+      );
+      return;
+    }
+
+    const cases = dedupeByAutomationKey(
+      complete
+        ? matched
+        : withIncompleteTargetNote(
+            matched,
+            described,
+            diff.changed.length,
+            job.locale,
+          ),
+    );
+
+    const persisted = await this.proposalWriter.persistExtracted(cases, ctx);
+    if (!persisted) {
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        NOT_ENTITLED_REASON,
+      );
+      return;
+    }
+
+    if (!complete) {
+      this.logger.log(
+        `Extraction of ${ctx.filePath} described ${String(described)} of ${String(diff.changed.length)} requested test declarations (${stopReason ?? EXTRACTION_INCOMPLETE_REASON}): leaving it unstamped so the next push extracts it again`,
+      );
+      return;
+    }
+
+    await this.stampExtraction(job.fingerprint, snapshot);
+  }
+
+  /**
+   * The declarations of the file at its baseline push: the push of the same
+   * project, file and branch recorded right before this one (by `createdAt`,
+   * then `id`, like `findPreviousPush`).
+   *
+   * The branch matters because pushes to a branch other than the default one
+   * are recorded but never extracted: comparing a merge with the branch push
+   * right before it would always find "not extracted" and send the whole
+   * file. A push without a known branch compares with the previous push of
+   * any branch.
+   *
+   * Null, so every declaration counts as changed, when that push is not
+   * stamped (in flight, failed, incomplete) or does not exist, when the job
+   * does not know when its push was recorded, or when anything fails. A
+   * stamped push without a snapshot (extracted before snapshots existed) is
+   * read again at its commit and parsed: one extra source read.
+   */
+  private async findDeclarationBaseline(
+    ctx: JobContext,
+    readAt: (ref: string) => Promise<SourceReadResult>,
+  ): Promise<DeclaredFile | null> {
+    const createdAt = ctx.codeChangeCreatedAt;
+    if (ctx.codeChangeId === null || createdAt === undefined) return null;
+
+    try {
+      const branch = ctx.codeChangeBranch ?? null;
+      const previous = await this.prisma.codeChange.findFirst({
+        where: {
+          projectId: ctx.projectId,
+          filePath: ctx.filePath,
+          ...(branch === null ? {} : { batch: { scmEvent: { branch } } }),
+          OR: [
+            { createdAt: { lt: createdAt } },
+            { createdAt, id: { lt: ctx.codeChangeId } },
+          ],
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: {
+          commitSha: true,
+          extractedAt: true,
+          declarationSnapshot: true,
+        },
+      });
+      if (previous === null || previous.extractedAt === null) return null;
+
+      const stored = readDeclarationSnapshot(previous.declarationSnapshot);
+      if (stored !== null) return stored;
+
+      const source = await readAt(previous.commitSha);
+      if (source.kind === 'unavailable') {
+        this.logger.warn(
+          `Could not read ${ctx.filePath} at ${previous.commitSha} to compare its tests, extracting every one: ${source.reason}`,
+        );
+        return null;
+      }
+
+      const result = readDeclaredFile({
+        filePath: ctx.filePath,
+        content: source.content,
+        truncated: source.truncated,
+      });
+      return result.kind === 'declared' ? result.file : null;
+    } catch (error) {
+      this.logger.warn(
+        `Could not find the baseline of ${ctx.filePath}, extracting every test: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
   }
 
   /**

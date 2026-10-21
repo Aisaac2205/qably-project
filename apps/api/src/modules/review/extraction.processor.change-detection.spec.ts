@@ -5,6 +5,7 @@ import type { EncryptionService } from '../../common/crypto/encryption.service';
 import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type {
+  ExtractedCase,
   ExtractionInput,
   ExtractionOutcome,
   TestCaseExtractor,
@@ -64,9 +65,13 @@ function extractedCase(
   };
 }
 
-function extracted(
-  cases: ReturnType<typeof extractedCase>[],
-): ExtractionOutcome {
+/** A test body generator that rewrites the assertion of one test only. */
+const changing = (changed: string) => (title: string) =>
+  title === changed
+    ? `expect('${title}').toBe('rewritten');`
+    : `expect('${title}').toBeTruthy();`;
+
+function extracted(cases: readonly ExtractedCase[]): ExtractionOutcome {
   return {
     kind: 'extracted',
     cases,
@@ -121,12 +126,14 @@ function matchesWhere(row: StoredChange, where: Where): boolean {
   });
 }
 
+type OrderBy = Record<string, 'asc' | 'desc'>;
+
 function compareRows(
   a: StoredChange,
   b: StoredChange,
-  orderBy: Record<string, 'asc' | 'desc'>[],
+  orderBy: OrderBy | OrderBy[],
 ): number {
-  for (const clause of orderBy) {
+  for (const clause of Array.isArray(orderBy) ? orderBy : [orderBy]) {
     const [field, direction] = Object.entries(clause)[0];
     if (field !== 'createdAt' && field !== 'id') {
       throw new Error(`the fake store cannot order by "${field}"`);
@@ -142,7 +149,7 @@ function compareRows(
 
 interface QueryArgs {
   where: Where;
-  orderBy?: Record<string, 'asc' | 'desc'>[];
+  orderBy?: OrderBy | OrderBy[];
   take?: number;
 }
 
@@ -194,6 +201,7 @@ function fakePrisma(changes: Map<string, StoredChange>) {
       ),
     },
     testCase: {
+      findUnique: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue(null),
     },
@@ -224,6 +232,8 @@ interface RunOptions {
   model?: string;
   attemptsStarted?: number;
   answer?: (input: ExtractionInput) => ExtractionOutcome;
+  /** Another job than the code change named by the id. */
+  data?: Record<string, unknown>;
 }
 
 function harness() {
@@ -298,7 +308,11 @@ function harness() {
       ),
       { GEMINI_MODEL: options.model ?? 'gemini-test' } as Env,
     ).process({
-      data: { kind: 'code-change', codeChangeId: id, locale: 'en' },
+      data: options.data ?? {
+        kind: 'code-change',
+        codeChangeId: id,
+        locale: 'en',
+      },
       attemptsStarted: options.attemptsStarted ?? 1,
       opts: { attempts: 3 },
     } as never);
@@ -437,7 +451,404 @@ describe('ExtractionProcessor — declaration snapshot of a code change', () => 
     });
 
     expect(store.extract).toHaveBeenCalledTimes(1);
+    expect(store.extract.mock.calls[0][0].targetDeclarations).toBeUndefined();
     expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
     expect(store.changes.get('change-1')?.declarationSnapshot).toBeNull();
+  });
+});
+
+/** Describes exactly the declarations a targeted request names, tagged. */
+function answerTargets(input: ExtractionInput): ExtractionOutcome {
+  const targets = input.targetDeclarations ?? [];
+  return extracted(
+    targets.map((target, index) => ({
+      ...extractedCase([...target.describePath, target.title].join(' ')),
+      targetRef: `T${index + 1}`,
+    })),
+  );
+}
+
+/** The titles each model call asked for, one list per call. */
+function requestedTitles(store: ReturnType<typeof harness>): string[][] {
+  return store.extract.mock.calls.map(([input]) =>
+    (input.targetDeclarations ?? []).map(({ title }) => title),
+  );
+}
+
+const numbered = (count: number, prefix = 'case') =>
+  Array.from({ length: count }, (_, index) => `${prefix} ${index + 1}`);
+
+/** A first push of the file, extracted and stamped with its snapshot. */
+async function extractedFirstPush(
+  store: ReturnType<typeof harness>,
+  content: string,
+): Promise<void> {
+  store.push('change-1', 1, content);
+  await store.run('change-1', { answer: answerTargets });
+  expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+  store.extract.mockClear();
+  store.tryConsume.mockClear();
+  store.spendCredit.mockClear();
+  store.read.mockClear();
+  store.prisma.extractedProposal.create.mockClear();
+}
+
+describe('ExtractionProcessor — a code change sends only new or changed tests to the model', () => {
+  const FORTY = numbered(40);
+  const changedSeventh = changing('case 7');
+  const THREE = numbered(3);
+  const changedSecond = changing('case 2');
+
+  it('sends one target and writes one proposal when one test of forty changed', async () => {
+    const store = harness();
+    quietLogs();
+    await extractedFirstPush(store, testFile(FORTY));
+    store.push('change-2', 2, testFile(FORTY, { body: changedSeventh }));
+
+    await store.run('change-2', { answer: answerTargets });
+
+    expect(requestedTitles(store)).toEqual([['case 7']]);
+    expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    expect(store.tryConsume).toHaveBeenCalledTimes(1);
+    expect(store.spendCredit).toHaveBeenCalledTimes(1);
+    expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+    expect(store.snapshotOf('change-2')?.removed).toEqual([]);
+  });
+
+  it('describes a whole file the first time, in chunks of at most twenty, and stamps it', async () => {
+    const store = harness();
+    store.push('change-1', 1, testFile(FORTY));
+    quietLogs();
+
+    await store.run('change-1', { answer: answerTargets });
+
+    expect(requestedTitles(store)).toEqual([
+      numbered(20),
+      numbered(40).slice(20),
+    ]);
+    expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(40);
+    expect(store.tryConsume).toHaveBeenCalledTimes(2);
+    expect(store.spendCredit).toHaveBeenCalledTimes(1);
+    expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+  });
+
+  it('splits forty-five changed tests into three model calls and persists all of them', async () => {
+    const store = harness();
+    store.push('change-1', 1, testFile(numbered(45)));
+    quietLogs();
+
+    await store.run('change-1', { answer: answerTargets });
+
+    expect(requestedTitles(store).map((titles) => titles.length)).toEqual([
+      20, 20, 5,
+    ]);
+    expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(45);
+    expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+  });
+
+  it('sends only the tests of the describe whose hook changed', async () => {
+    const twoDescribes = (hook: string) =>
+      [
+        "describe('Cart', () => {",
+        `  beforeEach(() => { ${hook}; });`,
+        "  it('adds', () => { expect(1).toBe(1); });",
+        "  it('removes', () => { expect(0).toBe(0); });",
+        '});',
+        "describe('Checkout', () => {",
+        "  it('pays', () => { expect(2).toBe(2); });",
+        '});',
+      ].join('\n');
+    const store = harness();
+    quietLogs();
+    await extractedFirstPush(store, twoDescribes('reset()'));
+    store.push('change-2', 2, twoDescribes('reset(true)'));
+
+    await store.run('change-2', { answer: answerTargets });
+
+    expect(requestedTitles(store)).toEqual([['adds', 'removes']]);
+  });
+
+  it('sends every test when the file context changed', async () => {
+    const titles = numbered(3);
+    const store = harness();
+    quietLogs();
+    await extractedFirstPush(store, testFile(titles));
+    store.push(
+      'change-2',
+      2,
+      testFile(titles, {
+        header:
+          "import { it, describe } from '@jest/globals';\nconst total = 2;",
+      }),
+    );
+
+    await store.run('change-2', { answer: answerTargets });
+
+    expect(requestedTitles(store)).toEqual([titles]);
+  });
+
+  it('sends a new test and records a removed one without extracting it', async () => {
+    const store = harness();
+    quietLogs();
+    await extractedFirstPush(store, testFile(['keeps', 'drops']));
+    store.push('change-2', 2, testFile(['keeps', 'arrives']));
+
+    await store.run('change-2', { answer: answerTargets });
+
+    expect(requestedTitles(store)).toEqual([['arrives']]);
+    expect(store.snapshotOf('change-2')?.removed).toEqual([
+      {
+        id: JSON.stringify([['Cart'], 'drops', 0]),
+        title: 'drops',
+        describePath: ['Cart'],
+      },
+    ]);
+  });
+
+  it('spends no budget, model call or credit when no test changed, and still stamps the push', async () => {
+    const store = harness();
+    const { log } = quietLogs();
+    await extractedFirstPush(store, testFile(FORTY));
+    store.push(
+      'change-2',
+      2,
+      testFile(FORTY, {
+        header:
+          "// imports reordered\nimport { describe, expect, it } from '@jest/globals';",
+      }),
+    );
+
+    await store.run('change-2', { answer: answerTargets });
+
+    expect(store.extract).not.toHaveBeenCalled();
+    expect(store.tryConsume).not.toHaveBeenCalled();
+    expect(store.spendCredit).not.toHaveBeenCalled();
+    expect(store.prisma.extractedProposal.create).not.toHaveBeenCalled();
+    expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+    expect(store.snapshotOf('change-2')?.declarations).toHaveLength(40);
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('none of its 40 test declarations changed'),
+    );
+  });
+
+  describe('the baseline it compares with', () => {
+    it('is the snapshot of the previous push, with no extra source read', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(FORTY));
+      store.push('change-2', 2, testFile(FORTY, { body: changedSeventh }));
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(store.read.mock.calls.map(([input]) => input.ref)).toEqual([
+        'sha-change-2',
+      ]);
+    });
+
+    it('is the source of the previous commit when that push was extracted before snapshots existed', async () => {
+      const store = harness();
+      quietLogs();
+      const old = store.push('change-1', 1, testFile(FORTY));
+      Object.assign(old, { sourceHash: 'old-hash', extractedAt: new Date() });
+      store.push('change-2', 2, testFile(FORTY, { body: changedSeventh }));
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(store.read.mock.calls.map(([input]) => input.ref)).toEqual([
+        'sha-change-2',
+        'sha-change-1',
+      ]);
+      expect(requestedTitles(store)).toEqual([['case 7']]);
+      expect(store.snapshotOf('change-2')?.removed).toEqual([]);
+    });
+
+    it('is nothing while the previous push is still in flight, so every test is sent', async () => {
+      const store = harness();
+      quietLogs();
+      const inFlight = store.push('change-1', 1, testFile(THREE));
+      Object.assign(inFlight, { sourceHash: 'in-flight', extractedAt: null });
+      store.push('change-2', 2, testFile(THREE, { body: changedSecond }));
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([THREE]);
+      expect(store.snapshotOf('change-2')?.removed).toBeNull();
+    });
+
+    it('is nothing when the previous commit cannot be read, so every test is sent', async () => {
+      const store = harness();
+      const { warn } = quietLogs();
+      const old = store.push('change-1', 1, testFile(THREE));
+      Object.assign(old, { sourceHash: 'old-hash', extractedAt: new Date() });
+      store.unreadable.add('sha-change-1');
+      store.push('change-2', 2, testFile(THREE, { body: changedSecond }));
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([THREE]);
+      expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('fetch-failed'),
+      );
+    });
+
+    it('is the previous push of the same branch, so a merge after a skipped branch push compares with the default branch', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(FORTY));
+      store.push('change-2', 2, testFile(FORTY, { body: changedSeventh }), {
+        branch: 'feature/seven',
+      });
+      store.push('change-3', 3, testFile(FORTY, { body: changedSeventh }));
+
+      await store.run('change-3', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([['case 7']]);
+    });
+
+    it('is nothing when the lookup fails, and the job still extracts', async () => {
+      const store = harness();
+      const { warn } = quietLogs();
+      await extractedFirstPush(store, testFile(THREE));
+      store.push('change-2', 2, testFile(THREE, { body: changedSecond }));
+      store.prisma.codeChange.findFirst.mockRejectedValueOnce(
+        new Error('db gone'),
+      );
+
+      await store.run('change-2', { answer: answerTargets });
+
+      expect(requestedTitles(store)).toEqual([THREE]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('db gone'));
+    });
+  });
+
+  describe('an incomplete answer', () => {
+    it('persists what matched but leaves the push unstamped when the model skipped a target', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(numbered(3)));
+      quietLogs();
+
+      await store.run('change-1', {
+        answer: (input) => {
+          const full = answerTargets(input);
+          return full.kind === 'extracted'
+            ? { ...full, cases: full.cases.slice(0, 2) }
+            : full;
+        },
+      });
+
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(2);
+      expect(store.changes.get('change-1')?.extractedAt).toBeNull();
+      expect(store.changes.get('change-1')?.declarationSnapshot).toBeNull();
+    });
+
+    it('drops a case for a test it was not asked about', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(THREE));
+      store.push('change-2', 2, testFile(THREE, { body: changing('case 3') }));
+
+      await store.run('change-2', {
+        answer: (input) => {
+          const full = answerTargets(input);
+          return full.kind === 'extracted'
+            ? {
+                ...full,
+                cases: [...full.cases, extractedCase('Cart case 1')],
+              }
+            : full;
+        },
+      });
+
+      expect(requestedTitles(store)).toEqual([['case 3']]);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('persists the chunks that ran and leaves the push unstamped when the daily budget runs out', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(numbered(25)));
+      quietLogs();
+      store.tryConsume.mockResolvedValueOnce(true).mockResolvedValue(false);
+
+      await store.run('change-1', { answer: answerTargets });
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(20);
+      expect(store.changes.get('change-1')?.extractedAt).toBeNull();
+    });
+
+    it('records the reason and spends nothing when the budget refuses the first call', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(numbered(3)));
+      const { warn } = quietLogs();
+      store.tryConsume.mockResolvedValue(false);
+
+      await store.run('change-1', { answer: answerTargets });
+
+      expect(store.extract).not.toHaveBeenCalled();
+      expect(store.spendCredit).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('quota-exhausted'),
+      );
+    });
+
+    it('retries the whole job on a retryable failure, charging the budget only on the first attempt', async () => {
+      const store = harness();
+      store.push('change-1', 1, testFile(numbered(25)));
+      quietLogs();
+      let call = 0;
+      const flaky = (input: ExtractionInput): ExtractionOutcome => {
+        call += 1;
+        return call === 2
+          ? {
+              kind: 'provider-unavailable',
+              reason: 'rate-limited',
+              retryable: true,
+            }
+          : answerTargets(input);
+      };
+
+      await expect(store.run('change-1', { answer: flaky })).rejects.toThrow(
+        'provider-unavailable:rate-limited',
+      );
+      expect(store.prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(store.tryConsume).toHaveBeenCalledTimes(2);
+
+      await store.run('change-1', { answer: flaky, attemptsStarted: 2 });
+
+      expect(store.tryConsume).toHaveBeenCalledTimes(2);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(25);
+      expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  it('leaves a document-case request on its own flow, even for a file the parser reads', async () => {
+    const store = harness();
+    store.push('change-1', 1, testFile(THREE));
+    quietLogs();
+    store.prisma.testCase.findUnique.mockResolvedValue({
+      id: 'case-1',
+      projectId: 'project-1',
+      suiteId: 'suite-1',
+      name: 'case 2',
+      automationKey: 'Cart case 2',
+      automationFilePath: FILE_PATH,
+      automationClassName: null,
+      suite: { name: 'Cart' },
+      project: { organizationId: 'org-1', connection },
+    });
+
+    await store.run('change-1', {
+      data: { kind: 'document-case', testCaseId: 'case-1', locale: 'en' },
+      answer: () => extracted([extractedCase('Cart case 2')]),
+    });
+
+    expect(store.extract).toHaveBeenCalledTimes(1);
+    const [input] = store.extract.mock.calls[0];
+    expect(input.targetDeclarations).toBeUndefined();
+    expect(input.automationKey).toBe('Cart case 2');
+    expect(store.prisma.codeChange.updateMany).not.toHaveBeenCalled();
+    expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
   });
 });
