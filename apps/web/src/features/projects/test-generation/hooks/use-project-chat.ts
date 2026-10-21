@@ -1,15 +1,25 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import type { AttachedCaseRecord } from '@qably/types'
+import type {
+  AttachedCaseRecord,
+  ChatMessageRecord,
+  ChatThreadDetailRecord,
+  ChatThreadRecord,
+} from '@qably/types'
 import {
   createThread,
   deleteThread,
   getThread,
   listThreads,
-  sendMessage,
+  streamMessage,
 } from '@/features/ai-review/api/chat.api'
+import {
+  ChatStreamError,
+  isAbortError,
+  type ChatStreamDone,
+} from '@/features/ai-review/lib/chat-stream'
 import { chatKeys } from '@/features/ai-review/lib/query-keys'
 import { ApiError } from '@/lib/api-client'
 
@@ -61,11 +71,40 @@ function classifySendError(error: unknown): ChatSendErrorKind {
   return 'error'
 }
 
+function appendReply(
+  detail: ChatThreadDetailRecord | undefined,
+  { userMessage, assistantMessage }: ChatStreamDone,
+): ChatThreadDetailRecord | undefined {
+  if (detail === undefined) return undefined
+
+  const replyIds = new Set([userMessage.id, assistantMessage.id])
+
+  return {
+    ...detail,
+    messages: [
+      ...detail.messages.filter((message) => !replyIds.has(message.id)),
+      userMessage,
+      assistantMessage,
+    ],
+  }
+}
+
+interface ChatRun {
+  controller: AbortController
+}
+
 export function useProjectChat(projectId: string) {
   const queryClient = useQueryClient()
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] = useState<PendingMessage | null>(null)
   const [deleteError, setDeleteError] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
+  const [isRunning, setIsRunning] = useState(false)
+  // While a reply is in flight the visible thread is the snapshot taken when it
+  // was sent: the server stores the question first, so a refetch mid-stream
+  // would otherwise show it twice next to the optimistic bubble.
+  const [frozenMessages, setFrozenMessages] = useState<ChatMessageRecord[] | null>(null)
+  const runRef = useRef<ChatRun | null>(null)
 
   const threadsQuery = useQuery({
     queryKey: chatKeys.threads(projectId),
@@ -78,16 +117,31 @@ export function useProjectChat(projectId: string) {
     enabled: activeThreadId !== null,
   })
 
-  const startNewChat = useCallback(() => {
-    setActiveThreadId(null)
-    setPendingMessage(null)
-    setDeleteError(false)
+  const settleRun = useCallback((pending: PendingMessage | null) => {
+    runRef.current = null
+    setPendingMessage(pending)
+    setStreamingText('')
+    setIsRunning(false)
+    setFrozenMessages(null)
   }, [])
 
-  const selectThread = useCallback((threadId: string) => {
-    setActiveThreadId(threadId)
-    setPendingMessage(null)
+  const startNewChat = useCallback(() => {
+    settleRun(null)
+    setActiveThreadId(null)
     setDeleteError(false)
+  }, [settleRun])
+
+  const selectThread = useCallback(
+    (threadId: string) => {
+      settleRun(null)
+      setActiveThreadId(threadId)
+      setDeleteError(false)
+    },
+    [settleRun],
+  )
+
+  const cancel = useCallback(() => {
+    runRef.current?.controller.abort()
   }, [])
 
   const removeThread = useCallback(
@@ -102,14 +156,15 @@ export function useProjectChat(projectId: string) {
       }
 
       if (threadId === activeThreadId) {
+        runRef.current?.controller.abort()
+        settleRun(null)
         setActiveThreadId(null)
-        setPendingMessage(null)
       }
 
       queryClient.removeQueries({ queryKey: chatKeys.thread(projectId, threadId) })
       void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
     },
-    [projectId, activeThreadId, queryClient],
+    [projectId, activeThreadId, queryClient, settleRun],
   )
 
   const send = useCallback(
@@ -117,63 +172,112 @@ export function useProjectChat(projectId: string) {
       const content = text.trim()
       if (!content) return
 
-      setPendingMessage({ content, status: 'sending', attachedCases })
+      const run: ChatRun = { controller: new AbortController() }
+      runRef.current = run
+      // Opening another conversation detaches the run: the reply still lands in
+      // its own thread cache, but it no longer drives what the panel shows.
+      const isCurrent = () => runRef.current === run
 
       let threadId = activeThreadId
+      let createdThread: ChatThreadRecord | undefined
       const caseIds = attachedCases.map((attachedCase) => attachedCase.id)
+
+      setFrozenMessages(
+        threadId === null
+          ? []
+          : (queryClient.getQueryData<ChatThreadDetailRecord>(chatKeys.thread(projectId, threadId))
+              ?.messages ?? []),
+      )
+      setPendingMessage({ content, status: 'sending', attachedCases })
+      setStreamingText('')
+      setIsRunning(true)
 
       try {
         if (threadId === null) {
-          const thread = await createThread(projectId)
-          threadId = thread.id
-          setActiveThreadId(threadId)
+          createdThread = await createThread(projectId)
+          threadId = createdThread.id
+          if (isCurrent()) setActiveThreadId(threadId)
           void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
         }
 
-        if (caseIds.length > 0 && filePath !== undefined) {
-          await sendMessage(projectId, threadId, content, caseIds, filePath)
-        } else if (caseIds.length > 0) {
-          await sendMessage(projectId, threadId, content, caseIds)
-        } else if (filePath !== undefined) {
-          await sendMessage(projectId, threadId, content, [], filePath)
-        } else {
-          await sendMessage(projectId, threadId, content)
+        if (run.controller.signal.aborted) {
+          throw new DOMException('The chat reply was stopped', 'AbortError')
         }
 
-        await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
-        void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
-        setPendingMessage(null)
-      } catch (error) {
-        const kind = classifySendError(error)
+        const reply = await streamMessage(
+          projectId,
+          threadId,
+          { content, caseIds, filePath },
+          {
+            signal: run.controller.signal,
+            onDelta: (delta) => {
+              if (isCurrent()) setStreamingText((previous) => previous + delta)
+            },
+          },
+        )
 
-        if ((kind === 'provider-unavailable' || kind === 'quota-exhausted') && threadId !== null) {
-          await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
-          setPendingMessage({ status: 'unavailable', errorKind: kind })
+        const threadKey = chatKeys.thread(projectId, threadId)
+        const placeholder = createdThread && { ...createdThread, messages: [] }
+        await queryClient.cancelQueries({ queryKey: threadKey })
+        queryClient.setQueryData<ChatThreadDetailRecord>(threadKey, (detail) =>
+          appendReply(detail ?? placeholder, reply),
+        )
+        if (isCurrent()) settleRun(null)
+
+        void queryClient.invalidateQueries({ queryKey: threadKey })
+        void queryClient.invalidateQueries({ queryKey: chatKeys.threads(projectId) })
+      } catch (error) {
+        if (!isCurrent()) return
+
+        setStreamingText('')
+        setIsRunning(false)
+
+        const refetchThread = async () => {
+          if (threadId !== null) {
+            await queryClient.invalidateQueries({ queryKey: chatKeys.thread(projectId, threadId) })
+          }
+        }
+
+        if (isAbortError(error)) {
+          // The server keeps the question and drops the partial reply.
+          await refetchThread()
+          if (isCurrent()) settleRun(null)
           return
         }
 
-        setPendingMessage({
-          content,
-          status: 'error',
-          errorKind: kind,
-          attachedCases,
-        })
+        const kind = classifySendError(error)
+
+        if ((kind === 'provider-unavailable' || kind === 'quota-exhausted') && threadId !== null) {
+          await refetchThread()
+          if (isCurrent()) settleRun({ status: 'unavailable', errorKind: kind })
+          return
+        }
+
+        if (error instanceof ChatStreamError && threadId !== null) {
+          await refetchThread()
+          if (isCurrent()) settleRun({ status: 'error', errorKind: kind })
+          return
+        }
+
+        settleRun({ content, status: 'error', errorKind: kind, attachedCases })
       }
     },
-    [projectId, activeThreadId, queryClient],
+    [projectId, activeThreadId, queryClient, settleRun],
   )
 
   return {
     threads: threadsQuery.data ?? [],
-    isLoadingThreads: threadsQuery.isLoading,
+    isLoadingThread: activeThreadId !== null && frozenMessages === null && threadQuery.isLoading,
     activeThreadId,
-    messages: threadQuery.data?.messages ?? [],
-    isLoadingThread: activeThreadId !== null && threadQuery.isLoading,
+    messages: frozenMessages ?? threadQuery.data?.messages ?? [],
     pendingMessage,
+    streamingText,
+    isRunning,
     deleteError,
     startNewChat,
     selectThread,
     removeThread,
     send,
+    cancel,
   }
 }

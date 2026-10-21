@@ -52,11 +52,18 @@ async function resolveOrganizationId(options: ApiRequestOptions): Promise<string
   return useActiveOrganizationStore.getState().organizationId ?? undefined
 }
 
-function buildHeaders(options: ApiRequestOptions, organizationId: string | undefined): Headers {
+function buildHeaders(
+  options: ApiRequestOptions,
+  organizationId: string | undefined,
+  accept: string | undefined,
+): Headers {
   const headers = new Headers()
 
   headers.set('accept-language', useI18nStore.getState().locale)
 
+  if (accept !== undefined) {
+    headers.set('accept', accept)
+  }
   if (options.body !== undefined) {
     headers.set('content-type', 'application/json')
   }
@@ -96,21 +103,44 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<T> {
-  return performRequest<T>(path, options, false)
+  const response = await performRequest(path, options, undefined, false)
+
+  if (response.status === 204) return undefined as T
+
+  return (await response.json()) as T
 }
 
-async function performRequest<T>(
+/**
+ * Opens a streamed response, such as a server-sent event stream. It shares the
+ * base url, credentials, headers, organization recovery and error mapping of
+ * apiRequest, and hands back the raw body for the caller to read.
+ */
+export async function apiStream(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<ReadableStream<Uint8Array>> {
+  const response = await performRequest(path, options, 'text/event-stream', false)
+
+  if (response.body === null) {
+    throw new ApiError(response.status, `Request to ${path} returned no stream`)
+  }
+
+  return response.body
+}
+
+async function performRequest(
   path: string,
   options: ApiRequestOptions,
+  accept: string | undefined,
   isRetry: boolean,
-): Promise<T> {
+): Promise<Response> {
   const organizationId = await resolveOrganizationId(options)
   const organizationIdWasInjected = options.organizationId === undefined && organizationId !== undefined
 
   const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     method: options.method ?? 'GET',
     credentials: 'include',
-    headers: buildHeaders(options, organizationId),
+    headers: buildHeaders(options, organizationId, accept),
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     signal: options.signal,
   })
@@ -128,13 +158,11 @@ async function performRequest<T>(
       code === NOT_A_MEMBER_ERROR_CODE
     ) {
       await applyOrganizationChange(getRegisteredQueryClient(), null)
-      return performRequest<T>(path, options, true)
+      return performRequest(path, options, accept, true)
     }
 
     throw new ApiError(response.status, message, code, details)
   }
 
-  if (response.status === 204) return undefined as T
-
-  return (await response.json()) as T
+  return response
 }

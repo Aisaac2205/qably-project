@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, apiRequest } from './api-client'
+import { ApiError, apiRequest, apiStream } from './api-client'
 import { DEFAULT_LOCALE, useI18nStore } from './i18n/store'
 import { useActiveOrganizationStore } from '@/stores/active-organization.store'
 import { registerQueryClient, resetQueryClientRegistry } from '@/lib/query-client-registry'
@@ -331,5 +331,97 @@ describe('apiRequest', () => {
       useActiveOrganizationStore.persist.hasHydrated = originalHasHydrated
       useActiveOrganizationStore.persist.onFinishHydration = originalOnFinishHydration
     }
+  })
+})
+
+describe('apiStream', () => {
+  function streamOf(text: string): ReadableStream<Uint8Array<ArrayBuffer>> {
+    return new ReadableStream<Uint8Array<ArrayBuffer>>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(text))
+        controller.close()
+      },
+    })
+  }
+
+  it('returns the body of a successful response and asks for an event stream', async () => {
+    const body = streamOf('event: delta\ndata: {"text":"Hi"}\n\n')
+    const spy = mockFetch({ body, headers: new Headers({ 'content-type': 'text/event-stream' }) })
+
+    await expect(
+      apiStream('/projects/p1/chat/threads/t1/messages/stream', {
+        method: 'POST',
+        body: { content: 'Hello' },
+      }),
+    ).resolves.toBe(body)
+
+    const [url, init] = spy.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('http://localhost:3001/projects/p1/chat/threads/t1/messages/stream')
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('include')
+    expect(init.body).toBe('{"content":"Hello"}')
+    expect(new Headers(init.headers).get('accept')).toBe('text/event-stream')
+    expect(new Headers(init.headers).get('content-type')).toBe('application/json')
+  })
+
+  it('sends the locale and the active organization like apiRequest', async () => {
+    useI18nStore.getState().setLocale('es')
+    useActiveOrganizationStore.getState().setActiveOrganization('org-9', 'user-1')
+    const spy = mockFetch({ body: streamOf('') })
+
+    await apiStream('/stream', { method: 'POST', body: {} })
+
+    const headers = new Headers((spy.mock.calls[0][1] as RequestInit).headers)
+    expect(headers.get('accept-language')).toBe('es')
+    expect(headers.get('x-organization-id')).toBe('org-9')
+  })
+
+  it('forwards the abort signal to fetch', async () => {
+    const spy = mockFetch({ body: streamOf('') })
+    const controller = new AbortController()
+
+    await apiStream('/stream', { method: 'POST', body: {}, signal: controller.signal })
+
+    expect((spy.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal)
+  })
+
+  it('throws the same ApiError as apiRequest when the request fails before streaming', async () => {
+    mockFetch({
+      ok: false,
+      status: 503,
+      json: () =>
+        Promise.resolve({ statusCode: 503, code: 'provider-unavailable', message: 'Model down' }),
+    })
+
+    const failure = apiStream('/stream', { method: 'POST', body: {} })
+
+    await expect(failure).rejects.toBeInstanceOf(ApiError)
+    await expect(failure).rejects.toMatchObject({
+      status: 503,
+      code: 'provider-unavailable',
+      message: 'Model down',
+    })
+  })
+
+  it('clears the active organization and retries once on not-a-member, like apiRequest', async () => {
+    useActiveOrganizationStore.getState().setActiveOrganization('org-stale', 'user-1')
+    const body = streamOf('')
+    const spy = vi
+      .fn()
+      .mockResolvedValueOnce(notAMemberResponse())
+      .mockResolvedValueOnce({ ok: true, status: 200, headers: new Headers(), body })
+    vi.stubGlobal('fetch', spy)
+
+    await expect(apiStream('/stream', { method: 'POST', body: {} })).resolves.toBe(body)
+
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(new Headers((spy.mock.calls[1][1] as RequestInit).headers).get('x-organization-id')).toBeNull()
+    expect(useActiveOrganizationStore.getState().organizationId).toBeNull()
+  })
+
+  it('throws an ApiError when a successful response carries no body to stream', async () => {
+    mockFetch({ body: null })
+
+    await expect(apiStream('/stream', { method: 'POST', body: {} })).rejects.toBeInstanceOf(ApiError)
   })
 })
