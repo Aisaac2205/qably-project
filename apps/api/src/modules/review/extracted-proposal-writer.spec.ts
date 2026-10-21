@@ -1294,6 +1294,118 @@ describe('ExtractedProposalWriter.persistExtracted — one open proposal per tes
     });
   });
 
+  describe('a redelivery that races a decision', () => {
+    const samePush = (overrides: StoredFields = {}) =>
+      storedProposal({
+        id: 'same-push',
+        evidenceId: 'evidence-same-push',
+        change: { id: 'change-2', createdAt: CURRENT },
+        ...overrides,
+      });
+
+    it('does not put a proposal back in the inbox when it was approved between the read and the update', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [samePush()]);
+      // The read saw it in review; the approval commits before the update.
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      const persisted = await writer.persistExtracted(
+        [extractedCase()],
+        secondPush(),
+      );
+
+      expect(persisted).toBe(true);
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'same-push',
+        status: 'in_review',
+      });
+      expect(
+        lastCall(prisma.extractedProposal.updateMany).data,
+      ).not.toHaveProperty('status');
+      expect(prisma.extractedProposal.update).not.toHaveBeenCalled();
+      expect(prisma.evidence.update).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('opens no duplicate for the same code change and key when the update matches nothing', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [samePush()]);
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(prisma.evidence.create).not.toHaveBeenCalled();
+    });
+
+    it('still refreshes the other cases of the redelivered push', async () => {
+      const prisma = createPrisma();
+      seedProposals(prisma, [
+        samePush(),
+        samePush({
+          id: 'same-push-2',
+          evidenceId: 'evidence-same-push-2',
+          automationKey: 'Cart > removes an item',
+        }),
+      ]);
+      prisma.extractedProposal.updateMany
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+      const writer = build(prisma, fakeEntitlement());
+
+      await writer.persistExtracted(
+        [
+          extractedCase(),
+          extractedCase({ automationKey: 'Cart > removes an item' }),
+        ],
+        secondPush(),
+      );
+
+      expect(prisma.evidence.update).toHaveBeenCalledTimes(1);
+      expect(lastCall(prisma.evidence.update).where).toEqual({
+        id: 'evidence-same-push-2',
+      });
+    });
+
+    it('leaves the winner of a lost create race alone when it was decided in the meantime', async () => {
+      const prisma = createPrisma();
+      prisma.extractedProposal.create.mockRejectedValueOnce(
+        Object.assign(new Error('duplicate'), { code: 'P2002' }),
+      );
+      prisma.extractedProposal.findFirst.mockResolvedValueOnce({
+        id: 'winner-1',
+        status: 'in_review',
+        evidenceId: 'evidence-winner',
+      });
+      prisma.extractedProposal.updateMany.mockResolvedValue({ count: 0 });
+      const publish = jest.fn();
+      const writer = build(
+        prisma,
+        fakeEntitlement(),
+        fakeReclassifier(),
+        fakeEvents(publish),
+      );
+
+      await writer.persistExtracted([extractedCase()], secondPush());
+
+      expect(lastCall(prisma.extractedProposal.updateMany).where).toEqual({
+        id: 'winner-1',
+        status: 'in_review',
+      });
+      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.evidence.update).not.toHaveBeenCalled();
+      expect(publish).not.toHaveBeenCalled();
+    });
+  });
+
   describe('a push that is older than the one that owns the proposal', () => {
     const newerOwner = { id: 'change-3', createdAt: NEWER };
 
