@@ -37,6 +37,7 @@ describe('RunList empty state', () => {
 
     await screen.findByText(TITLE)
     expect(screen.queryByRole('link', { name: /how to report results from ci/i })).not.toBeInTheDocument()
+    expect(linkTargets().filter((href) => href?.includes('/docs/quickstart'))).toEqual([])
     expect(linkTargets().filter((href) => href?.includes('step-4-report-ci'))).toEqual([])
   })
 

@@ -1,38 +1,28 @@
 ---
+import type { Locale } from '../../i18n/types';
 import type { DocContent } from '../content/types';
+import DocsNavList from './DocsNavList.astro';
 
 interface Props {
   content: DocContent;
+  locale: Locale;
+  currentSlug: string;
 }
 
-const { content } = Astro.props;
-const sectionById = new Map(content.sections.map((section) => [section.id, section]));
+const { content, locale, currentSlug } = Astro.props;
 ---
 
-<aside class="hidden lg:block sticky top-24 self-start border-r border-border pr-6">
-  <nav aria-label={content.tocLabel} class="space-y-7">
-    {
-      content.navGroups.map((group) => (
-        <div class="space-y-2.5">
-          <h4 class="text-sm font-semibold text-fg">{group.label}</h4>
-          <ul class="space-y-1.5 text-sm text-fg-muted">
-            {group.sectionIds.map((id) => {
-              const section = sectionById.get(id);
-              return section ? (
-                <li>
-                  <a
-                    href={`#${section.id}`}
-                    data-toc-link={section.id}
-                    class="block py-0.5 transition-colors hover:text-fg"
-                  >
-                    {section.navLabel}
-                  </a>
-                </li>
-              ) : null;
-            })}
-          </ul>
-        </div>
-      ))
-    }
+{
+  /*
+    Left rail: lg and up. Below lg the same list lives in DocsMobileNav. Pinned
+    below the fixed header (top-docs-offset) and never taller than what is left
+    of the viewport (max-h-docs-rail): a longer list scrolls on its own.
+  */
+}
+<div
+  class="sticky top-docs-offset hidden max-h-docs-rail w-docs-sidebar shrink-0 overflow-y-auto overscroll-contain p-1 lg:block"
+>
+  <nav aria-label={content.navAriaLabel} data-docs-sidebar>
+    <DocsNavList content={content} locale={locale} currentSlug={currentSlug} idPrefix="sidebar" />
   </nav>
-</aside>
+</div>

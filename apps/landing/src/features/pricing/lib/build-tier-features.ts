@@ -24,7 +24,6 @@ export function buildTierFeatures(tier: PricingTier, t: PricingTranslations): st
   ];
 
   if (tier.notificationIntegrations) features.push(t.notificationsFeature);
-  if (tier.id === 'empresa') features.push(t.byokFeature);
 
   return features;
 }

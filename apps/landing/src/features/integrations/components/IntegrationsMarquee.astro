@@ -6,117 +6,48 @@ interface Props {
 const { locale = "es" } = Astro.props;
 const isEn = locale === "en";
 
-const technologies = [
-  { name: "Playwright", icon: "/tech-icons/playwright.svg", invert: false },
-  { name: "Jest", icon: "/tech-icons/jest-icon.svg", invert: false },
-  { name: "TypeScript", icon: "/tech-icons/typescript.svg", invert: false },
-  { name: "Next.js", icon: "/tech-icons/nextjs.svg", invert: true },
-  { name: "React", icon: "/tech-icons/react.svg", invert: false },
-  { name: "Docker", icon: "/tech-icons/docker.svg", invert: false },
-  { name: "NestJS", icon: "/tech-icons/nestjs.svg", invert: false },
-  { name: "Python", icon: "/tech-icons/python.svg", invert: false },
-  { name: "Golang", icon: "/tech-icons/go.svg", invert: false },
-  {
-    name: "PostgreSQL",
-    icon: "/tech-icons/postgresql-icon.svg",
-    invert: false,
-  },
-  { name: "FastAPI", icon: "/tech-icons/fastapi-icon.svg", invert: false },
-  {
-    name: "Spring Boot",
-    icon: "/tech-icons/spring-boot-icon.svg",
-    invert: false,
-  },
+// Only runners and CI tools that the docs actually cover (JUnit XML ingestion).
+const tools = [
+  { name: "Jest", icon: "/tech-icons/jest-icon.svg" },
+  { name: "Playwright", icon: "/tech-icons/playwright.svg" },
+  { name: "Python (pytest)", icon: "/tech-icons/python.svg" },
+  { name: "Go", icon: "/tech-icons/go.svg" },
+  { name: "GitHub Actions", icon: "/logos/githubactions.svg" },
 ];
 
 const heading = isEn
-  ? "Native integrations with your languages and developer tooling"
-  : "Integraciones nativas con tus lenguajes y herramientas de desarrollo";
+  ? "Works with any runner or CI that produces JUnit XML"
+  : "Compatible con cualquier runner o CI que genere JUnit XML";
 
-const label = isEn ? "Integrated technologies" : "Tecnologías integradas";
+const label = isEn ? "Compatible runners and CI tools" : "Runners y herramientas de CI compatibles";
 ---
 
 <section
-  class="py-12 sm:py-16 border-y border-white/[0.08] bg-black overflow-hidden select-none"
+  class="py-12 sm:py-16 border-y border-white/[0.08] bg-black overflow-hidden"
   aria-label={label}
 >
   <div class="max-w-7xl mx-auto px-6 mb-8 sm:mb-10 text-center">
     <p class="text-sm font-medium text-zinc-400 font-sans">{heading}</p>
   </div>
 
-  <div
-    class="marquee-wrapper relative w-full overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_12%,black_88%,transparent)]"
-  >
+  <ul class="max-w-7xl mx-auto px-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-6 sm:gap-x-14">
     {
-      [0, 1].map((track) => (
-        <div
-          class="marquee-track flex items-center py-2 shrink-0"
-          aria-hidden={track === 1 ? "true" : undefined}
-        >
-          {technologies.map((tech) => (
-            <div class="flex items-center gap-3 sm:gap-4 mx-5 sm:mx-8 group cursor-default shrink-0">
-              <img
-                src={tech.icon}
-                alt=""
-                aria-hidden="true"
-                width="56"
-                height="56"
-                class={`size-10 sm:size-12 lg:size-14 object-contain opacity-85 group-hover:opacity-100 group-hover:scale-105 transition-all duration-200 ${
-                  tech.invert ? "brightness-0 invert" : ""
-                }`}
-                loading="lazy"
-              />
-              <span class="text-sm sm:text-base font-medium text-zinc-300 group-hover:text-white transition-colors font-sans whitespace-nowrap">
-                {tech.name}
-              </span>
-            </div>
-          ))}
-        </div>
+      tools.map((tool) => (
+        <li class="flex items-center gap-3 sm:gap-4 group">
+          <img
+            src={tool.icon}
+            alt=""
+            aria-hidden="true"
+            width="56"
+            height="56"
+            class="size-10 sm:size-12 object-contain opacity-85 group-hover:opacity-100 transition-opacity duration-200"
+            loading="lazy"
+          />
+          <span class="text-sm sm:text-base font-medium text-zinc-300 group-hover:text-white transition-colors font-sans whitespace-nowrap">
+            {tool.name}
+          </span>
+        </li>
       ))
     }
-  </div>
+  </ul>
 </section>
-
-<style>
-  .marquee-wrapper {
-    display: flex;
-    overflow: hidden;
-    user-select: none;
-  }
-
-  .marquee-track {
-    display: flex;
-    flex-shrink: 0;
-    min-width: 100%;
-    animation: scroll-seamless 38s linear infinite;
-    will-change: transform;
-  }
-
-  @keyframes scroll-seamless {
-    from {
-      transform: translate3d(0, 0, 0);
-    }
-    to {
-      transform: translate3d(-100%, 0, 0);
-    }
-  }
-
-  /* Standing still, a single track only ever shows its first few logos, so the
-     duplicate goes away and the real one wraps into a readable grid. */
-  @media (prefers-reduced-motion: reduce) {
-    .marquee-wrapper {
-      mask-image: none;
-    }
-
-    .marquee-track {
-      animation: none;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .marquee-track[aria-hidden="true"] {
-      display: none;
-    }
-  }
-</style>

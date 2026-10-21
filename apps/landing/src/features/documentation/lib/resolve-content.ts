@@ -30,6 +30,29 @@ function resolveBlock(block: DocBlock, apiBaseUrl: string): DocBlock {
         headers: block.headers.map((header) => resolveText(header, apiBaseUrl)),
         rows: block.rows.map((row) => row.map((cell) => resolveText(cell, apiBaseUrl))),
       };
+    case 'diagram':
+      return {
+        ...block,
+        title: resolveText(block.title, apiBaseUrl),
+        description: resolveText(block.description, apiBaseUrl),
+        ...(block.caption === undefined ? {} : { caption: resolveText(block.caption, apiBaseUrl) }),
+        ...(block.groups === undefined
+          ? {}
+          : { groups: block.groups.map((group) => ({ ...group, label: resolveText(group.label, apiBaseUrl) })) }),
+        nodes: block.nodes.map((node) => ({
+          ...node,
+          label: resolveText(node.label, apiBaseUrl),
+          ...(node.detail === undefined ? {} : { detail: resolveText(node.detail, apiBaseUrl) }),
+        })),
+        ...(block.edges === undefined
+          ? {}
+          : {
+              edges: block.edges.map((edge) => ({
+                ...edge,
+                ...(edge.label === undefined ? {} : { label: resolveText(edge.label, apiBaseUrl) }),
+              })),
+            }),
+      };
     case 'faq':
       return {
         ...block,
@@ -46,9 +69,12 @@ function resolveBlock(block: DocBlock, apiBaseUrl: string): DocBlock {
 export function resolveDocContent(content: DocContent, apiBaseUrl: string): DocContent {
   return {
     ...content,
-    sections: content.sections.map((section) => ({
-      ...section,
-      blocks: section.blocks.map((block) => resolveBlock(block, apiBaseUrl)),
+    pages: content.pages.map((page) => ({
+      ...page,
+      sections: page.sections.map((section) => ({
+        ...section,
+        blocks: section.blocks.map((block) => resolveBlock(block, apiBaseUrl)),
+      })),
     })),
   };
 }

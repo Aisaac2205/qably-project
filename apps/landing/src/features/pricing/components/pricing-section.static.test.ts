@@ -6,14 +6,25 @@ import path from 'node:path';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(path.join(here, 'PricingSection.tsx'), 'utf-8');
 
-describe('PricingSection has no monthly/annual toggle, no fabricated price, no contact CTA', () => {
+describe('PricingSection presents plan limits only: no price, no toggle, no purchase flow', () => {
   it('renders no billing-cycle state (no monthly/annual toggle)', () => {
     expect(source).not.toMatch(/useState/);
     expect(source).not.toMatch(/billingCycle/);
   });
 
+  it('never renders a price or a billing period', () => {
+    expect(source).not.toMatch(/monthlyPriceUsd/);
+    expect(source).not.toMatch(/perMonth/);
+    expect(source).not.toMatch(/\$\{/);
+  });
+
   it('never shows a fabricated "Custom" price', () => {
     expect(source).not.toMatch(/Custom/);
+  });
+
+  it('never highlights a tier as the most chosen one', () => {
+    expect(source).not.toMatch(/mostPopularBadge/);
+    expect(source).not.toMatch(/FEATURED_TIER_ID/);
   });
 
   it('never links to a sales/contact email', () => {
@@ -31,8 +42,10 @@ describe('PricingSection has no monthly/annual toggle, no fabricated price, no c
     expect(source).toMatch(/PRICING_TIERS\.map/);
   });
 
-  it('shows the plan-upgrade note only for tiers other than gratuito', () => {
-    expect(source).toMatch(/tier\.id\s*!==\s*'gratuito'/);
-    expect(source).toMatch(/planUpgradeNote/);
+  it('states once, outside the tier cards, that billing and plan changes are not available', () => {
+    const noteMatches = source.match(/planUpgradeNote/g) ?? [];
+
+    expect(noteMatches).toHaveLength(1);
+    expect(source).not.toMatch(/tier\.id\s*!==\s*'gratuito'/);
   });
 });

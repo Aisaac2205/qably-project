@@ -1,0 +1,37 @@
+---
+import type { InlineNode } from '../lib/inline';
+import type { DocsRenderContext } from '../lib/render-context';
+
+interface Props {
+  nodes: InlineNode[];
+  ctx: DocsRenderContext;
+}
+
+const { nodes, ctx } = Astro.props;
+
+const codeClasses =
+  'break-words rounded-md border border-border bg-bg-subtle px-1.5 py-0.5 font-mono text-inline-code text-fg';
+const linkClasses =
+  'font-medium text-fg underline decoration-fg-subtle underline-offset-4 transition-colors duration-150 ease-out hover:decoration-fg motion-reduce:transition-none';
+
+// A docs link to a page or an anchor that does not exist resolves to null and
+// shows its label as plain text (docs-links.test.ts turns that into a failing test).
+const items = nodes.map((node) => ({
+  node,
+  path: node.type === 'link' && node.href.kind === 'docs' ? ctx.resolveLink(node.href) : null,
+}));
+---
+
+{
+  /*
+    Renders the nodes of lib/inline.ts. Text goes through Astro's escaping, so
+    "<", "&" and quotes in the content can never become markup; nothing here
+    injects raw HTML. The expressions sit on one line on purpose: whitespace between
+    them would show up as stray spaces in the middle of a sentence.
+  */
+}
+{
+  items.map(({ node, path }) => (
+    <Fragment>{node.type === 'text' && node.value}{node.type === 'code' && <code class={codeClasses}>{node.value}</code>}{node.type === 'strong' && <strong class="font-semibold text-fg"><Astro.self nodes={node.children} ctx={ctx} /></strong>}{node.type === 'link' && node.href.kind === 'external' && <a href={node.href.url} rel="noopener noreferrer" class={linkClasses}><Astro.self nodes={node.children} ctx={ctx} /></a>}{node.type === 'link' && node.href.kind === 'docs' && (path === null ? <Astro.self nodes={node.children} ctx={ctx} /> : <a href={path} class={linkClasses}><Astro.self nodes={node.children} ctx={ctx} /></a>)}</Fragment>
+  ))
+}

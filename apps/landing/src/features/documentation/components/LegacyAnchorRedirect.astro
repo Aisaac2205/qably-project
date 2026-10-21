@@ -1,0 +1,44 @@
+---
+import type { Locale } from '../../i18n/types';
+
+interface Props {
+  locale: Locale;
+  /** Slug of the page this component is rendered on. */
+  slug: string;
+}
+
+const { locale, slug } = Astro.props;
+---
+
+{/*
+  Only the overview renders this. Old links such as the step-4-report-ci anchor
+  of the docs root point at a fragment that no longer exists there; a server
+  never sees a fragment, so the browser moves the reader to the page that now
+  holds the section. The decision lives in lib/legacy-targets.ts (unit tested).
+*/}
+<div data-legacy-anchor-redirect data-locale={locale} data-slug={slug} hidden></div>
+
+<script>
+  import { resolveLegacyRedirect } from '../lib/legacy-targets';
+
+  const marker = document.querySelector<HTMLElement>('[data-legacy-anchor-redirect]');
+
+  if (marker) {
+    const locale = marker.dataset.locale === 'en' ? 'en' : 'es';
+    const currentSlug = marker.dataset.slug ?? '';
+
+    const redirect = (): void => {
+      const target = resolveLegacyRedirect({
+        hash: window.location.hash,
+        locale,
+        currentSlug,
+        hasElementWithId: (id) => document.getElementById(id) !== null,
+      });
+
+      if (target !== null) window.location.replace(target);
+    };
+
+    redirect();
+    window.addEventListener('hashchange', redirect);
+  }
+</script>

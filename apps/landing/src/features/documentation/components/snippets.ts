@@ -10,10 +10,12 @@ export const SNIPPET_LANGUAGES: Record<SnippetId, CodeLanguage> = {
 };
 
 export const SNIPPETS: Record<SnippetId, string> = {
-  junit: `# Any runner that writes JUnit XML works:
-#   vitest --reporter=junit
+  junit: `# Any runner that writes a JUnit XML file works:
+#   npx vitest run --reporter=junit \\
+#     --outputFile=junit.xml
 #   jest --reporters=jest-junit
-#   playwright test --reporter=junit
+#   PLAYWRIGHT_JUNIT_OUTPUT_NAME=junit.xml \\
+#     npx playwright test --reporter=junit
 #   pytest --junitxml=junit.xml
 
 URL=${API_BASE_URL_TOKEN}/runs/ingest/junit
@@ -38,7 +40,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: npx vitest --reporter=junit
+      - run: |
+          npx vitest run --reporter=junit \\
+            --outputFile=junit.xml
 
       - name: Report to Qably
         if: always()

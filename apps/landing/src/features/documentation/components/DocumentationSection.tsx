@@ -133,7 +133,7 @@ export function DocumentationSection({ t, locale = 'es' }: DocumentationSectionP
               : '¿Buscas la referencia completa de la API y el esquema de ingesta de ejecuciones?'}
           </span>
           <a
-            href={isEn ? '/en/docs' : '/docs'}
+            href={isEn ? '/en/docs/api-ingest' : '/docs/api-ingest'}
             className="inline-flex shrink-0 items-center gap-1 font-medium text-white transition-colors hover:text-zinc-300"
           >
             <span>{isEn ? 'Read the documentation' : 'Ver la documentación'}</span>

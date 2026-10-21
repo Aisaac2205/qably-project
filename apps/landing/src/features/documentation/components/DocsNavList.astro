@@ -1,0 +1,67 @@
+---
+import type { Locale } from '../../i18n/types';
+import type { DocContent } from '../content/types';
+import { docsPagePath, findPage } from '../lib/pages';
+
+interface Props {
+  content: DocContent;
+  locale: Locale;
+  currentSlug: string;
+  /** Keeps the heading ids unique when the list is rendered more than once. */
+  idPrefix: string;
+  /** Rows at least 44px tall, for the collapsible menu that is used with a finger. */
+  touch?: boolean;
+}
+
+const { content, locale, currentSlug, idPrefix, touch = false } = Astro.props;
+
+const groups = content.navGroups.map((group, index) => ({
+  headingId: `${idPrefix}-group-${index}`,
+  label: group.label,
+  pages: group.pageSlugs.flatMap((slug) => {
+    const page = findPage(content, slug);
+
+    return page === undefined ? [] : [page];
+  }),
+}));
+---
+
+{
+  /*
+    Group headings in bold, pages muted; the page being read is a soft filled
+    pill with the full foreground. Colour is the only thing that changes on
+    hover, and focus keeps the global focus ring.
+  */
+}
+<ul class="space-y-7">
+  {
+    groups.map((group) => (
+      <li>
+        <p id={group.headingId} class="px-3 text-sm font-semibold text-fg">
+          {group.label}
+        </p>
+        <ul aria-labelledby={group.headingId} class="mt-2 space-y-0.5">
+          {group.pages.map((page) => {
+            const isCurrent = page.slug === currentSlug;
+
+            return (
+              <li>
+                <a
+                  href={docsPagePath(locale, page.slug)}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  class:list={[
+                    'rounded-lg px-3 text-sm leading-snug transition-colors duration-150 ease-out motion-reduce:transition-none',
+                    touch ? 'flex min-h-11 items-center' : 'block py-1.5',
+                    isCurrent ? 'bg-bg-elevated text-fg' : 'text-fg-muted hover:text-fg',
+                  ]}
+                >
+                  {page.navLabel}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </li>
+    ))
+  }
+</ul>

@@ -63,10 +63,17 @@ value; it is never actually dialed, since the build never makes a real request. 
 already sets its own `NEXT_PUBLIC_API_URL` for the test environment, so the two do not conflict.
 
 `NEXT_PUBLIC_DOCS_URL` is optional and names the origin of the public documentation site, so the app
-can link a QA from the empty Actions tab of the runs page to the CI reporting guide. Unset, the
-link is a same-origin path (`/docs#...`, `/en/docs#...`), which is right for local development
-where the two apps are proxied together. Production should set the real docs origin; no value is
-guessed here because domains are the owner's call.
+can link a QA from the empty Actions tab of the runs page to the CI reporting guide. The docs are
+one page per topic, so the link is built from a page slug plus an optional anchor (`docsUrl(slug,
+locale, anchor)` in `apps/web/src/lib/docs-url.ts`): the CI guide is `/docs/quickstart#step-4-report-ci`
+and `/en/docs/quickstart#step-4-report-ci`. Unset, the link is a same-origin path, which is right
+for local development where the two apps are proxied together. Production should set the real docs
+origin; no value is guessed here because domains are the owner's call.
+
+Deploy order: the landing goes out before the web app. The old single-page links
+(`/docs#step-4-report-ci`) keep working in the meantime, because the docs overview redirects every
+old section id to the page that holds it, so a web build that still links the old URL is never
+broken.
 
 ### `landing`
 

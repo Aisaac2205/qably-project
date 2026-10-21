@@ -1,5 +1,5 @@
 import React from 'react'
-import { CaretRight, SealCheck, PaperPlaneTilt, WarningCircle } from '@phosphor-icons/react'
+import { CaretRight, Envelope, SealCheck, PaperPlaneTilt, WarningCircle } from '@phosphor-icons/react'
 import type { DashboardChannelsRecord, DashboardEmailChannel, DashboardInAppChannel } from '@qably/types'
 import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -77,12 +77,10 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
     <div className="group grid flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center">
-          <img
-            src="/logos/gmail.svg"
-            alt=""
-            width={24}
-            height={24}
-            className="size-6 shrink-0 object-contain transition-transform duration-150 ease-out group-hover:scale-105"
+          <Envelope
+            size={24}
+            aria-hidden="true"
+            className="size-6 shrink-0 text-default transition-transform duration-150 ease-out group-hover:scale-105"
           />
         </div>
         <div className="min-w-0">
@@ -137,21 +135,20 @@ export function ChannelsCard({ channels }: ChannelsCardProps) {
         ? t('dashboard.channelsInAppName')
         : lastDelivery.channel === 'email'
           ? t('dashboard.channelsEmailName')
-          : resolveLastDeliveryWebhookName(channels) ??
-            t('dashboard.channelsFallbackWebhookName')
+          : (resolveLastDeliveryWebhookName(channels) ?? lastDelivery.webhookId ?? '')
 
   const lastDeliveryText =
     lastDelivery === null
-      ? t('dashboard.channelsNoDeliveries')
-      : lastDelivery.status === 'sent'
-        ? t('dashboard.channelsLastDeliverySent', {
-            channel: lastDeliveryChannelName,
-            time: formatRelativeTime(lastDelivery.deliveredAt, timeLocale),
-          })
-        : t('dashboard.channelsLastDeliveryFailed', {
-            channel: lastDeliveryChannelName,
-            time: formatRelativeTime(lastDelivery.deliveredAt, timeLocale),
-          })
+      ? ''
+      : t('dashboard.channelsLastDelivery', {
+          status: t(
+            lastDelivery.status === 'sent'
+              ? 'dashboard.channelsDeliveryStatusSent'
+              : 'dashboard.channelsDeliveryStatusFailed',
+          ),
+          name: lastDeliveryChannelName,
+          time: formatRelativeTime(lastDelivery.deliveredAt, timeLocale),
+        })
 
   return (
     <Card as="section" aria-labelledby="channels-card-heading" className="flex h-full flex-col overflow-hidden">
@@ -169,14 +166,16 @@ export function ChannelsCard({ channels }: ChannelsCardProps) {
         {channels.email.enabled && <EmailChannelRow email={channels.email} />}
       </div>
 
-      <CardFooter className="flex items-center gap-2 border-t border-border bg-canvas/30 px-5 py-3 text-xs text-muted">
-        {lastDelivery?.status === 'failed' ? (
-          <WarningCircle size={14} weight="bold" className="shrink-0 text-fail" aria-hidden="true" />
-        ) : (
-          <PaperPlaneTilt size={14} weight="bold" className="shrink-0 text-muted" aria-hidden="true" />
-        )}
-        <span className="truncate">{lastDeliveryText}</span>
-      </CardFooter>
+      {lastDelivery !== null ? (
+        <CardFooter className="flex items-center gap-2 border-t border-border bg-canvas/30 px-5 py-3 text-xs text-muted">
+          {lastDelivery.status === 'failed' ? (
+            <WarningCircle size={14} weight="bold" className="shrink-0 text-fail" aria-hidden="true" />
+          ) : (
+            <PaperPlaneTilt size={14} weight="bold" className="shrink-0 text-muted" aria-hidden="true" />
+          )}
+          <span className="truncate">{lastDeliveryText}</span>
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }

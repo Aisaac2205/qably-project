@@ -10,6 +10,7 @@ import { useCiRunsPage } from '../hooks/use-ci-runs'
 import { FRESHNESS_TICK_MS, useNow } from '../hooks/use-now'
 import { CiRunRow } from './ci-run-row'
 
+const REPORT_CI_PAGE = 'quickstart'
 const REPORT_CI_ANCHOR = 'step-4-report-ci'
 
 function CiRunRows({ ciRuns, projectId }: { ciRuns: CiRunSummaryRecord[]; projectId: string }) {
@@ -75,7 +76,7 @@ export function CiRunList({ projectId }: { projectId: string }) {
       description={t('runs.ci.emptyDescription')}
       action={
         <a
-          href={docsUrl(REPORT_CI_ANCHOR, locale)}
+          href={docsUrl(REPORT_CI_PAGE, locale, REPORT_CI_ANCHOR)}
           className="inline-flex min-h-11 items-center rounded text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden! focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-8"
         >
           {t('runs.ci.emptyDocsLink')}
