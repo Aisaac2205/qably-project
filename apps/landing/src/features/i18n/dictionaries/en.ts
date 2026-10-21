@@ -97,7 +97,7 @@ export const en: Dictionary = {
     feature4Title: 'Flaky test detection',
     feature4Desc: 'Highlights test cases that alternate between pass and fail on the same commit, helping teams isolate race conditions before release.',
     feature5Title: 'Repository and commit traceability',
-    feature5Desc: 'Links every test run and suite directly to commits, branches, and pull requests in GitHub or Bitbucket.',
+    feature5Desc: 'Links every test run and suite directly to commits, branches, and pull requests in GitHub.',
     codeCardLabel: 'Diff analysis for PR #142',
     codeCardConfidence: '96% match',
     cardStatusApproved: 'Approved',

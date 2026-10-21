@@ -1,4 +1,4 @@
-const JS_TEST_EXT = /\.(?:test|spec)\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
+const JS_TEST_EXT = /\.(?:test|spec|e2e-spec)\.(?:js|jsx|ts|tsx|mjs|cjs)$/;
 const PY_TEST_SUFFIX = /_test\.py$/;
 const PY_TEST_PREFIX = /(?:^|\/)test_[^/]+\.py$/;
 const JAVA_TEST = /Tests?\.java$/;

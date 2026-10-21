@@ -181,6 +181,34 @@ describe('parseEnv', () => {
     );
   });
 
+  it('treats a blank AERIS_DAILY_BUDGET as unmetered, as an empty hosting variable arrives', () => {
+    expect(
+      parseEnv({ ...validEnv, AERIS_DAILY_BUDGET: '' }).AERIS_DAILY_BUDGET,
+    ).toBeUndefined();
+  });
+
+  it('treats a blank RESEND_FROM_EMAIL as absent, as an empty hosting variable arrives', () => {
+    expect(
+      parseEnv({ ...validEnv, RESEND_FROM_EMAIL: '' }).RESEND_FROM_EMAIL,
+    ).toBeUndefined();
+  });
+
+  it('falls back to the default PORT when it is an empty string', () => {
+    expect(parseEnv({ ...validEnv, PORT: '' }).PORT).toBe(3001);
+  });
+
+  it('falls back to the default GEMINI_MODEL when it is an empty string', () => {
+    expect(parseEnv({ ...validEnv, GEMINI_MODEL: '' }).GEMINI_MODEL).toBe(
+      'gemini-3.1-flash-lite',
+    );
+  });
+
+  it('falls back to the default NODE_ENV when it is an empty string', () => {
+    expect(parseEnv({ ...validEnv, NODE_ENV: '' }).NODE_ENV).toBe(
+      'development',
+    );
+  });
+
   it('defaults EXTRACTION_MAX_FILES_PER_BATCH to 50 so a batch can never fan out without a bound', () => {
     expect(parseEnv(validEnv).EXTRACTION_MAX_FILES_PER_BATCH).toBe(50);
   });

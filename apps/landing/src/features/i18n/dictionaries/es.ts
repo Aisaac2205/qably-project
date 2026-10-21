@@ -97,7 +97,7 @@ export const es: Dictionary = {
     feature4Title: 'Detección de pruebas inestables (flaky tests)',
     feature4Desc: 'Identifica pruebas que alternan entre éxito y fallo en el mismo commit, ayudando a resolver problemas de concurrencia antes del despliegue.',
     feature5Title: 'Trazabilidad directa con tu repositorio',
-    feature5Desc: 'Vincula cada corrida de pruebas con los commits, ramas y pull requests de GitHub o Bitbucket para auditar la calidad en cada entrega.',
+    feature5Desc: 'Vincula cada corrida de pruebas con los commits, ramas y pull requests de GitHub para auditar la calidad en cada entrega.',
     codeCardLabel: 'Análisis de cambios en PR #142',
     codeCardConfidence: '96% de coincidencia',
     cardStatusApproved: 'Aprobado',

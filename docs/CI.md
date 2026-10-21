@@ -314,8 +314,8 @@ instead a query parameter the reporter builds from the environment:
 | `source` | `github_actions` when `GITHUB_ACTIONS` is `true`, otherwise `api` |
 | `reportSize` | how many suite groups the whole file becomes on the server (see "The reporter's grouping count must match the server's") |
 | `externalId` | `gha-<GITHUB_RUN_ID>-<GITHUB_JOB>-<slug(basename(filePath))>-<sha256(filePath)[0:8]>` — see below |
-| `commitSha` | `$GITHUB_SHA` |
-| `commitMessage` / `commitAuthor` | `git log -1 --pretty=%s` / `%an` (best-effort, read locally — cheaper than parsing the event payload) |
+| `commitSha` | `$GITHUB_SHA`; on `pull_request` and `pull_request_target` events, the pull request head commit (`pull_request.head.sha` in the file at `$GITHUB_EVENT_PATH`), because `$GITHUB_SHA` there is a temporary merge commit that no push ever carries. An unreadable or invalid event file falls back to `$GITHUB_SHA`. |
+| `commitMessage` / `commitAuthor` | `git log -1 --pretty=%s` / `%an` (best-effort, read locally). When the pull request head commit is reported they describe that commit; if the checkout does not contain it (for example a shallow checkout that only holds the merge commit), both are omitted rather than describing the merge commit. |
 | `ciRunExternalId` | `$GITHUB_RUN_ID` |
 | `ciJobKey` | `$QABLY_JOB_KEY`, otherwise `$GITHUB_JOB` |
 | `ciWorkflowName` | `$GITHUB_WORKFLOW` |

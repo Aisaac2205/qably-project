@@ -57,13 +57,13 @@ describe('LoginForm', () => {
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
   })
 
-  it('offers the forgot password and sign up destinations', async () => {
+  it('offers the sign up destination and no link to a password reset page that does not exist', async () => {
     await renderForm()
 
-    expect(screen.getByRole('link', { name: 'Forgot your password?' })).toHaveAttribute(
-      'href',
-      '/forgot-password',
-    )
+    expect(screen.queryByRole('link', { name: /forgot/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('link').map((link) => link.getAttribute('href'))).toEqual([
+      '/register',
+    ])
     expect(screen.getByRole('link', { name: 'Sign up' })).toHaveAttribute(
       'href',
       '/register',
@@ -95,7 +95,6 @@ describe('LoginForm', () => {
 
     const stops = [
       screen.getByLabelText('Email'),
-      screen.getByRole('link', { name: 'Forgot your password?' }),
       screen.getByLabelText('Password'),
       screen.getByRole('button', { name: 'Login' }),
       screen.getByRole('button', { name: 'Login with GitHub' }),

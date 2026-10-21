@@ -81,7 +81,7 @@ export const es: DocContent = {
           type: 'list',
           items: [
             'Una cuenta en Qably con al menos una organización activa.',
-            'Un repositorio alojado en GitHub o Bitbucket (proveedores compatibles actualmente).',
+            'Un repositorio alojado en GitHub (el proveedor de repositorios compatible).',
             'Un pipeline de CI con capacidad de ejecutar pruebas y enviar peticiones HTTP al concluir.',
           ],
         },
@@ -158,7 +158,7 @@ export const es: DocContent = {
         },
         {
           type: 'paragraph',
-          text: 'Las conexiones de Bitbucket siguen el mismo principio, utilizando el encabezado de firma propio de Bitbucket. Actualmente, GitHub y Bitbucket son los dos proveedores compatibles.',
+          text: 'GitHub es el proveedor de repositorios compatible. Las conexiones de repositorio con otros proveedores no están disponibles.',
         },
         {
           type: 'callout',
@@ -687,16 +687,16 @@ response.raise_for_status()`,
       blocks: [
         {
           type: 'paragraph',
-          text: 'El parámetro :provider acepta los valores github o bitbucket (indistinto de mayúsculas). Este endpoint no utiliza API keys: cada entrega se valida mediante el secreto HMAC configurado para la conexión del repositorio.',
+          text: 'El parámetro :provider toma el valor github, el proveedor de repositorios compatible (indistinto de mayúsculas). Este endpoint no utiliza API keys: cada entrega se valida mediante el secreto HMAC configurado para la conexión del repositorio.',
         },
         {
           type: 'table',
-          headers: ['', 'GitHub', 'Bitbucket'],
+          headers: ['', 'GitHub'],
           rows: [
-            ['Encabezado de firma', 'x-hub-signature-256 (formato sha256=<hex>)', 'x-hub-signature (formato sha256=<hex>)'],
-            ['Encabezado de evento', 'x-github-event: push o pull_request', 'x-event-key: repo:push, pullrequest:created o pullrequest:updated'],
-            ['Encabezado de id de entrega', 'x-github-delivery', 'x-request-uuid'],
-            ['Acciones de pull request manejadas', 'opened, synchronize', 'created, updated'],
+            ['Encabezado de firma', 'x-hub-signature-256 (formato sha256=<hex>)'],
+            ['Encabezado de evento', 'x-github-event: push o pull_request'],
+            ['Encabezado de id de entrega', 'x-github-delivery'],
+            ['Acciones de pull request manejadas', 'opened, synchronize'],
           ],
         },
         {
@@ -916,7 +916,7 @@ response.raise_for_status()`,
               answer: [
                 {
                   type: 'paragraph',
-                  text: 'La vista Repository se alimenta exclusivamente mediante el webhook del sistema de control de versiones (GitHub o Bitbucket). El envío de reportes de pruebas desde CI registra ejecuciones en el historial, pero no transmite el contenido de los commits ni la actividad del repositorio.',
+                  text: 'La vista Repository se alimenta exclusivamente mediante el webhook de su repositorio de GitHub. El envío de reportes de pruebas desde CI registra ejecuciones en el historial, pero no transmite el contenido de los commits ni la actividad del repositorio.',
                 },
                 {
                   type: 'paragraph',

@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { readFile, readdir, realpath, stat } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { basename, dirname, isAbsolute, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const REPORT_VERSION = '10.1.0';
+export const REPORT_VERSION = '10.1.1';
 
 const DEFAULT_API_BASE_URL = 'https://api.qably.dev';
 const MAX_TESTCASES_PER_REQUEST = 10_000;
@@ -504,28 +505,59 @@ export function buildFileExternalId(filePath, context) {
   return `gha-${context.runId}-${context.idSegment}-${slugify(basename(filePath))}-${shortHash(filePath)}`;
 }
 
-function readCommitMetadata(env) {
-  let commitMessage;
-  let commitAuthor;
+const PULL_REQUEST_EVENTS = new Set(['pull_request', 'pull_request_target']);
+const FULL_COMMIT_SHA = /^[0-9a-f]{40}$/i;
+
+/**
+ * On pull_request and pull_request_target events GITHUB_SHA is the temporary
+ * merge commit (refs/pull/N/merge), which never appears in any push. The
+ * commit the author actually pushed is `pull_request.head.sha` in the event
+ * payload. Returns undefined whenever that sha cannot be read, so the caller
+ * keeps GITHUB_SHA; it never throws.
+ */
+export function resolvePullRequestHeadSha(env, read = readFileSync) {
+  if (!PULL_REQUEST_EVENTS.has(env.GITHUB_EVENT_NAME)) return undefined;
+
+  const eventPath = nonBlank(env.GITHUB_EVENT_PATH);
+  if (eventPath === undefined) return undefined;
 
   try {
-    commitMessage = execFileSync('git', ['log', '-1', '--pretty=%s'], {
-      encoding: 'utf8',
-    }).trim();
+    const headSha = JSON.parse(read(eventPath, 'utf8'))?.pull_request?.head?.sha;
+    return typeof headSha === 'string' && FULL_COMMIT_SHA.test(headSha)
+      ? headSha
+      : undefined;
   } catch {
-    commitMessage = undefined;
+    return undefined;
   }
+}
+
+function readGitLogField(format, ref, exec) {
+  // An explicit ref is a validated 40-hex sha; without one git reads HEAD.
+  const args = ['log', '-1', `--pretty=${format}`, ...(ref ? [ref, '--'] : [])];
 
   try {
-    commitAuthor = execFileSync('git', ['log', '-1', '--pretty=%an'], {
+    return exec('git', args, {
       encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
   } catch {
-    commitAuthor = undefined;
+    return undefined;
   }
+}
+
+export function readCommitMetadata(
+  env,
+  { readFileSync: read = readFileSync, execFileSync: exec = execFileSync } = {},
+) {
+  const headSha = resolvePullRequestHeadSha(env, read);
+  // With the head commit chosen, never fall back to HEAD for the message and
+  // author: in a checkout that only holds the merge commit that would describe
+  // the merge commit, not the commit being reported.
+  const commitMessage = readGitLogField('%s', headSha, exec);
+  const commitAuthor = readGitLogField('%an', headSha, exec);
 
   return {
-    commitSha: env.GITHUB_SHA,
+    commitSha: headSha ?? env.GITHUB_SHA,
     commitMessage: commitMessage ? commitMessage.slice(0, 2000) : undefined,
     commitAuthor: commitAuthor ? commitAuthor.slice(0, 200) : undefined,
   };
