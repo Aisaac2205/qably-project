@@ -617,37 +617,50 @@ The unit suite mocks Prisma, so it asserts the lock statement, its parameter and
 
 ### A test file that did not change is not extracted again
 
-A push re-reads every test file it touches, and the model is charged for each one: one credit and one unit of the daily budget per file job, spent after the call. A byte-identical file produced the same proposals again, for nothing. A `code-change` job now compares the file with the last one it extracted before it spends anything.
+A push re-reads every test file it touches, and each file job is charged: the unit of the daily budget is consumed **before** the model call, and the credit is spent **after** it, once the proposals are saved. A byte-identical file produced the same proposals again, for nothing. A `code-change` job now compares the file with the push recorded right before it, before it spends anything.
 
 After the source is read and before the daily budget and the model call, `ExtractionProcessor.runExtractionUnsafe` computes `fingerprintSource` (`apps/api/src/modules/review/lib/source-fingerprint.ts`), a SHA-256 over:
 
 | Part | Why it is in the hash |
 |---|---|
 | `EXTRACTION_PROMPT_VERSION` | A new prompt must re-extract every file. |
+| The model: `GEMINI_MODEL`, with the class name of the bound extractor | Another model describes the same tests differently. The class name stands in when a disabled or fake extractor is bound, so swapping the extractor re-extracts too. |
 | Resolved locale | The proposals are written in that language. |
-| Source character limit of the plan | A plan change decides how much of the file reaches the model, so it must re-extract. |
+| The plan's source limit, **only when the file was truncated** | `SourceReader` returns exactly the first `limit` characters, so a plan change cannot alter a file that fit, and must not re-extract it. A file that was cut is cut at a different place under another limit, so it does. |
 | The content the reader returned | What the model would actually see, truncated or not. |
 
-`CodeChange` carries two nullable columns for this (migration `20261021110000_add_code_change_source_fingerprint`, with an index on `(projectId, filePath)`):
+`CodeChange` carries two nullable columns for this (migration `20261021110000_add_code_change_source_fingerprint`, with an index on `(projectId, filePath)`; the older `@@index([projectId])` is now redundant and was left in place):
 
-- `sourceHash`: the fingerprint of the file as this job read it. Written as soon as the job knows it will extract, and again together with `extractedAt`.
-- `extractedAt`: set only when the file version is accounted for by a successful extraction. Rows from before the migration have both columns empty, so the first push after the deploy extracts each file once.
+- `sourceHash`: the fingerprint of the file as this job read it. Written as soon as the job knows it will extract, so an extraction that is in flight or failed still leaves its hash behind.
+- `extractedAt`: set when the file version is accounted for by a successful extraction, together with `sourceHash`. Rows from before the migration have both columns empty, so the first push after the deploy extracts each file once.
 
-The job looks up the **newest** code change of the same project and `filePath` with a non-null `extractedAt` and compares hashes:
+#### What it is compared with
 
-- **Same hash:** the job ends. It spends no daily budget, makes no model call, spends no credit and writes no proposals. It logs one line and stamps `sourceHash` and `extractedAt` on the current code change.
-- **Different hash, or no earlier extraction:** the job runs as before.
+The previous push of the **same file**: the code change of the same project and `filePath` with the greatest `(createdAt, id)` strictly before the current one. `createdAt` is written by the database, so the order does not depend on worker clocks.
 
-What counts as a success is narrow. `extractedAt` is set only after `persistExtracted` returned `true`. A provider error, a missing entitlement, an exhausted budget, a source that could not be read, a model that found no tests, and a result with no matching case all leave it empty, so a failed attempt never causes a later skip. An extraction cut short by the case cap still saves its proposals and counts.
+- **The previous push is stamped and has the same hash:** the job ends. It spends no daily budget, makes no model call, spends no credit and writes no proposals. It logs one line and stamps `sourceHash` and `extractedAt` on the current code change.
+- **The job's own row is already stamped with this hash:** the job was delivered again after it finished. It ends without writing anything.
+- **Anything else** (no previous push, a different hash, or a previous push without `extractedAt`): the job writes its hash and runs as before.
+
+The previous push alone is compared, not "the newest successful extraction", because pushes persist out of order. With A, B, A: if push 2 (B) is still running or waiting out its retry backoff when push 3 (A) arrives, the newest *stamped* row is push 1 (A), and a comparison with it would skip push 3. Push 2 then commits B, the file at `HEAD` is A, and the inbox shows B. Comparing with push 2 instead finds a row with a hash but no `extractedAt`, which is enough to stop the skip.
+
+#### When a push is stamped
+
+`extractedAt` is set only after `persistExtracted` returned `true`, so a failed attempt never causes a later skip. A provider error (retryable or not), a missing entitlement, an exhausted daily budget, a source that could not be read, a model that found no tests, and a result with no matching case all leave it empty. Some edge cases deserve a note:
+
+- **A persist that created nothing still stamps.** When every case was refreshed or skipped (see "One open proposal per test case across pushes"), the push is accounted for.
+- **A truncated source still stamps.** Extracting it again cannot see more of the file.
+- **An extraction that hit the case cap does not stamp.** When the model returned `MAX_EXTRACTED_CASES` (20) cases, the file very likely holds more tests than the cap allowed, so the next push extracts it again. The signal is the model's own case count before duplicates are merged. A regex count of declarations is not used: it overcounts and would switch the skip off. Targeted extraction, which removes the cap, is the follow-up.
+- **A job delivered again after its proposals were saved but the stamp failed** runs again and stamps this time.
 
 Design choices:
 
-- **Only the newest successful extraction is compared.** A file that changes and then goes back (A, B, A) is extracted again on the third push, because its proposals were refreshed from version B. Comparing against any earlier match would leave them describing B.
-- **A skip stamps `extractedAt` too.** Its proposals are exactly those of the extraction it matched, so the stamp is true, and the next comparison stays correct if the matched row is ever removed. No separate column was added. A redelivery of a job that already finished matches its own row and writes nothing.
+- **A skip stamps `extractedAt` too.** Its proposals are exactly those of the push it matched, so the stamp is true, and the next push compares with it. No separate column was added.
+- **A skipped push leaves its file's open proposals on the older batch.** Nothing moves, so the inbox batch filter of the skipped push does not list them; they stay under the push that last wrote them.
 - **It never blocks an extraction.** If the lookup or a write fails, the job logs a warning and extracts anyway; a failure to stamp after the proposals are saved is logged and does not fail or retry the job.
 - **Only `code-change` jobs.** `document-case` and `document-file` are explicit requests from a person ("Document again with Aeris") and always run.
 
-Two jobs for the same new file can run at the same time. Neither sees a successful extraction, so both extract; the per-case lock above keeps their proposals from doubling.
+Two jobs for the same new file can run at the same time. Neither sees a stamped previous push, so both extract; the per-file lock above keeps their proposals from doubling.
 
 ### Deduplication within a batch
 

@@ -1,19 +1,19 @@
 import { Logger } from '@nestjs/common';
 import { DEFAULT_LOCALE } from '@qably/i18n';
+import type { Env } from '../../config/env';
 import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { EncryptionService } from '../../common/crypto/encryption.service';
 import type { SourceReader } from '../repository/source-reader';
 import type { TestFileLocator } from '../repository/test-file-locator';
-import type { TestCaseExtractor } from '../ai/extraction.contracts';
+import {
+  MAX_EXTRACTED_CASES,
+  type TestCaseExtractor,
+} from '../ai/extraction.contracts';
 import { EXTRACTION_PROMPT_VERSION } from '../ai/extraction-prompt';
 import { ExtractionFailureRecorder } from './extraction-failure-recorder';
 import { ExtractedProposalWriter } from './extracted-proposal-writer';
 import { ExtractionProcessor } from './extraction.processor';
-import {
-  fingerprintSource,
-  type SourceFingerprintParts,
-} from './lib/source-fingerprint';
 
 function extractedCase(overrides: Record<string, unknown> = {}) {
   return {
@@ -33,6 +33,7 @@ interface FakePrisma {
   codeChange: {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
+    findMany: jest.Mock;
     updateMany: jest.Mock;
   };
   testCase: {
@@ -73,11 +74,14 @@ const codeChangeRow = {
   project: { organizationId: 'org-1', connection },
 };
 
+const TEST_ENV = { GEMINI_MODEL: 'gemini-test' } as Env;
+
 function createPrisma(): FakePrisma {
   const prisma: FakePrisma = {
     codeChange: {
       findUnique: jest.fn().mockResolvedValue(codeChangeRow),
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     testCase: {
@@ -184,6 +188,7 @@ function build(
   dailyBudget: AiDailyBudget = fakeDailyBudget(),
   testFileLocator: TestFileLocator = fakeTestFileLocator(),
   publish: jest.Mock = jest.fn(),
+  env: Env = TEST_ENV,
 ) {
   return new ExtractionProcessor(
     prisma as never,
@@ -200,6 +205,7 @@ function build(
       { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
       { publish } as never,
     ),
+    env,
   );
 }
 
@@ -979,389 +985,639 @@ describe('ExtractionProcessor — code-change job', () => {
 });
 
 describe('ExtractionProcessor — code-change job skips a test file that did not change', () => {
-  const SOURCE = 'file body';
   const FILE_PATH = 'src/cart.spec.ts';
+  const BASE_TIME = Date.parse('2026-10-20T10:00:00.000Z');
+  const SOURCE_A = 'describe("cart", () => { it("adds an item"); });';
+  const SOURCE_B = 'describe("cart", () => { it("removes an item"); });';
 
-  function hashOf(overrides: Partial<SourceFingerprintParts> = {}): string {
-    return fingerprintSource({
-      promptVersion: EXTRACTION_PROMPT_VERSION,
-      locale: DEFAULT_LOCALE,
-      sourceLimit: 60_000,
-      content: SOURCE,
-      ...overrides,
+  interface StoredChange {
+    id: string;
+    projectId: string;
+    filePath: string;
+    createdAt: Date;
+    sourceHash: string | null;
+    extractedAt: Date | null;
+  }
+
+  interface RunOptions {
+    content?: string;
+    truncated?: boolean;
+    sourceLimit?: number;
+    locale?: string;
+    model?: string;
+    attemptsStarted?: number;
+    outcome?: unknown;
+  }
+
+  function matchesClause(
+    row: StoredChange,
+    clause: Record<string, unknown>,
+  ): boolean {
+    return Object.entries(clause).every(([field, condition]) => {
+      if (field === 'id') {
+        return typeof condition === 'string'
+          ? row.id === condition
+          : row.id < (condition as { lt: string }).lt;
+      }
+      if (field === 'createdAt') {
+        return condition instanceof Date
+          ? row.createdAt.getTime() === condition.getTime()
+          : row.createdAt < (condition as { lt: Date }).lt;
+      }
+      throw new Error(`the fake store does not understand "${field}"`);
     });
   }
 
-  function codeChangeJob(locale?: string) {
-    return {
-      data: {
-        kind: 'code-change',
-        codeChangeId: 'change-1',
-        ...(locale === undefined ? {} : { locale }),
-      },
-    } as never;
-  }
-
-  function lastSuccessful(sourceHash: string | null, id = 'change-0') {
-    return { id, sourceHash };
-  }
-
-  function recorded(prisma: FakePrisma): Record<string, unknown>[] {
-    return (prisma.codeChange.updateMany.mock.calls as [CallArgs][]).map(
-      ([args]) => args.data ?? {},
-    );
-  }
-
-  function quietLog() {
-    return jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
-  }
-
-  it('skips the daily budget, the model and the credit when the file is identical to the last successful extraction', async () => {
+  // The code_change table as far as the processor reads and writes it, so the
+  // tests drive whole sequences of pushes instead of canned answers.
+  function pushes() {
     const prisma = createPrisma();
-    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
-    const extract = jest.fn();
+    const changes = new Map<string, StoredChange>();
+
+    prisma.codeChange.findUnique.mockImplementation(
+      (args: { where: { id: string } }) => {
+        const change = changes.get(args.where.id);
+        if (change === undefined) return Promise.resolve(null);
+
+        return Promise.resolve({
+          ...codeChangeRow,
+          id: change.id,
+          createdAt: change.createdAt,
+          batchId: 'batch-1',
+          batch: { scmEvent: null },
+        });
+      },
+    );
+    prisma.codeChange.findMany.mockImplementation(
+      (args: {
+        where: Record<string, unknown>;
+        take?: number;
+        orderBy: Record<string, 'asc' | 'desc'>[];
+      }) => {
+        const where = args.where as {
+          projectId: string;
+          filePath: string;
+          OR?: Record<string, unknown>[];
+          id?: string;
+        };
+        const found = [...changes.values()]
+          .filter(
+            (change) =>
+              change.projectId === where.projectId &&
+              change.filePath === where.filePath,
+          )
+          .filter((change) =>
+            where.OR === undefined
+              ? where.id === undefined || change.id === where.id
+              : where.OR.some((clause) => matchesClause(change, clause)),
+          )
+          .sort(
+            (a, b) =>
+              b.createdAt.getTime() - a.createdAt.getTime() ||
+              (a.id < b.id ? 1 : -1),
+          );
+
+        return Promise.resolve(found.slice(0, args.take ?? found.length));
+      },
+    );
+    prisma.codeChange.updateMany.mockImplementation(
+      (args: { where: { id: string }; data: Partial<StoredChange> }) => {
+        const change = changes.get(args.where.id);
+        if (change === undefined) return Promise.resolve({ count: 0 });
+
+        Object.assign(change, args.data);
+        return Promise.resolve({ count: 1 });
+      },
+    );
+
+    const extract = jest
+      .fn()
+      .mockResolvedValue(extractedOutcome([extractedCase()]));
     const tryConsume = jest.fn().mockResolvedValue(true);
     const spendCredit = jest.fn().mockResolvedValue(true);
-    const log = quietLog();
 
-    await build(
-      prisma,
-      fakeSourceReader(),
-      fakeExtractor(extract),
-      fakeEncryption(),
-      fakeEntitlement(undefined, spendCredit),
-      fakeDailyBudget(tryConsume),
-    ).process(codeChangeJob());
-
-    expect(extract).not.toHaveBeenCalled();
-    expect(tryConsume).not.toHaveBeenCalled();
-    expect(spendCredit).not.toHaveBeenCalled();
-    expect(prisma.$transaction).not.toHaveBeenCalled();
-    expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
-    expect(prisma.evidence.create).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledWith(expect.stringContaining(FILE_PATH));
-    log.mockRestore();
-  });
-
-  it('compares with the newest successful extraction of the same file in the same project', async () => {
-    const prisma = createPrisma();
-
-    await build(
-      prisma,
-      fakeSourceReader(),
-      fakeExtractor(
-        jest.fn().mockResolvedValue(extractedOutcome([extractedCase()])),
-      ),
-    ).process(codeChangeJob());
-
-    expect(prisma.codeChange.findFirst).toHaveBeenCalledWith({
-      where: {
+    // The n-th push touching the file, one minute after the one before it.
+    function push(id: string, order: number): StoredChange {
+      const change: StoredChange = {
+        id,
         projectId: 'project-1',
         filePath: FILE_PATH,
-        extractedAt: { not: null },
-      },
-      orderBy: { extractedAt: 'desc' },
-      select: { id: true, sourceHash: true },
-    });
-  });
+        createdAt: new Date(BASE_TIME + order * 60_000),
+        sourceHash: null,
+        extractedAt: null,
+      };
+      changes.set(id, change);
+      return change;
+    }
 
-  it('records the skip on the current code change, so later pushes compare with it', async () => {
-    const prisma = createPrisma();
-    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
-    const log = quietLog();
-
-    await build(prisma, fakeSourceReader(), fakeExtractor(jest.fn())).process(
-      codeChangeJob(),
-    );
-
-    expect(prisma.codeChange.updateMany).toHaveBeenCalledTimes(1);
-    expect(lastCall(prisma.codeChange.updateMany).where).toEqual({
-      id: 'change-1',
-    });
-    expect(recorded(prisma)).toEqual([
-      { sourceHash: hashOf(), extractedAt: expect.any(Date) as Date },
-    ]);
-    log.mockRestore();
-  });
-
-  it('does not rewrite the record when the same job is delivered again after it finished', async () => {
-    const prisma = createPrisma();
-    prisma.codeChange.findFirst.mockResolvedValue(
-      lastSuccessful(hashOf(), 'change-1'),
-    );
-    const extract = jest.fn();
-    const log = quietLog();
-
-    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-      codeChangeJob(),
-    );
-
-    expect(extract).not.toHaveBeenCalled();
-    expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
-    log.mockRestore();
-  });
-
-  it('runs normally when the content changed, and stamps the extraction only after the proposals are saved', async () => {
-    const prisma = createPrisma();
-    prisma.codeChange.findFirst.mockResolvedValue(
-      lastSuccessful(hashOf({ content: 'the previous body' })),
-    );
-    const extract = jest
-      .fn()
-      .mockResolvedValue(extractedOutcome([extractedCase()]));
-    const tryConsume = jest.fn().mockResolvedValue(true);
-
-    await build(
-      prisma,
-      fakeSourceReader(),
-      fakeExtractor(extract),
-      fakeEncryption(),
-      fakeEntitlement(),
-      fakeDailyBudget(tryConsume),
-    ).process(codeChangeJob());
-
-    expect(tryConsume).toHaveBeenCalledTimes(1);
-    expect(extract).toHaveBeenCalledTimes(1);
-    expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
-    expect(recorded(prisma)).toEqual([
-      { sourceHash: hashOf() },
-      { sourceHash: hashOf(), extractedAt: expect.any(Date) as Date },
-    ]);
-
-    const [hashOrder, stampOrder] =
-      prisma.codeChange.updateMany.mock.invocationCallOrder;
-    const extractOrder = extract.mock.invocationCallOrder[0];
-    const createOrder =
-      prisma.extractedProposal.create.mock.invocationCallOrder[0];
-    expect(hashOrder).toBeLessThan(extractOrder);
-    expect(createOrder).toBeLessThan(stampOrder);
-  });
-
-  it('runs normally when the file has never been extracted', async () => {
-    const prisma = createPrisma();
-    const extract = jest
-      .fn()
-      .mockResolvedValue(extractedOutcome([extractedCase()]));
-
-    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-      codeChangeJob(),
-    );
-
-    expect(extract).toHaveBeenCalledTimes(1);
-  });
-
-  it('runs normally when the last successful extraction predates the fingerprint', async () => {
-    const prisma = createPrisma();
-    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(null));
-    const extract = jest
-      .fn()
-      .mockResolvedValue(extractedOutcome([extractedCase()]));
-
-    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-      codeChangeJob(),
-    );
-
-    expect(extract).toHaveBeenCalledTimes(1);
-  });
-
-  it.each<[string, Partial<SourceFingerprintParts>]>([
-    ['prompt version', { promptVersion: 'extraction-v11' }],
-    ['locale', { locale: 'es' }],
-    ['source character limit', { sourceLimit: 1_000_000 }],
-  ])(
-    'runs normally when the last extraction used another %s',
-    async (_label, previous) => {
-      const prisma = createPrisma();
-      prisma.codeChange.findFirst.mockResolvedValue(
-        lastSuccessful(hashOf(previous)),
-      );
-      const extract = jest
-        .fn()
-        .mockResolvedValue(extractedOutcome([extractedCase()]));
-
-      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-        codeChangeJob(),
+    async function run(id: string, options: RunOptions = {}): Promise<void> {
+      const entitlement = {
+        isEntitled: jest.fn().mockResolvedValue(true),
+        spendCredit,
+        maxSourceCharacters: jest
+          .fn()
+          .mockResolvedValue(options.sourceLimit ?? 60_000),
+      } as unknown as AiEntitlementService;
+      const read = jest.fn().mockResolvedValue({
+        kind: 'content',
+        content: options.content ?? SOURCE_A,
+        truncated: options.truncated ?? false,
+      });
+      extract.mockResolvedValue(
+        options.outcome ?? extractedOutcome([extractedCase()]),
       );
 
-      expect(extract).toHaveBeenCalledTimes(1);
-      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
-    },
-  );
+      await build(
+        prisma,
+        fakeSourceReader(read),
+        fakeExtractor(extract),
+        fakeEncryption(),
+        entitlement,
+        fakeDailyBudget(tryConsume),
+        undefined,
+        undefined,
+        { GEMINI_MODEL: options.model ?? 'gemini-test' } as Env,
+      ).process({
+        data: {
+          kind: 'code-change',
+          codeChangeId: id,
+          ...(options.locale === undefined ? {} : { locale: options.locale }),
+        },
+        attemptsStarted: options.attemptsStarted ?? 1,
+        opts: { attempts: 3 },
+      } as never);
+    }
 
-  it('re-extracts when the job asks for another locale than the last extraction used', async () => {
-    const prisma = createPrisma();
-    prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
-    const extract = jest
-      .fn()
-      .mockResolvedValue(extractedOutcome([extractedCase()]));
+    return { prisma, changes, push, run, extract, tryConsume, spendCredit };
+  }
 
-    await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-      codeChangeJob('es'),
+  const providerDown = (retryable: boolean) => ({
+    kind: 'provider-unavailable',
+    reason: 'rate-limited',
+    retryable,
+  });
+
+  const nCases = (count: number) =>
+    extractedOutcome(
+      Array.from({ length: count }, (_, index) =>
+        extractedCase({ automationKey: `Cart > case ${String(index)}` }),
+      ),
     );
 
-    expect(extract).toHaveBeenCalledTimes(1);
-    expect(recorded(prisma)[0]).toEqual({
-      sourceHash: hashOf({ locale: 'es' }),
+  function quietLogs() {
+    return [
+      jest.spyOn(Logger.prototype, 'log').mockImplementation(() => {}),
+      jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {}),
+    ];
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  describe('a file identical to the previous push', () => {
+    it('skips the daily budget, the model and the credit', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-2');
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+      expect(store.tryConsume).toHaveBeenCalledTimes(1);
+      expect(store.spendCredit).toHaveBeenCalledTimes(1);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('logs one line and stamps the skipped push, so the next push compares with it', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      const second = store.push('change-2', 2);
+      store.push('change-3', 3);
+      const [log] = quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-2');
+      await store.run('change-3');
+
+      expect(log).toHaveBeenCalledWith(expect.stringContaining(FILE_PATH));
+      expect(second.extractedAt).toBeInstanceOf(Date);
+      expect(second.sourceHash).toBe(store.changes.get('change-1')?.sourceHash);
+      expect(store.extract).toHaveBeenCalledTimes(1);
+    });
+
+    it('still skips on a retry attempt', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-2', { attemptsStarted: 2 });
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+      expect(store.tryConsume).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not rewrite a push that was already extracted when its job is delivered again', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      quietLogs();
+
+      await store.run('change-1');
+      const stamped = store.changes.get('change-1')?.extractedAt;
+      const writes = store.prisma.codeChange.updateMany.mock.calls.length;
+      await store.run('change-1');
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+      expect(store.prisma.codeChange.updateMany).toHaveBeenCalledTimes(writes);
+      expect(store.changes.get('change-1')?.extractedAt).toBe(stamped);
+    });
+
+    it('extracts again when a job is delivered again after its proposals were saved but never stamped', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      quietLogs();
+      const write = store.prisma.codeChange.updateMany.getMockImplementation();
+      store.prisma.codeChange.updateMany
+        .mockImplementationOnce(write as never)
+        .mockRejectedValueOnce(new Error('db gone'));
+
+      await store.run('change-1');
+      expect(store.changes.get('change-1')?.extractedAt).toBeNull();
+      await store.run('change-1');
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+      expect(store.changes.get('change-1')?.extractedAt).toBeInstanceOf(Date);
     });
   });
 
-  it('fingerprints the content the plan let through, not the full file', async () => {
-    const prisma = createPrisma();
-    const read = jest.fn().mockResolvedValue({
-      kind: 'content',
-      content: 'only the first part',
-      truncated: true,
+  describe('a file that differs from the previous push', () => {
+    it('runs when the content changed', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-2', { content: SOURCE_B });
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+      expect(store.tryConsume).toHaveBeenCalledTimes(2);
     });
-    const extract = jest
-      .fn()
-      .mockResolvedValue(extractedOutcome([extractedCase()]));
 
-    await build(prisma, fakeSourceReader(read), fakeExtractor(extract)).process(
-      codeChangeJob(),
-    );
+    it('runs when the model changed, and skips again once it is stable', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      store.push('change-3', 3);
+      quietLogs();
 
-    expect(recorded(prisma)[0]).toEqual({
-      sourceHash: hashOf({ content: 'only the first part' }),
+      await store.run('change-1', { model: 'gemini-a' });
+      await store.run('change-2', { model: 'gemini-b' });
+      await store.run('change-3', { model: 'gemini-b' });
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+
+    it('runs when the locale changed', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1', { locale: 'en' });
+      await store.run('change-2', { locale: 'es' });
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not extract a file that fit again when only the plan limit changed', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1', { sourceLimit: 60_000 });
+      await store.run('change-2', { sourceLimit: 1_000_000 });
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+    });
+
+    it('extracts a truncated file again when the plan limit changed', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1', { sourceLimit: 60_000, truncated: true });
+      await store.run('change-2', { sourceLimit: 1_000_000, truncated: true });
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips a truncated file at the same limit, since a re-extraction cannot see more', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1', { truncated: true });
+      await store.run('change-2', { truncated: true });
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('a failed extraction is never taken for a success', () => {
-    it('leaves the extraction unstamped when the provider is unavailable', async () => {
-      const prisma = createPrisma();
-      const extract = jest.fn().mockResolvedValue({
-        kind: 'provider-unavailable',
-        reason: 'rate-limited',
-        retryable: false,
+  describe('the push it is compared with', () => {
+    it('is the one recorded immediately before it, even when an older one matches', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      store.push('change-3', 3);
+      quietLogs();
+
+      await store.run('change-1', { content: SOURCE_A });
+      await store.run('change-2', { content: SOURCE_B });
+      await store.run('change-3', { content: SOURCE_A });
+
+      expect(store.extract).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not hide a revert while the push in between is still in its retry backoff', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      store.push('change-3', 3);
+      quietLogs();
+
+      await store.run('change-1', { content: SOURCE_A });
+      await expect(
+        store.run('change-2', {
+          content: SOURCE_B,
+          outcome: providerDown(true),
+        }),
+      ).rejects.toThrow('provider-unavailable');
+      await store.run('change-3', { content: SOURCE_A });
+
+      expect(store.extract).toHaveBeenCalledTimes(3);
+      expect(store.changes.get('change-3')?.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('does not hide a revert while the push in between has not run yet', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      store.push('change-3', 3);
+      quietLogs();
+
+      await store.run('change-1', { content: SOURCE_A });
+      await store.run('change-3', { content: SOURCE_A });
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+
+    it('is never one recorded after it', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      store.push('change-3', 3);
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-3');
+      await store.run('change-2');
+
+      // change-2 matches change-1, which came right before it; change-3 is
+      // newer and is not what it is compared with.
+      expect(store.extract).toHaveBeenCalledTimes(2);
+      expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('is not a push that failed, whatever it held', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1', { outcome: providerDown(false) });
+      await store.run('change-2');
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+
+    it('is not a push whose creation time the job does not know', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2);
+      quietLogs();
+      const lookup = store.prisma.codeChange.findUnique.getMockImplementation();
+      store.prisma.codeChange.findUnique.mockImplementation(
+        async (args: { where: { id: string } }) => ({
+          ...((await lookup?.(args)) as Record<string, unknown>),
+          createdAt: undefined,
+        }),
+      );
+
+      await store.run('change-1');
+      await store.run('change-2');
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('an extraction is only stamped when it is complete', () => {
+    it('stamps after the proposals are saved, and writes the hash before the model call', async () => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
+
+      await store.run('change-1');
+
+      expect(change.sourceHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(change.extractedAt).toBeInstanceOf(Date);
+
+      const [hashOrder, stampOrder] =
+        store.prisma.codeChange.updateMany.mock.invocationCallOrder;
+      expect(hashOrder).toBeLessThan(store.extract.mock.invocationCallOrder[0]);
+      expect(
+        store.prisma.extractedProposal.create.mock.invocationCallOrder[0],
+      ).toBeLessThan(stampOrder);
+    });
+
+    it('stamps when every proposal was refreshed and none was created', async () => {
+      const store = pushes();
+      const first = store.push('change-1', 1);
+      const second = store.push('change-2', 2);
+      quietLogs();
+      store.prisma.extractedProposal.findMany.mockImplementation(
+        (args: { where: Record<string, unknown> }) =>
+          Promise.resolve(
+            typeof args.where.codeChangeId === 'object'
+              ? [
+                  {
+                    id: 'open-1',
+                    status: 'in_review',
+                    evidenceId: 'evidence-1',
+                    automationKey: 'Cart > adds an item',
+                    codeChange: { id: first.id, createdAt: first.createdAt },
+                  },
+                ]
+              : [],
+          ),
+      );
+
+      await store.run('change-2', { content: SOURCE_B });
+
+      expect(store.prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(store.prisma.extractedProposal.updateMany).toHaveBeenCalledTimes(
+        1,
+      );
+      expect(second.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('stamps a truncated source, since extracting it again cannot see more', async () => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
+
+      await store.run('change-1', { truncated: true });
+
+      expect(change.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('does not stamp an extraction that hit the case cap, so the next push extracts again', async () => {
+      const store = pushes();
+      const first = store.push('change-1', 1);
+      const second = store.push('change-2', 2);
+      quietLogs();
+
+      await store.run('change-1', { outcome: nCases(MAX_EXTRACTED_CASES) });
+      await store.run('change-2', { outcome: nCases(MAX_EXTRACTED_CASES) });
+
+      expect(first.extractedAt).toBeNull();
+      expect(first.sourceHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(second.extractedAt).toBeNull();
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
+
+    it('stamps an extraction one case short of the cap', async () => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
+
+      await store.run('change-1', {
+        outcome: nCases(MAX_EXTRACTED_CASES - 1),
       });
 
-      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-        codeChangeJob(),
-      );
-
-      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+      expect(change.extractedAt).toBeInstanceOf(Date);
     });
 
-    it('leaves the extraction unstamped when the model finds no tests', async () => {
-      const prisma = createPrisma();
-      const extract = jest.fn().mockResolvedValue({ kind: 'no-tests-found' });
+    it.each([
+      ['the provider is unavailable', providerDown(false)],
+      ['the model finds no tests', { kind: 'no-tests-found' }],
+      ['no extracted case matches the request', extractedOutcome([])],
+    ])('does not stamp when %s', async (_label, outcome) => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
 
-      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-        codeChangeJob(),
-      );
+      await store.run('change-1', { outcome });
 
-      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+      expect(change.extractedAt).toBeNull();
+      expect(change.sourceHash).toMatch(/^[0-9a-f]{64}$/);
     });
 
-    it('leaves the extraction unstamped when no extracted case matches the request', async () => {
-      const prisma = createPrisma();
-      const extract = jest.fn().mockResolvedValue(extractedOutcome([]));
+    it('does not stamp when the provider failure is retryable, and rethrows it', async () => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
 
-      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-        codeChangeJob(),
-      );
+      await expect(
+        store.run('change-1', { outcome: providerDown(true) }),
+      ).rejects.toThrow('provider-unavailable:rate-limited');
 
-      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+      expect(change.extractedAt).toBeNull();
     });
 
-    it('leaves the extraction unstamped when the credit cannot be spent', async () => {
-      const prisma = createPrisma();
-      const extract = jest
-        .fn()
-        .mockResolvedValue(extractedOutcome([extractedCase()]));
+    it('does not stamp when the credit cannot be spent', async () => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
+      store.spendCredit.mockResolvedValue(false);
 
-      await build(
-        prisma,
-        fakeSourceReader(),
-        fakeExtractor(extract),
-        fakeEncryption(),
-        fakeEntitlement(undefined, jest.fn().mockResolvedValue(false)),
-      ).process(codeChangeJob());
+      await store.run('change-1');
 
-      expect(prisma.extractedProposal.create).not.toHaveBeenCalled();
-      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+      expect(store.prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(change.extractedAt).toBeNull();
     });
 
-    it('leaves the extraction unstamped when the daily budget is exhausted', async () => {
-      const prisma = createPrisma();
-      const extract = jest.fn();
+    it('does not stamp when the daily budget is exhausted', async () => {
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
+      store.tryConsume.mockResolvedValue(false);
 
-      await build(
-        prisma,
-        fakeSourceReader(),
-        fakeExtractor(extract),
-        fakeEncryption(),
-        fakeEntitlement(),
-        fakeDailyBudget(jest.fn().mockResolvedValue(false)),
-      ).process(codeChangeJob());
+      await store.run('change-1');
 
-      expect(extract).not.toHaveBeenCalled();
-      expect(recorded(prisma)).toEqual([{ sourceHash: hashOf() }]);
+      expect(store.extract).not.toHaveBeenCalled();
+      expect(change.extractedAt).toBeNull();
     });
 
     it('does not fingerprint a source that could not be read', async () => {
-      const prisma = createPrisma();
+      const store = pushes();
+      const change = store.push('change-1', 1);
+      quietLogs();
       const read = jest
         .fn()
         .mockResolvedValue({ kind: 'unavailable', reason: 'timeout' });
 
       await build(
-        prisma,
+        store.prisma,
         fakeSourceReader(read),
-        fakeExtractor(jest.fn()),
-      ).process(codeChangeJob());
+        fakeExtractor(store.extract),
+      ).process({
+        data: { kind: 'code-change', codeChangeId: 'change-1' },
+      } as never);
 
-      expect(prisma.codeChange.findFirst).not.toHaveBeenCalled();
-      expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
+      expect(store.prisma.codeChange.findMany).not.toHaveBeenCalled();
+      expect(change.sourceHash).toBeNull();
     });
   });
 
   describe('the fingerprint never blocks an extraction', () => {
-    it('extracts anyway when the previous extraction cannot be looked up', async () => {
-      const prisma = createPrisma();
-      prisma.codeChange.findFirst.mockRejectedValue(new Error('db gone'));
-      const extract = jest
-        .fn()
-        .mockResolvedValue(extractedOutcome([extractedCase()]));
-      const warn = jest
-        .spyOn(Logger.prototype, 'warn')
-        .mockImplementation(() => {});
+    it('extracts anyway when the previous push cannot be looked up', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      const [, warn] = quietLogs();
+      store.prisma.codeChange.findMany.mockRejectedValue(new Error('db gone'));
 
-      await build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-        codeChangeJob(),
-      );
+      await store.run('change-1');
 
-      expect(extract).toHaveBeenCalledTimes(1);
-      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(store.extract).toHaveBeenCalledTimes(1);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('db gone'));
-      warn.mockRestore();
     });
 
-    it('keeps the job successful when stamping the extraction fails after the proposals were saved', async () => {
-      const prisma = createPrisma();
-      prisma.codeChange.updateMany
-        .mockResolvedValueOnce({ count: 1 })
-        .mockRejectedValueOnce(new Error('db gone'));
-      const extract = jest
-        .fn()
-        .mockResolvedValue(extractedOutcome([extractedCase()]));
-      const warn = jest
-        .spyOn(Logger.prototype, 'warn')
-        .mockImplementation(() => {});
+    it('keeps the job successful when stamping fails after the proposals were saved', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      const [, warn] = quietLogs();
       const error = jest
         .spyOn(Logger.prototype, 'error')
         .mockImplementation(() => {});
+      const write = store.prisma.codeChange.updateMany.getMockImplementation();
+      store.prisma.codeChange.updateMany
+        .mockImplementationOnce(write as never)
+        .mockRejectedValueOnce(new Error('db gone'));
 
-      await expect(
-        build(prisma, fakeSourceReader(), fakeExtractor(extract)).process(
-          codeChangeJob(),
-        ),
-      ).resolves.toBeUndefined();
+      await expect(store.run('change-1')).resolves.toBeUndefined();
 
-      expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(store.prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('db gone'));
       expect(error).not.toHaveBeenCalled();
-      warn.mockRestore();
-      error.mockRestore();
     });
   });
 
@@ -1378,10 +1634,6 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
     it('still extracts a document-case request for an unchanged file', async () => {
       const prisma = createPrisma();
       prisma.testCase.findUnique.mockResolvedValue(testCaseRow);
-      prisma.codeChange.findFirst.mockResolvedValue({
-        ...lastSuccessful(hashOf()),
-        commitSha: 'sha-1',
-      });
       const extract = jest
         .fn()
         .mockResolvedValue(extractedOutcome([extractedCase()]));
@@ -1392,6 +1644,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
 
       expect(extract).toHaveBeenCalledTimes(1);
       expect(prisma.extractedProposal.create).toHaveBeenCalledTimes(1);
+      expect(prisma.codeChange.findMany).not.toHaveBeenCalled();
       expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
     });
 
@@ -1404,7 +1657,6 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
       prisma.testCase.findMany.mockResolvedValue([
         { id: 'case-1', suiteId: 'suite-1', documentationSource: 'ingestion' },
       ]);
-      prisma.codeChange.findFirst.mockResolvedValue(lastSuccessful(hashOf()));
       const extract = jest
         .fn()
         .mockResolvedValue(
@@ -1424,6 +1676,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
       } as never);
 
       expect(extract).toHaveBeenCalledTimes(1);
+      expect(prisma.codeChange.findMany).not.toHaveBeenCalled();
       expect(prisma.codeChange.updateMany).not.toHaveBeenCalled();
     });
   });

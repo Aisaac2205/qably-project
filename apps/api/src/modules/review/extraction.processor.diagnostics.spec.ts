@@ -1,3 +1,4 @@
+import type { Env } from '../../config/env';
 import type { AiDailyBudget } from '../ai/ai-daily-budget.service';
 import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { EncryptionService } from '../../common/crypto/encryption.service';
@@ -58,6 +59,7 @@ function createPrisma() {
         project: { organizationId: 'org-1', connection },
       }),
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     testCase: {
@@ -137,6 +139,7 @@ function build(
       { enqueue: jest.fn().mockResolvedValue(undefined) } as never,
       { publish: jest.fn() } as never,
     ),
+    { GEMINI_MODEL: 'gemini-test' } as Env,
   );
 
   const warn = jest

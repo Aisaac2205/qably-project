@@ -5,8 +5,9 @@ import {
 
 const parts: SourceFingerprintParts = {
   promptVersion: 'extraction-v12',
+  model: 'gemini-3.1-flash-lite',
   locale: 'en',
-  sourceLimit: 60_000,
+  truncationLimit: null,
   content: "it('adds an item', () => {});\n",
 };
 
@@ -31,28 +32,36 @@ describe('fingerprintSource', () => {
     expect(fingerprintSource(next)).not.toBe(fingerprintSource(parts));
   });
 
+  it('changes with the model, so a new model re-extracts every file', () => {
+    const next = { ...parts, model: 'gemini-3.2-pro' };
+
+    expect(fingerprintSource(next)).not.toBe(fingerprintSource(parts));
+  });
+
   it('changes with the locale, so the proposals are written in the new language', () => {
     const next = { ...parts, locale: 'es' };
 
     expect(fingerprintSource(next)).not.toBe(fingerprintSource(parts));
   });
 
-  it('changes with the source character limit, so a plan change re-extracts', () => {
-    const next = { ...parts, sourceLimit: 1_000_000 };
+  it('changes with the limit a truncated file was cut at', () => {
+    const cut = { ...parts, truncationLimit: 60_000 };
+    const cutLater = { ...parts, truncationLimit: 1_000_000 };
 
-    expect(fingerprintSource(next)).not.toBe(fingerprintSource(parts));
+    expect(fingerprintSource(cut)).not.toBe(fingerprintSource(parts));
+    expect(fingerprintSource(cutLater)).not.toBe(fingerprintSource(cut));
   });
 
   it('does not let a part bleed into its neighbour', () => {
     const left = fingerprintSource({
       ...parts,
       promptVersion: 'v1',
-      locale: 'en',
+      model: 'm',
     });
     const right = fingerprintSource({
       ...parts,
-      promptVersion: 'v1e',
-      locale: 'n',
+      promptVersion: 'v1m',
+      model: '',
     });
 
     expect(left).not.toBe(right);
