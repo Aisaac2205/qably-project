@@ -6,9 +6,13 @@ import type { AiEntitlementService } from '../ai/ai-entitlement.service';
 import type { AuthenticatedUser } from '../auth/auth.contracts';
 import type { OrgContext } from '../organizations/organizations.contracts';
 import type { CaseContextBuilder } from './case-context-builder';
-import type { ChatAssistant, ChatReplyOutcome } from './chat.assistant';
+import type {
+  ChatAssistant,
+  ChatReplyOutcome,
+  ChatReplyStreamEvent,
+} from './chat.assistant';
 import { buildGroundingDeclineReply } from './chat-prompt';
-import { CHAT_PROMPT_VERSION } from './chat.contracts';
+import { CHAT_PROMPT_VERSION, type ChatStreamEvent } from './chat.contracts';
 import { ChatService } from './chat.service';
 
 const org: OrgContext = {
@@ -174,8 +178,11 @@ function createPrisma(): FakePrisma {
 
 function createAssistant(
   outcome: ChatReplyOutcome,
-): ChatAssistant & { reply: jest.Mock } {
-  return { reply: jest.fn().mockResolvedValue(outcome) };
+): ChatAssistant & { reply: jest.Mock; replyStream: jest.Mock } {
+  return {
+    reply: jest.fn().mockResolvedValue(outcome),
+    replyStream: jest.fn(),
+  };
 }
 
 function containing(shape: Record<string, unknown>): unknown {
@@ -1201,7 +1208,7 @@ describe('ChatService', () => {
   it('reports quota-exhausted and does not call the assistant when the daily Aeris budget is spent', async () => {
     const prisma = createPrisma();
     const reply = jest.fn();
-    const assistant: ChatAssistant = { reply };
+    const assistant: ChatAssistant = { reply, replyStream: jest.fn() };
     const spendCredit = jest.fn().mockResolvedValue(true);
     const tryConsume = jest.fn().mockResolvedValue(false);
     const service = build(
@@ -2437,5 +2444,321 @@ describe('ChatService — notifying that a chat proposal is ready', () => {
 
     expect(result).toEqual({ ok: false, error: 'no-code-evidence' });
     expect(publish).not.toHaveBeenCalled();
+  });
+});
+
+describe('ChatService — streaming a message', () => {
+  const replied: ChatReplyOutcome = {
+    kind: 'replied',
+    reply: 'Here is a case worth adding.',
+    cases: [suggestedCase],
+    usage: { promptTokens: 100, candidatesTokens: 20, totalTokens: 120 },
+    grounding: { status: 'grounded', references: [] },
+  };
+
+  function streamingAssistant(
+    ...steps: Array<ChatReplyStreamEvent | (() => void)>
+  ): ChatAssistant & { reply: jest.Mock; replyStream: jest.Mock } {
+    return {
+      reply: jest.fn(),
+      replyStream: jest.fn().mockImplementation(async function* () {
+        for (const step of steps) {
+          await Promise.resolve();
+          if (typeof step === 'function') {
+            step();
+          } else {
+            yield step;
+          }
+        }
+      }),
+    };
+  }
+
+  async function collect(
+    events: AsyncGenerator<ChatStreamEvent>,
+  ): Promise<ChatStreamEvent[]> {
+    const collected: ChatStreamEvent[] = [];
+    for await (const event of events) collected.push(event);
+    return collected;
+  }
+
+  function stream(
+    service: ChatService,
+    input: Parameters<ChatService['streamMessage']>[4] = {
+      content: 'What is missing in checkout?',
+    },
+    signal: AbortSignal = new AbortController().signal,
+  ): Promise<ChatStreamEvent[]> {
+    return collect(
+      service.streamMessage(org, user, 'project-1', 'thread-1', input, signal),
+    );
+  }
+
+  it('streams the reply deltas, then the stored user and assistant messages', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.findMany.mockResolvedValue([]);
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const assistant = streamingAssistant(
+      { type: 'delta', text: 'Here is a case ' },
+      { type: 'delta', text: 'worth adding.' },
+      { type: 'outcome', outcome: replied },
+    );
+    const service = build(prisma, assistant, fakeEntitlement(spendCredit));
+
+    const events = await stream(service);
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Here is a case ' },
+      { type: 'delta', text: 'worth adding.' },
+      {
+        type: 'done',
+        userMessage: containing({
+          id: 'message-1',
+          role: 'user',
+          content: 'What is missing in checkout?',
+          attachedCases: [],
+        }),
+        assistantMessage: containing({
+          id: 'message-2',
+          role: 'assistant',
+          content: 'Here is a case worth adding.',
+          suggestedCases: [suggestedCase],
+        }),
+      },
+    ]);
+    expect(assistant.replyStream).toHaveBeenCalledWith(
+      containing({ locale: 'es', message: 'What is missing in checkout?' }),
+      { signal: expect.any(AbortSignal) as unknown },
+    );
+    expect(assistant.reply).not.toHaveBeenCalled();
+    expect(spendCredit).toHaveBeenCalledWith('org-1', prisma);
+    expect(prisma.chatThread.update).toHaveBeenCalledWith(
+      containing({
+        data: containing({ title: 'What is missing in checkout?' }),
+      }),
+    );
+  });
+
+  it('lists the attached cases on the streamed user message', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.create
+      .mockReset()
+      .mockResolvedValueOnce({ ...userRow, attachedCaseIds: ['case-1'] })
+      .mockResolvedValueOnce(assistantRow);
+    const service = build(
+      prisma,
+      streamingAssistant({ type: 'outcome', outcome: replied }),
+    );
+
+    const events = await stream(service, {
+      content: 'Improve this case',
+      caseIds: ['case-1'],
+    });
+
+    expect(events).toEqual([
+      containing({
+        type: 'done',
+        userMessage: containing({
+          attachedCases: [
+            {
+              id: 'case-1',
+              name: 'Rejects an expired card',
+              suiteName: 'Checkout',
+            },
+          ],
+        }),
+      }),
+    ]);
+  });
+
+  it('sends the stored decline in done when the streamed reply cites a reference never attached', async () => {
+    const prisma = createPrisma();
+    prisma.chatMessage.create
+      .mockReset()
+      .mockResolvedValueOnce(userRow)
+      .mockImplementationOnce((args: { data: Record<string, unknown> }) =>
+        Promise.resolve({ ...assistantRow, ...args.data }),
+      );
+    const service = build(
+      prisma,
+      streamingAssistant(
+        { type: 'delta', text: 'Here is a case worth adding.' },
+        {
+          type: 'outcome',
+          outcome: {
+            ...replied,
+            grounding: {
+              status: 'grounded',
+              references: [{ kind: 'source-excerpt', id: 'case-ghost' }],
+            },
+          },
+        },
+      ),
+    );
+
+    const events = await stream(service);
+
+    expect(events[0]).toEqual({
+      type: 'delta',
+      text: 'Here is a case worth adding.',
+    });
+    expect(events[1]).toEqual(
+      containing({
+        type: 'done',
+        assistantMessage: containing({
+          content: buildGroundingDeclineReply('es'),
+          suggestedCases: [],
+        }),
+      }),
+    );
+  });
+
+  it('fails before streaming with quota-exhausted, keeping the user message and never calling the provider', async () => {
+    const prisma = createPrisma();
+    const assistant = streamingAssistant({ type: 'outcome', outcome: replied });
+    const service = build(
+      prisma,
+      assistant,
+      fakeEntitlement(),
+      fakeCaseContextBuilder(),
+      fakeDailyBudget(jest.fn().mockResolvedValue(false)),
+    );
+
+    const events = await stream(service);
+
+    expect(events).toEqual([{ type: 'failed', error: 'quota-exhausted' }]);
+    expect(assistant.replyStream).not.toHaveBeenCalled();
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails before streaming with file-unreadable, before storing anything', async () => {
+    const prisma = createPrisma();
+    const tryConsume = jest.fn().mockResolvedValue(true);
+    const service = build(
+      prisma,
+      streamingAssistant({ type: 'outcome', outcome: replied }),
+      fakeEntitlement(),
+      fakeCaseContextBuilder(),
+      fakeDailyBudget(tryConsume),
+    );
+
+    const events = await stream(service, {
+      content: 'Cover this file',
+      filePath: 'src/missing.ts',
+    });
+
+    expect(events).toEqual([{ type: 'failed', error: 'file-unreadable' }]);
+    expect(prisma.chatMessage.create).not.toHaveBeenCalled();
+    expect(tryConsume).not.toHaveBeenCalled();
+  });
+
+  it('fails with provider-unavailable when the provider fails before the first chunk', async () => {
+    const prisma = createPrisma();
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const service = build(
+      prisma,
+      streamingAssistant({
+        type: 'outcome',
+        outcome: { kind: 'provider-unavailable', reason: 'timeout' },
+      }),
+      fakeEntitlement(spendCredit),
+    );
+
+    const events = await stream(service);
+
+    expect(events).toEqual([{ type: 'failed', error: 'provider-unavailable' }]);
+    expect(spendCredit).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider failure in the middle of the stream after the deltas, spending no credit and storing no reply', async () => {
+    const prisma = createPrisma();
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const service = build(
+      prisma,
+      streamingAssistant(
+        { type: 'delta', text: 'Here is' },
+        {
+          type: 'outcome',
+          outcome: { kind: 'provider-unavailable', reason: 'socket hang up' },
+        },
+      ),
+      fakeEntitlement(spendCredit),
+    );
+
+    const events = await stream(service);
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Here is' },
+      { type: 'failed', error: 'provider-unavailable' },
+    ]);
+    expect(spendCredit).not.toHaveBeenCalled();
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+    expect(prisma.chatThread.update).not.toHaveBeenCalled();
+  });
+
+  it('reports ai-not-enabled after the deltas when the monthly credit cannot be spent', async () => {
+    const prisma = createPrisma();
+    const service = build(
+      prisma,
+      streamingAssistant(
+        { type: 'delta', text: 'Here is a case worth adding.' },
+        { type: 'outcome', outcome: replied },
+      ),
+      fakeEntitlement(jest.fn().mockResolvedValue(false)),
+    );
+
+    const events = await stream(service);
+
+    expect(events).toEqual([
+      { type: 'delta', text: 'Here is a case worth adding.' },
+      { type: 'failed', error: 'ai-not-enabled' },
+    ]);
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('ends without spending a credit, storing the reply or retitling the thread when the client aborts mid-stream', async () => {
+    const prisma = createPrisma();
+    const spendCredit = jest.fn().mockResolvedValue(true);
+    const controller = new AbortController();
+    const service = build(
+      prisma,
+      streamingAssistant(
+        { type: 'delta', text: 'Here is' },
+        () => controller.abort(),
+        { type: 'outcome', outcome: replied },
+      ),
+      fakeEntitlement(spendCredit),
+    );
+
+    const events = await stream(
+      service,
+      { content: 'What is missing in checkout?' },
+      controller.signal,
+    );
+
+    expect(events).toEqual([{ type: 'delta', text: 'Here is' }]);
+    expect(spendCredit).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+    expect(prisma.chatThread.update).not.toHaveBeenCalled();
+  });
+
+  it('does not call the provider when the client is already gone once the user message is stored', async () => {
+    const prisma = createPrisma();
+    const controller = new AbortController();
+    controller.abort();
+    const assistant = streamingAssistant({ type: 'outcome', outcome: replied });
+    const service = build(prisma, assistant);
+
+    const events = await stream(
+      service,
+      { content: 'What is missing in checkout?' },
+      controller.signal,
+    );
+
+    expect(events).toEqual([]);
+    expect(assistant.replyStream).not.toHaveBeenCalled();
+    expect(prisma.chatMessage.create).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
