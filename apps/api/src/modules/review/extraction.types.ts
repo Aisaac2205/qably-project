@@ -28,6 +28,9 @@ export interface JobContext {
   // at a time, retries with backoff), so this is what tells an older push from
   // a newer one. Set for code-change jobs.
   codeChangeCreatedAt?: Date;
+  // The branch the push went to, when its batch came from an SCM event. Change
+  // detection compares a file with the previous push of the same branch.
+  codeChangeBranch?: string | null;
   targetTestCaseId: string | null;
   knownSuiteId: string | null;
   onlyAutomationKey: string | null;

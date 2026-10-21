@@ -2,9 +2,11 @@ import { Inject, Logger } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { resolveLocale } from '@qably/i18n';
 import {
+  PLAN_LIMITS,
   assessCaseDocumentation,
   assessSuiteDocumentation,
 } from '@qably/types';
+import { Prisma } from '../../../generated/prisma/client';
 import { assertNever } from '../../common/assert-never';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { InjectEnv } from '../../config/config.tokens';
@@ -23,11 +25,15 @@ import {
   type ExtractedSuite,
   type ExtractionInput,
   type ExtractionOutcome,
+  type ExtractionTargetDeclaration,
   type TestCaseExtractor,
 } from '../ai/extraction.contracts';
 import { countTestDeclarations } from '../ai/count-test-declarations';
 import { buildTargetManifest } from '../ai/target-reference';
-import { SourceReader } from '../repository/source-reader';
+import {
+  SourceReader,
+  type SourceReadResult,
+} from '../repository/source-reader';
 import { splitRepo } from '../repository/lib/split-repo';
 import { TestFileLocator } from '../repository/test-file-locator';
 import { normalizeAutomationFilePath } from '../../common/paths/normalize-automation-file-path';
@@ -37,6 +43,16 @@ import {
   diagnoseNameCollision,
   summarizeUnmatchedTargets,
 } from './document-file-diagnostics';
+import {
+  buildDeclarationSnapshot,
+  diffDeclarations,
+  matchTargetedCases,
+  readDeclarationSnapshot,
+  readDeclaredFile,
+  type DeclarationSnapshot,
+  type DeclaredFile,
+  type SnapshotDeclaration,
+} from './lib/change-detection';
 import { detectLanguage } from './lib/detect-language';
 import { fingerprintSource } from './lib/source-fingerprint';
 import {
@@ -110,12 +126,115 @@ interface SourceFingerprint {
 
 interface PushStamp {
   id: string;
+  commitSha: string;
   sourceHash: string | null;
   extractedAt: Date | null;
+  declarationSnapshot: unknown;
 }
+
+const PUSH_STAMP_SELECT = {
+  id: true,
+  commitSha: true,
+  sourceHash: true,
+  extractedAt: true,
+  declarationSnapshot: true,
+} as const;
+
+/** What the fingerprint gate found, handed on to change detection. */
+interface PushComparison {
+  skipped: boolean;
+  own: PushStamp | null;
+  previous: PushStamp | null;
+}
+
+/**
+ * A file shorter than this fit under every plan, so no extraction of it was
+ * ever cut, whatever limit applied when it ran.
+ */
+const SMALLEST_PLAN_SOURCE_LIMIT = Math.min(
+  ...Object.values(PLAN_LIMITS).map((limits) => limits.maxSourceCharacters),
+);
 
 function unmatchedReasonFor(sourceTruncated: boolean): string {
   return sourceTruncated ? SOURCE_TRUNCATED_REASON : NO_MATCHING_CASE_REASON;
+}
+
+/**
+ * The value written to `CodeChange.declarationSnapshot`. A nullable JSON
+ * column cannot take a bare null through Prisma: clearing it needs `DbNull`.
+ */
+function snapshotColumn(
+  snapshot: DeclarationSnapshot | null,
+): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return snapshot === null ? Prisma.DbNull : snapshot;
+}
+
+/**
+ * Plain tests per model call. Below `MAX_EXTRACTED_CASES`, so a model that
+ * answers a few extra cases does not push a requested one past the cap.
+ */
+const PLAIN_TARGETS_PER_CALL = 15;
+
+/**
+ * The changed declarations, in source order, one model call's worth each:
+ * plain tests in groups of at most `PLAIN_TARGETS_PER_CALL`, and every table
+ * (`.each`/`.for`) alone, since it is answered with one case per row and its
+ * rows alone can fill the cap.
+ */
+function chunkTargets(
+  declarations: readonly SnapshotDeclaration[],
+): SnapshotDeclaration[][] {
+  const chunks: SnapshotDeclaration[][] = [];
+  let plain: SnapshotDeclaration[] = [];
+  const flush = (): void => {
+    if (plain.length > 0) chunks.push(plain);
+    plain = [];
+  };
+
+  for (const declaration of declarations) {
+    if (declaration.parametrized) {
+      flush();
+      chunks.push([declaration]);
+      continue;
+    }
+    plain.push(declaration);
+    if (plain.length === PLAIN_TARGETS_PER_CALL) flush();
+  }
+  flush();
+
+  return chunks;
+}
+
+/** What the model is told about a declaration: its name and where it is. */
+function toTargetDeclaration(
+  declaration: SnapshotDeclaration,
+): ExtractionTargetDeclaration {
+  return {
+    describePath: declaration.describePath,
+    title: declaration.title,
+    startLine: declaration.startLine,
+    endLine: declaration.endLine,
+    parametrized: declaration.parametrized,
+  };
+}
+
+/**
+ * Tells the reviewer that the push's other requested tests did not come back,
+ * like the document-file note, on every case that has room for it.
+ */
+function withIncompleteTargetNote(
+  cases: readonly ExtractedCase[],
+  described: number,
+  requested: number,
+  locale: 'es' | 'en',
+): ExtractedCase[] {
+  const note = incompleteTargetNote(described, requested, locale);
+
+  return cases.map((testCase) => {
+    const observations = testCase.observations ?? [];
+    if (observations.length >= MAX_CASE_OBSERVATIONS) return testCase;
+    return { ...testCase, observations: [...observations, note] };
+  });
 }
 
 async function lockTestCases(tx: TxClient, ids: string[]): Promise<void> {
@@ -300,6 +419,7 @@ export class ExtractionProcessor {
         commitSha: true,
         evidenceId: true,
         createdAt: true,
+        batch: { select: { scmEvent: { select: { branch: true } } } },
         project: {
           select: {
             organizationId: true,
@@ -320,6 +440,10 @@ export class ExtractionProcessor {
       return;
     }
 
+    // Optional chaining on purpose: the batch is required in the schema, but a
+    // missing branch must only cost the branch filter, never fail the job.
+    const branch = codeChange.batch?.scmEvent?.branch ?? null;
+
     await this.runExtraction({
       projectId: codeChange.projectId,
       organizationId: codeChange.project.organizationId,
@@ -328,6 +452,7 @@ export class ExtractionProcessor {
       connection: codeChange.project.connection,
       codeChangeId: codeChange.id,
       codeChangeCreatedAt: codeChange.createdAt,
+      codeChangeBranch: branch,
       targetTestCaseId: null,
       knownSuiteId: null,
       onlyAutomationKey: null,
@@ -1493,10 +1618,40 @@ export class ExtractionProcessor {
               content: source.content,
             }),
           };
-    if (
-      fingerprint !== null &&
-      (await this.skipUnchangedSource(ctx, fingerprint))
-    ) {
+    // The tests the parser reads in this file version, recorded with the stamp
+    // so the next push can tell which ones changed. Null for a file it cannot
+    // read (another language, a syntax error, a cut source, no test it sees).
+    const declared: DeclaredFile | null =
+      fingerprint === null ? null : this.readDeclarations(ctx, source);
+    const comparison =
+      fingerprint === null
+        ? null
+        : await this.skipUnchangedSource(ctx, fingerprint, declared);
+    if (comparison?.skipped === true) return;
+
+    // For a file the parser reads, only the declarations that are new or
+    // changed since the baseline push go to the model, as explicit targets.
+    // Every other file keeps the whole-file extraction below.
+    if (fingerprint !== null && declared !== null) {
+      const connection = ctx.connection;
+      await this.extractChangedDeclarations(ctx, {
+        fingerprint,
+        declared,
+        own: comparison?.own ?? null,
+        previous: comparison?.previous ?? null,
+        content: source.content,
+        locale,
+        readAt: (ref) =>
+          this.sourceReader.read({
+            provider: connection.provider,
+            owner,
+            repo,
+            ref,
+            path: normalizeAutomationFilePath(ctx.filePath, repo),
+            accessToken,
+            maxContentLength: sourceLimit,
+          }),
+      });
       return;
     }
 
@@ -1583,8 +1738,10 @@ export class ExtractionProcessor {
     // A file that hit the case cap lost cases the model could not return, so
     // it must be extracted again next time instead of being taken for done.
     // The count that matters is the model's own, before duplicates are merged.
-    // (Targeted extraction removes the cap; until then this is the only signal
-    // that is exact: a regex count of declarations overcounts.)
+    // (A file the parser reads takes the targeted extraction, which splits its
+    // tests over as many calls as it needs and applies the same cap rule per
+    // call. For the rest this is the only signal that is exact: a regex count
+    // of declarations overcounts.)
     if (outcome.cases.length >= MAX_EXTRACTED_CASES) {
       this.logger.log(
         `Extraction of ${ctx.filePath} reached the ${String(MAX_EXTRACTED_CASES)}-case cap: leaving it unstamped so the next push extracts it again`,
@@ -1592,32 +1749,361 @@ export class ExtractionProcessor {
       return;
     }
 
-    await this.stampExtraction(fingerprint);
+    // A file the parser reads never gets here, so there is no snapshot to keep.
+    await this.stampExtraction(fingerprint, null);
   }
 
   /**
-   * Ends a code-change job whose file is identical to what the push recorded
-   * right before it extracted, under the same prompt, model, locale and
-   * truncation.
+   * Reads the test declarations of a code change's file for change detection.
+   * A file it cannot read is logged and goes through the whole-file
+   * extraction.
+   */
+  private readDeclarations(
+    ctx: JobContext,
+    source: { content: string; truncated: boolean },
+  ): DeclaredFile | null {
+    const result = readDeclaredFile({
+      filePath: ctx.filePath,
+      content: source.content,
+      truncated: source.truncated,
+    });
+    if (result.kind === 'declared') return result.file;
+
+    this.logger.debug(
+      `No declaration snapshot for ${ctx.filePath} at ${ctx.ref}: ${result.reason}`,
+    );
+    return null;
+  }
+
+  /**
+   * The code-change extraction of a file the parser reads. The declarations
+   * are compared with the baseline push of the file; only the new and changed
+   * ones go to the model, as explicit targets (see `chunkTargets` for how many
+   * per call), and every other test of the file produces nothing.
    *
-   * Only the previous push of this file counts, never "the newest extraction
-   * overall": pushes persist out of order, so a revert (A, B, A) must not be
-   * matched with the first A while B is still in flight or in its retry
-   * backoff. That push holds its hash but no `extractedAt`, which is enough to
-   * stop the skip. Comparing by `createdAt`, which the database wrote, also
-   * keeps the order off the worker clocks.
+   * Cost: one unit of the daily budget per model call, and one credit for each
+   * save of proposals, which is once per job unless a retry finishes it. A
+   * file with no change spends neither and is stamped.
+   *
+   * The push is stamped, with a complete snapshot, only when every target came
+   * back described. Otherwise what matched is saved and the push keeps an
+   * incomplete snapshot without the stamp: a retry or a redelivery of this
+   * push, and the next push of the branch, send only what is still
+   * undescribed.
+   *
+   * A retryable provider failure saves what the earlier calls matched before
+   * it rethrows, so the retry resends only the rest. The unit charged for the
+   * call that failed pays for the retry's first call; every later call is
+   * charged. The budget therefore counts each call that answers, once.
+   */
+  private async extractChangedDeclarations(
+    ctx: JobContext,
+    job: {
+      fingerprint: SourceFingerprint;
+      declared: DeclaredFile;
+      /** This push's own row, from the fingerprint gate. */
+      own: PushStamp | null;
+      /** The push it is compared with, from the fingerprint gate. */
+      previous: PushStamp | null;
+      content: string;
+      locale: 'es' | 'en';
+      readAt: (ref: string) => Promise<SourceReadResult>;
+    },
+  ): Promise<void> {
+    // An earlier attempt at this same file version left an incomplete
+    // snapshot: carry on from it, keeping what it found removed.
+    const resumed =
+      job.own !== null && job.own.sourceHash === job.fingerprint.sourceHash
+        ? readDeclarationSnapshot(job.own.declarationSnapshot)
+        : null;
+    const resuming = resumed !== null && !resumed.complete;
+    const baseline = resuming
+      ? resumed
+      : await this.resolveBaseline(ctx, job.previous, job.readAt);
+    const diff = diffDeclarations(job.declared, baseline);
+    const removedRefs = resuming ? resumed.removed : diff.removed;
+    const total = job.declared.declarations.length;
+    const removed = removedRefs?.length ?? 0;
+
+    if (diff.changed.length === 0) {
+      this.logger.log(
+        `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: none of its ${String(total)} test declarations changed since the previous push (${String(removed)} removed)`,
+      );
+      await this.stampExtraction(
+        job.fingerprint,
+        buildDeclarationSnapshot(job.declared, removedRefs),
+      );
+      return;
+    }
+
+    const chunks = chunkTargets(diff.changed);
+    this.logger.log(
+      `Extracting ${String(diff.changed.length)} of ${String(total)} test declarations of ${ctx.filePath} at ${ctx.ref} in ${String(chunks.length)} model call(s) (${resuming ? 'resumed' : (diff.wholeFile ?? 'changed only')}, ${String(removed)} removed)`,
+    );
+
+    const matched: ExtractedCase[] = [];
+    const described = new Set<string>();
+    let answered = false;
+    let stopReason: string | null = null;
+    let retryReason: string | null = null;
+    // A retry's first call reuses the unit charged for the call that failed.
+    let prepaid = ctx.isFirstAttempt ? 0 : 1;
+
+    for (const targets of chunks) {
+      const withinBudget =
+        prepaid > 0 || (await this.dailyBudget.tryConsume(NOT_BYOK));
+      prepaid = 0;
+      if (!withinBudget) {
+        stopReason = QUOTA_EXHAUSTED_REASON;
+        break;
+      }
+
+      const outcome = await this.extractor.extract({
+        filePath: ctx.filePath,
+        language: detectLanguage(ctx.filePath),
+        content: job.content,
+        locale: job.locale,
+        targetDeclarations: targets.map(toTargetDeclaration),
+      });
+
+      if (outcome.kind === 'provider-unavailable') {
+        if (outcome.retryable && !ctx.isFinalAttempt) {
+          retryReason = outcome.reason;
+        } else {
+          stopReason = outcome.reason;
+        }
+        break;
+      }
+
+      answered = true;
+      const returned = outcome.kind === 'extracted' ? outcome.cases : [];
+      const round = matchTargetedCases(
+        targets,
+        job.declared.declarations,
+        returned,
+        job.content,
+      );
+      matched.push(...round.matched.map(({ testCase }) => testCase));
+      // An answer at the cap may have lost cases the extractor cut, rows of a
+      // table above all: what it matched is saved, but none of its targets
+      // counts as described, so the push stays unstamped.
+      if (returned.length >= MAX_EXTRACTED_CASES) {
+        this.logger.log(
+          `A model call for ${ctx.filePath} reached the ${String(MAX_EXTRACTED_CASES)}-case cap: its ${String(targets.length)} declaration(s) count as not described`,
+        );
+      } else {
+        for (const { target } of round.matched) described.add(target.id);
+      }
+      if (round.dropped > 0) {
+        this.logger.log(
+          `Dropped ${String(round.dropped)} case(s) of ${ctx.filePath} that describe no requested declaration`,
+        );
+      }
+    }
+
+    const saved = await this.saveTargetedCases(ctx, {
+      matched,
+      described,
+      requested: diff.changed.length,
+      locale: job.locale,
+      // Spent once the job ends; a retry pays when it answers.
+      chargeEmptyAnswer: answered && retryReason === null,
+    });
+    if (saved !== 'saved') described.clear();
+
+    const undescribed = diff.changed
+      .map(({ id }) => id)
+      .filter((id) => !described.has(id));
+    const snapshot = buildDeclarationSnapshot(
+      job.declared,
+      removedRefs,
+      undescribed,
+    );
+
+    if (undescribed.length === 0) {
+      await this.stampExtraction(job.fingerprint, snapshot);
+      return;
+    }
+
+    await this.recordProgress(job.fingerprint, snapshot);
+
+    if (retryReason !== null) throw new RetryableProviderError(retryReason);
+
+    const reason = stopReason ?? EXTRACTION_INCOMPLETE_REASON;
+    this.logger.log(
+      `Extraction of ${ctx.filePath} described ${String(diff.changed.length - undescribed.length)} of ${String(diff.changed.length)} requested test declarations (${reason}): leaving it unstamped so the rest is requested again`,
+    );
+    if (saved === 'nothing') {
+      await this.failureRecorder.recordExtractionFailure(ctx, reason);
+    }
+  }
+
+  /**
+   * Saves the matched cases of a targeted extraction, with the incomplete
+   * note when some requested declarations did not come back. `nothing` when
+   * no case matched; `refused` when the credit was refused, which is already
+   * recorded.
+   */
+  private async saveTargetedCases(
+    ctx: JobContext,
+    result: {
+      matched: readonly ExtractedCase[];
+      described: ReadonlySet<string>;
+      requested: number;
+      locale: 'es' | 'en';
+      chargeEmptyAnswer: boolean;
+    },
+  ): Promise<'saved' | 'nothing' | 'refused'> {
+    if (result.matched.length === 0) {
+      // A call that answered was paid for even when nothing in it was usable.
+      if (
+        result.chargeEmptyAnswer &&
+        !(await this.spendCreditOrFallback(ctx))
+      ) {
+        return 'refused';
+      }
+      return 'nothing';
+    }
+
+    const cases = dedupeByAutomationKey(
+      result.described.size === result.requested
+        ? result.matched
+        : withIncompleteTargetNote(
+            result.matched,
+            result.described.size,
+            result.requested,
+            result.locale,
+          ),
+    );
+
+    const persisted = await this.proposalWriter.persistExtracted(cases, ctx);
+    if (!persisted) {
+      await this.failureRecorder.recordExtractionFailure(
+        ctx,
+        NOT_ENTITLED_REASON,
+      );
+      return 'refused';
+    }
+    return 'saved';
+  }
+
+  /**
+   * Records an incomplete snapshot on the push and clears its stamp, so the
+   * fingerprint gate treats it as not extracted even when a stamp from an
+   * earlier run of the same hash is still there. Written with the hash it
+   * belongs to. A failure here only costs the next attempt or push the
+   * requests it could have avoided.
+   */
+  private async recordProgress(
+    fingerprint: SourceFingerprint,
+    snapshot: DeclarationSnapshot,
+  ): Promise<void> {
+    try {
+      await this.prisma.codeChange.updateMany({
+        where: { id: fingerprint.codeChangeId },
+        data: {
+          sourceHash: fingerprint.sourceHash,
+          extractedAt: null,
+          declarationSnapshot: snapshotColumn(snapshot),
+        },
+      });
+    } catch (error) {
+      this.logger.warn(
+        `Could not record the progress of code change ${fingerprint.codeChangeId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * The declarations of the file at the push it is compared with (see
+   * `findBaselinePush`), or null, so every declaration counts as changed:
+   *
+   * - no such push, or the lookup failed;
+   * - that push is not stamped and left no incomplete snapshot (in flight);
+   *   an incomplete snapshot is a baseline whose undescribed declarations
+   *   count as changed;
+   * - it is stamped without a snapshot (extracted before snapshots existed, or
+   *   through the whole-file path) and its file cannot be rebuilt safely: the
+   *   file is read again at its commit and parsed, one extra read, but only
+   *   when the read is complete and no shorter than any plan limit could have
+   *   cut it. A longer file may have been extracted cut under another limit,
+   *   so the tests past that cut were never described.
+   */
+  private async resolveBaseline(
+    ctx: JobContext,
+    previous: PushStamp | null,
+    readAt: (ref: string) => Promise<SourceReadResult>,
+  ): Promise<DeclaredFile | null> {
+    if (previous === null) return null;
+
+    const stored = readDeclarationSnapshot(previous.declarationSnapshot);
+    if (previous.extractedAt === null) {
+      return stored !== null && !stored.complete ? stored : null;
+    }
+    if (stored !== null) return stored;
+
+    try {
+      const source = await readAt(previous.commitSha);
+      if (source.kind === 'unavailable') {
+        this.logger.warn(
+          `Could not read ${ctx.filePath} at ${previous.commitSha} to compare its tests, extracting every one: ${source.reason}`,
+        );
+        return null;
+      }
+
+      if (source.content.length >= SMALLEST_PLAN_SOURCE_LIMIT) {
+        this.logger.log(
+          `Not comparing ${ctx.filePath} with ${previous.commitSha}: a file of ${String(source.content.length)} characters may have been extracted cut, extracting every test`,
+        );
+        return null;
+      }
+
+      const result = readDeclaredFile({
+        filePath: ctx.filePath,
+        content: source.content,
+        truncated: source.truncated,
+      });
+      return result.kind === 'declared' ? result.file : null;
+    } catch (error) {
+      this.logger.warn(
+        `Could not rebuild the baseline of ${ctx.filePath}, extracting every test: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Ends a code-change job whose file is identical to what the push it is
+   * compared with (see `findBaselinePush`) extracted, under the same prompt,
+   * model, locale and truncation.
+   *
+   * Never "the newest extraction overall": pushes persist out of order, so a
+   * revert (A, B, A) must not be matched with the first A while B is still in
+   * flight or in its retry backoff. That push holds its hash but no
+   * `extractedAt`, which is enough to stop the skip. Comparing by `createdAt`,
+   * which the database wrote, also keeps the order off the worker clocks.
    *
    * A skipped push is stamped as extracted too, because its proposals are
    * exactly those of the push it matched. A job delivered again after its own
    * extraction finished finds its own stamp and ends without writing.
    *
    * The check never blocks an extraction. If the lookup or the write fails,
-   * the job carries on and pays for the call it could have skipped.
+   * the job carries on and pays for the call it could have skipped, with no
+   * push to compare its tests with.
+   *
+   * The declaration snapshot moves with the stamp: a skipped push records the
+   * declarations it holds, with nothing removed since the identical push it
+   * matched, and a cleared stamp clears its snapshot too.
    */
   private async skipUnchangedSource(
     ctx: JobContext,
     fingerprint: SourceFingerprint,
-  ): Promise<boolean> {
+    declared: DeclaredFile | null,
+  ): Promise<PushComparison> {
     const { codeChangeId, sourceHash } = fingerprint;
 
     try {
@@ -1631,7 +2117,7 @@ export class ExtractionProcessor {
         this.logger.log(
           `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: this push was already extracted`,
         );
-        return true;
+        return { skipped: true, own, previous };
       }
 
       if (
@@ -1641,68 +2127,108 @@ export class ExtractionProcessor {
       ) {
         await this.prisma.codeChange.updateMany({
           where: { id: codeChangeId },
-          data: { sourceHash, extractedAt: new Date() },
+          data: {
+            sourceHash,
+            extractedAt: new Date(),
+            declarationSnapshot: snapshotColumn(
+              declared === null ? null : buildDeclarationSnapshot(declared, []),
+            ),
+          },
         });
         this.logger.log(
           `Skipped extraction of ${ctx.filePath} at ${ctx.ref}: unchanged since the previous push`,
         );
-        return true;
+        return { skipped: true, own, previous };
       }
 
       // The stamp goes with the old hash. A push delivered again under another
       // prompt, model, locale or limit would otherwise keep it next to the new
       // hash even if this extraction fails, finds nothing or hits the cap, and
-      // the next identical push would skip a version never extracted.
-      await this.prisma.codeChange.updateMany({
-        where: { id: codeChangeId },
-        data: { sourceHash, extractedAt: null },
-      });
-      return false;
+      // the next identical push would skip a version never extracted. A row
+      // that already holds this hash, unstamped, is a retry or a redelivery of
+      // this same version: its incomplete snapshot stays, for it to resume.
+      if (own?.sourceHash !== sourceHash) {
+        await this.prisma.codeChange.updateMany({
+          where: { id: codeChangeId },
+          data: {
+            sourceHash,
+            extractedAt: null,
+            declarationSnapshot: Prisma.DbNull,
+          },
+        });
+      }
+      return { skipped: false, own, previous };
     } catch (error) {
       this.logger.warn(
         `Could not compare ${ctx.filePath} with its last extraction, extracting anyway: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
-      return false;
+      return { skipped: false, own: null, previous: null };
     }
   }
 
-  /**
-   * This push's own row and the one recorded right before it for the same file.
-   * One query: the own row sorts first, since everything else is older. When
-   * the job does not know when its push was recorded there is no telling what
-   * came before it, so only its own row is read.
-   */
+  /** This push's own row and the push it is compared with. */
   private async findPreviousPush(
     ctx: JobContext,
     codeChangeId: string,
   ): Promise<{ own: PushStamp | null; previous: PushStamp | null }> {
-    const createdAt = ctx.codeChangeCreatedAt;
-
-    const rows: PushStamp[] = await this.prisma.codeChange.findMany({
-      where: {
-        projectId: ctx.projectId,
-        filePath: ctx.filePath,
-        ...(createdAt === undefined
-          ? { id: codeChangeId }
-          : {
-              OR: [
-                { id: codeChangeId },
-                { createdAt: { lt: createdAt } },
-                { createdAt, id: { lt: codeChangeId } },
-              ],
-            }),
-      },
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: 2,
-      select: { id: true, sourceHash: true, extractedAt: true },
+    const own = await this.prisma.codeChange.findFirst({
+      where: { id: codeChangeId },
+      select: PUSH_STAMP_SELECT,
     });
 
-    return {
-      own: rows.find((row) => row.id === codeChangeId) ?? null,
-      previous: rows.find((row) => row.id !== codeChangeId) ?? null,
+    return { own, previous: await this.findBaselinePush(ctx, codeChangeId) };
+  }
+
+  /**
+   * The push a code change of the file is compared with, by the fingerprint
+   * gate and by change detection alike. Order is `createdAt`, then `id`,
+   * strictly before this push.
+   *
+   * 1. The previous push of the same branch, stamped or not. Pushes to a branch
+   *    other than the default one are recorded but only extracted when the
+   *    default branch is unknown, so the push right before a merge is usually
+   *    an unstamped branch push; comparing within the branch skips it. A push
+   *    of the same branch that is in flight or failed still counts, and stops
+   *    a skip, which is what keeps a revert (A, B, A) visible.
+   * 2. When the branch has no earlier push of the file (a new or renamed
+   *    branch), or the push has no known branch: the latest stamped push of
+   *    the file on any branch.
+   *
+   * None when the job does not know when its push was recorded.
+   */
+  private async findBaselinePush(
+    ctx: JobContext,
+    codeChangeId: string,
+  ): Promise<PushStamp | null> {
+    const createdAt = ctx.codeChangeCreatedAt;
+    if (createdAt === undefined) return null;
+
+    const earlier = {
+      projectId: ctx.projectId,
+      filePath: ctx.filePath,
+      OR: [
+        { createdAt: { lt: createdAt } },
+        { createdAt, id: { lt: codeChangeId } },
+      ],
     };
+    const branch = ctx.codeChangeBranch ?? null;
+
+    if (branch !== null) {
+      const sameBranch = await this.prisma.codeChange.findFirst({
+        where: { ...earlier, batch: { scmEvent: { branch } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: PUSH_STAMP_SELECT,
+      });
+      if (sameBranch !== null) return sameBranch;
+    }
+
+    return this.prisma.codeChange.findFirst({
+      where: { ...earlier, extractedAt: { not: null } },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: PUSH_STAMP_SELECT,
+    });
   }
 
   /**
@@ -1716,17 +2242,22 @@ export class ExtractionProcessor {
 
   /**
    * Marks the file version as extracted, once its proposals are saved. Written
-   * with the hash so a row never carries one without the other. The proposals
+   * with the hash and the declaration snapshot so a row never carries one
+   * without the others; a null snapshot clears any older one. The proposals
    * are already committed, so a failure here only costs the next identical push
    * one repeated extraction and must not fail, and so retry, the job.
    */
-  private async stampExtraction(fingerprint: SourceFingerprint): Promise<void> {
+  private async stampExtraction(
+    fingerprint: SourceFingerprint,
+    snapshot: DeclarationSnapshot | null,
+  ): Promise<void> {
     try {
       await this.prisma.codeChange.updateMany({
         where: { id: fingerprint.codeChangeId },
         data: {
           sourceHash: fingerprint.sourceHash,
           extractedAt: new Date(),
+          declarationSnapshot: snapshotColumn(snapshot),
         },
       });
     } catch (error) {

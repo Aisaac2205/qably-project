@@ -8,7 +8,9 @@ import { MAX_EXTRACTED_CASES } from './extraction.contracts';
 import {
   FILE_CONTENT_CLOSE,
   FILE_CONTENT_OPEN,
+  TARGET_DECLARATIONS_OPEN,
   buildSystemInstruction,
+  buildTargetedDeclarationInstruction,
 } from './extraction-prompt';
 import { buildSuiteSummaryInstruction } from './suite-summary-prompt';
 import {
@@ -134,6 +136,55 @@ describe('GeminiExtractor', () => {
 
     const contents = received.contents as string;
     expect(contents).toContain('Cart > adds an item');
+  });
+
+  it('sends the target-declarations block, its own instruction and the targeted schema when the input names declarations', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({
+        locale: 'es',
+        targetDeclarations: [
+          {
+            describePath: ['Cart'],
+            title: 'adds an item',
+            startLine: 1,
+            endLine: 1,
+            parametrized: false,
+          },
+        ],
+      }),
+    );
+
+    const contents = received.contents as string;
+    const config = received.config as Record<string, unknown>;
+    expect(contents).toContain(TARGET_DECLARATIONS_OPEN);
+    expect(contents).toContain('T1: lines 1-1: Cart > adds an item');
+    expect(config.systemInstruction).toBe(
+      buildTargetedDeclarationInstruction('es'),
+    );
+    expect(config.responseJsonSchema).toBe(TARGETED_RESPONSE_JSON_SCHEMA);
+  });
+
+  it('keeps the whole-file request when the declaration list is empty', async () => {
+    let received: Record<string, unknown> = {};
+    const client = fakeClient((params) => {
+      received = params;
+      return Promise.resolve({ text: JSON.stringify({ cases: [] }) });
+    });
+
+    await new GeminiExtractor(client, env()).extract(
+      input({ targetDeclarations: [] }),
+    );
+
+    const config = received.config as Record<string, unknown>;
+    expect(received.contents as string).not.toContain(TARGET_DECLARATIONS_OPEN);
+    expect(config.systemInstruction).toBe(buildSystemInstruction('en'));
+    expect(config.responseJsonSchema).toBe(RESPONSE_JSON_SCHEMA);
   });
 
   it('sends the base (non-targeted) response schema when there are no targets', async () => {

@@ -9,6 +9,7 @@ import { summarizeDroppedCases, type CaseIssue } from './dropped-case-summary';
 import {
   buildFileContentTurn,
   buildSystemInstruction,
+  buildTargetedDeclarationInstruction,
 } from './extraction-prompt';
 import {
   buildSuiteSummaryInstruction,
@@ -169,7 +170,10 @@ export class GeminiExtractor implements TestCaseExtractor {
 
   async extract(input: ExtractionInput): Promise<ExtractionOutcome> {
     try {
-      const hasTargets = (input.targetAutomationKeys?.length ?? 0) > 0;
+      const targetDeclarations = input.targetDeclarations ?? [];
+      const targetsDeclarations = targetDeclarations.length > 0;
+      const hasTargets =
+        targetsDeclarations || (input.targetAutomationKeys?.length ?? 0) > 0;
       const response = await this.client.models.generateContent({
         model: this.model,
         contents: buildFileContentTurn({
@@ -177,14 +181,17 @@ export class GeminiExtractor implements TestCaseExtractor {
           language: input.language,
           content: input.content,
           targetAutomationKeys: input.targetAutomationKeys,
+          targetDeclarations,
         }),
         config: {
-          systemInstruction: buildSystemInstruction(
-            input.locale,
-            hasTargets,
-            input.declarationCountHint,
-            input.requestSuiteSummary ?? true,
-          ),
+          systemInstruction: targetsDeclarations
+            ? buildTargetedDeclarationInstruction(input.locale)
+            : buildSystemInstruction(
+                input.locale,
+                hasTargets,
+                input.declarationCountHint,
+                input.requestSuiteSummary ?? true,
+              ),
           responseMimeType: 'application/json',
           responseJsonSchema: hasTargets
             ? TARGETED_RESPONSE_JSON_SCHEMA

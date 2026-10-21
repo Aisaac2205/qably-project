@@ -112,6 +112,24 @@ Trade-offs to keep in mind:
   is not seen.
 - A comment between statements belongs to no statement and is in no hash.
 
+## Change detection
+
+`apps/api/src/modules/review/lib/change-detection/` turns a parse into what a code change records
+(see `docs/AI_EXTRACTION.md`, *Which tests of a file changed*). Each declaration gets a local id
+made of its describe path, its title and its occurrence among the declarations with the same
+path and title, in source order; line numbers are left out, so a test that only moved keeps its
+id. `readDeclaredFile` refuses a source the reader truncated and a file in which the parser sees no
+declaration, besides the `unsupported` and `error` results above: those files keep the whole-file
+extraction.
+
+`diffDeclarations` applies the rule of *The hashes* against the file's baseline push: a new id or a
+different `bodyHash` or `contextHash` marks one declaration changed, a different `fileContextHash`
+marks all of them, and a describe path and title the baseline had and no current declaration has
+is returned as removed, once. Only the changed
+declarations are sent to the model, by describe path, title and line span, and
+`matchTargetedCases` maps the answer back by the cited tag, then the automation key, then the line
+span of the quoted excerpt.
+
 ## Runner detection
 
 | `evidence` | Signal | Example |

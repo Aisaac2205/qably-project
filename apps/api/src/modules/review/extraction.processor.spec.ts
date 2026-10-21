@@ -995,6 +995,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
     id: string;
     projectId: string;
     filePath: string;
+    branch: string | null;
     createdAt: Date;
     sourceHash: string | null;
     extractedAt: Date | null;
@@ -1010,22 +1011,42 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
     outcome?: unknown;
   }
 
+  // Applies every filter the processor sends, and fails on one it does not
+  // know, so a query that loses a condition makes the tests fail.
   function matchesClause(
     row: StoredChange,
     clause: Record<string, unknown>,
   ): boolean {
     return Object.entries(clause).every(([field, condition]) => {
-      if (field === 'id') {
-        return typeof condition === 'string'
-          ? row.id === condition
-          : row.id < (condition as { lt: string }).lt;
+      switch (field) {
+        case 'projectId':
+        case 'filePath':
+          return row[field] === condition;
+        case 'id':
+          return typeof condition === 'string'
+            ? row.id === condition
+            : row.id < (condition as { lt: string }).lt;
+        case 'createdAt':
+          return condition instanceof Date
+            ? row.createdAt.getTime() === condition.getTime()
+            : row.createdAt < (condition as { lt: Date }).lt;
+        case 'extractedAt':
+          if ((condition as { not?: unknown }).not !== null) {
+            throw new Error('the fake store only filters stamped pushes');
+          }
+          return row.extractedAt !== null;
+        case 'batch':
+          return (
+            row.branch ===
+            (condition as { scmEvent: { branch: string } }).scmEvent.branch
+          );
+        case 'OR':
+          return (condition as Record<string, unknown>[]).some((inner) =>
+            matchesClause(row, inner),
+          );
+        default:
+          throw new Error(`the fake store does not understand "${field}"`);
       }
-      if (field === 'createdAt') {
-        return condition instanceof Date
-          ? row.createdAt.getTime() === condition.getTime()
-          : row.createdAt < (condition as { lt: Date }).lt;
-      }
-      throw new Error(`the fake store does not understand "${field}"`);
     });
   }
 
@@ -1069,37 +1090,33 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
           id: change.id,
           createdAt: change.createdAt,
           batchId: 'batch-1',
-          batch: { scmEvent: null },
+          batch: {
+            scmEvent:
+              change.branch === null
+                ? null
+                : { author: 'ada', branch: change.branch },
+          },
         });
       },
     );
-    prisma.codeChange.findMany.mockImplementation(
-      (args: {
-        where: Record<string, unknown>;
-        take?: number;
-        orderBy?: Record<string, 'asc' | 'desc'>[];
-      }) => {
-        const where = args.where as {
-          projectId: string;
-          filePath: string;
-          OR?: Record<string, unknown>[];
-          id?: string;
-        };
-        const found = [...changes.values()]
-          .filter(
-            (change) =>
-              change.projectId === where.projectId &&
-              change.filePath === where.filePath,
-          )
-          .filter((change) =>
-            where.OR === undefined
-              ? where.id === undefined || change.id === where.id
-              : where.OR.some((clause) => matchesClause(change, clause)),
-          )
-          .sort((a, b) => compareChanges(a, b, args.orderBy ?? []));
+    const query = (args: {
+      where: Record<string, unknown>;
+      take?: number;
+      orderBy?: Record<string, 'asc' | 'desc'>[];
+    }): StoredChange[] => {
+      const found = [...changes.values()]
+        .filter((change) => matchesClause(change, args.where))
+        .sort((a, b) => compareChanges(a, b, args.orderBy ?? []))
+        .map((change) => ({ ...change }));
 
-        return Promise.resolve(found.slice(0, args.take ?? found.length));
-      },
+      return found.slice(0, args.take ?? found.length);
+    };
+    prisma.codeChange.findMany.mockImplementation(
+      (args: Parameters<typeof query>[0]) => Promise.resolve(query(args)),
+    );
+    prisma.codeChange.findFirst.mockImplementation(
+      (args: Parameters<typeof query>[0]) =>
+        Promise.resolve(query({ ...args, take: 1 })[0] ?? null),
     );
     prisma.codeChange.updateMany.mockImplementation(
       (args: { where: { id: string }; data: Partial<StoredChange> }) => {
@@ -1117,12 +1134,18 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
     const tryConsume = jest.fn().mockResolvedValue(true);
     const spendCredit = jest.fn().mockResolvedValue(true);
 
-    // The n-th push touching the file, one minute after the one before it.
-    function push(id: string, order: number): StoredChange {
+    // The n-th push touching the file, one minute after the one before it, on
+    // the default branch unless told otherwise.
+    function push(
+      id: string,
+      order: number,
+      branch: string | null = 'main',
+    ): StoredChange {
       const change: StoredChange = {
         id,
         projectId: 'project-1',
         filePath: FILE_PATH,
+        branch,
         createdAt: new Date(BASE_TIME + order * 60_000),
         sourceHash: null,
         extractedAt: null,
@@ -1479,6 +1502,61 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
 
       expect(store.extract).toHaveBeenCalledTimes(2);
     });
+
+    // Pushes to a branch other than the default one are recorded but not
+    // extracted, so the push right before a merge is usually never stamped.
+    it('is the previous push of the same branch, so a merge after branch pushes still skips', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2, 'feature/cart');
+      store.push('change-3', 3);
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-3');
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+      expect(store.changes.get('change-3')?.extractedAt).toBeInstanceOf(Date);
+    });
+
+    it('is the latest stamped push of any branch for the first push of a branch', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2, 'feature/new');
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-2');
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+    });
+
+    it('is the latest stamped push of any branch for a push with no known branch', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2, 'feature/cart');
+      store.push('change-3', 3, null);
+      quietLogs();
+
+      await store.run('change-1');
+      await store.run('change-3');
+
+      expect(store.extract).toHaveBeenCalledTimes(1);
+    });
+
+    it('still does not hide a revert while the push in between, on the same branch, has not run', async () => {
+      const store = pushes();
+      store.push('change-1', 1);
+      store.push('change-2', 2, 'feature/cart');
+      store.push('change-3', 3);
+      store.push('change-4', 4);
+      quietLogs();
+
+      await store.run('change-1', { content: SOURCE_A });
+      await store.run('change-4', { content: SOURCE_A });
+
+      expect(store.extract).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('an extraction is only stamped when it is complete', () => {
@@ -1636,6 +1714,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
       } as never);
 
       expect(store.prisma.codeChange.findMany).not.toHaveBeenCalled();
+      expect(store.prisma.codeChange.findFirst).not.toHaveBeenCalled();
       expect(change.sourceHash).toBeNull();
     });
   });
@@ -1646,6 +1725,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
       store.push('change-1', 1);
       const [, warn] = quietLogs();
       store.prisma.codeChange.findMany.mockRejectedValue(new Error('db gone'));
+      store.prisma.codeChange.findFirst.mockRejectedValue(new Error('db gone'));
 
       await store.run('change-1');
 

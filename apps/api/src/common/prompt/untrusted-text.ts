@@ -21,12 +21,26 @@ export function sanitizeUntrustedText(
   return `${flattened.slice(0, maxLength).trimEnd()}...`;
 }
 
+/**
+ * Removes every delimiter until none is left. One pass is not enough: removing
+ * one occurrence can join the text around it into another, as in
+ * `<<<END_FILE_<<<X>>>CONTENT>>>`. Each pass that changes anything makes the
+ * text shorter, so the loop ends.
+ */
 export function stripBlockDelimiters(
   value: string,
   delimiters: string[],
 ): string {
-  return delimiters.reduce(
-    (text, delimiter) => text.split(delimiter).join(''),
-    value,
-  );
+  let text = value;
+  let previous: string;
+
+  do {
+    previous = text;
+    text = delimiters.reduce(
+      (current, delimiter) => current.split(delimiter).join(''),
+      text,
+    );
+  } while (text !== previous);
+
+  return text;
 }
