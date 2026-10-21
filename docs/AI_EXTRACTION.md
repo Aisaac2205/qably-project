@@ -640,7 +640,7 @@ The previous push of the **same file**: the code change of the same project and 
 
 - **The previous push is stamped and has the same hash:** the job ends. It spends no daily budget, makes no model call, spends no credit and writes no proposals. It logs one line and stamps `sourceHash` and `extractedAt` on the current code change.
 - **The job's own row is already stamped with this hash:** the job was delivered again after it finished. It ends without writing anything.
-- **Anything else** (no previous push, a different hash, or a previous push without `extractedAt`): the job writes its hash and runs as before.
+- **Anything else** (no previous push, a different hash, or a previous push without `extractedAt`): the job writes its hash, **clears its own `extractedAt`**, and runs as before. The stamp is cleared because a push that is delivered again under another prompt, model, locale or limit is about to hold a new hash. If its new extraction then failed, found nothing or hit the case cap, the old stamp would stay next to the new hash, and the next identical push would skip a version that was never extracted.
 
 The previous push alone is compared, not "the newest successful extraction", because pushes persist out of order. With A, B, A: if push 2 (B) is still running or waiting out its retry backoff when push 3 (A) arrives, the newest *stamped* row is push 1 (A), and a comparison with it would skip push 3. Push 2 then commits B, the file at `HEAD` is A, and the inbox shows B. Comparing with push 2 instead finds a row with a hash but no `extractedAt`, which is enough to stop the skip.
 

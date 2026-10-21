@@ -1492,9 +1492,13 @@ export class ExtractionProcessor {
         return true;
       }
 
+      // The stamp goes with the old hash. A push delivered again under another
+      // prompt, model, locale or limit would otherwise keep it next to the new
+      // hash even if this extraction fails, finds nothing or hits the cap, and
+      // the next identical push would skip a version never extracted.
       await this.prisma.codeChange.updateMany({
         where: { id: codeChangeId },
-        data: { sourceHash },
+        data: { sourceHash, extractedAt: null },
       });
       return false;
     } catch (error) {

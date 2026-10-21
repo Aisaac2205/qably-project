@@ -1028,6 +1028,30 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
     });
   }
 
+  // Applies the order the processor asks for, so a query that flips it makes
+  // the tests fail instead of being papered over by the fake.
+  function compareChanges(
+    a: StoredChange,
+    b: StoredChange,
+    orderBy: Record<string, 'asc' | 'desc'>[],
+  ): number {
+    for (const clause of orderBy) {
+      const [field, direction] = Object.entries(clause)[0];
+      if (field !== 'createdAt' && field !== 'id') {
+        throw new Error(`the fake store cannot order by "${field}"`);
+      }
+
+      const left = field === 'createdAt' ? a.createdAt.getTime() : a.id;
+      const right = field === 'createdAt' ? b.createdAt.getTime() : b.id;
+      if (left === right) continue;
+
+      const ascending = left < right ? -1 : 1;
+      return direction === 'desc' ? -ascending : ascending;
+    }
+
+    return 0;
+  }
+
   // The code_change table as far as the processor reads and writes it, so the
   // tests drive whole sequences of pushes instead of canned answers.
   function pushes() {
@@ -1052,7 +1076,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
       (args: {
         where: Record<string, unknown>;
         take?: number;
-        orderBy: Record<string, 'asc' | 'desc'>[];
+        orderBy?: Record<string, 'asc' | 'desc'>[];
       }) => {
         const where = args.where as {
           projectId: string;
@@ -1071,11 +1095,7 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
               ? where.id === undefined || change.id === where.id
               : where.OR.some((clause) => matchesClause(change, clause)),
           )
-          .sort(
-            (a, b) =>
-              b.createdAt.getTime() - a.createdAt.getTime() ||
-              (a.id < b.id ? 1 : -1),
-          );
+          .sort((a, b) => compareChanges(a, b, args.orderBy ?? []));
 
         return Promise.resolve(found.slice(0, args.take ?? found.length));
       },
@@ -1395,6 +1415,38 @@ describe('ExtractionProcessor — code-change job skips a test file that did not
       expect(store.extract).toHaveBeenCalledTimes(2);
       expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
     });
+
+    // A stamped push delivered again after the model, prompt, locale or limit
+    // changed holds a new hash. If its new extraction then comes to nothing,
+    // the old stamp must not stay behind: the next identical push would read
+    // "new hash, stamped" and skip a version that was never extracted.
+    it.each([
+      ['fails', providerDown(false)],
+      ['finds no tests', { kind: 'no-tests-found' }],
+      ['hits the case cap', nCases(MAX_EXTRACTED_CASES)],
+    ])(
+      'clears the stamp of a push delivered again with another fingerprint whose extraction %s',
+      async (_label, outcome) => {
+        const store = pushes();
+        const first = store.push('change-1', 1);
+        store.push('change-2', 2);
+        quietLogs();
+
+        await store.run('change-1', { model: 'gemini-a' });
+        expect(first.extractedAt).toBeInstanceOf(Date);
+
+        await store.run('change-1', { model: 'gemini-b', outcome });
+        expect(first.extractedAt).toBeNull();
+
+        // The extractor may be asked twice for the failed run (it retries a
+        // file that holds declarations), so count what the next push adds.
+        const calls = store.extract.mock.calls.length;
+        await store.run('change-2', { model: 'gemini-b' });
+
+        expect(store.extract).toHaveBeenCalledTimes(calls + 1);
+        expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
+      },
+    );
 
     it('is not a push that failed, whatever it held', async () => {
       const store = pushes();
