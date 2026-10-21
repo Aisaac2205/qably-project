@@ -13,19 +13,29 @@ describe('pricing copy', () => {
   });
 
   it.each([
-    ['es', es],
-    ['en', en],
-  ])('%s every tier CTA reads the same start-free copy', (_locale, dictionary) => {
+    ['es', es, 'Crear cuenta'],
+    ['en', en, 'Create account'],
+  ])('%s every tier CTA reads the same create-account copy', (_locale, dictionary, expected) => {
     const { gratuito, equipo, empresa } = dictionary.pricing.tiers;
 
-    expect(equipo.cta).toBe(gratuito.cta);
-    expect(empresa.cta).toBe(gratuito.cta);
+    expect(gratuito.cta).toBe(expected);
+    expect(equipo.cta).toBe(expected);
+    expect(empresa.cta).toBe(expected);
+  });
+
+  it.each([
+    ['es', es, /cobro/i],
+    ['en', en, /billing/i],
+  ])('%s says that billing and plan changes are not part of this version', (_locale, dictionary, billing) => {
+    expect(dictionary.pricing.planUpgradeNote).toMatch(billing);
   });
 
   it.each([
     ['es', es],
     ['en', en],
-  ])('%s has a non-empty plan-upgrade note for the paid tiers', (_locale, dictionary) => {
-    expect(dictionary.pricing.planUpgradeNote.length).toBeGreaterThan(0);
+  ])('%s carries no price or billing-period copy', (_locale, dictionary) => {
+    expect(dictionary.pricing).not.toHaveProperty('perMonth');
+    expect(dictionary.pricing).not.toHaveProperty('mostPopularBadge');
+    expect(dictionary.pricing).not.toHaveProperty('byokFeature');
   });
 });

@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import { getDictionary } from "../features/i18n/get-dictionary";
 import type { Locale } from "../features/i18n/types";
 
 interface Props {
@@ -8,14 +9,10 @@ interface Props {
   locale?: Locale;
 }
 
-const {
-  locale = "es",
-  title = "Qably",
-  description = locale === "es"
-    ? "Plataforma de QA automatizada nativa con IA, telemetría de CI/CD en tiempo real y trazabilidad bidireccional desde el commit hasta el caso de prueba."
-    : "AI-native automated QA management, real-time CI/CD telemetry, and bi-directional traceability from git commit to test execution.",
-} = Astro.props;
+const { locale = "es", title = "Qably", description: descriptionProp } = Astro.props;
 
+const meta = getDictionary(locale).meta;
+const description = descriptionProp ?? meta.description;
 const isEn = locale === "en";
 const site = Astro.site;
 
@@ -72,7 +69,7 @@ const siteUrl = site.toString();
     />
 
     <!-- Structured Data (JSON-LD) -->
-    <script type="application/ld+json" is:inline define:vars={{ title, description, siteUrl }}>
+    <script type="application/ld+json" is:inline define:vars={{ title, description, siteUrl, orgDescription: meta.description }}>
       {
         "@context": "https://schema.org",
         "@graph": [
@@ -81,13 +78,13 @@ const siteUrl = site.toString();
             "name": "Qably",
             "url": siteUrl,
             "logo": siteUrl + "/qably-icon.svg",
-            "description": "AI-automated software quality management for modern engineering teams."
+            "description": orgDescription
           },
           {
             "@type": "SoftwareApplication",
             "name": "Qably",
             "applicationCategory": "DeveloperApplication",
-            "operatingSystem": "All",
+            "operatingSystem": "Web",
             "offers": {
               "@type": "Offer",
               "price": "0",
@@ -110,9 +107,7 @@ const siteUrl = site.toString();
 
     <!-- Screen reader & search engine hidden headline -->
     <h1 class="sr-only">
-      {title === "Qably"
-        ? (isEn ? "Qably — QA Management for Engineers, Automated by AI" : "Qably — Gestión QA para Ingenieros, Automatizada con IA")
-        : title}
+      {title === "Qably" ? meta.heading : title}
     </h1>
 
     <div class="relative min-h-screen flex flex-col justify-between">

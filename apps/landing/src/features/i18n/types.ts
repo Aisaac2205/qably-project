@@ -14,19 +14,17 @@ export interface NavTranslations {
   signUp: string;
 }
 
+export interface MetaTranslations {
+  description: string;
+  heading: string;
+}
+
 export interface HeroTranslations {
-  badgeText: string;
-  badgeLink: string;
   headingPart1: string;
   headingPart2: string;
   subtitle: string;
   ctaPrimary: string;
   ctaSecondary: string;
-  dashboardTabs: {
-    overview: string;
-    traceability: string;
-    qualityRisk: string;
-  };
 }
 
 export interface DashboardTranslations {
@@ -77,7 +75,6 @@ export interface DashboardTranslations {
   runsKpi?: string;
   passRateKpi?: string;
   pendingAiKpi?: string;
-  coverageGapsKpi?: string;
   vsPrior7d?: string;
   viewDetails?: string;
   traceabilityHeading?: string;
@@ -105,13 +102,17 @@ export interface FeaturesTranslations {
   feature4Desc: string;
   feature5Title: string;
   feature5Desc: string;
-  codeCardLabel: string;
-  codeCardConfidence: string;
+  sampleLabel: string;
+  caseCardLabel: string;
+  caseObjectiveLabel: string;
+  caseStepsLabel: string;
+  caseExpectedLabel: string;
+  caseSampleTitle: string;
+  caseSampleObjective: string;
+  caseSampleSteps: string[];
+  caseSampleExpected: string;
   cardStatusApproved: string;
-  cardIngestionSpeedLabel: string;
   cardFlakyBadge: string;
-  cardTraceabilityRequirements: string;
-  cardTraceabilityCoverage: string;
 }
 
 export interface DocumentationTranslations {
@@ -132,11 +133,8 @@ export interface PricingTierCopy {
 }
 
 export interface PricingTranslations {
-  sectionBadge: string;
   title: string;
   subtitle: string;
-  perMonth: string;
-  mostPopularBadge: string;
   membersFeature: string;
   projectsFeatureOne: string;
   projectsFeatureOther: string;
@@ -145,7 +143,6 @@ export interface PricingTranslations {
   teamReviewFeature: string;
   sharedFeatures: string[];
   notificationsFeature: string;
-  byokFeature: string;
   planUpgradeNote: string;
   tiers: {
     gratuito: PricingTierCopy;
@@ -156,7 +153,6 @@ export interface PricingTranslations {
 
 export interface FooterTranslations {
   tagline: string;
-  systemsOperational: string;
   product: string;
   resources: string;
   company: string;
@@ -183,6 +179,7 @@ export interface FooterTranslations {
 }
 
 export interface Dictionary {
+  meta: MetaTranslations;
   nav: NavTranslations;
   hero: HeroTranslations;
   dashboard: DashboardTranslations;

@@ -2,7 +2,6 @@ import type { Plan } from '@qably/types';
 
 export interface PricingTier {
   id: Plan;
-  monthlyPriceUsd: number;
   members: number;
   projects: number | null;
   monthlyAiCredits: number;
@@ -12,7 +11,6 @@ export interface PricingTier {
 export const PRICING_TIERS: PricingTier[] = [
   {
     id: 'gratuito',
-    monthlyPriceUsd: 0,
     members: 3,
     projects: 1,
     monthlyAiCredits: 25,
@@ -20,7 +18,6 @@ export const PRICING_TIERS: PricingTier[] = [
   },
   {
     id: 'equipo',
-    monthlyPriceUsd: 20,
     members: 10,
     projects: 5,
     monthlyAiCredits: 300,
@@ -28,7 +25,6 @@ export const PRICING_TIERS: PricingTier[] = [
   },
   {
     id: 'empresa',
-    monthlyPriceUsd: 49,
     members: 25,
     projects: null,
     monthlyAiCredits: 1000,

@@ -1,5 +1,5 @@
 import React from 'react'
-import { CaretRight, SealCheck, PaperPlaneTilt, WarningCircle } from '@phosphor-icons/react'
+import { CaretRight, Envelope, SealCheck, PaperPlaneTilt, WarningCircle } from '@phosphor-icons/react'
 import type { DashboardChannelsRecord, DashboardEmailChannel, DashboardInAppChannel } from '@qably/types'
 import { Card, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -77,12 +77,10 @@ function EmailChannelRow({ email }: { email: DashboardEmailChannel }) {
     <div className="group grid flex-1 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 px-5 py-4 transition-colors duration-150 ease-out hover:bg-canvas-hover/50">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center">
-          <img
-            src="/logos/gmail.svg"
-            alt=""
-            width={24}
-            height={24}
-            className="size-6 shrink-0 object-contain transition-transform duration-150 ease-out group-hover:scale-105"
+          <Envelope
+            size={24}
+            aria-hidden="true"
+            className="size-6 shrink-0 text-default transition-transform duration-150 ease-out group-hover:scale-105"
           />
         </div>
         <div className="min-w-0">

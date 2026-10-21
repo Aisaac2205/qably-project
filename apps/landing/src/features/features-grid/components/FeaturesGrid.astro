@@ -24,7 +24,7 @@ const f = dict.features;
 
   {/* Flat Bento Grid (No nested cards on cards, clean B&W) */}
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    {/* Feature 1: AI Test Generation (2-column) */}
+    {/* Feature 1: AI case documentation (2-column) */}
     <div id="ai-review" class="md:col-span-2 rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
       <div>
         <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
@@ -36,22 +36,33 @@ const f = dict.features;
         <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature1Desc}</p>
       </div>
 
-      <div class="rounded-xl border border-white/10 bg-black p-4 sm:p-5 font-mono">
-        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3.5 border-b border-white/[0.08] text-[11px] sm:text-xs text-zinc-300 font-sans">
+      <div class="rounded-xl border border-white/10 bg-black p-4 sm:p-5 font-sans">
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3.5 border-b border-white/[0.08] text-xs text-zinc-300">
           <span class="flex items-center gap-2">
             <span class="size-2 rounded-full bg-pass"></span>
-            {f.codeCardLabel}
+            {f.caseCardLabel}
           </span>
-          <span class="text-white font-semibold">{f.codeCardConfidence}</span>
+          <span class="text-zinc-400 font-medium">{f.sampleLabel}</span>
         </div>
-        <pre class="whitespace-pre-wrap break-words text-[11px] sm:text-xs leading-relaxed text-code-plain"><span class="text-pass">+</span> <span class="text-code-keyword">test</span><span class="text-code-punctuation">(</span><span class="text-code-string">'retries the webhook on 429'</span><span class="text-code-punctuation">,</span> <span class="text-code-keyword">async</span> <span class="text-code-punctuation">()</span> =&gt; <span class="text-code-punctuation">&#123;</span>
-  <span class="text-code-keyword">const</span> res = <span class="text-code-keyword">await</span> triggerWebhookRetry<span class="text-code-punctuation">(&#123;</span>
-    <span class="text-code-property">delay</span><span class="text-code-punctuation">:</span> <span class="text-code-string">'2s'</span><span class="text-code-punctuation">,</span>
-    <span class="text-code-property">maxAttempts</span><span class="text-code-punctuation">:</span> <span class="text-code-number">3</span><span class="text-code-punctuation">,</span>
-  <span class="text-code-punctuation">&#125;);</span>
-
-  <span class="text-code-keyword">expect</span><span class="text-code-punctuation">(</span>res.status<span class="text-code-punctuation">).</span>toBe<span class="text-code-punctuation">(</span><span class="text-code-number">200</span><span class="text-code-punctuation">);</span>
-<span class="text-code-punctuation">&#125;);</span></pre>
+        <p class="text-sm font-medium text-white mb-3">{f.caseSampleTitle}</p>
+        <dl class="space-y-3 text-xs leading-relaxed">
+          <div>
+            <dt class="text-zinc-400 font-medium mb-0.5">{f.caseObjectiveLabel}</dt>
+            <dd class="text-zinc-300">{f.caseSampleObjective}</dd>
+          </div>
+          <div>
+            <dt class="text-zinc-400 font-medium mb-0.5">{f.caseStepsLabel}</dt>
+            <dd>
+              <ol class="list-decimal pl-4 space-y-0.5 text-zinc-300">
+                {f.caseSampleSteps.map((step) => <li>{step}</li>)}
+              </ol>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-zinc-400 font-medium mb-0.5">{f.caseExpectedLabel}</dt>
+            <dd class="text-zinc-300">{f.caseSampleExpected}</dd>
+          </div>
+        </dl>
       </div>
     </div>
 
@@ -68,6 +79,7 @@ const f = dict.features;
       </div>
 
       <div class="space-y-2 text-xs border-t border-white/[0.06] pt-4 font-sans">
+        <p class="text-zinc-400 font-medium">{f.sampleLabel}</p>
         <div class="flex items-center justify-between py-1.5 border-b border-white/[0.04]">
           <span class="text-zinc-300">Token Expiration Guard</span>
           <span class="text-emerald-400 font-medium">{f.cardStatusApproved}</span>
@@ -79,7 +91,7 @@ const f = dict.features;
       </div>
     </div>
 
-    {/* Feature 3: Real-Time CI Runs */}
+    {/* Feature 3: CI report ingestion */}
     <div id="runs-telemetry" class="rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
       <div>
         <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
@@ -88,12 +100,7 @@ const f = dict.features;
           </svg>
         </div>
         <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature3Title}</h3>
-        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature3Desc}</p>
-      </div>
-
-      <div class="border-t border-white/[0.06] pt-4 text-xs flex items-center justify-between font-sans">
-        <span class="text-zinc-400">{f.cardIngestionSpeedLabel}</span>
-        <span class="text-white font-medium tabular-nums">&lt; 50ms / run</span>
+        <p class="text-sm text-zinc-400 leading-relaxed font-sans">{f.feature3Desc}</p>
       </div>
     </div>
 
@@ -115,7 +122,7 @@ const f = dict.features;
       </div>
     </div>
 
-    {/* Feature 5: Bi-Directional Traceability */}
+    {/* Feature 5: Repository traceability */}
     <div id="traceability" class="rounded-xl border border-white/[0.08] bg-zinc-950 p-6 sm:p-8 flex flex-col justify-between hover:border-white/20 transition-all scroll-mt-24">
       <div>
         <div class="size-9 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center text-white mb-5">
@@ -124,12 +131,7 @@ const f = dict.features;
           </svg>
         </div>
         <h3 class="text-lg font-semibold text-white mb-2 font-sans">{f.feature5Title}</h3>
-        <p class="text-sm text-zinc-400 leading-relaxed mb-6 font-sans">{f.feature5Desc}</p>
-      </div>
-
-      <div class="border-t border-white/[0.06] pt-4 text-xs flex items-center justify-between font-sans">
-        <span class="text-zinc-400">{f.cardTraceabilityRequirements}</span>
-        <span class="text-white font-medium">{f.cardTraceabilityCoverage}</span>
+        <p class="text-sm text-zinc-400 leading-relaxed font-sans">{f.feature5Desc}</p>
       </div>
     </div>
   </div>

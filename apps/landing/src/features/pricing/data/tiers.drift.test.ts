@@ -24,10 +24,11 @@ describe('landing pricing tiers match @qably/types PLAN_LIMITS', () => {
     expect(tier.notificationIntegrations).toBe(limits.notificationIntegrations);
   });
 
-  it('prices are fixed monthly USD amounts, none are null', () => {
+  it('carries no price: nothing in the product charges for a plan', () => {
     for (const tier of PRICING_TIERS) {
-      expect(typeof tier.monthlyPriceUsd).toBe('number');
-      expect(tier.monthlyPriceUsd).toBeGreaterThanOrEqual(0);
+      expect(Object.keys(tier).sort()).toEqual(
+        ['id', 'members', 'monthlyAiCredits', 'notificationIntegrations', 'projects'],
+      );
     }
   });
 });

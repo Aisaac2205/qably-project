@@ -55,9 +55,14 @@ describe('buildTierFeatures', () => {
     );
   });
 
-  it('lists the bring-your-own-model feature only for empresa', () => {
-    expect(buildTierFeatures(empresa, es.pricing)).toContain(es.pricing.byokFeature);
-    expect(buildTierFeatures(gratuito, es.pricing)).not.toContain(es.pricing.byokFeature);
-    expect(buildTierFeatures(equipo, es.pricing)).not.toContain(es.pricing.byokFeature);
+  it('lists the same shared features on every tier and promises no model of your own', () => {
+    for (const tier of [gratuito, equipo, empresa]) {
+      const features = buildTierFeatures(tier, es.pricing);
+
+      for (const shared of es.pricing.sharedFeatures) {
+        expect(features).toContain(shared);
+      }
+      expect(features.join(' ')).not.toMatch(/modelos de ia propios/i);
+    }
   });
 });
