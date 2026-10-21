@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { en } from '../content/en';
 import { API_BASE_URL_TOKEN, type DocContent } from '../content/types';
 import { parseInline } from './inline';
 import { resolveDocContent } from './resolve-content';
@@ -15,6 +16,7 @@ function buildContent(): DocContent {
     nextLabel: 'Next',
     copyCodeLabel: 'Copy code',
     copiedLabel: 'Copied!',
+    labels: en.labels,
     navGroups: [{ label: 'Reference', pageSlugs: ['reference', 'guide'] }],
     pages: [
       {

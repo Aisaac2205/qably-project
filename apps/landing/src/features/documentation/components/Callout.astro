@@ -1,0 +1,39 @@
+---
+import { Info, WarningCircle } from '@phosphor-icons/react';
+import type { CalloutBlock } from '../content/types';
+import type { DocsRenderContext } from '../lib/render-context';
+import Inline from './Inline.astro';
+
+interface Props {
+  tone: CalloutBlock['tone'];
+  text: string;
+  ctx: DocsRenderContext;
+}
+
+const { tone, text, ctx } = Astro.props;
+
+const isWarning = tone === 'warning';
+const label = isWarning ? ctx.labels.calloutWarning : ctx.labels.calloutInfo;
+---
+
+{
+  /*
+    Quiet and neutral on purpose: the tone is carried by the icon, the bold
+    lead-in and (for a warning) a stronger hairline, never by a hue. Colours are
+    tokens only; the icon is decorative because the label already says it.
+  */
+}
+<div
+  role="note"
+  class:list={[
+    'flex items-start gap-3 rounded-xl border bg-bg-elevated px-4 py-3.5',
+    isWarning ? 'border-border-strong' : 'border-border',
+  ]}
+>
+  <span aria-hidden="true" class="mt-1 shrink-0 text-fg-muted">
+    {isWarning ? <WarningCircle size={20} /> : <Info size={20} />}
+  </span>
+  <p class="min-w-0 text-base leading-7 text-fg-muted">
+    <strong class="font-semibold text-fg">{label}:</strong>{' '}<Inline text={text} ctx={ctx} />
+  </p>
+</div>

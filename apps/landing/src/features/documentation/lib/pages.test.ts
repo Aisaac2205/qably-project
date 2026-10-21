@@ -36,6 +36,7 @@ const fixture: DocContent = {
   nextLabel: 'Next',
   copyCodeLabel: 'Copy',
   copiedLabel: 'Copied',
+  labels: en.labels,
   navGroups: [
     { label: 'Start', pageSlugs: ['overview', 'setup'] },
     { label: 'Reference', pageSlugs: ['api'] },

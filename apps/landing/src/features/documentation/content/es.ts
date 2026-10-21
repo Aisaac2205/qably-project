@@ -11,6 +11,10 @@ export const es: DocContent = {
   nextLabel: 'Siguiente',
   copyCodeLabel: 'Copiar código',
   copiedLabel: '¡Copiado!',
+  labels: {
+    calloutInfo: 'Nota',
+    calloutWarning: 'Importante',
+  },
   navGroups: [
     { label: 'Primeros pasos', pageSlugs: ['overview', 'quickstart', 'other-runners'] },
     { label: 'Buenas prácticas', pageSlugs: ['naming-tests'] },

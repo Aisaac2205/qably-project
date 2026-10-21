@@ -1,5 +1,6 @@
 ---
 import type { DocBlock } from '../content/types';
+import Callout from './Callout.astro';
 import CodeBlock from './CodeBlock.astro';
 import CodeGroup from './CodeGroup.astro';
 import type { DocsRenderContext } from '../lib/render-context';
@@ -9,28 +10,35 @@ import Inline from './Inline.astro';
 
 interface Props {
   blocks: DocBlock[];
-  /** Locale, copy labels and link resolution of the page being rendered. */
+  /** Locale, UI labels and link resolution of the page being rendered. */
   ctx: DocsRenderContext;
   /** Section the blocks belong to: subheadings derive their anchor from it. */
   sectionId?: string;
   /** h3 under a visible section heading; h2 when the section heading is not rendered. */
   subheadingLevel?: 2 | 3;
+  /**
+   * Prefix of the ids of the blocks that need one (the tabs of a code group).
+   * Defaults to the section id, so ids come from the content, not from chance.
+   */
+  idPrefix?: string;
 }
 
-const { blocks, ctx, sectionId, subheadingLevel = 3 } = Astro.props;
+const { blocks, ctx, sectionId, subheadingLevel = 3, idPrefix = sectionId ?? 'docs' } = Astro.props;
 const Subheading = subheadingLevel === 2 ? 'h2' : 'h3';
-
-const calloutClasses = {
-  info: 'border-border bg-bg-elevated text-fg-muted',
-  warning: 'border-warn/30 bg-warn/[0.06] text-fg-muted',
-};
 ---
 
 {
-  blocks.map((block) => (
+  /*
+    Reading rhythm: prose is body text (1rem, 1.75 leading) in the muted colour
+    and capped at a comfortable measure; headings, bold words and table headers
+    carry the full foreground. Code, tables and diagrams use the whole column.
+  */
+}
+{
+  blocks.map((block, index) => (
     <Fragment>
       {block.type === 'paragraph' && (
-        <p class="text-sm sm:text-base text-fg-muted leading-relaxed">
+        <p class="max-w-prose text-pretty text-base leading-7 text-fg-muted">
           <Inline text={block.text} ctx={ctx} />
         </p>
       )}
@@ -38,14 +46,14 @@ const calloutClasses = {
       {block.type === 'subheading' && (
         <Subheading
           id={sectionId === undefined ? undefined : subheadingId(sectionId, block.text)}
-          class="scroll-mt-24 text-base sm:text-lg font-semibold text-fg pt-2"
+          class="scroll-mt-docs-offset pt-4 text-lg font-semibold tracking-tight text-fg text-balance"
         >
           <Inline text={block.text} ctx={ctx} />
         </Subheading>
       )}
 
       {block.type === 'list' && !block.ordered && (
-        <ul class="list-disc space-y-2 pl-5 text-sm sm:text-base text-fg-muted leading-relaxed">
+        <ul class="max-w-prose list-disc space-y-2 pl-6 text-base leading-7 text-fg-muted marker:text-fg-subtle">
           {block.items.map((item) => (
             <li>
               <Inline text={item} ctx={ctx} />
@@ -55,7 +63,7 @@ const calloutClasses = {
       )}
 
       {block.type === 'list' && block.ordered && (
-        <ol class="list-decimal space-y-2 pl-5 text-sm sm:text-base text-fg-muted leading-relaxed">
+        <ol class="max-w-prose list-decimal space-y-2 pl-6 text-base leading-7 text-fg-muted marker:text-fg-subtle">
           {block.items.map((item) => (
             <li>
               <Inline text={item} ctx={ctx} />
@@ -78,6 +86,7 @@ const calloutClasses = {
         <CodeGroup
           label={block.label}
           variants={block.variants}
+          groupId={`${idPrefix}-code-group-${index}`}
           copyLabel={ctx.copyLabel}
           copiedLabel={ctx.copiedLabel}
         />
@@ -85,11 +94,11 @@ const calloutClasses = {
 
       {block.type === 'table' && (
         <div class="overflow-x-auto rounded-xl border border-border">
-          <table class="w-full text-left text-sm sm:text-base">
+          <table class="w-full text-left text-sm leading-6">
             <thead>
-              <tr class="border-b border-border bg-bg-elevated">
+              <tr class="border-b border-border">
                 {block.headers.map((header) => (
-                  <th class="px-4 py-2.5 font-semibold text-fg">
+                  <th scope="col" class="px-4 py-3 font-semibold text-fg">
                     <Inline text={header} ctx={ctx} />
                   </th>
                 ))}
@@ -99,7 +108,7 @@ const calloutClasses = {
               {block.rows.map((row) => (
                 <tr class="border-b border-border last:border-b-0">
                   {row.map((cell) => (
-                    <td class="px-4 py-2.5 align-top text-fg-muted">
+                    <td class="px-4 py-3 align-top text-fg-muted">
                       <Inline text={cell} ctx={ctx} />
                     </td>
                   ))}
@@ -110,11 +119,7 @@ const calloutClasses = {
         </div>
       )}
 
-      {block.type === 'callout' && (
-        <div class={`rounded-xl border px-4 py-3 text-sm sm:text-base leading-relaxed ${calloutClasses[block.tone]}`}>
-          <Inline text={block.text} ctx={ctx} />
-        </div>
-      )}
+      {block.type === 'callout' && <Callout tone={block.tone} text={block.text} ctx={ctx} />}
 
       {block.type === 'logoRow' && (
         <div class="flex flex-wrap gap-3">
@@ -130,14 +135,14 @@ const calloutClasses = {
       )}
 
       {block.type === 'faq' && (
-        <dl class="space-y-6">
-          {block.items.map((item) => (
+        <dl class="space-y-8">
+          {block.items.map((item, itemIndex) => (
             <div>
-              <dt class="text-base font-semibold text-fg">
+              <dt class="text-lg font-semibold tracking-tight text-fg">
                 <Inline text={item.question} ctx={ctx} />
               </dt>
-              <dd class="mt-2 space-y-3">
-                <DocsBlocks blocks={item.answer} ctx={ctx} />
+              <dd class="mt-3 space-y-4">
+                <DocsBlocks blocks={item.answer} ctx={ctx} idPrefix={`${idPrefix}-faq-${index}-${itemIndex}`} />
               </dd>
             </div>
           ))}

@@ -78,6 +78,7 @@ function flattenContent(content: DocContent): string {
     content.nextLabel,
     content.copyCodeLabel,
     content.copiedLabel,
+    ...Object.values(content.labels),
   ];
 
   for (const group of content.navGroups) parts.push(group.label);
@@ -175,6 +176,20 @@ function findAsciiWordMatch(haystack: string, word: string): string | undefined 
 const MAX_DESCRIPTION_LENGTH = 160;
 
 describe('documentation content', () => {
+  it.each(locales)('$name has a non-empty UI label for every kind of callout', ({ content }) => {
+    expect(content.labels.calloutInfo.trim().length).toBeGreaterThan(0);
+    expect(content.labels.calloutWarning.trim().length).toBeGreaterThan(0);
+    expect(content.labels.calloutInfo).not.toBe(content.labels.calloutWarning);
+  });
+
+  it('en and es define the same UI labels, and translate them', () => {
+    expect(Object.keys(es.labels).sort()).toEqual(Object.keys(en.labels).sort());
+
+    for (const key of Object.keys(en.labels) as (keyof typeof en.labels)[]) {
+      expect(es.labels[key], `es label "${key}"`).not.toBe(en.labels[key]);
+    }
+  });
+
   it.each(locales)('$name has at least one page', ({ content }) => {
     expect(content.pages.length).toBeGreaterThan(0);
   });

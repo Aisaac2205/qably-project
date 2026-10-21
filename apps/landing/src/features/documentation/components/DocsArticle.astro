@@ -23,11 +23,11 @@ const ctx = createRenderContext(content, locale);
 <DocsInteractions />
 
 <article class="text-fg-muted" data-docs-article data-docs-page={page.slug}>
-  <header class="space-y-3 border-b border-border pb-8">
+  <header class="space-y-4 border-b border-border pb-8">
     <nav aria-label={content.breadcrumbAriaLabel}>
       <ol class="flex flex-wrap items-center gap-x-2 text-sm text-fg-muted">
         <li>
-          <a href={docsBasePath(locale)} class="transition-colors hover:text-fg">{content.docsLabel}</a>
+          <a href={docsBasePath(locale)} class="transition-colors duration-150 ease-out hover:text-fg motion-reduce:transition-none">{content.docsLabel}</a>
         </li>
         {
           groupLabel !== undefined && (
@@ -39,19 +39,20 @@ const ctx = createRenderContext(content, locale);
         }
       </ol>
     </nav>
-    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-fg">{page.title}</h1>
-    <p class="text-base sm:text-lg text-fg-muted leading-relaxed">{page.description}</p>
+    <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight text-fg text-balance">{page.title}</h1>
+    <p class="max-w-prose text-pretty text-lg leading-8 text-fg-muted">{page.description}</p>
   </header>
 
-  <div class="mt-12 space-y-14">
+  {/* Sections sit 3rem apart, so a heading always has more air above it than below. */}
+  <div class="mt-12 space-y-12">
     {
       page.sections.map((section) =>
         isSectionHeadingVisible(page, section) ? (
-          <section id={section.id} aria-labelledby={`${section.id}-heading`} class="space-y-4 scroll-mt-24">
-            <h2 id={`${section.id}-heading`} class="text-2xl font-semibold tracking-tight text-fg">
+          <section id={section.id} aria-labelledby={`${section.id}-heading`} class="scroll-mt-docs-offset">
+            <h2 id={`${section.id}-heading`} class="text-2xl font-semibold tracking-tight text-fg text-balance">
               {section.title}
             </h2>
-            <div class="space-y-4">
+            <div class="mt-4 space-y-4">
               <DocsBlocks
                 blocks={section.blocks}
                 sectionId={section.id}
@@ -60,7 +61,7 @@ const ctx = createRenderContext(content, locale);
             </div>
           </section>
         ) : (
-          <div id={section.id} class="space-y-4 scroll-mt-24">
+          <div id={section.id} class="scroll-mt-docs-offset space-y-4">
             <DocsBlocks
               blocks={section.blocks}
               sectionId={section.id}

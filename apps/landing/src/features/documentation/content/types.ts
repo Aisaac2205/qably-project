@@ -114,6 +114,17 @@ export interface DocNavGroup {
   pageSlugs: string[];
 }
 
+/**
+ * UI strings of the reader that belong to no page: the lead-in of each kind of
+ * callout, and so on. Both locales define every key (content.test.ts).
+ */
+export interface DocLabels {
+  /** Bold lead-in of an informational callout ("Note"). */
+  calloutInfo: string;
+  /** Bold lead-in of a warning callout ("Important"). */
+  calloutWarning: string;
+}
+
 export interface DocContent {
   /** Root of the breadcrumb ("Docs") and name of the documentation. */
   docsLabel: string;
@@ -129,6 +140,7 @@ export interface DocContent {
   nextLabel: string;
   copyCodeLabel: string;
   copiedLabel: string;
+  labels: DocLabels;
   navGroups: DocNavGroup[];
   pages: DocPage[];
 }

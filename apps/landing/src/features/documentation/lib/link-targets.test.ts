@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { en } from '../content/en';
 import type { DocBlock, DocContent } from '../content/types';
 import { buildLinkTargets, findBrokenInlineLinks, resolveDocsLink } from './link-targets';
 
@@ -14,6 +15,7 @@ function buildContent(extraBlocks: DocBlock[] = []): DocContent {
     nextLabel: 'Next',
     copyCodeLabel: 'Copy',
     copiedLabel: 'Copied',
+    labels: en.labels,
     navGroups: [{ label: 'Start', pageSlugs: ['overview', 'guide'] }],
     pages: [
       {

@@ -47,6 +47,11 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+
+  /* Documentation reader. Distance from the top of the viewport at which a
+     heading counts as reached: the 4rem fixed header plus 2rem of air. Anchor
+     jumps (scroll-margin), the pinned rails and the scroll spy share it. */
+  --docs-scroll-offset:    6rem;
 }
 
 /* ─── Product app tokens (dashboard preview only) ───────────────────────
@@ -155,6 +160,9 @@
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
 
   --container-dashboard: 1128px;
+
+  /* Documentation reader: spacing key `docs-offset` (scroll-mt-docs-offset, top-docs-offset). */
+  --spacing-docs-offset: var(--docs-scroll-offset);
 
   --color-bg:          var(--landing-bg);
   --color-bg-elevated: var(--landing-bg-elevated);

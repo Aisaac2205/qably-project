@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { en } from '../content/en';
 import type { DocBlock, DocContent } from '../content/types';
 import { forEachProse, walkBlocks } from './content-walk';
 
@@ -14,6 +15,7 @@ function contentWith(blocks: DocBlock[]): DocContent {
     nextLabel: 'Next',
     copyCodeLabel: 'Copy',
     copiedLabel: 'Copied',
+    labels: en.labels,
     navGroups: [{ label: 'Start', pageSlugs: ['guide'] }],
     pages: [
       {
