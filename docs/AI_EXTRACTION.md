@@ -755,13 +755,17 @@ Code changes recorded before the fingerprint columns existed have no `extractedA
 
 #### Mapping the answer back
 
-The model's `title` is its own wording, so it cannot identify a test. Each returned case is tried in turn against the chunk's declarations:
+The model's `title` is its own wording, so it cannot identify a test. Two other fields of each returned case are evidence of which test it describes, and both are checked against **every** declaration of the file, not only the chunk's targets, so a case about a test nobody asked for is recognized as such:
 
-1. the `T{n}` tag it cites in `targetRef`, when no other case cites the same tag for a plain test (a table, `.each`/`.for`, takes one case per row);
-2. its `automationKey`, when it is exactly one declaration's describe chain and title (jest: joined by spaces; vitest: by `" > "`, after the file path and `"::"`), compared through `normalizeAutomationKey`;
-3. its `sourceExcerpt`, when the excerpt's longest line (8 characters or more) falls inside exactly one declaration's line span.
+- its `automationKey` names a declaration when it is that declaration's describe chain and title (jest: joined by spaces; vitest: by `" > "`, after the file path and `"::"`), compared through `normalizeAutomationKey`;
+- its `sourceExcerpt` quotes a declaration when the excerpt's longest line (8 characters or more) appears inside that declaration's line span.
 
-A plain test takes one case. A case that matches no declaration (an unchanged test the model described anyway, or an invented one) is dropped and counted in a log line.
+Then, per case (`matchTargetedCases`):
+
+1. A case citing a `T{n}` tag in `targetRef` is bound to that target when neither piece of evidence points only at other declarations, and no other case cites the same tag for a plain test (a table, `.each`/`.for`, takes one case per row). A tag that the key or the excerpt contradicts drops the case: the model tagged one test and described another.
+2. A case without a usable tag is bound when its key and excerpt together point at exactly one declaration and that declaration is a target. An excerpt line shared by two tests, or a key and an excerpt that point at different tests, settle nothing, and the case is dropped.
+
+A plain test takes one case. A dropped case is counted in a log line; a target left without a case is missing (see "When the push is stamped").
 
 The `automationKey` stays the one the model derives, as before: existing catalog keys were generated that way, and the parser's own key (`deriveAutomationKey`) needs a vitest `pathBase` the job does not know. Keys of existing cases do not change.
 

@@ -1830,6 +1830,7 @@ export class ExtractionProcessor {
       answered = true;
       const round = matchTargetedCases(
         targets,
+        job.declared.declarations,
         outcome.kind === 'extracted' ? outcome.cases : [],
         job.content,
       );

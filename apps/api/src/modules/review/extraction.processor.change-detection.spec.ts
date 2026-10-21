@@ -867,6 +867,28 @@ describe('ExtractionProcessor — a code change sends only new or changed tests 
       expect(store.changes.get('change-2')?.extractedAt).toBeInstanceOf(Date);
     });
 
+    it('drops an unchanged test the model tagged as the requested one, and does not stamp', async () => {
+      const store = harness();
+      quietLogs();
+      await extractedFirstPush(store, testFile(THREE));
+      store.push('change-2', 2, testFile(THREE, { body: changing('case 3') }));
+
+      await store.run('change-2', {
+        answer: () =>
+          extracted([
+            {
+              ...extractedCase('Cart case 1'),
+              sourceExcerpt: "expect('case 1').toBeTruthy();",
+              targetRef: 'T1',
+            },
+          ]),
+      });
+
+      expect(requestedTitles(store)).toEqual([['case 3']]);
+      expect(store.prisma.extractedProposal.create).not.toHaveBeenCalled();
+      expect(store.changes.get('change-2')?.extractedAt).toBeNull();
+    });
+
     it('persists the chunks that ran and leaves the push unstamped when the daily budget runs out', async () => {
       const store = harness();
       store.push('change-1', 1, testFile(numbered(25)));
