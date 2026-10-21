@@ -160,6 +160,35 @@ describe('Review inbox (e2e)', () => {
     expect(call[0].where.status).toBeUndefined();
   });
 
+  it('narrows the page to one batch, as a notification link does', async () => {
+    await request(app.getHttpServer())
+      .get('/review/inbox?projectId=project-1&batch=batch-1')
+      .expect(200);
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: { projectId?: string; AND?: unknown[] } }],
+    ];
+    expect(call[0].where.projectId).toBe('project-1');
+    expect(call[0].where.AND).toEqual([
+      { OR: [{ codeChange: { batchId: 'batch-1' } }, { id: 'batch-1' }] },
+    ]);
+  });
+
+  it('applies no batch condition when the query names none', async () => {
+    await request(app.getHttpServer()).get('/review/inbox').expect(200);
+
+    const [call] = prisma.extractedProposal.findMany.mock.calls as [
+      [{ where: { AND?: unknown[] } }],
+    ];
+    expect(call[0].where.AND).toBeUndefined();
+  });
+
+  it('rejects a blank batch filter', async () => {
+    await request(app.getHttpServer())
+      .get('/review/inbox?batch=%20')
+      .expect(400);
+  });
+
   it('rejects an unknown status filter', async () => {
     await request(app.getHttpServer())
       .get('/review/inbox?status=whatever')
@@ -176,6 +205,19 @@ describe('Review inbox (e2e)', () => {
     await request(app.getHttpServer())
       .get('/review/inbox?limit=101')
       .expect(400);
+  });
+
+  it('counts only the requested batch', async () => {
+    await request(app.getHttpServer())
+      .get('/review/inbox/counts?batch=batch-1')
+      .expect(200);
+
+    const [call] = prisma.extractedProposal.groupBy.mock.calls as [
+      [{ where: { AND?: unknown[] } }],
+    ];
+    expect(call[0].where.AND).toEqual([
+      { OR: [{ codeChange: { batchId: 'batch-1' } }, { id: 'batch-1' }] },
+    ]);
   });
 
   it('returns the status counts shape', async () => {

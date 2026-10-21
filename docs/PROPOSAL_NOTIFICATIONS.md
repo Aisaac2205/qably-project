@@ -40,6 +40,29 @@ Only a push has an ingestion batch, so only a push sets `notification.ingestionB
 
 The web link is `/review-inbox?projectId=<projectId>&batch=<batchId>`.
 
+## Opening a batch in the review inbox
+
+`GET /review/inbox` and `GET /review/inbox/counts` take an optional `batch` query parameter, so the notification link shows only the proposals it announced.
+
+| Parameter | Rule |
+|---|---|
+| `batch` | Optional. Trimmed, 1 to 64 characters. A blank value is a `400`, like a blank `search`. |
+
+The value is either an ingestion batch id or a proposal id, and one query matches both:
+
+```text
+codeChange.batchId = <batch>   (a push)
+OR id = <batch>                (a source that creates one proposal)
+```
+
+Details that keep the filter safe to add:
+
+- Omitting `batch` changes nothing. No condition is added and the existing queries and cursors behave as before.
+- The condition sits in its own `AND`, because the search filter already uses the top-level `OR`. Every page of a cursor walk stays inside the batch, since the keyset condition wraps the base filter.
+- The organization scope is untouched, so a batch id from another organization matches nothing.
+- `counts` takes the same parameter, so the status tabs count the batch the list shows. Without it a link would open a list of 18 under a tab that says 214.
+- `status` still defaults to `in_review`. A batch whose proposals were all decided opens an empty list; pass `status=all` to see them.
+
 ## One row per batch
 
 A push with N test files runs N `code-change` jobs, and each one announces the same batch. The notification table has `@@unique([userId, organizationId, dedupeKey])`, so the processor upserts on the dedupe key and the batch keeps one row per member.

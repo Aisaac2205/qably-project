@@ -813,6 +813,78 @@ describe('ReviewInboxQueryService.page', () => {
     });
   });
 
+  describe('batch filter', () => {
+    type Where = Record<string, unknown> & { AND?: unknown[] };
+
+    async function whereFor(
+      filters: Record<string, unknown>,
+    ): Promise<{ where: Where; prisma: PageFakePrisma }> {
+      const prisma = createPageFixture([]);
+
+      await buildService(prisma).page(serviceOrg, {
+        status: 'in_review',
+        limit: 50,
+        ...filters,
+      });
+
+      const [call] = prisma.extractedProposal.findMany.mock.calls as [
+        [{ where: Where }],
+      ];
+      return { where: call[0].where, prisma };
+    }
+
+    it('matches the proposals of an ingestion batch, or a single proposal that is its own batch', async () => {
+      const { where } = await whereFor({ batch: 'batch-1' });
+
+      expect(where.AND).toEqual([
+        { OR: [{ codeChange: { batchId: 'batch-1' } }, { id: 'batch-1' }] },
+      ]);
+    });
+
+    it('stays scoped to the organization and the other filters', async () => {
+      const { where } = await whereFor({
+        batch: 'batch-1',
+        projectId: 'project-1',
+      });
+
+      expect(where).toMatchObject({
+        project: { organizationId: 'org-1' },
+        projectId: 'project-1',
+        status: 'in_review',
+      });
+    });
+
+    it('does not collide with the search filter, which owns the top-level OR', async () => {
+      const { where } = await whereFor({ batch: 'batch-1', search: 'cart' });
+
+      expect(where.OR).toEqual([
+        { title: { contains: 'cart', mode: 'insensitive' } },
+        { objective: { contains: 'cart', mode: 'insensitive' } },
+      ]);
+      expect(where.AND).toHaveLength(1);
+    });
+
+    it('survives the cursor keyset filter, so every page stays inside the batch', async () => {
+      const cursor = encodeInboxCursor({
+        createdAt: '2026-09-24T10:00:00.000Z',
+        id: 'proposal-5',
+      });
+
+      const { where } = await whereFor({ batch: 'batch-1', cursor });
+
+      const [base] = where.AND as [Where];
+      expect(base.AND).toEqual([
+        { OR: [{ codeChange: { batchId: 'batch-1' } }, { id: 'batch-1' }] },
+      ]);
+    });
+
+    it('adds no condition at all when no batch is given', async () => {
+      const { where } = await whereFor({});
+
+      expect(where).not.toHaveProperty('AND');
+    });
+  });
+
   it('omits the status filter entirely when status is "all"', async () => {
     const prisma = createPageFixture([pageRow()]);
 
@@ -1256,5 +1328,37 @@ describe('ReviewInboxQueryService.counts', () => {
     expect(result).not.toHaveProperty('openCollisionSuites');
     expect(prisma.caseIdentityCollision.groupBy).not.toHaveBeenCalled();
     expect(prisma.suite.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReviewInboxQueryService.counts batch filter', () => {
+  it('counts only the batch, for both the status and the duplicate-kind groupings', async () => {
+    const prisma = createPageFixture([]);
+
+    await buildService(prisma).counts(serviceOrg, { batch: 'batch-1' });
+
+    const calls = prisma.extractedProposal.groupBy.mock.calls as [
+      { where: Record<string, unknown> },
+    ][];
+    expect(calls).toHaveLength(2);
+    for (const [call] of calls) {
+      expect(call.where).toMatchObject({
+        project: { organizationId: 'org-1' },
+        AND: [
+          { OR: [{ codeChange: { batchId: 'batch-1' } }, { id: 'batch-1' }] },
+        ],
+      });
+    }
+  });
+
+  it('adds no batch condition when the counts query names none', async () => {
+    const prisma = createPageFixture([]);
+
+    await buildService(prisma).counts(serviceOrg, {});
+
+    const [[first]] = prisma.extractedProposal.groupBy.mock.calls as [
+      { where: Record<string, unknown> },
+    ][];
+    expect(first.where).not.toHaveProperty('AND');
   });
 });

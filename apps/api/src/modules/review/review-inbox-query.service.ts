@@ -277,6 +277,25 @@ function toInboxItem(row: InboxItemRow): InboxItem {
   };
 }
 
+/**
+ * The `batch` filter of the page and counts queries. It is declared here, next
+ * to the one query that reads it, and applies to both.
+ */
+export interface ReviewInboxBatchFilter {
+  batch?: string;
+}
+
+/**
+ * One batch is the set of proposals a notification announced. A push owns an
+ * ingestion batch that its code changes point at. Every other source creates a
+ * single proposal, which is its own batch and is named by its proposal id. Both
+ * are generated ids, so a single value matches whichever kind it is. Either
+ * lookup is by an indexed column, and both stay inside the organization scope.
+ */
+function batchWhere(batch: string): Prisma.ExtractedProposalWhereInput {
+  return { OR: [{ codeChange: { batchId: batch } }, { id: batch }] };
+}
+
 @Injectable()
 export class ReviewInboxQueryService {
   constructor(
@@ -286,7 +305,12 @@ export class ReviewInboxQueryService {
 
   private baseWhere(
     org: OrgContext,
-    filters: { projectId?: string; status?: ProposalStatus; search?: string },
+    filters: {
+      projectId?: string;
+      status?: ProposalStatus;
+      search?: string;
+      batch?: string;
+    },
   ): Prisma.ExtractedProposalWhereInput {
     return {
       project: { organizationId: org.organizationId },
@@ -294,6 +318,10 @@ export class ReviewInboxQueryService {
         ? {}
         : { projectId: filters.projectId }),
       ...(filters.status === undefined ? {} : { status: filters.status }),
+      // In an AND of its own: the search filter already owns the top-level OR.
+      ...(filters.batch === undefined
+        ? {}
+        : { AND: [batchWhere(filters.batch)] }),
       ...(filters.search === undefined
         ? {}
         : {
@@ -309,7 +337,7 @@ export class ReviewInboxQueryService {
 
   async page(
     org: OrgContext,
-    filters: ReviewInboxPageFilters,
+    filters: ReviewInboxPageFilters & ReviewInboxBatchFilter,
   ): Promise<ReviewInboxPage> {
     const status = filters.status === 'all' ? undefined : filters.status;
 
@@ -365,7 +393,7 @@ export class ReviewInboxQueryService {
 
   async counts(
     org: OrgContext,
-    filters: ReviewInboxCountsFilters,
+    filters: ReviewInboxCountsFilters & ReviewInboxBatchFilter,
   ): Promise<ReviewInboxCounts> {
     const where = this.baseWhere(org, filters);
 

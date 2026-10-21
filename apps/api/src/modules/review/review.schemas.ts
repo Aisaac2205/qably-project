@@ -19,8 +19,16 @@ export const documentFilesBodySchema = z
 
 export type DocumentFilesBody = z.infer<typeof documentFilesBodySchema>;
 
+/**
+ * Narrows the inbox to the proposals one notification announced: an ingestion
+ * batch id, or the id of a proposal that is its own batch. Optional, so every
+ * existing query stays valid.
+ */
+const inboxBatchSchema = z.string().trim().min(1).max(64).optional();
+
 export const reviewInboxQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
+  batch: inboxBatchSchema,
   status: z
     .enum(['in_review', 'approved', 'rejected', 'changes_requested', 'all'])
     .default('in_review'),
@@ -42,6 +50,7 @@ export const reviewInboxQuerySchema = z.object({
 
 export const reviewInboxCountsQuerySchema = z.object({
   projectId: z.string().min(1).optional(),
+  batch: inboxBatchSchema,
   search: z.string().trim().min(1).max(200).optional(),
 });
 
