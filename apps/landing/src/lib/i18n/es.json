@@ -488,7 +488,8 @@
     "activityEmptyTitle": "Sin actividad reciente",
     "activityPassedOf": "{{passed}} de {{total}} con éxito",
     "activitySuitesCases_one": "{{count}} suite · {{passed}}/{{total}} casos",
-    "activitySuitesCases_other": "{{count}} suites · {{passed}}/{{total}} casos"
+    "activitySuitesCases_other": "{{count}} suites · {{passed}}/{{total}} casos",
+    "sampleData": "Datos de ejemplo"
   },
   "quality": {
     "breadcrumb": "Calidad",

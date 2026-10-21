@@ -25,6 +25,7 @@ import { CasesGaugeCard } from './cases-gauge-card'
 import { ChannelsCard } from './channels-card'
 import { ActivityCard } from './activity-card'
 import type { HeroTranslations, Locale } from '@/features/i18n/types'
+import { getWebBaseUrl } from '@/lib/auth-config'
 import { useTranslation } from '@/lib/i18n'
 
 export interface DashboardWindowFrameProps {
@@ -43,6 +44,7 @@ export function DashboardWindowFrame({ locale }: DashboardWindowFrameProps) {
 
   const overview = MOCK_DASHBOARD_OVERVIEWS[selectedPeriod]
   const channels = MOCK_DASHBOARD_CHANNELS
+  const appAddress = `${new URL(getWebBaseUrl()).host}/dashboard`
 
   const navItems: { id: NavSection; label: string; icon: Icon }[] = [
     { id: 'dashboard', label: t('sidebar.dashboard'), icon: SquaresFour },
@@ -67,12 +69,11 @@ export function DashboardWindowFrame({ locale }: DashboardWindowFrameProps) {
 
         <div className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-3 py-1 text-[11px] font-medium text-muted">
           <LockSimple size={12} weight="bold" aria-hidden="true" />
-          <span>qably.dev/dashboard</span>
+          <span>{appAddress}</span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted">
-          <span className="size-2 rounded-full bg-pass animate-pulse" aria-hidden="true" />
-          <span className="hidden sm:inline">Live</span>
+        <div className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs font-medium text-muted">
+          {t('dashboard.sampleData')}
         </div>
       </div>
 
@@ -168,7 +169,7 @@ export function DashboardWindowFrame({ locale }: DashboardWindowFrameProps) {
               aria-label="Dashboard"
               className="@container w-full space-y-5 px-5 py-6 text-default @md:space-y-6 sm:px-7 lg:px-9 lg:py-6"
             >
-              <DashboardHeader period={selectedPeriod} onPeriodChange={setSelectedPeriod} />
+              <DashboardHeader period={selectedPeriod} onPeriodChange={setSelectedPeriod} showSampleLabel={false} />
               <KpiStrip overview={overview} period={selectedPeriod} />
               <PassRateHero overview={overview} period={selectedPeriod} />
 

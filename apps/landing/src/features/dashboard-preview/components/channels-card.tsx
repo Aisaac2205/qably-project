@@ -135,21 +135,20 @@ export function ChannelsCard({ channels }: ChannelsCardProps) {
         ? t('dashboard.channelsInAppName')
         : lastDelivery.channel === 'email'
           ? t('dashboard.channelsEmailName')
-          : resolveLastDeliveryWebhookName(channels) ??
-            t('dashboard.channelsFallbackWebhookName')
+          : (resolveLastDeliveryWebhookName(channels) ?? lastDelivery.webhookId ?? '')
 
   const lastDeliveryText =
     lastDelivery === null
-      ? t('dashboard.channelsNoDeliveries')
-      : lastDelivery.status === 'sent'
-        ? t('dashboard.channelsLastDeliverySent', {
-            channel: lastDeliveryChannelName,
-            time: formatRelativeTime(lastDelivery.deliveredAt, timeLocale),
-          })
-        : t('dashboard.channelsLastDeliveryFailed', {
-            channel: lastDeliveryChannelName,
-            time: formatRelativeTime(lastDelivery.deliveredAt, timeLocale),
-          })
+      ? ''
+      : t('dashboard.channelsLastDelivery', {
+          status: t(
+            lastDelivery.status === 'sent'
+              ? 'dashboard.channelsDeliveryStatusSent'
+              : 'dashboard.channelsDeliveryStatusFailed',
+          ),
+          name: lastDeliveryChannelName,
+          time: formatRelativeTime(lastDelivery.deliveredAt, timeLocale),
+        })
 
   return (
     <Card as="section" aria-labelledby="channels-card-heading" className="flex h-full flex-col overflow-hidden">
@@ -167,14 +166,16 @@ export function ChannelsCard({ channels }: ChannelsCardProps) {
         {channels.email.enabled && <EmailChannelRow email={channels.email} />}
       </div>
 
-      <CardFooter className="flex items-center gap-2 border-t border-border bg-canvas/30 px-5 py-3 text-xs text-muted">
-        {lastDelivery?.status === 'failed' ? (
-          <WarningCircle size={14} weight="bold" className="shrink-0 text-fail" aria-hidden="true" />
-        ) : (
-          <PaperPlaneTilt size={14} weight="bold" className="shrink-0 text-muted" aria-hidden="true" />
-        )}
-        <span className="truncate">{lastDeliveryText}</span>
-      </CardFooter>
+      {lastDelivery !== null ? (
+        <CardFooter className="flex items-center gap-2 border-t border-border bg-canvas/30 px-5 py-3 text-xs text-muted">
+          {lastDelivery.status === 'failed' ? (
+            <WarningCircle size={14} weight="bold" className="shrink-0 text-fail" aria-hidden="true" />
+          ) : (
+            <PaperPlaneTilt size={14} weight="bold" className="shrink-0 text-muted" aria-hidden="true" />
+          )}
+          <span className="truncate">{lastDeliveryText}</span>
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }
