@@ -713,7 +713,7 @@ The fingerprint above only answers "did any byte of the file change". A push tha
 
 #### The declaration snapshot
 
-`CodeChange.declarationSnapshot` (nullable JSONB, migration `20261021140000_add_code_change_declaration_snapshot`, no backfill) records the test declarations the parser read in the file version of that push (`apps/api/src/modules/review/lib/change-detection/`):
+`CodeChange.declarationSnapshot` (nullable JSONB, migration `20261021160000_add_code_change_declaration_snapshot`, no backfill) records the test declarations the parser read in the file version of that push (`apps/api/src/modules/review/lib/change-detection/`):
 
 | Field | Content |
 |---|---|
