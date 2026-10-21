@@ -44,7 +44,35 @@ describe('subheadingId', () => {
   });
 });
 
+describe('subheadingId with inline markup', () => {
+  it('derives the anchor from the words, never from the markers', () => {
+    expect(subheadingId('reference', 'The `externalId` **field**')).toBe('reference-the-externalid-field');
+    expect(subheadingId('reference', 'See [the key page](/docs/api-keys#create-a-key)')).toBe(
+      'reference-see-the-key-page',
+    );
+  });
+
+  it('gives a heading with markup the same anchor as the same heading without it', () => {
+    expect(subheadingId('reference', 'The **field**')).toBe(subheadingId('reference', 'The field'));
+  });
+});
+
 describe('buildPageToc', () => {
+  it('shows the words of a subheading with markup, not its markers', () => {
+    const toc = buildPageToc(
+      page('Reference', [
+        section('reference', 'Reference', [para, { type: 'subheading', text: 'The `externalId` **field**' }]),
+        section('other', 'Other', [para]),
+      ]),
+    );
+
+    expect(toc).toEqual([
+      { id: 'reference', label: 'Reference', level: 2 },
+      { id: 'reference-the-externalid-field', label: 'The externalId field', level: 3 },
+      { id: 'other', label: 'Other', level: 2 },
+    ]);
+  });
+
   it('lists the sections of a multi-section page, each followed by its subheadings', () => {
     const toc = buildPageToc(
       page('Quickstart', [

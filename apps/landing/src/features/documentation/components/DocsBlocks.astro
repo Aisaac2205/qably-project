@@ -2,20 +2,22 @@
 import type { DocBlock } from '../content/types';
 import CodeBlock from './CodeBlock.astro';
 import CodeGroup from './CodeGroup.astro';
+import type { DocsRenderContext } from '../lib/render-context';
 import { subheadingId } from '../lib/toc';
 import DocsBlocks from './DocsBlocks.astro';
+import Inline from './Inline.astro';
 
 interface Props {
   blocks: DocBlock[];
-  copyLabel: string;
-  copiedLabel: string;
+  /** Locale, copy labels and link resolution of the page being rendered. */
+  ctx: DocsRenderContext;
   /** Section the blocks belong to: subheadings derive their anchor from it. */
   sectionId?: string;
   /** h3 under a visible section heading; h2 when the section heading is not rendered. */
   subheadingLevel?: 2 | 3;
 }
 
-const { blocks, copyLabel, copiedLabel, sectionId, subheadingLevel = 3 } = Astro.props;
+const { blocks, ctx, sectionId, subheadingLevel = 3 } = Astro.props;
 const Subheading = subheadingLevel === 2 ? 'h2' : 'h3';
 
 const calloutClasses = {
@@ -28,7 +30,9 @@ const calloutClasses = {
   blocks.map((block) => (
     <Fragment>
       {block.type === 'paragraph' && (
-        <p class="text-sm sm:text-base text-fg-muted leading-relaxed">{block.text}</p>
+        <p class="text-sm sm:text-base text-fg-muted leading-relaxed">
+          <Inline text={block.text} ctx={ctx} />
+        </p>
       )}
 
       {block.type === 'subheading' && (
@@ -36,14 +40,16 @@ const calloutClasses = {
           id={sectionId === undefined ? undefined : subheadingId(sectionId, block.text)}
           class="scroll-mt-24 text-base sm:text-lg font-semibold text-fg pt-2"
         >
-          {block.text}
+          <Inline text={block.text} ctx={ctx} />
         </Subheading>
       )}
 
       {block.type === 'list' && !block.ordered && (
         <ul class="list-disc space-y-2 pl-5 text-sm sm:text-base text-fg-muted leading-relaxed">
           {block.items.map((item) => (
-            <li>{item}</li>
+            <li>
+              <Inline text={item} ctx={ctx} />
+            </li>
           ))}
         </ul>
       )}
@@ -51,7 +57,9 @@ const calloutClasses = {
       {block.type === 'list' && block.ordered && (
         <ol class="list-decimal space-y-2 pl-5 text-sm sm:text-base text-fg-muted leading-relaxed">
           {block.items.map((item) => (
-            <li>{item}</li>
+            <li>
+              <Inline text={item} ctx={ctx} />
+            </li>
           ))}
         </ol>
       )}
@@ -61,8 +69,8 @@ const calloutClasses = {
           language={block.language}
           code={block.code}
           label={block.label}
-          copyLabel={copyLabel}
-          copiedLabel={copiedLabel}
+          copyLabel={ctx.copyLabel}
+          copiedLabel={ctx.copiedLabel}
         />
       )}
 
@@ -70,8 +78,8 @@ const calloutClasses = {
         <CodeGroup
           label={block.label}
           variants={block.variants}
-          copyLabel={copyLabel}
-          copiedLabel={copiedLabel}
+          copyLabel={ctx.copyLabel}
+          copiedLabel={ctx.copiedLabel}
         />
       )}
 
@@ -81,7 +89,9 @@ const calloutClasses = {
             <thead>
               <tr class="border-b border-border bg-bg-elevated">
                 {block.headers.map((header) => (
-                  <th class="px-4 py-2.5 font-semibold text-fg">{header}</th>
+                  <th class="px-4 py-2.5 font-semibold text-fg">
+                    <Inline text={header} ctx={ctx} />
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -89,7 +99,9 @@ const calloutClasses = {
               {block.rows.map((row) => (
                 <tr class="border-b border-border last:border-b-0">
                   {row.map((cell) => (
-                    <td class="px-4 py-2.5 align-top text-fg-muted">{cell}</td>
+                    <td class="px-4 py-2.5 align-top text-fg-muted">
+                      <Inline text={cell} ctx={ctx} />
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -100,7 +112,7 @@ const calloutClasses = {
 
       {block.type === 'callout' && (
         <div class={`rounded-xl border px-4 py-3 text-sm sm:text-base leading-relaxed ${calloutClasses[block.tone]}`}>
-          {block.text}
+          <Inline text={block.text} ctx={ctx} />
         </div>
       )}
 
@@ -121,9 +133,11 @@ const calloutClasses = {
         <dl class="space-y-6">
           {block.items.map((item) => (
             <div>
-              <dt class="text-base font-semibold text-fg">{item.question}</dt>
+              <dt class="text-base font-semibold text-fg">
+                <Inline text={item.question} ctx={ctx} />
+              </dt>
               <dd class="mt-2 space-y-3">
-                <DocsBlocks blocks={item.answer} copyLabel={copyLabel} copiedLabel={copiedLabel} />
+                <DocsBlocks blocks={item.answer} ctx={ctx} />
               </dd>
             </div>
           ))}

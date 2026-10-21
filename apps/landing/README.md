@@ -25,6 +25,19 @@ The docs content is a page model per locale: `src/features/documentation/content
 - Links that predate the split (`/docs#step-4-report-ci`) are still alive: the overview page maps every old section id to its new page in `lib/legacy-targets.ts` and redirects in the browser, because a server never sees a fragment. Keep that map when a page is renamed or removed.
 - `lib/docs-links.test.ts` checks that every `/docs...` link written in the landing source resolves to a page and an anchor of the page model.
 
+### Inline markup in docs text
+
+Paragraphs, list items, table cells, callouts, FAQ questions and answers and subheadings accept a small markup, defined in one place (`lib/inline.ts`) and rendered by `components/Inline.astro`. It is parsed into nodes and built into elements, never injected as HTML, so `<`, `&` and quotes in the content are always plain text.
+
+| Write | Get |
+|---|---|
+| `**bold**` | strong text; may hold `code` and links |
+| `` `code` `` | inline code, verbatim (nothing inside is parsed) |
+| `[label](/docs/<slug>#<anchor>)` | a link to a docs page or one of its anchors, localized to the page's locale; `/docs` is the overview |
+| `[label](https://host.tld/path)` | an external https link (`rel="noopener noreferrer"`) |
+
+A marker with no partner stays literal, a link with an empty label stays literal, and a target outside the two forms above (`javascript:`, `data:`, `http:`, a relative path, a URL with credentials) is rejected: only its label is shown. `lib/docs-links.test.ts` fails when a link written in markup points to a page or an anchor that does not exist, or has a rejected target. Code blocks, code-group labels, page titles and descriptions are plain text and never parsed. Subheading anchors and table-of-contents labels come from the words, so adding markup to a heading never moves its anchor.
+
 ## Project Structure
 
 ```text

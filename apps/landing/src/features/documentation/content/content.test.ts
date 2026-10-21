@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { stripInline } from '../lib/inline';
 import { getAllSections } from '../lib/pages';
 import { en } from './en';
 import { es } from './es';
@@ -9,15 +10,17 @@ const locales: { name: string; content: DocContent }[] = [
   { name: 'es', content: es },
 ];
 
+// Prose goes through the inline renderer, so the words are compared without the
+// markers (`**bold**`, `code`, links); code blocks stay exactly as written.
 function collectBlockText(block: DocBlock, parts: string[]): void {
   switch (block.type) {
     case 'paragraph':
     case 'subheading':
     case 'callout':
-      parts.push(block.text);
+      parts.push(stripInline(block.text));
       break;
     case 'list':
-      parts.push(...block.items);
+      parts.push(...block.items.map(stripInline));
       break;
     case 'code':
       parts.push(block.code);
@@ -27,15 +30,15 @@ function collectBlockText(block: DocBlock, parts: string[]): void {
       for (const variant of block.variants) parts.push(variant.label, variant.code);
       break;
     case 'table':
-      parts.push(...block.headers);
-      for (const row of block.rows) parts.push(...row);
+      parts.push(...block.headers.map(stripInline));
+      for (const row of block.rows) parts.push(...row.map(stripInline));
       break;
     case 'logoRow':
       for (const item of block.items) parts.push(item.alt, item.label);
       break;
     case 'faq':
       for (const item of block.items) {
-        parts.push(item.question);
+        parts.push(stripInline(item.question));
         for (const answerBlock of item.answer) collectBlockText(answerBlock, parts);
       }
       break;

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { en } from '../content/en';
 import { es } from '../content/es';
 import type { DocContent } from '../content/types';
+import { findBrokenInlineLinks } from './link-targets';
 import { docsPagePath } from './pages';
 import { buildPageToc } from './toc';
 
@@ -141,5 +142,40 @@ describe('internal links to the documentation', () => {
     expect(resolveHref('/docs/quickstart#step-4-report-ci', table)).toBeNull();
     expect(resolveHref('/docs/nope', table)).not.toBeNull();
     expect(resolveHref('/docs/', table)).not.toBeNull();
+  });
+});
+
+describe('links written as inline markup in the docs content', () => {
+  it.each([
+    { name: 'es', content: es },
+    { name: 'en', content: en },
+  ])('every [label](/docs/...) in the $name content resolves to a page and an anchor', ({ content }) => {
+    expect(findBrokenInlineLinks(content)).toEqual([]);
+  });
+
+  it('would catch a broken link written in markup', () => {
+    const broken: DocContent = {
+      ...en,
+      pages: en.pages.map((page, index) =>
+        index === 0
+          ? {
+              ...page,
+              sections: page.sections.map((section, sectionIndex) =>
+                sectionIndex === 0
+                  ? {
+                      ...section,
+                      blocks: [
+                        ...section.blocks,
+                        { type: 'paragraph' as const, text: 'See [nowhere](/docs/not-a-page) or [there](/docs/quickstart#nope).' },
+                      ],
+                    }
+                  : section,
+              ),
+            }
+          : page,
+      ),
+    };
+
+    expect(findBrokenInlineLinks(broken)).toHaveLength(2);
   });
 });

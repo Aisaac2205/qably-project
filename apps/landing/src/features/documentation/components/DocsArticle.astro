@@ -2,6 +2,7 @@
 import type { Locale } from '../../i18n/types';
 import type { DocContent, DocPage } from '../content/types';
 import { docsBasePath, getPrevNext, isSectionHeadingVisible } from '../lib/pages';
+import { createRenderContext } from '../lib/render-context';
 import DocsBlocks from './DocsBlocks.astro';
 import DocsInteractions from './DocsInteractions.astro';
 import DocsPager from './DocsPager.astro';
@@ -16,6 +17,7 @@ interface Props {
 
 const { content, locale, page, groupLabel } = Astro.props;
 const { previous, next } = getPrevNext(content, locale, page.slug);
+const ctx = createRenderContext(content, locale);
 ---
 
 <DocsInteractions />
@@ -53,8 +55,7 @@ const { previous, next } = getPrevNext(content, locale, page.slug);
               <DocsBlocks
                 blocks={section.blocks}
                 sectionId={section.id}
-                copyLabel={content.copyCodeLabel}
-                copiedLabel={content.copiedLabel}
+                ctx={ctx}
               />
             </div>
           </section>
@@ -64,8 +65,7 @@ const { previous, next } = getPrevNext(content, locale, page.slug);
               blocks={section.blocks}
               sectionId={section.id}
               subheadingLevel={2}
-              copyLabel={content.copyCodeLabel}
-              copiedLabel={content.copiedLabel}
+              ctx={ctx}
             />
           </div>
         ),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { API_BASE_URL_TOKEN, type DocContent } from '../content/types';
+import { parseInline } from './inline';
 import { resolveDocContent } from './resolve-content';
 
 function buildContent(): DocContent {
@@ -130,5 +131,47 @@ describe('resolveDocContent', () => {
     const resolved = resolveDocContent(withoutToken, 'https://api.qably.dev');
 
     expect(resolved.pages[0]!.sections[0]!.blocks[0]).toMatchObject({ text: 'No token here.' });
+  });
+
+  it('replaces the token inside inline markup, so a link target built on it becomes a real external link', () => {
+    const content = buildContent();
+    const withMarkup: DocContent = {
+      ...content,
+      pages: [
+        {
+          ...content.pages[0]!,
+          sections: [
+            {
+              ...content.pages[0]!.sections[0]!,
+              blocks: [
+                { type: 'paragraph', text: `Check [the health endpoint](${API_BASE_URL_TOKEN}/health) and **${API_BASE_URL_TOKEN}**.` },
+                { type: 'callout', tone: 'info', text: `Use \`${API_BASE_URL_TOKEN}/runs\`.` },
+              ],
+            },
+          ],
+        },
+      ],
+      navGroups: [{ label: 'Reference', pageSlugs: ['reference'] }],
+    };
+
+    const resolved = resolveDocContent(withMarkup, 'https://api.qably.dev');
+    const [paragraph, callout] = resolved.pages[0]!.sections[0]!.blocks as { text: string }[];
+
+    expect(parseInline(paragraph!.text)).toEqual([
+      { type: 'text', value: 'Check ' },
+      {
+        type: 'link',
+        href: { kind: 'external', url: 'https://api.qably.dev/health' },
+        children: [{ type: 'text', value: 'the health endpoint' }],
+      },
+      { type: 'text', value: ' and ' },
+      { type: 'strong', children: [{ type: 'text', value: 'https://api.qably.dev' }] },
+      { type: 'text', value: '.' },
+    ]);
+    expect(parseInline(callout!.text)).toEqual([
+      { type: 'text', value: 'Use ' },
+      { type: 'code', value: 'https://api.qably.dev/runs' },
+      { type: 'text', value: '.' },
+    ]);
   });
 });

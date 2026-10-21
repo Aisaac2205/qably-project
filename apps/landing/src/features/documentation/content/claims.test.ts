@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SNIPPETS } from '../components/snippets';
+import { stripInline } from '../lib/inline';
 import { getAllSections } from '../lib/pages';
 import { en } from './en';
 import { es } from './es';
@@ -34,10 +35,16 @@ const locales: Locale[] = [
 ];
 
 // Every string reachable from the content, whatever the page, section or block
-// type, so a new page or block kind cannot hide a claim from this guard.
+// type, so a new page or block kind cannot hide a claim from this guard. A string
+// that carries inline markup is collected twice: as written (code stays code) and
+// without the markers, so a forbidden phrase split by `**bold**` or a link is
+// still found.
 function collectStrings(value: unknown, parts: string[] = []): string[] {
   if (typeof value === 'string') {
     parts.push(value);
+
+    const plain = stripInline(value);
+    if (plain !== value) parts.push(plain);
   } else if (Array.isArray(value)) {
     for (const item of value) collectStrings(item, parts);
   } else if (typeof value === 'object' && value !== null) {
@@ -105,6 +112,22 @@ function sectionText(content: DocContent, id: string): string {
 
   return collectStrings(section).join('\n');
 }
+
+describe('collectStrings', () => {
+  it('also returns the words of a string without its inline markup', () => {
+    const parts = collectStrings({ text: 'Supports **Bit**bucket and [real time](/docs/faq)' });
+
+    expect(parts).toContain('Supports **Bit**bucket and [real time](/docs/faq)');
+    expect(parts).toContain('Supports Bitbucket and real time');
+  });
+
+  it('finds a forbidden claim that markup splits in two', () => {
+    const text = collectStrings([{ text: 'We run in **real** time' }, { text: 'it is **Bit**bucket' }]).join('\n');
+
+    expect(text).toMatch(/real[\s-]time/i);
+    expect(text).toMatch(/bitbucket/i);
+  });
+});
 
 describe('documentation claims', () => {
   describe.each(locales)('$name', ({ content, onlyGithub, junitAccepted, perSuiteRuns, staleProviderRow }) => {

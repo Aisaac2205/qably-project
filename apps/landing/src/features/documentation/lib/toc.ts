@@ -1,4 +1,5 @@
 import type { DocPage } from '../content/types';
+import { stripInline } from './inline';
 import { getSubheadingLevel, isSectionHeadingVisible } from './pages';
 
 export interface TocEntry {
@@ -28,11 +29,13 @@ export function slugifyHeading(text: string): string {
 
 /**
  * Stable anchor of a subheading: the id of its section plus the slug of its
- * text. The article and the table of contents both derive it from here, so they
- * can never disagree.
+ * words. A subheading may carry inline markup; the anchor comes from its words,
+ * so adding a `code` span or a bold word never moves a published link. The
+ * article and the table of contents both derive it from here, so they can never
+ * disagree.
  */
 export function subheadingId(sectionId: string, text: string): string {
-  return `${sectionId}-${slugifyHeading(text)}`;
+  return `${sectionId}-${slugifyHeading(stripInline(text))}`;
 }
 
 export function buildPageToc(page: DocPage): TocEntry[] {
@@ -47,7 +50,7 @@ export function buildPageToc(page: DocPage): TocEntry[] {
 
     for (const block of section.blocks) {
       if (block.type === 'subheading') {
-        entries.push({ id: subheadingId(section.id, block.text), label: block.text, level });
+        entries.push({ id: subheadingId(section.id, block.text), label: stripInline(block.text), level });
       }
     }
   }

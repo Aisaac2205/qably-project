@@ -1,0 +1,15 @@
+---
+import { parseInline } from '../lib/inline';
+import type { DocsRenderContext } from '../lib/render-context';
+import InlineNodes from './InlineNodes.astro';
+
+interface Props {
+  /** A prose string of the content, with the inline markup defined in lib/inline.ts. */
+  text: string;
+  ctx: DocsRenderContext;
+}
+
+const { text, ctx } = Astro.props;
+---
+
+<InlineNodes nodes={parseInline(text)} ctx={ctx} />
