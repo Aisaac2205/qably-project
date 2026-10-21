@@ -203,6 +203,20 @@ function lastCall(mock: jest.Mock): CallArgs {
   return calls[calls.length - 1][0];
 }
 
+// A push takes an advisory lock per case before it writes; the savepoint
+// choreography around each proposal is what these tests pin, so the locks are
+// left out of the raw statements they read back.
+function savepointStatements(
+  prisma: FakePrisma,
+): { sql: string; order: number }[] {
+  const calls = prisma.$executeRawUnsafe.mock.calls as [string][];
+  const orders = prisma.$executeRawUnsafe.mock.invocationCallOrder;
+
+  return calls
+    .map(([sql], index) => ({ sql, order: orders[index] }))
+    .filter(({ sql }) => !sql.includes('pg_advisory_xact_lock'));
+}
+
 function extractedOutcome(
   cases: ReturnType<typeof extractedCase>[],
   suite: { title: string; description: string; tags?: string[] } | null = null,
@@ -398,19 +412,17 @@ describe('ExtractionProcessor — code-change job', () => {
       promptVersion: EXTRACTION_PROMPT_VERSION,
     });
 
-    const savepointCalls = prisma.$executeRawUnsafe.mock.calls.map(
-      ([sql]: [string]) => sql,
-    );
-    expect(savepointCalls).toEqual([
+    const statements = savepointStatements(prisma);
+    expect(statements.map(({ sql }) => sql)).toEqual([
       'SAVEPOINT extraction_proposal',
       'RELEASE SAVEPOINT extraction_proposal',
     ]);
-    const savepointOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+    const savepointOrder = statements[0].order;
     const evidenceCreateOrder =
       prisma.evidence.create.mock.invocationCallOrder[0];
     const proposalCreateOrder =
       prisma.extractedProposal.create.mock.invocationCallOrder[0];
-    const releaseOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
+    const releaseOrder = statements[1].order;
     expect(savepointOrder).toBeLessThan(evidenceCreateOrder);
     expect(evidenceCreateOrder).toBeLessThan(proposalCreateOrder);
     expect(proposalCreateOrder).toBeLessThan(releaseOrder);
@@ -731,15 +743,14 @@ describe('ExtractionProcessor — code-change job', () => {
       ),
     ).toHaveLength(2);
 
-    const firstSavepointOrder =
-      prisma.$executeRawUnsafe.mock.invocationCallOrder[0];
+    const statements = savepointStatements(prisma);
+    const firstSavepointOrder = statements[0].order;
     const firstEvidenceCreateOrder =
       prisma.evidence.create.mock.invocationCallOrder[0];
     const firstProposalCreateOrder =
       prisma.extractedProposal.create.mock.invocationCallOrder[0];
-    const rollbackOrder = prisma.$executeRawUnsafe.mock.invocationCallOrder[1];
-    const releaseAfterRollbackOrder =
-      prisma.$executeRawUnsafe.mock.invocationCallOrder[2];
+    const rollbackOrder = statements[1].order;
+    const releaseAfterRollbackOrder = statements[2].order;
     const findFirstOrder =
       prisma.extractedProposal.findFirst.mock.invocationCallOrder[0];
 

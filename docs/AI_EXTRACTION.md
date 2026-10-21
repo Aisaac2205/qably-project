@@ -553,6 +553,42 @@ On PostgreSQL, catching an error raised by one statement inside an interactive `
 
 The unit suite mocks Prisma, so it cannot exercise real Postgres transaction-abort semantics; it only asserts that the writer issues `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` / `RELEASE SAVEPOINT` in the right order relative to the `Evidence` and `ExtractedProposal` calls. A Postgres integration test (real transaction, two concurrent connections racing the same natural key) is a recommended follow-up to validate the behavior against the actual database instead of a mock.
 
+### One open proposal per test case across pushes
+
+The guard above only looks inside one code change (`codeChangeId + automationKey`), so it stops a redelivery and nothing else. Every push that touches a test file runs `code-change` extraction of the whole file again, and the model paraphrases the same tests a little differently each time. Without a second rule, a byte-identical re-push opened a second proposal for every case that was still waiting in the inbox.
+
+Before it creates anything, `ExtractedProposalWriter.persistExtracted` looks for an open proposal of the same case from an **earlier** code change (`findOpenProposalsFromEarlierPushes`, one `findMany` for the whole batch):
+
+| Match | Value |
+|---|---|
+| Project | `projectId` of the job |
+| Case | `automationKey` |
+| Source file | `codeChange.filePath` equals the file being extracted |
+| State | `status = in_review` |
+
+The file is part of the match on purpose. jest keys are `"describe it"` and can repeat in two files, so project and key alone could merge two different tests.
+
+When one is found the writer refreshes it instead of creating a new proposal. It writes the same fields the redelivery guard refreshes (title, steps, expected result, priority, locale, `targetTestCaseId`, and the evidence title, URI and excerpt) and also sets `codeChangeId` to the current code change, so the newest push owns the proposal. The inbox `batch` filter follows `codeChange.batchId`, so a refreshed proposal moves to the batch of the latest push. A refresh creates nothing, so it is not counted and `proposals.created` is not published for it; see [Proposal notifications](./PROPOSAL_NOTIFICATIONS.md).
+
+What the rule leaves alone:
+
+- **Decided proposals.** `approved`, `rejected` and `changes_requested` proposals of earlier pushes are not refreshed. A later push that still extracts the case opens a new one, as before.
+- **Duplicates that already exist.** Production holds pairs of open proposals for the same case. Only the newest (by `createdAt`, then `id`) is refreshed; the others stay as they are and need a manual clean-up.
+- **The same push.** A proposal that already belongs to the current code change keeps the redelivery behaviour above and is not moved.
+- **Other sources.** `document-case` proposals have no code change and are untouched.
+
+#### Why a lock instead of a unique index
+
+Two jobs for the same file can run at the same moment (the queue runs two at once), and each would read "no open proposal" before either wrote. A unique index on `(projectId, automationKey)` would close that, but the duplicate pairs already in production would make its migration fail. So the writer takes a transaction-scoped advisory lock per case before it reads:
+
+```sql
+SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))
+```
+
+`$1` is `JSON.stringify([projectId, filePath, automationKey])`. The keys of one batch are de-duplicated and locked in sorted order, so two jobs that share keys always take them in the same order and cannot deadlock. The lock is released when the persist transaction ends. It is taken only for code-change jobs, after the credit spend and before the first proposal read. A 64-bit hash collision would only make two unrelated cases wait for each other.
+
+The unit suite mocks Prisma, so it asserts the lock statements, their order and their position before the reads; it cannot show that two real connections serialize. A Postgres integration test with two racing connections remains a recommended follow-up.
+
 ### Deduplication within a batch
 
 A single extraction can return multiple cases sharing the same `automationKey` (a model quirk, or two declarations that stringify to the same reporter name). `ExtractionProcessor` deduplicates by `automationKey` before persisting, keeping only the first occurrence.

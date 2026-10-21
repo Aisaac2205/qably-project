@@ -21,6 +21,8 @@ A batch is the set of proposals one occurrence of a source produced. The review 
 | Documenting one automated case | `documentation` | The new proposal id | A document-case job creates a single proposal. There is no batch entity, so the proposal is its own batch. |
 | Sending a chat suggestion to review | `chat` | The new proposal id | One send creates one proposal. |
 
+A push only counts the proposals it creates. When a case is still waiting in the inbox from an earlier push, the new push refreshes that proposal and moves it to its own batch instead of opening a second one (see "One open proposal per test case across pushes" in [AI extraction](./AI_EXTRACTION.md)). A push that only refreshed proposals announces nothing. The refreshed proposals show under the new batch when the inbox is filtered by it, because the batch filter follows `code_change.batchId`.
+
 Documenting a whole file or suite (`document-file`) publishes case versions directly and creates no proposal, so it raises no notification. A failed extraction that falls back to a manual-review placeholder does not raise one either: nothing is ready to review.
 
 Only a push has an ingestion batch, so only a push sets `notification.ingestionBatchId`. The column is a plain string with no foreign key and no index. For the other sources the batch id lives in the payload only.

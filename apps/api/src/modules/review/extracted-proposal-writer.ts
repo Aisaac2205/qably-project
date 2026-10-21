@@ -18,6 +18,16 @@ import type {
 
 const PROPOSAL_SAVEPOINT = 'extraction_proposal';
 
+// One lock per (project, file, key). The file is part of the key because jest
+// keys ("describe it") can repeat across files and must not serialize, or merge.
+function proposalLockKey(
+  projectId: string,
+  filePath: string,
+  automationKey: string,
+): string {
+  return JSON.stringify([projectId, filePath, automationKey]);
+}
+
 @Injectable()
 export class ExtractedProposalWriter {
   private readonly logger = new Logger(ExtractedProposalWriter.name);
@@ -62,6 +72,10 @@ export class ExtractedProposalWriter {
         if (pending !== null) return true;
       }
 
+      if (ctx.codeChangeId !== null) {
+        await this.lockProposalKeys(tx, ctx, automationKeys);
+      }
+
       const suiteId =
         ctx.knownSuiteId ??
         (await this.resolveSuiteId(tx, ctx.projectId, ctx.filePath));
@@ -77,6 +91,16 @@ export class ExtractedProposalWriter {
           ? new Map<string, ExistingProposal>()
           : await this.findExistingProposalsByKey(
               tx,
+              ctx.codeChangeId,
+              automationKeys,
+            );
+
+      const openProposalByKey =
+        ctx.codeChangeId === null
+          ? new Map<string, ExistingProposal>()
+          : await this.findOpenProposalsFromEarlierPushes(
+              tx,
+              ctx,
               ctx.codeChangeId,
               automationKeys,
             );
@@ -112,11 +136,32 @@ export class ExtractedProposalWriter {
         };
 
         if (ctx.codeChangeId !== null) {
+          const inThisChange = existingProposalByKey.get(
+            testCase.automationKey,
+          );
+          const fromEarlierPush =
+            inThisChange === undefined
+              ? openProposalByKey.get(testCase.automationKey)
+              : undefined;
+
+          if (fromEarlierPush !== undefined) {
+            await this.carryOverOpenProposal(
+              tx,
+              ctx,
+              testCase,
+              fromEarlierPush,
+              matchedCaseId,
+              uri,
+              shared,
+            );
+            continue;
+          }
+
           const created = await this.upsertCodeChangeProposal(
             tx,
             ctx,
             testCase,
-            existingProposalByKey.get(testCase.automationKey) ?? null,
+            inThisChange ?? null,
             matchedCaseId,
             uri,
             shared,
@@ -282,6 +327,98 @@ export class ExtractedProposalWriter {
     );
   }
 
+  /**
+   * Serializes concurrent writers of the same test case. Two pushes that touch
+   * one file run two jobs that would each read "no open proposal" and each
+   * create one, and no unique index can stop that: production already holds
+   * duplicate pairs, so the index would not build.
+   *
+   * The lock lives for the rest of the transaction. Keys are taken in sorted
+   * order, so two jobs that share keys can never wait on each other in a cycle.
+   * Postgres hashes each key to 64 bits; a collision only makes two unrelated
+   * cases wait for one another.
+   */
+  private async lockProposalKeys(
+    tx: TxClient,
+    ctx: JobContext,
+    automationKeys: readonly string[],
+  ): Promise<void> {
+    const lockKeys = [
+      ...new Set(
+        automationKeys.map((automationKey) =>
+          proposalLockKey(ctx.projectId, ctx.filePath, automationKey),
+        ),
+      ),
+    ].sort();
+
+    for (const lockKey of lockKeys) {
+      await tx.$executeRawUnsafe(
+        'SELECT pg_advisory_xact_lock(hashtextextended($1::text, 0))',
+        lockKey,
+      );
+    }
+  }
+
+  /**
+   * The newest proposal still in review for each key, from any earlier code
+   * change of the same project and source file. When duplicates exist the older
+   * ones are not returned, so they stay as they are for the owner to clean up.
+   */
+  async findOpenProposalsFromEarlierPushes(
+    tx: TxClient,
+    ctx: JobContext,
+    codeChangeId: string,
+    automationKeys: readonly string[],
+  ): Promise<Map<string, ExistingProposal>> {
+    const rows = (await tx.extractedProposal.findMany({
+      where: {
+        projectId: ctx.projectId,
+        automationKey: { in: [...automationKeys] },
+        status: 'in_review',
+        codeChangeId: { not: codeChangeId },
+        codeChange: { filePath: ctx.filePath },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { id: true, status: true, evidenceId: true, automationKey: true },
+    })) as (ExistingProposal & { automationKey: string | null })[];
+
+    const newestByKey = new Map<string, ExistingProposal>();
+    for (const row of rows) {
+      if (row.automationKey === null || newestByKey.has(row.automationKey)) {
+        continue;
+      }
+      newestByKey.set(row.automationKey, row);
+    }
+
+    return newestByKey;
+  }
+
+  /**
+   * Refreshes the open proposal of an earlier push and hands it to this code
+   * change, so the newest push owns it (the inbox batch filter follows
+   * `codeChange.batchId`). Nothing is created, so nothing is announced.
+   */
+  async carryOverOpenProposal(
+    tx: TxClient,
+    ctx: JobContext,
+    testCase: ExtractedCase,
+    existing: ExistingProposal,
+    matchedCaseId: string | null,
+    uri: string,
+    shared: SharedProposalFields,
+  ): Promise<void> {
+    await this.refreshOpenProposal(
+      tx,
+      ctx,
+      testCase,
+      existing,
+      matchedCaseId,
+      uri,
+      shared,
+      { codeChangeId: ctx.codeChangeId },
+    );
+  }
+
   async upsertCodeChangeProposal(
     tx: TxClient,
     ctx: JobContext,
@@ -375,6 +512,28 @@ export class ExtractedProposalWriter {
       return;
     }
 
+    await this.refreshOpenProposal(
+      tx,
+      ctx,
+      testCase,
+      existing,
+      matchedCaseId,
+      uri,
+      shared,
+      {},
+    );
+  }
+
+  private async refreshOpenProposal(
+    tx: TxClient,
+    ctx: JobContext,
+    testCase: ExtractedCase,
+    existing: ExistingProposal,
+    matchedCaseId: string | null,
+    uri: string,
+    shared: SharedProposalFields,
+    ownership: { codeChangeId?: string | null },
+  ): Promise<void> {
     await tx.evidence.update({
       where: { id: existing.evidenceId },
       data: { title: ctx.filePath, uri, excerpt: testCase.sourceExcerpt },
@@ -382,7 +541,7 @@ export class ExtractedProposalWriter {
 
     await tx.extractedProposal.update({
       where: { id: existing.id },
-      data: { ...shared, targetTestCaseId: matchedCaseId },
+      data: { ...shared, targetTestCaseId: matchedCaseId, ...ownership },
     });
   }
 
